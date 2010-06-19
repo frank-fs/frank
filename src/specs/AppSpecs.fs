@@ -18,7 +18,7 @@ let head (app:Environment -> int * Map<string,string> * seq<string>) =
 [<Scenario>]
 let ``When running an app that just returns pre-defined values, those values should be returned.``() =
   let ``running an app with predefined values`` (env:Environment) =
-    printMethod "200, text/plain and 5, Howdy"
+    printMethod "200, type = text/plain and length = 5, Howdy"
     app env
   Given env
   |> When ``running an app with predefined values``
@@ -34,14 +34,12 @@ let ``running a middleware for a `` (m:string) (env:Environment) =
 let ``When running a middleware on an app handling a GET request, the body should be left alone.``() =
   Given env
   |> When ``running a middleware for a `` "GET"
-  |> It should have (fun result -> let st, hd, bd = result
-                                   bd = body)
+  |> It should have (fun result -> match result with _, _, bd -> bd = body)
   |> Verify
 
 [<Scenario>]
-let ``When running a middleware on an app handling a HEAD request, the body should be left alone.``() =
+let ``When running a middleware on an app handling a HEAD request, the body should be empty.``() =
   Given env
   |> When ``running a middleware for a `` "HEAD"
-  |> It should have (fun result -> let st, hd, bd = result
-                                   bd = Seq.empty)
+  |> It should have (fun result -> match result with _, _, bd -> bd = Seq.empty)
   |> Verify
