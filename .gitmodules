@@ -1,3 +1,0 @@
-[submodule "src/frack"]
-	path = src/frack
-	url = https://github.com/frack/frack.git
