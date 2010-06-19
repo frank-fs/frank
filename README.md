@@ -14,7 +14,7 @@ Usage
 ============
 
     // NOTE: This will be changing as more functionality is added!
-    // Wrap the context into an env. An extension is available for [HttpListenerContext](http://msdn.microsoft.com/en-us/library/system.net.httplistenercontext.aspx), as well.
+    // Wrap the context into an env. An extension is available for HttpListenerContext.
     // errors is a StringBuilder that captures errors from 
     let errors, env = context |> Env.create << HttpContextWrapper.createFromHttpContext
 
