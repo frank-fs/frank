@@ -33,13 +33,13 @@ let ``running a middleware for a`` (m:string) (env:Environment) =
 [<Scenario>]
 let ``When running a middleware on an app handling a GET request, the body should be left alone.``() =
   Given env
-  |> When ``running a middleware for a `` "GET"
+  |> When ``running a middleware for a`` "GET"
   |> It should have (fun result -> match result with _, _, bd -> bd = body)
   |> Verify
 
 [<Scenario>]
 let ``When running a middleware on an app handling a HEAD request, the body should be empty.``() =
   Given env
-  |> When ``running a middleware for a `` "HEAD"
+  |> When ``running a middleware for a`` "HEAD"
   |> It should have (fun result -> match result with _, _, bd -> bd = Seq.empty)
   |> Verify
