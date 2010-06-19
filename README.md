@@ -24,7 +24,7 @@ Usage
 
     > let head (app:Environment -> int * Map<string,string> * seq<string>) =
     >   fun env -> let status, hdrs, body = app env
-    >              if env.HEADERS.["REQUEST_METHOD"] = "HEAD" then
+    >              if env.HTTP_METHOD = "HEAD" then
     >                ( status, hdrs, Seq.empty )
     >              else
     >                ( status, hdrs, body )
