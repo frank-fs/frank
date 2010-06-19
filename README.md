@@ -13,19 +13,19 @@ Goals
 Usage
 ============
 
-> // NOTE: This will be changing as more functionality is added!
-> // Wrap the context into an env. An extension is available for [HttpListenerContext](http://msdn.microsoft.com/en-us/library/system.net.httplistenercontext.aspx), as well.
-> // errors is a StringBuilder that captures errors from 
-> let errors, env = context |> Env.create << HttpContextWrapper.createFromHttpContext
->
-> // Define an app
-> let process env =
->   ( 200,
->     Map.ofList [("Content-Type","text/plain");("Content-Length","5")],
->     seq { "Howdy" })
->
-> // Run the app
-> process env
+    // NOTE: This will be changing as more functionality is added!
+    // Wrap the context into an env. An extension is available for [HttpListenerContext](http://msdn.microsoft.com/en-us/library/system.net.httplistenercontext.aspx), as well.
+    // errors is a StringBuilder that captures errors from 
+    let errors, env = context |> Env.create << HttpContextWrapper.createFromHttpContext
+
+    // Define an app
+    let process env =
+      ( 200,
+        Map.ofList [("Content-Type","text/plain");("Content-Length","5")],
+        seq { "Howdy" })
+
+    // Run the app
+    process env
 
 Team
 ============
