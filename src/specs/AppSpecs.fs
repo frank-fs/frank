@@ -25,7 +25,7 @@ let ``When running an app that just returns pre-defined values, those values sh
   |> It should equal ( 200, Map.ofList [("Content_Type","text/plain");("Content_Length","5")], body )
   |> Verify
 
-let ``running a middleware for a `` (m:string) (env:Environment) =
+let ``running a middleware for a`` (m:string) (env:Environment) =
   printMethod m
   let e = { env with HTTP_METHOD = m }
   head app e

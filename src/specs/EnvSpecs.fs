@@ -6,7 +6,7 @@ open Frack.Specs.Fakes
 open NaturalSpec
 
 let ``creating the environment`` (ctx:HttpContextBase) =
-  printMethod "creating the environment"
+  printMethod ""
   Env.create ctx
 
 [<Scenario>]
@@ -17,7 +17,7 @@ let ``When reading in a context, it should return an environment``() =
   |> Verify
   
 let ``getting path parts`` (path:string) =
-  printMethod "getting path parts"
+  printMethod ""
   Env.getPathParts path
 
 [<Scenario>]

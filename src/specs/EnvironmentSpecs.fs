@@ -6,19 +6,17 @@ open NaturalSpec
 let errors, env = Env.create context
 
 let ``an entry for`` (key:string) (col:Map<string,string>) =
-  let msg = "an entry for " + key
-  printMethod msg
+  printMethod key
   col.ContainsKey(key)
 
 let ``with value of`` expected key (col:Map<string,string>) =
-  let msg = "a value of " + expected + " for " + key
-  printMethod msg
+  printMethod (expected + "for" + key)
   col.[key] = expected
 
 [<Scenario>]
 let ``When given an environment, it should provide the http method``() =
   let ``retrieving the http method`` (env:Environment) =
-    printMethod "http method"
+    printMethod ""
     env.HTTP_METHOD
   Given env
   |> When ``retrieving the http method``
@@ -28,7 +26,7 @@ let ``When given an environment, it should provide the http method``() =
 [<Scenario>]
 let ``When given an environment, it should provide the url scheme``() =
   let ``retrieving the url scheme`` (env:Environment) =
-    printMethod "url scheme"
+    printMethod ""
     env.UrlScheme
   Given env
   |> When ``retrieving the url scheme``
@@ -38,7 +36,7 @@ let ``When given an environment, it should provide the url scheme``() =
 [<Scenario>]
 let ``When given an environment, it should provide the content type``() =
   let ``retrieving the content type`` (env:Environment) =
-    printMethod "content type"
+    printMethod ""
     env.CONTENT_TYPE
   Given env
   |> When ``retrieving the content type``
@@ -48,7 +46,7 @@ let ``When given an environment, it should provide the content type``() =
 [<Scenario>]
 let ``When given an environment, it should provide the content length``() =
   let ``retrieving the content length`` (env:Environment) =
-    printMethod "content length"
+    printMethod ""
     env.CONTENT_LENGTH
   Given env
   |> When ``retrieving the content length``
@@ -58,7 +56,7 @@ let ``When given an environment, it should provide the content length``() =
 [<Scenario>]
 let ``When given an environment, it should provide the server name``() =
   let ``retrieving the server name`` (env:Environment) =
-    printMethod "server name"
+    printMethod ""
     env.SERVER_NAME
   Given env
   |> When ``retrieving the server name``
@@ -68,7 +66,7 @@ let ``When given an environment, it should provide the server name``() =
 [<Scenario>]
 let ``When given an environment, it should provide the port``() =
   let ``retrieving the port`` (env:Environment) =
-    printMethod "port"
+    printMethod ""
     env.SERVER_PORT
   Given env
   |> When ``retrieving the port``
@@ -78,7 +76,7 @@ let ``When given an environment, it should provide the port``() =
 [<Scenario>]
 let ``When given an environment, it should provide the script name``() =
   let ``retrieving the script name`` (env:Environment) =
-    printMethod "script name"
+    printMethod ""
     env.SCRIPT_NAME
   Given env
   |> When ``retrieving the script name``
@@ -88,7 +86,7 @@ let ``When given an environment, it should provide the script name``() =
 [<Scenario>]
 let ``When given an environment, it should provide the path info``() =
   let ``retrieving the path info`` (env:Environment) =
-    printMethod "path info"
+    printMethod ""
     env.PATH_INFO
   Given env
   |> When ``retrieving the path info``
@@ -98,7 +96,7 @@ let ``When given an environment, it should provide the path info``() =
 [<Scenario>]
 let ``When given an environment, it should provide the stringified query string``() =
   let ``retrieving the query string`` (env:Environment) =
-    printMethod "stringified query string"
+    printMethod ""
     env.QUERY_STRING
   Given env
   |> When ``retrieving the query string``
@@ -108,7 +106,7 @@ let ``When given an environment, it should provide the stringified query string`
 [<Scenario>]
 let ``When given an environment, it should provide the query string``() =
   let ``retrieving the query string`` (env:Environment) =
-    printMethod "query string"
+    printMethod ""
     env.QueryString
   Given env
   |> When ``retrieving the query string``
@@ -121,7 +119,7 @@ let ``When given an environment, it should provide the query string``() =
 [<Scenario>]
 let ``When given an environment, it should provide the headers``() =
   let ``retrieving the headers`` (env:Environment) =
-    printMethod "headers"
+    printMethod ""
     env.HEADERS
   Given env
   |> When ``retrieving the headers``
@@ -132,7 +130,7 @@ let ``When given an environment, it should provide the headers``() =
 [<Scenario>]
 let ``When given an environment, it should provide a version of 0.1``() =
   let ``retrieving the version`` (env:Environment) =
-    printMethod "version"
+    printMethod ""
     env.Version
   Given env
   |> When ``retrieving the version``
