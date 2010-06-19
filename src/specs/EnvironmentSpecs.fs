@@ -42,7 +42,7 @@ let ``When given an environment, it should provide the content type``() =
     env.CONTENT_TYPE
   Given env
   |> When ``retrieving the content type``
-  |> It should equal "text/html"
+  |> It should equal "text/plain"
   |> Verify
 
 [<Scenario>]

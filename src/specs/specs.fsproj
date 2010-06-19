@@ -50,6 +50,7 @@
     <Compile Include="Fakes.fs" />
     <Compile Include="EnvSpecs.fs" />
     <Compile Include="EnvironmentSpecs.fs" />
+    <Compile Include="AppSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\frack\frack.fsproj">
