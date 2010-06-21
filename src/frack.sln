@@ -5,12 +5,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "frack\frack.fsproj
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "specs", "specs\specs.fsproj", "{3E066CB1-A93A-4552-A786-6163C173B19B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "lib", "lib", "{4384C534-8C35-4E43-8E1F-EE1223BDF187}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ConsoleHttpListener", "..\samples\ConsoleHttpListener\ConsoleHttpListener.fsproj", "{4C00385D-C2D6-4603-870F-B25D39ADA2A1}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{B87D3EDA-9376-42C3-8D23-61681266A760}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,21 +35,8 @@ Global
 		{3E066CB1-A93A-4552-A786-6163C173B19B}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{3E066CB1-A93A-4552-A786-6163C173B19B}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{3E066CB1-A93A-4552-A786-6163C173B19B}.Release|x86.ActiveCfg = Release|Any CPU
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Debug|Any CPU.ActiveCfg = Debug|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Debug|Mixed Platforms.Build.0 = Debug|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Debug|x86.ActiveCfg = Debug|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Debug|x86.Build.0 = Debug|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Release|Any CPU.ActiveCfg = Release|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Release|Mixed Platforms.ActiveCfg = Release|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Release|Mixed Platforms.Build.0 = Release|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Release|x86.ActiveCfg = Release|x86
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{4C00385D-C2D6-4603-870F-B25D39ADA2A1} = {B87D3EDA-9376-42C3-8D23-61681266A760}
 	EndGlobalSection
 EndGlobal

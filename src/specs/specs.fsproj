@@ -11,8 +11,9 @@
     <AssemblyName>specs</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>specs</Name>
-    <TargetFrameworkVersion />
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FscToolPath>..\..\tools\FSharp\</FscToolPath>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,15 +37,14 @@
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\tools\FSharp\FSharp.Core.dll</HintPath>
-      <Private>True</Private>
     </Reference>
+    <Reference Include="mscorlib" />
     <Reference Include="NaturalSpec">
       <HintPath>..\..\tools\NaturalSpec\NaturalSpec.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
-    <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Web" />

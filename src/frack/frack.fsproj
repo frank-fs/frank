@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>frack</RootNamespace>
     <AssemblyName>frack</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <Name>frack</Name>
     <TargetFrameworkProfile />
     <FscToolPath>..\..\tools\FSharp\</FscToolPath>
