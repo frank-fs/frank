@@ -16,20 +16,20 @@ Usage
 ### Define an app
     
     > let app (env:Environment) =
-    >   ( 200, Map.ofList [("Content-Type","text/plain");("Content-Length","5")], seq { yield "Howdy" } )
+    >   ( 200, dict[("Content-Type","text/plain");("Content-Length","5")], seq { yield "Howdy" } )
     
-    val app : Environment -> int * Map<string,string> * seq<string>
+    val app : Environment -> int * IDictionary<string,string> * seq<string>
 
 ### Define a middleware
 
-    > let head (app:Environment -> int * Map<string,string> * seq<string>) =
+    > let head (app:Environment -> int * IDictionary<string,string> * seq<string>) =
     >   fun env -> let status, hdrs, body = app env
     >              if env.HTTP_METHOD = "HEAD" then
     >                ( status, hdrs, Seq.empty )
     >              else
     >                ( status, hdrs, body )
 
-    val head : (Environment -> int * Map<string,string> * seq<string>) -> Environment -> int * Map<string,string> * seq<string>
+    val head : (Environment -> int * IDictionary<string,string> * seq<string>) -> Environment -> int * IDictionary<string,string> * seq<string>
 
 Team
 ============
