@@ -35,6 +35,15 @@ Takes an app and returns an app.
 
     val head : (Environment -> int * IDictionary<string,string> * seq<string>) -> Environment -> int * IDictionary<string,string> * seq<string>
 
+### Add middlewares to an app.
+
+    > let myApp = app
+    >               |> head
+    >               |> auth
+    >               |> logging
+    
+    val myApp : Environment -> int * IDictionary<string,string> * seq<string>
+
 Team
 ============
 * Ryan Riley (@panesofglass)
