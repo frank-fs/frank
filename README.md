@@ -14,6 +14,8 @@ Usage
 ============
 
 ### Define an app
+
+Takes an environment and returns a triple of status code, headers, and body.
     
     > let app (env:Environment) =
     >   ( 200, dict[("Content-Type","text/plain");("Content-Length","5")], seq { yield "Howdy" } )
@@ -21,6 +23,8 @@ Usage
     val app : Environment -> int * IDictionary<string,string> * seq<string>
 
 ### Define a middleware
+
+Takes an app and returns an app.
 
     > let head (app:Environment -> int * IDictionary<string,string> * seq<string>) =
     >   fun env -> let status, hdrs, body = app env
