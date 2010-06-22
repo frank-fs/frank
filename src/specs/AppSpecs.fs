@@ -4,9 +4,9 @@ open Frack.Specs
 open NaturalSpec
 
 let errors, env = Env.create Fakes.context
+let hdrs = Map.ofList [("Content_Type","text/plain");("Content_Length","5")] 
 let body = seq { yield "Howdy" } 
-let app (env:Environment) =
-  ( 200, Map.ofList [("Content_Type","text/plain");("Content_Length","5")], body )
+let app (env:Environment) = ( 200, hdrs, body )
 
 let head (app:Environment -> int * Map<string,string> * seq<string>) =
   fun env -> let status, hdrs, body = app env
@@ -22,7 +22,7 @@ let ``When running an app that just returns pre-defined values, those values sh
     app env
   Given env
   |> When ``running an app with predefined values``
-  |> It should equal ( 200, Map.ofList [("Content_Type","text/plain");("Content_Length","5")], body )
+  |> It should equal ( 200, hdrs, body )
   |> Verify
 
 let ``running a middleware for a`` (m:string) (env:Environment) =

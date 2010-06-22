@@ -44,7 +44,7 @@
     <Reference Include="System.Web.Abstractions" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Map.fs" />
+    <Compile Include="NameValueCollectionEx.fs" />
     <Compile Include="HttpContextWrapper.fs" />
     <Compile Include="Environment.fs" />
     <Compile Include="Env.fs" />
