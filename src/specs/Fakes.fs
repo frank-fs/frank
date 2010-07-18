@@ -14,15 +14,13 @@ module Fakes =
     
   let mutable headers = new NameValueCollection()
   headers.Add("HTTP_TEST", "value")
-  headers.Add("Content_Type", "text/plain")
-  headers.Add("Content_Length", "5")
   headers.Add("REQUEST_METHOD", "GET")
   
-  let context =
+  let createContext m =
     { new HttpContextBase() with
         override this.Request =
           { new HttpRequestBase() with
-              override this.HttpMethod = "GET"
+              override this.HttpMethod = m
               override this.Url = url
               override this.QueryString = queryString
               override this.Headers = headers
