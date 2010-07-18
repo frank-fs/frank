@@ -17,23 +17,25 @@ Usage
 
 Takes an environment and returns a triple of status code, headers, and body.
     
-    > let app (env:Environment) =
-    >   ( 200, Map.ofList [("Content-Type","text/plain");("Content-Length","5")], seq { yield "Howdy" } )
+    > let app env =
+    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } )
     
-    val app : Environment -> int * Map<string,string> * seq<string>
+    val app : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
 ### Define a middleware
 
 Takes an app and returns an app.
 
-    > let head (app:Environment -> int * Map<string,string> * seq<string>) =
-    >   fun env -> let status, hdrs, body = app env
-    >              if env.HTTP_METHOD = "HEAD" then
-    >                ( status, hdrs, Seq.empty )
-    >              else
-    >                ( status, hdrs, body )
+    > open Frack.Utility
+    > let head app =
+    >   fun (env:IDictionary<string,Value> ->
+    >     let status, hdrs, body = app env
+    >     if env?HTTP_METHOD = "HEAD" then
+    >       ( status, hdrs, Seq.empty )
+    >     else
+    >       ( status, hdrs, body )
 
-    val head : (Environment -> int * Map<string,string> * seq<string>) -> Environment -> int * Map<string,string> * seq<string>
+    val head : (IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>) -> IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
 ### Add middlewares to an app.
 
@@ -42,7 +44,7 @@ Takes an app and returns an app.
     >               |> auth
     >               |> logging
     
-    val myApp : Environment -> int * Map<string,string> * seq<string>
+    val myApp : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
 Team
 ============
