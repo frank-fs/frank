@@ -27,13 +27,10 @@ Takes an environment and returns a triple of status code, headers, and body.
 Takes an app and returns an app.
 
     > open Frack.Utility
-    > let head app =
-    >   fun (env:IDictionary<string,Value> ->
-    >     let status, hdrs, body = app env
-    >     if env?HTTP_METHOD = "HEAD" then
-    >       ( status, hdrs, Seq.empty )
-    >     else
-    >       ( status, hdrs, body )
+    > fun env -> let status, hdrs, body = app env
+    >        match env?HTTP_METHOD with
+    >          | Str "HEAD" -> ( status, hdrs, Seq.empty )
+    >          | _ -> ( status, hdrs, body )
 
     val head : (IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>) -> IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
