@@ -15,7 +15,7 @@ module Middleware =
                                      | Hash(v) -> v.ToString()
                                      | Err(v) -> v.ToString()
                                      | Inp(v) -> v.ToString()
-                                     | Ver(maj, min) -> maj.ToString() + "." + min.ToString()
+                                     | Ver(v) -> v.[0].ToString() + "." + v.[1].ToString()
                                      | Obj(v) -> v.ToString()
                          yield key + ": " + value }
       let bd = seq { yield! body; yield! vars }

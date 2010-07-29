@@ -9,10 +9,11 @@ type Value =
   | Hash of System.Collections.Generic.IDictionary<string, Value>
   | Err of TextWriter
   | Inp of TextReader
-  | Ver of int * int
+  | Ver of int array
   | Obj of obj
 
 /// Defines a set of convenience methods for HttpContexts and NameValueCollections.
+[<AutoOpen>]
 module Extensions =
   open System.Collections.Specialized
   open System.Net
@@ -54,6 +55,8 @@ module Extensions =
   type HttpListenerContext with
     member this.ToContextBase() = createFromHttpListenerContext(this)
 
+/// Frack environment methods.
+[<AutoOpen>]
 module Env =
   open System.Collections
   open System.Text
@@ -82,5 +85,5 @@ module Env =
           yield ("url_scheme", Str ctx.Request.Url.Scheme)
           yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
           yield ("input", Inp (TextReader.Synchronized(new StreamReader(ctx.Request.InputStream))))
-          yield ("version", Ver (0,1) )
+          yield ("version", Ver [|0;1|] )
         } |> dict

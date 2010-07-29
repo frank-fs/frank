@@ -1,5 +1,7 @@
 ﻿#nowarn "77"
 namespace Frack
+/// Utility methods for Frack.
+[<AutoOpen>]
 module Utility =
   /// Dynamic indexer lookups.
   /// <see href="http://codebetter.com/blogs/matthew.podwysocki/archive/2010/02/05/using-and-abusing-the-f-dynamic-lookup-operator.aspx" />
