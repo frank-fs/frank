@@ -5,7 +5,6 @@ open System.Text
 open System.Web
 open Frack
 open Frack.Specs.Fakes
-open Frack.Utility
 open NaturalSpec
 
 let errors = StringBuilder()
@@ -86,7 +85,7 @@ let ``When given an environment, it should provide a version of 0.1``() =
     env?version
   Given env
   |> When ``retrieving the version``
-  |> It should equal (Ver (0,1))
+  |> It should equal (Ver [|0;1|])
   |> Verify
   
 let ``getting path parts`` (path:string) =

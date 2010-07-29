@@ -2,7 +2,6 @@
 open System.Text
 open Frack
 open Frack.Specs.Fakes
-open Frack.Utility
 open NaturalSpec
 
 let getEnv m = Env.createEnvironment (createContext m) (StringBuilder())
@@ -17,7 +16,7 @@ let head app =
                | _ -> ( status, hdrs, body )
 
 [<Scenario>]
-let ``When running an app that just returns pre-defined values, those values should be returned.``() =
+let ``When running an app that just returns pre-defined values, those values should be returned.``() =
   let ``running an app with predefined values`` env =
     printMethod "200, type = text/plain and length = 5, Howdy"
     app env
