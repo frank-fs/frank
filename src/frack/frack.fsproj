@@ -12,7 +12,7 @@
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <Name>frack</Name>
     <TargetFrameworkProfile />
-    <FscToolPath>..\..\tools\FSharp\</FscToolPath>
+    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -35,7 +35,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
-      <HintPath>..\..\tools\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
@@ -48,7 +48,7 @@
     <Compile Include="Utility.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
-  <Import Project="..\..\tools\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
 	<Target Name="BeforeBuild">
