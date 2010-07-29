@@ -36,10 +36,7 @@ Takes an app and returns an app.
 
 ### Add middlewares to an app.
 
-    > let myApp = app
-    >               |> head
-    >               |> auth
-    >               |> logging
+    > let myApp = app >> head >> auth >> logging
     
     val myApp : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
