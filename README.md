@@ -9,6 +9,7 @@ Goals
 1. Provide a simple, to-the-metal framework for quickly building web applications without a lot of hassle. Frack will run on top of [ASP.NET](http://asp.net/) or [System.Net.HttpListener](http://msdn.microsoft.com/en-us/library/system.net.httplistener.aspx).
 2. Provide a similar interface to those already available on other platforms for easier interoperability with those platforms/applications.
 3. Provide a means of using Frack apps as middlewares for other multi-tier applications, similar to [Rack middleware](http://tekpub.com/production/rack).
+4. Allow easy deployment on a range of servers: IIS via ASP.NET, [Kayak](http://kayakhttp.com), etc.
 
 Usage
 ============
