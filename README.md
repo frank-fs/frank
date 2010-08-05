@@ -40,6 +40,10 @@ Takes an app and returns an app.
     
     val myApp : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
 
+Other
+============
+If this interests you, please also check out [Frank](http://bitbucket.org/riles01/frank). It's a work in progress, atm; not much to see. It'll soon move to http://github.com/panesofglass/frank.
+
 Team
 ============
 * Ryan Riley (@panesofglass)
