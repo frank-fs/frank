@@ -1,22 +1,30 @@
 #I "tools/FAKE"
 #r "FakeLib.dll"
 open Fake 
+open Fake.MSBuild
 
 (* properties *)
 let projectName = "frack"
 let version = "0.1"  
+
+(* Directories *)
 let buildDir = "./build/"
 let docsDir = "./docs/" 
 let deployDir = "./deploy/"
 let testDir = "./test/"
+
+(* Tools *)
 let nunitPath = "./tools/Nunit"
 let nunitOutput = testDir + "TestResults.xml"
 let zipFileName = deployDir + sprintf "%s-%s.zip" projectName version
 
 (* files *)
-let appReferences  = !+ "src/frack/**/*.*proj" |> Scan
-let testReferences = !+ "src/specs/**/*.*proj" |> Scan
-let testDlls = !+ (buildDir + "specs.dll") |> Scan
+let appReferences =
+    !+ @"src\**\*.csproj" 
+      ++ @"src\**\*.fsproj"
+      -- "**\*_Spliced*" 
+        |> Scan
+
 let filesToZip =
   !+ (buildDir + "/**/*.*")     
       -- "*.zip"
@@ -37,21 +45,23 @@ Target? BuildApp <-
                  AssemblyTitle = "frack";
                  AssemblyDescription = "An implementation of NWSGI (.NET Web Server Gateway Interface) written in F#.";
                  Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996";
-                 OutputFileName = "./src/frack/AssemblyInfo.fs"})                      
+                 OutputFileName = "./src/AssemblyInfo.fs"})                      
 
         appReferences
+          |> Seq.map (RemoveTestsFromProject AllNUnitReferences AllSpecAndTestDataFiles)
           |> MSBuildRelease buildDir "Build"
           |> Log "AppBuild-Output: "
 
 Target? BuildTest <-
     fun _ -> 
-        testReferences
+        appReferences
           |> MSBuildDebug buildDir "Build"
           |> Log "TestBuild-Output: "
 
 Target? Test <-
     fun _ ->
-        testDlls
+        !+ (testDir + "/*.dll")
+          |> Scan
           |> NUnit (fun p -> 
                       {p with 
                          ToolPath = nunitPath; 
@@ -60,12 +70,13 @@ Target? Test <-
 
 Target? GenerateDocumentation <-
     fun _ ->
-        Docu (fun p ->
+      !+ (buildDir + "frack.dll")      
+        |> Scan
+        |> Docu (fun p ->
             {p with
                ToolPath = "./tools/FAKE/docu.exe"
                TemplatesPath = "./tools/FAKE/templates"
                OutputPath = docsDir })
-            (buildDir + "frack.dll")      
 
 Target? BuildZip <-
     fun _ -> Zip buildDir zipFileName filesToZip
