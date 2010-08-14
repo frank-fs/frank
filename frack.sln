@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\core\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack.aspnet", "src\aspnet\frack.aspnet.fsproj", "{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,6 +25,16 @@ Global
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|x86.ActiveCfg = Release|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{BAA877B9-B5D3-4547-9FDE-44953F6BEEAA}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
