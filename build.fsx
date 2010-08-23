@@ -55,7 +55,7 @@ Target? BuildApp <-
 Target? BuildTest <-
     fun _ -> 
         appReferences
-          |> MSBuildDebug buildDir "Build"
+          |> MSBuildDebug testDir "Build"
           |> Log "TestBuild-Output: "
 
 Target? Test <-
