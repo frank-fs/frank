@@ -13,6 +13,15 @@ Hook up myApp to a Frack workflow:
     > ])
     > run myApp env
 
+Todo / Design decisions
+============
+1. Are discriminated unions really best, or should we go with plain objects?
+2. Should routing filters be stored in a lookup dictionary to find the appropriate handler?
+3. Apply a better pattern match to path filters.
+4. Create a params hash from the incoming request.
+5. Is model binding a good idea or should that be another layer? 
+6. Samples
+
 Team
 ============
 * Ryan Riley (@panesofglass)
