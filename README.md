@@ -5,13 +5,13 @@ Frank is a simple, domain specific language for writing web applications on top 
 Usage
 ============
 
-Sinatra-like syntax helpers:
+Hook up myApp to a Frack workflow:
 
-> let myApp = FrankApp([
->   get "/" (fun () -> "Hello world!")
->   post "/order" (fun order -> createOrder(order))
-> ])
-> run myApp env // The env would be provided from Frack.
+    > let myApp = FrankApp([
+    >   get "/" (fun () -> "Hello world!")
+    >   post "/order" (fun order -> createOrder(order))
+    > ])
+    > run myApp env
 
 Team
 ============

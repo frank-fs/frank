@@ -17,9 +17,6 @@ type Map(filter, handler) =
   interface IFrankHandler with
     member this.Call(env) = if filter(env) then Value(handler(env)) else None
 
-/// Function to create a map in a more readable format.      
-let map filter handler = Map(filter, handler) :> IFrankHandler
-
 /// Defines the standard Frank application type.
 type FrankApp(handlers: seq<IFrankHandler>) =
   interface IFrankHandler with
@@ -28,20 +25,28 @@ type FrankApp(handlers: seq<IFrankHandler>) =
                             |> Seq.filter (fun r -> not (r = None))
                             |> Seq.head
 
-/// Creates a filter that constrains by the HTTP method. If the method is a POST, it also checks for X_HTTP_METHOD_OVERRIDE.
+let private read value = match value with | Str(x) -> x | _ -> ""
+
+/// Creates a path that constrains by the HTTP method. If the method is a POST, it also checks for X_HTTP_METHOD_OVERRIDE.
 let private methodFilter m (env: IDictionary<string, Value>) =
-  let read value = match value with | Str(x) -> x | _ -> ""
   let httpMethod = read env?HTTP_METHOD
   if httpMethod = "POST" && env.ContainsKey("X_HTTP_METHOD_OVERRIDE") then m = read env?X_HTTP_METHOD_OVERRIDE
   else m = httpMethod
 
+let private matchPath path (env: IDictionary<string, Value>) =
+  path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
+
+/// Function to create a map in a more readable format.      
+let map path handler = Map((fun e -> matchPath path e), handler) :> IFrankHandler
+
 // TODO: What's a better way to compose predicates?
-let get filter handler = map (fun e -> methodFilter "GET" e && filter e) handler
-let head filter handler = map (fun e -> methodFilter "HEAD" e && filter e) handler
-let post filter handler = map (fun e -> methodFilter "POST" e && filter e) handler
-let put filter handler = map (fun e -> methodFilter "PUT" e && filter e) handler
-let delete filter handler = map (fun e -> methodFilter "DELETE" e && filter e) handler
-let options filter handler = map (fun e -> methodFilter "OPTIONS" e && filter e) handler
+// Should filters go into a route table, or is this the best approach?
+let get path handler = Map((fun e -> methodFilter "GET" e && matchPath path e), handler) :> IFrankHandler
+let head path handler = Map((fun e -> methodFilter "HEAD" e && path e), handler) :> IFrankHandler
+let post path handler = Map((fun e -> methodFilter "POST" e && path e), handler) :> IFrankHandler
+let put path handler = Map((fun e -> methodFilter "PUT" e && path e), handler) :> IFrankHandler
+let delete path handler = Map((fun e -> methodFilter "DELETE" e && path e), handler) :> IFrankHandler
+let options path handler = Map((fun e -> methodFilter "OPTIONS" e && path e), handler) :> IFrankHandler
 
 /// Runs the app and returns a Frack response.
 let run (app: IFrankHandler) (env: IDictionary<string, Value>) =
