@@ -11,7 +11,7 @@ Hook up myApp to a Frack workflow:
     >   get "/" (fun _ -> "Hello world!")
     >   post "/order" (fun params -> createOrder(params))
     > ])
-    > run myApp env
+    > let frackApp = (run myApp)
 
 Todo / Design decisions
 ============
