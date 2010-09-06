@@ -8,8 +8,8 @@ Usage
 Hook up myApp to a Frack workflow:
 
     > let myApp = FrankApp([
-    >   get "/" (fun () -> "Hello world!")
-    >   post "/order" (fun order -> createOrder(order))
+    >   get "/" (fun _ -> "Hello world!")
+    >   post "/order" (fun params -> createOrder(params))
     > ])
     > run myApp env
 
