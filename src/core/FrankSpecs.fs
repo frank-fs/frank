@@ -9,7 +9,7 @@ let ``When creating a Frank applicaion, it should accept a seq of request mappin
   let ``creating an app`` handlers =
     printMethod ""
     FrankApp handlers
-  Given [| map "/" (fun env -> Str("Hello world!")) |]
+  Given [| get "/" (fun _ -> Object(Str("Hello world!"))) |]
   |> When ``creating an app``
   |> It should be (fun app -> app.GetType() = typeof<FrankApp>)
   |> Verify

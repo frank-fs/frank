@@ -1,59 +1,89 @@
-﻿module Frank
+﻿namespace Frank
 open System.Collections.Generic
+open System.Text.RegularExpressions
 open Frack
-open Frack.Utility
 
+type Agent<'T> = MailboxProcessor<'T>
+
+/// Defines available response types.
 type FrankResponse =
   | Response of int * IDictionary<string, string> * seq<string>
-  | Value of Frack.Value 
+  | Object of Frack.Value 
   | None
 
-/// Interface for Frank handlers, including the application type.
-type IFrankHandler =
-  abstract Call : IDictionary<string, Value> -> FrankResponse
+/// Defines a route.
+type FrankRoute = { Pattern: System.Text.RegularExpressions.Regex
+                    Keys: seq<string>
+                    Conditions: seq<unit -> bool>
+                    Handler: unit -> FrankResponse }
 
-/// Maps a handler to a constraint against the incoming request and returns the response as an option when it is a match.
-type Map(filter, handler) =
-  interface IFrankHandler with
-    member this.Call(env) = if filter(env) then Value(handler(env)) else None
+[<AutoOpen>]
+module Core =
+  let private read value = match value with | Str(x) -> x | _ -> ""
+
+  /// Creates a path that constrains by the HTTP method. If the method is a POST, it also checks for X_HTTP_METHOD_OVERRIDE.
+  let private methodFilter m (env: IDictionary<string, Value>) =
+    let httpMethod = read env?HTTP_METHOD
+    if httpMethod = "POST" && env.ContainsKey("X_HTTP_METHOD_OVERRIDE") then m = read env?X_HTTP_METHOD_OVERRIDE
+    else m = httpMethod
+
+[<AutoOpen>]
+module Routing =
+  open System
+  open System.Collections.Generic
+  open System.Text.RegularExpressions
+  open Frack
+  open Frack.Utility
+  open Core
+
+  type RouteAddedEventArgs(httpMethod, FrankRoute) =
+    inherit EventArgs()
+
+  /// An event to be triggered when a route is added.
+  let routeAdded = new Event<RouteAddedEventArgs>()
+
+  /// The router agent for managing consistent state of the routes.
+  let router =
+    Agent<string * FrankRoute>.Start(fun inbox ->
+      let rec loop() = async {
+        let! httpMethod, route = inbox.Receive()
+        return! loop() }
+      loop() )
+
+  /// Helper for posting to an Agent.
+  let inline (<--) (m:MailboxProcessor<_>) msg = m.Post(msg)
+
+  let private compile path =
+    (Regex(path), [])
+
+  let private route httpMethod path handler =
+    let pattern, keys = compile path
+    (httpMethod, { Pattern = pattern; Keys = keys; Conditions = [||]; Handler = handler })
+
+  let get path handler = route "GET" path handler
+  let head path handler = route "HEAD" path handler
+  let put path handler = route "PUT" path handler
+  let post path handler = route "POST" path handler
+  let delete path handler = route "DELETE" path handler
+  let options path handler = route "OPTIONS" path handler
 
 /// Defines the standard Frank application type.
-type FrankApp(handlers: seq<IFrankHandler>) =
-  interface IFrankHandler with
-    member this.Call(env) = handlers
-                            |> Seq.map (fun h -> h.Call(env))
-                            |> Seq.filter (fun r -> not (r = None))
-                            |> Seq.head
+type FrankApp(routes: seq<string * FrankRoute>) =
+  let router = Dictionary<string, seq<FrankRoute>>()
+  do for httpMethod, route in routes do
+       router?httpMethod <- seq { if router.ContainsKey(httpMethod) then yield! router?httpMethod
+                                  yield route }
+       routeAdded.Trigger(RouteAddedEventArgs(httpMethod, route))
 
-let private read value = match value with | Str(x) -> x | _ -> ""
+  member this.Call(env) = Object(Str("In progress")) 
 
-/// Creates a path that constrains by the HTTP method. If the method is a POST, it also checks for X_HTTP_METHOD_OVERRIDE.
-let private methodFilter m (env: IDictionary<string, Value>) =
-  let httpMethod = read env?HTTP_METHOD
-  if httpMethod = "POST" && env.ContainsKey("X_HTTP_METHOD_OVERRIDE") then m = read env?X_HTTP_METHOD_OVERRIDE
-  else m = httpMethod
-
-let private matchPath path (env: IDictionary<string, Value>) =
-  path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
-
-/// Function to create a map in a more readable format.      
-let map path handler = Map((fun e -> matchPath path e), handler) :> IFrankHandler
-
-// TODO: What's a better way to compose predicates?
-// Should filters go into a route table, or is this the best approach?
-let get path handler = Map((fun e -> methodFilter "GET" e && matchPath path e), handler) :> IFrankHandler
-let head path handler = Map((fun e -> methodFilter "HEAD" e && path e), handler) :> IFrankHandler
-let post path handler = Map((fun e -> methodFilter "POST" e && path e), handler) :> IFrankHandler
-let put path handler = Map((fun e -> methodFilter "PUT" e && path e), handler) :> IFrankHandler
-let delete path handler = Map((fun e -> methodFilter "DELETE" e && path e), handler) :> IFrankHandler
-let options path handler = Map((fun e -> methodFilter "OPTIONS" e && path e), handler) :> IFrankHandler
-
-/// Runs the app and returns a Frack response.
-let run (app: IFrankHandler) (env: IDictionary<string, Value>) =
-  match app.Call(env) with
-  | Response(status, hdrs, body) -> (status, hdrs, body)
-  | Value(obj) -> let content = match obj with
-                                | Str(value) -> value
-                                | _ -> obj.ToString() // TODO: Continue adding matchers. 
-                  (200, dict[("Content_Length", content.Length.ToString())], seq { yield content })
-  | _ -> (404, dict[("Content_Length", "9")], seq { yield "Not found" })
+[<AutoOpen>]
+module Runner =
+  let run (app: FrankApp) (env: IDictionary<string, Value>) =
+    match app.Call(env) with
+    | Response(status, hdrs, body) -> (status, hdrs, body)
+    | Object(obj) -> let content = match obj with
+                                   | Str(value) -> value
+                                   | _ -> obj.ToString()
+                     (200, dict[("Content_Length", content.Length.ToString())], seq { yield content })
+    | _ -> (404, dict[("Content_Length", "9")], seq { yield "Not found" })
