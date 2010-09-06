@@ -1,4 +1,5 @@
 ﻿namespace Frank
+open System
 open System.Collections.Generic
 open System.Text.RegularExpressions
 open Frack
@@ -9,56 +10,35 @@ type Agent<'T> = MailboxProcessor<'T>
 type FrankResponse =
   | Response of int * IDictionary<string, string> * seq<string>
   | Object of Frack.Value 
-  | None
-
-/// Defines a route.
-type FrankRoute = { Pattern: System.Text.RegularExpressions.Regex
-                    Keys: seq<string>
-                    Conditions: seq<unit -> bool>
-                    Handler: unit -> FrankResponse }
+  | NotFound
 
 [<AutoOpen>]
-module Core =
-  let private read value = match value with | Str(x) -> x | _ -> ""
+module Utility =
+  let read value = match value with | Str(v) -> v | _ -> value.ToString()
+  let (|Match|_|) pattern input =
+    let m = Regex.Match(input, pattern) in
+    if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ]) else None
 
-  /// Creates a path that constrains by the HTTP method. If the method is a POST, it also checks for X_HTTP_METHOD_OVERRIDE.
-  let private methodFilter m (env: IDictionary<string, Value>) =
-    let httpMethod = read env?HTTP_METHOD
-    if httpMethod = "POST" && env.ContainsKey("X_HTTP_METHOD_OVERRIDE") then m = read env?X_HTTP_METHOD_OVERRIDE
-    else m = httpMethod
+type FrankRoute = { Pattern: Regex
+                    Keys: seq<string>
+                    Conditions: seq<IDictionary<string, string> -> bool>
+                    Handler: IDictionary<string, string> -> FrankResponse }
 
 [<AutoOpen>]
 module Routing =
-  open System
-  open System.Collections.Generic
-  open System.Text.RegularExpressions
-  open Frack
   open Frack.Utility
-  open Core
-
-  type RouteAddedEventArgs(httpMethod, FrankRoute) =
-    inherit EventArgs()
 
   /// An event to be triggered when a route is added.
-  let routeAdded = new Event<RouteAddedEventArgs>()
-
-  /// The router agent for managing consistent state of the routes.
-  let router =
-    Agent<string * FrankRoute>.Start(fun inbox ->
-      let rec loop() = async {
-        let! httpMethod, route = inbox.Receive()
-        return! loop() }
-      loop() )
-
-  /// Helper for posting to an Agent.
-  let inline (<--) (m:MailboxProcessor<_>) msg = m.Post(msg)
+  let routeAdded = new Event<string * FrankRoute>()
 
   let private compile path =
-    (Regex(path), [])
+    // Need to finish this method.
+    (Regex(path), Seq.empty<string>)
 
   let private route httpMethod path handler =
     let pattern, keys = compile path
-    (httpMethod, { Pattern = pattern; Keys = keys; Conditions = [||]; Handler = handler })
+    let conditions = Seq.empty<IDictionary<string, string> -> bool>
+    (httpMethod, {Pattern = pattern; Keys = keys; Conditions = conditions; Handler = handler})
 
   let get path handler = route "GET" path handler
   let head path handler = route "HEAD" path handler
@@ -69,13 +49,32 @@ module Routing =
 
 /// Defines the standard Frank application type.
 type FrankApp(routes: seq<string * FrankRoute>) =
+  let routeAddedEvent = routeAdded.Publish
+  // Using a mutable dictionary here since we are only creating this once at the start of a FrankApp.
   let router = Dictionary<string, seq<FrankRoute>>()
   do for httpMethod, route in routes do
        router?httpMethod <- seq { if router.ContainsKey(httpMethod) then yield! router?httpMethod
                                   yield route }
-       routeAdded.Trigger(RouteAddedEventArgs(httpMethod, route))
+       routeAdded.Trigger(httpMethod, route)
 
-  member this.Call(env) = Object(Str("In progress")) 
+  /// Finds the appropriate handler from the router and invokes it.
+  member this.Call(env) =
+    let httpMethod = read env?HTTP_METHOD
+    if router.ContainsKey(httpMethod) then
+      let path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
+      router?httpMethod
+      |> Seq.filter (fun r -> r.Pattern.IsMatch(path))
+      |> Seq.map (fun r -> 
+           let values = dict [| for c in r.Pattern.Match(path).Captures do
+                                  yield (path.Substring(c.Index, c.Length), c.Value) |]
+           r.Handler(values))
+      |> Seq.head  // What happens if the list is empty?
+    else NotFound
+
+  /// Allows an extension point to the point at which a route has been wired up.
+  member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
+  interface IObservable<string * FrankRoute> with
+    member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
 
 [<AutoOpen>]
 module Runner =
