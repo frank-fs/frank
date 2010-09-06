@@ -30,7 +30,6 @@ type FrankRoute = { Pattern: Regex
 module Routing =
   open Frack.Utility
 
-
   let private compile path =
     // Need to finish this method.
     (Regex(path), Seq.empty<string>)
@@ -51,6 +50,7 @@ module Routing =
 type FrankApp(routes: seq<string * FrankRoute>) =
   let routeAdded = new Event<string * FrankRoute>()
   let routeAddedEvent = routeAdded.Publish
+
   // Using a mutable dictionary here since we are only creating this once at the start of a FrankApp.
   let router = Dictionary<string, seq<FrankRoute>>()
   do for httpMethod, route in routes do
@@ -58,32 +58,32 @@ type FrankApp(routes: seq<string * FrankRoute>) =
                                   yield route }
        routeAdded.Trigger(httpMethod, route)
 
-  /// Finds the appropriate handler from the router and invokes it.
-  member this.Call(env) =
-    let httpMethod = read env?HTTP_METHOD
-    if router.ContainsKey(httpMethod) then
-      let path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
-      router?httpMethod
-      |> Seq.filter (fun r -> r.Pattern.IsMatch(path))
-      |> Seq.map (fun r -> 
-           let values = dict [| for c in r.Pattern.Match(path).Captures do
-                                  yield (path.Substring(c.Index, c.Length), c.Value) |]
-           r.Handler(values))
-      |> Seq.head  // What happens if the list is empty?
-    else NotFound
-
-  /// Allows an extension point to the point at which a route has been wired up.
-  member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
-  interface IObservable<string * FrankRoute> with
-    member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
-
-[<AutoOpen>]
-module Runner =
-  let run (app: FrankApp) (env: IDictionary<string, Value>) =
-    match app.Call(env) with
+  let parseResponse response =
+    match response with
     | Response(status, hdrs, body) -> (status, hdrs, body)
     | Object(obj) -> let content = match obj with
                                    | Str(value) -> value
                                    | _ -> obj.ToString()
                      (200, dict[("Content_Length", content.Length.ToString())], seq { yield content })
     | _ -> (404, dict[("Content_Length", "9")], seq { yield "Not found" })
+
+  /// Finds the appropriate handler from the router and invokes it.
+  member this.Call(env: IDictionary<string, Value>) =
+    let httpMethod = read env?HTTP_METHOD
+    let response =
+      if router.ContainsKey(httpMethod) then
+        let path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
+        router?httpMethod
+        |> Seq.filter (fun r -> r.Pattern.IsMatch(path))
+        |> Seq.map (fun r -> 
+             let values = dict [| for c in r.Pattern.Match(path).Captures do
+                                    yield (path.Substring(c.Index, c.Length), c.Value) |]
+             r.Handler(values))
+        |> Seq.head  // What happens if the list is empty?
+      else NotFound
+    parseResponse response
+
+  /// Allows an extension point to the point at which a route has been wired up.
+  member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
+  interface IObservable<string * FrankRoute> with
+    member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
