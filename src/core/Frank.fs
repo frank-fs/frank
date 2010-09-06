@@ -15,6 +15,8 @@ type FrankResponse =
 [<AutoOpen>]
 module Utility =
   let read value = match value with | Str(v) -> v | _ -> value.ToString()
+
+  /// Pulled from <see href="http://www.markhneedham.com/blog/2009/05/10/f-regular-expressionsactive-patterns/" />.
   let (|Match|_|) pattern input =
     let m = Regex.Match(input, pattern) in
     if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ]) else None
@@ -28,8 +30,6 @@ type FrankRoute = { Pattern: Regex
 module Routing =
   open Frack.Utility
 
-  /// An event to be triggered when a route is added.
-  let routeAdded = new Event<string * FrankRoute>()
 
   let private compile path =
     // Need to finish this method.
@@ -49,6 +49,7 @@ module Routing =
 
 /// Defines the standard Frank application type.
 type FrankApp(routes: seq<string * FrankRoute>) =
+  let routeAdded = new Event<string * FrankRoute>()
   let routeAddedEvent = routeAdded.Publish
   // Using a mutable dictionary here since we are only creating this once at the start of a FrankApp.
   let router = Dictionary<string, seq<FrankRoute>>()
