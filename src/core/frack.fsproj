@@ -50,9 +50,7 @@
     <Reference Include="System.Web.Abstractions" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Env.fs" />
-    <Compile Include="Utility.fs" />
-    <Compile Include="Middleware.fs" />
+    <Compile Include="Frack.fs" />
     <Compile Include="FrackSpecs.fs" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />

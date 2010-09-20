@@ -37,7 +37,7 @@ module EnvSpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = Env.createEnvironment (createContext "GET") errors
+  let env = (createContext "GET").ToFrackEnv(errors)
   
   let ``with value of`` expected key (col:IDictionary<string,Value>) =
     printMethod expected
@@ -106,13 +106,12 @@ module EnvSpecs =
     Given env
     |> It should have ("HTTP_TEST" |> ``with value of`` (Str "value"))
     |> Verify
-  
 
 module PathSpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = Env.createEnvironment (createContext "GET") errors
+  let env = (createContext "GET").ToFrackEnv(errors)
 
   [<Scenario>]
   let ``When given an environment, it should provide a version of 0.1``() =
@@ -195,7 +194,7 @@ module PathSpecs =
 module AppSpecs =
   open Fakes
 
-  let getEnv m = Env.createEnvironment (createContext m) (StringBuilder())
+  let getEnv m = (createContext m).ToFrackEnv(StringBuilder())
   let hdrs = dict [| ("Content_Type","text/plain");("Content_Length","5") |] 
   let body = seq { yield "Howdy" } 
   let app env = ( 200, hdrs, body )
