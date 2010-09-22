@@ -19,6 +19,7 @@ Thumbs.db
 *.cache
 *.ilk
 *.log
+*_Spliced.*proj
 [Bb]in
 [Dd]ebug*/
 *.lib

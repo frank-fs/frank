@@ -12,7 +12,6 @@ type Value =
   | Ver of int array
   | Obj of obj
 
-
 [<AutoOpen>]
 module Env =
   /// Returns the script name and path info from a 
@@ -22,7 +21,6 @@ module Env =
     let scriptName = if not(String.IsNullOrEmpty(p.[0])) then "/" + p.[0] else String.Empty 
     let pathInfo   = if p.Length > 1 && not(String.IsNullOrEmpty(p.[1])) then "/" + p.[1].TrimEnd('/') else String.Empty 
     (scriptName, pathInfo)
-  
 
 [<AutoOpen>]
 module Extensions =
@@ -41,47 +39,6 @@ module Extensions =
         Map.add key this.[key] h 
       this.AllKeys |> Array.fold (folder) Map.empty
 
-  /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
-  type System.Web.HttpContext with
-    member this.ToContextBase() = System.Web.HttpContextWrapper(this)
-
-  type System.Web.HttpContextBase with
-    /// Creates an environment variable <see cref="HttpContextBase"/>.
-    member this.ToFrackEnv(errors:StringBuilder) =
-      seq { yield ("HTTP_METHOD", Str this.Request.HttpMethod)
-            yield ("SCRIPT_NAME", Str (this.Request.Url.AbsolutePath |> getPathParts |> fst))
-            yield ("PATH_INFO", Str (this.Request.Url.AbsolutePath |> getPathParts |> snd))
-            yield ("QUERY_STRING", Str (this.Request.Url.Query.TrimStart('?')))
-            yield ("CONTENT_TYPE", Str this.Request.ContentType)
-            yield ("CONTENT_LENGTH", Int this.Request.ContentLength)
-            yield ("SERVER_NAME", Str this.Request.Url.Host)
-            yield ("SERVER_PORT", Str (this.Request.Url.Port.ToString()))
-            yield! this.Request.Headers.AsEnumerable()
-            yield ("url_scheme", Str this.Request.Url.Scheme)
-            yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-            yield ("input", Inp (TextReader.Synchronized(new StreamReader(this.Request.InputStream))))
-            yield ("version", Ver [|0;1|] )
-          } |> dict
-
-  type System.Net.HttpListenerContext with
-    /// Creates an environment variable from an <see cref="HttpListenerContext"/>.
-    member this.ToFrackEnv(errors:StringBuilder) =
-      seq { yield ("HTTP_METHOD", Str this.Request.HttpMethod)
-            yield ("SCRIPT_NAME", Str (this.Request.Url.AbsolutePath |> getPathParts |> fst))
-            yield ("PATH_INFO", Str (this.Request.Url.AbsolutePath |> getPathParts |> snd))
-            yield ("QUERY_STRING", Str (this.Request.Url.Query.TrimStart('?')))
-            yield ("CONTENT_TYPE", Str this.Request.ContentType)
-            yield ("CONTENT_LENGTH", Int (Convert.ToInt32(this.Request.ContentLength64))) 
-            yield ("SERVER_NAME", Str this.Request.Url.Host)
-            yield ("SERVER_PORT", Str (this.Request.Url.Port.ToString()))
-            yield! this.Request.Headers.AsEnumerable()
-            yield ("url_scheme", Str this.Request.Url.Scheme)
-            yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-            yield ("input", Inp (TextReader.Synchronized(new StreamReader(this.Request.InputStream))))
-            yield ("version", Ver [|0;1|] )
-          } |> dict
-    
-
 [<AutoOpen>]
 module Utility =
   /// Dynamic indexer lookups.
@@ -95,7 +52,6 @@ module Utility =
   /// <see href="http://weblogs.asp.net/podwysocki/archive/2009/06/11/f-duck-typing-and-structural-typing.aspx" />
   let inline implicit arg =
     ( ^a : (static member op_Implicit : ^b -> ^a) arg)
-
 
 module Middleware =
   open System.Collections.Generic

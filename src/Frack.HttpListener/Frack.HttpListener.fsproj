@@ -5,13 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</ProjectGuid>
+    <ProjectGuid>{cf0856fd-3258-455a-a236-7025968bb639}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack</RootNamespace>
-    <AssemblyName>frack</AssemblyName>
+    <RootNamespace>Frack.HttpListener</RootNamespace>
+    <AssemblyName>Frack.HttpListener</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <Name>Frack</Name>
-    <TargetFrameworkProfile />
+    <Name>Frack.HttpListener</Name>
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -22,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\frack.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Frack.HttpListener.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,7 +30,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Frack.HttpListener.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
@@ -48,8 +47,14 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Frack.fs" />
-    <Compile Include="FrackSpecs.fs" />
+    <Compile Include="Frack.HttpListener.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\core\Frack.fsproj">
+      <Name>frack</Name>
+      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

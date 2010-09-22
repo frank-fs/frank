@@ -1,9 +1,10 @@
-﻿module FrackSpecs
+﻿module Frack.AspNetSpecs
 open System
 open System.Collections.Generic
 open System.Text
 open System.Web
 open Frack
+open Frack.AspNet
 open NaturalSpec
 
 module Fakes =
@@ -13,27 +14,31 @@ module Fakes =
 
   let url = new Uri("http://wizardsofsmart.net/something/awesome?name=test&why=how")
     
-  let createContext m (errors:StringBuilder) =
-    seq { yield ("HTTP_METHOD", Str m)
-          yield ("SCRIPT_NAME", Str (url.AbsolutePath |> getPathParts |> fst))
-          yield ("PATH_INFO", Str (url.AbsolutePath |> getPathParts |> snd))
-          yield ("QUERY_STRING", Str (url.Query.TrimStart('?')))
-          yield ("CONTENT_TYPE", Str "text/plain")
-          yield ("CONTENT_LENGTH", Int 5)
-          yield ("SERVER_NAME", Str url.Host)
-          yield ("SERVER_PORT", Str (url.Port.ToString()))
-          yield! [|("HTTP_TEST", Str "value");("REQUEST_METHOD", Str "GET")|]
-          yield ("url_scheme", Str url.Scheme)
-          yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-          yield ("input", Inp (TextReader.Synchronized(new StreamReader(new MemoryStream(Encoding.UTF8.GetBytes("Howdy")) :> Stream))))
-          yield ("version", Ver [|0;1|] )
-        } |> dict
+  let mutable queryString = new NameValueCollection()
+  queryString.Add("name","test")
+  queryString.Add("why","how")
+    
+  let mutable headers = new NameValueCollection()
+  headers.Add("HTTP_TEST", "value")
+  headers.Add("REQUEST_METHOD", "GET")
+  
+  let createContext m =
+    { new HttpContextBase() with
+        override this.Request =
+          { new HttpRequestBase() with
+              override this.HttpMethod = m
+              override this.Url = url
+              override this.QueryString = queryString
+              override this.Headers = headers
+              override this.ContentType = "text/plain"
+              override this.ContentLength = 5 
+              override this.InputStream = new MemoryStream(Encoding.UTF8.GetBytes("Howdy")) :> Stream } }
 
 module EnvSpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = createContext "GET" errors
+  let env = (createContext "GET").ToFrackEnv(errors)
   
   let ``with value of`` expected key (col:IDictionary<string,Value>) =
     printMethod expected
@@ -107,7 +112,7 @@ module PathSpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = createContext "GET" errors
+  let env = (createContext "GET").ToFrackEnv(errors)
 
   [<Scenario>]
   let ``When given an environment, it should provide a version of 0.1``() =
@@ -190,7 +195,7 @@ module PathSpecs =
 module AppSpecs =
   open Fakes
 
-  let getEnv m = createContext m (StringBuilder())
+  let getEnv m = (createContext m).ToFrackEnv(StringBuilder())
   let hdrs = dict [| ("Content_Type","text/plain");("Content_Length","5") |] 
   let body = seq { yield "Howdy" } 
   let app env = ( 200, hdrs, body )
