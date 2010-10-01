@@ -1,16 +1,24 @@
 ﻿#nowarn "77"
 namespace Frack
 open System
+open System.Collections.Generic
 open System.IO
 
+/// Defines a discriminated union of types that may be provided in the <see cref="Frack.Environment"/>.
 type Value =
   | Str of string
   | Int of int
-  | Hash of System.Collections.Generic.IDictionary<string, Value>
+  | Hash of IDictionary<string, Value>
   | Err of TextWriter
   | Inp of TextReader
   | Ver of int array
   | Obj of obj
+
+/// Defines the type for a Frack application.
+type App = delegate of IDictionary<string, Value> -> int * IDictionary<string, string> * seq<string>
+
+/// Defines the type for a Frack middleware.
+type Middleware = delegate of App -> int * IDictionary<string, string> * seq<string>
 
 [<AutoOpen>]
 module Env =
@@ -53,12 +61,9 @@ module Utility =
   let inline implicit arg =
     ( ^a : (static member op_Implicit : ^b -> ^a) arg)
 
-module Middleware =
-  open System.Collections.Generic
-
-  let printEnvironment app =
-    fun (env:IDictionary<string,Value>) ->
-      let status, hdrs, body = app env
+module Middlewares =
+  let printEnvironment (app: App) = fun env ->
+      let status, hdrs, body = app.Invoke(env)
       let vars = seq { for key in env.Keys do
                          let value = match env.[key] with
                                      | Str(v) -> v

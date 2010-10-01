@@ -198,19 +198,19 @@ module AppSpecs =
   let getEnv m = (createContext m).ToFrackEnv(StringBuilder())
   let hdrs = dict [| ("Content_Type","text/plain");("Content_Length","5") |] 
   let body = seq { yield "Howdy" } 
-  let app env = ( 200, hdrs, body )
+  let app = App(fun env -> ( 200, hdrs, body ))
   
-  let head app =
-    fun env -> let status, hdrs, body = app env
-               match env?HTTP_METHOD with
-                 | Str "HEAD" -> ( status, hdrs, Seq.empty )
-                 | _ -> ( status, hdrs, body )
+  let head (app:App) = fun env -> 
+    let status, hdrs, body = app.Invoke(env)
+    match env?HTTP_METHOD with
+    | Str "HEAD" -> ( status, hdrs, Seq.empty )
+    | _ -> ( status, hdrs, body )
   
   [<Scenario>]
   let ``When running an app that just returns pre-defined values, those values should be returned.``() =
     let ``running an app with predefined values`` env =
       printMethod "200, type = text/plain and length = 5, Howdy"
-      app env
+      app.Invoke(env)
     let env = getEnv "GET"
     Given env
     |> When ``running an app with predefined values``
@@ -242,7 +242,7 @@ module AppSpecs =
     let env = getEnv "GET"
     let ``running a middleware to print the environment`` env =
       printMethod ""
-      let printEnv = Frack.Middleware.printEnvironment app 
+      let printEnv = Frack.Middlewares.printEnvironment app 
       let result = printEnv env
       match result with
       | _, _, bd -> bd |> Seq.iter (printfn "%s")
