@@ -1,15 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frank", "core\frank.fsproj", "{E1AFD786-27AE-4834-87FD-A18412DE9715}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F865DBAF-33B2-433A-BEB8-CE6B2441EAD3}"
 	ProjectSection(SolutionItems) = preProject
-		..\build.bat = ..\build.bat
-		..\build.fsx = ..\build.fsx
-		..\LICENSE.txt = ..\LICENSE.txt
-		..\README.md = ..\README.md
+		build.bat = build.bat
+		build.fsx = build.fsx
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frank", "src\frank.fsproj", "{E1AFD786-27AE-4834-87FD-A18412DE9715}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

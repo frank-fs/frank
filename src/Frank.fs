@@ -8,7 +8,7 @@ type Agent<'T> = MailboxProcessor<'T>
 
 /// Defines available response types.
 type FrankResponse =
-  | Response of int * IDictionary<string, string> * seq<string>
+  | Response of Frack.Response
   | Object of Frack.Value 
   | NotFound
 
@@ -21,10 +21,11 @@ module Utility =
     let m = Regex.Match(input, pattern) in
     if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ]) else None
 
-type FrankRoute = { Pattern: Regex
-                    Keys: seq<string>
-                    Conditions: seq<IDictionary<string, string> -> bool>
-                    Handler: IDictionary<string, string> -> FrankResponse }
+/// A route for a Frank applicaiton.
+type Route = { Pattern: Regex
+               Keys: seq<string>
+               Conditions: seq<IDictionary<string, string> -> bool>
+               Handler: IDictionary<string, string> -> FrankResponse }
 
 [<AutoOpen>]
 module Routing =
@@ -47,16 +48,12 @@ module Routing =
   let options path handler = route "OPTIONS" path handler
 
 /// Defines the standard Frank application type.
-type FrankApp(routes: seq<string * FrankRoute>) =
-  let routeAdded = new Event<string * FrankRoute>()
-  let routeAddedEvent = routeAdded.Publish
-
+type FrankApp(routes: seq<string * Route>) =
   // Using a mutable dictionary here since we are only creating this once at the start of a FrankApp.
-  let router = Dictionary<string, seq<FrankRoute>>()
-  do for httpMethod, route in routes do
-       router?httpMethod <- seq { if router.ContainsKey(httpMethod) then yield! router?httpMethod
-                                  yield route }
-       routeAdded.Trigger(httpMethod, route)
+  let router = routes
+               |> Seq.groupBy fst
+               |> Seq.map (fun (key, values) -> (key, values |> Seq.map snd))
+               |> dict
 
   let parseResponse response =
     match response with
@@ -68,22 +65,18 @@ type FrankApp(routes: seq<string * FrankRoute>) =
     | _ -> (404, dict[("Content_Length", "9")], seq { yield "Not found" })
 
   /// Finds the appropriate handler from the router and invokes it.
-  member this.Call(env: IDictionary<string, Value>) =
-    let httpMethod = read env?HTTP_METHOD
+  member this.Invoke(request: Frack.Request) =
+    let httpMethod = read request?HTTP_METHOD
     let response =
       if router.ContainsKey(httpMethod) then
-        let path = read env?SCRIPT_NAME + "/" + read env?PATH_INFO
-        router?httpMethod
+        let path = read request?SCRIPT_NAME + "/" + read request?PATH_INFO
+        router.[httpMethod]
         |> Seq.filter (fun r -> r.Pattern.IsMatch(path))
         |> Seq.map (fun r -> 
              let values = dict [| for c in r.Pattern.Match(path).Captures do
                                     yield (path.Substring(c.Index, c.Length), c.Value) |]
              r.Handler(values))
         |> Seq.head  // What happens if the list is empty?
-      else NotFound
+      else
+        NotFound
     parseResponse response
-
-  /// Allows an extension point to the point at which a route has been wired up.
-  member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
-  interface IObservable<string * FrankRoute> with
-    member this.Subscribe(observer) = routeAddedEvent.Subscribe(observer)
