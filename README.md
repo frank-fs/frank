@@ -5,13 +5,13 @@ Frank is a simple, domain specific language for writing web applications on top 
 Usage
 ============
 
-Hook up myApp to a Frack workflow:
+Define a Frank application:
 
-    > let myApp = FrankApp([
-    >   get "/" (fun _ -> "Hello world!")
-    >   post "/order" (fun params -> createOrder(params))
-    > ])
-    > let frackApp = (myApp.Call)
+    > let myApp = FrankApp [
+    >   get "/" (fun _ -> Object(Str("Hello world!")))
+    >   post "/order" (fun params -> Object(Obj(createOrder(params))))
+    > ]
+    > let frackApp = (myApp.Invoke)
 
 Todo / Design decisions
 ============
