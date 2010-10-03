@@ -13,7 +13,7 @@ module Fakes =
 
   let url = new Uri("http://wizardsofsmart.net/something/awesome?name=test&why=how")
     
-  let createContext m (errors:StringBuilder) =
+  let getRequest m (errors:StringBuilder) =
     seq { yield ("HTTP_METHOD", Str m)
           yield ("SCRIPT_NAME", Str (url.AbsolutePath |> getPathParts |> fst))
           yield ("PATH_INFO", Str (url.AbsolutePath |> getPathParts |> snd))
@@ -29,77 +29,77 @@ module Fakes =
           yield ("version", Ver [|0;1|] )
         } |> dict
 
-module EnvSpecs =
+module UtilitySpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = createContext "GET" errors
+  let request = getRequest "GET" errors
   
   let ``with value of`` expected key (col:IDictionary<string, Value>) =
     printMethod expected
     col.[key] = expected
   
   [<Scenario>]
-  let ``When given an environment, it should provide the url scheme``() =
-    let ``retrieving the url scheme`` env =
+  let ``When given an requestironment, it should provide the url scheme``() =
+    let ``retrieving the url scheme`` request =
       printMethod ""
-      env?url_scheme
-    Given env
+      request?url_scheme
+    Given request
     |> When ``retrieving the url scheme``
     |> It should equal (Str "http")
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the http method``() =
-    Given env
+  let ``When given an requestironment, it should provide the http method``() =
+    Given request
     |> It should have ("HTTP_METHOD" |> ``with value of`` (Str "GET"))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the content type``() =
-    Given env
+  let ``When given an requestironment, it should provide the content type``() =
+    Given request
     |> It should have ("CONTENT_TYPE" |> ``with value of`` (Str "text/plain"))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the content length``() =
-    Given env
+  let ``When given an requestironment, it should provide the content length``() =
+    Given request
     |> It should have ("CONTENT_LENGTH" |> ``with value of`` (Int 5))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the server name``() =
-    Given env
+  let ``When given an requestironment, it should provide the server name``() =
+    Given request
     |> It should have ("SERVER_NAME" |> ``with value of`` (Str "wizardsofsmart.net"))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the port``() =
-    Given env
+  let ``When given an requestironment, it should provide the port``() =
+    Given request
     |> It should have ("SERVER_PORT" |> ``with value of`` (Str "80"))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the script name``() =
-    Given env
+  let ``When given an requestironment, it should provide the script name``() =
+    Given request
     |> It should have ("SCRIPT_NAME" |> ``with value of`` (Str "/something"))
     |> Verify
   
   [<Scenario>]
-  let ``When given an environment, it should provide the path info``() =
-    Given env
+  let ``When given an requestironment, it should provide the path info``() =
+    Given request
     |> It should have ("PATH_INFO" |> ``with value of`` (Str "/awesome"))
     |> Verify
     
   [<Scenario>]
-  let ``When given an environment, it should provide the stringified query string``() =
-    Given env
+  let ``When given an requestironment, it should provide the stringified query string``() =
+    Given request
     |> It should have ("QUERY_STRING" |> ``with value of`` (Str "name=test&why=how"))
     |> Verify
     
   [<Scenario>]
-  let ``When given an environment, it should provide the headers``() =
-    Given env
+  let ``When given an requestironment, it should provide the headers``() =
+    Given request
     |> It should have ("HTTP_TEST" |> ``with value of`` (Str "value"))
     |> Verify
 
@@ -107,21 +107,21 @@ module PathSpecs =
   open Fakes
 
   let errors = StringBuilder()
-  let env = createContext "GET" errors
+  let request = getRequest "GET" errors
 
   [<Scenario>]
-  let ``When given an environment, it should provide a version of 0.1``() =
-    let ``retrieving the version`` env =
+  let ``When given an requestironment, it should provide a version of 0.1``() =
+    let ``retrieving the version`` request =
       printMethod ""
-      env?version
-    Given env
+      request?version
+    Given request
     |> When ``retrieving the version``
     |> It should equal (Ver [|0;1|])
     |> Verify
     
   let ``getting path parts`` (path:string) =
     printMethod ""
-    Env.getPathParts path
+    Utility.getPathParts path
   
   [<Scenario>]
   [<FailsWithType (typeof<ArgumentNullException>)>]
@@ -190,59 +190,59 @@ module PathSpecs =
 module AppSpecs =
   open Fakes
 
-  let getEnv m = createContext m (StringBuilder())
+  let getUtility m = getRequest m (StringBuilder())
   let hdrs = dict [| ("Content_Type","text/plain");("Content_Length","5") |] 
   let body = seq { yield "Howdy" } 
-  let app = App(fun env -> ( 200, hdrs, body ))
+  let app = App(fun request -> ( 200, hdrs, body ))
   
-  let head (app:App) = fun env ->
-    let status, hdrs, body = app.Invoke(env)
-    match env?HTTP_METHOD with
+  let head (app:App) = fun request ->
+    let status, hdrs, body = app.Invoke(request)
+    match request?HTTP_METHOD with
     | Str "HEAD" -> ( status, hdrs, Seq.empty )
     | _ -> ( status, hdrs, body )
   
   [<Scenario>]
   let ``When running an app that just returns pre-defined values, those values should be returned.``() =
-    let ``running an app with predefined values`` env =
+    let ``running an app with predefined values`` request =
       printMethod "200, type = text/plain and length = 5, Howdy"
-      app.Invoke(env)
-    let env = getEnv "GET"
-    Given env
+      app.Invoke(request)
+    let request = getUtility "GET"
+    Given request
     |> When ``running an app with predefined values``
     |> It should equal ( 200, hdrs, body )
     |> Verify
     
-  let ``running a middleware for a`` m env =
+  let ``running a middleware for a`` m request =
     printMethod m
-    head app env
+    head app request
     
   [<Scenario>]
   let ``When running a middleware on an app handling a GET request, the body should be left alone.``() =
-    let env = getEnv "GET"
-    Given env
+    let request = getUtility "GET"
+    Given request
     |> When ``running a middleware for a`` "GET"
     |> It should have (fun result -> match result with _, _, bd -> bd = body)
     |> Verify
   
   [<Scenario>]
   let ``When running a middleware on an app handling a HEAD request, the body should be empty.``() =
-    let env = getEnv "HEAD"
-    Given env
+    let request = getUtility "HEAD"
+    Given request
     |> When ``running a middleware for a`` "HEAD"
     |> It should have (fun result -> match result with _, _, bd -> bd = Seq.empty)
     |> Verify
     
   [<Scenario>]
-  let ``When adding the printEnvironment middleware, the body should include more than 1 value.``() =
-    let env = getEnv "GET"
-    let ``running a middleware to print the environment`` env =
+  let ``When adding the printRequest middleware, the body should include more than 1 value.``() =
+    let request = getUtility "GET"
+    let ``running a middleware to print the request`` request =
       printMethod ""
-      let printEnv = Frack.Middlewares.printEnvironment app 
-      let result = printEnv env
+      let printUtility = Frack.Middlewares.printRequest app 
+      let result = printUtility request
       match result with
       | _, _, bd -> bd |> Seq.iter (printfn "%s")
       result
-    Given env
-    |> When ``running a middleware to print the environment``
+    Given request
+    |> When ``running a middleware to print the request``
     |> It should have (fun result -> match result with _, _, bd -> bd |> Seq.length > 1)
     |> Verify

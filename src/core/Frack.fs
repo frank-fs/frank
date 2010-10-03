@@ -14,38 +14,33 @@ type Value =
   | Ver of int array
   | Obj of obj
 
+/// Defines the type for a Frack request.
+type Request = IDictionary<string, Value>
+
+/// Defines the type for a Frack response.
+type Response = int * IDictionary<string, string> * seq<string>
+
 /// Defines the type for a Frack application.
-type App = delegate of IDictionary<string, Value> -> int * IDictionary<string, string> * seq<string>
+type App = delegate of Request -> Response
 
 /// Defines the type for a Frack middleware.
-type Middleware = delegate of App -> int * IDictionary<string, string> * seq<string>
+type Middleware = delegate of App -> Response
 
-[<AutoOpen>]
-module Env =
-  /// Returns the script name and path info from a 
-  let getPathParts (path:string) =
-    if String.IsNullOrEmpty(path) then raise (ArgumentNullException("path")) 
-    let p = path.TrimStart('/').Split([|'/'|], 2)  
-    let scriptName = if not(String.IsNullOrEmpty(p.[0])) then "/" + p.[0] else String.Empty 
-    let pathInfo   = if p.Length > 1 && not(String.IsNullOrEmpty(p.[1])) then "/" + p.[1].TrimEnd('/') else String.Empty 
-    (scriptName, pathInfo)
 
 [<AutoOpen>]
 module Extensions =
   open System.Collections.Specialized
   open System.Text
 
-  let nameValueCollectionToTupleSeq (coll:NameValueCollection) =
-    seq { for key in coll.Keys do yield (key, Str (coll.[key])) }
-
   /// Extends System.Collections.Specialized.NameValueCollection with methods to transform it to an enumerable, map or dictionary.
   type NameValueCollection with
-    member this.AsEnumerable() = nameValueCollectionToTupleSeq this
-    member this.ToDictionary() = dict (nameValueCollectionToTupleSeq this)
+    member this.AsEnumerable() = seq { for key in this.Keys do yield (key, Str (this.[key])) }
+    member this.ToDictionary() = dict (this.AsEnumerable())
     member this.ToMap() =
       let folder (h:Map<string,string>) (key:string) =
         Map.add key this.[key] h 
       this.AllKeys |> Array.fold (folder) Map.empty
+
 
 [<AutoOpen>]
 module Utility =
@@ -61,19 +56,28 @@ module Utility =
   let inline implicit arg =
     ( ^a : (static member op_Implicit : ^b -> ^a) arg)
 
+  /// Returns the script name and path info from a 
+  let getPathParts (path:string) =
+    if String.IsNullOrEmpty(path) then raise (ArgumentNullException("path")) 
+    let p = path.TrimStart('/').Split([|'/'|], 2)  
+    let scriptName = if not(String.IsNullOrEmpty(p.[0])) then "/" + p.[0] else String.Empty 
+    let pathInfo   = if p.Length > 1 && not(String.IsNullOrEmpty(p.[1])) then "/" + p.[1].TrimEnd('/') else String.Empty 
+    (scriptName, pathInfo)
+
+
 module Middlewares =
-  let printEnvironment (app: App) = fun env ->
-      let status, hdrs, body = app.Invoke(env)
-      let vars = seq { for key in env.Keys do
-                         let value = match env.[key] with
-                                     | Str(v) -> v
-                                     | Int(v) -> v.ToString()
-                                     | Hash(v) -> v.ToString()
-                                     | Err(v) -> v.ToString()
-                                     | Inp(v) -> v.ToString()
-                                     | Ver(v) -> v.[0].ToString() + "." + v.[1].ToString()
-                                     | Obj(v) -> v.ToString()
-                         yield key + ": " + value }
-      let bd = seq { yield! body; yield! vars }
-               |> Seq.filter (fun v -> not(String.IsNullOrEmpty(v)))
-      ( status, hdrs, bd )
+  let printRequest (app: App) = fun request ->
+    let status, hdrs, body = app.Invoke(request)
+    let vars = seq { for key in request.Keys do
+                       let value = match request.[key] with
+                                   | Str(v) -> v
+                                   | Int(v) -> v.ToString()
+                                   | Hash(v) -> v.ToString()
+                                   | Err(v) -> v.ToString()
+                                   | Inp(v) -> v.ToString()
+                                   | Ver(v) -> v.[0].ToString() + "." + v.[1].ToString()
+                                   | Obj(v) -> v.ToString()
+                       yield key + ": " + value }
+    let bd = seq { yield! body; yield! vars }
+             |> Seq.filter (fun v -> not(String.IsNullOrEmpty(v)))
+    ( status, hdrs, bd )

@@ -7,7 +7,7 @@ module Kayak =
 
   type IKayakContext with
     /// Creates an environment variable from an <see cref="HttpListenerContext"/>.
-    member this.ToFrackEnv(errors:StringBuilder) =
+    member this.ToFrackRequest(errors:StringBuilder) =
       let url = Uri(this.Request.RequestUri)
       seq { yield ("HTTP_METHOD", Str this.Request.Verb)
             yield ("SCRIPT_NAME", Str (url.AbsolutePath |> getPathParts |> fst))

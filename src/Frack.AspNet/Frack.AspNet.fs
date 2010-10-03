@@ -10,7 +10,7 @@ module AspNet =
 
   type System.Web.HttpContextBase with
     /// Creates an environment variable <see cref="HttpContextBase"/>.
-    member this.ToFrackEnv(errors:StringBuilder) =
+    member this.ToFrackRequest(errors:StringBuilder) =
       seq { yield ("HTTP_METHOD", Str this.Request.HttpMethod)
             yield ("SCRIPT_NAME", Str (this.Request.Url.AbsolutePath |> getPathParts |> fst))
             yield ("PATH_INFO", Str (this.Request.Url.AbsolutePath |> getPathParts |> snd))
