@@ -121,7 +121,7 @@ module PathSpecs =
     
   let ``getting path parts`` (path:string) =
     printMethod ""
-    Utility.getPathParts path
+    getPathParts path
   
   [<Scenario>]
   [<FailsWithType (typeof<ArgumentNullException>)>]
