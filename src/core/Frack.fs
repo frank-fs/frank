@@ -4,15 +4,13 @@ open System
 open System.Collections.Generic
 open System.IO
 
-/// Defines a discriminated union of types that may be provided in the <see cref="Frack.Environment"/>.
+/// Defines a discriminated union of types that may be provided in the <see cref="Frack.Request"/>.
 type Value =
   | Str of string
   | Int of int
-  | Hash of IDictionary<string, Value>
   | Err of TextWriter
   | Inp of TextReader
   | Ver of int array
-  | Obj of obj
 
 /// Defines the type for a Frack request.
 type Request = IDictionary<string, Value>
@@ -25,6 +23,16 @@ type App = delegate of Request -> Response
 
 /// Defines the type for a Frack middleware.
 type Middleware = delegate of App -> Response
+
+[<AutoOpen>]
+module Core =
+  /// Returns the script name and path info from a url.
+  let getPathParts (path:string) =
+    if String.IsNullOrEmpty(path) then raise (ArgumentNullException("path")) 
+    let p = path.TrimStart('/').Split([|'/'|], 2)  
+    let scriptName = if not(String.IsNullOrEmpty(p.[0])) then "/" + p.[0] else String.Empty 
+    let pathInfo   = if p.Length > 1 && not(String.IsNullOrEmpty(p.[1])) then "/" + p.[1].TrimEnd('/') else String.Empty 
+    (scriptName, pathInfo)
 
 
 [<AutoOpen>]
@@ -46,23 +54,12 @@ module Extensions =
 module Utility =
   /// Dynamic indexer lookups.
   /// <see href="http://codebetter.com/blogs/matthew.podwysocki/archive/2010/02/05/using-and-abusing-the-f-dynamic-lookup-operator.aspx" />
-  let inline (?) this key =
-    ( ^a : (member get_Item : ^b -> ^c) (this,key))
-  let inline (?<-) this key value =
-    ( ^a : (member set_Item : ^b * ^c -> ^d) (this,key,value))
+  let inline (?) this key = ( ^a : (member get_Item : ^b -> ^c) (this,key))
+  let inline (?<-) this key value = ( ^a : (member set_Item : ^b * ^c -> ^d) (this,key,value))
 
   /// Generic duck-typing operator.
   /// <see href="http://weblogs.asp.net/podwysocki/archive/2009/06/11/f-duck-typing-and-structural-typing.aspx" />
-  let inline implicit arg =
-    ( ^a : (static member op_Implicit : ^b -> ^a) arg)
-
-  /// Returns the script name and path info from a 
-  let getPathParts (path:string) =
-    if String.IsNullOrEmpty(path) then raise (ArgumentNullException("path")) 
-    let p = path.TrimStart('/').Split([|'/'|], 2)  
-    let scriptName = if not(String.IsNullOrEmpty(p.[0])) then "/" + p.[0] else String.Empty 
-    let pathInfo   = if p.Length > 1 && not(String.IsNullOrEmpty(p.[1])) then "/" + p.[1].TrimEnd('/') else String.Empty 
-    (scriptName, pathInfo)
+  let inline implicit arg = ( ^a : (static member op_Implicit : ^b -> ^a) arg)
 
 
 module Middlewares =
@@ -72,12 +69,10 @@ module Middlewares =
                        let value = match request.[key] with
                                    | Str(v) -> v
                                    | Int(v) -> v.ToString()
-                                   | Hash(v) -> v.ToString()
                                    | Err(v) -> v.ToString()
                                    | Inp(v) -> v.ToString()
                                    | Ver(v) -> v.[0].ToString() + "." + v.[1].ToString()
-                                   | Obj(v) -> v.ToString()
-                       yield key + ": " + value }
+                       yield key + " => " + value }
     let bd = seq { yield! body; yield! vars }
              |> Seq.filter (fun v -> not(String.IsNullOrEmpty(v)))
     ( status, hdrs, bd )

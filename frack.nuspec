@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>frack</id>
+    <version>0.1.0.0</version>
+    <authors>
+      <author>Ryan Riley</author> 
+    </authors>
+    <description>An implementation of NWSGI (.NET Web Server Gateway Interface) written in F#.</description>
+    <language>en-US</language>
+  </metadata>
+  <files src="build\*.dll" target="lib" />
+  <files src="build\*.xml" target="lib" />
+</package>
+

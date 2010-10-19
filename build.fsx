@@ -5,7 +5,7 @@ open Fake.MSBuild
 
 (* properties *)
 let projectName = "frack"
-let version = "0.1"  
+let version = "0.1.0.0"  
 
 (* Directories *)
 let buildDir = "./build/"
