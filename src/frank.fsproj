@@ -49,6 +49,8 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ByteString.fs" />
+    <Compile Include="EnumerableStream.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="FrankSpecs.fs" />
   </ItemGroup>

@@ -4,6 +4,11 @@ open System.Collections.Generic
 open System.Text.RegularExpressions
 open Frack
 
+module Dict =
+  let toSeq (d:IDictionary<_,_>) = d |> Seq.map (fun (KeyValue(k,v)) -> (k,v))
+  let toArray (d:IDictionary<_,_>) = d |> toSeq |> Seq.toArray
+  let toList (d:IDictionary<_,_>) = d |> toSeq |> Seq.toList
+
 type Agent<'T> = MailboxProcessor<'T>
 
 /// Defines available response types.

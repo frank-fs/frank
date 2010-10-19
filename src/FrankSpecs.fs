@@ -44,8 +44,7 @@ module FrankAppSpecs =
 
   [<Scenario>]
   let ``When creating a Frank application, it should respond with Hello world!``() =
-    let helloworld = FrankApp [
-                       get "/" (fun _ -> Object(Str("Hello world!"))) ] 
+    let helloworld = FrankApp [ get "/" (fun _ -> Object(Str("Hello world!"))) ] 
     let ``invoking an hello world app`` (app:FrankApp) =
       printMethod ""
       let url = Uri("http://wizardsofsmart.net/") 
