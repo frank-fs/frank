@@ -6,12 +6,30 @@ let slicing start stop arr =
   printMethod ""
   arr |> ArrayEx.slice start stop
 
-[<ScenarioTemplate(0, 1, [|1|])>]
-[<ScenarioTemplate(0, 2, [|1;2|])>]
-[<ScenarioTemplate(2, 5, [|3;4;5|])>]
-[<ScenarioTemplate(2,-3, [|3;4|])>]
-let ``When slicing an array`` (arr, start, stop, result) =
+[<Scenario>]
+let ``When slicing the first element of an array``() =
   Given [|1..7|]
-  |> When (slicing start stop)
-  |> It should equal result
+  |> When (slicing 0 1)
+  |> It should equal [|1|]
+  |> Verify
+
+[<Scenario>]
+let ``When slicing the first two elements of an array``() =
+  Given [|1..7|]
+  |> When (slicing 0 2)
+  |> It should equal [|1;2|]
+  |> Verify
+
+[<Scenario>]
+let ``When slicing the third through fifth elements of an array``() =
+  Given [|1..7|]
+  |> When (slicing 2 5)
+  |> It should equal [|3;4;5|]
+  |> Verify
+
+[<Scenario>]
+let ``When slicing the third through the third from last elements of an array``() =
+  Given [|1..7|]
+  |> When (slicing 2 -3)
+  |> It should equal [|3;4|]
   |> Verify
