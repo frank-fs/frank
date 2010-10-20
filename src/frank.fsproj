@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArrayEx.fs" />
+    <Compile Include="ArrayExSpecs.fs" />
     <Compile Include="ByteString.fs" />
     <Compile Include="EnumerableStream.fs" />
     <Compile Include="Frank.fs" />

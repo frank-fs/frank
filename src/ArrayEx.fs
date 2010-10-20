@@ -2,8 +2,8 @@
 
 [<AutoOpen>]
 module ArrayEx =
-  let slice start end' (source:'a[]) =
-    let e = ref end'
-    if !e < 0 then e := source.Length + !e
-    let len = !e - start
+  let slice start stop (source:'a[]) =
+    let stop' = ref stop
+    if !stop' < 0 then stop' := source.Length + !stop'
+    let len = !stop' - start
     [| for i in [0..(len-1)] do yield source.[i + start] |]
