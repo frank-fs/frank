@@ -56,6 +56,7 @@
     <Compile Include="ArrayExSpecs.fs" />
     <Compile Include="ByteString.fs" />
     <Compile Include="EnumerableStream.fs" />
+    <Compile Include="EnumerableStreamSpecs.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="FrankSpecs.fs" />
   </ItemGroup>
