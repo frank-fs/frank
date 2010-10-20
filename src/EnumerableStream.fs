@@ -25,7 +25,6 @@ type EnumerableStream(data: seq<byte>) =
     Contract.Requires(buffer <> null)
     Contract.Requires(offset >= 0)
     Contract.Requires(count > 0)
-
     if offset + count > buffer.Length then
       raise (System.ArgumentException("offset + count exceeds buffer size"))
     let readc = ref 0
@@ -36,13 +35,11 @@ type EnumerableStream(data: seq<byte>) =
     !readc
 
 [<AutoOpen>]
-module EnumStream =
-
+module EStream =
   /// Converts a <see cref="Stream"/> into a byte seq.
-  let streamToSeq (bufferSize:int) (stream:Stream) =
+  let toSeq (bufferSize:int) (stream:Stream) =
     Contract.Requires(stream <> null)
     Contract.Requires(bufferSize > 0)
-
     let buffer = Array.init bufferSize byte
     let count = ref 0
     count := stream.Read(buffer, 0, buffer.Length)
@@ -53,10 +50,9 @@ module EnumStream =
     }
 
   /// Converts a <see cref="Stream"/> into a byte[] seq.
-  let streamToSeqChunks (bufferSize:int) (stream:Stream) =
+  let toSeqChunks (bufferSize:int) (stream:Stream) =
     Contract.Requires(stream <> null)
     Contract.Requires(bufferSize > 0)
-
     let buffer = Array.init bufferSize byte
     let count = ref 0
     count := stream.Read(buffer, 0, buffer.Length)
@@ -69,22 +65,22 @@ module EnumStream =
 
   /// Extensions to <see cref="Stream"/>.
   type Stream with
-    member this.ToEnumerable() = streamToSeq 1024 this
-    member this.ToEnumerableChunks() = streamToSeqChunks 1024 this
+    member this.ToEnumerable() = toSeq 1024 this
+    member this.ToEnumerableChunks() = toSeqChunks 1024 this
     
+module EFileInfo =
   /// Converts a <see cref="FileInfo"/> into a byte seq.
-  let fileInfoToSeq (file:FileInfo) =
+  let toSeq (file:FileInfo) =
     Contract.Requires(file <> null)
-
     use stream = file.OpenRead()
     seq { for x in stream.ToEnumerable() do yield x }
 
   /// Extensions to <see cref="FileInfo"/>.
   type FileInfo with
-    member this.ToEnumerable() = fileInfoToSeq this
+    member this.ToEnumerable() = toSeq this
 
 [<AutoOpen>]
-module SeqEx =
+module ByteSeq =
   /// Converts a byte seq into a <see cref="Stream"/>.
   let toStream (source:seq<byte>) =
     Contract.Requires(source <> null)
