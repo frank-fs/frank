@@ -19,7 +19,6 @@ Thumbs.db
 *.cache
 *.ilk
 *.log
-*_Spliced.*proj
 [Bb]in
 [Dd]ebug*/
 *.lib
@@ -31,4 +30,6 @@ _ReSharper*/
 build/
 deploy/
 docs/
+tools/FAKE/templates/
 test/
+*_Spliced.*
