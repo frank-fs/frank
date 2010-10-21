@@ -38,9 +38,6 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Contracts">
-      <HintPath>..\lib\Microsoft.Contracts.dll</HintPath>
-    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="NaturalSpec">
       <HintPath>..\tools\NaturalSpec\NaturalSpec.dll</HintPath>
@@ -52,11 +49,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ArrayEx.fs" />
-    <Compile Include="ArrayExSpecs.fs" />
-    <Compile Include="ByteString.fs" />
-    <Compile Include="EnumerableStream.fs" />
-    <Compile Include="EnumerableStreamSpecs.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="FrankSpecs.fs" />
   </ItemGroup>
