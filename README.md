@@ -15,11 +15,14 @@ Define a Frank application:
 
 Todo / Design decisions
 ============
-1. Are discriminated unions really best, or should we go with plain objects?
-2. Should routing filters be stored in a lookup dictionary to find the appropriate handler?
-3. Apply a better pattern match to path filters.
+1. Choice: Discriminated union or explicit cast?
+  1. If the former, don't rely on Frack.Value but create a Frank specific type.
+  2. If the latter, how do you prevent the implementer from having to use `:> obj` everywhere?
+2. Should routing filters be stored in a lookup dictionary to find the appropriate handler? (done)
+3. Apply a better pattern match to path filters. (done - Regex)
 4. Create a params hash from the incoming request.
-5. Is model binding a good idea or should that be another layer? 
+<del>5. Is model binding a good idea or should that be another layer?</del>
+5. Introduce the State monad for retrieving/writing Request/Response throughout app composition.
 6. Samples
 
 Team
