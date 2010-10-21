@@ -19,7 +19,7 @@ Todo / Design decisions
     * If the former, don't rely on Frack.Value but create a Frank specific type.
     * If the latter, how do you prevent the implementer from having to use `:> obj` everywhere?
 2. Should routing filters be stored in a lookup dictionary to find the appropriate handler? (done)
-3. Apply a better pattern match to path filters. (done - Regex)
+3. Apply a better pattern match to path filters. (done - Regex via Active Patterns)
 4. Create a params hash from the incoming request.
 5. <del>Is model binding a good idea or should that be another layer?</del>
 6. Introduce the State monad for retrieving/writing Request/Response throughout app composition.
