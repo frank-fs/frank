@@ -50,7 +50,7 @@ module FrankAppSpecs =
       let url = Uri("http://wizardsofsmart.net/") 
       let request = getRequest "GET" url (StringBuilder()) 
       let status, hdrs, value = app.Invoke(request)
-      value |> Seq.head
+      value |> Seq.head |> ByteString.toString
     Given helloworld
     |> When ``invoking an hello world app``
     |> It should equal "Hello world!" 

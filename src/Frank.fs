@@ -66,8 +66,8 @@ type FrankApp(routes: seq<string * Route>) =
     | Object(obj) -> let content = match obj with
                                    | Str(value) -> value
                                    | _ -> obj.ToString()
-                     (200, dict[("Content_Length", content.Length.ToString())], seq { yield content })
-    | _ -> (404, dict[("Content_Length", "9")], seq { yield "Not found" })
+                     (200, dict[("Content_Length", content.Length.ToString())], seq { yield ByteString.fromString content })
+    | _ -> (404, dict[("Content_Length", "9")], seq { yield ByteString.fromString "Not found" })
 
   /// Finds the appropriate handler from the router and invokes it.
   member this.Invoke(request: Frack.Request) =
