@@ -1,6 +1,6 @@
-﻿module MiddlewareSpecs
+﻿module MiddlewaresSpecs
 open Frack
-open Frack.Middleware
+open Frack.Middlewares
 open NaturalSpec
 open BaseSpecs
 
@@ -35,12 +35,9 @@ let ``When adding the printRequest middleware, the body should include more than
   let request = getUtility "GET"
   let ``running a middleware to print the request`` request =
     printMethod ""
-    let printUtility = printRequest app 
-    let result = printUtility request
-    match result with
-    | _, _, bd -> bd |> Seq.map (ByteString.toString) |> Seq.iter (printfn "%s")
+    let result = match printRequest app request with _, _, bd -> bd
     result
   Given request
   |> When ``running a middleware to print the request``
-  |> It should have (fun result -> match result with _, _, bd -> bd |> Seq.length > 1)
+  |> It should have (fun r -> r |> Seq.length > 1)
   |> Verify

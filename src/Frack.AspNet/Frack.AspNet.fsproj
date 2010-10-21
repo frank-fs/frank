@@ -50,7 +50,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Frack.AspNet.fs" />
-    <Compile Include="Frack.AspNetSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\Frack.fsproj">

@@ -1,7 +1,7 @@
 ﻿namespace Frack
 open System
 
-module Middleware =
+module Middlewares =
   let printRequest (app: App) = fun request ->
     let status, hdrs, body = app.Invoke(request)
     let vars = seq { for key in request.Keys do
@@ -12,7 +12,7 @@ module Middleware =
                                    | Inp(v) -> v.ToString()
                                    | Ver(v) -> v.[0].ToString() + "." + v.[1].ToString()
                        yield key + " => " + value }
-               |> Seq.filter (fun v -> String.IsNullOrEmpty(v))
+               |> Seq.filter (fun v -> not(String.IsNullOrEmpty(v)))
                |> Seq.map (ByteString.fromString)
     let bd = seq { yield! body; yield! vars }
     ( status, hdrs, bd )
