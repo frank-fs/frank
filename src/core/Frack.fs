@@ -47,5 +47,6 @@ module Core =
   /// Reads a Frack.Value and returns a string result.
   let read value = match value with
                    | Str(v) -> v
-                   | Ver(v) -> sprintf "%d\.%d" v.[0] v.[1] 
-                   | _ -> value.ToString()
+                   | Int(v) -> v.ToString()
+                   | Ver(v) -> sprintf "%d.%d" v.[0] v.[1] 
+                   | _      -> value.ToString()

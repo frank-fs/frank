@@ -18,28 +18,31 @@ Usage
 
 Takes an environment and returns a triple of status code, headers, and body.
     
-    > let app env =
-    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } )
+    > // Using an App delegate instead of a pure function for better C#/VB interop.
+    > let app env = App(fun env ->
+    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } ))
     
-    val app : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
+    val app : App
 
 ### Define a middleware
 
 Takes an app and returns an app.
 
-    > open Frack.Utility
-    > fun env -> let status, hdrs, body = app env
-    >            match env?HTTP_METHOD with
-    >              | Str "HEAD" -> ( status, hdrs, Seq.empty )
-    >              | _ -> ( status, hdrs, body )
+    > let head = App(fun env ->
+    >   let status, hdrs, body = app env
+    >   match env?HTTP_METHOD with
+    >   | Str "HEAD" -> ( status, hdrs, Seq.empty )
+    >   | _ -> ( status, hdrs, body ))
 
-    val head : (IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>) -> IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
+    val head : App
 
 ### Add middlewares to an app.
 
-    > let myApp = app >> head >> auth >> logging
+    > // I want to get back to the previous approach:
+    > // let myApp = app >> head >> auth >> logging
+    > let myApp = logging auth head app
     
-    val myApp : IDictionary<string,Value> -> int * IDictionary<string,string> * seq<string>
+    val myApp : App
 
 Other
 ============
