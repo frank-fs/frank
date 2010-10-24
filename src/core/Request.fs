@@ -38,13 +38,13 @@ type Request(env:Environment) =
   member this.HttpMethod = read env?HTTP_METHOD
 
   /// Gets the dictionary of url-form-encoded values.
-  member this.Form = dict urlFormEncoded
+  member this.Post = dict urlFormEncoded
 
   /// Gets a dictionary containing the values from the query string and url-form-encoded values.
   member this.Params = seq { yield! queryString; yield! urlFormEncoded } |> dict
 
   /// Gets a dictionary of query string values.
-  member this.QueryString = dict queryString
+  member this.Get = dict queryString
 
   /// Gets the requested uri.
   member this.Uri = uri
