@@ -17,10 +17,20 @@ type Request(env:Environment) =
     // Parse the input stream and the url-form-encoded values.
     seq { yield ("","") }
 
+  // Parse the query string into a dictionary.
   let queryString =
     match env?QUERY_STRING with
     | Str(query) -> query.Split('&') |> Seq.filter isNotNullOrEmpty |> Seq.map ((|/) '&')
     | _          -> Seq.empty
+
+  // Reconstruct the uri.
+  let uri = System.Uri(
+              (read env?url_scheme) + "://" +
+              (read env?SERVER_NAME) +
+              (match env?SERVER_PORT with Int(v) when v <> 80 -> ":" + v.ToString() | _ -> "") +
+              (read env?SCRIPT_NAME) +
+              (read env?PATH_INFO) +
+              (match env?QUERY_STRING with Str(v) when isNotNullOrEmpty v -> "?" + v | _ -> ""))
 
   /// Gets a dictionary of headers
   member this.Headers = env |> Seq.choose headers |> dict
@@ -35,3 +45,6 @@ type Request(env:Environment) =
 
   /// Gets a dictionary of query string values.
   member this.QueryString = dict queryString
+
+  /// Gets the requested uri.
+  member this.Uri = uri
