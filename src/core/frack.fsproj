@@ -48,7 +48,9 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ByteString.fs" />
     <Compile Include="Frack.fs" />
+    <Compile Include="Extensions.fs" />
     <Compile Include="BaseSpecs.fs" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="UtilitySpecs.fs" />
