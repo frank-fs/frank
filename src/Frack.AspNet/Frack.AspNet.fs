@@ -21,7 +21,7 @@ module AspNet =
             yield ("SERVER_PORT", Str (this.Request.Url.Port.ToString()))
             yield! this.Request.Headers.AsEnumerable()
             yield ("url_scheme", Str this.Request.Url.Scheme)
-            yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-            yield ("input", Inp (TextReader.Synchronized(new StreamReader(this.Request.InputStream))))
+            yield ("errors", Err ByteString.empty)
+            yield ("input", Inp (this.Request.InputStream.ToByteString()))
             yield ("version", Ver [|0;1|] )
           } |> dict

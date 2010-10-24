@@ -5,15 +5,14 @@ open Frack
 open NaturalSpec
 open BaseSpecs
 
-let errors = StringBuilder()
-let request = getRequest "GET" errors
+let env = getEnv "GET"
 
 [<Scenario>]
-let ``When given an requestironment, it should provide a version of 0.1``() =
-  let ``retrieving the version`` request =
+let ``When given an environment, it should provide a version of 0.1``() =
+  let ``retrieving the version`` env =
     printMethod ""
-    request?version
-  Given request
+    env?version
+  Given env
   |> When ``retrieving the version``
   |> It should equal (Ver [|0;1|])
   |> Verify
@@ -24,14 +23,14 @@ let ``getting path parts`` (path:string) =
   
 [<Scenario>]
 [<FailsWithType (typeof<ArgumentNullException>)>]
-let ``When getting the parts of null, the request should fail with an ArgumentNullException``() =
+let ``When getting the parts of null, the env should fail with an ArgumentNullException``() =
   Given null
   |> When ``getting path parts``
   |> Verify 
     
 [<Scenario>]
 [<FailsWithType (typeof<ArgumentNullException>)>]
-let ``When getting the parts of "", the request should fail with an ArgumentNullException``() =
+let ``When getting the parts of "", the env should fail with an ArgumentNullException``() =
   Given ""
   |> When ``getting path parts``
   |> Verify 

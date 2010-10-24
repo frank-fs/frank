@@ -19,7 +19,7 @@ module Kayak =
             yield ("SERVER_PORT", Str (url.Port.ToString()))
             for header in this.Request.Headers do yield (header.Name, Str header.Value)
             yield ("url_scheme", Str url.Scheme)
-            yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-            yield ("input", Inp (TextReader.Synchronized(new StreamReader(this.Request.Body))))
+            yield ("errors", Err ByteString.empty)
+            yield ("input", Inp (this.Request.Body.ToByteString()))
             yield ("version", Ver [|0;1|] )
           } |> dict

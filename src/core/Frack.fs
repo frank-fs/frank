@@ -14,6 +14,13 @@ module Array =
     let len = !stop' - start
     [| for i in [0..(len-1)] do yield source.[i + start] |]
 
+/// Extensions to dictionaries.
+[<AutoOpen>]
+module Dict =
+  let toSeq d = d |> Seq.map (fun (KeyValue(k,v)) -> (k,v))
+  let toArray (d:IDictionary<_,_>) = d |> toSeq |> Seq.toArray
+  let toList (d:IDictionary<_,_>) = d |> toSeq |> Seq.toList
+
 /// An immutable byte sequence.
 /// <remarks>Alias of byte seq.</remarks>
 type bytestring = seq<byte>
@@ -53,11 +60,16 @@ type SeqStream(data:bytestring) =
 /// Module to transform a string into an immutable list of bytes and back.
 [<AutoOpen>]
 module ByteString =
+  open System.Text
+
+  /// An empty byte string.
+  let empty = Seq.empty<byte>
+
   /// Converts a byte string into a string.
-  let toString (bs:bytestring) = System.Text.Encoding.UTF8.GetString(bs |> Seq.toArray)
+  let toString (bs:bytestring) = Encoding.UTF8.GetString(bs |> Seq.toArray)
 
   /// Converts a string into a byte string.
-  let fromString (s: string) : bytestring = System.Text.Encoding.UTF8.GetBytes(s) |> Array.toSeq
+  let fromString (s: string) : bytestring = Encoding.UTF8.GetBytes(s) |> Array.toSeq
 
   /// Converts a stream into a byte string.
   let fromStream (bufferSize:int) (stream:Stream) : bytestring =
@@ -114,18 +126,18 @@ module ByteString =
 type Value =
   | Str of string
   | Int of int
-  | Err of TextWriter
-  | Inp of TextReader
+  | Err of bytestring
+  | Inp of bytestring
   | Ver of int array
 
 /// Defines the type for a Frack request.
-type Request = IDictionary<string, Value>
+type Environment = IDictionary<string, Value>
 
 /// Defines the type for a Frack response.
 type Response = int * IDictionary<string, string> * seq<bytestring>
 
 /// Defines the type for a Frack application.
-type App = delegate of Request -> Response
+type App = delegate of Environment -> Response
 
 /// Defines the type for a Frack middleware.
 type Middleware = delegate of App -> Response
@@ -164,3 +176,47 @@ module Utility =
   /// Generic duck-typing operator.
   /// <see href="http://weblogs.asp.net/podwysocki/archive/2009/06/11/f-duck-typing-and-structural-typing.aspx" />
   let inline implicit arg = ( ^a : (static member op_Implicit : ^b -> ^a) arg)
+
+  let isNotNullOrEmpty s = not (String.IsNullOrEmpty(s))
+
+  /// Reads a Frack.Value and returns a string result.
+  let read value = match value with
+                   | Str(v) -> v
+                   | Ver(v) -> sprintf "%d\.%d" v.[0] v.[1] 
+                   | _ -> value.ToString()
+
+/// A helper type that parses an environment into more readily usable pieces.
+type Request(env:Environment) =
+  /// Creates a tuple from the first two values returned from a string split on the specified split character.
+  let (|/) (split:char) (input:string) =
+    if input |> isNotNullOrEmpty then
+      let p = input.Split(split) in (p.[0], if p.Length > 1 then p.[1] else "")
+    else ("","") // This should never be reached but has to be here to satisfy the return type.
+
+  /// Tests a key value pair and returns Some(header, value) for true header values; otherwise None.
+  let headers (KeyValue(header, value)) =
+    let nonHeaders = ["HTTP_METHOD";"SCRIPT_NAME";"PATH_INFO";"QUERY_STRING";"url_scheme";"errors";"input";"version"]
+    if nonHeaders |> Seq.exists ((=) header) then None else Some(header, read value)
+
+  let urlFormEncoded =
+    // Parse the input stream and the url-form-encoded values.
+    seq { yield ("","") }
+
+  let queryString =
+    match env?QUERY_STRING with
+    | Str(query) -> query.Split('&') |> Seq.filter isNotNullOrEmpty |> Seq.map ((|/) '&')
+    | _          -> Seq.empty
+
+  /// Gets a dictionary of headers
+  member this.Headers = env |> Seq.choose headers |> dict
+
+  member this.HttpMethod = read env?HTTP_METHOD
+
+  /// Gets the dictionary of url-form-encoded values.
+  member this.Form = dict urlFormEncoded
+
+  /// Gets a dictionary containing the values from the query string and url-form-encoded values.
+  member this.Params = seq { yield! queryString; yield! urlFormEncoded } |> dict
+
+  /// Gets a dictionary of query string values.
+  member this.QueryString = dict queryString
