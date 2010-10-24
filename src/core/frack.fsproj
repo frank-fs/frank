@@ -54,6 +54,7 @@
     <Compile Include="UtilitySpecs.fs" />
     <Compile Include="PathSpecs.fs" />
     <Compile Include="FrackSpecs.fs" />
+    <Compile Include="Request.fs" />
     <Compile Include="Middlewares.fs" />
     <Compile Include="MiddlewaresSpecs.fs" />
   </ItemGroup>
