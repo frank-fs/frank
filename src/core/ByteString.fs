@@ -26,6 +26,8 @@ type bytestring = seq<byte>
 
 /// Initializes a new instance of the SeqStream class.
 /// <param name="data">The bytes for the enumerable stream.</param>
+/// <remarks>The implementation is derived from Bent Rasumssen's Extensia project.</remarks>
+/// <see href="http://extensia.codeplex.com"/>
 type SeqStream(data:bytestring) =
   inherit Stream()
   do if data = null then raise (ArgumentNullException("data"))
@@ -57,6 +59,8 @@ type SeqStream(data:bytestring) =
     !readc
 
 /// Module to transform a string into an immutable list of bytes and back.
+/// <remarks>Several extensions derived from Bent Rasumssen's Extensia project.</remarks>
+/// <see href="http://extensia.codeplex.com"/>
 [<AutoOpen>]
 module ByteString =
   open System.Text
