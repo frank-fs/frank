@@ -9,7 +9,7 @@ Define a Frank application:
 
     > let myApp = FrankApp [
     >   get "/" (fun _ -> Str "Hello world!")
-    >   post "/order" (fun params -> Obj createOrder(params))
+    >   post "/order" (fun params -> Obj (createOrder params))
     > ]
     > let frackApp = (myApp.Invoke)
 

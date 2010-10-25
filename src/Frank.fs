@@ -4,11 +4,6 @@ open System.Collections.Generic
 open System.Text.RegularExpressions
 open Frack
 
-module Dict =
-  let toSeq d = d |> Seq.map (fun (KeyValue(k,v)) -> (k,v))
-  let toArray (d:IDictionary<_,_>) = d |> toSeq |> Seq.toArray
-  let toList (d:IDictionary<_,_>) = d |> toSeq |> Seq.toList
-
 /// Defines available response types.
 type FrankResponse =
   | Obj of obj
@@ -31,8 +26,6 @@ type Route = { Pattern: Regex
 
 [<AutoOpen>]
 module Routing =
-  open Frack.Utility
-
   /// Pulled from <see href="http://www.markhneedham.com/blog/2009/05/10/f-regular-expressionsactive-patterns/" />.
   let (|Match|_|) pattern input =
     let m = Regex.Match(input, pattern) in
@@ -86,12 +79,12 @@ type FrankApp(routes: seq<string * Route>) =
     | _ -> (404, dict[("Content_Length", "9")], seq { yield ByteString.fromString "Not found" })
 
   /// Finds the appropriate handler from the router and invokes it.
-  member this.Invoke(request:Request) =
-    let read value = match value with | Frack.Str(v) -> v | _ -> value.ToString()
-    let httpMethod = read request?HTTP_METHOD
+  member this.Invoke(env:Environment) =
+    let request = Request(env)
+    let httpMethod = request.HttpMethod
     let response =
       if router.ContainsKey(httpMethod) then
-        let path = read request?SCRIPT_NAME + "/" + read request?PATH_INFO
+        let path = request.Uri.AbsolutePath
         // TODO: Switch to the Match Active Pattern.
         router.[httpMethod]
         |> Seq.filter (fun r -> r.Pattern.IsMatch(path))

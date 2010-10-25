@@ -22,8 +22,8 @@ module Fakes =
           yield ("SERVER_PORT", Frack.Str (url.Port.ToString()))
           yield! [|("HTTP_TEST", Frack.Str "value");("REQUEST_METHOD", Frack.Str m)|]
           yield ("url_scheme", Frack.Str url.Scheme)
-          yield ("errors", Err (TextWriter.Synchronized(new StringWriter(errors))))
-          yield ("input", Inp (TextReader.Synchronized(new StreamReader(new MemoryStream(Encoding.UTF8.GetBytes("Howdy")) :> Stream))))
+          yield ("errors", Err ByteString.empty)
+          yield ("input", Inp (ByteString.fromString "Howdy"))
           yield ("version", Ver [|0;1|] )
         } |> dict
 
