@@ -6,7 +6,7 @@ open BaseSpecs
 
 let ``running a middleware for a`` m env =
   printMethod m
-  (head app).Invoke(env)
+  head app env
     
 [<Scenario>]
 let ``When running a middleware on an app handling a GET request, the body should be left alone.``() =
@@ -29,7 +29,7 @@ let ``When adding the printRequest middleware, the body should include more than
   let env = getEnv "GET"
   let ``running a middleware to print the env`` env =
     printMethod ""
-    let result = match (printEnvironment app).Invoke(env) with _, _, bd -> bd
+    let result = match (printEnvironment app env) with _, _, bd -> bd
     result
   Given env
   |> When ``running a middleware to print the env``

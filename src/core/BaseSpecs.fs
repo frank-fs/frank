@@ -24,4 +24,4 @@ let getEnv m =
 
 let hdrs = dict [| ("Content_Type","text/plain");("Content_Length","5") |] 
 let body = seq { yield ByteString.fromString "Howdy" } 
-let app = App(fun request -> ( 200, hdrs, body ))
+let app = fun request -> ( 200, hdrs, body )

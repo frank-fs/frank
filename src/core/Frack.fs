@@ -18,10 +18,10 @@ type Environment = IDictionary<string, Value>
 type Response = int * IDictionary<string, string> * seq<bytestring>
 
 /// Defines the type for a Frack application.
-type App = delegate of Environment -> Response
+type App = Environment -> Response
 
 /// Defines the type for a Frack middleware.
-type Middleware = delegate of App -> Response
+type Middleware = App -> Response
 
 [<AutoOpen>]
 module Core =

@@ -22,11 +22,8 @@ open Frack.Middlewares
 open Frack.HttpListener
 
 // Simple Frack app
-let app = App(fun env ->
-  (200, dict [("Content_Type","text/plain");("Content_Length","5")], seq { yield ByteString.fromString "Howdy" }))
-
-// Simple Frack app with middleware
-let midApp = printEnvironment app
+let app env = 
+  (200, dict [("Content_Type","text/plain");("Content_Length","5")], seq { yield ByteString.fromString "Howdy" })
 
 // Set up and start an HttpListener
 let listener = new HttpListener()
@@ -39,8 +36,8 @@ let context = listener.GetContext()
 // This is where Frack takes over.
 let env = context.ToFrackEnvironment()
 printfn "Received a %s request" (read env?HTTP_METHOD)
-//app.Invoke(env) |> write context.Response
-midApp.Invoke(env) |> write context.Response
+//app env |> write context.Response
+printEnvironment app env |> write context.Response
 // Done.
 
 listener.Close()

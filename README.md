@@ -18,9 +18,8 @@ Usage
 
 Takes an environment and returns a triple of status code, headers, and body.
     
-    > // Using an App delegate instead of a pure function for better C#/VB interop.
-    > let app env = App(fun env ->
-    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } ))
+    > let app env =
+    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } )
     
     val app : App
 
@@ -38,9 +37,7 @@ Takes an app and returns an app.
 
 ### Add middlewares to an app.
 
-    > // I want to get back to the previous approach:
-    > // let myApp = app >> head >> auth >> logging
-    > let myApp = logging auth head app
+    > let myApp = printEnvironment head app
     
     val myApp : App
 
