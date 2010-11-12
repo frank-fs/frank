@@ -3,7 +3,6 @@ open System
 open System.Collections.Generic
 open System.Net
 open Microsoft.Http
-open Frack
 
 [<AutoOpen>]
 module Core =
@@ -13,55 +12,52 @@ module Core =
   type App = Func<HttpRequestMessage, HttpResponseMessage>
 
   /// Defines a handler for responding requests.
-  type FrankHandler = State<unit, HttpRequestMessage * IDictionary<string, string> * HttpResponseMessage>
+  type FrankHandler = IDictionary<string,string> -> State<HttpResponseMessage, HttpRequestMessage * HttpResponseMessage>
 
   let frank = State.StateBuilder()
 
   /// Gets the current state of the request.
   let getRequest = frank {
-    let! (req:HttpRequestMessage, _:IDictionary<string,string>, _:HttpResponseMessage) = getState
+    let! (req:HttpRequestMessage, _:HttpResponseMessage) = getState
     return req }
-
-  /// Gets the current state of the parameters.
-  let getParameters = frank {
-    let! (_:HttpRequestMessage, parms:IDictionary<string,string>, _:HttpResponseMessage) = getState
-    return parms }
 
   /// Gets the current state of the response.
   let getResponse = frank {
-    let! (_:HttpRequestMessage, _:IDictionary<string,string>, resp:HttpResponseMessage) = getState
+    let! (_:HttpRequestMessage, resp:HttpResponseMessage) = getState
     return resp }
 
   /// Updates the state of the request.
   let putRequest req = frank {
-    let! (_:HttpRequestMessage, parms:IDictionary<string,string>, resp:HttpResponseMessage) = getState
-    do! putState (req, parms, resp) }
+    let! (_:HttpRequestMessage, resp:HttpResponseMessage) = getState
+    do! putState (req, resp)
+    return resp }
 
   /// Updates the state of the response.
   let putResponse resp = frank {
-    let! (req:HttpRequestMessage, parms:IDictionary<string,string>, _:HttpResponseMessage) = getState
-    do! putState (req, parms, resp) }
+    let! (req:HttpRequestMessage, _:HttpResponseMessage) = getState
+    do! putState (req, resp)
+    return resp }
 
   /// Updates the state of the response content.
   let putContent content = frank {
-    let! (req:HttpRequestMessage, parms:IDictionary<string,string>, resp:HttpResponseMessage) = getState
+    let! (req:HttpRequestMessage, resp:HttpResponseMessage) = getState
     resp.StatusCode <- HttpStatusCode.OK
     resp.Content <- content
-    do! putState (req, parms, resp) }
+    do! putState (req, resp)
+    return resp }
 
   /// Updates the state of the response content with plain text.
   let putPlainText (content:string) = frank {
-    let! (req:HttpRequestMessage, parms:IDictionary<string,string>, resp:HttpResponseMessage) = getState
+    let! (req:HttpRequestMessage, resp:HttpResponseMessage) = getState
     resp.StatusCode <- HttpStatusCode.OK
     resp.Content <- HttpContent.Create(content, "text/plain")
-    do! putState (req, parms, resp) }
+    do! putState (req, resp)
+    return resp }
 
   // TODO: Add more helper methods to mutate only portions of the request or response objects.
 
   /// Runs the FrankHandler 
-  let run (h: FrankHandler) initialState =
-    let (_, _, resp) = exec h initialState
-    resp
+  let run (h: FrankHandler) parms initialState = eval (h parms) initialState
 
 [<AutoOpen>]
 module Routing =
@@ -124,6 +120,7 @@ module Routing =
 
 [<AutoOpen>]
 module FrankApp =
+  open Frack
   open Core
   open Routing
 
@@ -137,8 +134,29 @@ module FrankApp =
     // Matches the route and request to a registered route.
     let fromRoutes = function Route res -> Some(res) | _ -> None
 
+    // TODO: Move this into a functioning Frack helper.
+    let (|/) (split:char) (input:string) =
+      if input |> isNotNullOrEmpty then
+        let p = input.Split(split) in (p.[0], if p.Length > 1 then p.[1] else "")
+      else ("","") // This should never be reached but has to be here to satisfy the return type.
+    
+    // TODO: Move this into a functioning Frack helper.
+    let parseQueryString qs =
+      if isNotNullOrEmpty qs then
+        let query = qs.Trim('?')
+        // Using helpers from Frack.
+        query.Split('&') |> Seq.filter isNotNullOrEmpty |> Seq.map ((|/) '=')
+      else Seq.empty
+
     // Executes the handler on the current state of the application.
-    let toResponse (request, handler, parms) = run handler (request, parms, notFound)
+    let toResponse (request:HttpRequestMessage, handler, parms) =
+      // TODO: Pull url-form-encoded values, if any, off the request and stick them in the parms' dictionary.
+      let parms' =
+        seq {
+          yield! parms |> Dict.toSeq
+          yield! request.Uri.Query |> parseQueryString
+        } |> dict
+      run handler parms' (request, notFound)
 
     // Define the delegate that defines the Frank application. 
     let app = Func<_,_>(fun request ->

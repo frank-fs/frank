@@ -14,14 +14,14 @@ module HelloAppSpecs =
     let ``creating an app`` routes =
       printMethod ""
       FrankApp.init routes
-    Given [ get "/" (putPlainText "Hello world!") ]
+    Given [ get "/" (fun _ -> putPlainText "Hello world!") ]
     |> When ``creating an app``
     |> It should be (fun app -> app.GetType() = typeof<App>)
     |> Verify
 
   [<Scenario>]
   let ``When creating a Frank application, it should respond with Hello world!``() =
-    let helloworld = FrankApp.init [ get "/" (putPlainText "Hello world!") ] 
+    let helloworld = FrankApp.init [ get "/" (fun _ -> putPlainText "Hello world!") ] 
     let ``invoking an hello world app`` (app:App) =
       printMethod ""
       let url = Uri("http://wizardsofsmart.net/") 
