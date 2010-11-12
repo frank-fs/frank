@@ -14,6 +14,7 @@ module HttpListener =
     headers |> Dict.toSeq
             |> Seq.iter out.Headers.Add
     body    |> ByteString.transfer out.OutputStream 
+    out.Close()
 
   type System.Net.HttpListenerContext with
     /// Creates an environment variable from an <see cref="HttpListenerContext"/>.

@@ -8,8 +8,7 @@ module Middlewares =
     let vars = seq { for key in env.Keys do yield "\r\n" + key + " => " + (read env.[key]) }
                |> Seq.filter isNotNullOrEmpty
                |> Seq.map ByteString.fromString
-               |> Seq.concat
-    let bd = seq { yield! body; yield! vars }
+    let bd = seq { yield! body; for var in vars do yield! var }
     ( status, hdrs, bd )
 
   /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
