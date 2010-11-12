@@ -63,6 +63,8 @@ type SeqStream(data:bytestring) =
 /// <see href="http://extensia.codeplex.com"/>
 [<AutoOpen>]
 module ByteString =
+  open System.Runtime.Serialization
+  open System.Runtime.Serialization.Formatters.Binary
   open System.Text
 
   /// An empty byte string.
@@ -109,10 +111,26 @@ module ByteString =
     use stream = file.OpenRead()
     seq { for x in fromStream 1024 stream do yield x }
 
+  /// Converts an object to a byte seq.
+  let fromObject (o:obj) : bytestring =
+    let formatter = BinaryFormatter()
+    use stream = new MemoryStream()
+    try
+      formatter.Serialize(stream, o)
+      stream |> fromStream 1024
+    with :? SerializationException as e -> null
+
   /// Converts a byte string into a stream.
   let toStream (source:bytestring) =
     if source = null then raise (ArgumentNullException("source"))
     new SeqStream(source) :> Stream
+
+  /// Converts a byte string into an object.
+  let toObj (source:bytestring) =
+    let formatter = BinaryFormatter()
+    use stream = new MemoryStream(source |> Seq.toArray)
+    try formatter.Deserialize(stream)
+    with e -> null
 
   /// Transfers the bytes of a byte string into a stream
   let transfer (stream:Stream) (source:bytestring) =

@@ -37,6 +37,12 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Http">
+      <HintPath>..\..\lib\Microsoft.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Http.Extensions">
+      <HintPath>..\..\lib\Microsoft.Http.Extensions.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="NaturalSpec">
       <HintPath>..\..\tools\NaturalSpec\NaturalSpec.dll</HintPath>

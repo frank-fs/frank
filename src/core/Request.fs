@@ -1,7 +1,10 @@
 ﻿namespace Frack
+open Microsoft.Http
 
 /// A helper type that parses an environment into more readily usable pieces.
 type Request(env:Environment) =
+  let input = match env?input with Inp(bs) -> bs |> Seq.toArray | _ -> Array.init 0 byte
+  let request = new HttpRequestMessage(Content = HttpContent.Create(input))
   /// Creates a tuple from the first two values returned from a string split on the specified split character.
   let (|/) (split:char) (input:string) =
     if input |> isNotNullOrEmpty then
