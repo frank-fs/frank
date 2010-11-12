@@ -49,12 +49,19 @@ module Core =
     resp.Content <- content
     do! putState (req, parms, resp) }
 
+  /// Updates the state of the response content with plain text.
+  let putPlainText (content:string) = frank {
+    let! (req:HttpRequestMessage, parms:IDictionary<string,string>, resp:HttpResponseMessage) = getState
+    resp.StatusCode <- HttpStatusCode.OK
+    resp.Content <- HttpContent.Create(content, "text/plain")
+    do! putState (req, parms, resp) }
+
+  // TODO: Add more helper methods to mutate only portions of the request or response objects.
+
   /// Runs the FrankHandler 
   let run (h: FrankHandler) initialState =
     let (_, _, resp) = exec h initialState
     resp
-
-  // TODO: Add more helper methods to mutate only portions of the request or response objects.
 
 [<AutoOpen>]
 module Routing =
