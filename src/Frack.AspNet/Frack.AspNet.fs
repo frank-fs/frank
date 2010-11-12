@@ -11,10 +11,10 @@ module AspNet =
   let write (out:HttpResponseBase) (response:int * IDictionary<string,string> * bytestring) =
     let status, headers, body = response
     out.StatusCode <- status
-    headers |> Dict.toSeq
-            |> Seq.iter out.Headers.Add
+    // TODO: Get headers working. These should work fine in IIS pipeline mode.
+//    headers |> Dict.toSeq
+//            |> Seq.iter out.Headers.Add
     body    |> ByteString.transfer out.OutputStream 
-    out.Close()
 
   type System.Web.HttpContext with
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase

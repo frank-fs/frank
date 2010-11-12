@@ -60,7 +60,7 @@
     <Compile Include="MiddlewaresSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\core\frack.fsproj">
+    <ProjectReference Include="..\Frack.Core\frack.fsproj">
       <Name>frack</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
