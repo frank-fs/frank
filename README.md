@@ -19,7 +19,7 @@ Usage
 Takes an environment and returns a triple of status code, headers, and body.
     
     > let app env =
-    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], seq { yield "Howdy" } )
+    >   ( 200, dict [| ("Content-Type","text/plain");("Content-Length","5") |], ByteString.fromString "Howdy" )
     
     val app : App
 
@@ -30,7 +30,7 @@ Takes an app and returns an app.
     > let head = App(fun env ->
     >   let status, hdrs, body = app env
     >   match env?HTTP_METHOD with
-    >   | Str "HEAD" -> ( status, hdrs, Seq.empty )
+    >   | Str "HEAD" -> ( status, hdrs, ByteString.empty )
     >   | _ -> ( status, hdrs, body ))
 
     val head : App

@@ -3,23 +3,6 @@ open System
 open System.Collections.Generic
 open System.IO
 
-/// Extensions to the Array module.
-[<AutoOpen>]
-module Array =
-  /// Slices out a portion of the array from the start index up to the stop index.
-  let slice start stop (source:'a[]) =
-    let stop' = ref stop
-    if !stop' < 0 then stop' := source.Length + !stop'
-    let len = !stop' - start
-    [| for i in [0..(len-1)] do yield source.[i + start] |]
-
-/// Extensions to dictionaries.
-[<AutoOpen>]
-module Dict =
-  let toSeq d = d |> Seq.map (fun (KeyValue(k,v)) -> (k,v))
-  let toArray (d:IDictionary<_,_>) = d |> toSeq |> Seq.toArray
-  let toList (d:IDictionary<_,_>) = d |> toSeq |> Seq.toList
-
 /// An immutable byte sequence.
 /// <remarks>Alias of byte seq.</remarks>
 type bytestring = seq<byte>

@@ -37,12 +37,6 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Http">
-      <HintPath>..\..\lib\Microsoft.Http.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Http.Extensions">
-      <HintPath>..\..\lib\Microsoft.Http.Extensions.dll</HintPath>
-    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="NaturalSpec">
       <HintPath>..\..\tools\NaturalSpec\NaturalSpec.dll</HintPath>
@@ -54,17 +48,13 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ByteString.fs" />
-    <Compile Include="Frack.fs" />
     <Compile Include="Extensions.fs" />
-    <Compile Include="BaseSpecs.fs" />
     <Compile Include="ArraySpecs.fs" />
-    <Compile Include="UtilitySpecs.fs" />
+    <Compile Include="ByteString.fs" />
+    <Compile Include="Core.fs" />
+    <Compile Include="BaseSpecs.fs" />
     <Compile Include="PathSpecs.fs" />
     <Compile Include="FrackSpecs.fs" />
-    <Compile Include="Request.fs" />
-    <Compile Include="Middlewares.fs" />
-    <Compile Include="MiddlewaresSpecs.fs" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

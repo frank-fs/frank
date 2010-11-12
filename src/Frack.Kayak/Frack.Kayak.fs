@@ -1,21 +1,24 @@
 ﻿namespace Frack
 module Kayak =
   open System
+  open System.Collections.Generic
   open System.IO
   open System.Text
+  open Frack
   open Kayak
 
-  /// Writes the Frack response to the ASP.NET response.
-  let write (out:Kayak.IKayakServerResponse) (response:Frack.Response) =
+  /// Writes the Frack response to the Kayak response.
+  let write (out:Kayak.IKayakServerResponse) (response:int * IDictionary<string,string> * bytestring) =
     let status, headers, body = response
     out.StatusCode <- status
     headers |> Dict.toSeq
             |> Seq.iter out.Headers.Add
-    body    |> Seq.iter (ByteString.transfer out.Body) 
+    body    |> ByteString.transfer out.Body
+    // TODO: how do you signal completion?
 
   type IKayakContext with
     /// Creates an environment variable from an <see cref="HttpListenerContext"/>.
-    member this.ToFrackEnvironment() : Frack.Environment =
+    member this.ToFrackEnvironment() : Environment =
       let url = Uri(this.Request.RequestUri)
       seq { yield ("HTTP_METHOD", Str this.Request.Verb)
             yield ("SCRIPT_NAME", Str (url.AbsolutePath |> getPathParts |> fst))

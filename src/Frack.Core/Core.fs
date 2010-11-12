@@ -1,30 +1,27 @@
 ﻿#nowarn "77"
 namespace Frack
-open System
-open System.Collections.Generic
-
-/// Defines a discriminated union of types that may be provided in the Frack Request.
-type Value =
-  | Str of string
-  | Int of int
-  | Err of bytestring
-  | Inp of bytestring
-  | Ver of int array
-
-/// Defines the type for a Frack request.
-type Environment = IDictionary<string, Value>
-
-/// Defines the type for a Frack response.
-type Response = int * IDictionary<string, string> * seq<bytestring>
-
-/// Defines the type for a Frack application.
-type App = Environment -> Response
-
-/// Defines the type for a Frack middleware.
-type Middleware = App -> Response
-
 [<AutoOpen>]
 module Core =
+  open System
+  open System.Collections.Generic
+  
+  /// Defines a discriminated union of types that may be provided in the Frack Request.
+  type Value =
+    | Str of string
+    | Int of int
+    | Err of bytestring
+    | Inp of bytestring
+    | Ver of int array
+
+  /// Defines the type for a Frack request.
+  type Environment = IDictionary<string, Value>
+
+  /// Defines the type for a Frack application.
+  type App = Environment -> int * IDictionary<string, string> * bytestring
+
+  /// Defines the type for a Frack middleware.
+  type Middleware = App -> int * IDictionary<string, string> * bytestring
+
   /// Returns the script name and path info from a url.
   let getPathParts (path:string) =
     if String.IsNullOrEmpty(path) then raise (ArgumentNullException("path")) 
