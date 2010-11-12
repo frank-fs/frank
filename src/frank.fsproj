@@ -58,8 +58,10 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Frank.fs" />
-    <Compile Include="FrankSpecs.fs" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Routing.fs" />
+    <Compile Include="FrankApp.fs" />
+    <Compile Include="FrankAppSpecs.fs" />
   </ItemGroup>
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
