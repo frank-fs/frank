@@ -35,6 +35,9 @@
     <Reference Include="frack">
       <HintPath>..\lib\frack\build\frack.dll</HintPath>
     </Reference>
+    <Reference Include="Frack.Extensions">
+      <HintPath>..\lib\frack\build\Frack.Extensions.dll</HintPath>
+    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>

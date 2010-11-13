@@ -10,8 +10,11 @@ Usage
 Define a Frank application:
 
     > let myApp = FrankApp.init [
-    >   get "/" (fun _ -> putPlainText "Hello world!")
-    >   post "/order" (fun params -> putContent (createOrder params))
+    >   get "/" (putPlainText "Hello world!")
+    >   post "/order" (fun () -> frank {
+    >     let! p = getParams
+    >     createThingFromParams p
+    >     redirectTo "/" })
     >   // More to come...
     > ]
     val myApp : Func<HttpRequestMessage,HttpResponseMessage>

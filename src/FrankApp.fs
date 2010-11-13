@@ -19,29 +19,19 @@ module FrankApp =
     // Matches the route and request to a registered route.
     let fromRoutes = function Route res -> Some(res) | _ -> None
 
-    // TODO: Move this into a functioning Frack helper.
-    let (|/) (split:char) (input:string) =
-      if input |> isNotNullOrEmpty then
-        let p = input.Split(split) in (p.[0], if p.Length > 1 then p.[1] else "")
-      else ("","") // This should never be reached but has to be here to satisfy the return type.
-    
-    // TODO: Move this into a functioning Frack helper.
-    let parseQueryString qs =
-      if isNotNullOrEmpty qs then
-        let query = qs.Trim('?')
-        // Using helpers from Frack.
-        query.Split('&') |> Seq.filter isNotNullOrEmpty |> Seq.map ((|/) '=')
-      else Seq.empty
-
     // Executes the handler on the current state of the application.
     let toResponse (request:HttpRequestMessage, handler, parms) =
       // TODO: Pull url-form-encoded values, if any, off the request and stick them in the parms' dictionary.
       let parms' =
         seq {
           yield! parms |> Dict.toSeq
-          yield! request.Uri.Query |> parseQueryString
+          yield! request.Uri.Query |> Request.parseQueryString |> Dict.toSeq
         } |> dict
-      run handler parms' (request, notFound)
+      // Add the parameter dictionary to the request properties.
+      request.Properties.Add(parms')
+      // Eval the handler with the initial state of the request and a not found response.
+      // This returns an HttpResponseMessage.
+      run handler (request, notFound)
 
     // Define the delegate that defines the Frank application. 
     let app = Func<_,_>(fun request ->
@@ -52,3 +42,9 @@ module FrankApp =
       |> Seq.map toResponse
       |> Seq.head )
     app
+
+  /// Converts a Frank application into a Frack application.
+  let toFrack (app:Frank.Core.App) = fun env ->
+    env |> Request.fromFrack
+        |> app.Invoke
+        |> Response.toFrack
