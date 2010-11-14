@@ -25,8 +25,8 @@ module Middlewares =
     let overrideKey = "_method"
     let overrideHeader = "HTTP_X_HTTP_METHOD_OVERRIDE"
     let env' =
-      if env?HTTP_METHOD = Str "POST" then
-        let form = Request.parseUrlFormEncoded env?input
+      if env?HTTP_METHOD = Str "POST" && env?CONTENT_TYPE = Str "application/x-http-form-urlencoded" then
+        let form = match env?input with Inp(v) -> Request.parseFormUrlEncoded v | _ -> dict Seq.empty
         let m = if isNotNullOrEmpty form.[overrideKey] then
                   form.[overrideKey]
                 else read env.[overrideHeader]

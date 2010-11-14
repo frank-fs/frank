@@ -27,24 +27,30 @@ module Request =
       |> Seq.iter headers.Add
     headers
 
+  /// Decodes url encoded values.
+  let decodeUrl input = System.Uri.UnescapeDataString(input).Replace("+", " ")
+
   /// Creates a tuple from the first two values returned from a string split on the specified split character.
   let private (|/) (split:char) (input:string) =
     if input |> isNotNullOrEmpty then
       let p = input.Split(split) in (p.[0], if p.Length > 1 then p.[1] else "")
     else ("","") // This should never be reached but has to be here to satisfy the return type.
 
-  /// Parses the query string into an IDictionary<string,string>.
-  let parseQueryString query =
-    if query |> isNotNullOrEmpty then
-      query.Split('&')
+  /// Parses the url encoded string into an IDictionary<string,string>.
+  let private parseUrlEncodedString input =
+    if input |> isNotNullOrEmpty then
+      let data = decodeUrl input
+      data.Split('&')
         |> Seq.filter isNotNullOrEmpty
         |> Seq.map ((|/) '=')
         |> dict
     else dict Seq.empty
 
-  /// Parses the input stream for url-form-encoded values into an IDictionary<string,string>.
-  let parseUrlFormEncoded formData =
-    seq { yield ("","") } |> dict
+  /// Parses the query string into an IDictionary<string,string>.
+  let parseQueryString (query:string) = query.TrimStart('?') |> parseUrlEncodedString
+
+  /// Parses the input stream for x-http-form-urlencoded values into an IDictionary<string,string>.
+  let parseFormUrlEncoded (input:bytestring) = input |> ByteString.toString |> parseUrlEncodedString
 
   /// Creates an HttpRequestMessage from a Frack.Env.
   let fromFrack (env:Environment) =
