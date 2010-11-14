@@ -18,11 +18,13 @@ module FrankApp =
 
     // Executes the handler on the current state of the application.
     let toResponse (request:HttpRequestMessage, handler, parms) =
-      // TODO: Pull url-form-encoded values, if any, off the request and stick them in the parms' dictionary.
+      // Collect the passed in parameters, as well as query string and form-urlencoded parameters.
       let parms' =
         seq {
           yield! parms |> Dict.toSeq
           yield! request.Uri.Query |> Request.parseQueryString |> Dict.toSeq
+          if request.Content <> null && request.Content.ContentType = "application/x-http-form-urlencoded" then
+            yield! request.Content.ReadAsByteArray() |> Request.parseFormUrlEncoded |> Dict.toSeq
         } |> dict
       // Add the parameter dictionary to the request properties.
       request.Properties.Add(parms')
