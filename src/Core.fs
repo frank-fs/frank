@@ -12,7 +12,13 @@ type FrankHandler = State<unit, HttpRequestMessage * HttpResponseMessage>
 [<AutoOpen>]
 module Core =
   open System.Collections.Generic
+  open System.IO
   open System.Net
+  open System.Runtime.Serialization
+  open System.Xml
+  open System.Xml.Linq
+  open System.Xml.Serialization
+  open Frack
 
   /// Sets an instance of StateBuilder as the computation workflow for a Frank monad.
   let frank = State.StateBuilder()
@@ -45,6 +51,18 @@ module Core =
     let! (req:HttpRequestMessage, _:HttpResponseMessage) = getState
     do! putState (req, resp) }
 
+  /// Updates the state of the response headers with the specified name-value pair.
+  let appendHeader name (value:string) = frank {
+    let! resp = getResponse
+    resp.Headers.Add(name, value)
+    do! putResponse resp }
+
+  /// Updates the state of the response headers with the specified name-value pair.
+  let appendHeaderValues name (values:string[]) = frank {
+    let! resp = getResponse
+    resp.Headers.Add(name, values)
+    do! putResponse resp }
+
   /// Updates the state of the response content.
   let putContent content = frank {
     let! resp = getResponse
@@ -52,17 +70,45 @@ module Core =
     resp.Content <- content
     do! putResponse resp }
 
+  /// Updates the state of the response content with the provided bytestring as the specified content type.
+  let puts content contentType = putContent (HttpContent.Create(content |> Seq.toArray, contentType))
+
   /// Updates the state of the response content as text/plain.
-  let putText (content:string) = putContent (HttpContent.Create(content, "text/plain"))
+  let putText (content:string) = puts (ByteString.fromString content) "text/plain"
 
   /// Updates the state of the response content as text/html.
-  let putHtml (content:string) = putContent (HttpContent.Create(content, "text/html"))
+  let putHtml (content:string) = puts (ByteString.fromString content) "text/html"
 
   /// Updates the state of the response content as text/json.
-  let putJson (content:string) = putContent (HttpContent.Create(content, "text/json"))
+  let putJson (content:string) = puts (ByteString.fromString content) "application/json"
 
-  /// Updates the state of the response content as application/xml.
-  let putXml (content:string) = putContent (HttpContent.Create(content, "application/xml"))
+  /// Updates the state of the response content as the specified content type.
+  let putXml (content:XElement) contentType =
+    use stream = new MemoryStream()
+    use writer = XmlWriter.Create(stream)
+    content.Save(writer)
+    puts (stream.ToByteString()) contentType
+
+  /// Updates the state of the response content serialized using the serialize function as the specified content type.
+  let putSerialized content contentType serialize =
+    use stream = new MemoryStream()
+    serialize(stream, content)
+    puts (stream.ToByteString()) contentType
+
+  /// Updates the state of the response content serialized with a data contract as application/json.
+  let putAsJson content =
+    let serializer = System.Runtime.Serialization.Json.DataContractJsonSerializer(content.GetType())
+    putSerialized content "application/json" serializer.WriteObject
+
+  /// Updates the state of the response content with content object serialized as XML as the specified content type.
+  let putAsXml content contentType =
+    let serializer = XmlSerializer(content.GetType())
+    putSerialized content contentType serializer.Serialize
+
+  /// Updates the state of the response content serialized with a data contract as the specified content type.
+  let putDataContract content contentType =
+    let serializer = DataContractSerializer(content.GetType())
+    putSerialized content contentType serializer.WriteObject
 
   /// Updates the response state with a redirect, setting the status code to 303
   /// and the location header to the specified url.
