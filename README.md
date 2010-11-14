@@ -14,7 +14,7 @@ Define a Frank application:
     >   post "/order" (fun () -> frank {
     >     let! p = getParams
     >     createThingFromParams p
-    >     redirectTo "/" })
+    >     do! redirectTo "/" })
     >   // More to come...
     > ]
     val myApp : Func<HttpRequestMessage,HttpResponseMessage>
