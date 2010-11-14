@@ -1,13 +1,10 @@
 ﻿namespace Frank
-[<AutoOpen>]
 module FrankApp =
   open System
   open System.Collections.Generic
   open System.Net
   open Microsoft.Http
   open Frack
-  open Core
-  open Routing
 
   /// Initializes a Frank application with the specified sequence of routes.
   let init (routes: seq<Route>) =
@@ -44,7 +41,7 @@ module FrankApp =
     app
 
   /// Converts a Frank application into a Frack application.
-  let toFrack (app:Frank.Core.App) = fun env ->
+  let toFrack (app:Frank.App) = fun env ->
     env |> Request.fromFrack
         |> app.Invoke
         |> Response.toFrack

@@ -1,17 +1,18 @@
 namespace Frank
+open System
+open Microsoft.Http
+open FSharp.Monad
+
+/// Defines the standard Frank application type.
+type App = Func<HttpRequestMessage, HttpResponseMessage>
+
+/// The Frank monad as a request/response handler.
+type FrankHandler = State<unit, HttpRequestMessage * HttpResponseMessage>
+
 [<AutoOpen>]
 module Core =
-  open System
   open System.Collections.Generic
   open System.Net
-  open Microsoft.Http
-  open FSharp.Monad
-
-  /// Defines the standard Frank application type.
-  type App = Func<HttpRequestMessage, HttpResponseMessage>
-
-  /// The Frank monad as a request/response handler.
-  type FrankHandler = State<unit, HttpRequestMessage * HttpResponseMessage>
 
   /// Sets an instance of StateBuilder as the computation workflow for a Frank monad.
   let frank = State.StateBuilder()

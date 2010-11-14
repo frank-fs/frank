@@ -7,7 +7,6 @@ module Routing =
   open Microsoft.Http
   open System.Text.RegularExpressions
   open FSharp.Monad.Maybe
-  open Core
 
   /// A route for a Frank application.
   type Route = { Method     : string
