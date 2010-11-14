@@ -79,7 +79,7 @@ module Core =
   /// Updates the state of the response content as text/html.
   let putHtml (content:string) = puts (ByteString.fromString content) "text/html"
 
-  /// Updates the state of the response content as text/json.
+  /// Updates the state of the response content as application/json.
   let putJson (content:string) = puts (ByteString.fromString content) "application/json"
 
   /// Updates the state of the response content as the specified content type.
