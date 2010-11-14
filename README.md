@@ -10,7 +10,7 @@ Usage
 Define a Frank application:
 
     > let myApp = FrankApp.init [
-    >   get "/" (putPlainText "Hello world!")
+    >   get "/" (putText "Hello world!")
     >   post "/order" (fun () -> frank {
     >     let! p = getParams
     >     createThingFromParams p
