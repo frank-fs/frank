@@ -5,7 +5,7 @@ open Fake.MSBuild
 
 (* properties *)
 let projectName = "frank"
-let version = "0.2.0.0"  
+let version = "0.2.0.0" 
 
 (* Directories *)
 let buildDir = "./build/"
