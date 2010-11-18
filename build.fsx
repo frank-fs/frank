@@ -1,11 +1,11 @@
 #I "tools/FAKE"
 #r "FakeLib.dll"
-open Fake 
+open Fake
 open Fake.MSBuild
 
 (* properties *)
 let projectName = "frank"
-let version = "0.1.0.0"  
+let version = "0.2.0.0"  
 
 (* Directories *)
 let buildDir = "./build/"
@@ -20,15 +20,15 @@ let zipFileName = deployDir + sprintf "%s-%s.zip" projectName version
 
 (* files *)
 let appReferences =
-    !+ @"src\**\*.csproj" 
+    !+ @"src\**\*.csproj"
       ++ @"src\**\*.fsproj"
       -- "**\*_Spliced*" 
         |> Scan
 
 let filesToZip =
-  !+ (buildDir + "/**/*.*")     
+  !+ (buildDir + "/**/*.*")
       -- "*.zip"
-      |> Scan      
+      |> Scan
 
 (* Targets *)
 Target? Clean <-
