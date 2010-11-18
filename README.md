@@ -9,7 +9,7 @@ Usage
 
 Define a Frank application:
 
-    > let myApp = FrankApp.init [
+    > let myApp = App [
     >   get "/" (putText "Hello world!")
     >   post "/order" (fun () -> frank {
     >     let! p = getParams
@@ -17,7 +17,7 @@ Define a Frank application:
     >     do! redirectTo "/" })
     >   // More to come...
     > ]
-    val myApp : Func<HttpRequestMessage,HttpResponseMessage>
+    val myApp : Frank.App
 
 TODO / Design decisions
 ============
