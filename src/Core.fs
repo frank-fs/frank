@@ -1,55 +1,55 @@
 namespace Frank
 open System
+open System.IO
+open System.Collections.Generic
 open Microsoft.Http
 open FSharp.Monad
 
-/// Defines the standard Frank application type.
-type App = Func<HttpRequestMessage, HttpResponseMessage>
+/// Formats an object into the specified content type using the given format function.
+type Formatter = { ContentType:string; Format:Stream * obj -> unit }
 
 /// The Frank monad as a request/response handler.
-type FrankHandler = State<unit, HttpRequestMessage * HttpResponseMessage>
+type Handler = State<unit, HttpRequestMessage * HttpResponseMessage * IDictionary<string,string> * seq<Formatter>>
 
 [<AutoOpen>]
 module Core =
-  open System.Collections.Generic
-  open System.IO
   open System.Net
-  open System.Runtime.Serialization
   open System.Xml
   open System.Xml.Linq
-  open System.Xml.Serialization
   open Frack
 
   /// Sets an instance of StateBuilder as the computation workflow for a Frank monad.
   let frank = State.StateBuilder()
 
-  /// Runs a Frank handler with an initial state and returns an HttpResponseMessage.
-  let run (h:FrankHandler) initialState = exec h initialState |> snd
-
   /// Gets the current state of the request.
   let getRequest = frank {
-    let! (req:HttpRequestMessage, _:HttpResponseMessage) = getState
+    let! (req:HttpRequestMessage, _:HttpResponseMessage, _:IDictionary<string,string>, _:seq<Formatter>) = getState
     return req }
-
-  /// Gets the current state of the parameters.
-  let getParams = frank {
-    let! req = getRequest
-    return req.GetPropertyOrDefault<IDictionary<string,string>>() } 
 
   /// Gets the current state of the response.
   let getResponse = frank {
-    let! (_:HttpRequestMessage, resp:HttpResponseMessage) = getState
+    let! (_:HttpRequestMessage, resp:HttpResponseMessage, _:IDictionary<string,string>, _:seq<Formatter>) = getState
     return resp }
+
+  /// Gets the current state of the parameters.
+  let getParams = frank {
+    let! (_:HttpRequestMessage, _:HttpResponseMessage, parms:IDictionary<string,string>, _:seq<Formatter>) = getState
+    return parms } 
+
+  /// Gets the current state of the formatters.
+  let getFormatters = frank {
+    let! (_:HttpRequestMessage, _:HttpResponseMessage, _:IDictionary<string,string>, formatters:seq<Formatter>) = getState
+    return formatters } 
 
   /// Updates the state of the request.
   let putRequest req = frank {
-    let! (_:HttpRequestMessage, resp:HttpResponseMessage) = getState
-    do! putState (req, resp) }
+    let! (_:HttpRequestMessage, r:HttpResponseMessage, p:IDictionary<string,string>, f:seq<Formatter>) = getState
+    do! putState (req, r, p, f) }
 
   /// Updates the state of the response.
   let putResponse resp = frank {
-    let! (req:HttpRequestMessage, _:HttpResponseMessage) = getState
-    do! putState (req, resp) }
+    let! (r:HttpRequestMessage, _:HttpResponseMessage, p:IDictionary<string,string>, f:seq<Formatter>) = getState
+    do! putState (r, resp, p, f) }
 
   /// Updates the state of the response headers with the specified name-value pair.
   let appendHeader name (value:string) = frank {
@@ -74,41 +74,43 @@ module Core =
   let puts content contentType = putContent (HttpContent.Create(content |> Seq.toArray, contentType))
 
   /// Updates the state of the response content as text/plain.
-  let putText (content:string) = puts (ByteString.fromString content) "text/plain"
+  let ``text/plain`` (content:string) = puts (ByteString.fromString content) "text/plain"
 
   /// Updates the state of the response content as text/html.
-  let putHtml (content:string) = puts (ByteString.fromString content) "text/html"
+  let ``text/html`` (content:string) = puts (ByteString.fromString content) "text/html"
 
   /// Updates the state of the response content as application/json.
-  let putJson (content:string) = puts (ByteString.fromString content) "application/json"
+  let ``application/json`` (content:string) = puts (ByteString.fromString content) "application/json"
 
   /// Updates the state of the response content as the specified content type.
-  let putXml (content:XElement) contentType =
+  let xml (content:XElement) =
     use stream = new MemoryStream()
     use writer = XmlWriter.Create(stream)
     content.Save(writer)
-    puts (stream.ToByteString()) contentType
+    puts (stream.ToByteString()) "application/xml"
 
-  /// Updates the state of the response content serialized using the serialize function as the specified content type.
-  let putSerialized content contentType serialize =
-    use stream = new MemoryStream()
-    serialize(stream, content)
-    puts (stream.ToByteString()) contentType
+  /// Selects a formatter using the Accept header from the request and the available formatters.
+  let getFormatter() = frank {
+    let! request = getRequest
+    let accepts = request.Headers.Accept
+    let! formatters = getFormatters
+    let formatterMatches (f:Formatter, ct, q) =
+      if f.ContentType = ct then Some(f.Format, ct, q) else None
+    let (f, ct, _) =
+      formatters
+      |> Seq.map (fun f -> seq { for a in accepts do yield (f, a.Value, a.Quality) })
+      |> Seq.concat
+      |> Seq.choose formatterMatches
+      // TODO: Sort the results by the quality
+      |> Seq.head
+    return (f, ct) }
 
-  /// Updates the state of the response content serialized with a data contract as application/json.
-  let putAsJson content =
-    let serializer = System.Runtime.Serialization.Json.DataContractJsonSerializer(content.GetType())
-    putSerialized content "application/json" serializer.WriteObject
-
-  /// Updates the state of the response content with content object serialized as XML as the specified content type.
-  let putAsXml content contentType =
-    let serializer = XmlSerializer(content.GetType())
-    putSerialized content contentType serializer.Serialize
-
-  /// Updates the state of the response content serialized with a data contract as the specified content type.
-  let putDataContract content contentType =
-    let serializer = DataContractSerializer(content.GetType())
-    putSerialized content contentType serializer.WriteObject
+  /// Updates the state of the response content using the request's Accept header and available formatters.
+  let render content = frank {
+    let! (formatter, contentType) = getFormatter()
+    use stream = new MemoryStream() :> Stream
+    formatter(stream, content)
+    do! puts (stream.ToByteString()) contentType }
 
   /// Updates the response state with a redirect, setting the status code to 303
   /// and the location header to the specified url.

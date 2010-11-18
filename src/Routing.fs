@@ -13,7 +13,7 @@ module Routing =
                  Path       : string
                  Keys       : seq<string>
                  Conditions : seq<HttpRequestMessage -> bool>
-                 Handler    : FrankHandler }
+                 Handler    : Handler }
 
   /// Pulled from <see href="http://www.markhneedham.com/blog/2009/05/10/f-regular-expressionsactive-patterns/" />.
   let (|Match|_|) pattern input =
