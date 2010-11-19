@@ -26,7 +26,7 @@ type App (routes:seq<Route>, ?before:Handler, ?after:Handler, ?formatters:seq<Fo
       yield! parms |> Dict.toSeq
       yield! uri.Query |> Request.parseQueryString |> Dict.toSeq
       if content <> null && content.ContentType = "application/x-http-form-urlencoded" then
-        yield! content.ReadAsByteArray() |> Request.parseFormUrlEncoded |> Dict.toSeq
+        yield! content.ReadAsByteString() |> Request.parseFormUrlEncoded |> Dict.toSeq
     } |> dict
 
   // Executes the handler on the current state of the application.

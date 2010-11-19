@@ -6,7 +6,7 @@ open Microsoft.Http
 open FSharp.Monad
 
 /// Formats an object into the specified content type using the given format function.
-type Formatter = { ContentType:string; Format:Stream * obj -> unit }
+type Formatter = { ContentType: seq<string>; Format: obj * Stream * HttpRequestMessage -> unit }
 
 /// The Frank monad as a request/response handler.
 type Handler = State<unit, HttpRequestMessage * HttpResponseMessage * IDictionary<string,string> * seq<Formatter>>
@@ -17,6 +17,10 @@ module Core =
   open System.Xml
   open System.Xml.Linq
   open Frack
+
+  type HttpContent with
+    /// Reads the content as a byte string.
+    member this.ReadAsByteString() : bytestring = this.ReadAsByteArray() |> Array.toSeq
 
   /// Sets an instance of StateBuilder as the computation workflow for a Frank monad.
   let frank = State.StateBuilder()
@@ -73,44 +77,54 @@ module Core =
   /// Updates the state of the response content with the provided bytestring as the specified content type.
   let puts content contentType = putContent (HttpContent.Create(content |> Seq.toArray, contentType))
 
-  /// Updates the state of the response content as text/plain.
-  let ``text/plain`` (content:string) = puts (ByteString.fromString content) "text/plain"
-
-  /// Updates the state of the response content as text/html.
-  let ``text/html`` (content:string) = puts (ByteString.fromString content) "text/html"
-
-  /// Updates the state of the response content as application/json.
-  let ``application/json`` (content:string) = puts (ByteString.fromString content) "application/json"
-
-  /// Updates the state of the response content as the specified content type.
-  let xml (content:XElement) =
-    use stream = new MemoryStream()
-    use writer = XmlWriter.Create(stream)
-    content.Save(writer)
-    puts (stream.ToByteString()) "application/xml"
+  /// Appends the content to the existing output.
+  let appends content = frank {
+    let! resp = getResponse
+    let bs = resp.Content.ReadAsByteString()
+    let ct = resp.Content.ContentType
+    do! puts (bs |> Seq.append content) ct }
 
   /// Selects a formatter using the Accept header from the request and the available formatters.
+  // TODO: For WCF HTTP, this should delegate to the MediaTypeProcessor.
   let getFormatter() = frank {
     let! request = getRequest
     let accepts = request.Headers.Accept
+                  |> Seq.map (fun a -> ((if a.Quality.HasValue then a.Quality.Value else 0.0), a.Value))
+                  |> Seq.sort
+    let aset = accepts |> Seq.map snd |> Set.ofSeq
     let! formatters = getFormatters
-    let formatterMatches (f:Formatter, ct, q) =
-      if f.ContentType = ct then Some(f.Format, ct, q) else None
-    let (f, ct, _) =
-      formatters
-      |> Seq.map (fun f -> seq { for a in accepts do yield (f, a.Value, a.Quality) })
-      |> Seq.concat
-      |> Seq.choose formatterMatches
-      // TODO: Sort the results by the quality
-      |> Seq.head
-    return (f, ct) }
+    return seq {
+      for f in formatters do
+        let fset = f.ContentType |> Set.ofSeq
+        let intersect = Set.intersect aset fset
+        if intersect |> Set.count > 0 then
+          yield (intersect |> Set.toSeq |> Seq.head, f.Format)
+    } |> Seq.head } 
 
   /// Updates the state of the response content using the request's Accept header and available formatters.
-  let render content = frank {
-    let! (formatter, contentType) = getFormatter()
+  // TODO: For WCF HTTP, this should delegate to the MediaTypeProcessor.
+  let format content = frank {
+    let! request = getRequest
+    let! (contentType, formatter) = getFormatter()
     use stream = new MemoryStream() :> Stream
-    formatter(stream, content)
+    formatter(content, stream, request)
     do! puts (stream.ToByteString()) contentType }
+
+  /// An active pattern to identify and safely type incoming content for rendering.
+  let (|Str|Xml|Format|) (content:obj) =
+    match content with
+    | :? string   -> Str(content :?> string)
+    | :? XElement -> Xml(content :?> XElement)
+    | _           -> Format(content)
+
+  /// Renders the content.
+  let render = function
+    | Str(v)    -> puts (ByteString.fromString v) "text/plain"
+    | Xml(v)    -> use stream = new MemoryStream()
+                   use writer = XmlWriter.Create(stream)
+                   v.Save(writer)
+                   puts (stream.ToByteString()) "application/xml"
+    | Format(v) -> format v
 
   /// Updates the response state with a redirect, setting the status code to 303
   /// and the location header to the specified url.
