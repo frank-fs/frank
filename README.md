@@ -11,7 +11,7 @@ Define a Frank application:
 
     > let myApp = App [
     >   get "/" (render "Hello world!")
-    >   post "/order" (fun () -> frank {
+    >   post "/order" (frank {
     >     let! p = getParams
     >     createThingFromParams p
     >     do! redirectTo "/" })
