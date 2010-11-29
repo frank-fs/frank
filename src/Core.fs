@@ -106,9 +106,9 @@ module Core =
   let format content = frank {
     let! request = getRequest
     let! (contentType, formatter) = getFormatter()
-    use stream = new MemoryStream() :> Stream
+    use stream = new MemoryStream()
     formatter(content, stream, request)
-    do! puts (stream.ToByteString()) contentType }
+    do! puts (stream.ToArray()) contentType }
 
   /// An active pattern to identify and safely type incoming content for rendering.
   let (|Str|Xml|Format|) (content:obj) =
