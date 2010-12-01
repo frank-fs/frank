@@ -1,0 +1,3 @@
+[submodule "lib/nwsgi"]
+	path = lib/nwsgi
+	url = git://github.com/panesofglass/nwsgi.git
