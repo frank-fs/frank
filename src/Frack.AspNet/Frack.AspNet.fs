@@ -11,8 +11,11 @@ module AspNet =
 
   /// Writes the Frack response to the ASP.NET response.
   let write (out:HttpResponseBase) (response:IResponse) =
-    out.StatusCode <- int response.Status
-    response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
+    let statusCode, statusDescription = splitStatus response.Status
+    out.StatusCode <- statusCode
+    out.StatusDescription <- statusDescription
+    // TODO: Fix ASP.NET headers issue.
+    //response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
     response.GetBody() :?> bytestring |> ByteString.transfer out.OutputStream 
 
   type System.Web.HttpContext with

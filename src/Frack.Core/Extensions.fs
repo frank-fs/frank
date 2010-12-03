@@ -3,13 +3,21 @@
 [<AutoOpen>]
 module Extensions =
   /// Splits a relative Uri string into the path and query string.
-  let splitUri (uri:string) =
+  let splitUri (uri) =
     if System.String.IsNullOrEmpty(uri)
       then ("/", "")
       else let arr = uri.Split([|'?'|])
            let path = if arr.[0] = "/" then "/" else arr.[0].TrimEnd('/')
            let queryString = if arr.Length > 1 then arr.[1] else ""
            (path, queryString)
+
+  let splitStatus (status) =
+    if System.String.IsNullOrEmpty(status)
+      then (200, "OK")
+      else let arr = status.Split([|' '|])
+           let code = int arr.[0]
+           let description = if arr.Length > 1 then arr.[1] else "OK"
+           (code, description)
 
   type Owin.IRequest with
     /// Gets the Uri path.

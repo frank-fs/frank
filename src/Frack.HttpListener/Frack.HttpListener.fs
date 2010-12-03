@@ -11,7 +11,9 @@ module HttpListener =
 
   /// Writes the Frack response to the HttpListener response.
   let write (out:HttpListenerResponse) (response:IResponse) =
-    out.StatusCode <- int response.Status
+    let statusCode, statusDescription = splitStatus response.Status
+    out.StatusCode <- statusCode
+    out.StatusDescription <- statusDescription
     response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
     response.GetBody() :?> bytestring |> ByteString.transfer out.OutputStream 
     out.Close()
