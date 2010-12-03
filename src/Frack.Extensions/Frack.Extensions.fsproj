@@ -50,14 +50,15 @@
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="owin">
+      <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Request.fs" />
-    <Compile Include="Response.fs" />
-    <Compile Include="Middlewares.fs" />
-    <Compile Include="MiddlewaresSpecs.fs" />
+    <Compile Include="Utility.fs" />
+    <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Frack.Core\frack.fsproj">

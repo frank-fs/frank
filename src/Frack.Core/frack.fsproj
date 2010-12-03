@@ -44,17 +44,20 @@
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="owin">
+      <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Frack.fs" />
     <Compile Include="Extensions.fs" />
-    <Compile Include="ArraySpecs.fs" />
     <Compile Include="ByteString.fs" />
-    <Compile Include="Core.fs" />
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="PathSpecs.fs" />
-    <Compile Include="FrackSpecs.fs" />
+    <Compile Include="ArraySpecs.fs" />
+    <Compile Include="UriSpecs.fs" />
+    <Compile Include="RequestSpecs.fs" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

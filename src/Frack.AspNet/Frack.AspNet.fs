@@ -5,16 +5,15 @@ module AspNet =
   open System.IO
   open System.Text
   open System.Web
+  open Owin
   open Frack
+  open Frack.Extensions
 
   /// Writes the Frack response to the ASP.NET response.
-  let write (out:HttpResponseBase) (response:int * IDictionary<string,string> * bytestring) =
-    let status, headers, body = response
-    out.StatusCode <- status
-    // TODO: Get headers working. These should work fine in IIS pipeline mode.
-//    headers |> Dict.toSeq
-//            |> Seq.iter out.Headers.Add
-    body    |> ByteString.transfer out.OutputStream 
+  let write (out:HttpResponseBase) (response:IResponse) =
+    out.StatusCode <- int response.Status
+    response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
+    response.GetBody() :?> bytestring |> ByteString.transfer out.OutputStream 
 
   type System.Web.HttpContext with
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
@@ -22,24 +21,19 @@ module AspNet =
 
   type System.Web.HttpContextBase with
     /// Creates an environment variable <see cref="HttpContextBase"/>.
-    member this.ToFrackEnvironment() : Environment =
-      seq { yield ("HTTP_METHOD", Str this.Request.HttpMethod)
-            yield ("SCRIPT_NAME", Str (this.Request.Url.AbsolutePath |> getPathParts |> fst))
-            yield ("PATH_INFO", Str (this.Request.Url.AbsolutePath |> getPathParts |> snd))
-            yield ("QUERY_STRING", Str (this.Request.Url.Query.TrimStart('?')))
-            yield ("CONTENT_TYPE", Str this.Request.ContentType)
-            yield ("CONTENT_LENGTH", Int this.Request.ContentLength)
-            yield ("SERVER_NAME", Str this.Request.Url.Host)
-            yield ("SERVER_PORT", Str (this.Request.Url.Port.ToString()))
-            yield! this.Request.Headers.AsEnumerable() |> Seq.map (fun (k,v) -> (k, Str v))
-            yield ("url_scheme", Str this.Request.Url.Scheme)
-            yield ("errors", Err ByteString.empty)
-            yield ("input", Inp (if this.Request.InputStream = null then ByteString.empty else this.Request.InputStream.ToByteString()))
-            yield ("version", Ver [|0;1|] )
-          } |> dict
+    member this.ToOwinRequest() =
+      let headers = new Dictionary<string, seq<string>>() :> IDictionary<string, seq<string>>
+      this.Request.Headers.AsEnumerable() |> Seq.iter (fun (k,v) -> headers.Add(k, seq { yield v }))
+      let items = new Dictionary<string, obj>() :> IDictionary<string, obj>
+      items.["url_scheme"] <- this.Request.Url.Scheme
+      items.["host"] <- this.Request.Url.Host
+      items.["server_port"] <- this.Request.Url.Port
+      Request.fromAsync this.Request.HttpMethod
+                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query) 
+                        headers  items (this.Request.InputStream.AsyncRead)
 
   /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
-  type FrackRouteHandler(app:App) =
+  type FrackRouteHandler(app:IApplication) =
     interface Routing.IRouteHandler with
       /// Get the IHttpHandler for the Frack application.
       /// The RequestContext is not used in this case,
@@ -51,5 +45,8 @@ module AspNet =
             /// Process an incoming request. 
             member this.ProcessRequest(context:HttpContext) =
               let contextBase = context.ToContextBase()
-              let env = contextBase.ToFrackEnvironment()
-              app env |> write contextBase.Response }
+              let req = contextBase.ToOwinRequest()
+              app.AsyncInvoke(req)
+              //|> Async.Catch // <- This would allow a choice of returning response or writing out errors.
+              |> Async.RunSynchronously
+              |> write contextBase.Response }

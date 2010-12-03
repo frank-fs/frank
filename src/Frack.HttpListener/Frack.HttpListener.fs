@@ -5,31 +5,26 @@ module HttpListener =
   open System.IO
   open System.Net
   open System.Text
+  open Owin
   open Frack
+  open Frack.Extensions
 
   /// Writes the Frack response to the HttpListener response.
-  let write (out:HttpListenerResponse) (response:int * IDictionary<string,string> * bytestring) =
-    let status, headers, body = response
-    out.StatusCode <- status
-    headers |> Dict.toSeq
-            |> Seq.iter out.Headers.Add
-    body    |> ByteString.transfer out.OutputStream 
+  let write (out:HttpListenerResponse) (response:IResponse) =
+    out.StatusCode <- int response.Status
+    response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
+    response.GetBody() :?> bytestring |> ByteString.transfer out.OutputStream 
     out.Close()
 
   type System.Net.HttpListenerContext with
-    /// Creates an environment variable from an <see cref="HttpListenerContext"/>.
-    member this.ToFrackEnvironment() : Environment =
-      seq { yield ("HTTP_METHOD", Str this.Request.HttpMethod)
-            yield ("SCRIPT_NAME", Str (this.Request.Url.AbsolutePath |> getPathParts |> fst))
-            yield ("PATH_INFO", Str (this.Request.Url.AbsolutePath |> getPathParts |> snd))
-            yield ("QUERY_STRING", Str (this.Request.Url.Query.TrimStart('?')))
-            yield ("CONTENT_TYPE", Str this.Request.ContentType)
-            yield ("CONTENT_LENGTH", Int (Convert.ToInt32(this.Request.ContentLength64))) 
-            yield ("SERVER_NAME", Str this.Request.Url.Host)
-            yield ("SERVER_PORT", Str (this.Request.Url.Port.ToString()))
-            yield! this.Request.Headers.AsEnumerable() |> Seq.map (fun (k,v) -> (k, Str v))
-            yield ("url_scheme", Str this.Request.Url.Scheme)
-            yield ("errors", Err ByteString.empty)
-            yield ("input", Inp (if this.Request.InputStream = null then ByteString.empty else this.Request.InputStream.ToByteString()))
-            yield ("version", Ver [|0;1|] )
-          } |> dict
+    /// Creates an environment variable <see cref="HttpContextBase"/>.
+    member this.ToOwinRequest() =
+      let headers = new Dictionary<string, seq<string>>() :> IDictionary<string, seq<string>>
+      this.Request.Headers.AsEnumerable() |> Seq.iter (fun (k,v) -> headers.Add(k, seq { yield v }))
+      let items = new Dictionary<string, obj>() :> IDictionary<string, obj>
+      items.["url_scheme"] <- this.Request.Url.Scheme
+      items.["server_name"] <- this.Request.Url.Host
+      items.["server_port"] <- this.Request.Url.Port
+      Request.fromAsync this.Request.HttpMethod
+                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query) 
+                        headers  items (this.Request.InputStream.AsyncRead)
