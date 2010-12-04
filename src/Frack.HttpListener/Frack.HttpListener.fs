@@ -6,8 +6,8 @@ module HttpListener =
   open System.Net
   open System.Text
   open Owin
+  open Owin.Extensions
   open Frack
-  open Frack.Extensions
 
   /// Writes the Frack response to the HttpListener response.
   let write (out:HttpListenerResponse) (response:IResponse) =

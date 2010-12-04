@@ -1,8 +1,7 @@
 ﻿#nowarn "77"
-namespace Frack.Extensions
+namespace Owin.Extensions
 open System
 open System.Collections.Generic
-open Frack
 
 [<AutoOpen>]
 module Utility =
@@ -19,6 +18,24 @@ module Utility =
 
   /// Decodes url encoded values.
   let decodeUrl input = System.Uri.UnescapeDataString(input).Replace("+", " ")
+
+  /// Splits a relative Uri string into the path and query string.
+  let splitUri (uri) =
+    if System.String.IsNullOrEmpty(uri)
+      then ("/", "")
+      else let arr = uri.Split([|'?'|])
+           let path = if arr.[0] = "/" then "/" else arr.[0].TrimEnd('/')
+           let queryString = if arr.Length > 1 then arr.[1] else ""
+           (path, queryString)
+
+  /// Splits a status code into the integer status code and the string status description.
+  let splitStatus (status) =
+    if System.String.IsNullOrEmpty(status)
+      then (200, "OK")
+      else let arr = status.Split([|' '|])
+           let code = int arr.[0]
+           let description = if arr.Length > 1 then arr.[1] else "OK"
+           (code, description)
 
   /// Creates a tuple from the first two values returned from a string split on the specified split character.
   let private (|/) (split:char) (input:string) =

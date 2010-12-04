@@ -37,9 +37,6 @@
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
-    <Reference Include="NaturalSpec">
-      <HintPath>..\..\tools\NaturalSpec\NaturalSpec.dll</HintPath>
-    </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
@@ -56,6 +53,11 @@
     <ProjectReference Include="..\Frack.Core\frack.fsproj">
       <Name>frack</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Frack.Extensions\Owin.Extensions.fsproj">
+      <Name>Owin.Extensions</Name>
+      <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

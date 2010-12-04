@@ -4,7 +4,7 @@ open System
 open System.Web
 open System.Web.Routing
 open Frack
-open Frack.Extensions.Middleware
+open Frack.Middleware
 open Frack.AspNet
 
 type Global() =

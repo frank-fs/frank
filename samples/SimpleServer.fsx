@@ -9,12 +9,15 @@
 #r "System.Web.Abstractions.dll"
 #r "FSharp.Core.dll"
 #r "owin.dll"
+#r "Owin.Extensions.dll"
 #r "frack.dll"
 #r "Frack.HttpListener.dll"
 
 open System
 open System.IO
 open System.Net
+open Owin
+open Owin.Extensions
 open Frack
 open Frack.HttpListener
 

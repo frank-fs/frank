@@ -3,6 +3,8 @@ open System
 open System.Collections.Specialized
 open System.IO
 open System.Text
+open Owin
+open Owin.Extensions
 open Frack
 open NUnit.Framework
 open BaseSpecs
@@ -30,7 +32,7 @@ let items = new System.Collections.Generic.Dictionary<string, obj>()
 let asyncReadBody(buffer, offset, count) = async {
   let stream = "Howdy"B |> ByteString.toStream
   return! stream.AsyncRead(buffer, offset, count) }
-let getRequest m = Request.FromAsync(m, "/something/awesome?name=test&why=how", hdrs, items, asyncReadBody)
+let getRequest m = Request(m, "/something/awesome?name=test&why=how", hdrs, items, asyncReadBody) :> Owin.IRequest
 
 // Act
 let request = getRequest "GET"
@@ -42,12 +44,6 @@ let ``Request should have an HTTP method of GET``() = request.Method == "GET"
 [<Test>]
 let ``Request should have a Uri of /something/awesome?name=test&why=how``() =
   request.Uri == "/something/awesome?name=test&why=how" 
-
-[<Test>]
-let ``Request should have a Path of /something/awesome``() = request.Path == "/something/awesome"
-
-[<Test>]
-let ``Request should have a QueryString of name=test&why=how``() = request.QueryString == "name=test&why=how"
     
 [<Test>]
 let ``Request should contain the headers``() = request.Headers == hdrs

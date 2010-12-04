@@ -1,4 +1,4 @@
-﻿module Frack.BaseSpecs
+﻿module BaseSpecs
 open NUnit.Framework
 
 // NUnit helpers

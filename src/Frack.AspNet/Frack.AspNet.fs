@@ -6,8 +6,8 @@ module AspNet =
   open System.Text
   open System.Web
   open Owin
+  open Owin.Extensions
   open Frack
-  open Frack.Extensions
 
   /// Writes the Frack response to the ASP.NET response.
   let write (out:HttpResponseBase) (response:IResponse) =
