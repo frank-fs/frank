@@ -35,9 +35,6 @@
     <Reference Include="frack">
       <HintPath>..\lib\frack\build\frack.dll</HintPath>
     </Reference>
-    <Reference Include="Frack.Extensions">
-      <HintPath>..\lib\frack\build\Frack.Extensions.dll</HintPath>
-    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
@@ -56,6 +53,12 @@
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\tools\NaturalSpec\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="owin">
+      <HintPath>..\lib\frack\build\owin.dll</HintPath>
+    </Reference>
+    <Reference Include="Owin.Extensions">
+      <HintPath>..\lib\frack\build\Owin.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

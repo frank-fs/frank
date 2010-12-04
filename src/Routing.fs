@@ -1,4 +1,5 @@
 namespace Frank
+
 [<AutoOpen>]
 module Routing =
   open System

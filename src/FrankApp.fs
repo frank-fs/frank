@@ -4,7 +4,7 @@ open System.Collections.Generic
 open System.Net
 open Microsoft.Http
 open FSharp.Monad
-open Frack
+open Owin.Extensions
 
 // TODO: If a given route returns a not found, can you continue, or fall through, to another route?
 
@@ -24,9 +24,9 @@ type App (routes:seq<Route>, ?before:Handler, ?after:Handler, ?formatters:seq<Fo
   let collectParams parms (uri:Uri) (content:HttpContent) = 
     seq {
       yield! parms |> Dict.toSeq
-      yield! uri.Query |> Request.parseQueryString |> Dict.toSeq
+      yield! uri.Query |> parseQueryString |> Dict.toSeq
       if content <> null && content.ContentType = "application/x-http-form-urlencoded" then
-        yield! content.ReadAsByteString() |> Request.parseFormUrlEncoded |> Dict.toSeq
+        yield! content.ReadAsByteString() |> parseFormUrlEncoded |> Dict.toSeq
     } |> dict
 
   // Executes the handler on the current state of the application.
@@ -60,10 +60,3 @@ type App (routes:seq<Route>, ?before:Handler, ?after:Handler, ?formatters:seq<Fo
              |> Seq.head
     responseSentEvent.Trigger(response)
     response
-
-module FrankApp =
-  /// Converts a Frank application into a Frack application.
-  let toFrack (app:App) = fun env ->
-    env |> Request.fromFrack
-        |> app.Invoke
-        |> Response.toFrack

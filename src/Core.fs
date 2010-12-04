@@ -4,6 +4,7 @@ open System.IO
 open System.Collections.Generic
 open Microsoft.Http
 open FSharp.Monad
+open Owin.Extensions
 
 /// Formats an object into the specified content type using the given format function.
 type Formatter = { ContentType: seq<string>; Format: obj * Stream * HttpRequestMessage -> unit }
