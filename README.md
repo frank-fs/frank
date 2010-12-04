@@ -21,7 +21,7 @@ Takes an environment and returns a triple of status code, headers, and body.
     >  let app = Application(fun request ->
     >    ("200 OK",
     >     (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
-    >     "Hello ASP.NET!"B :> System.Collections.IEnumerable) })
+    >     "Hello ASP.NET!"B )})
     
     val app : Application
 
@@ -35,8 +35,8 @@ Takes an app and returns an app.
     >       then return! app.AsyncInvoke(req)
     >       else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
     >            let! resp = app.AsyncInvoke(get)
-    >            return Response.Create(resp.Status, resp.Headers, Seq.empty }
-    >   Application.fromAsync asyncInvoke
+    >            return Response.Create(resp.Status, resp.Headers, Seq.empty) }
+    >   Application(asyncInvoke) :> Owin.IApplication
 
     val head : Owin.IApplication
 
