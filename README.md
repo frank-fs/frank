@@ -38,7 +38,7 @@ Takes an app and returns an app.
     >            return Response.Create(resp.Status, resp.Headers, Seq.empty) }
     >   Application(asyncInvoke) :> Owin.IApplication
 
-    val head : Owin.IApplication
+    val head : Owin.IApplication -> Owin.IApplication
 
 ### Add middlewares to an app.
 
