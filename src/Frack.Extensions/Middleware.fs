@@ -10,7 +10,7 @@ module Middleware =
         then return! app.AsyncInvoke(req)
         else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
              let! resp = app.AsyncInvoke(get)
-             return Response.Create(resp.Status, resp.Headers, Seq.empty) }
+             return Response.Create(resp.Status, resp.Headers, (fun () -> Seq.empty)) }
     Application(asyncInvoke) :> Owin.IApplication
 
   /// Intercepts the environment and checks for use of X_HTTP_METHOD_OVERRIDE.

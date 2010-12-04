@@ -10,20 +10,17 @@
 #r "FSharp.Core.dll"
 #r "owin.dll"
 #r "frack.dll"
-#r "Frack.Extensions.dll"
 #r "Frack.HttpListener.dll"
 
 open System
 open System.IO
 open System.Net
-open System.Text
-open System.Web
 open Frack
 open Frack.HttpListener
 
 // Simple Frack app
 let app = Application(fun request -> 
-  ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!"B))
+  ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!"))
 
 // Set up and start an HttpListener
 let listener = new HttpListener()

@@ -13,7 +13,7 @@ type Global() =
         let app = Application(fun request ->
           ("200 OK",
            (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
-           "Hello ASP.NET!"B))
+           "Hello ASP.NET!"))
         routes.Add(new Route("{*path}", new FrackRouteHandler(app))) 
 
     member x.Start() =

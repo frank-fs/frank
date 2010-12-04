@@ -17,7 +17,7 @@ module AspNet =
     // TODO: Fix ASP.NET headers issue.
     //response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
     response.GetBody()
-    |> Seq.map (fun o -> o :?> byte[])
+    |> Seq.map (fun o -> o :?> bytestring)
     |> Seq.iter (ByteString.transfer out.OutputStream) 
 
   type System.Web.HttpContext with

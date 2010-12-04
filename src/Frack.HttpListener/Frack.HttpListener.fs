@@ -16,7 +16,7 @@ module HttpListener =
     out.StatusDescription <- statusDescription
     response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
     response.GetBody()
-    |> Seq.map (fun o -> o :?> byte[])
+    |> Seq.map (fun o -> o :?> bytestring)
     |> Seq.iter (ByteString.transfer out.OutputStream) 
     out.Close()
 
