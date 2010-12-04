@@ -54,7 +54,7 @@ module Utility =
       else dict Seq.empty
 
   /// Parses the query string into an IDictionary<string,string>.
-  let parseQueryString (query:string) = parseUrlEncodedString query
+  let parseQueryString = parseUrlEncodedString
 
   /// Parses the input stream for x-http-form-urlencoded values into an IDictionary<string,string>.
-  let parseFormUrlEncoded (input:#seq<byte>) = input |> ByteString.toString |> parseUrlEncodedString
+  let parseFormUrlEncoded : bytestring -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)
