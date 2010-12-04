@@ -10,11 +10,10 @@ type Global() =
     inherit System.Web.HttpApplication() 
 
     static member RegisterRoutes(routes:RouteCollection) =
-        let app = Application.FromAsync(fun request -> async {
-          return Response.Create("200 OK",
-                                 (dict [| ("Content-Type", seq { yield "text/plain" })
-                                          ("Content-Length", seq { yield "14" }) |]),
-                                 "Hello ASP.NET!"B |> Seq.map (fun b -> b :> obj) )})
+        let app = Application(fun request ->
+          ("200 OK",
+           (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
+           "Hello ASP.NET!"B))
         routes.Add(new Route("{*path}", new FrackRouteHandler(app))) 
 
     member x.Start() =

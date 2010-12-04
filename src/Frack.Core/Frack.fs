@@ -26,16 +26,20 @@ type Request(methd, uri, headers, items, beginRead, endRead) =
     Request(methd, uri, headers, items', asyncRead') :> Owin.IRequest
 
 /// <summary>Creates an Owin.IResponse.</summary>
-type Response(status, headers, getBody) =
+type Response(status, headers, getBody:unit -> seq<byte[]>) =
   /// <summary>Creates an Owin.IResponse.</summary>
-  new (status, headers, body) = Response(status, headers, (fun () -> body))
+  new (status, headers, body:seq<byte[]>) = Response(status, headers, (fun () -> body))
+  /// <summary>Creates an Owin.IResponse.</summary>
+  new (status, headers, body:byte[]) = Response(status, headers, (fun () -> seq { yield body }))
   interface Owin.IResponse with
     member this.Status = status
     member this.Headers = headers
-    member this.GetBody() = getBody()
-  static member Create(status, headers, body:seq<obj>) =
+    member this.GetBody() = getBody() |> Seq.map (fun o -> o :> obj)
+  static member Create(status, headers, body:byte[]) =
     Response(status, headers, body) :> Owin.IResponse
-  static member Create(status, headers, getBody:unit -> seq<obj>) =
+  static member Create(status, headers, body:seq<byte[]>) =
+    Response(status, headers, body) :> Owin.IResponse
+  static member Create(status, headers, getBody:unit -> seq<byte[]>) =
     Response(status, headers, getBody) :> Owin.IResponse
 
 /// <summary>Creates an Owin.IApplication.</summary>
@@ -48,10 +52,30 @@ type Application(beginInvoke, endInvoke) =
   new (invoke: Owin.IRequest -> Owin.IResponse) =
     let asyncInvoke req = async { return invoke req }
     Application(asyncInvoke)
+  /// <summary>Creates an Owin.IApplication.</summary>
+  new (asyncInvoke: Owin.IRequest -> Async<string * IDictionary<string, seq<string>> * seq<byte[]>>) =
+    let asyncInvoke req = async {
+      let! status, headers, body = asyncInvoke req
+      return Response(status, headers, body) :> Owin.IResponse }
+    Application(asyncInvoke)
+  /// <summary>Creates an Owin.IApplication.</summary>
+  new (invoke: Owin.IRequest -> string * IDictionary<string, seq<string>> * seq<byte[]>) =
+    let asyncInvoke req = async {
+      let status, headers, body = invoke req
+      return Response(status, headers, body) :> Owin.IResponse }
+    Application(asyncInvoke)
+  /// <summary>Creates an Owin.IApplication.</summary>
+  new (asyncInvoke: Owin.IRequest -> Async<string * IDictionary<string, seq<string>> * byte[]>) =
+    let asyncInvoke req = async {
+      let! status, headers, body = asyncInvoke req
+      return Response(status, headers, body) :> Owin.IResponse }
+    Application(asyncInvoke)
+  /// <summary>Creates an Owin.IApplication.</summary>
+  new (invoke: Owin.IRequest -> string * IDictionary<string, seq<string>> * byte[]) =
+    let asyncInvoke req = async {
+      let status, headers, body = invoke req
+      return Response(status, headers, body) :> Owin.IResponse }
+    Application(asyncInvoke)
   interface Owin.IApplication with
     member this.BeginInvoke(request, callback, state) = beginInvoke(request, callback, state)
     member this.EndInvoke(result) = endInvoke(result)
-  static member Create(invoke: Owin.IRequest -> Owin.IResponse) = Application(invoke) :> Owin.IApplication
-  static member FromBeginEnd(beginInvoke, endInvoke) = Application(beginInvoke, endInvoke) :> Owin.IApplication
-  static member FromAsync(asyncInvoke: Owin.IRequest -> Async<Owin.IResponse>) =
-    Application(asyncInvoke) :> Owin.IApplication

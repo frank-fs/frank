@@ -11,7 +11,7 @@ module Middleware =
         else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
              let! resp = app.AsyncInvoke(get)
              return Response.Create(resp.Status, resp.Headers, Seq.empty) }
-    Application.FromAsync(asyncInvoke)
+    Application(asyncInvoke) :> Owin.IApplication
 
   /// Intercepts the environment and checks for use of X_HTTP_METHOD_OVERRIDE.
   let methodOverride (app: Owin.IApplication) =
@@ -39,4 +39,4 @@ module Middleware =
                                                   return body.Length }))
                         else req
            return! app.AsyncInvoke(req') }
-    Application.FromAsync(asyncInvoke)
+    Application(asyncInvoke) :> Owin.IApplication

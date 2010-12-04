@@ -16,7 +16,9 @@ module AspNet =
     out.StatusDescription <- statusDescription
     // TODO: Fix ASP.NET headers issue.
     //response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
-    response.GetBody() |> Seq.map (fun o -> o :?> byte) |> ByteString.transfer out.OutputStream 
+    response.GetBody()
+    |> Seq.map (fun o -> o :?> byte[])
+    |> Seq.iter (ByteString.transfer out.OutputStream) 
 
   type System.Web.HttpContext with
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase

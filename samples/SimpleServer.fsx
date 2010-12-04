@@ -8,6 +8,7 @@
 #r "System.Web.dll"
 #r "System.Web.Abstractions.dll"
 #r "FSharp.Core.dll"
+#r "owin.dll"
 #r "frack.dll"
 #r "Frack.Extensions.dll"
 #r "Frack.HttpListener.dll"
@@ -18,12 +19,11 @@ open System.Net
 open System.Text
 open System.Web
 open Frack
-open Frack.Middlewares
 open Frack.HttpListener
 
 // Simple Frack app
-let app env = 
-  (200, dict [("Content_Type","text/plain");("Content_Length","6")], ByteString.fromString "Howdy!")
+let app = Application(fun request -> 
+  ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!"B))
 
 // Set up and start an HttpListener
 let listener = new HttpListener()
@@ -34,9 +34,8 @@ listener.Start()
 let context = listener.GetContext()
 
 // This is where Frack takes over.
-let env = context.ToFrackEnvironment()
-printfn "Received a %s request" (read env?HTTP_METHOD)
-//app env |> write context.Response
-printEnvironment app env |> write context.Response
+let request = context.ToOwinRequest()
+printfn "Received a %s request" 
+app request |> write context.Response
 
 listener.Close()

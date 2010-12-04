@@ -16,15 +16,14 @@ Usage
 
 ### Define an app
 
-Takes an environment and returns a triple of status code, headers, and body (or at least it will again soon).
+Takes an environment and returns a triple of status code, headers, and body.
 
-    >  let app = Application.fromAsync (fun request -> async {
-    >    return Response.create "200 OK"
-    >                           (dict [| ("Content-Type", seq { yield "text/plain" })
-    >                                    ("Content-Length", seq { yield "14" }) |])
-    >                           (fun () -> "Hello ASP.NET!"B :> System.Collections.IEnumerable) })
+    >  let app = Application(fun request ->
+    >    ("200 OK",
+    >     (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
+    >     "Hello ASP.NET!"B :> System.Collections.IEnumerable) })
     
-    val app : Owin.IApplication
+    val app : Application
 
 ### Define a middleware
 
@@ -34,9 +33,9 @@ Takes an app and returns an app.
     >   let asyncInvoke (req: Owin.IRequest) = async {
     >     if req.Method <> "HEAD"
     >       then return! app.AsyncInvoke(req)
-    >       else let get = Request.create "GET" req.Uri req.Headers req.Items req.BeginReadBody req.EndReadBody
+    >       else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
     >            let! resp = app.AsyncInvoke(get)
-    >            return Response.create resp.Status resp.Headers (fun () -> Seq.empty :> System.Collections.IEnumerable) }
+    >            return Response.Create(resp.Status, resp.Headers, Seq.empty }
     >   Application.fromAsync asyncInvoke
 
     val head : Owin.IApplication
