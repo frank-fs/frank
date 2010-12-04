@@ -36,7 +36,6 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
@@ -44,7 +43,6 @@
       <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Core" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
     <Reference Include="System.Web.Routing" />
@@ -58,7 +56,7 @@
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Frack.Extensions\Owin.Extensions.fsproj">
+    <ProjectReference Include="..\Owin.Extensions\Owin.Extensions.fsproj">
       <Name>Owin.Extensions</Name>
       <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
       <Private>True</Private>

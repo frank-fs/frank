@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\Frack.Core\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.Extensions", "src\Frack.Extensions\Owin.Extensions.fsproj", "{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.Extensions", "src\Owin.Extensions\Owin.Extensions.fsproj", "{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.AspNet", "src\Frack.AspNet\Frack.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
 EndProject

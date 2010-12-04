@@ -39,7 +39,7 @@
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="owin">
-      <HintPath>..\..\..\build\owin.dll</HintPath>
+      <HintPath>..\..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
@@ -62,7 +62,7 @@
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\src\Frack.Extensions\Owin.Extensions.fsproj">
+    <ProjectReference Include="..\..\..\src\Owin.Extensions\Owin.Extensions.fsproj">
       <Name>Owin.Extensions</Name>
       <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
       <Private>True</Private>

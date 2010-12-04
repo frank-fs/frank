@@ -8,7 +8,7 @@
     <ProjectGuid>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack</RootNamespace>
-    <AssemblyName>Frack.Extensions</AssemblyName>
+    <AssemblyName>Owin.Extensions</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <Name>Owin.Extensions</Name>
     <TargetFrameworkProfile />
@@ -37,7 +37,6 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
@@ -45,7 +44,6 @@
       <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
