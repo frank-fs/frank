@@ -31,9 +31,9 @@ module AspNet =
       items.["url_scheme"] <- this.Request.Url.Scheme
       items.["host"] <- this.Request.Url.Host
       items.["server_port"] <- this.Request.Url.Port
-      Request.fromAsync this.Request.HttpMethod
-                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query) 
-                        headers  items (this.Request.InputStream.AsyncRead)
+      Request.FromAsync(this.Request.HttpMethod,
+                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query),
+                        headers, items, (this.Request.InputStream.AsyncRead))
 
   /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
   type FrackRouteHandler(app:IApplication) =

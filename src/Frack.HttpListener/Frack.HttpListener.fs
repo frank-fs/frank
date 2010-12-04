@@ -27,6 +27,6 @@ module HttpListener =
       items.["url_scheme"] <- this.Request.Url.Scheme
       items.["server_name"] <- this.Request.Url.Host
       items.["server_port"] <- this.Request.Url.Port
-      Request.fromAsync this.Request.HttpMethod
-                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query) 
-                        headers  items (this.Request.InputStream.AsyncRead)
+      Request.FromAsync(this.Request.HttpMethod,
+                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query), 
+                        headers, items, (this.Request.InputStream.AsyncRead))

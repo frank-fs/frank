@@ -8,10 +8,10 @@ module Middleware =
     let asyncInvoke (req: Owin.IRequest) = async {
       if req.Method <> "HEAD"
         then return! app.AsyncInvoke(req)
-        else let get = Request.create "GET" req.Uri req.Headers req.Items req.BeginReadBody req.EndReadBody
+        else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
              let! resp = app.AsyncInvoke(get)
-             return Response.create resp.Status resp.Headers (fun () -> Seq.empty :> System.Collections.IEnumerable) }
-    Application.fromAsync asyncInvoke
+             return Response.Create(resp.Status, resp.Headers, Seq.empty) }
+    Application.FromAsync(asyncInvoke)
 
   /// Intercepts the environment and checks for use of X_HTTP_METHOD_OVERRIDE.
   let methodOverride (app: Owin.IApplication) =
@@ -32,11 +32,11 @@ module Middleware =
            let req' = if httpMethods |> List.exists ((=) httpMethod)
                         then let items = req.Items
                              items?methodoverride_original_method <- "POST" 
-                             Request.fromAsync httpMethod req.Uri req.Headers items
+                             Request.FromAsync(httpMethod, req.Uri, req.Headers, items,
                                                (fun (b,o,c) -> async {
                                                   // TODO: Find a more efficient way to do this.
                                                   System.Array.Copy(body, b, body.Length)
-                                                  return body.Length })
+                                                  return body.Length }))
                         else req
            return! app.AsyncInvoke(req') }
-    Application.fromAsync asyncInvoke
+    Application.FromAsync(asyncInvoke)
