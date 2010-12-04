@@ -4,8 +4,8 @@ open System
 open System.Web
 open System.Web.Routing
 open Frack
-open Frack.Middleware
 open Frack.AspNet
+open Owin.Extensions.Middleware
 
 type Global() =
     inherit System.Web.HttpApplication() 

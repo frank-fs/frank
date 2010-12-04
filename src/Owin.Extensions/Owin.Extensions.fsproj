@@ -37,6 +37,7 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
@@ -51,7 +52,9 @@
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="Utility.fs" />
     <Compile Include="UriSpecs.fs" />
+    <Compile Include="Factory.fs" />
     <Compile Include="Extensions.fs" />
+    <Compile Include="Middleware.fs" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
