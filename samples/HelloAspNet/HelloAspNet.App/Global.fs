@@ -4,6 +4,7 @@ open System
 open System.Web
 open System.Web.Routing
 open Frack
+open Frack.Extensions.Middleware
 open Frack.AspNet
 
 type Global() =
@@ -14,7 +15,9 @@ type Global() =
           ("200 OK",
            (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
            "Hello ASP.NET!"))
-        routes.Add(new Route("{*path}", new FrackRouteHandler(app))) 
+        // Uses the head middleware.
+        // Try using Fiddler and perform a HEAD request.
+        routes.Add(new Route("{*path}", new FrackRouteHandler(head app))) 
 
     member x.Start() =
         Global.RegisterRoutes(RouteTable.Routes)

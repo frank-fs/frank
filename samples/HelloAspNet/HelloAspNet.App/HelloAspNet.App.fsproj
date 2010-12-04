@@ -62,6 +62,11 @@
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\src\Frack.Extensions\Frack.Extensions.fsproj">
+      <Name>Frack.Extensions</Name>
+      <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
