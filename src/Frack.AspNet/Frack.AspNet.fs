@@ -9,16 +9,19 @@ module AspNet =
   open Owin.Extensions
   open Frack
 
-  /// Writes the Frack response to the ASP.NET response.
-  let write (out:HttpResponseBase) (response:IResponse) =
-    let statusCode, statusDescription = splitStatus response.Status
-    out.StatusCode <- statusCode
-    out.StatusDescription <- statusDescription
-    // TODO: Fix ASP.NET headers issue.
-    //response.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> out.Headers.Add(k,v')))
-    response.GetBody()
-    |> Seq.map (fun o -> o :?> bytestring)
-    |> Seq.iter (ByteString.transfer out.OutputStream) 
+  type System.Web.HttpResponseBase with
+    /// Writes the Frack response to the ASP.NET response.
+    member response.Reply(r:IResponse) =
+      let statusCode, statusDescription = splitStatus r.Status
+      //response.ContentType <- r.MediaType
+      response.StatusCode <- statusCode
+      response.StatusDescription <- statusDescription
+      // TODO: Fix ASP.NET headers issue.
+      //r.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> response.Headers.Add(k,v')))
+      let output = response.OutputStream
+      r.GetBody()
+      |> Seq.map (fun o -> o :?> bytestring)
+      |> Seq.iter (ByteString.transfer output) 
 
   type System.Web.HttpContext with
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
@@ -54,4 +57,4 @@ module AspNet =
               app.AsyncInvoke(req)
               //|> Async.Catch // <- This would allow a choice of returning response or writing out errors.
               |> Async.RunSynchronously
-              |> write contextBase.Response }
+              |> contextBase.Response.Reply }

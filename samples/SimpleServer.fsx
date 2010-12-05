@@ -1,5 +1,5 @@
-﻿/// SimpleServer is an example of using Frack as a F# script.
-/// <see href="http://blogs.msdn.com/b/chrsmith/archive/2008/09/12/scripting-in-f.aspx" />
+﻿// SimpleServer is an example of using Frack as a F# script.
+// <see href="http://blogs.msdn.com/b/chrsmith/archive/2008/09/12/scripting-in-f.aspx" />
 #I @"..\lib\FSharp"
 #I @"..\build"
 #r "mscorlib.dll"
@@ -16,26 +16,19 @@
 open System
 open System.IO
 open System.Net
+open System.Threading
 open Owin
 open Owin.Extensions
 open Frack
 open Frack.HttpListener
 
-// Simple Frack app
-let app = Application(fun request -> 
-  ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!"))
+let cts = new CancellationTokenSource()
 
 // Set up and start an HttpListener
-let listener = new HttpListener()
-let prefix = "http://localhost:9191/"
-listener.Prefixes.Add(prefix)
-printfn "Listening on %s" prefix 
-listener.Start()
-let context = listener.GetContext()
+HttpListener.Start(
+  "http://localhost:9191/",
+  Application(fun request -> 
+    ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!")),
+  cts.Token)
 
-// This is where Frack takes over.
-let request = context.ToOwinRequest()
-printfn "Received a %s request" 
-app request |> write context.Response
-
-listener.Close()
+cts.Cancel()

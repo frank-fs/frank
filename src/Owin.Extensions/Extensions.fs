@@ -32,6 +32,11 @@ module Extensions =
     readBodyToEnd(count)
 
   [<System.Runtime.CompilerServices.Extension>]
+  let ReadAsString(request:Owin.IRequest) =
+    let bytes = AsyncReadBodyToEnd(request, 0) |> Async.RunSynchronously
+    System.Text.Encoding.UTF8.GetString(bytes)
+
+  [<System.Runtime.CompilerServices.Extension>]
   let ReadBody(request:Owin.IRequest, buffer, offset, count) =
     Async.FromBeginEnd(buffer, offset, count, request.BeginReadBody, request.EndReadBody)
     |> Async.RunSynchronously
