@@ -1,14 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\Frack.Core\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.Extensions", "src\Owin.Extensions\Owin.Extensions.fsproj", "{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.AspNet", "src\Frack.AspNet\Frack.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.HttpListener", "src\Frack.HttpListener\Frack.HttpListener.fsproj", "{CF0856FD-3258-455A-A236-7025968BB639}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B8E01199-E214-4775-A731-6923932BE7B1}"
 	ProjectSection(SolutionItems) = preProject
 		build.bat = build.bat
@@ -18,18 +10,26 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Hosting", "Hosting", "{0D74C7C2-8D0C-4478-8054-DFA76828D041}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.Extensions", "src\Owin.Extensions\Owin.Extensions.fsproj", "{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}"
-	ProjectSection(SolutionItems) = preProject
-		samples\SimpleServer.fsx = samples\SimpleServer.fsx
-	EndProjectSection
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\Frack\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.AspNet", "src\Owin.AspNet\Owin.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Owin.HttpListener", "src\Owin.HttpListener\Owin.HttpListener.fsproj", "{CF0856FD-3258-455A-A236-7025968BB639}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Hosting", "Hosting", "{0D74C7C2-8D0C-4478-8054-DFA76828D041}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloAspNet.Web", "samples\HelloAspNet\HelloAspNet.Web\HelloAspNet.Web.csproj", "{5E761E95-549D-48E8-9694-C43FB433DB6B}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloAspNet.App", "samples\HelloAspNet\HelloAspNet.App\HelloAspNet.App.fsproj", "{534EF4B0-5A7B-43F3-8889-0E27560E9A18}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HelloAspNet", "HelloAspNet", "{7A2392BE-8586-4D58-84C3-ED994FDC7CAC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}"
+	ProjectSection(SolutionItems) = preProject
+		samples\SimpleServer.fsx = samples\SimpleServer.fsx
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,16 +41,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|x86.ActiveCfg = Release|Any CPU
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
@@ -61,6 +51,16 @@ Global
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{EFAD9B2F-2B4D-49B1-BDB6-049B28F091E3}.Release|x86.ActiveCfg = Release|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|x86.ActiveCfg = Release|Any CPU
 		{762480C7-F12D-475E-A4AC-47978D33FAF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{762480C7-F12D-475E-A4AC-47978D33FAF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{762480C7-F12D-475E-A4AC-47978D33FAF9}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU

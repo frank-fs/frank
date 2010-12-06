@@ -2,7 +2,6 @@
 open System
 open System.Collections.Generic
 open Owin
-open Owin.Extensions
 
 /// <summary>Creates an Owin.IResponse.</summary>
 type Response(status, headers, getBody:unit -> seq<seq<byte>>) =

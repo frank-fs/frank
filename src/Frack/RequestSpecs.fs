@@ -4,7 +4,6 @@ open System.Collections.Specialized
 open System.IO
 open System.Text
 open Owin
-open Owin.Extensions
 open Frack
 open NUnit.Framework
 open BaseSpecs

@@ -1,4 +1,4 @@
-﻿namespace Owin.Extensions
+﻿namespace Owin
 
 [<AutoOpen>]
 [<System.Runtime.CompilerServices.Extension>]

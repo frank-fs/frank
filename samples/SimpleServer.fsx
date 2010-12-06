@@ -10,17 +10,16 @@
 #r "FSharp.Core.dll"
 #r "owin.dll"
 #r "Owin.Extensions.dll"
+#r "Owin.HttpListener.dll"
 #r "frack.dll"
-#r "Frack.HttpListener.dll"
 
 open System
 open System.IO
 open System.Net
 open System.Threading
-open Owin
-open Owin.Extensions
 open Frack
-open Frack.HttpListener
+open Owin
+open Owin.Hosting.HttpListener
 
 let cts = new CancellationTokenSource()
 

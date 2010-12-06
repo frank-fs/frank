@@ -1,4 +1,4 @@
-﻿namespace Owin.Extensions
+﻿namespace Owin
 module Middleware =
   open Owin
 

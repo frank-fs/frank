@@ -4,8 +4,8 @@ open System
 open System.Web
 open System.Web.Routing
 open Frack
-open Frack.AspNet
-open Owin.Extensions.Middleware
+open Owin.Hosting.AspNet
+open Owin.Middleware
 
 type Global() =
     inherit System.Web.HttpApplication() 
@@ -17,7 +17,7 @@ type Global() =
            "Hello ASP.NET!"))
         // Uses the head middleware.
         // Try using Fiddler and perform a HEAD request.
-        routes.Add(new Route("{*path}", new FrackRouteHandler(head app))) 
+        routes.Add(new Route("{*path}", new OwinRouteHandler(head app))) 
 
     member x.Start() =
         Global.RegisterRoutes(RouteTable.Routes)

@@ -1,5 +1,5 @@
 ﻿#nowarn "77"
-namespace Owin.Extensions
+namespace Owin
 open System
 open System.Collections.Generic
 

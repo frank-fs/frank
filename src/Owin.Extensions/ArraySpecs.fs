@@ -1,4 +1,4 @@
-﻿module Owin.Extensions.ArraySpecs
+﻿module Owin.ArraySpecs
 open NUnit.Framework
 open BaseSpecs
 

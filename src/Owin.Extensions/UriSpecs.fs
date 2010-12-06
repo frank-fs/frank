@@ -1,4 +1,4 @@
-﻿module Owin.Extensions.UriSpecs
+﻿module Owin.UriSpecs
 open System
 open NUnit.Framework
 open BaseSpecs

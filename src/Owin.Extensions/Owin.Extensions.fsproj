@@ -42,12 +42,13 @@
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="owin">
-      <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
+      <HintPath>..\..\lib\owin\build\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
+    <Compile Include="SeqStream.fs" />
     <Compile Include="ByteString.fs" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="Utility.fs" />

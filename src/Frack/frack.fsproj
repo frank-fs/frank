@@ -41,7 +41,7 @@
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="owin">
-      <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
+      <HintPath>..\..\lib\owin\build\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
   </ItemGroup>

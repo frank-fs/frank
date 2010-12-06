@@ -1,5 +1,4 @@
-﻿namespace Owin.Extensions
-open Owin
+﻿namespace Owin
 
 module Request =
   /// <summary>Creates an IRequest from a begin/end methods.</summary>

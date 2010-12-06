@@ -2,7 +2,6 @@
 open System
 open System.Collections.Generic
 open Owin
-open Owin.Extensions
 
 /// <summary>Creates an Owin.IRequest.</summary>
 type Request(methd, uri, headers, items, beginRead, endRead) =

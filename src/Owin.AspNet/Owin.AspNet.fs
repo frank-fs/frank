@@ -1,4 +1,4 @@
-﻿namespace Frack
+﻿namespace Owin.Hosting
 module AspNet =
   open System
   open System.Collections.Generic
@@ -6,14 +6,13 @@ module AspNet =
   open System.Text
   open System.Web
   open Owin
-  open Owin.Extensions
-  open Frack
 
   type System.Web.HttpResponseBase with
     /// Writes the Frack response to the ASP.NET response.
     member response.Reply(r:IResponse) =
+      if r.Headers.ContainsKey("Content-Length") then
+        response.ContentType <- Seq.head(r.Headers.["Content-Length"])
       let statusCode, statusDescription = splitStatus r.Status
-      //response.ContentType <- r.MediaType
       response.StatusCode <- statusCode
       response.StatusDescription <- statusDescription
       // TODO: Fix ASP.NET headers issue.
@@ -36,14 +35,14 @@ module AspNet =
       items.["url_scheme"] <- this.Request.Url.Scheme
       items.["host"] <- this.Request.Url.Host
       items.["server_port"] <- this.Request.Url.Port
-      Request.FromAsync(this.Request.HttpMethod,
-                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query),
-                        headers, items, (this.Request.InputStream.AsyncRead))
+      Request.fromAsync this.Request.HttpMethod
+                        (this.Request.Url.AbsolutePath + "?" + this.Request.Url.Query)
+                        headers items (this.Request.InputStream.AsyncRead)
 
-  /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
-  type FrackRouteHandler(app:IApplication) =
+  /// Defines a System.Web.Routing.IRouteHandler for hooking up OWIN applications.
+  type OwinRouteHandler(app:IApplication) =
     interface Routing.IRouteHandler with
-      /// Get the IHttpHandler for the Frack application.
+      /// Get the IHttpHandler for the OWIN application.
       /// The RequestContext is not used in this case,
       /// but could be used instead of the context passed to the handler.
       member this.GetHttpHandler(context) =
