@@ -1,15 +1,21 @@
-﻿namespace Owin
+﻿namespace Frack
 open System
+open System.Collections
+open System.Collections.Generic
 open System.IO
 
 /// Initializes a new instance of the SeqStream class.
 /// <param name="data">The bytes for the enumerable stream.</param>
 /// <remarks>The implementation is derived from Bent Rasumssen's Extensia project.</remarks>
 /// <see href="http://extensia.codeplex.com"/>
-type SeqStream(data:seq<byte>) =
+type EnumerableStream(data:seq<byte>) =
   inherit Stream()
   do if data = null then raise (ArgumentNullException("data"))
   let d = data.GetEnumerator()
+
+  interface IEnumerable<byte> with
+    member this.GetEnumerator() = data.GetEnumerator()
+    member this.GetEnumerator() = data.GetEnumerator() :> IEnumerator 
 
   override this.CanRead = true
   override this.CanSeek = true
@@ -21,6 +27,9 @@ type SeqStream(data:seq<byte>) =
   override this.Seek(offset, origin) = raise (NotSupportedException())
   override this.SetLength(value) = raise (NotSupportedException())
   override this.Write(buffer, offset, count) = raise (NotSupportedException())
+//    d := seq { yield! !d |> Seq.take offset
+//               yield! buffer |> Seq.take count
+//               yield! !d |> Seq.skip offset }
   override this.Dispose(disposing) = d.Dispose()
                                      base.Dispose(disposing)
   override this.Read(buffer, offset, count) =

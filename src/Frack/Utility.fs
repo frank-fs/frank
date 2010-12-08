@@ -1,11 +1,12 @@
 ﻿#nowarn "77"
-namespace Owin
+namespace Frack
 open System
 open System.Collections.Generic
 
 [<AutoOpen>]
 module Utility =
-  let isNotNullOrEmpty s = not (String.IsNullOrEmpty(s))
+  [<System.Runtime.CompilerServices.Extension>]
+  let IsNotNullOrEmpty s = not (String.IsNullOrEmpty(s))
 
   /// Dynamic indexer lookups.
   /// <see href="http://codebetter.com/blogs/matthew.podwysocki/archive/2010/02/05/using-and-abusing-the-f-dynamic-lookup-operator.aspx" />
@@ -17,10 +18,10 @@ module Utility =
   let inline implicit arg = ( ^a : (static member op_Implicit : ^b -> ^a) arg)
 
   /// Decodes url encoded values.
-  let decodeUrl input = System.Uri.UnescapeDataString(input).Replace("+", " ")
+  let DecodeUrl input = System.Uri.UnescapeDataString(input).Replace("+", " ")
 
   /// Splits a relative Uri string into the path and query string.
-  let splitUri (uri) =
+  let SplitUri uri =
     if System.String.IsNullOrEmpty(uri)
       then ("/", "")
       else let arr = uri.Split([|'?'|])
@@ -29,7 +30,7 @@ module Utility =
            (path, queryString)
 
   /// Splits a status code into the integer status code and the string status description.
-  let splitStatus (status) =
+  let SplitStatus status =
     if System.String.IsNullOrEmpty(status)
       then (200, "OK")
       else let arr = status.Split([|' '|])
@@ -39,22 +40,22 @@ module Utility =
 
   /// Creates a tuple from the first two values returned from a string split on the specified split character.
   let private (|/) (split:char) (input:string) =
-    if input |> isNotNullOrEmpty
+    if input |> IsNotNullOrEmpty
       then let p = input.Split(split) in (p.[0], if p.Length > 1 then p.[1] else "")
       else ("","") // This should never be reached but has to be here to satisfy the return type.
 
   /// Parses the url encoded string into an IDictionary<string,string>.
   let private parseUrlEncodedString input =
-    if input |> isNotNullOrEmpty
-      then let data = decodeUrl input
+    if input |> IsNotNullOrEmpty
+      then let data = DecodeUrl input
            data.Split('&')
-             |> Seq.filter isNotNullOrEmpty
+             |> Seq.filter IsNotNullOrEmpty
              |> Seq.map ((|/) '=')
              |> dict
       else dict Seq.empty
 
   /// Parses the query string into an IDictionary<string,string>.
-  let parseQueryString = parseUrlEncodedString
+  let ParseQueryString = parseUrlEncodedString
 
   /// Parses the input stream for x-http-form-urlencoded values into an IDictionary<string,string>.
-  let parseFormUrlEncoded : bytestring -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)
+  let ParseFormUrlEncoded : seq<byte> -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)

@@ -47,17 +47,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
+    <Compile Include="EnumerableStream.fs" />
+    <Compile Include="ByteString.fs" />
+    <Compile Include="ArraySpecs.fs" />
+    <Compile Include="Utility.fs" />
+    <Compile Include="UriSpecs.fs" />
+    <Compile Include="Extensions.fs" />
     <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
     <Compile Include="Application.fs" />
     <Compile Include="RequestSpecs.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Owin.Extensions\Owin.Extensions.fsproj">
-      <Name>Owin.Extensions</Name>
-      <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
-      <Private>True</Private>
-    </ProjectReference>
+    <Compile Include="Middleware.fs" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

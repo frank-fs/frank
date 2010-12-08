@@ -1,4 +1,4 @@
-﻿module Owin.ArraySpecs
+﻿module Frack.ArraySpecs
 open NUnit.Framework
 open BaseSpecs
 

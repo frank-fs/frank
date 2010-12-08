@@ -1,4 +1,4 @@
-﻿namespace Owin
+﻿namespace Frack
 
 [<AutoOpen>]
 [<System.Runtime.CompilerServices.Extension>]
@@ -6,10 +6,10 @@ module Extensions =
 
   // Owin.IRequest Extensions
   [<System.Runtime.CompilerServices.Extension>]
-  let Path(request:Owin.IRequest) = request.Uri |> (splitUri >> fst)
+  let Path(request:Owin.IRequest) = request.Uri |> (SplitUri >> fst)
 
   [<System.Runtime.CompilerServices.Extension>]
-  let QueryString(request:Owin.IRequest) = request.Uri |> (splitUri >> snd)
+  let QueryString(request:Owin.IRequest) = request.Uri |> (SplitUri >> snd)
 
   [<System.Runtime.CompilerServices.Extension>]
   let AsyncReadBody(request:Owin.IRequest, buffer, offset, count) =
@@ -70,10 +70,10 @@ module Extensions =
 
   // Owin.IResponse Extensions
   [<System.Runtime.CompilerServices.Extension>]
-  let StatusCode(response:Owin.IResponse) = response.Status |> (fst << splitStatus) 
+  let StatusCode(response:Owin.IResponse) = response.Status |> (fst << SplitStatus) 
 
   [<System.Runtime.CompilerServices.Extension>]
-  let StatusDescription(response:Owin.IResponse) = response.Status |> (snd << splitStatus) 
+  let StatusDescription(response:Owin.IResponse) = response.Status |> (snd << SplitStatus) 
 
   type Owin.IResponse with
     member this.StatusCode = StatusCode this
@@ -101,11 +101,20 @@ module Extensions =
     /// <returns>An <see cref="Owin.IResponse"/>.</returns>
     member this.Invoke(request) = Async.FromBeginEnd(request, this.BeginInvoke, this.EndInvoke)
                                   |> Async.RunSynchronously
+
+  /// Extends NameValueCollection with methods to transform it to an enumerable.
+  [<System.Runtime.CompilerServices.Extension>]
+  let AsEnumerable(this:System.Collections.Specialized.NameValueCollection) =
+    seq { for key in this.Keys do yield (key, this.[key]) }
+
+  /// Extends NameValueCollection with methods to transform it to a dictionary.
+  [<System.Runtime.CompilerServices.Extension>]
+  let ToDictionary(this:System.Collections.Specialized.NameValueCollection) = this |> AsEnumerable |> dict
                                   
   /// Extends NameValueCollection with methods to transform it to an enumerable, map or dictionary.
   type System.Collections.Specialized.NameValueCollection with
-    member this.AsEnumerable() = seq { for key in this.Keys do yield (key, this.[key]) }
-    member this.ToDictionary() = dict (this.AsEnumerable())
+    member this.AsEnumerable() = this |> AsEnumerable
+    member this.ToDictionary() = this |> ToDictionary
     member this.ToMap() =
       let folder (h:Map<_,_>) (key:string) =
         Map.add key this.[key] h 

@@ -5,13 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</ProjectGuid>
+    <ProjectGuid>{cf0856fd-3258-455a-a236-7025968bb639}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack</RootNamespace>
-    <AssemblyName>Owin.Extensions</AssemblyName>
+    <RootNamespace>Frack.HttpListener</RootNamespace>
+    <AssemblyName>Frack.HttpListener</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <Name>Owin.Extensions</Name>
-    <TargetFrameworkProfile />
+    <Name>Frack.HttpListener</Name>
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -22,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Frack.Extensions.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Frack.HttpListener.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,31 +30,29 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.Extensions.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Frack.HttpListener.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="owin">
-      <HintPath>..\..\lib\owin\build\owin.dll</HintPath>
+      <HintPath>..\..\lib\owin\build\2.0\Release\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BaseSpecs.fs" />
-    <Compile Include="SeqStream.fs" />
-    <Compile Include="ByteString.fs" />
-    <Compile Include="ArraySpecs.fs" />
-    <Compile Include="Utility.fs" />
-    <Compile Include="UriSpecs.fs" />
-    <Compile Include="Factory.fs" />
-    <Compile Include="Extensions.fs" />
-    <Compile Include="Middleware.fs" />
+    <Compile Include="Frack.HttpListener.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Frack\frack.fsproj">
+      <Name>frack</Name>
+      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -1,4 +1,4 @@
-﻿namespace Owin
+﻿namespace Frack
 open System
 open System.Collections.Generic
 open System.IO
@@ -12,16 +12,15 @@ module Array =
     let len = !stop' - start
     [| for i in [0..(len-1)] do yield source.[i + start] |]
 
+  [<System.Runtime.CompilerServices.Extension>]
+  let Slice(arr, start, stop) = slice start stop arr
+
 /// Extensions to dictionaries.
 module Dict =
   open System.Collections.Generic
   let toSeq d = d |> Seq.map (fun (KeyValue(k,v)) -> (k,v))
   let toArray (d:IDictionary<_,_>) = d |> toSeq |> Seq.toArray
   let toList (d:IDictionary<_,_>) = d |> toSeq |> Seq.toList
-
-/// An immutable byte sequence.
-/// <remarks>Alias of byte seq.</remarks>
-type bytestring = seq<byte>
 
 /// Module to transform a string into an immutable list of bytes and back.
 /// <remarks>Several extensions derived from Bent Rasumssen's Extensia project.</remarks>
@@ -36,13 +35,13 @@ module ByteString =
   let empty = Seq.empty<byte>
 
   /// Converts a byte string into a string.
-  let toString (bs:bytestring) = Encoding.UTF8.GetString(bs |> Seq.toArray)
+  let toString (bs:#seq<byte>) = Encoding.UTF8.GetString(bs |> Seq.toArray)
 
   /// Converts a string into a byte string.
-  let fromString (s: string) : bytestring = Encoding.UTF8.GetBytes(s) |> Array.toSeq
+  let fromString (s: string) = Encoding.UTF8.GetBytes(s) |> Array.toSeq
 
   /// Converts a stream into a byte string.
-  let fromStream (bufferSize:int) (stream:Stream) : bytestring =
+  let fromStream (bufferSize:int) (stream:Stream) =
     if stream = null then raise (ArgumentNullException("stream"))
     if bufferSize <= 0 then raise (ArgumentException("bufferSize must be greater than 0.", "bufferSize"))
 
@@ -71,13 +70,13 @@ module ByteString =
     }
 
   /// Converts a <see cref="FileInfo"/> into a byte seq.
-  let fromFileInfo (file:FileInfo) : bytestring =
+  let fromFileInfo (file:FileInfo) =
     if file = null then raise (ArgumentNullException("file"))
     use stream = file.OpenRead()
     seq { for x in fromStream 1024 stream do yield x }
 
   /// Converts an object to a byte seq.
-  let fromObject (o:obj) : bytestring =
+  let fromObject (o:obj) =
     let formatter = BinaryFormatter()
     use stream = new MemoryStream()
     try
@@ -86,19 +85,19 @@ module ByteString =
     with :? SerializationException as e -> null
 
   /// Converts a byte string into a stream.
-  let toStream (source:bytestring) =
+  let toStream source =
     if source = null then raise (ArgumentNullException("source"))
-    new SeqStream(source) :> Stream
+    new EnumerableStream(source) :> Stream
 
   /// Converts a byte string into an object.
-  let toObj (source:bytestring) =
+  let toObj (source:#seq<byte>) =
     let formatter = BinaryFormatter()
     use stream = new MemoryStream(source |> Seq.toArray)
     try formatter.Deserialize(stream)
     with e -> null
 
   /// Transfers the bytes of a byte string into a stream
-  let transfer (stream:Stream) (source:bytestring) =
+  let transfer (stream:Stream) (source:#seq<byte>) =
     if source = null then raise (ArgumentNullException("source"))
     if stream = null then raise (ArgumentNullException("stream"))
     source |> Seq.iter (fun x -> stream.WriteByte(x))

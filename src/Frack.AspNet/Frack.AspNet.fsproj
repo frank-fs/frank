@@ -8,9 +8,9 @@
     <ProjectGuid>{762480c7-f12d-475e-a4ac-47978d33faf9}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.AspNet</RootNamespace>
-    <AssemblyName>Owin.AspNet</AssemblyName>
+    <AssemblyName>Frack.AspNet</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <Name>Owin.AspNet</Name>
+    <Name>Frack.AspNet</Name>
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -48,12 +48,12 @@
     <Reference Include="System.Web.Routing" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Owin.AspNet.fs" />
+    <Compile Include="Frack.AspNet.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Owin.Extensions\Owin.Extensions.fsproj">
-      <Name>Owin.Extensions</Name>
-      <Project>{efad9b2f-2b4d-49b1-bdb6-049b28f091e3}</Project>
+    <ProjectReference Include="..\Frack\frack.fsproj">
+      <Name>frack</Name>
+      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

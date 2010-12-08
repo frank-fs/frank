@@ -1,4 +1,4 @@
-﻿module Owin.UriSpecs
+﻿module Frack.UriSpecs
 open System
 open NUnit.Framework
 open BaseSpecs
@@ -17,4 +17,4 @@ let uriCases = [|
 
 [<Test>]
 [<TestCaseSource("uriCases")>]
-let ``Splitting the uri`` (uri, path:string, queryString:string) = (splitUri uri) == (path, queryString)
+let ``Splitting the uri`` (uri, path:string, queryString:string) = (SplitUri uri) == (path, queryString)
