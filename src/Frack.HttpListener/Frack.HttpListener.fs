@@ -36,11 +36,7 @@ module HttpListener =
     response.StatusDescription <- statusDescription
     r.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> response.Headers.Add(k,v')))
     let output = response.OutputStream 
-    r.GetBody()
-    |> Seq.map (fun o -> o :?> byte[])
-    //|> Seq.iter (ByteString.transfer output) 
-    // Or batch it per byte[]:
-    |> Seq.iter (fun buffer -> output.Write(buffer, 0, buffer.Length))
+    r.WriteToStream output
     output.Close()
 
   type System.Net.HttpListenerResponse with

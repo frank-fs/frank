@@ -75,10 +75,24 @@ module Extensions =
   [<System.Runtime.CompilerServices.Extension>]
   let StatusDescription(response:Owin.IResponse) = response.Status |> (snd << SplitStatus) 
 
+  let writeTo stream item =
+    match item with
+    // Transfers the bytes to the stream
+    | Bytes bs -> ByteString.transfer stream bs
+    // Converts a FileInfo into a seq<byte>, then transfers the bytes to the stream
+    | File fi -> ByteString.fromFileInfo fi |> (ByteString.transfer stream)
+    // Ignore until I better understand ArraySegment
+    | Segment seg -> ()
+    // Converts a string into a seq<byte>, then transfers the bytes to the stream
+    | Str str -> ByteString.fromString str |> (ByteString.transfer stream)
+
+  [<System.Runtime.CompilerServices.Extension>]
+  let WriteToStream(response:Owin.IResponse, stream) = response.GetBody() |> Seq.iter (writeTo stream)
+
   type Owin.IResponse with
     member this.StatusCode = StatusCode this
     member this.StatusDescription = StatusDescription this
-
+    member this.WriteToStream stream = this.GetBody() |> Seq.iter (writeTo stream)
 
   // Owin.IApplication Extensions
   [<System.Runtime.CompilerServices.Extension>]

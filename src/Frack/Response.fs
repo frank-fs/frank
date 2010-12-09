@@ -45,3 +45,4 @@ type Response(status, headers, getBody:unit -> seq<byte[]>) =
   /// <summary>Creates an Owin.IResponse.</summary>
   static member Create(status, headers, getBody:unit -> seq<byte[]>) =
     Response(status, headers, getBody) :> IResponse
+

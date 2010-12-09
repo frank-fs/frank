@@ -59,3 +59,11 @@ module Utility =
 
   /// Parses the input stream for x-http-form-urlencoded values into an IDictionary<string,string>.
   let ParseFormUrlEncoded : seq<byte> -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)
+
+  /// An active pattern for parsing the type of object returned within the response body.
+  let (|Bytes|File|Segment|Str|) (item:obj) =
+    match item with
+    | :? System.IO.FileInfo -> File(item :?> System.IO.FileInfo) 
+    | :? ArraySegment<byte> -> Segment(item :?> ArraySegment<byte>)
+    | :? string             -> Str(item :?> string)
+    | _                     -> Bytes(item :?> byte[])

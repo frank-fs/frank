@@ -21,9 +21,7 @@ module AspNet =
     // TODO: Fix ASP.NET headers issue.
     //r.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> response.Headers.Add(k,v')))
     let output = response.OutputStream
-    r.GetBody()
-    |> Seq.map (fun o -> o :?> byte[])
-    |> Seq.iter (ByteString.transfer output) 
+    r.WriteToStream output
 
   type System.Web.HttpResponseBase with
     /// Writes the Frack response to the ASP.NET response.
