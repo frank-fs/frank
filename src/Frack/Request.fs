@@ -24,6 +24,14 @@ type Request(methd, uri, headers, items, beginRead:Func<_,_,_,_>, endRead:Func<_
       beginRead.Invoke((buffer, offset, count), callback, state)
     member this.EndReadBody(result) = endRead.Invoke(result)
 
+  member this.Method = methd
+  member this.Uri = uri
+  member this.Headers = headers
+  member this.Items = items
+  member this.BeginReadBody(buffer, offset, count, callback, state) =
+    beginRead.Invoke((buffer, offset, count), callback, state)
+  member this.EndReadBody(result) = endRead.Invoke(result)
+
   /// <summary>Creates an IRequest from begin/end Func delegates.</summary>
   static member Create(methd, uri, headers, items, beginRead:Func<_,_,_,_>, endRead:Func<_,_>) =
     Request(methd, uri, headers, items, beginRead, endRead) :> Owin.IRequest
