@@ -17,7 +17,7 @@ type Global() =
            "Hello ASP.NET!"))
         // Uses the head middleware.
         // Try using Fiddler and perform a HEAD request.
-        routes.MapFrackRoute("{*path}", app)
+        routes.MapFrackRoute("{*path}", head app)
 
     member x.Start() =
         Global.RegisterRoutes(RouteTable.Routes)
