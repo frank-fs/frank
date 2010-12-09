@@ -15,15 +15,16 @@ namespace HelloAspNet
         {
             routes.IgnoreRoute("{resource}.axd/{*pathInfo}");
 
-            routes.MapFrackRoute("{*page}", new Frack.Application(request =>
-                new Frack.Response(
-                    "200 OK",
-                    new Dictionary<string, IEnumerable<string>>
-                    {
-                        { "Content-Type", new [] { "text/plain" } },
-                        { "Content-Length", new [] { "14" } },
-                    },
-                    "Hello ASP.NET!")));
+            routes.MapFrackRoute("{*page}",
+ 		Middleware.head(
+       		    new Application(request =>
+       			new Response("200 OK",
+       			    new Dictionary<string, IEnumerable<string>>
+       			    {
+       			        { "Content-Type", new[] { "text/plain" } },
+       				{ "Content-Length", new[] { "14" } },
+       			    },
+       			    "Hello ASP.NET!"))));
         }
 
         protected void Application_Start()
