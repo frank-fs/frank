@@ -43,10 +43,10 @@ Takes an app and returns an app.
     >   let asyncInvoke (req: Owin.IRequest) = async {
     >     if req.Method <> "HEAD"
     >       then return! app.AsyncInvoke(req)
-    >       else let get = Request.Create("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
+    >       else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
     >            let! resp = app.AsyncInvoke(get)
-    >            return Response(resp.Status, resp.Headers, (fun () -> Seq.empty)) :> Owin.IResponse }
-    >   Application asyncInvoke :> Owin.IApplication
+    >            return Response.Create(resp.Status, resp.Headers, Array.empty<byte>) }
+    >   Application.Create asyncInvoke
 
     val head : Owin.IApplication -> Owin.IApplication
 
