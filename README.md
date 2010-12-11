@@ -16,21 +16,21 @@ Usage
 
 ### Define an app
 
-Takes an environment and returns a triple of status code, headers, and body.
+Takes an Owin.IRequest and returns an Owin.IResponse (or here, a triple of status code, headers, and body).
 
     >  let app = Application(fun request ->
     >    ("200 OK",
-    >     (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
+    >     dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |],
     >     "Hello ASP.NET!"))
     
     val app : Application
 
-Or define an asynchronous application.
+Or define an asynchronous application (here echoing the contents of the request).
 
     >  let app = Application(fun (request:Owin.IRequest) -> async {
-    >    let! body = request.AsyncReadAsString()  // Echo the request body.
+    >    let! body = request.AsyncReadAsString()
     >    return ("200 OK",
-    >            (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
+    >            dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |],
     >            body) })
     
     val app : Application
