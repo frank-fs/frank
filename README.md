@@ -1,8 +1,8 @@
 Frack
 ============
-Frack is an implementation of the proposed NWSGI (.NET Web Server Gateway Interface), which has a similar intent as the [Python WSGI](http://www.python.org/dev/peps/pep-0333/) and [JSGI](http://jackjs.org/jsgi-spec.html) specifications. Frack is similar in implementation to [Rack](http://rack.rubyforge.org/) and [Jack](http://jackjs.org/) and owes a lot to those projects.
+Frack -- Functional Rack -- is an implementation of [OWIN](http://owin.github.com/owin) (Open Web Interface for .NET), which has a similar intent as the [Python WSGI](http://www.python.org/dev/peps/pep-0333/) and [JSGI](http://jackjs.org/jsgi-spec.html) specifications. Frack is similar in implementation to [Rack](http://rack.rubyforge.org/) and [Jack](http://jackjs.org/) and owes a lot to those projects.
 
-Frack is developed in [F#](http://fsharp.net) as it most directly correlates to the Python and JavaScript implementations and provides yet another opportunity to show off the power and elegance of a terrific language.
+Frack is developed in [F#](http://fsharp.net) as it most directly correlates to the Python and JavaScript implementations and provides yet another opportunity to show off the power and elegance of this terrific language.
 
 Goals
 ============
@@ -35,8 +35,8 @@ Takes an app and returns an app.
     >       then return! app.AsyncInvoke(req)
     >       else let get = Request.Create("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
     >            let! resp = app.AsyncInvoke(get)
-    >            return Response.Create(resp.Status, resp.Headers, (fun () -> Seq.empty)) }
-    >   Application.fromAsync asyncInvoke
+    >            return Response(resp.Status, resp.Headers, (fun () -> Seq.empty)) :> Owin.IResponse }
+    >   Application asyncInvoke :> Owin.IApplication
 
     val head : Owin.IApplication -> Owin.IApplication
 
