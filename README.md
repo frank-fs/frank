@@ -21,7 +21,17 @@ Takes an environment and returns a triple of status code, headers, and body.
     >  let app = Application(fun request ->
     >    ("200 OK",
     >     (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
-    >     "Hello ASP.NET!" )})
+    >     "Hello ASP.NET!"))
+    
+    val app : Application
+
+Or define an asynchronous application.
+
+    >  let app = Application(fun (request:Owin.IRequest) -> async {
+    >    let! body = request.AsyncReadAsString()  // Echo the request body.
+    >    return ("200 OK",
+    >            (dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |]),
+    >            body) })
     
     val app : Application
 
