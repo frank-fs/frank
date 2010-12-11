@@ -15,7 +15,8 @@ type Global() =
     // Echo the request body contents back to the sender. 
     // Use Fiddler to post a message and see it return.
     let app = Application.Create(fun (request:IRequest) -> async {
-      let! body = request.AsyncReadBody(2 <<< 16)
+      //let! body = request.AsyncReadBody(2 <<< 16)
+      let! body = request.AsyncReadAsString()
       return ("200 OK",
               (dict [| ("Content-Length", seq { yield body.Length.ToString() }) |]),
               body) })

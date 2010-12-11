@@ -20,7 +20,7 @@ module Extensions =
       Async.FromBeginEnd(buffer, offset, count, request.BeginReadBody, request.EndReadBody))
     let readBodyToEnd(count) = async {
       let notFinished = ref true
-      let initialSize = if count > 1 then count else 32768
+      let initialSize = if count > 1 then count else (2 <<< 16)
       let buffer = Array.zeroCreate<byte> initialSize
       use ms = new System.IO.MemoryStream()
       while !notFinished do
@@ -31,9 +31,12 @@ module Extensions =
     readBodyToEnd(count)
 
   [<System.Runtime.CompilerServices.Extension>]
-  let ReadAsString(request:Owin.IRequest) =
-    let bytes = AsyncReadBodyToEnd(request, 0) |> Async.RunSynchronously
-    System.Text.Encoding.UTF8.GetString(bytes)
+  let AsyncReadAsString(request:Owin.IRequest) = async {
+    let! bytes = AsyncReadBodyToEnd(request, 2 <<< 16)
+    return System.Text.Encoding.UTF8.GetString(bytes) }
+
+  [<System.Runtime.CompilerServices.Extension>]
+  let ReadAsString(request:Owin.IRequest) = AsyncReadAsString request |> Async.RunSynchronously
 
   [<System.Runtime.CompilerServices.Extension>]
   let ReadBody(request:Owin.IRequest, buffer, offset, count) =
@@ -59,6 +62,10 @@ module Extensions =
     /// <returns>An <see cref="Async{T}"/> computation returning the bytes read.</returns>
     /// <remarks>If the <paramref name="count"/> is less than 1, the buffer size is set to 32768.</remarks>
     member this.AsyncReadBody(count) = AsyncReadBodyToEnd(this, count)
+
+    member this.AsyncReadAsString() = AsyncReadAsString this
+
+    member this.ReadAsString() = ReadAsString this
 
     /// <summary>Reads the HTTP request body synchronously.</summary>
     /// <param name="buffer">The byte buffer.</param>
