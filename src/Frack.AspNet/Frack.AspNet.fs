@@ -10,6 +10,7 @@ module AspNet =
   open System.Web.Routing
   open Owin
   open Frack
+  open Frack.Response
 
   [<System.Runtime.CompilerServices.Extension>]
   let Reply(r:IResponse, response:HttpResponseBase) = 
@@ -40,9 +41,9 @@ module AspNet =
     items.["url_scheme"] <- request.Url.Scheme
     items.["host"] <- request.Url.Host
     items.["server_port"] <- request.Url.Port
-    Request.Create(request.HttpMethod,
-                   (request.Url.AbsolutePath + "?" + request.Url.Query),
-                   headers, items, (fun (b,o,c) -> request.InputStream.AsyncRead(b,o,c)))
+    Request.FromAsync(request.HttpMethod,
+                      (request.Url.AbsolutePath + "?" + request.Url.Query),
+                      headers, items, request.InputStream.AsyncRead)
 
   type System.Web.HttpContextBase with
     /// Creates an environment variable <see cref="HttpContextBase"/>.

@@ -9,6 +9,7 @@ module HttpListener =
   open System.Text
   open Owin
   open Frack
+  open Frack.Response
 
   [<System.Runtime.CompilerServices.Extension>]
   let ToOwinRequest(context:HttpListenerContext) =
@@ -19,9 +20,9 @@ module HttpListener =
     items.["url_scheme"] <- request.Url.Scheme
     items.["server_name"] <- request.Url.Host
     items.["server_port"] <- request.Url.Port
-    Request.Create(request.HttpMethod,
-                   (request.Url.AbsolutePath + "?" + request.Url.Query),
-                   headers, items, (fun (b,o,c) -> request.InputStream.AsyncRead(b,o,c)))
+    Request.FromAsync(request.HttpMethod,
+                      (request.Url.AbsolutePath + "?" + request.Url.Query),
+                      headers, items, request.InputStream.AsyncRead)
 
   type System.Net.HttpListenerContext with
     /// Creates an environment variable <see cref="HttpContextBase"/>.

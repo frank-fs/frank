@@ -31,7 +31,7 @@ let items = new System.Collections.Generic.Dictionary<string, obj>()
 let asyncReadBody(buffer, offset, count) = async {
   let stream = "Howdy"B |> ByteString.toStream
   return! stream.AsyncRead(buffer, offset, count) }
-let getRequest m = Request(m, "/something/awesome?name=test&why=how", hdrs, items, asyncReadBody) :> Owin.IRequest
+let getRequest m = Request.FromAsync(m, "/something/awesome?name=test&why=how", hdrs, items, asyncReadBody)
 
 // Act
 let request = getRequest "GET"

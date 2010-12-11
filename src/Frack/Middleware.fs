@@ -7,10 +7,10 @@ module Middleware =
     let asyncInvoke (req: IRequest) = async {
       if req.Method <> "HEAD"
         then return! app.AsyncInvoke(req)
-        else let get = Request.Create("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
+        else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
              let! resp = app.AsyncInvoke(get)
-             return Response(resp.Status, resp.Headers, (fun () -> Seq.empty)) :> IResponse }
-    Application asyncInvoke :> IApplication
+             return Response.Create(resp.Status, resp.Headers, Array.empty<byte>) }
+    Application.Create asyncInvoke
 
   /// Intercepts the environment and checks for use of X_HTTP_METHOD_OVERRIDE.
   let methodOverride (app: IApplication) =
@@ -31,11 +31,11 @@ module Middleware =
            let req' = if httpMethods |> List.exists ((=) httpMethod)
                         then let items = req.Items
                              items?methodoverride_original_method <- "POST" 
-                             Request.Create(httpMethod, req.Uri, req.Headers, items,
-                                            (fun (b,o,c) -> async {
-                                            // TODO: Find a more efficient way to do this.
-                                            System.Array.Copy(body, b, body.Length)
-                                            return body.Length }))
+                             Request.FromAsync(httpMethod, req.Uri, req.Headers, items,
+                                               (fun (b,o,c) -> async {
+                                               // TODO: Find a more efficient way to do this.
+                                               System.Array.Copy(body, b, body.Length)
+                                               return body.Length }))
                         else req
            return! app.AsyncInvoke(req') }
-    Application asyncInvoke :> IApplication
+    Application.Create asyncInvoke

@@ -53,9 +53,9 @@
     <Compile Include="Utility.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="Request.fs" />
+    <Compile Include="RequestSpecs.fs" />
     <Compile Include="Response.fs" />
     <Compile Include="Application.fs" />
-    <Compile Include="RequestSpecs.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>

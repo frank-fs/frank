@@ -1,22 +1,16 @@
 ﻿namespace Frack
 open System
-open System.Collections.Generic
-open Owin
 
-/// <summary>Creates an Owin.IResponse.</summary>
-type Response(status, headers, getBody:unit -> seq<'a>) =
+module Response =
+  /// <summary>Creates an Owin.IResponse.</summary>
+  let FromFactory(status, headers, getBody:Func<seq<_>>) =
+    { new Owin.IResponse with
+        member this.Status = status
+        member this.Headers = headers
+        member this.GetBody() = getBody.Invoke() |> Seq.map (fun o -> o :> obj) }
 
   /// <summary>Creates an Owin.IResponse.</summary>
-  new (status, headers, body:seq<'a>) = Response(status, headers, (fun () -> body))
+  let FromEnumerable(status, headers, body:seq<_>) = FromFactory(status, headers, Func<_>(fun () -> body)) 
 
   /// <summary>Creates an Owin.IResponse.</summary>
-  new (status, headers, body:'a) = Response(status, headers, (fun () -> seq { yield body }))
-
-  interface IResponse with
-    member this.Status = status
-    member this.Headers = headers
-    member this.GetBody() = getBody() |> Seq.map (fun o -> o :> obj)
-
-  member this.Status = status
-  member this.Headers = headers
-  member this.GetBody() = getBody()
+  let Create(status, headers, body) = FromFactory(status, headers, Func<_>(fun () -> seq { yield body })) 

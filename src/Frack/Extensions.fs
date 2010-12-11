@@ -3,8 +3,7 @@
 [<AutoOpen>]
 [<System.Runtime.CompilerServices.Extension>]
 module Extensions =
-
-  // Owin.IRequest Extensions
+  // Owin.IRequest Extensions    
   [<System.Runtime.CompilerServices.Extension>]
   let Path(request:Owin.IRequest) = request.Uri |> (SplitUri >> fst)
 
