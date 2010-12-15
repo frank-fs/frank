@@ -39,7 +39,7 @@
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="owin">
-      <HintPath>..\..\..\lib\owin\build\owin.dll</HintPath>
+      <HintPath>..\..\..\lib\owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
