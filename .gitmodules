@@ -1,3 +1,0 @@
-[submodule "lib/owin"]
-	path = lib/owin
-	url = git://github.com/panesofglass/owin.git
