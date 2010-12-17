@@ -1,16 +1,17 @@
 ﻿namespace Frack
 open System
 
-module Response =
-  /// <summary>Creates an Owin.IResponse.</summary>
-  let FromFactory(status, headers, getBody:Func<seq<_>>) =
-    { new Owin.IResponse with
-        member this.Status = status
-        member this.Headers = headers
-        member this.GetBody() = getBody.Invoke() |> Seq.map (fun o -> o :> obj) }
+/// Creates a new response with an enumerable body.
+type Response(status, headers, body:seq<_>) =
+  /// Creates a new response with a single body element.
+  new (status, headers, body) = Response(status, headers, seq { yield body })
 
   /// <summary>Creates an Owin.IResponse.</summary>
-  let FromEnumerable(status, headers, body:seq<_>) = FromFactory(status, headers, Func<_>(fun () -> body)) 
+  interface Owin.IResponse with
+    member this.Status = status
+    member this.Headers = headers
+    member this.GetBody() = body |> Seq.map (fun o -> o :> obj)
 
-  /// <summary>Creates an Owin.IResponse.</summary>
-  let Create(status, headers, body) = FromFactory(status, headers, Func<_>(fun () -> seq { yield body })) 
+  member this.Status = status
+  member this.Headers = headers
+  member this.Body = body

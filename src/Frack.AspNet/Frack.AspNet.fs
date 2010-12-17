@@ -10,7 +10,6 @@ module AspNet =
   open System.Web.Routing
   open Owin
   open Frack
-  open Frack.Response
 
   [<System.Runtime.CompilerServices.Extension>]
   let Reply(r:IResponse, response:HttpResponseBase) = 

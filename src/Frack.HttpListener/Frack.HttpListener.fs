@@ -9,7 +9,6 @@ module HttpListener =
   open System.Text
   open Owin
   open Frack
-  open Frack.Response
 
   [<System.Runtime.CompilerServices.Extension>]
   let ToOwinRequest(context:HttpListenerContext) =

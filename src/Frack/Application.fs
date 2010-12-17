@@ -3,42 +3,53 @@ open System
 open System.Collections.Generic
 open Owin
 
-[<AbstractClass>]
-type Application =
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(beginInvoke:Func<_,_,_,_>, endInvoke:Func<_,_>) =
-    { new Owin.IApplication with
-        member this.BeginInvoke(request, callback, state) = beginInvoke.Invoke(request, callback, state)
-        member this.EndInvoke(result) = endInvoke.Invoke(result) }
+type Message =
+  | Req of IRequest
+  | Resp of AsyncReplyChannel<IResponse option>
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(beginInvoke:IRequest * AsyncCallback * obj -> IAsyncResult, endInvoke:IAsyncResult -> IResponse) = 
-    Application.Create(Func<_,_,_,_>(fun r cb s -> beginInvoke(r,cb,s)), Func<_,_>(endInvoke))
+type Application(responder, ?timeout) =
+  // Set the default timeout to 110 seconds.
+  let timeout = defaultArg timeout 110*60
+  // Create the underlying application agent.
+  let agent = MailboxProcessor<_>.Start(fun inbox ->
+    let rec loop request = async {
+      let! msg = inbox.Receive()
+      match msg with
+      // Set the request for the response to process.
+      | Req req -> return! loop(Some(req))
+      | Resp resp ->
+          match request with
+          // If no request has been set, return None.
+          | None -> resp.Reply(None)
+          // If a request was provided, process the response then send the result.
+          | Some(req) ->
+              let! response = responder req
+              resp.Reply(Some(response))
+          // Restore the state to that of having no request.
+          return! loop None }
+    // Start the loop with a current request state of None.
+    // If a response is requested before a request is received,
+    // the caller will get nothing back.
+    loop None)
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(invoke:Func<_,_>) =
-    Application.Create(invoke.BeginInvoke, invoke.EndInvoke)
+  let headers = Dictionary<string, seq<string>>() :> IDictionary<string, seq<string>>
+  let emptyResponse = Response("404 Not Found", headers, null) :> IResponse
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(asyncInvoke: IRequest -> Async<IResponse>) =
-    let beginInvoke, endInvoke, cancelInvoke = Async.AsBeginEnd(asyncInvoke)
-    Application.Create(beginInvoke, endInvoke)
+  let runAsync request = async {
+    agent.Post(Req request)
+    let! response = agent.PostAndAsyncReply(Resp, timeout = timeout)
+    return defaultArg response emptyResponse }
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(invoke: IRequest -> IResponse) =
-    let asyncInvoke req = async { return invoke req }
-    Application.Create(asyncInvoke)
+  let beginInvoke, endInvoke, cancelInvoke = Async.AsBeginEnd(runAsync)
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(asyncInvoke: IRequest -> Async<string * IDictionary<string, seq<string>> * 'a>) =
-    let asyncInvoke req = async {
-      let! (status, headers, body) = asyncInvoke req
-      return Response.Create(status, headers, body) }
-    Application.Create(asyncInvoke)
+  member this.RunAsync(request) = runAsync request
 
-  /// <summary>Creates an Owin.IApplication.</summary>
-  static member Create(invoke: IRequest -> string * IDictionary<string, seq<string>> * 'a) =
-    let asyncInvoke req = async {
-      let (status, headers, body) = invoke req
-      return Response.Create(status, headers, body) }
-    Application.Create(asyncInvoke)
+  member this.Run(request) =
+    agent.Post(Req request)
+    let response = agent.PostAndReply(Resp, timeout = timeout)
+    defaultArg response emptyResponse
+
+  interface IApplication with
+    member this.BeginInvoke(request, callback, state) =
+      beginInvoke(request, callback, state)
+    member this.EndInvoke(result) = endInvoke result

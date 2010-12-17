@@ -61,8 +61,9 @@ module Utility =
   let ParseFormUrlEncoded : seq<byte> -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)
 
   /// An active pattern for parsing the type of object returned within the response body.
-  let (|Bytes|File|Segment|Str|) (item:obj) =
+  let (|Bytes|Enum|File|Segment|Str|) (item:obj) =
     match item with
+    | :? seq<obj>           -> Enum(item :?> seq<obj>)
     | :? System.IO.FileInfo -> File(item :?> System.IO.FileInfo) 
     | :? ArraySegment<byte> -> Segment(item :?> ArraySegment<byte>)
     | :? string             -> Str(item :?> string)

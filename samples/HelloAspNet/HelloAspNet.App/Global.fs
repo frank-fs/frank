@@ -14,12 +14,11 @@ type Global() =
   static member RegisterRoutes(routes:RouteCollection) =
     // Echo the request body contents back to the sender. 
     // Use Fiddler to post a message and see it return.
-    let app = Application.Create(fun (request:IRequest) -> async {
-      //let! body = request.AsyncReadBody(2 <<< 16)
-      let! body = request.AsyncReadAsString()
-      return ("200 OK",
-              (dict [| ("Content-Length", seq { yield body.Length.ToString() }) |]),
-              body) })
+    let app = Application(fun (request:IRequest) -> async {
+      let! body = request.AsyncReadBody(2 <<< 16)
+      return Response("200 OK",
+                      (dict [| ("Content-Length", seq { yield body.Length.ToString() }) |]),
+                      seq { yield "Howdy!\r\n"B; yield body }) :> IResponse })
     // Uses the head middleware.
     // Try using Fiddler and perform a HEAD request.
     routes.MapFrackRoute("{*path}", head app)
