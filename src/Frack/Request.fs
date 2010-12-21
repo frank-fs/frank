@@ -2,7 +2,6 @@
 open System
 open System.Collections.Generic
 
-[<System.Runtime.CompilerServices.Extension>]
 module Request =
   /// Creates an Owin.IRequest from begin/end methods.
   let FromAsyncPattern(methd, uri, headers, items, beginRead:Func<_,_,_,_>, endRead:Func<_,_>) =
@@ -22,11 +21,11 @@ module Request =
                      Func<_,_,_,_>(fun (b,o,c) cb s -> beginRead((b,o,c),cb,s)),
                      Func<_,_>(fun iar -> endRead(iar)))
 
-  /// Creates an IRequest from a begin/end functions.
+  /// Creates an IRequest from begin/end functions.
   let FromBeginEnd(methd, uri, headers, items, beginRead:byte[] * int * int * AsyncCallback * obj -> IAsyncResult, endRead) =
     let asyncRead = fun (b, o, c) -> Async.FromBeginEnd(b, o, c, beginRead, endRead)
     FromAsync(methd, uri, headers, items, asyncRead)
 
-  /// <summary>Creates an IRequest from a Func delegate.</summary>
+  /// Creates an IRequest from a Func delegate.
   let Create(methd, uri, headers, items, read:Func<byte[],int,int,int>) =
     FromBeginEnd(methd, uri, headers, items, read.BeginInvoke, read.EndInvoke)

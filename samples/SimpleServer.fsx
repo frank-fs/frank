@@ -13,13 +13,26 @@
 #r "Frack.HttpListener.dll"
 
 open System
+open System.Collections.Generic
 open System.IO
 open System.Net
 open System.Threading
 open Frack
+open Frack.Middleware
 open Frack.Hosting.HttpListener
 
+printfn "Creating server ..."
+
 let cts = new CancellationTokenSource()
+
+let app = Application(fun (request:Owin.IRequest) -> async {
+  let greeting = "Howdy!\r\n"B
+  let length = greeting.Length
+  return Response.Create("200 OK",
+                         (dict [("Content-Length", seq { yield length.ToString() })]),
+                         seq { yield greeting }) })
+
+printfn "Listening on http://localhost:9191/ ..."
 
 // Set up and start an HttpListener
 HttpListener.Start(
@@ -30,4 +43,7 @@ HttpListener.Start(
                     "Howdy!") :> Owin.IResponse }),
   cts.Token)
 
+System.Console.ReadKey() |> ignore
+app.Stop()
 cts.Cancel()
+printfn "Stopped listening."

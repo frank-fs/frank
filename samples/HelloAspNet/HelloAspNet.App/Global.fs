@@ -15,13 +15,15 @@ type Global() =
     // Echo the request body contents back to the sender. 
     // Use Fiddler to post a message and see it return.
     let app = Application(fun (request:IRequest) -> async {
+      let greeting = "Howdy!\r\n"B
       let! body = request.AsyncReadBody(2 <<< 16)
-      return Response("200 OK",
-                      (dict [| ("Content-Length", seq { yield body.Length.ToString() }) |]),
-                      seq { yield "Howdy!\r\n"B; yield body }) :> IResponse })
+      let length = greeting.Length + body.Length
+      return Response.Create("200 OK",
+                             (dict [("Content-Length", seq { yield length.ToString() })]),
+                             seq { yield greeting; yield body }) })
     // Uses the head middleware.
     // Try using Fiddler and perform a HEAD request.
-    routes.MapFrackRoute("{*path}", head app)
+    routes.MapFrackRoute("{*path}", app |> (log >> head))
 
   member x.Start() =
     Global.RegisterRoutes(RouteTable.Routes)

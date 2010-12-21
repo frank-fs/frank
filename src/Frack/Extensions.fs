@@ -84,7 +84,7 @@ module Extensions =
   let rec writeTo stream item =
     match item with
     // Matches and iterates a sequence recursively to the stream
-    | Enum it -> it |> Seq.iter (writeTo stream)
+    | Sequence it -> it |> Seq.iter (writeTo stream)
     // Transfers the bytes to the stream
     | Bytes bs -> let st = new SeqStream(bs) in st.TransferTo(stream)
     // Converts a FileInfo into a SeqStream, then transfers the bytes to the stream

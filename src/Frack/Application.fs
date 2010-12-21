@@ -1,55 +1,49 @@
 ﻿namespace Frack
 open System
 open System.Collections.Generic
-open Owin
 
 type Message =
-  | Req of IRequest
-  | Resp of AsyncReplyChannel<IResponse option>
+  | Die
+  | Req of Owin.IRequest * AsyncReplyChannel<Owin.IResponse>
 
+/// Defines a server application.
 type Application(responder, ?timeout) =
-  // Set the default timeout to 110 seconds.
+  /// Set the default timeout to 110 seconds.
   let timeout = defaultArg timeout 110*60
-  // Create the underlying application agent.
+
+  /// Create the underlying application agent.
   let agent = MailboxProcessor<_>.Start(fun inbox ->
-    let rec loop request = async {
+    let rec loop () = async {
       let! msg = inbox.Receive()
       match msg with
-      // Set the request for the response to process.
-      | Req req -> return! loop(Some(req))
-      | Resp resp ->
-          match request with
-          // If no request has been set, return None.
-          | None -> resp.Reply(None)
-          // If a request was provided, process the response then send the result.
-          | Some(req) ->
-              let! response = responder req
-              resp.Reply(Some(response))
-          // Restore the state to that of having no request.
-          return! loop None }
-    // Start the loop with a current request state of None.
-    // If a response is requested before a request is received,
-    // the caller will get nothing back.
-    loop None)
+      // Stop processing messages.
+      | Die -> return ()
+      // Process the request and reply on the response channel.
+      | Req(req, resp) ->
+          let! response = responder req
+          resp.Reply(response)
+          return! loop () }
+    loop ())
 
-  let headers = Dictionary<string, seq<string>>() :> IDictionary<string, seq<string>>
-  let emptyResponse = Response("404 Not Found", headers, null) :> IResponse
-
+  /// Asynchronously runs the app on the request. 
   let runAsync request = async {
-    agent.Post(Req request)
-    let! response = agent.PostAndAsyncReply(Resp, timeout = timeout)
-    return defaultArg response emptyResponse }
+    let! response = agent.PostAndAsyncReply((fun resp -> Req(request, resp)), timeout = timeout)
+    return response }
 
+  /// Create the begin/end/cancel invoke functions for use implementing Owin.IApplication.
   let beginInvoke, endInvoke, cancelInvoke = Async.AsBeginEnd(runAsync)
 
-  member this.RunAsync(request) = runAsync request
-
+  /// Stops the server.
+  member this.Stop() = agent.Post(Die)
+  /// Runs the application asynchronously.
+  member this.AsyncRun(request) = runAsync request
+  /// Runs the application synchronously.
   member this.Run(request) =
-    agent.Post(Req request)
-    let response = agent.PostAndReply(Resp, timeout = timeout)
-    defaultArg response emptyResponse
+    agent.PostAndReply((fun resp -> Req(request, resp)), timeout = timeout)
 
-  interface IApplication with
+  interface Owin.IApplication with
+    /// Begins invocation of the OWIN application.
     member this.BeginInvoke(request, callback, state) =
       beginInvoke(request, callback, state)
+    /// Ends invocation of the OWIN application.
     member this.EndInvoke(result) = endInvoke result
