@@ -13,16 +13,16 @@ open System.Text
 type SeqStream(data:seq<byte>) =
   inherit Stream()
   do Contract.Requires(data <> null)
-  let d = data.GetEnumerator()
+  let enumerator = data.GetEnumerator
 
   interface IEnumerable<byte> with
     /// Gets the enumerator for the SeqStream.
-    member this.GetEnumerator() = data.GetEnumerator()
+    member this.GetEnumerator() = enumerator()
     /// Gets the enumerator for the SeqStream.
-    member this.GetEnumerator() = data.GetEnumerator() :> IEnumerator 
+    member this.GetEnumerator() = enumerator() :> IEnumerator 
 
   override this.CanRead = true
-  override this.CanSeek = true
+  override this.CanSeek = false
   override this.CanWrite = false
   override this.Flush() = ()
   override this.Length = data |> Seq.length |> int64
@@ -31,7 +31,7 @@ type SeqStream(data:seq<byte>) =
   override this.Seek(offset, origin) = raise (NotSupportedException())
   override this.SetLength(value) = raise (NotSupportedException())
   override this.Write(buffer, offset, count) = raise (NotSupportedException())
-  override this.Dispose(disposing) = d.Dispose()
+  override this.Dispose(disposing) = let d = enumerator() in d.Dispose()
                                      base.Dispose(disposing)
   override this.Read(buffer, offset, count) =
     Contract.Requires(buffer <> null)
@@ -39,6 +39,7 @@ type SeqStream(data:seq<byte>) =
     Contract.Requires(count > 0)
     Contract.Requires(offset + count <= buffer.Length)
 
+    let d = enumerator()
     let rec loop bytesRead =
       if d.MoveNext() && bytesRead < count
         then
@@ -94,7 +95,7 @@ type SeqStream(data:seq<byte>) =
     with e -> null
 
   /// Gets the enumerator for the SeqStream.
-  member this.GetEnumerator() = data.GetEnumerator()
+  member this.GetEnumerator() = enumerator()
 
   /// Transfers the bytes of the SeqStream into the specified stream
   member this.TransferTo (stream:Stream) =

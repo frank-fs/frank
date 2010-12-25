@@ -64,9 +64,10 @@ module Utility =
   /// An active pattern for parsing the type of object returned within the response body.
   /// The return type can be one of a byte[], FileInfo, ArraySegment<byte>, or a sequence of any of these.
   /// If a Sequence is returned, each element should be re-matched during processing. 
-  let (|Bytes|File|Segment|Sequence|) (item:obj) =
+  let (|Bytes|File|Segment|Sequence|Str|) (item:obj) =
     match item with
     | :? seq<obj>           -> Sequence(item :?> seq<obj>)
     | :? System.IO.FileInfo -> File(item :?> System.IO.FileInfo) 
     | :? ArraySegment<byte> -> Segment(item :?> ArraySegment<byte>)
+    | :? string             -> Str(item :?> string)
     | _                     -> Bytes(item :?> byte[])
