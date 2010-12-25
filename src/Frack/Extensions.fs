@@ -86,11 +86,11 @@ module Extensions =
     // Matches and iterates a sequence recursively to the stream
     | Enum it -> it |> Seq.iter (writeTo stream)
     // Transfers the bytes to the stream
-    | Bytes bs -> ByteString.transfer stream bs
-    // Converts a FileInfo into a seq<byte>, then transfers the bytes to the stream
-    | File fi -> ByteString.fromFileInfo fi |> (ByteString.transfer stream)
-    // Converts a string into a seq<byte>, then transfers the bytes to the stream
-    | Str str -> ByteString.fromString str |> (ByteString.transfer stream)
+    | Bytes bs -> let st = new SeqStream(bs) in st.TransferTo(stream)
+    // Converts a FileInfo into a SeqStream, then transfers the bytes to the stream
+    | File fi -> let st = SeqStream.FromFileInfo(fi) in st.TransferTo(stream)
+    // Converts a string into a SeqStream, then transfers the bytes to the stream
+    | Str str -> let st = SeqStream.FromString(str) in st.TransferTo(stream)
     // Ignore until I better understand ArraySegment
     | Segment seg -> ()
 

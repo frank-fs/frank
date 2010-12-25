@@ -58,7 +58,8 @@ module Utility =
   let ParseQueryString = parseUrlEncodedString
 
   /// Parses the input stream for x-http-form-urlencoded values into an IDictionary<string,string>.
-  let ParseFormUrlEncoded : seq<byte> -> IDictionary<string,string> = (ByteString.toString >> parseUrlEncodedString)
+  let ParseFormUrlEncoded (data:seq<byte>) =
+    let stream = new SeqStream(data) in stream.ToString() |> parseUrlEncodedString
 
   /// An active pattern for parsing the type of object returned within the response body.
   let (|Bytes|Enum|File|Segment|Str|) (item:obj) =

@@ -37,6 +37,9 @@
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Contracts">
+      <HintPath>..\..\lib\Microsoft.Contracts.dll</HintPath>
+    </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
@@ -47,9 +50,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="EnumerableStream.fs" />
-    <Compile Include="ByteString.fs" />
+    <Compile Include="Dict.fs" />
+    <Compile Include="Array.fs" />
     <Compile Include="ArraySpecs.fs" />
+    <Compile Include="SeqStream.fs" />
     <Compile Include="Utility.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="Request.fs" />

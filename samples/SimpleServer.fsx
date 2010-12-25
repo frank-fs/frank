@@ -24,8 +24,10 @@ let cts = new CancellationTokenSource()
 // Set up and start an HttpListener
 HttpListener.Start(
   "http://localhost:9191/",
-  Application(fun request -> 
-    ("200 OK", (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]), "Howdy!")),
+  Application(fun request -> async { 
+    return Response("200 OK",
+                    (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]),
+                    "Howdy!") :> Owin.IResponse }),
   cts.Token)
 
 cts.Cancel()
