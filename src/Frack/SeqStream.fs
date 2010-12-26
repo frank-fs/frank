@@ -9,17 +9,18 @@ open System.Runtime.Serialization.Formatters.Binary
 open System.Text
 
 /// Initializes a new instance of the SeqStream class.
-/// <see href="http://extensia.codeplex.com"/>
+/// SeqStream is a read-only stream that always reads from the beginning of the stream.
+/// See http://extensia.codeplex.com/
 type SeqStream(data:seq<byte>) =
   inherit Stream()
   do Contract.Requires(data <> null)
-  let enumerator = data.GetEnumerator
+  let getEnumerator = data.GetEnumerator
 
   interface IEnumerable<byte> with
-    /// Gets the enumerator for the SeqStream.
-    member this.GetEnumerator() = enumerator()
-    /// Gets the enumerator for the SeqStream.
-    member this.GetEnumerator() = enumerator() :> IEnumerator 
+    /// Gets the getEnumerator for the SeqStream.
+    member this.GetEnumerator() = getEnumerator()
+    /// Gets the getEnumerator for the SeqStream.
+    member this.GetEnumerator() = getEnumerator() :> IEnumerator 
 
   override this.CanRead = true
   override this.CanSeek = false
@@ -31,15 +32,13 @@ type SeqStream(data:seq<byte>) =
   override this.Seek(offset, origin) = raise (NotSupportedException())
   override this.SetLength(value) = raise (NotSupportedException())
   override this.Write(buffer, offset, count) = raise (NotSupportedException())
-  override this.Dispose(disposing) = let d = enumerator() in d.Dispose()
-                                     base.Dispose(disposing)
   override this.Read(buffer, offset, count) =
     Contract.Requires(buffer <> null)
     Contract.Requires(offset >= 0)
     Contract.Requires(count > 0)
     Contract.Requires(offset + count <= buffer.Length)
 
-    let d = enumerator()
+    let d = getEnumerator()
     let rec loop bytesRead =
       if d.MoveNext() && bytesRead < count
         then
@@ -94,8 +93,8 @@ type SeqStream(data:seq<byte>) =
     try formatter.Deserialize(stream) :?> 'a
     with e -> null
 
-  /// Gets the enumerator for the SeqStream.
-  member this.GetEnumerator() = enumerator()
+  /// Gets the getEnumerator for the SeqStream.
+  member this.GetEnumerator() = getEnumerator()
 
   /// Transfers the bytes of the SeqStream into the specified stream
   member this.TransferTo (stream:Stream) =
