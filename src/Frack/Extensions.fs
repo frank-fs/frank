@@ -76,21 +76,21 @@ module Extensions =
 
   // Owin.IResponse Extensions
   [<System.Runtime.CompilerServices.Extension>]
-  let StatusCode(response:Owin.IResponse) = response.Status |> (fst << SplitStatus) 
+  let StatusCode(response:Owin.IResponse) = response.Status |> (fst << splitStatus) 
 
   [<System.Runtime.CompilerServices.Extension>]
-  let StatusDescription(response:Owin.IResponse) = response.Status |> (snd << SplitStatus) 
+  let StatusDescription(response:Owin.IResponse) = response.Status |> (snd << splitStatus) 
 
   let rec writeTo stream item =
     match item with
     // Matches and iterates a sequence recursively to the stream
     | Sequence it -> it |> Seq.iter (writeTo stream)
     // Transfers the bytes to the stream
-    | Bytes bs -> let st = new SeqStream(bs) in st.TransferTo(stream)
+    | Bytes bs -> bs |> ByteString.transfer stream
     // Converts a FileInfo into a SeqStream, then transfers the bytes to the stream
-    | File fi -> let st = SeqStream.FromFileInfo(fi) in st.TransferTo(stream)
+    | File fi -> fi |> ByteString.fromFileInfo |> ByteString.transfer stream
     // Converts a string into a SeqStream, then transfers the bytes to the stream
-    | Str str -> let st = SeqStream.FromString(str) in st.TransferTo(stream)
+    | Str str -> str |> ByteString.fromString |> ByteString.transfer stream
     // Ignore until I better understand ArraySegment
     | Segment seg -> ()
 

@@ -13,7 +13,7 @@ type Application(responder, ?timeout) =
 
   /// Create the underlying application agent.
   let agent = MailboxProcessor<_>.Start(fun inbox ->
-    let rec loop () = async {
+    let rec loop() = async {
       let! msg = inbox.Receive()
       match msg with
       // Stop processing messages.
@@ -23,7 +23,7 @@ type Application(responder, ?timeout) =
           let! response = responder req
           resp.Reply(response)
           return! loop () }
-    loop ())
+    loop())
 
   /// Asynchronously runs the app on the request. 
   let runAsync request = async {

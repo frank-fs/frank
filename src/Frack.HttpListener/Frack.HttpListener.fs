@@ -31,7 +31,7 @@ module HttpListener =
   let Reply (r:IResponse, response:HttpListenerResponse) =
     if r.Headers.ContainsKey("Content-Length") then
       response.ContentType <- Seq.head(r.Headers.["Content-Length"])
-    let statusCode, statusDescription = SplitStatus r.Status
+    let statusCode, statusDescription = splitStatus r.Status
     response.StatusCode <- statusCode
     response.StatusDescription <- statusDescription
     r.Headers |> Dict.toSeq |> Seq.iter (fun (k,v) -> v |> Seq.iter (fun v' -> response.Headers.Add(k,v')))

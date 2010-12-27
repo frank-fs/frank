@@ -54,6 +54,7 @@
     <Compile Include="Array.fs" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="SeqStream.fs" />
+    <Compile Include="ByteString.fs" />
     <Compile Include="Utility.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="Request.fs" />

@@ -15,7 +15,7 @@ module AspNet =
   let Reply(r:IResponse, response:HttpResponseBase) = 
     if r.Headers.ContainsKey("Content-Length") then
       response.ContentType <- Seq.head(r.Headers.["Content-Length"])
-    let statusCode, statusDescription = SplitStatus r.Status
+    let statusCode, statusDescription = splitStatus r.Status
     response.StatusCode <- statusCode
     response.StatusDescription <- statusDescription
     // TODO: Fix ASP.NET headers issue.

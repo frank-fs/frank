@@ -32,8 +32,8 @@ module Middleware =
          then return! app.AsyncInvoke(req)
          else
            let! body = req.AsyncReadBody(0)
-           let form = ParseFormUrlEncoded body
-           let m = if IsNotNullOrEmpty form?_method then form?_method
+           let form = parseFormUrlEncoded body
+           let m = if isNotNullOrEmpty form?_method then form?_method
                    elif not (req.Headers.ContainsKey("HTTP_X_HTTP_METHOD_OVERRIDE")) then
                      req.Headers?HTTP_X_HTTP_METHOD_OVERRIDE |> Seq.head
                    else req.Method
