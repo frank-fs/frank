@@ -3,12 +3,10 @@
 #I @"..\lib\FSharp"
 #I @"..\src\Frack\bin\Debug"
 #I @"..\src\Frack.HttpListener\bin\Debug"
-#r "mscorlib.dll"
 #r "System.Core.dll"
 #r "System.Net.dll"
 #r "System.Web.dll"
 #r "System.Web.Abstractions.dll"
-#r "FSharp.Core.dll"
 #r "owin.dll"
 #r "frack.dll"
 #r "Frack.HttpListener.dll"
@@ -26,24 +24,18 @@ printfn "Creating server ..."
 
 let cts = new CancellationTokenSource()
 
-let app = Application(
-  fun (request:Owin.IRequest) -> async {
-    let greeting = "Howdy!\r\n"B
-    let length = greeting.Length
-    return Response.Create("200 OK",
-                           (dict [("Content-Length", seq { yield length.ToString() })]),
-                           seq { yield greeting }) })
+// Define the application function.
+let appAsync = fun request -> async { 
+  return Response.Create("200 OK",
+                         (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]),
+                         "Howdy!") }
 
-printfn "Listening on http://localhost:9191/ ..."
+// Define the application.
+let app = Application(appAsync)
 
 // Set up and start an HttpListener
-HttpListener.Start(
-  "http://localhost:9191/",
-  Application(fun request -> async { 
-    return Response.Create("200 OK",
-                           (dict [("Content_Type", seq { yield "text/plain" });("Content_Length", seq { yield "6" })]),
-                           "Howdy!") }),
-  cts.Token)
+HttpListener.Start("http://localhost:9191/", app, cts.Token)
+printfn "Listening on http://localhost:9191/ ..."
 
 let stopListening() =
   app.Stop()
