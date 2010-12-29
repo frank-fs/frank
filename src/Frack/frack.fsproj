@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Frack</RootNamespace>
     <AssemblyName>frack</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frack</Name>
     <TargetFrameworkProfile />
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
@@ -34,35 +34,29 @@
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
-    </Reference>
+    <Reference Include="FSharp.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="Microsoft.Contracts">
       <HintPath>..\..\lib\Microsoft.Contracts.dll</HintPath>
     </Reference>
+    <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
-    <Reference Include="owin">
-      <HintPath>..\..\lib\owin.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Dict.fs" />
-    <Compile Include="Array.fs" />
-    <Compile Include="ArraySpecs.fs" />
     <Compile Include="SeqStream.fs" />
     <Compile Include="ByteString.fs" />
-    <Compile Include="Utility.fs" />
+    <Compile Include="ArraySpecs.fs" />
+    <Compile Include="Owin.fs" />
+    <Compile Include="Parser.fs" />
     <Compile Include="UriSpecs.fs" />
-    <Compile Include="Request.fs" />
-    <Compile Include="RequestSpecs.fs" />
-    <Compile Include="Response.fs" />
-    <Compile Include="Application.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="Middleware.fs" />
+    <None Include="TcpSocket.fsx" />
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

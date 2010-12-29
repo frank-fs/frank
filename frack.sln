@@ -13,7 +13,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\Frack\frack.fs
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.AspNet", "src\Frack.AspNet\Frack.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.HttpListener", "src\Frack.HttpListener\Frack.HttpListener.fsproj", "{CF0856FD-3258-455A-A236-7025968BB639}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Server", "src\Frack.HttpListener\Frack.Server.fsproj", "{CF0856FD-3258-455A-A236-7025968BB639}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Hosting", "Hosting", "{0D74C7C2-8D0C-4478-8054-DFA76828D041}"
 EndProject

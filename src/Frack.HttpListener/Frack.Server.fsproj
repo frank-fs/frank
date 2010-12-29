@@ -10,7 +10,7 @@
     <RootNamespace>Frack.HttpListener</RootNamespace>
     <AssemblyName>Frack.HttpListener</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <Name>Frack.HttpListener</Name>
+    <Name>Frack.Server</Name>
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -45,7 +45,8 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Frack.HttpListener.fs" />
+    <Compile Include="Socket.fs" />
+    <Compile Include="Frack.Server.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Frack\frack.fsproj">

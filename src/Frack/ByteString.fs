@@ -1,5 +1,20 @@
 ﻿namespace Frack
 
+/// Extensions to the Array module.
+[<System.Runtime.CompilerServices.Extension>]
+module Array =
+  open System.Collections.Generic
+
+  /// Slices out a portion of the array from the start index up to the stop index.
+  let slice start stop (source:'a[]) =
+    let stop' = ref stop
+    if !stop' < 0 then stop' := source.Length + !stop'
+    let len = !stop' - start
+    [| for i in [0..(len-1)] do yield source.[i + start] |]
+
+  [<System.Runtime.CompilerServices.Extension>]
+  let Slice(arr, start, stop) = slice start stop arr
+
 /// Module to transform a string into an immutable list of bytes and back.
 /// See http://extensia.codeplex.com/
 [<AutoOpen>]
@@ -63,11 +78,6 @@ module ByteString =
       stream |> fromStream 1024
     with :? SerializationException as e -> null
 
-  /// Converts a byte string into a stream.
-  let toStream source =
-    Contract.Requires(source <> null)
-    new SeqStream(source) :> Stream
-
   /// Converts a byte string into an object.
   let cast<'a when 'a : null> source =
     let formatter = BinaryFormatter()
@@ -79,7 +89,30 @@ module ByteString =
   let transfer (stream:Stream) source =
     Contract.Requires(source <> null)
     Contract.Requires(stream <> null)
-    source |> Seq.iter (fun x -> stream.WriteByte(x))
+    stream.AsyncWrite(source, 0, source.Length)
+
+  /// An active pattern for parsing the type of object returned within the response body.
+  /// The return type can be one of a byte[], FileInfo, ArraySegment<byte>, or a sequence of any of these.
+  /// If a Sequence is returned, each element should be re-matched during processing. 
+  let (|Bytes|File|Segment|Sequence|Str|) (item:obj) =
+    match item with
+    | :? seq<obj>           -> Sequence(item :?> seq<obj>)
+    | :? System.IO.FileInfo -> File(item :?> System.IO.FileInfo) 
+    | :? ArraySegment<byte> -> Segment(item :?> ArraySegment<byte>)
+    | :? string             -> Str(item :?> string)
+    | :? seq<byte>          -> Bytes(item :?> seq<byte> |> Seq.toArray)
+    | _                     -> Bytes(item :?> byte[])
+
+  let rec getBytes item =
+    match item with
+    | Sequence it -> seq { for i in it do yield! getBytes i } |> Seq.toArray
+    | Bytes bs -> bs
+    | File fi -> fi |> fromFileInfo |> Seq.toArray
+    | Str str -> str |> fromString |> Seq.toArray
+    | Segment seg -> seq { let ndx = ref seg.Offset
+                           while !ndx < seg.Count do
+                             yield seg.Array.[!ndx]
+                             incr ndx } |> Seq.toArray
 
   /// Extensions to stream.
   type Stream with
