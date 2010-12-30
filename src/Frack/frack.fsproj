@@ -34,7 +34,12 @@
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+    <Reference Include="FSharp.Core">
+      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharp.PowerPack">
+      <HintPath>..\..\lib\FSharp\FSharp.PowerPack.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.Contracts">
       <HintPath>..\..\lib\Microsoft.Contracts.dll</HintPath>
     </Reference>
@@ -47,11 +52,12 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Owin.fs" />
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="SeqStream.fs" />
+    <Compile Include="Dict.fs" />
+    <Compile Include="AsyncSeq.fs" />
     <Compile Include="ByteString.fs" />
     <Compile Include="ArraySpecs.fs" />
-    <Compile Include="Owin.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="Extensions.fs" />
