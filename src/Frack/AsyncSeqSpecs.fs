@@ -74,3 +74,16 @@ let ``Reading a stream of size 1024 in 1024 blocks into a seq<byte[]> should ret
   let aseq = stream |> ASeq.readInBlocks 1024
   let result = aseq |> ASeq.toSeq |> Async.RunSynchronously |> Seq.head
   Assert.AreEqual(buffer, result)
+
+[<Test>]
+let ``Reading a stream of size 2048 in 1024 blocks into a seq<byte[]> should return two byte[].``() =
+  let buffer = Array.zeroCreate 2048
+  use stream = new MemoryStream(buffer)
+  let aseq = stream |> ASeq.readInBlocks 1024
+
+  let result = aseq |> (ASeq.toSeq >> Async.RunSynchronously >> Array.ofSeq)
+
+  Assert.AreEqual(2, result.Length)
+  Assert.AreEqual(1024, result.[0].Length)
+  Assert.AreEqual(1024, result.[1].Length)
+  Assert.AreEqual(buffer, result |> Array.concat)

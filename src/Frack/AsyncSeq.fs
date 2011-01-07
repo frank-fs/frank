@@ -54,7 +54,7 @@ module ASeq =
       let! item = aseq
       match item with
       | Ended -> return cont [] |> Seq.ofList
-      | Item(hd, tl) -> return! read (fun rest -> hd::rest) tl}
+      | Item(hd, tl) -> return! read (fun rest -> hd::rest |> cont) tl}
     read id aseq
 
   /// Asynchronous function that creates a lazy Seq from an AsyncSeq.
@@ -64,7 +64,7 @@ module ASeq =
       let! item = aseq
       match item with
       | Ended -> return cont Seq.empty
-      | Item(hd, tl) -> return! read (fun rest -> seq { yield hd; yield! rest }) tl}
+      | Item(hd, tl) -> return! read (fun rest -> seq { yield hd; yield! rest } |> cont) tl}
     read id aseq
 
   /// Asynchronous function that compares two asynchronous sequences
