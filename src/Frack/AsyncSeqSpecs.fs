@@ -21,8 +21,12 @@ let ``Reading a stream of size 1024 in 1024 blocks should return one Item and on
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
   let aseq = stream |> ASeq.readInBlocks 1024
-  let item = aseq |> Async.RunSynchronously
-  let ended = aseq |> Async.RunSynchronously
+
+  let item, ended = async {
+    let! item = aseq
+    let! ended = aseq
+    return (item, ended) } |> Async.RunSynchronously
+
   Assert.IsItem(item)
   Assert.BytesInItem(item, 1024)
   Assert.IsEnded(ended)
@@ -32,9 +36,13 @@ let ``Reading a stream of size 1024 in 512 blocks should return two equally-size
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
   let aseq = stream |> ASeq.readInBlocks 512
-  let item1 = aseq |> Async.RunSynchronously
-  let item2 = aseq |> Async.RunSynchronously
-  let ended = aseq |> Async.RunSynchronously
+
+  let item1, item2, ended = async {
+    let! item1 = aseq
+    let! item2 = aseq
+    let! ended = aseq
+    return (item1, item2, ended) } |> Async.RunSynchronously
+
   Assert.IsItem(item1)
   Assert.BytesInItem(item1, 512)
   Assert.IsItem(item2)
@@ -46,9 +54,13 @@ let ``Reading a stream of size 1024 in 1000 blocks should return two unequally-s
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
   let aseq = stream |> ASeq.readInBlocks 1000
-  let item1 = aseq |> Async.RunSynchronously
-  let item2 = aseq |> Async.RunSynchronously
-  let ended = aseq |> Async.RunSynchronously
+
+  let item1, item2, ended = async {
+    let! item1 = aseq
+    let! item2 = aseq
+    let! ended = aseq
+    return (item1, item2, ended) } |> Async.RunSynchronously
+
   Assert.IsItem(item1)
   Assert.BytesInItem(item1, 1000)
   Assert.IsItem(item2)

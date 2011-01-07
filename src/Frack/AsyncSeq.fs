@@ -12,11 +12,6 @@ module ASeq =
   open System.IO
   open System.Net.Sockets
 
-  type Socket with
-    member socket.AsyncReceive(buffer, offset, count) =
-      let beginReceive(b,o,c,cb,s) = socket.BeginReceive(b, o, c, SocketFlags.None, cb, s)
-      Async.FromBeginEnd(buffer, offset, count, beginReceive, socket.EndReceive)
-
   /// Read socket 'socket' in blocks of size 'size'
   /// (returns on-demand asynchronous sequence)
   let receiveInBlocks size (socket:Socket) = async {
@@ -53,14 +48,24 @@ module ASeq =
         
     return! nextBlock() }
 
-  /// Asynchronous function that creates a seq from an AsyncSeq
+  /// Asynchronous function that greedily creates a Seq from an AsyncSeq.
   let toSeq aseq =
-    let rec read aseq acc = async {
+    let rec read cont aseq = async {
       let! item = aseq
       match item with
-      | Ended -> return acc
-      | Item(b, ns) -> return! read ns (seq { yield! acc; yield b }) }
-    read aseq Seq.empty
+      | Ended -> return cont [] |> Seq.ofList
+      | Item(hd, tl) -> return! read (fun rest -> hd::rest) tl}
+    read id aseq
+
+  /// Asynchronous function that creates a lazy Seq from an AsyncSeq.
+  /// Be careful to manage the lifetime of the underlying provider.
+  let toLazySeq aseq =
+    let rec read cont aseq = async {
+      let! item = aseq
+      match item with
+      | Ended -> return cont Seq.empty
+      | Item(hd, tl) -> return! read (fun rest -> seq { yield hd; yield! rest }) tl}
+    read id aseq
 
   /// Asynchronous function that compares two asynchronous sequences
   /// item by item. If an item doesn't match, 'false' is returned
