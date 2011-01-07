@@ -4,7 +4,7 @@ open System
 open System.Collections.Generic
 
 [<AutoOpen>]
-module Parser =
+module Utility =
   let isNotNullOrEmpty s = not (String.IsNullOrEmpty(s))
 
   /// Dynamic indexer lookups.

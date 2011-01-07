@@ -141,3 +141,83 @@
 //      let folder (h:Map<_,_>) (key:string) =
 //        Map.add key this.[key] h 
 //      this.AllKeys |> Array.fold (folder) Map.empty
+//
+//[<AutoOpen>]
+//module Parser =
+//  open System.Text
+//
+//  let ascii (s:string) = Encoding.ASCII.GetBytes(s)
+//  let utf8  (s:string) = Encoding.UTF8.GetBytes(s)
+//
+//  let private matchToken pattern =
+//    function chr when pattern |> List.exists ((=) chr) -> Some(chr) | _ -> None 
+//
+//  let private matchTokens pattern exclude input =
+//    let chars = Some input
+//    let excludeIf chr =
+//      // If there are no exclusions, just return the char.
+//      if exclude = [] then chars
+//      // Otherwise, reverse the selection.
+//      else match matchToken exclude chr with
+//           | None -> chars
+//           | _ -> None
+//    let folder st chr =
+//      match st with
+//      | None -> None
+//      | _ ->
+//          match matchToken pattern chr with
+//          | None -> None
+//          // If a match, ensure it is not one of the excluded tokens.
+//          | Some(chr') -> excludeIf chr'
+//    List.fold folder chars input
+//
+//  let rec (|Star|_|) f acc s =
+//    match f s with
+//    | Some (res, rest) -> (|Star|_|) f (res :: acc) rest
+//    | None -> Some(acc |> List.rev, s)
+//
+//  /// Character
+//  let (|CHAR|_|) = matchToken [0uy..127uy]
+//  /// Upper-case alpha
+//  let (|UPALPHA|_|) = matchToken [65uy..90uy]
+//  /// Lower-case alpha
+//  let (|LOALPHA|_|) = matchToken [97uy..122uy]
+//  /// Alpha
+//  let (|ALPHA|_|) = function UPALPHA res | LOALPHA res -> Some(res) | _ -> None
+//  /// Numeric
+//  let (|DIGIT|_|) = matchToken [48uy..57uy]
+//  /// Alphanumeric
+//  let (|ALPHANUM|_|) = function ALPHA res | DIGIT res -> Some(res) | _ -> None
+//  /// Control character
+//  let (|CTL|_|) = matchToken ([0uy..31uy] @ [127uy])
+//  /// Carriage return
+//  let (|CR|_|) = matchToken [13uy]
+//  /// Line feed
+//  let (|LF|_|) = matchToken [10uy]
+//  /// Space
+//  let (|SP|_|) = matchToken [32uy]
+//  /// Horizontal tab
+//  let (|HT|_|) = matchToken [9uy]
+//  /// Double quote
+//  let (|DQ|_|) = matchToken [34uy]
+//  /// Newline (carriage return + line feed)
+//  let rec (|CRLF|_|) (input: byte list) =
+//    match input with (CR _)::(LF _)::[] -> Some(input) | _ -> None
+//  /// Linear Whitespace (LWS)
+//  let rec (|LWS|_|) (input: byte list) =
+//    let sp = Some 32uy
+//    // Must be at least one character.
+//    if input.Length < 1 then None
+//    else match input with
+//         // Check for an optional initial CRLF and ensure it is not the empty list.
+//         | (CR _)::(LF _)::tl when tl <> [] -> (|LWS|_|) tl
+//         // The rest of the items should be either a space or horizontal tab.
+//         | _ -> List.fold (fun st b ->
+//                  match st with
+//                  | None -> None
+//                  | _ -> match b with SP res | HT res -> sp | _ -> None) sp input
+//  /// Any byte that is not a CTL (but including LWS chars).
+//  let (|TEXT|_|) (input: byte list) =
+//    let text = Some input
+//    // If no character byte is a CTL return None; otherwise return the original text.
+//    List.fold (fun st b -> match b with CTL _ -> None | _ -> text) text input

@@ -2,7 +2,7 @@
 module Middleware =
 
   /// Logs the incoming request and the time to respond.
-  let log (app: Application) =
+  let log (app:Handler) =
     let sw = System.Diagnostics.Stopwatch.StartNew()
     fun (request:Request) -> async {
       let! response = app request
@@ -11,7 +11,7 @@ module Middleware =
       return response }
 
   /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
-  let head (app: Application) = fun (request:Request) -> async {
+  let head (app:Handler) = fun (request:Request) -> async {
     if (request.["METHOD"] :?> string) <> "HEAD" then return! app request
     else request?METHOD <- "GET"
          let! status, headers, _ = app request

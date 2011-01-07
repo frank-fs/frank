@@ -17,4 +17,4 @@ let uriCases = [|
 
 [<Test>]
 [<TestCaseSource("uriCases")>]
-let ``Splitting the uri`` (uri, path:string, queryString:string) = (SplitUri uri) == (path, queryString)
+let ``Splitting the uri`` (uri, path:string, queryString:string) = (splitUri uri) == (path, queryString)
