@@ -2,23 +2,26 @@
 open System
 open System.Collections.Generic
 
-module Owin =
+[<AbstractClass>]
+type Owin() =
   /// Creates an OWIN application from an Async computation.
-  let create handler cancellationToken =
-    Action<#IDictionary<string, #obj>, Action<string, #IDictionary<string, string>, #seq<#obj>>, Action<exn>>(
+  static member FromAsync(handler, ?cancellationToken) =
+    Action<IDictionary<string, obj>, Action<string, #IDictionary<string, string>, seq<obj>>, Action<exn>>(
       fun request onCompleted onError ->
         Async.StartWithContinuations(handler request, onCompleted.Invoke, onError.Invoke, onError.Invoke,
-          cancellationToken = cancellationToken))
+          ?cancellationToken = cancellationToken))
+
+  /// Transforms an OWIN application into an Async computation.
+  static member ToAsync(app: Action<IDictionary<string, obj>, Action<_,_,_>, Action<_>>) = fun req ->
+    Async.FromContinuations(fun (cont, econt, _) ->
+      app.Invoke(req, Action<_,_,_>(fun a b c -> cont(a,b,c)), Action<_>(econt)))
     
 module Request =
-  open FSharp.Monad
-
   /// Reads the request body into a buffer and invokes the onCompleted callback with the buffer.
-  let readBody onCompleted onError (requestBody: obj) =
-    let requestBody = requestBody :?> Action<Action<ArraySegment<byte>>, Action<exn>>
-    // We rely on the underlying implementation to return and perform the asynchronous retrieval.
-    let nextSegment = Cont(fun onSeg -> requestBody.Invoke(Action<_>(onSeg), onError))
-    let rec loop acc = cont {
+  let readBody (request: IDictionary<string, obj>) =
+    let requestBody = request?RequestBody :?> Action<Action<ArraySegment<byte>>, Action<exn>>
+    let nextSegment = Async.FromContinuations(fun (cont, econt, _) -> requestBody.Invoke(Action<_>(cont), Action<_>(econt)))
+    let rec loop acc = async {
       let! chunk = nextSegment
       if chunk.Count = 0 then
         // Invoke the continuation with an empty list.
@@ -33,8 +36,4 @@ module Request =
         return buffer
       // We append the last call as the tail of the previous call.
       else return! loop (fun chunks -> chunk::chunks) }
-    runCont (loop id) onCompleted 
-
-  /// Reads the request body as x-http-form-urlencoded.
-  let readAsFormUrlEncoded onCompleted onError requestBody =
-    readBody (UrlEncoded.parseForm >> onCompleted) onError requestBody
+    loop id

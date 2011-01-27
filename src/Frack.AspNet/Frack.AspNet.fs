@@ -18,20 +18,18 @@ module AspNet =
   [<System.Runtime.CompilerServices.Extension>]
   let ToOwinRequest(context:System.Web.HttpContextBase) =
     let request = context.Request
-    let asyncRead = async {
-      let! bytes = request.InputStream.AsyncRead(1024)
-      return ArraySegment<_>(bytes) }
+    let asyncRead = request.InputStream |> AsyncSeq.readInSegments |> AsyncSeq.toLazySeq
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.HttpMethod)
     owinRequest.Add("RequestUri", (request.Url.AbsolutePath + "?" + request.Url.Query))
-    request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v))
+    owinRequest.Add("RequestHeaders", request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v)))
     owinRequest.Add("url_scheme", request.Url.Scheme)
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
-    owinRequest.Add("RequestBody", (Action<Action<_>, Action<_>>(fun onNext onErr ->
+    owinRequest.Add("RequestBody", (Action<Action<_>, Action<_>>(fun cont econt ->
        try
-         Async.StartWithContinuations(asyncRead, onNext.Invoke, onErr.Invoke, onErr.Invoke)
-       with e -> onErr.Invoke(e))))
+         Async.StartWithContinuations(asyncRead, cont.Invoke, econt.Invoke, econt.Invoke)
+       with e -> econt.Invoke(e))))
     owinRequest
 
   type System.Web.HttpContextBase with
@@ -40,11 +38,11 @@ module AspNet =
 
   [<System.Runtime.CompilerServices.Extension>]
   let Reply(response: HttpResponseBase, status, headers: IDictionary<string, string>, body: seq<obj>) =
-    if headers.ContainsKey("Content-Length") then
-      response.ContentType <- headers.["Content-Length"]
     let statusCode, statusDescription = splitStatus status
     response.StatusCode <- statusCode
     response.StatusDescription <- statusDescription
+    if headers.ContainsKey("Content-Length") then
+      response.ContentType <- headers.["Content-Length"]
 //    headers |> Dict.toSeq |> Seq.iter (fun (k, v) -> response.Headers.Add(k, v))
     let output = response.OutputStream
     ByteString.write output body
@@ -53,6 +51,7 @@ module AspNet =
     member response.Reply(status, headers, body) = Reply(response, status, headers, body)
 
   type OwinHttpHandler (app: Action<IDictionary<string, obj>, Action<string, IDictionary<string, string>, seq<obj>>, Action<exn>>) =
+    let app = app |> Owin.ToAsync
     interface System.Web.IHttpHandler with
       /// Since this is a pure function, it can be reused as often as desired.
       member this.IsReusable = true
@@ -61,10 +60,8 @@ module AspNet =
         let contextBase = context.ToContextBase()
         let request = contextBase.ToOwinRequest()
         let response = contextBase.Response
-        let reply status headers body = response.Reply(status, headers, body)
-        app.Invoke(request,
-                   Action<string, IDictionary<string, string>, seq<obj>>(reply),
-                   Action<exn>(fun e -> printfn "%A" e))
+        let econt e = printfn "%A" e
+        Async.StartWithContinuations(app request, response.Reply, econt, econt)
 
   /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
   type OwinRouteHandler(app) =

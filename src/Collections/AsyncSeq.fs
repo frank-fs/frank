@@ -9,12 +9,13 @@ and AsyncSeqInner<'a> =
   | Item of 'a * AsyncSeq<'a>
 
 module AsyncSeq =
+  open System
   open System.IO
   open System.Net.Sockets
 
   /// Read stream 'stream' in blocks of size 'size'
   /// (returns on-demand asynchronous sequence)
-  let readInBlocks size (stream:Stream) = async {
+  let private readInMappedBlocks f size (stream:Stream) = async {
     let buffer = Array.zeroCreate size
 
     /// Returns next block as 'Item' of async seq.
@@ -26,9 +27,12 @@ module AsyncSeq =
         let res =
           if count = size then buffer
           else buffer |> Seq.take count |> Array.ofSeq
-        return Item(res, nextBlock()) }
+        return Item(f res, nextBlock()) }
         
     return! nextBlock() }
+
+  let readInBlocks size stream = readInMappedBlocks id size stream
+  let readInSegments stream = readInMappedBlocks (fun bs -> ArraySegment<byte>(bs)) 1024 stream
 
   /// Asynchronous function that greedily creates a Seq from an AsyncSeq.
   let toSeq aseq =
