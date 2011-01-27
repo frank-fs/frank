@@ -15,17 +15,20 @@ namespace HelloAspNet
         {
             routes.IgnoreRoute("{resource}.axd/{*pathInfo}");
 
-            //routes.MapFrackRoute("{*page}",
-            //    Frack.Middleware.head(
-            //        new Frack.Application(request =>
-            //            new Response(
-            //                "200 OK",
-            //                new Dictionary<string, IEnumerable<string>>
-            //                {
-            //                    { "Content-Type", new [] { "text/plain" } },
-            //                    { "Content-Length", new [] { "14" } },
-            //                },
-            //                "Hello ASP.NET!"))));
+            routes.MapFrackRoute("{*page}",
+                Frack.Middleware.head(
+                    (IDictionary<string, object> request, Action<string, IDictionary<string, string>, IEnumerable<object>> onCompleted, Action<Exception> onError) => {
+                        try
+                        {
+                            onCompleted("200 OK",
+                                new Dictionary<string, string> { { "Content-Type", "text/plain" } },
+                                new [] { System.Text.Encoding.UTF8.GetBytes("Hello ASP.NET!") });
+                        }
+                        catch (Exception e)
+                        {
+                            onError(e);
+                        }
+                    }));
         }
 
         protected void Application_Start()

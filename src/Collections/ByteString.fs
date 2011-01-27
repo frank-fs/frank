@@ -1,23 +1,7 @@
-﻿namespace Frack
-
-/// Extensions to the Array module.
-[<System.Runtime.CompilerServices.Extension>]
-module Array =
-  open System.Collections.Generic
-
-  /// Slices out a portion of the array from the start index up to the stop index.
-  let slice start stop (source:'a[]) =
-    let stop' = ref stop
-    if !stop' < 0 then stop' := source.Length + !stop'
-    let len = !stop' - start
-    [| for i in [0..(len-1)] do yield source.[i + start] |]
-
-  [<System.Runtime.CompilerServices.Extension>]
-  let Slice(arr, start, stop) = slice start stop arr
+﻿namespace Frack.Collections
 
 /// Module to transform a string into an immutable list of bytes and back.
 /// See http://extensia.codeplex.com/
-[<AutoOpen>]
 module ByteString =
   open System
   open System.Collections.Generic
@@ -86,15 +70,15 @@ module ByteString =
     with e -> null
 
   /// Transfers the bytes of a byte string into a stream
-  let transfer (stream:Stream) source =
+  let transfer (stream: Stream) source =
     Contract.Requires(source <> null)
     Contract.Requires(stream <> null)
-    stream.AsyncWrite(source, 0, source.Length)
+    stream.Write(source, 0, source.Length)
 
   /// An active pattern for parsing the type of object returned within the response body.
   /// The return type can be one of a byte[], FileInfo, ArraySegment<byte>, or a sequence of any of these.
   /// If a Sequence is returned, each element should be re-matched during processing. 
-  let (|Bytes|File|Segment|Sequence|Str|) (item:obj) =
+  let (|Bytes|File|Segment|Sequence|Str|) (item: obj) =
     match item with
     | :? seq<obj>           -> Sequence(item :?> seq<obj>)
     | :? System.IO.FileInfo -> File(item :?> System.IO.FileInfo) 
@@ -102,6 +86,19 @@ module ByteString =
     | :? string             -> Str(item :?> string)
     | :? seq<byte>          -> Bytes(item :?> seq<byte> |> Seq.toArray)
     | _                     -> Bytes(item :?> byte[])
+
+  let rec write (stream: Stream) item =
+    match item with
+    // Matches and iterates a sequence recursively to the stream
+    | Sequence it -> it |> Seq.iter (write stream)
+    // Transfers the bytes to the stream
+    | Bytes bs -> bs |> transfer stream
+    // Converts a FileInfo into a SeqStream, then transfers the bytes to the stream
+    | File fi -> fi |> fromFileInfo |> Array.ofSeq |> transfer stream
+    // Converts a string into a SeqStream, then transfers the bytes to the stream
+    | Str str -> str |> fromString |> Array.ofSeq |> transfer stream
+    // Transfers the bytes from the byte array to the stream
+    | Segment seg -> stream.Write(seg.Array, seg.Offset, seg.Count)
 
   let rec getBytes item =
     match item with
@@ -113,6 +110,7 @@ module ByteString =
                            while !ndx < seg.Count do
                              yield seg.Array.[!ndx]
                              incr ndx } |> Seq.toArray
+
 
   /// Extensions to stream.
   type Stream with

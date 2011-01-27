@@ -1,4 +1,5 @@
-﻿module Frack.ArraySpecs
+﻿module ArraySpecs
+open Frack.Collections
 open NUnit.Framework
 open BaseSpecs
 

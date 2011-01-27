@@ -5,13 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{cf0856fd-3258-455a-a236-7025968bb639}</ProjectGuid>
+    <ProjectGuid>{5c60975e-b38a-4293-be97-b42038a9e26b}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack.HttpListener</RootNamespace>
-    <AssemblyName>Frack.HttpListener</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <Name>Frack.Server</Name>
-    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
+    <RootNamespace>FHPS</RootNamespace>
+    <AssemblyName>FHPS</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <Name>FHPS</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -21,7 +20,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Frack.HttpListener.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\FHPS.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,32 +29,23 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.HttpListener.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\FHPS.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
-    </Reference>
-    <Reference Include="owin">
-      <HintPath>..\..\lib\owin.dll</HintPath>
-    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core" />
     <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Socket.fs" />
-    <Compile Include="Frack.Server.fs" />
+    <Compile Include="SocketEx.fs" />
+    <Compile Include="BocketPool.fs" />
+    <Compile Include="Connection.fs" />
+    <Compile Include="TcpListener.fs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Frack\frack.fsproj">
-      <Name>frack</Name>
-      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
 	<Target Name="BeforeBuild">

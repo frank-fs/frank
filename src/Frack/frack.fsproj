@@ -34,17 +34,14 @@
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Cashel">
+      <HintPath>..\..\lib\Cashel.dll</HintPath>
+    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Monad">
       <HintPath>..\..\lib\FSharp.Monad.dll</HintPath>
-    </Reference>
-    <Reference Include="FSharp.PowerPack">
-      <HintPath>..\..\lib\FSharp\FSharp.PowerPack.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Contracts">
-      <HintPath>..\..\lib\Microsoft.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
@@ -55,21 +52,19 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Owin.fs" />
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Dict.fs" />
-    <Compile Include="Socket.fs" />
-    <Compile Include="AsyncSeq.fs" />
-    <Compile Include="AsyncSeqSpecs.fs" />
-    <Compile Include="ByteString.fs" />
-    <Compile Include="ArraySpecs.fs" />
     <Compile Include="Utility.fs" />
     <Compile Include="UriSpecs.fs" />
-    <Compile Include="Http.fs" />
-    <Compile Include="Server.fs" />
-    <Compile Include="Extensions.fs" />
+    <Compile Include="UrlEncoded.fs" />
+    <Compile Include="Owin.fs" />
     <Compile Include="Middleware.fs" />
-    <None Include="TcpSocket.fsx" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
+      <Name>Frack.Collections</Name>
+      <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

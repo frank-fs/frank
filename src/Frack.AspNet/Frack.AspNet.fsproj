@@ -9,9 +9,10 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.AspNet</RootNamespace>
     <AssemblyName>Frack.AspNet</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frack.AspNet</Name>
     <FscToolPath>..\..\lib\FSharp\</FscToolPath>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -39,9 +40,6 @@
     <Reference Include="nunit.framework">
       <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
     </Reference>
-    <Reference Include="owin">
-      <HintPath>..\..\lib\owin.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
@@ -51,6 +49,11 @@
     <Compile Include="Frack.AspNet.fs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
+      <Name>Frack.Collections</Name>
+      <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Frack\frack.fsproj">
       <Name>frack</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
