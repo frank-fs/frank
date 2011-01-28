@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
@@ -19,10 +20,11 @@ namespace HelloAspNet
         		{
         			try
         			{
-        				//var body = Frack.Request.readBody(request);
+                        byte[] bytes = new byte[] { };
+                        //request.ReadToEnd(bs => bytes = bs, econt);
         				cont("200 OK",
         					new Dictionary<string, string> { { "Content-Type", "text/plain" } },
-        					new[] { System.Text.Encoding.ASCII.GetBytes("Hello ASP.NET!") });
+        					new[] { Encoding.ASCII.GetBytes("Hello ASP.NET!\r\n"), bytes });
         			}
         			catch (Exception e)
         			{

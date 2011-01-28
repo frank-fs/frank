@@ -18,7 +18,7 @@ module AspNet =
   [<System.Runtime.CompilerServices.Extension>]
   let ToOwinRequest(context:System.Web.HttpContextBase) =
     let request = context.Request
-    let asyncRead = request.InputStream |> AsyncSeq.readInSegments |> AsyncSeq.toLazySeq
+    let asyncRead = ref (request.InputStream |> AsyncSeq.readInSegments)
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.HttpMethod)
     owinRequest.Add("RequestUri", (request.Url.AbsolutePath + "?" + request.Url.Query))
@@ -27,9 +27,12 @@ module AspNet =
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
     owinRequest.Add("RequestBody", (Action<Action<_>, Action<_>>(fun cont econt ->
-       try
-         Async.StartWithContinuations(asyncRead, cont.Invoke, econt.Invoke, econt.Invoke)
-       with e -> econt.Invoke(e))))
+      let next = function
+        | Ended -> ArraySegment<_>(Array.empty)
+        | Item(hd, tl) -> asyncRead := tl; hd
+      try
+        Async.StartWithContinuations(!asyncRead, next >> cont.Invoke, econt.Invoke, econt.Invoke)
+      with e -> econt.Invoke(e))))
     owinRequest
 
   type System.Web.HttpContextBase with
