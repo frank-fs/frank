@@ -1,0 +1,292 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Microsoft.ServiceModel.Web.jQuery</name>
+    </assembly>
+    <members>
+        <member name="T:Microsoft.ServiceModel.Activation.WebServiceHostFactory3">
+            <summary>
+            A factory that provides instances of <see cref="T:Microsoft.ServiceModel.Web.WebServiceHost3"/> in
+            managed hosting environments where the host instance is created dynamically in response to incoming
+            messages.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Activation.WebServiceHostFactory3.CreateServiceHost(System.Type,System.Uri[])">
+            <summary>
+            Creates an instance of the <see cref="T:Microsoft.ServiceModel.Web.WebServiceHost3"/> class for
+            the specified service with the specified base addresses.
+            </summary>
+            <param name="serviceType">The type of service to be hosted.</param>
+            <param name="baseAddresses">An array of base addresses for the service.</param>
+            <returns>An instance of the <see cref="T:Microsoft.ServiceModel.Web.WebServiceHost3"/> class.</returns>
+        </member>
+        <member name="T:Microsoft.ServiceModel.Configuration.WebHttpElement3">
+            <summary>
+            Enables the <see cref="T:Microsoft.ServiceModel.Web.WebHttpBehavior3"/> for an endpoint through configuration.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Configuration.WebHttpElement3.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Microsoft.ServiceModel.Configuration.WebHttpElement3"/> class.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Configuration.WebHttpElement3.CreateBehavior">
+            <summary>
+            Creates a behavior extension based on the current configuration settings.
+            </summary>
+            <returns>The behavior extension.</returns>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.AutomaticFormatSelectionEnabled">
+            <summary>
+            Gets or sets a value indicating whether the message format can be automatically selected.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.DefaultBodyStyle">
+            <summary>
+            Gets or sets the default message body style.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.DefaultOutgoingResponseFormat">
+            <summary>
+            Gets or sets the default outgoing response format.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.FaultExceptionEnabled">
+            <summary>
+            Gets or sets a value indicating whether a FaultException is generated when an internal server error (HTTP status code: 500) occurs.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.HelpEnabled">
+            <summary>
+            Gets or sets a value indicating whether help is enabled.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.BehaviorType">
+            <summary>
+            Gets the type of the behavior enabled by this configuration element.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Configuration.WebHttpElement3.Properties">
+            <summary>
+            Gets the collection of properties.
+            </summary>
+        </member>
+        <member name="T:Microsoft.ServiceModel.Web.FormUrlEncodedExtensions">
+            <summary>
+            This class provides helper methods for decoding form url-encoded strings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.FormUrlEncodedExtensions.GetQueryStringAsJsonObject(System.ServiceModel.Web.IncomingWebRequestContext)">
+            <summary>
+            Returns the query string from the incoming web context as a <see cref="T:System.Json.JsonObject"/> instance.
+            </summary>
+            <param name="context">The <see cref="T:System.ServiceModel.Web.IncomingWebRequestContext"/> instance
+            where the query string can be retrieved.</param>
+            <returns>The query string parsed as a <see cref="T:System.Json.JsonObject"/> instance.</returns>
+            <remarks>The main usage of this extension method is to retrieve the query string within
+            an operation using the System.ServiceModel.Web.WebOperationContext.Current.IncomingContext object.
+            The query string is parsed as x-www-form-urlencoded data.</remarks>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.FormUrlEncodedExtensions.ParseFormUrlEncoded(System.String)">
+            <summary>
+            Parses a query string (x-www-form-urlencoded) as a <see cref="T:System.Json.JsonObject"/>.
+            </summary>
+            <param name="queryString">The query string to be parsed.</param>
+            <returns>The <see cref="T:System.Json.JsonObject"/> corresponding to the given query string.</returns>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.FormUrlEncodedExtensions.ParseFormUrlEncoded(System.String,System.Int32)">
+            <summary>
+            Parses a query string (x-www-form-urlencoded) as a <see cref="T:System.Json.JsonObject"/>.
+            </summary>
+            <param name="queryString">The query string to be parsed.</param>
+            <param name="maxDepth">The maximum depth of object graph encoded as x-www-form-urlencoded.</param>
+            <returns>The <see cref="T:System.Json.JsonObject"/> corresponding to the given query string.</returns>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.FormUrlEncodedExtensions.ParseFormUrlEncoded(System.Collections.Generic.IEnumerable{System.Tuple{System.String,System.String}},System.Int32)">
+            <summary>
+            Parses a collection of query string values as a <see cref="T:System.Json.JsonObject"/>.
+            </summary>
+            <param name="queryStringValues">The collection of query string values.</param>
+            <param name="maxDepth">The maximum depth of object graph encoded as x-www-form-urlencoded.</param>
+            <returns>The <see cref="T:System.Json.JsonObject"/> corresponding to the given query string values.</returns>
+        </member>
+        <member name="T:Microsoft.ServiceModel.Web.WebHttpBehavior3">
+            <summary>
+            Enables the System.Json extensions for the Web programming model for a service.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebHttpBehavior3.ApplyDispatchBehavior(System.ServiceModel.Description.ServiceEndpoint,System.ServiceModel.Dispatcher.EndpointDispatcher)">
+            <summary>
+            Implements the Implements the <see cref="M:System.ServiceModel.Description.IEndpointBehavior.ApplyDispatchBehavior(System.ServiceModel.Description.ServiceEndpoint,System.ServiceModel.Dispatcher.EndpointDispatcher)">ApplyDispatchBehavior(ServiceEndpoint,
+            EndpointDispatcher)</see> method to support modification or extension of the service across an endpoint.
+            </summary>
+            <param name="endpoint">The endpoint that exposes the contract.</param>
+            <param name="endpointDispatcher">The endpoint dispatcher to which the behavior is applied.</param>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebHttpBehavior3.GetReplyDispatchFormatter(System.ServiceModel.Description.OperationDescription,System.ServiceModel.Description.ServiceEndpoint)">
+            <summary>
+            Gets the reply formatter on the service for the specified endpoint and service operation.
+            </summary>
+            <param name="operationDescription">The service operation.</param>
+            <param name="endpoint">The service endpoint.</param>
+            <returns>An <see cref="T:System.ServiceModel.Dispatcher.IDispatchMessageFormatter"/> reference to the reply formatter on the service for the specified operation and endpoint.</returns>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebHttpBehavior3.GetRequestDispatchFormatter(System.ServiceModel.Description.OperationDescription,System.ServiceModel.Description.ServiceEndpoint)">
+            <summary>
+            Gets the request formatter on the service for the specified endpoint and service operation.
+            </summary>
+            <param name="operationDescription">The service operation.</param>
+            <param name="endpoint">The service endpoint.</param>
+            <returns>An <see cref="T:System.ServiceModel.Dispatcher.IDispatchMessageFormatter"/> reference to the request formatter on the service for the specified operation and endpoint.</returns>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebHttpBehavior3.AddServerErrorHandlers(System.ServiceModel.Description.ServiceEndpoint,System.ServiceModel.Dispatcher.EndpointDispatcher)">
+            <summary>
+            Overrides the base method to add an <see cref="T:System.ServiceModel.Dispatcher.IErrorHandler"/> which can
+            return correctly formatted faults for <see cref="T:System.Json.JsonValue"/> and <see cref="T:System.ComponentModel.DataAnnotations.ValidationException"/>.
+            </summary>
+            <param name="endpoint">The service endpoint.</param>
+            <param name="endpointDispatcher">The endpoint dispatcher to which the error handler is applied.</param>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.WebHttpBehavior3.AutomaticFormatSelectionEnabled">
+            <summary>
+            Gets or sets a value that determines if automatic format selection is enabled.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.WebHttpBehavior3.FaultExceptionEnabled">
+            <summary>
+            Gets or sets the flag that specifies whether a FaultException is generated when
+            an internal server error (HTTP status code: 500) occurs.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.WebHttpBehavior3.HelpEnabled">
+            <summary>
+            Gets or sets a value that determines if the Help page is enabled.
+            </summary>
+            <remarks>For more information about the REST Help page, see
+            <a href="http://msdn.microsoft.com/en-us/library/ee230442.aspx">WCF REST Service Help Page</a>.</remarks>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.WebHttpBehavior3.ValidationEnabled">
+            <summary>
+            Gets or sets a value indicating whether validation is to be performed for typed
+            arguments.
+            </summary>
+        </member>
+        <member name="T:Microsoft.ServiceModel.Web.WebServiceHost3">
+            <summary>
+            A <see cref="T:System.ServiceModel.Web.WebServiceHost"/> derived class which adds
+            <see cref="T:System.Json.JsonValue"/> and validation support to the REST programming model.
+            </summary>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebServiceHost3.#ctor(System.Type,System.Uri[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:Microsoft.ServiceModel.Web.WebServiceHost3"/> class with the specified service type and base address.
+            </summary>
+            <param name="serviceType">The service type.</param>
+            <param name="baseAddresses">The base addresses of the service.</param>
+        </member>
+        <member name="M:Microsoft.ServiceModel.Web.WebServiceHost3.OnOpening">
+            <summary>
+            Called when the <see cref="T:Microsoft.ServiceModel.Web.WebServiceHost3"/> opens.
+            </summary>
+            <remarks>When the method is called, it replaces, for all endpoints in this host, the
+            <see cref="T:System.ServiceModel.Description.WebHttpBehavior"/> with the
+            <see cref="T:Microsoft.ServiceModel.Web.WebHttpBehavior3"/>.</remarks>
+        </member>
+        <member name="T:Microsoft.ServiceModel.Web.SR">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.ConflictingArrayPath">
+            <summary>
+              Looks up a localized string similar to {0} in the JsonValue object can not be both JsonObject and JsonArray..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.ExpectUrlEncodedOrJson">
+            <summary>
+              Looks up a localized string similar to Expected either to receive JSON in the message body or the content-type to be application/x-www-form-urlencoded..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.FormEncodedMustBeBare">
+            <summary>
+              Looks up a localized string similar to This formatter only supports bare style when used in request or response..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.FormUrlEncodedMismatchingTypes">
+            <summary>
+              Looks up a localized string similar to Mismatching types at node &apos;{0}&apos;..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.InvalidArrayInsert">
+            <summary>
+              Looks up a localized string similar to Invalid array at node &apos;{0}&apos;..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.JQuery13CompatModeNotSupportNestedJson">
+            <summary>
+              Looks up a localized string similar to Traditional style array without &apos;[]&apos; is not supported with nested object at location {0}..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.MaxDepthExceeded">
+            <summary>
+              Looks up a localized string similar to The maximum read depth ({0}) has been exceeded because the forms url-encoded data being read has more levels of nesting than is allowed by the quota. This quota may be increased by changing the MaxDepth property on the ReaderQuotas object in the WebMessageEncodingBindingElement..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.MessageVersionMustBeNone">
+            <summary>
+              Looks up a localized string similar to MessageVersion must be None..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.NestedBracketNotValid">
+            <summary>
+              Looks up a localized string similar to Nested bracket is not valid for form-urlencoded at position {0}..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.OperationContractConflictsWebGetOrWebInvoke">
+            <summary>
+              Looks up a localized string similar to OperationContract {0} has both [WebGet] and [WebInvoke]. Only one of [WebGet] or [WebInvoke] can be applied to each operation contract..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.ParameterUnmappedInUriTemplate">
+            <summary>
+              Looks up a localized string similar to Operation &apos;{0}&apos; of contract &apos;{1}&apos; specifies at least one request body parameter in addition to the JsonValue parameter which is not mapped to the UriTemplate. All non-JsonValue parameters must be mapped to the UriTemplate..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.QueryStringNameShouldNotNull">
+            <summary>
+              Looks up a localized string similar to Query string name cannot be null..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.QueryVariableCannotBeConverted">
+            <summary>
+              Looks up a localized string similar to Operation &apos;{0}&apos; in contract &apos;{1}&apos; has a query variable named &apos;{2}&apos; of type &apos;{3}&apos;, but type &apos;{3}&apos; is not convertible by &apos;{4}&apos;. Variables for UriTemplate query values must have types that can be converted by &apos;{4}&apos;..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.ResponseFormatMustBeJson">
+            <summary>
+              Looks up a localized string similar to The response format for the operation {0} is not supported. Operations returning JsonValue must have the ResponseFormat set to Json..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.UnMatchedBracketNotValid">
+            <summary>
+              Looks up a localized string similar to There is an unmatched opened bracket for the form-urlencoded string at position {0}..
+            </summary>
+        </member>
+        <member name="P:Microsoft.ServiceModel.Web.SR.UriTemplateParameterNotInOperation">
+            <summary>
+              Looks up a localized string similar to Operation &apos;{0}&apos; in contract &apos;{1}&apos; has a UriTemplate that expects a parameter named &apos;{2}&apos;, but there is no input parameter with that name on the operation..
+            </summary>
+        </member>
+    </members>
+</doc>
