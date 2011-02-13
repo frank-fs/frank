@@ -9,61 +9,58 @@ Goals
 1. Provide a simple, to-the-metal framework for quickly building web applications without a lot of hassle. Frack will run on top of [ASP.NET](http://asp.net/) or [System.Net.HttpListener](http://msdn.microsoft.com/en-us/library/system.net.httplistener.aspx).
 2. Provide a similar interface to those already available on other platforms for easier interoperability with those platforms/applications.
 3. Provide a means of using Frack apps as middlewares for other multi-tier applications, similar to [Rack middleware](http://tekpub.com/production/rack).
-4. Allow easy deployment on a range of servers: IIS via ASP.NET, [Kayak](http://kayakhttp.com), etc.
+4. Allow easy deployment on a range of hosts: IIS via ASP.NET, [Kayak](http://kayakhttp.com), etc.
 
 Usage
 ============
 
 ### Define an app
 
-Takes an Owin.IRequest and returns an Owin.IResponse (or here, a triple of status code, headers, and body).
+Takes an OWIN request dictionary and handlers for an OWIN response tuple or exception. 
 
-    >  let app = Application(fun request ->
-    >    ("200 OK",
-    >     dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |],
-    >     "Hello ASP.NET!"))
+    >  // Writes "Howdy!" then echoes the request body.
+    >  let app = Owin.FromAsync (fun request -> async {
+    >    let! body = request |> Request.readToEnd
+    >    return ("200 OK", dict [| ("Content-Type", "text/plain") |],
+    >            seq { yield "Howdy!"B :> obj
+    >                  yield body :> obj }) })
     
-    val app : Application
-
-Or define an asynchronous application (here echoing the contents of the request).
-
-    >  let app = Application(fun (request:Owin.IRequest) -> async {
-    >    let! body = request.AsyncReadAsString()
-    >    return ("200 OK",
-    >            dict [| ("Content-Type", seq { yield "text/plain" }); ("Content-Length", seq { yield "14" }) |],
-    >            body) })
-    
-    val app : Application
+    val app : Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>>
 
 ### Define a middleware
 
-Takes an app and returns an app.
+Takes an OWIN app delegate and returns an OWIN app delegate.
 
-    > let head (app: Owin.IApplication) =
-    >   let asyncInvoke (req: Owin.IRequest) = async {
-    >     if req.Method <> "HEAD"
-    >       then return! app.AsyncInvoke(req)
-    >       else let get = Request.FromBeginEnd("GET", req.Uri, req.Headers, req.Items, req.BeginReadBody, req.EndReadBody)
-    >            let! resp = app.AsyncInvoke(get)
-    >            return Response.Create(resp.Status, resp.Headers, Array.empty<byte>) }
-    >   Application.Create asyncInvoke
+    > let head (app: Action<_,Action<_,IDicitonary<_,_>,_>,Action<exn>>)=
+    >   let app = app |> Owin.ToAsync
+    >   Owin.FromAsync (fun (req: IDictionary<string, obj>) -> async {
+    >     if (req?RequestMethod :?> string) <> "HEAD" then
+    >       return! app req
+    >     else
+    >       req?RequestMethod <- "GET"
+    >       let! status, headers, _ = app req
+    >       return status, headers, Seq.empty })
 
-    val head : Owin.IApplication -> Owin.IApplication
+    val head : Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>> -> Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>>
 
 ### Add middlewares to an app.
 
+    > // f(g(x)) style
     > let myApp = printEnvironment head app
-    
-    val myApp : Owin.IApplication
+
+    > // using F# pipeline operator
+    > let myApp = app |> head |> printEnvironment
+
+    > // using function composition 
+    > let myApp = (head >> printEnvironment) app
 
 Other
 ============
-If this interests you, please also check out [Frank](http://bitbucket.org/riles01/frank). It's a work in progress, atm; not much to see. It'll soon move to http://github.com/panesofglass/frank.
+If this interests you, please also check out [Frank](https://github.com/panesofglass/frank).
 
 Team
 ============
-* Ryan Riley (@panesofglass)
-* (Contact me if you are interested.)
+* Ryan Riley
 
 Thanks
 ============
