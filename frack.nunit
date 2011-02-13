@@ -5,5 +5,8 @@
     <assembly path="src\Frack.AspNet\bin\Debug\Frack.AspNet.dll" />
     <assembly path="src\Collections\bin\Debug\Frack.Collections.dll" />
     <assembly path="src\HttpMachine\bin\Debug\HttpMachine.dll" />
+    <assembly path="src\Frack.SystemWeb\bin\Debug\Frack.SystemWeb.dll" />
+    <assembly path="src\Frack.HttpListener\bin\Debug\Frack.HttpListener.dll" />
+    <assembly path="src\Frack.Wcf\bin\Debug\Frack.Wcf.dll" />
   </Config>
 </NUnitProject>

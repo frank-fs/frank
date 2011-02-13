@@ -19,7 +19,7 @@ module SystemWeb =
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.HttpMethod)
     owinRequest.Add("RequestUri", request.Url.PathAndQuery)
-    owinRequest.Add("RequestHeaders", request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v)))
+    request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v))
     owinRequest.Add("url_scheme", request.Url.Scheme)
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
