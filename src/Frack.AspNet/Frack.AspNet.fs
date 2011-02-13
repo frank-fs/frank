@@ -18,21 +18,15 @@ module AspNet =
   [<System.Runtime.CompilerServices.Extension>]
   let ToOwinRequest(context:System.Web.HttpContextBase) =
     let request = context.Request
-    let asyncRead = ref (request.InputStream |> AsyncSeq.readInSegments)
+    let stream = request.InputStream
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.HttpMethod)
-    owinRequest.Add("RequestUri", (request.Url.AbsolutePath + "?" + request.Url.Query))
+    owinRequest.Add("RequestUri", request.Url.PathAndQuery)
     owinRequest.Add("RequestHeaders", request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v)))
     owinRequest.Add("url_scheme", request.Url.Scheme)
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
-    owinRequest.Add("RequestBody", (Action<Action<_>, Action<_>>(fun cont econt ->
-      let next = function
-        | Ended -> ArraySegment<_>(Array.empty)
-        | Item(hd, tl) -> asyncRead := tl; hd
-      try
-        Async.StartWithContinuations(!asyncRead, next >> cont.Invoke, econt.Invoke, econt.Invoke)
-      with e -> econt.Invoke(e))))
+    owinRequest.Add("RequestBody", Request.chunk stream)
     owinRequest
 
   type System.Web.HttpContextBase with
@@ -64,7 +58,8 @@ module AspNet =
         let request = contextBase.ToOwinRequest()
         let response = contextBase.Response
         let econt e = printfn "%A" e
-        Async.StartWithContinuations(app request, response.Reply, econt, econt)
+        let runApp = app request
+        Async.StartWithContinuations(runApp, response.Reply, econt, econt)
 
   /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
   type OwinRouteHandler(app) =

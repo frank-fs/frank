@@ -46,7 +46,9 @@
     <Reference Include="System.Web.Routing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseSpecs.fs" />
     <Compile Include="Frack.AspNet.fs" />
+    <Compile Include="Frack.AspNetSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">

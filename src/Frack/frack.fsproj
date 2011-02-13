@@ -57,6 +57,7 @@
     <Compile Include="UriSpecs.fs" />
     <Compile Include="UrlEncoded.fs" />
     <Compile Include="Owin.fs" />
+    <Compile Include="OwinSpecs.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>

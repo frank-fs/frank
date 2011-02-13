@@ -2,5 +2,8 @@
   <Settings activeconfig="Default" />
   <Config name="Default" binpathtype="Auto">
     <assembly path="src\Frack\bin\Debug\frack.dll" />
+    <assembly path="src\Frack.AspNet\bin\Debug\Frack.AspNet.dll" />
+    <assembly path="src\Collections\bin\Debug\Frack.Collections.dll" />
+    <assembly path="src\HttpMachine\bin\Debug\HttpMachine.dll" />
   </Config>
 </NUnitProject>

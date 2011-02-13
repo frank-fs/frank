@@ -46,7 +46,7 @@
     <Compile Include="AsyncSeq.fs" />
     <Compile Include="AsyncSeqSpecs.fs" />
     <Compile Include="Dict.fs" />
-    <Compile Include="ArrayEx.fs" />
+    <Compile Include="Array.fs" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="NameValueCollectionEx.fs" />
     <Compile Include="ByteString.fs" />

@@ -34,8 +34,8 @@ type TcpListener(maxaccepts, maxsends, maxreceives, size, port, backlog) as this
 
   let acceptPool = initPool (maxaccepts, this.AcceptCompleted)
   let newConnection socket = new Connection (maxreceives, maxsends, size, socket)
-  let testMessage = Array.init<byte> 128 (fun _ -> 1uy)
-  let header = Array.init<byte> 1 (fun _ -> 1uy)
+  let testMessage = Array.create 128 1uy
+  let header = Array.create 1 1uy
   let mutable disposed = false
  
   //mutable state from original

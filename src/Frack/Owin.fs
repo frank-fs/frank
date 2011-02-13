@@ -18,13 +18,34 @@ type Owin() =
     
 [<System.Runtime.CompilerServices.Extension>]
 module Request =
-  /// Reads all segments from the request body into a list.
-  let readBody (req: IDictionary<string, obj>) =
-    let requestBody = req?RequestBody :?> Action<Action<ArraySegment<byte>>, Action<exn>>
-    let nextSegment = Async.FromContinuations(fun (cont, econt, _) ->
-      requestBody.Invoke(Action<_>(cont), Action<_>(econt)))
+  open Frack.Collections
+
+  /// Converts the input stream into an AsyncSeq so that it can be read in chunks asynchronously.
+  let chunk input =
+    // Create the AsyncSeq and store it in a ref cell.
+    // The ref cell will allow us to update the function to read only the remaining values.
+    let asyncRead = input |> AsyncSeq.readInBlocks (fun bs -> ArraySegment<_>(bs)) 1024 |> ref
+    // The next function allows us to pull out the ArraySegment<byte> for use in the continuation.
+    let next = function
+      | Ended ->
+          // Return an empty array segment to indicate completion.
+          ArraySegment<_>(Array.empty)
+      | Item(hd, tl) ->
+          // Replace the AsyncSeq with the remaining values.
+          asyncRead := tl
+          // Return the current ArraySegment<byte>.
+          hd
+    // Create an Action delegate matching the required OWIN signature.
+    // This delegate reads the remaining AsyncSeq and processes the current value retrieved by the next function.
+    Action<Action<_>, Action<_>>(fun cont econt ->
+      try
+        Async.StartWithContinuations(!asyncRead, next >> cont.Invoke, econt.Invoke, econt.Invoke)
+      with e -> econt.Invoke(e))
+
+  /// Creates a list of ArraySegment<_> from the Async.
+  let listify (next: Async<ArraySegment<_>>) =
     let rec loop acc = async {
-      let! chunk = nextSegment
+      let! chunk = next
       if chunk.Count = 0 then
         // Invoke the continuation with an empty list.
         // This will cause the ArraySegment<byte> list to be created in order.
@@ -32,6 +53,16 @@ module Request =
       // We append the last call as the tail of the previous call.
       else return! loop (fun chunks -> chunk::chunks) }
     loop id
+
+  /// Reads all segments from the request body into a list.
+  let readBody (req: IDictionary<string, obj>) =
+    // Get the request body callback.
+    let requestBody = req?RequestBody :?> Action<Action<ArraySegment<byte>>, Action<exn>>
+    // Convert the callback into an Async computation.
+    let next = Async.FromContinuations(fun (cont, econt, _) ->
+      requestBody.Invoke(Action<_>(cont), Action<_>(econt)))
+    // Accumulate the request body into a list of ArraySegments.
+    listify next
 
   /// Reads the entire request body into a byte[].
   let readToEnd (req: IDictionary<string, obj>) = async {
@@ -47,7 +78,8 @@ module Request =
   /// Reads the body of the request as a callback accepting
   /// a callback taking an ArraySegment and an error callback.
   [<System.Runtime.CompilerServices.Extension>]
-  let ReadToEnd (req: IDictionary<string, obj>, onCompleted, onError) =
+  [<Microsoft.FSharp.Core.CompiledName("ReadToEnd")>]
+  let readToEndWithContinuations (req: IDictionary<string, obj>, onCompleted, onError) =
     let read = Action<Action<_>, Action<_>>(fun cont econt ->
       try
         Async.StartWithContinuations(readToEnd req, cont.Invoke, econt.Invoke, econt.Invoke)

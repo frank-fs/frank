@@ -9,10 +9,12 @@ type Assert with
   static member BytesInItem(item:AsyncSeqInner<byte[]>, numBytes) =
     Assert.IsTrue(match item with | Item(b, _) -> b.Length = numBytes | _ -> false)
 
+let readInBlocks = AsyncSeq.readInBlocks id
+
 [<Test>]
 let ``Reading an empty stream should return Ended``() =
   use stream = new MemoryStream(0)
-  let aseq = stream |> AsyncSeq.readInBlocks 1024
+  let aseq = stream |> readInBlocks 1024
   let result = aseq |> Async.RunSynchronously
   Assert.IsEnded(result)
 
@@ -20,7 +22,7 @@ let ``Reading an empty stream should return Ended``() =
 let ``Reading a stream of size 1024 in 1024 blocks should return one Item and one Ended``() =
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
-  let aseq = stream |> AsyncSeq.readInBlocks 1024
+  let aseq = stream |> readInBlocks 1024
 
   let item, ended = async {
     let! item = aseq
@@ -35,7 +37,7 @@ let ``Reading a stream of size 1024 in 1024 blocks should return one Item and on
 let ``Reading a stream of size 1024 in 512 blocks should return two equally-sized Items and one Ended``() =
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
-  let aseq = stream |> AsyncSeq.readInBlocks 512
+  let aseq = stream |> readInBlocks 512
 
   let item1, item2, ended = async {
     let! item1 = aseq
@@ -53,7 +55,7 @@ let ``Reading a stream of size 1024 in 512 blocks should return two equally-size
 let ``Reading a stream of size 1024 in 1000 blocks should return two unequally-sized Items and one Ended``() =
   let buffer = Array.zeroCreate 1024
   use stream = new MemoryStream(buffer)
-  let aseq = stream |> AsyncSeq.readInBlocks 1000
+  let aseq = stream |> readInBlocks 1000
 
   let item1, item2, ended = async {
     let! item1 = aseq
@@ -71,7 +73,7 @@ let ``Reading a stream of size 1024 in 1000 blocks should return two unequally-s
 let ``Reading a stream of size 1024 in 1024 blocks into a seq<byte[]> should return a same-size byte[].``() =
   let buffer = "Hello"B
   use stream = new MemoryStream(buffer)
-  let aseq = stream |> AsyncSeq.readInBlocks 1024
+  let aseq = stream |> readInBlocks 1024
   let result = aseq |> AsyncSeq.toSeq |> Async.RunSynchronously |> Seq.head
   Assert.AreEqual(buffer, result)
 
@@ -79,7 +81,7 @@ let ``Reading a stream of size 1024 in 1024 blocks into a seq<byte[]> should ret
 let ``Reading a stream of size 2048 in 1024 blocks into a seq<byte[]> should return two byte[].``() =
   let buffer = Array.zeroCreate 2048
   use stream = new MemoryStream(buffer)
-  let aseq = stream |> AsyncSeq.readInBlocks 1024
+  let aseq = stream |> readInBlocks 1024
 
   let result = aseq |> (AsyncSeq.toSeq >> Async.RunSynchronously >> Array.ofSeq)
 
