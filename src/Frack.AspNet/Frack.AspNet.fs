@@ -10,42 +10,15 @@ module AspNet =
   open System.Web.Routing
   open Frack
   open Frack.Collections
+  open Frack.Hosting.SystemWeb
+
+  [<System.Runtime.CompilerServices.Extension>]
+  [<Microsoft.FSharp.Core.CompiledName("ToContextBase")>]
+  let toContextBase(context) = System.Web.HttpContextWrapper(context)
 
   type System.Web.HttpContext with
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
-    member context.ToContextBase() = System.Web.HttpContextWrapper(context)
-
-  [<System.Runtime.CompilerServices.Extension>]
-  let ToOwinRequest(context:System.Web.HttpContextBase) =
-    let request = context.Request
-    let stream = request.InputStream
-    let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
-    owinRequest.Add("RequestMethod", request.HttpMethod)
-    owinRequest.Add("RequestUri", request.Url.PathAndQuery)
-    owinRequest.Add("RequestHeaders", request.Headers.AsEnumerable() |> Seq.iter (fun (k, v) -> owinRequest.Add(k, v)))
-    owinRequest.Add("url_scheme", request.Url.Scheme)
-    owinRequest.Add("host", request.Url.Host)
-    owinRequest.Add("server_port", request.Url.Port)
-    owinRequest.Add("RequestBody", Request.chunk stream)
-    owinRequest
-
-  type System.Web.HttpContextBase with
-    /// Creates an OWIN request variable from an HttpContextBase.
-    member context.ToOwinRequest() = ToOwinRequest context 
-
-  [<System.Runtime.CompilerServices.Extension>]
-  let Reply(response: HttpResponseBase, status, headers: IDictionary<string, string>, body: seq<obj>) =
-    let statusCode, statusDescription = splitStatus status
-    response.StatusCode <- statusCode
-    response.StatusDescription <- statusDescription
-    if headers.ContainsKey("Content-Length") then
-      response.ContentType <- headers.["Content-Length"]
-//    headers |> Dict.toSeq |> Seq.iter (fun (k, v) -> response.Headers.Add(k, v))
-    let output = response.OutputStream
-    ByteString.write output body
-
-  type HttpResponseBase with
-    member response.Reply(status, headers, body) = Reply(response, status, headers, body)
+    member context.ToContextBase() = toContextBase(context)
 
   type OwinHttpHandler (app: Action<IDictionary<string, obj>, Action<string, IDictionary<string, string>, seq<obj>>, Action<exn>>) =
     let app = app |> Owin.ToAsync
@@ -71,8 +44,9 @@ module AspNet =
       member this.GetHttpHandler(context) = OwinHttpHandler app :> IHttpHandler
 
   [<System.Runtime.CompilerServices.Extension>]
-  let MapFrackRoute(routes: RouteCollection, path: string, app: Action<_,_,_>) =
+  [<Microsoft.FSharp.Core.CompiledName("MapFrackRoute")>]
+  let mapFrackRoute(routes: RouteCollection, path: string, app: Action<_,_,_>) =
     routes.Add(new Route(path, new OwinRouteHandler(app))) 
 
   type System.Web.Routing.RouteCollection with
-    member routes.MapFrackRoute(path, app) = MapFrackRoute(routes, path, app)
+    member routes.MapFrackRoute(path, app) = mapFrackRoute(routes, path, app)

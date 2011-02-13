@@ -5,14 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{762480c7-f12d-475e-a4ac-47978d33faf9}</ProjectGuid>
+    <ProjectGuid>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack.AspNet</RootNamespace>
-    <AssemblyName>Frack.AspNet</AssemblyName>
+    <RootNamespace>Frack.SystemWeb</RootNamespace>
+    <AssemblyName>Frack.SystemWeb</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.AspNet</Name>
-    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
-    <TargetFrameworkProfile />
+    <Name>Frack.SystemWeb</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,7 +20,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Frack.AspNet.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Frack.SystemWeb.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,34 +29,29 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.AspNet.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Frack.SystemWeb.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
-    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core" />
     <Reference Include="nunit.framework">
-      <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
+      <HintPath>..\..\tools\Nunit\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
-    <Reference Include="System.Web.Routing" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Frack.AspNet.fs" />
-    <Compile Include="Frack.AspNetSpecs.fs" />
+    <Compile Include="Frack.SystemWeb.fs" />
+    <Compile Include="Frack.SystemWebSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
       <Name>Frack.Collections</Name>
       <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Frack.SystemWeb\Frack.SystemWeb.fsproj">
-      <Name>Frack.SystemWeb</Name>
-      <Project>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Frack\frack.fsproj">
@@ -67,7 +60,8 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
 	<Target Name="BeforeBuild">
