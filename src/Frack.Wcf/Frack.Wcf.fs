@@ -97,9 +97,10 @@ module Wcf =
       app.Invoke(request,
         Action<_,_,_>(fun status headers body ->
           response.StatusCode <- matchStatus status
-          response.Headers.Clear()
+          // TODO: Add only response message headers
           headers |> Seq.iter (fun (KeyValue(k,v)) -> response.Headers.Add(k,v))
-          response.Content <- new ByteArrayContent(body |> Seq.map (fun o -> o :?> byte) |> Array.ofSeq)),
+          response.Content <- new ByteArrayContent(body |> Seq.map (fun o -> o :?> byte[]) |> Array.concat)),
+          // TODO: Add entity-specific headers
         Action<_>(fun e -> Console.WriteLine(e)))
     
     /// <summary>Invokes the application with the specified GET <paramref name="request"/>.</summary>

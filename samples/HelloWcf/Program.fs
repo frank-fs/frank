@@ -20,9 +20,10 @@ open Frack.Hosting.Wcf
 let baseurl = "http://localhost:1000/"
 let processors = [| (fun op -> new PlainTextProcessor(op, MediaTypeProcessorMode.Response) :> System.ServiceModel.Dispatcher.Processor) |]
 
-let app request = async {
-  // do some stuff with the request
-  return "200 OK", Dict.empty, "Howdy!"B |> Seq.map (fun b -> b :> obj) }
+let app (request:IDictionary<string, obj>) = async {
+  // TODO: Determine why the response message is disposed
+  //let! body = request |> Request.readToEnd
+  return "200 OK", Dict.empty, seq { yield "Howdy!"B :> obj } } //; yield body :> obj } }
 
 [<EntryPoint>]
 let main(args) =
