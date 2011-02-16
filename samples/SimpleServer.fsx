@@ -16,8 +16,6 @@ open System.IO
 open System.Net
 open System.Threading
 open Frack
-open Frack.Collections
-open Frack.Middleware
 open Frack.Hosting.HttpListener
 
 printfn "Creating server ..."
