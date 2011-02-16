@@ -22,6 +22,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HelloAspNet", "HelloAspNet", "{7A2392BE-8586-4D58-84C3-ED994FDC7CAC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}"
+	ProjectSection(SolutionItems) = preProject
+		samples\SimpleServer.fsx = samples\SimpleServer.fsx
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloAspNet", "samples\HelloAspNet\HelloAspNet\HelloAspNet.csproj", "{C8F6AD13-397E-463B-99B9-B3BF5DD83847}"
 EndProject
