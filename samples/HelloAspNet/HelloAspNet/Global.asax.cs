@@ -15,22 +15,21 @@ namespace HelloAspNet
         {
             routes.IgnoreRoute("{resource}.axd/{*pathInfo}");
 
-        	routes.MapFrackRoute("{*page}",
-        		Middleware.log(Middleware.head((request, cont, econt) =>
-        		{
-        			try
-        			{
-                        byte[] bytes = new byte[] { };
-                        //request.ReadToEnd(bs => bytes = bs, econt);
-        				cont("200 OK",
-        					new Dictionary<string, string> { { "Content-Type", "text/plain" } },
-        					new[] { Encoding.ASCII.GetBytes("Hello ASP.NET!\r\n"), bytes });
-        			}
-        			catch (Exception e)
-        			{
-        				econt(e);
-        			}
-        		})));
+            routes.MapFrackRoute("{*page}", Middleware.log(Middleware.head(request => (cont, econt) =>
+            {
+                try
+                {
+                    byte[] bytes = new byte[] { };
+                    //request.ReadToEnd(bs => bytes = bs, econt);
+                    cont("200 OK",
+                        new Dictionary<string, string> { { "Content-Type", "text/plain" } },
+                        new[] { Encoding.ASCII.GetBytes("Hello ASP.NET!\r\n"), bytes });
+                }
+                catch (Exception e)
+                {
+                    econt(e);
+                }
+            })));
         }
 
         protected void Application_Start()

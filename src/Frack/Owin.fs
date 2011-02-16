@@ -2,19 +2,25 @@
 open System
 open System.Collections.Generic
 
+// Proposed: type ResponseBody = Action<Action<ArraySegment<byte>>, Action<exn>> seq
+type Handler = Action<Action<string, IDictionary<string, string>, seq<obj>>, Action<exn>>
+type App = Func<IDictionary<string, obj>, Handler>
+
 [<AbstractClass>]
 type Owin() =
   /// Creates an OWIN application from an Async computation.
   static member FromAsync(handler, ?cancellationToken) =
-    Action<IDictionary<string, obj>, Action<string, #IDictionary<string, string>, seq<obj>>, Action<exn>>(
-      fun request onCompleted onError ->
+    App(fun request ->
+      Action<_,_>(fun onCompleted onError ->
         Async.StartWithContinuations(handler request, onCompleted.Invoke, onError.Invoke, onError.Invoke,
-          ?cancellationToken = cancellationToken))
+          ?cancellationToken = cancellationToken)))
 
   /// Transforms an OWIN application into an Async computation.
-  static member ToAsync(app: Action<IDictionary<string, obj>, Action<_,_,_>, Action<_>>) = fun req ->
-    Async.FromContinuations(fun (cont, econt, _) ->
-      app.Invoke(req, Action<_,_,_>(fun st hd bd -> cont(st, hd, bd)), Action<_>(econt)))
+  static member ToAsync(app:Func<_,Handler>) =
+    fun request ->
+      let handler = app.Invoke(request)
+      Async.FromContinuations(fun (cont, econt, _) ->
+        handler.Invoke(Action<_,_,_>(fun st hd bd -> cont(st, hd, bd)), Action<_>(econt)))
     
 [<System.Runtime.CompilerServices.Extension>]
 module Request =

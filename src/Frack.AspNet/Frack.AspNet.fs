@@ -20,7 +20,7 @@ module AspNet =
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
     member context.ToContextBase() = toContextBase(context)
 
-  type OwinHttpHandler (app: Action<IDictionary<string, obj>, Action<string, IDictionary<string, string>, seq<obj>>, Action<exn>>) =
+  type OwinHttpHandler(app) =
     let app = app |> Owin.ToAsync
     interface System.Web.IHttpHandler with
       /// Since this is a pure function, it can be reused as often as desired.
@@ -45,7 +45,7 @@ module AspNet =
 
   [<System.Runtime.CompilerServices.Extension>]
   [<Microsoft.FSharp.Core.CompiledName("MapFrackRoute")>]
-  let mapFrackRoute(routes: RouteCollection, path: string, app: Action<_,_,_>) =
+  let mapFrackRoute(routes: RouteCollection, path, app) =
     routes.Add(new Route(path, new OwinRouteHandler(app))) 
 
   type System.Web.Routing.RouteCollection with

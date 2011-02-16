@@ -86,7 +86,7 @@ module Wcf =
   /// <remarks>The <see cref="AppResource"/> serves as a catch-all handler for WCF HTTP services.</remarks>
   [<ServiceContract>]
   [<ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)>]
-  type AppResource(app:Action<IDictionary<string, obj>, Action<string, IDictionary<string, string>, seq<obj>>, Action<exn>>) =
+  type AppResource(app:App) =
     let matchStatus (status:string) =
       let statusParts = status.Split(' ')
       let statusCode = statusParts.[0]
@@ -94,7 +94,8 @@ module Wcf =
   
     let handle (request:HttpRequestMessage) (response:HttpResponseMessage) =
       let request = request.ToOwinRequest()
-      app.Invoke(request,
+      let handler = app.Invoke(request)
+      handler.Invoke(
         Action<_,_,_>(fun status headers body ->
           response.StatusCode <- matchStatus status
           // TODO: Add only response message headers

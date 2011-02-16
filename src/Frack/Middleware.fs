@@ -5,7 +5,7 @@ module Middleware =
   open FSharp.Monad
 
   /// Logs the incoming request and the time to respond.
-  let log (app: Action<_, Action<_,IDictionary<_,_>,_>, Action<exn>>) =
+  let log app =
     let app = app |> Owin.ToAsync
     Owin.FromAsync (fun req -> async {
       let sw = System.Diagnostics.Stopwatch.StartNew()
@@ -16,7 +16,7 @@ module Middleware =
       return response })
 
   /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
-  let head (app: Action<_, Action<_,IDictionary<_,_>,_>, Action<exn>>) = 
+  let head app =
     let app = app |> Owin.ToAsync
     Owin.FromAsync (fun (req: IDictionary<string, obj>) -> async {
       if (req?RequestMethod :?> string) <> "HEAD" then
@@ -27,7 +27,7 @@ module Middleware =
         return status, headers, Seq.empty })
 
   /// Intercepts a request and checks for use of X_HTTP_METHOD_OVERRIDE.
-  let methodOverride (app: Action<_, Action<_,IDictionary<_,_>,_>, Action<exn>>) =
+  let methodOverride app =
     let app = app |> Owin.ToAsync
     // Leave out POST, as that is the method we are overriding.
     let httpMethods = ["GET";"HEAD";"PUT";"DELETE";"OPTIONS";"PATCH"]
