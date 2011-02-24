@@ -35,14 +35,8 @@
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Cashel">
-      <HintPath>..\..\lib\Cashel.dll</HintPath>
-    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="FSharp.Monad">
-      <HintPath>..\..\lib\FSharp.Monad.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">

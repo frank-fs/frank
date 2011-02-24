@@ -2,7 +2,6 @@
 module Middleware =
   open System
   open System.Collections.Generic
-  open FSharp.Monad
 
   /// Logs the incoming request and the time to respond.
   let log app =
