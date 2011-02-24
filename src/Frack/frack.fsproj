@@ -34,33 +34,31 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <ItemGroup>
+    <Compile Include="BaseSpecs.fs" />
+    <Compile Include="Utility.fs" />
+    <Compile Include="UriSpecs.fs" />
+    <Compile Include="UrlEncoded.fs" />
+    <Compile Include="Request.fs" />
+    <Compile Include="RequestSpecs.fs" />
+    <Compile Include="Middleware.fs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
-      <HintPath>..\..\tools\NaturalSpec\nunit.framework.dll</HintPath>
+      <HintPath>..\..\tools\Nunit\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Utility.fs" />
-    <Compile Include="UriSpecs.fs" />
-    <Compile Include="UrlEncoded.fs" />
-    <Compile Include="Owin.fs" />
-    <Compile Include="OwinSpecs.fs" />
-    <Compile Include="Middleware.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
       <Name>Frack.Collections</Name>
       <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
 </Project>

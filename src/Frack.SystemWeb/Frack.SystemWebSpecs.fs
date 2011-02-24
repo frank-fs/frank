@@ -1,4 +1,4 @@
-﻿namespace FrackSystemWebSpecs
+﻿namespace Frack.SystemWebSpecs
 open System
 open System.Collections.Specialized
 open System.IO
@@ -66,9 +66,12 @@ module ``Given an ASPNET context`` =
       request.ContainsKey("RequestBody") |> ``is true``
 
     [<Test>]
-    let ``It should have a RequestBody that is an Action delegate``() =
-      Assert.IsInstanceOf(typeof<Action<Action<ArraySegment<byte>>, Action<exn>>>, request?RequestBody)
+    let ``It should have a RequestBody that is an Async computation``() =
+      Assert.IsInstanceOf(typeof<Async<ArraySegment<byte>>>, request?RequestBody)
 
     [<Test>]
-    let ``It should have a RequestBody that yields "Howdy!" to a continuation``() =
-      Request.readToEndWithContinuations(request, Action<_>(fun bs -> bs == "Howdy!"B), Action<_>(fun e -> ()))
+    let ``It should have a RequestBody that yields "Howdy!"``() =
+      async {
+        let! bs = Request.readToEnd request
+        bs == "Howdy!"B } |> Async.RunSynchronously
+    

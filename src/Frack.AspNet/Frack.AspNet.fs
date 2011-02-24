@@ -20,19 +20,16 @@ module AspNet =
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
     member context.ToContextBase() = toContextBase(context)
 
-  type OwinHttpHandler(app) =
-    let app = app |> Owin.ToAsync
+  type OwinHttpHandler(app: IDictionary<string, obj> -> Async<string * IDictionary<string, string> * seq<obj>>) =
     interface System.Web.IHttpHandler with
       /// Since this is a pure function, it can be reused as often as desired.
       member this.IsReusable = true
       /// Process an incoming request. 
       member this.ProcessRequest(context) =
-        let contextBase = context.ToContextBase()
-        let request = contextBase.ToOwinRequest()
-        let response = contextBase.Response
+        let ctx = context.ToContextBase()
+        let request = ctx.ToOwinRequest()
         let econt e = printfn "%A" e
-        let runApp = app request
-        Async.StartWithContinuations(runApp, response.Reply, econt, econt)
+        Async.StartWithContinuations(app request, ctx.Response.Reply, econt, econt)
 
   /// Defines a System.Web.Routing.IRouteHandler for hooking up Frack applications.
   type OwinRouteHandler(app) =

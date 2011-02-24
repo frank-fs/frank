@@ -5,7 +5,7 @@ open Fake.MSBuild
 
 (* properties *)
 let projectName = "frack"
-let version = "0.7.1"  
+let version = "0.8.0"  
 
 (* Directories *)
 let buildDir = "./build/"
@@ -47,7 +47,7 @@ Target? BuildApp <-
                  Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996";
                  OutputFileName = "./src/AssemblyInfo.fs"})                      
 
-        Git.Submodule.init
+        Git.Submodule.init "" ""
 
         appReferences
           |> Seq.map (RemoveTestsFromProject AllNUnitReferences AllSpecAndTestDataFiles)

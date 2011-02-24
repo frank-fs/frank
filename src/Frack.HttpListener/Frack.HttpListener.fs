@@ -63,22 +63,22 @@ module HttpListener =
   type System.Net.HttpListener with
     member listener.AsyncGetContext() = asyncGetContext(listener)
 
-    static member Start(url, app, ?cancellationToken) =
-      let listen (listener:HttpListener) = async {
-        let! ctx = listener.AsyncGetContext()
-        let context = ctx.ToContextBase()
-        let request = context.ToOwinRequest()
-        let! response = app request
-        do context.Response.Reply(response)
-        // For HttpListener, we need to close the output stream.
-        ctx.Response.Close() }
+    static member Start(url, app) =
+      let cts = new System.Threading.CancellationTokenSource()
+      let handle (request: IDictionary<string, obj>) (response: HttpResponseBase) = async {
+        let! status, headers, body = app request
+        do response.Reply(status, headers, body)
+        response.Close() }
       let server = async {
         use listener = new HttpListener()
         listener.Prefixes.Add(url)
         listener.Start()
         while true do
-          Async.Start(listen listener, ?cancellationToken = cancellationToken) }
-      Async.Start(server, ?cancellationToken = cancellationToken)     
-
-    static member Start(url, app, ?cancellationToken) =
-      HttpListener.Start(url, app |> Owin.ToAsync, ?cancellationToken = cancellationToken)
+          let! ctx = listener.AsyncGetContext()
+          let context = ctx.ToContextBase()
+          let request = context.ToOwinRequest()
+          let response = context.Response
+          Async.Start(handle request response, cancellationToken = cts.Token) }
+      Async.Start(server, cancellationToken = cts.Token)
+      { new System.IDisposable with
+          member x.Dispose() = cts.Cancel() }

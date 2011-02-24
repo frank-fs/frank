@@ -8,7 +8,7 @@ open Frack.Hosting.Wcf
 open NUnit.Framework
 open BaseSpecs
 
-module ``Given an HttpListenerContext`` =
+module ``Given an HttpRequestMessage`` =
   [<Test>]
   let ``Placeholder test``() =
     true |> ``is true``

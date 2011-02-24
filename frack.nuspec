@@ -2,10 +2,8 @@
 <package>
   <metadata>
     <id>frack</id>
-    <version>0.1.0.0</version>
-    <authors>
-      <author>Ryan Riley</author> 
-    </authors>
+    <version>0.8.1</version>
+    <authors>Ryan Riley</authors>
     <description>An implementation of NWSGI (.NET Web Server Gateway Interface) written in F#.</description>
     <language>en-US</language>
   </metadata>

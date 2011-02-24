@@ -39,16 +39,6 @@ module AsyncSeq =
       | Item(hd, tl) -> return! read (fun rest -> hd::rest |> cont) tl}
     read List.toSeq aseq
 
-  /// Asynchronous function that creates a lazy Seq from an AsyncSeq.
-  /// Be careful to manage the lifetime of the underlying provider.
-  let toLazySeq aseq =
-    let rec read cont aseq = async {
-      let! item = aseq
-      match item with
-      | Ended -> return cont Seq.empty
-      | Item(hd, tl) -> return! read (fun rest -> seq { yield hd; yield! rest } |> cont) tl}
-    read id aseq
-
   /// Asynchronous function that compares two asynchronous sequences
   /// item by item. If an item doesn't match, 'false' is returned
   /// immediately without generating the rest of the sequence. If the

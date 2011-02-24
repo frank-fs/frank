@@ -32,19 +32,16 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Frack.HttpListener.XML</DocumentationFile>
   </PropertyGroup>
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <ItemGroup>
+    <Compile Include="Frack.HttpListener.fs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Abstractions" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Frack.HttpListener.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
       <Name>Frack.Collections</Name>
       <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
@@ -60,6 +57,7 @@
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Abstractions" />
   </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
 </Project>

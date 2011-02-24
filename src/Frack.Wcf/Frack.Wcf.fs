@@ -23,7 +23,7 @@ module Wcf =
   [<Microsoft.FSharp.Core.CompiledName("ToOwinRequest")>]
   let toOwinRequest(request:HttpRequestMessage) =
     // TODO: Consider using the LoadIntoBufferAsync task
-    let stream = request.Content.ContentReadStream
+    let requestBody = Request.chunk request.Content.ContentReadStream
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.Method)
     owinRequest.Add("RequestUri", request.RequestUri.PathAndQuery)
@@ -32,12 +32,12 @@ module Wcf =
     owinRequest.Add("url_scheme", request.RequestUri.Scheme)
     owinRequest.Add("host", request.RequestUri.Host)
     owinRequest.Add("server_port", request.RequestUri.Port)
-    owinRequest.Add("RequestBody", Request.chunk stream)
+    owinRequest.Add("RequestBody", requestBody)
     owinRequest
 
   type HttpRequestMessage with
     member request.ToOwinRequest() = toOwinRequest request
-    
+
 
   /// <summary>Creates a new instance of <see cref="Processor"/>.</summary>
   /// <param name="onExecute">The function to execute in the pipeline.</param>
@@ -59,7 +59,7 @@ module Wcf =
     override this.OnGetOutArguments() = onGetOutArgs'()
     override this.OnExecute(input) = onExecute input
     override this.OnError(result) = onError' result
-  
+
 
   /// <summary>Creates a new instance of <see cref="FuncConfiguration"/>.</summary>
   /// <param name="requestProcessors">The processors to run when receiving the request.</param>
@@ -72,37 +72,33 @@ module Wcf =
   
     // Allows partial application of args to a function using function composition.
     let create args f = f args
-    
+
     interface Microsoft.ServiceModel.Description.IProcessorProvider with
       member this.RegisterRequestProcessorsForOperation(operation, processors, mode) =
         requestProcessors' |> Seq.iter (processors.Add << (create operation))
-    
+      
       member this.RegisterResponseProcessorsForOperation(operation, processors, mode) =
         responseProcessors' |> Seq.iter (processors.Add << (create operation))
-  
+
 
   /// <summary>Creates a new instance of <see cref="AppResource"/>.</summary>
   /// <param name="app">The application to invoke.</param>
   /// <remarks>The <see cref="AppResource"/> serves as a catch-all handler for WCF HTTP services.</remarks>
   [<ServiceContract>]
   [<ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)>]
-  type AppResource(app:App) =
+  type AppResource(app: IDictionary<_,_> -> Async<string * IDictionary<string, string> * seq<obj>>) =
     let matchStatus (status:string) =
       let statusParts = status.Split(' ')
       let statusCode = statusParts.[0]
       Enum.Parse(typeof<HttpStatusCode>, statusCode) :?> HttpStatusCode
   
-    let handle (request:HttpRequestMessage) (response:HttpResponseMessage) =
+    let handle (request:HttpRequestMessage) (response:HttpResponseMessage) = async {
       let request = request.ToOwinRequest()
-      let handler = app.Invoke(request)
-      handler.Invoke(
-        Action<_,_,_>(fun status headers body ->
-          response.StatusCode <- matchStatus status
-          // TODO: Add only response message headers
-          headers |> Seq.iter (fun (KeyValue(k,v)) -> response.Headers.Add(k,v))
-          response.Content <- new ByteArrayContent(body |> Seq.map (fun o -> o :?> byte[]) |> Array.concat)),
-          // TODO: Add entity-specific headers
-        Action<_>(fun e -> Console.WriteLine(e)))
+      let! status, headers, body = app request
+      response.StatusCode <- matchStatus status
+      // TODO: Add only response message headers
+      headers |> Seq.iter (fun (KeyValue(k,v)) -> response.Headers.Add(k,v))
+      response.Content <- new ByteArrayContent(body |> Seq.map (fun o -> o :?> byte[]) |> Array.concat) } |> Async.RunSynchronously
     
     /// <summary>Invokes the application with the specified GET <paramref name="request"/>.</summary>
     /// <param name="request">The <see cref="HttpRequestMessage"/>.</param>
@@ -161,8 +157,7 @@ module Wcf =
     /// <param name="requestProcessors">The processors to run when receiving the request.</param>
     /// <param name="responseProcessors">The processors to run when sending the response.</param>
     /// <param name="baseAddresses">The base addresses to host (defaults to an empty array).</param>
-    static member FromAsync(app, ?requestProcessors, ?responseProcessors, ?baseAddresses) =
+    new(app, ?requestProcessors, ?responseProcessors, ?baseAddresses) =
       let baseAddresses = defaultArg baseAddresses [||] |> Array.map (fun baseAddress -> Uri(baseAddress))
-      let owinApp = Owin.FromAsync app
-      new OwinHost(owinApp, ?requestProcessors = requestProcessors, ?responseProcessors = responseProcessors, baseAddresses = baseAddresses)
+      new OwinHost(app, ?requestProcessors = requestProcessors, ?responseProcessors = responseProcessors, baseAddresses = baseAddresses)
     

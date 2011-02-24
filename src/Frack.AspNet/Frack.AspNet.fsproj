@@ -34,6 +34,10 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Frack.AspNet.XML</DocumentationFile>
   </PropertyGroup>
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <ItemGroup>
+    <Compile Include="Frack.AspNet.fs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
@@ -42,11 +46,6 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
     <Reference Include="System.Web.Routing" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Frack.AspNet.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
       <Name>Frack.Collections</Name>
       <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
@@ -63,5 +62,4 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
 </Project>

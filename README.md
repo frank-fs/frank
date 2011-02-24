@@ -19,29 +19,27 @@ Usage
 Takes an OWIN request dictionary and handlers for an OWIN response tuple or exception. 
 
     >  // Writes "Howdy!" then echoes the request body.
-    >  let app = Owin.FromAsync (fun request -> async {
+    >  let app request = async {
     >    let! body = request |> Request.readToEnd
-    >    return ("200 OK", dict [| ("Content-Type", "text/plain") |],
-    >            seq { yield "Howdy!"B :> obj
-    >                  yield body :> obj }) })
+    >    return "200 OK", dict [| ("Content-Type", "text/plain") |],
+    >           seq { yield box "Howdy!"B
+    >                 yield box body } }
     
-    val app : Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>>
+    val app : IDictionary<string,obj> -> Async<string * IDictionary<string,string> * seq<obj>>
 
 ### Define a middleware
 
 Takes an OWIN app delegate and returns an OWIN app delegate.
 
-    > let head (app: Action<_,Action<_,IDicitonary<_,_>,_>,Action<exn>>)=
-    >   let app = app |> Owin.ToAsync
-    >   Owin.FromAsync (fun (req: IDictionary<string, obj>) -> async {
-    >     if (req?RequestMethod :?> string) <> "HEAD" then
-    >       return! app req
-    >     else
-    >       req?RequestMethod <- "GET"
-    >       let! status, headers, _ = app req
-    >       return status, headers, Seq.empty })
+    > let head app = fun (req: IDictionary<string, obj>) -> async {
+    >   if (req?RequestMethod :?> string) <> "HEAD" then
+    >     return! app req
+    >   else
+    >     req?RequestMethod <- "GET"
+    >     let! status, headers, _ = app req
+    >     return status, headers, Seq.empty }
 
-    val head : Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>> -> Action<IDictionary<string,obj>,Action<string,IDictionary<string,string>,seq<obj>>,Action<exn>>
+    val head : (IDictionary<string,obj> -> Async<string * IDictionary<string,string> * seq<obj>>) -> (IDictionary<string,obj> -> Async<string * IDictionary<string,string> * seq<obj>>)
 
 ### Add middlewares to an app.
 

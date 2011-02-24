@@ -7,7 +7,6 @@ module SystemWeb =
   open System.IO
   open System.Text
   open System.Web
-  open System.Web.Routing
   open Frack
   open Frack.Collections
 
@@ -15,7 +14,6 @@ module SystemWeb =
   [<Microsoft.FSharp.Core.CompiledName("ToOwinRequest")>]
   let toOwinRequest(context:System.Web.HttpContextBase) =
     let request = context.Request
-    let stream = request.InputStream
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.HttpMethod)
     owinRequest.Add("RequestUri", request.Url.PathAndQuery)
@@ -23,7 +21,7 @@ module SystemWeb =
     owinRequest.Add("url_scheme", request.Url.Scheme)
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
-    owinRequest.Add("RequestBody", Request.chunk stream)
+    owinRequest.Add("RequestBody", Request.chunk request.InputStream)
     owinRequest
 
   type System.Web.HttpContextBase with
@@ -39,8 +37,7 @@ module SystemWeb =
     if headers.ContainsKey("Content-Length") then
       response.ContentType <- headers.["Content-Length"]
 //    headers |> Dict.toSeq |> Seq.iter (fun (k, v) -> response.Headers.Add(k, v))
-    let output = response.OutputStream
-    ByteString.write output body
+    body |> ByteString.write response.OutputStream
 
   type HttpResponseBase with
     member response.Reply(status, headers, body) = reply(response, status, headers, body)

@@ -32,12 +32,27 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Frack.Wcf.XML</DocumentationFile>
   </PropertyGroup>
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <ItemGroup>
+    <Compile Include="BaseSpecs.fs" />
+    <Compile Include="Frack.Wcf.fs" />
+    <Compile Include="Frack.WcfSpecs.fs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Net.Http">
       <HintPath>..\..\lib\wcf\Microsoft.Net.Http.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.QueryComposition">
+      <HintPath>..\..\lib\wcf\Microsoft.QueryComposition.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Runtime.Serialization.Json">
+      <HintPath>..\..\lib\wcf\Microsoft.Runtime.Serialization.Json.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.ServiceModel.Http">
       <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.ServiceModel.Web.jQuery">
+      <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.Web.jQuery.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceModel.WebHttp">
       <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.WebHttp.dll</HintPath>
@@ -52,13 +67,6 @@
     <Reference Include="System.Numerics" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.ServiceModel.Web" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Frack.Wcf.fs" />
-    <Compile Include="Frack.WcfSpecs.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
       <Name>Frack.Collections</Name>
       <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
@@ -70,5 +78,4 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
 </Project>

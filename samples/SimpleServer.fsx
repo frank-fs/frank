@@ -6,30 +6,30 @@
 #r "System.Net.dll"
 #r "System.Web.dll"
 #r "System.Web.Abstractions.dll"
-#r "Frack.Collections.dll"
 #r "frack.dll"
+#r "Frack.Collections.dll"
 #r "Frack.HttpListener.dll"
 
-open System
-open System.Collections.Generic
-open System.IO
 open System.Net
 open System.Threading
 open Frack
+open Frack.Middleware
 open Frack.Hosting.HttpListener
 
 printfn "Creating server ..."
 
-let cts = new CancellationTokenSource()
-
 // Define the application function.
-let app = Owin.FromAsync(fun request -> async { 
-  return "200 OK", dict [("Content_Type", "text/plain" )], seq { yield "Howdy!"B :> obj } })
+let app request = async { 
+  let! body = request |> Request.readToEnd
+  return "200 OK",
+         dict [("Content_Type", "text/plain" )],
+         seq { yield box "Howdy!"B
+               yield box body } }
 
 // Set up and start an HttpListener
-HttpListener.Start("http://localhost:9191/", app, cts.Token)
+let disposable = HttpListener.Start("http://localhost:9191/", app |> log)
 printfn "Listening on http://localhost:9191/ ..."
 
 Thread.Sleep(60 * 1000)
-cts.Cancel()
+disposable.Dispose()
 printfn "Stopped listening."

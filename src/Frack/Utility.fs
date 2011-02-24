@@ -20,7 +20,7 @@ module Utility =
   let inline implicit arg = ( ^a : (static member op_Implicit : ^b -> ^a) arg)
 
   /// Decodes url encoded values.
-  let decodeUrl input = Uri.UnescapeDataString(input).Replace("+", " ")
+  let decodeUrl input = Uri.UnescapeDataString(input)
 
   /// Splits a relative Uri string into the path and query string.
   let splitUri uri =
