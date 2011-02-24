@@ -35,7 +35,10 @@ Target? Clean <-
     fun _ -> CleanDirs [buildDir; testDir; deployDir; docsDir]
 
 Target? BuildApp <-
-    fun _ -> 
+    fun _ ->
+        if isLocalBuild then
+          Git.Submodule.init "" ""
+
         if not isLocalBuild then
           AssemblyInfo 
            (fun p -> 
@@ -45,9 +48,7 @@ Target? BuildApp <-
                  AssemblyTitle = "frack";
                  AssemblyDescription = "An implementation of NWSGI (.NET Web Server Gateway Interface) written in F#.";
                  Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996";
-                 OutputFileName = "./src/AssemblyInfo.fs"})                      
-
-        Git.Submodule.init "" ""
+                 OutputFileName = "./src/AssemblyInfo.fs"})
 
         appReferences
           |> Seq.map (RemoveTestsFromProject AllNUnitReferences AllSpecAndTestDataFiles)
