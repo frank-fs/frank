@@ -39,9 +39,6 @@
     <Reference Include="FSharp.Monad">
       <HintPath>..\..\lib\FSharp.Monad.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Contracts">
-      <HintPath>..\..\lib\Microsoft.Contracts.dll</HintPath>
-    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core" />
     <Reference Include="nunit.framework">
