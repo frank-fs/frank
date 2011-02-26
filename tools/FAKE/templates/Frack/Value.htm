@@ -20,15 +20,19 @@
   <h2 class="fixed">Types in Frack</h2>
 	<div class="scroll">
 		<ul><li>
-            <a href="../../../../../Frack/Env.htm">Env</a>
+            <a href="../../../../../Frack/Array.htm">Array</a>
+        </li><li>
+            <a href="../../../../../Frack/ByteString.htm">ByteString</a>
+        </li><li>
+            <a href="../../../../../Frack/Core.htm">Core</a>
+        </li><li>
+            <a href="../../../../../Frack/Dict.htm">Dict</a>
         </li><li>
             <a href="../../../../../Frack/Extensions.htm">Extensions</a>
         </li><li>
-            <a href="../../../../../Frack/Middleware.htm">Middleware</a>
+            <a href="../../../../../Frack/SeqStream.htm">SeqStream</a>
         </li><li>
             <a href="../../../../../Frack/Tags.htm">Tags</a>
-        </li><li>
-            <a href="../../../../../Frack/Utility.htm">Utility</a>
         </li><li>
             <a href="../../../../../Frack/Value.htm" class="current">Value</a>
         </li>
@@ -43,11 +47,11 @@
 
 
 			<h3 class="section">Methods</h3>
-			<ul><li><a href="../../../../../Frack/Value.htm#Equals">Equals</a></li><li><a href="../../../../../Frack/Value.htm#Equals">Equals</a></li><li><a href="../../../../../Frack/Value.htm#Equals">Equals</a></li><li><a href="../../../../../Frack/Value.htm#get_IsErr">get_IsErr</a></li><li><a href="../../../../../Frack/Value.htm#get_IsHash">get_IsHash</a></li><li><a href="../../../../../Frack/Value.htm#get_IsInp">get_IsInp</a></li><li><a href="../../../../../Frack/Value.htm#get_IsInt">get_IsInt</a></li><li><a href="../../../../../Frack/Value.htm#get_IsObj">get_IsObj</a></li><li><a href="../../../../../Frack/Value.htm#get_IsStr">get_IsStr</a></li><li><a href="../../../../../Frack/Value.htm#get_IsVer">get_IsVer</a></li><li><a href="../../../../../Frack/Value.htm#get_Tag">get_Tag</a></li><li><a href="../../../../../Frack/Value.htm#GetHashCode">GetHashCode</a></li><li><a href="../../../../../Frack/Value.htm#GetHashCode">GetHashCode</a></li><li><a href="../../../../../Frack/Value.htm#GetType">GetType</a></li><li><a href="../../../../../Frack/Value.htm#NewErr">NewErr</a></li><li><a href="../../../../../Frack/Value.htm#NewHash">NewHash</a></li><li><a href="../../../../../Frack/Value.htm#NewInp">NewInp</a></li><li><a href="../../../../../Frack/Value.htm#NewInt">NewInt</a></li><li><a href="../../../../../Frack/Value.htm#NewObj">NewObj</a></li><li><a href="../../../../../Frack/Value.htm#NewStr">NewStr</a></li><li><a href="../../../../../Frack/Value.htm#NewVer">NewVer</a></li><li><a href="../../../../../Frack/Value.htm#ToString">ToString</a></li>
+			<ul><li><a href="../../../../../Frack/Value.htm#Equals">Equals</a></li><li><a href="../../../../../Frack/Value.htm#Equals">Equals</a></li><li><a href="../../../../../Frack/Value.htm#get_IsErr">get_IsErr</a></li><li><a href="../../../../../Frack/Value.htm#get_IsInp">get_IsInp</a></li><li><a href="../../../../../Frack/Value.htm#get_IsInt">get_IsInt</a></li><li><a href="../../../../../Frack/Value.htm#get_IsStr">get_IsStr</a></li><li><a href="../../../../../Frack/Value.htm#get_IsVer">get_IsVer</a></li><li><a href="../../../../../Frack/Value.htm#get_Tag">get_Tag</a></li><li><a href="../../../../../Frack/Value.htm#GetHashCode">GetHashCode</a></li><li><a href="../../../../../Frack/Value.htm#NewErr">NewErr</a></li><li><a href="../../../../../Frack/Value.htm#NewInp">NewInp</a></li><li><a href="../../../../../Frack/Value.htm#NewInt">NewInt</a></li><li><a href="../../../../../Frack/Value.htm#NewStr">NewStr</a></li><li><a href="../../../../../Frack/Value.htm#NewVer">NewVer</a></li>
 			</ul>
 
 			<h3 class="section">Properties</h3>
-			<ul><li><a href="../../../../../Frack/Value.htm#IsErr">IsErr</a></li><li><a href="../../../../../Frack/Value.htm#IsHash">IsHash</a></li><li><a href="../../../../../Frack/Value.htm#IsInp">IsInp</a></li><li><a href="../../../../../Frack/Value.htm#IsInt">IsInt</a></li><li><a href="../../../../../Frack/Value.htm#IsObj">IsObj</a></li><li><a href="../../../../../Frack/Value.htm#IsStr">IsStr</a></li><li><a href="../../../../../Frack/Value.htm#IsVer">IsVer</a></li><li><a href="../../../../../Frack/Value.htm#Tag">Tag</a></li>
+			<ul><li><a href="../../../../../Frack/Value.htm#IsErr">IsErr</a></li><li><a href="../../../../../Frack/Value.htm#IsInp">IsInp</a></li><li><a href="../../../../../Frack/Value.htm#IsInt">IsInt</a></li><li><a href="../../../../../Frack/Value.htm#IsStr">IsStr</a></li><li><a href="../../../../../Frack/Value.htm#IsVer">IsVer</a></li><li><a href="../../../../../Frack/Value.htm#Tag">Tag</a></li>
 			</ul>
 
 	</div>
@@ -55,7 +59,7 @@
 
 	<h3 class="section">Public instance methods</h3>
 <div id="Equals" class="method">
-		<h4><span title="System.bool">bool</span> <strong>Equals</strong>(<span title="System.object">object</span> obj)</h4>
+		<h4><span title="System.bool">bool</span> <strong>Equals</strong>(<span title="System.object">object</span> obj, <span title="System.Collections.IEqualityComparer">IEqualityComparer</span> comp)</h4>
 		<div class="content">
 
 
@@ -70,24 +74,8 @@
 
 
 		</div>
-	</div><div id="Equals" class="method">
-		<h4><span title="System.bool">bool</span> <strong>Equals</strong>(<span title="System.object">object</span> obj, <span title="System.Collections.IEqualityComparer">IEqualityComparer</span> comp)</h4>
-		<div class="content">
-
-
-
-
-		</div>
 	</div><div id="get_IsErr" class="method">
 		<h4><span title="System.bool">bool</span> <strong>get_IsErr</strong>()</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="get_IsHash" class="method">
-		<h4><span title="System.bool">bool</span> <strong>get_IsHash</strong>()</h4>
 		<div class="content">
 
 
@@ -104,14 +92,6 @@
 		</div>
 	</div><div id="get_IsInt" class="method">
 		<h4><span title="System.bool">bool</span> <strong>get_IsInt</strong>()</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="get_IsObj" class="method">
-		<h4><span title="System.bool">bool</span> <strong>get_IsObj</strong>()</h4>
 		<div class="content">
 
 
@@ -143,31 +123,7 @@
 
 		</div>
 	</div><div id="GetHashCode" class="method">
-		<h4><span title="System.int">int</span> <strong>GetHashCode</strong>()</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="GetHashCode" class="method">
 		<h4><span title="System.int">int</span> <strong>GetHashCode</strong>(<span title="System.Collections.IEqualityComparer">IEqualityComparer</span> comp)</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="GetType" class="method">
-		<h4><span title="System.Type">Type</span> <strong>GetType</strong>()</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="ToString" class="method">
-		<h4><span title="System.string">string</span> <strong>ToString</strong>()</h4>
 		<div class="content">
 
 
@@ -178,15 +134,7 @@
 
 	<h3 class="section">Public static methods</h3>
 <div id="NewErr" class="method">
-		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewErr</strong>(<span title="System.IO.TextWriter">TextWriter</span> item)</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="NewHash" class="method">
-		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewHash</strong>(<span title="System.Collections.Generic.IDictionary<string, Value>">IDictionary&lt;string, Value&gt;</span> item)</h4>
+		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewErr</strong>(<span title="System.Collections.Generic.IEnumerable<Byte>">IEnumerable&lt;Byte&gt;</span> item)</h4>
 		<div class="content">
 
 
@@ -194,7 +142,7 @@
 
 		</div>
 	</div><div id="NewInp" class="method">
-		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewInp</strong>(<span title="System.IO.TextReader">TextReader</span> item)</h4>
+		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewInp</strong>(<span title="System.Collections.Generic.IEnumerable<Byte>">IEnumerable&lt;Byte&gt;</span> item)</h4>
 		<div class="content">
 
 
@@ -203,14 +151,6 @@
 		</div>
 	</div><div id="NewInt" class="method">
 		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewInt</strong>(<span title="System.int">int</span> item)</h4>
-		<div class="content">
-
-
-
-
-		</div>
-	</div><div id="NewObj" class="method">
-		<h4><a href="../../../../../Frack/Value.htm">Value</a> <strong>NewObj</strong>(<span title="System.object">object</span> item)</h4>
 		<div class="content">
 
 
@@ -241,11 +181,6 @@
     <div class="content">
 
     </div>
-  </div><div id="IsHash" class="method">
-    <h4><span title="System.bool">bool</span> <strong>IsHash</strong> get; </h4>
-    <div class="content">
-
-    </div>
   </div><div id="IsInp" class="method">
     <h4><span title="System.bool">bool</span> <strong>IsInp</strong> get; </h4>
     <div class="content">
@@ -253,11 +188,6 @@
     </div>
   </div><div id="IsInt" class="method">
     <h4><span title="System.bool">bool</span> <strong>IsInt</strong> get; </h4>
-    <div class="content">
-
-    </div>
-  </div><div id="IsObj" class="method">
-    <h4><span title="System.bool">bool</span> <strong>IsObj</strong> get; </h4>
     <div class="content">
 
     </div>

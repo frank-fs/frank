@@ -20,17 +20,29 @@
   <h2 class="fixed">Types in Frack</h2>
 	<div class="scroll">
 		<ul><li>
-            <a href="../../../../../Frack/Env.htm">Env</a>
+            <a href="../../../../../Frack/Application.htm">Application</a>
+        </li><li>
+            <a href="../../../../../Frack/Array.htm">Array</a>
+        </li><li>
+            <a href="../../../../../Frack/ByteString.htm">ByteString</a>
+        </li><li>
+            <a href="../../../../../Frack/Dict.htm">Dict</a>
         </li><li>
             <a href="../../../../../Frack/Extensions.htm">Extensions</a>
         </li><li>
+            <a href="../../../../../Frack/Message.htm">Message</a>
+        </li><li>
             <a href="../../../../../Frack/Middleware.htm" class="current">Middleware</a>
+        </li><li>
+            <a href="../../../../../Frack/Request.htm">Request</a>
+        </li><li>
+            <a href="../../../../../Frack/Response.htm">Response</a>
+        </li><li>
+            <a href="../../../../../Frack/SeqStream.htm">SeqStream</a>
         </li><li>
             <a href="../../../../../Frack/Tags.htm">Tags</a>
         </li><li>
             <a href="../../../../../Frack/Utility.htm">Utility</a>
-        </li><li>
-            <a href="../../../../../Frack/Value.htm">Value</a>
         </li>
 		</ul>
 	</div>
@@ -43,7 +55,7 @@
 
 
 			<h3 class="section">Methods</h3>
-			<ul><li><a href="../../../../../Frack/Middleware.htm#printEnvironment``3">printEnvironment&lt;a, b, c&gt;</a></li>
+			<ul><li><a href="../../../../../Frack/Middleware.htm#head">head</a></li><li><a href="../../../../../Frack/Middleware.htm#log">log</a></li><li><a href="../../../../../Frack/Middleware.htm#methodOverride">methodOverride</a></li>
 			</ul>
 
 
@@ -52,9 +64,25 @@
 
 
 	<h3 class="section">Public static methods</h3>
-<div id="printEnvironment``3" class="method">
-		<h4><span title="System.Tuple<a, b, IEnumerable<string>>">Tuple&lt;a, b, IEnumerable&lt;string&gt;&gt;</span> <strong>printEnvironment&lt;a, b, c&gt;</strong>(<span title="Microsoft.FSharp.Core.FSharpFunc<IDictionary<string, Value>, Tuple<a, b, c>>">FSharpFunc&lt;IDictionary&lt;string, Value&gt;, Tuple&lt;a, b, c&gt;&gt;</span> app, <span title="System.Collections.Generic.IDictionary<string, Value>">IDictionary&lt;string, Value&gt;</span> env)</h4>
-		<div class="content">
+<div id="head" class="method">
+		<h4><span title="Owin.IApplication">IApplication</span> <strong>head</strong>(<span title="Owin.IApplication">IApplication</span> app)</h4>
+		<div class="content">Intercepts a request using the HEAD method and strips away the returned body from a GET response.
+
+
+
+
+		</div>
+	</div><div id="log" class="method">
+		<h4><span title="Owin.IApplication">IApplication</span> <strong>log</strong>(<span title="Owin.IApplication">IApplication</span> app)</h4>
+		<div class="content">Logs the incoming request and the time to respond.
+
+
+
+
+		</div>
+	</div><div id="methodOverride" class="method">
+		<h4><span title="Owin.IApplication">IApplication</span> <strong>methodOverride</strong>(<span title="Owin.IApplication">IApplication</span> app)</h4>
+		<div class="content">Intercepts the environment and checks for use of X_HTTP_METHOD_OVERRIDE.
 
 
 

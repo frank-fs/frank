@@ -20,17 +20,29 @@
   <h2 class="fixed">Types in Frack</h2>
 	<div class="scroll">
 		<ul><li>
-            <a href="../../../../../Frack/Env.htm">Env</a>
+            <a href="../../../../../Frack/Application.htm">Application</a>
+        </li><li>
+            <a href="../../../../../Frack/Array.htm">Array</a>
+        </li><li>
+            <a href="../../../../../Frack/ByteString.htm">ByteString</a>
+        </li><li>
+            <a href="../../../../../Frack/Dict.htm">Dict</a>
         </li><li>
             <a href="../../../../../Frack/Extensions.htm" class="current">Extensions</a>
         </li><li>
+            <a href="../../../../../Frack/Message.htm">Message</a>
+        </li><li>
             <a href="../../../../../Frack/Middleware.htm">Middleware</a>
+        </li><li>
+            <a href="../../../../../Frack/Request.htm">Request</a>
+        </li><li>
+            <a href="../../../../../Frack/Response.htm">Response</a>
+        </li><li>
+            <a href="../../../../../Frack/SeqStream.htm">SeqStream</a>
         </li><li>
             <a href="../../../../../Frack/Tags.htm">Tags</a>
         </li><li>
             <a href="../../../../../Frack/Utility.htm">Utility</a>
-        </li><li>
-            <a href="../../../../../Frack/Value.htm">Value</a>
         </li>
 		</ul>
 	</div>
@@ -43,7 +55,7 @@
 
 
 			<h3 class="section">Methods</h3>
-			<ul><li><a href="../../../../../Frack/Extensions.htm#createFromHttpContext">createFromHttpContext</a></li><li><a href="../../../../../Frack/Extensions.htm#createFromHttpListenerContext">createFromHttpListenerContext</a></li><li><a href="../../../../../Frack/Extensions.htm#HttpContext.ToContextBase">HttpContext.ToContextBase</a></li><li><a href="../../../../../Frack/Extensions.htm#HttpListenerContext.ToContextBase">HttpListenerContext.ToContextBase</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.AsEnumerable">NameValueCollection.AsEnumerable</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.ToDictionary">NameValueCollection.ToDictionary</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.ToMap">NameValueCollection.ToMap</a></li><li><a href="../../../../../Frack/Extensions.htm#nameValueCollectionToTupleSeq">nameValueCollectionToTupleSeq</a></li>
+			<ul><li><a href="../../../../../Frack/Extensions.htm#AsEnumerable">AsEnumerable</a></li><li><a href="../../../../../Frack/Extensions.htm#AsyncInvoke">AsyncInvoke</a></li><li><a href="../../../../../Frack/Extensions.htm#AsyncReadAsString">AsyncReadAsString</a></li><li><a href="../../../../../Frack/Extensions.htm#AsyncReadBody">AsyncReadBody</a></li><li><a href="../../../../../Frack/Extensions.htm#AsyncReadBodyToEnd">AsyncReadBodyToEnd</a></li><li><a href="../../../../../Frack/Extensions.htm#IApplication.AsyncInvoke">IApplication.AsyncInvoke</a></li><li><a href="../../../../../Frack/Extensions.htm#IApplication.Invoke">IApplication.Invoke</a></li><li><a href="../../../../../Frack/Extensions.htm#Invoke">Invoke</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.AsyncReadAsString">IRequest.AsyncReadAsString</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.AsyncReadBody">IRequest.AsyncReadBody</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.AsyncReadBody">IRequest.AsyncReadBody</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.get_Path">IRequest.get_Path</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.get_QueryString">IRequest.get_QueryString</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.ReadAsString">IRequest.ReadAsString</a></li><li><a href="../../../../../Frack/Extensions.htm#IRequest.ReadBody">IRequest.ReadBody</a></li><li><a href="../../../../../Frack/Extensions.htm#IResponse.get_StatusCode">IResponse.get_StatusCode</a></li><li><a href="../../../../../Frack/Extensions.htm#IResponse.get_StatusDescription">IResponse.get_StatusDescription</a></li><li><a href="../../../../../Frack/Extensions.htm#IResponse.WriteToStream">IResponse.WriteToStream</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.AsEnumerable">NameValueCollection.AsEnumerable</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.ToDictionary">NameValueCollection.ToDictionary</a></li><li><a href="../../../../../Frack/Extensions.htm#NameValueCollection.ToMap">NameValueCollection.ToMap</a></li><li><a href="../../../../../Frack/Extensions.htm#Path">Path</a></li><li><a href="../../../../../Frack/Extensions.htm#QueryString">QueryString</a></li><li><a href="../../../../../Frack/Extensions.htm#ReadAsString">ReadAsString</a></li><li><a href="../../../../../Frack/Extensions.htm#ReadBody">ReadBody</a></li><li><a href="../../../../../Frack/Extensions.htm#StatusCode">StatusCode</a></li><li><a href="../../../../../Frack/Extensions.htm#StatusDescription">StatusDescription</a></li><li><a href="../../../../../Frack/Extensions.htm#ToDictionary">ToDictionary</a></li><li><a href="../../../../../Frack/Extensions.htm#writeTo">writeTo</a></li><li><a href="../../../../../Frack/Extensions.htm#WriteToStream">WriteToStream</a></li>
 			</ul>
 
 
@@ -52,32 +64,144 @@
 
 
 	<h3 class="section">Public static methods</h3>
-<div id="createFromHttpContext" class="method">
-		<h4><span title="System.Web.HttpContextWrapper">HttpContextWrapper</span> <strong>createFromHttpContext</strong>(<span title="System.Web.HttpContext">HttpContext</span> context)</h4>
-		<div class="content">Create an HttpContextBase from an HttpContext.
+<div id="AsEnumerable" class="method">
+		<h4><span title="System.Collections.Generic.IEnumerable<Tuple<string, string>>">IEnumerable&lt;Tuple&lt;string, string&gt;&gt;</span> <strong>AsEnumerable</strong>(this <span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> this)</h4>
+		<div class="content">Extends NameValueCollection with methods to transform it to an enumerable.
 
 
 
 
 		</div>
-	</div><div id="createFromHttpListenerContext" class="method">
-		<h4><span title="System.Web.HttpContextBase">HttpContextBase</span> <strong>createFromHttpListenerContext</strong>(<span title="System.Net.HttpListenerContext">HttpListenerContext</span> context)</h4>
-		<div class="content">Create an HttpContextBase from an HttpContextListener.
-
-
-
-
-		</div>
-	</div><div id="HttpContext.ToContextBase" class="method">
-		<h4><span title="System.Web.HttpContextWrapper">HttpContextWrapper</span> <strong>HttpContext.ToContextBase</strong>(<span title="System.Web.HttpContext">HttpContext</span> )</h4>
+	</div><div id="AsyncInvoke" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<IResponse>">FSharpAsync&lt;IResponse&gt;</span> <strong>AsyncInvoke</strong>(this <span title="Owin.IApplication">IApplication</span> app, <span title="Owin.IRequest">IRequest</span> request)</h4>
 		<div class="content">
 
 
 
 
 		</div>
-	</div><div id="HttpListenerContext.ToContextBase" class="method">
-		<h4><span title="System.Web.HttpContextBase">HttpContextBase</span> <strong>HttpListenerContext.ToContextBase</strong>(<span title="System.Net.HttpListenerContext">HttpListenerContext</span> )</h4>
+	</div><div id="AsyncReadAsString" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<string>">FSharpAsync&lt;string&gt;</span> <strong>AsyncReadAsString</strong>(this <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="AsyncReadBody" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<int>">FSharpAsync&lt;int&gt;</span> <strong>AsyncReadBody</strong>(this <span title="Owin.IRequest">IRequest</span> request, <span title="System.Byte[]">Byte[]</span> buffer, <span title="System.int">int</span> offset, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="AsyncReadBodyToEnd" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<Byte[]>">FSharpAsync&lt;Byte[]&gt;</span> <strong>AsyncReadBodyToEnd</strong>(this <span title="Owin.IRequest">IRequest</span> request, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IApplication.AsyncInvoke" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<IResponse>">FSharpAsync&lt;IResponse&gt;</span> <strong>IApplication.AsyncInvoke</strong>(<span title="Owin.IApplication">IApplication</span> this, <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IApplication.Invoke" class="method">
+		<h4><span title="Owin.IResponse">IResponse</span> <strong>IApplication.Invoke</strong>(<span title="Owin.IApplication">IApplication</span> this, <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="Invoke" class="method">
+		<h4><span title="Owin.IResponse">IResponse</span> <strong>Invoke</strong>(this <span title="Owin.IApplication">IApplication</span> app, <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.AsyncReadAsString" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<string>">FSharpAsync&lt;string&gt;</span> <strong>IRequest.AsyncReadAsString</strong>(<span title="Owin.IRequest">IRequest</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.AsyncReadBody" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<int>">FSharpAsync&lt;int&gt;</span> <strong>IRequest.AsyncReadBody</strong>(<span title="Owin.IRequest">IRequest</span> this, <span title="System.Byte[]">Byte[]</span> buffer, <span title="System.int">int</span> offset, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.AsyncReadBody" class="method">
+		<h4><span title="Microsoft.FSharp.Control.FSharpAsync<Byte[]>">FSharpAsync&lt;Byte[]&gt;</span> <strong>IRequest.AsyncReadBody</strong>(<span title="Owin.IRequest">IRequest</span> this, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.get_Path" class="method">
+		<h4><span title="System.string">string</span> <strong>IRequest.get_Path</strong>(<span title="Owin.IRequest">IRequest</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.get_QueryString" class="method">
+		<h4><span title="System.string">string</span> <strong>IRequest.get_QueryString</strong>(<span title="Owin.IRequest">IRequest</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.ReadAsString" class="method">
+		<h4><span title="System.string">string</span> <strong>IRequest.ReadAsString</strong>(<span title="Owin.IRequest">IRequest</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IRequest.ReadBody" class="method">
+		<h4><span title="System.int">int</span> <strong>IRequest.ReadBody</strong>(<span title="Owin.IRequest">IRequest</span> this, <span title="System.Byte[]">Byte[]</span> buffer, <span title="System.int">int</span> offset, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IResponse.get_StatusCode" class="method">
+		<h4><span title="System.int">int</span> <strong>IResponse.get_StatusCode</strong>(<span title="Owin.IResponse">IResponse</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IResponse.get_StatusDescription" class="method">
+		<h4><span title="System.string">string</span> <strong>IResponse.get_StatusDescription</strong>(<span title="Owin.IResponse">IResponse</span> )</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="IResponse.WriteToStream" class="method">
+		<h4><span title="System.void">void</span> <strong>IResponse.WriteToStream</strong>(<span title="Owin.IResponse">IResponse</span> this, <span title="System.IO.Stream">Stream</span> stream)</h4>
 		<div class="content">
 
 
@@ -85,7 +209,7 @@
 
 		</div>
 	</div><div id="NameValueCollection.AsEnumerable" class="method">
-		<h4><span title="System.Collections.Generic.IEnumerable<Tuple<string, Value>>">IEnumerable&lt;Tuple&lt;string, Value&gt;&gt;</span> <strong>NameValueCollection.AsEnumerable</strong>(<span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> )</h4>
+		<h4><span title="System.Collections.Generic.IEnumerable<Tuple<string, string>>">IEnumerable&lt;Tuple&lt;string, string&gt;&gt;</span> <strong>NameValueCollection.AsEnumerable</strong>(<span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> )</h4>
 		<div class="content">
 
 
@@ -93,7 +217,7 @@
 
 		</div>
 	</div><div id="NameValueCollection.ToDictionary" class="method">
-		<h4><span title="System.Collections.Generic.IDictionary<string, Value>">IDictionary&lt;string, Value&gt;</span> <strong>NameValueCollection.ToDictionary</strong>(<span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> )</h4>
+		<h4><span title="System.Collections.Generic.IDictionary<string, string>">IDictionary&lt;string, string&gt;</span> <strong>NameValueCollection.ToDictionary</strong>(<span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> )</h4>
 		<div class="content">
 
 
@@ -108,8 +232,72 @@
 
 
 		</div>
-	</div><div id="nameValueCollectionToTupleSeq" class="method">
-		<h4><span title="System.Collections.Generic.IEnumerable<Tuple<string, Value>>">IEnumerable&lt;Tuple&lt;string, Value&gt;&gt;</span> <strong>nameValueCollectionToTupleSeq</strong>(<span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> coll)</h4>
+	</div><div id="Path" class="method">
+		<h4><span title="System.string">string</span> <strong>Path</strong>(this <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="QueryString" class="method">
+		<h4><span title="System.string">string</span> <strong>QueryString</strong>(this <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="ReadAsString" class="method">
+		<h4><span title="System.string">string</span> <strong>ReadAsString</strong>(this <span title="Owin.IRequest">IRequest</span> request)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="ReadBody" class="method">
+		<h4><span title="System.int">int</span> <strong>ReadBody</strong>(this <span title="Owin.IRequest">IRequest</span> request, <span title="System.Byte[]">Byte[]</span> buffer, <span title="System.int">int</span> offset, <span title="System.int">int</span> count)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="StatusCode" class="method">
+		<h4><span title="System.int">int</span> <strong>StatusCode</strong>(this <span title="Owin.IResponse">IResponse</span> response)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="StatusDescription" class="method">
+		<h4><span title="System.string">string</span> <strong>StatusDescription</strong>(this <span title="Owin.IResponse">IResponse</span> response)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="ToDictionary" class="method">
+		<h4><span title="System.Collections.Generic.IDictionary<string, string>">IDictionary&lt;string, string&gt;</span> <strong>ToDictionary</strong>(this <span title="System.Collections.Specialized.NameValueCollection">NameValueCollection</span> this)</h4>
+		<div class="content">Extends NameValueCollection with methods to transform it to a dictionary.
+
+
+
+
+		</div>
+	</div><div id="writeTo" class="method">
+		<h4><span title="System.void">void</span> <strong>writeTo</strong>(<span title="System.IO.Stream">Stream</span> stream, <span title="System.object">object</span> item)</h4>
+		<div class="content">
+
+
+
+
+		</div>
+	</div><div id="WriteToStream" class="method">
+		<h4><span title="System.void">void</span> <strong>WriteToStream</strong>(this <span title="Owin.IResponse">IResponse</span> response, <span title="System.IO.Stream">Stream</span> stream)</h4>
 		<div class="content">
 
 
