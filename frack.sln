@@ -27,8 +27,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38F
 		samples\SimpleServer.fsx = samples\SimpleServer.fsx
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HttpMachine", "src\HttpMachine\HttpMachine.fsproj", "{2E6551A5-F290-40D7-BA1F-B579432D0011}"
-EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Collections", "src\Collections\Frack.Collections.fsproj", "{DFD1FC36-531B-48B7-A240-4F756E5C6760}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.HttpListener", "src\Frack.HttpListener\Frack.HttpListener.fsproj", "{109BB195-CC41-4548-BC61-BB1F05AE4C44}"
@@ -38,12 +36,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloWcf", "samples\HelloWcf\HelloWcf.fsproj", "{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Lib", "Lib", "{69DF6111-1991-46B2-90FD-DC443395E74B}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cashel", "src\cashel\src\Cashel\Cashel.fsproj", "{6B89DD99-F2D4-4C0B-9A9A-12AE0028EDD1}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cashel.Peg", "src\cashel\src\Cashel.Peg\Cashel.Peg.fsproj", "{ADA1F74D-B036-4756-967C-5E46199732C4}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cashel.Tests", "src\cashel\src\Cashel.Tests\Cashel.Tests.fsproj", "{25D2AF80-078E-46A1-8EBB-01A905DBAD48}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Monad", "src\FSharp.Monad\src\FSharp.Monad.fsproj", "{1E95A279-C2A9-498B-BC72-6E7A0D6854CE}"
 EndProject

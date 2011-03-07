@@ -1,6 +1,3 @@
-[submodule "src/cashel"]
-	path = src/cashel
-	url = https://github.com/panesofglass/cashel.git
 [submodule "src/FSharp.Monad"]
 	path = src/FSharp.Monad
 	url = https://github.com/panesofglass/FSharp.Monad.git
