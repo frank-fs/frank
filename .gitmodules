@@ -1,3 +1,0 @@
-[submodule "src/FSharp.Monad"]
-	path = src/FSharp.Monad
-	url = https://github.com/panesofglass/FSharp.Monad.git
