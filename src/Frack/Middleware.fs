@@ -32,7 +32,7 @@ module Middleware =
       if methd <> "POST" || headers?CONTENT_TYPE <> "application/x-http-form-urlencoded" then
         return! app req
       else
-        let! body = req |> Request.readToEnd
+        let! body = req?RequestBody :?> Async<_> |> Stream.readToEnd
         let form = UrlEncoded.parseForm body
         let m = if isNotNullOrEmpty form?_method then form?_method
                 elif headers.ContainsKey("HTTP_X_HTTP_METHOD_OVERRIDE") then

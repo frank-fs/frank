@@ -41,7 +41,6 @@
     <Compile Include="Array.fs" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="NameValueCollectionEx.fs" />
-    <Compile Include="ByteString.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

@@ -23,7 +23,7 @@ module Wcf =
   [<Microsoft.FSharp.Core.CompiledName("ToOwinRequest")>]
   let toOwinRequest(request:HttpRequestMessage) =
     // TODO: Consider using the LoadIntoBufferAsync task
-    let requestBody = Request.chunk request.Content.ContentReadStream
+    let requestBody = Stream.chunk request.Content.ContentReadStream
     let owinRequest = Dictionary<string, obj>() :> IDictionary<string, obj>
     owinRequest.Add("RequestMethod", request.Method)
     owinRequest.Add("RequestUri", request.RequestUri.PathAndQuery)
@@ -86,7 +86,7 @@ module Wcf =
   /// <remarks>The <see cref="AppResource"/> serves as a catch-all handler for WCF HTTP services.</remarks>
   [<ServiceContract>]
   [<ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)>]
-  type AppResource(app: IDictionary<_,_> -> Async<string * IDictionary<string, string> * seq<obj>>) =
+  type AppResource(app: IDictionary<_,_> -> Async<string * IDictionary<string, string> * Body>) =
     let matchStatus (status:string) =
       let statusParts = status.Split(' ')
       let statusCode = statusParts.[0]
@@ -98,7 +98,7 @@ module Wcf =
       response.StatusCode <- matchStatus status
       // TODO: Add only response message headers
       headers |> Seq.iter (fun (KeyValue(k,v)) -> response.Headers.Add(k,v))
-      response.Content <- new ByteArrayContent(body |> Seq.map (fun o -> o :?> byte[]) |> Array.concat) } |> Async.RunSynchronously
+      do response.Content <- new ByteArrayContent(body |> Response.getBytes) } |> Async.RunSynchronously
     
     /// <summary>Invokes the application with the specified GET <paramref name="request"/>.</summary>
     /// <param name="request">The <see cref="HttpRequestMessage"/>.</param>

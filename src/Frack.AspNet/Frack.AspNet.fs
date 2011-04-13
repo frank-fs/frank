@@ -20,7 +20,7 @@ module AspNet =
     /// Extends System.Web.HttpContext with a method to transform it into a System.Web.HttpContextBase
     member context.ToContextBase() = toContextBase(context)
 
-  type OwinHttpHandler(app: IDictionary<string, obj> -> Async<string * IDictionary<string, string> * seq<obj>>) =
+  type OwinHttpHandler(app: IDictionary<string, obj> -> Async<string * IDictionary<string, string> * Body>) =
     interface System.Web.IHttpHandler with
       /// Since this is a pure function, it can be reused as often as desired.
       member this.IsReusable = true

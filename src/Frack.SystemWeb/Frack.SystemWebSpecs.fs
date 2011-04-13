@@ -72,6 +72,6 @@ module ``Given an ASPNET context`` =
     [<Test>]
     let ``It should have a RequestBody that yields "Howdy!"``() =
       async {
-        let! bs = Request.readToEnd request
+        let! bs = request?RequestBody :?> Async<_> |> Stream.readToEnd
         bs == "Howdy!"B } |> Async.RunSynchronously
     

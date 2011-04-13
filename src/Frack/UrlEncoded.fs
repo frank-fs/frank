@@ -20,5 +20,5 @@ module UrlEncoded =
   let parseQuery = parseUrlEncodedString
    
   /// Parses the input stream for x-http-form-urlencoded values into a seq<string * string>.
-  let parseForm data = data |> ByteString.toString |> parseUrlEncodedString
+  let parseForm = System.Text.Encoding.UTF8.GetString >> parseUrlEncodedString
 

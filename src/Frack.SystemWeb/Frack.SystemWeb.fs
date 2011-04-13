@@ -21,7 +21,7 @@ module SystemWeb =
     owinRequest.Add("url_scheme", request.Url.Scheme)
     owinRequest.Add("host", request.Url.Host)
     owinRequest.Add("server_port", request.Url.Port)
-    owinRequest.Add("RequestBody", Request.chunk request.InputStream)
+    owinRequest.Add("RequestBody", Stream.chunk request.InputStream)
     owinRequest
 
   type System.Web.HttpContextBase with
@@ -30,14 +30,14 @@ module SystemWeb =
 
   [<System.Runtime.CompilerServices.Extension>]
   [<Microsoft.FSharp.Core.CompiledName("Reply")>]
-  let reply(response: HttpResponseBase, status, headers: IDictionary<string, string>, body: seq<obj>) =
+  let reply(response: HttpResponseBase, status, headers: IDictionary<string, string>, body) =
     let statusCode, statusDescription = splitStatus status
     response.StatusCode <- statusCode
     response.StatusDescription <- statusDescription
     if headers.ContainsKey("Content-Length") then
       response.ContentType <- headers.["Content-Length"]
 //    headers |> Dict.toSeq |> Seq.iter (fun (k, v) -> response.Headers.Add(k, v))
-    body |> ByteString.write response.OutputStream
+    body |> Frack.Response.write response.OutputStream
 
   type HttpResponseBase with
     member response.Reply(status, headers, body) = reply(response, status, headers, body)

@@ -1,10 +1,10 @@
-﻿module OwinSpecs
+﻿module StreamSpecs
 open System
 open System.Collections.Generic
 open System.IO
 open Frack
 open Frack.Collections
-open Request
+open Stream
 open NUnit.Framework
 open BaseSpecs
 
@@ -60,9 +60,7 @@ let ``Chunking a stream of size 1048 should return one 1024 byte segment, one 24
 let ``Reading the body of the request should return an empty list``() =
   use stream = new MemoryStream(0)
   let requestBody = chunk stream
-  let request = new Dictionary<string, obj>()
-  request?RequestBody <- requestBody
-  let result = readBody request |> Async.RunSynchronously
+  let result = listify requestBody |> Async.RunSynchronously
   Assert.AreEqual(0, result.Length)
 
 [<Test>]
@@ -70,20 +68,15 @@ let ``Reading the body of the request should return a list of one ArraySegment<b
   let buffer = "Hello, world!"B
   use stream = new MemoryStream(buffer)
   let requestBody = chunk stream
-  let request = new Dictionary<string, obj>()
-  request?RequestBody <- requestBody
-  let result = readBody request |> Async.RunSynchronously
+  let result = listify requestBody |> Async.RunSynchronously
   Assert.AreEqual(1, result.Length)
-  Assert.AreEqual(buffer, result.Head.Array)
 
 [<Test>]
 let ``Reading the body of the request to its end should return an empty byte[]``() =
   use stream = new MemoryStream(0)
   let requestBody = chunk stream
-  let request = new Dictionary<string, obj>()
-  request?RequestBody <- requestBody
   async {
-    let! bs = readToEnd request
+    let! bs = readToEnd requestBody
     Assert.AreEqual(0, bs.Length) } |> Async.RunSynchronously
 
 [<Test>]
@@ -91,8 +84,6 @@ let ``Reading the body of the request to its end should return a byte[] containi
   let buffer = "Hello, world!"B
   use stream = new MemoryStream(buffer)
   let requestBody = chunk stream
-  let request = new Dictionary<string, obj>()
-  request?RequestBody <- requestBody
   async {
-    let! bs = readToEnd request
+    let! bs = readToEnd requestBody
     Assert.AreEqual(13, bs.Length) } |> Async.RunSynchronously

@@ -10,6 +10,8 @@
 #r "Frack.Collections.dll"
 #r "Frack.HttpListener.dll"
 
+open System
+open System.Collections.Generic
 open System.Net
 open System.Threading
 open Frack
@@ -19,12 +21,12 @@ open Frack.Hosting.HttpListener
 printfn "Creating server ..."
 
 // Define the application function.
-let app request = async { 
-  let! body = request |> Request.readToEnd
+let app (request: IDictionary<string, obj>) = async { 
+  let! body = request?RequestBody :?> Async<ArraySegment<byte>> |> Stream.readToEnd
   return "200 OK",
          dict [("Content_Type", "text/plain" )],
-         seq { yield box "Howdy!"B
-               yield box body } }
+         Sequence(seq { yield (Str "Howdy!")
+                        yield (Bytes body) }) }
 
 // Set up and start an HttpListener
 let disposable = HttpListener.Start("http://localhost:9191/", app |> log)

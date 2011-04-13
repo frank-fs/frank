@@ -14,21 +14,16 @@ module AsyncSeq =
 
   /// Read stream 'stream' in blocks of size 'size'
   /// (returns on-demand asynchronous sequence)
-  let readInBlocks f size (stream:Stream) = async {
-    let buffer = Array.zeroCreate size
-
-    /// Returns next block as 'Item' of async seq.
-    let rec nextBlock() = async {
-      let! count = stream.AsyncRead(buffer, 0, size)
+  let readInBlocks buffer size (stream: Stream) = async {
+    let rec nextBlock offset = async {
+      let! count = stream.AsyncRead(buffer, offset, size)
       if count = 0 then return Ended
       else
-        // Create buffer with the right size
         let res =
-          if count = size then buffer
-          else buffer |> Seq.take count |> Array.ofSeq
-        return Item(f res, nextBlock()) }
-        
-    return! nextBlock() }
+          if count = size then ArraySegment<_>(buffer, offset, size)
+          else ArraySegment<_>(buffer, offset, count)
+        return Item(res, nextBlock (offset + size)) }
+    return! nextBlock 0 }
 
   /// Asynchronous function that greedily creates a Seq from an AsyncSeq.
   let toSeq aseq =
@@ -36,7 +31,7 @@ module AsyncSeq =
       let! item = aseq
       match item with
       | Ended -> return cont []
-      | Item(hd, tl) -> return! read (fun rest -> hd::rest |> cont) tl}
+      | Item(hd, tl) -> return! read (fun rest -> hd::rest |> cont) tl }
     read List.toSeq aseq
 
   /// Asynchronous function that compares two asynchronous sequences
