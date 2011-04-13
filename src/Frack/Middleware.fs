@@ -2,6 +2,7 @@
 module Middleware =
   open System
   open System.Collections.Generic
+  open Frack
   open Frack.Collections
 
   /// Logs the incoming request and the time to respond.
@@ -33,7 +34,7 @@ module Middleware =
         return! app req
       else
         let! body = req?RequestBody :?> Async<_> |> Stream.readToEnd
-        let form = UrlEncoded.parseForm body
+        let form = parseForm body
         let m = if isNotNullOrEmpty form?_method then form?_method
                 elif headers.ContainsKey("HTTP_X_HTTP_METHOD_OVERRIDE") then
                   headers?HTTP_X_HTTP_METHOD_OVERRIDE

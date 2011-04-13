@@ -42,11 +42,6 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
-      <Name>Frack.Collections</Name>
-      <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\Frack.SystemWeb\Frack.SystemWeb.fsproj">
       <Name>Frack.SystemWeb</Name>
       <Project>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</Project>

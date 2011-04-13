@@ -37,10 +37,11 @@
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Utility.fs" />
+    <Compile Include="Collections.fs" />
+    <Compile Include="ArraySpecs.fs" />
+    <Compile Include="AsyncSeqSpecs.fs" />
+    <Compile Include="Frack.fs" />
     <Compile Include="UriSpecs.fs" />
-    <Compile Include="UrlEncoded.fs" />
-    <Compile Include="Request.fs" />
     <Compile Include="RequestSpecs.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
@@ -55,10 +56,5 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\Collections\Frack.Collections.fsproj">
-      <Name>Frack.Collections</Name>
-      <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
-      <Private>True</Private>
-    </ProjectReference>
   </ItemGroup>
 </Project>

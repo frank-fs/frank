@@ -44,11 +44,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Collections\Frack.Collections.fsproj">
-      <Name>Frack.Collections</Name>
-      <Project>{dfd1fc36-531b-48b7-a240-4f756e5c6760}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <Reference Include="Microsoft.Net.Http">
       <HintPath>..\..\lib\wcf\Microsoft.Net.Http.dll</HintPath>
     </Reference>
