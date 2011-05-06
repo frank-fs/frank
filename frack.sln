@@ -35,6 +35,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloWcf", "samples\HelloWc
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.SystemWeb", "src\Frack.SystemWeb\Frack.SystemWeb.fsproj", "{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Tests", "Frack.Tests\Frack.Tests.fsproj", "{90ED62B2-D05A-4341-8C95-F729E11197E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,16 @@ Global
 		{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}.Release|x86.ActiveCfg = Release|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

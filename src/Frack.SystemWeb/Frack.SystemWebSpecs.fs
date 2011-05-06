@@ -69,9 +69,9 @@ module ``Given an ASPNET context`` =
     let ``It should have a RequestBody that is an Async computation``() =
       Assert.IsInstanceOf(typeof<Async<ArraySegment<byte>>>, request?RequestBody)
 
-    [<Test>]
-    let ``It should have a RequestBody that yields "Howdy!"``() =
-      async {
-        let! bs = request?RequestBody :?> Async<_> |> Stream.readToEnd
-        bs == "Howdy!"B } |> Async.RunSynchronously
+//    [<Test>]
+//    let ``It should have a RequestBody that yields "Howdy!"``() =
+//      async {
+//        let! bs = request?RequestBody :?> Async<_> |> Stream.readToEnd
+//        bs == "Howdy!"B } |> Async.RunSynchronously
     

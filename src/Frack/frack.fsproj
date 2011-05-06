@@ -36,13 +36,7 @@
   </PropertyGroup>
   <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Collections.fs" />
-    <Compile Include="ArraySpecs.fs" />
-    <Compile Include="AsyncSeqSpecs.fs" />
     <Compile Include="Frack.fs" />
-    <Compile Include="UriSpecs.fs" />
-    <Compile Include="RequestSpecs.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -50,9 +44,6 @@
       <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
-    <Reference Include="nunit.framework">
-      <HintPath>..\..\tools\Nunit\nunit.framework.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
