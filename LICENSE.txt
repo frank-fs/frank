@@ -1,4 +1,4 @@
-Copyright 2010
+Copyright 2010-2011
 
     Ryan Riley (http://panesofglass.org/)
 
