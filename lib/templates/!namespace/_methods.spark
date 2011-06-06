@@ -26,6 +26,7 @@
       </div>
       
       <value content="method.Value" />
-		</div>
+      <example content="method.Example" />
+    </div>
 	</div>
 </if>

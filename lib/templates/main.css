@@ -206,3 +206,20 @@ blockquote {
 	border-bottom-width: 1px;
 	font-size: 90%;
 }
+
+.example {
+	margin: 10px 0;
+}
+
+.example pre {
+	background: #DDD;
+	color: #000;
+	font-size: 14px;
+	font-family: Monaco, Consolas, Courier New, Monospace;
+	padding: 4px 10px;
+	border: 3px solid #AAA;
+}
+
+code {
+	font-family: Monaco, Consolas, Courier New, Monospace;
+}

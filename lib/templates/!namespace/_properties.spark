@@ -13,6 +13,7 @@
         <p><comment content="property.ReturnType.Summary" /></p>
       </div>
       <value content="property.Value" />
+      <example content="property.Example" />
     </div>
   </div>
 </if>
