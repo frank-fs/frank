@@ -10,7 +10,7 @@
     <RootNamespace>Frack.SystemWeb</RootNamespace>
     <AssemblyName>Frack.SystemWeb</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.SystemWeb</Name>
+    <Name>Frank.SystemWeb</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -44,12 +44,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Frack.SystemWeb.fs" />
-    <Compile Include="Frack.SystemWebSpecs.fs" />
+    <Compile Include="Frank.SystemWeb.fs" />
+    <Compile Include="Frank.SystemWebSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Frack\frack.fsproj">
-      <Name>frack</Name>
+    <ProjectReference Include="..\Frank\Frank.fsproj">
+      <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>

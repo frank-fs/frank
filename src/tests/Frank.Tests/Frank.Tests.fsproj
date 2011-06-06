@@ -5,12 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</ProjectGuid>
+    <ProjectGuid>{90ed62b2-d05a-4341-8c95-f729e11197e6}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack</RootNamespace>
-    <AssemblyName>frack</AssemblyName>
+    <RootNamespace>Frank.Tests</RootNamespace>
+    <AssemblyName>Frank.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack</Name>
+    <Name>Frank.Tests</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -29,19 +29,51 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <Compile Include="Frack.fs" />
-    <Compile Include="Middleware.fs" />
+    <None Include="packages.config" />
+    <Compile Include="ArraySpecs.fs" />
+    <Compile Include="AsyncSeqSpecs.fs" />
+    <Compile Include="UriSpecs.fs" />
+    <Compile Include="RequestSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="FsUnit.NUnit-0.9.0">
+      <HintPath>..\..\..\packages\FsUnit.0.9.0\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="mscorlib" />
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\nunit.framework.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="nunit.mocks">
+      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\nunit.mocks.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="pnunit.framework">
+      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\pnunit.framework.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\lib\Frank\Frank.fsproj">
+      <Name>Frank</Name>
+      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+	     Other similar extension points exist, see Microsoft.Common.targets.
+	<Target Name="BeforeBuild">
+	</Target>
+	<Target Name="AfterBuild">
+	</Target>
+	-->
 </Project>

@@ -5,12 +5,12 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{109bb195-cc41-4548-bc61-bb1f05ae4c44}</ProjectGuid>
+    <ProjectGuid>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack.HttpListener</RootNamespace>
-    <AssemblyName>Frack.HttpListener</AssemblyName>
+    <RootNamespace>Frack</RootNamespace>
+    <AssemblyName>frack</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.HttpListener</Name>
+    <Name>Frank</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -29,28 +29,19 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.HttpListener.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <Compile Include="Frack.HttpListener.fs" />
+    <Compile Include="Frack.fs" />
+    <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <ProjectReference Include="..\Frack.SystemWeb\Frack.SystemWeb.fsproj">
-      <Name>Frack.SystemWeb</Name>
-      <Project>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Frack\frack.fsproj">
-      <Name>frack</Name>
-      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Abstractions" />
   </ItemGroup>
 </Project>

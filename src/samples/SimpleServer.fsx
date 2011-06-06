@@ -1,7 +1,7 @@
 ﻿// SimpleServer is an example of using Frack as a F# script.
 #I @"..\..\lib\FSharp"
-#I @"..\lib\Frack\bin\Debug"
-#I @"..\lib\Frack.HttpListener\bin\Debug"
+#I @"..\lib\Frank\bin\Debug"
+#I @"..\lib\Frank.HttpListener\bin\Debug"
 #r "System.Core.dll"
 #r "System.Net.dll"
 #r "System.Web.dll"

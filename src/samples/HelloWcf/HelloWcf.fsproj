@@ -42,6 +42,16 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\lib\Frank.Wcf\Frank.Wcf.fsproj">
+      <Name>Frank.Wcf</Name>
+      <Project>{8e1c1918-d7af-4292-8054-2e567b7a204e}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\lib\Frank\Frank.fsproj">
+      <Name>Frank</Name>
+      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <Reference Include="Microsoft.Net.Http">
       <HintPath>..\..\..\lib\wcf\Microsoft.Net.Http.dll</HintPath>
     </Reference>
@@ -67,16 +77,6 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.ServiceModel" />
-    <ProjectReference Include="..\..\lib\Frack.Wcf\Frack.Wcf.fsproj">
-      <Name>Frack.Wcf</Name>
-      <Project>{8e1c1918-d7af-4292-8054-2e567b7a204e}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\lib\Frack\frack.fsproj">
-      <Name>frack</Name>
-      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <Reference Include="System.ServiceModel.Web" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Routing" />

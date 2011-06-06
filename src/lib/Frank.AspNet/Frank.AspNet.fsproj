@@ -10,7 +10,7 @@
     <RootNamespace>Frack.AspNet</RootNamespace>
     <AssemblyName>Frack.AspNet</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.AspNet</Name>
+    <Name>Frank.AspNet</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -33,7 +33,7 @@
   </PropertyGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <Compile Include="Frack.AspNet.fs" />
+    <Compile Include="Frank.AspNet.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
@@ -43,13 +43,15 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
     <Reference Include="System.Web.Routing" />
-    <ProjectReference Include="..\Frack.SystemWeb\Frack.SystemWeb.fsproj">
-      <Name>Frack.SystemWeb</Name>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Frank.SystemWeb\Frank.SystemWeb.fsproj">
+      <Name>Frank.SystemWeb</Name>
       <Project>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Frack\frack.fsproj">
-      <Name>frack</Name>
+    <ProjectReference Include="..\Frank\Frank.fsproj">
+      <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>

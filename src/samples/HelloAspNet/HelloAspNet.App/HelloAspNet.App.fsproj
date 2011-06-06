@@ -48,13 +48,13 @@
     <Compile Include="Global.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\lib\Frack.AspNet\Frack.AspNet.fsproj">
-      <Name>Frack.AspNet</Name>
+    <ProjectReference Include="..\..\..\lib\Frank.AspNet\Frank.AspNet.fsproj">
+      <Name>Frank.AspNet</Name>
       <Project>{762480c7-f12d-475e-a4ac-47978d33faf9}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\lib\Frack\frack.fsproj">
-      <Name>frack</Name>
+    <ProjectReference Include="..\..\..\lib\Frank\Frank.fsproj">
+      <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>

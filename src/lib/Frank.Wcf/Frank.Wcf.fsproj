@@ -10,7 +10,7 @@
     <RootNamespace>Frack.Wcf</RootNamespace>
     <AssemblyName>Frack.Wcf</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.Wcf</Name>
+    <Name>Frank.Wcf</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -34,8 +34,8 @@
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="BaseSpecs.fs" />
-    <Compile Include="Frack.Wcf.fs" />
-    <Compile Include="Frack.WcfSpecs.fs" />
+    <Compile Include="Frank.Wcf.fs" />
+    <Compile Include="Frank.WcfSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Net.Http">
@@ -65,8 +65,10 @@
     <Reference Include="System.Core" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.ServiceModel.Web" />
-    <ProjectReference Include="..\Frack\frack.fsproj">
-      <Name>frack</Name>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Frank\Frank.fsproj">
+      <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
