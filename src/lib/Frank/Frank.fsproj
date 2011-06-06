@@ -8,7 +8,7 @@
     <ProjectGuid>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack</RootNamespace>
-    <AssemblyName>frack</AssemblyName>
+    <AssemblyName>Frank</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>

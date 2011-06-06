@@ -8,7 +8,7 @@
     <ProjectGuid>{109bb195-cc41-4548-bc61-bb1f05ae4c44}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.HttpListener</RootNamespace>
-    <AssemblyName>Frack.HttpListener</AssemblyName>
+    <AssemblyName>Frank.HttpListener</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank.HttpListener</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>

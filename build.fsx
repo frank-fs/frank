@@ -6,7 +6,7 @@ open System.IO
 
 // properties
 let projectName = "Frank"
-let version = "0.3.0"  
+let version = "0.3"  
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
@@ -20,6 +20,9 @@ let packagesDir = "./packages/"
 let testDir = "./test/"
 let deployDir = "./deploy/"
 let docsDir = "./docs/" 
+let nugetDir = "./nuget/"
+let nugetLibDir = nugetDir @@ "lib"
+let nugetDocsDir = nugetDir @@ "docs"
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
 
 // params
@@ -27,6 +30,7 @@ let target = getBuildParamOrDefault "target" "All"
 
 // tools
 let fakePath = "./packages/FAKE.1.56.7/tools"
+let nugetPath = "./lib/NuGet/nuget.exe"
 let nunitPath = "./packages/NUnit.2.5.9.10348/Tools"
 
 // files
@@ -77,7 +81,7 @@ Target "Test" (fun _ ->
             {p with 
                ToolPath = nunitPath; 
                DisableShadowCopy = true; 
-               OutputFile = nunitPath + "TestResults.xml" }) 
+               OutputFile = testDir + "TestResults.xml" }) 
 )
 
 Target "GenerateDocumentation" (fun _ ->
@@ -100,6 +104,33 @@ Target "ZipDocumentation" (fun _ ->
         |> Zip docsDir (deployDir + sprintf "Documentation-%s.zip" version)
 )
 
+Target "BuildNuGet" (fun _ ->
+    CleanDirs [nugetDir; nugetLibDir; nugetDocsDir]
+
+    XCopy (docsDir |> FullName) nugetDocsDir
+    [buildDir + "Frank.dll"
+     buildDir + "Frank.SystemWeb.dll"
+     buildDir + "Frank.AspNet.dll"
+     buildDir + "Frank.HttpListener.dll"
+     buildDir + "Frank.Wcf.dll"]
+        |> CopyTo nugetLibDir
+
+    NuGet (fun p ->
+        {p with
+            Authors = authors
+            Project = projectName
+            Description = projectDescription
+            Version = version
+            OutputPath = nugetDir
+            AccessKey = nugetKey
+            ToolPath = nugetPath
+            Publish = nugetKey <> "" })
+        "frank.nuspec"
+
+    [nugetDir + sprintf "Frank.%s.nupkg" version]
+        |> CopyTo deployDir
+)
+
 Target "Deploy" (fun _ ->    
     !+ (buildDir + "/**/*.*")
         -- "*.zip"
@@ -114,6 +145,7 @@ Target "All" DoNothing
   ==> "BuildApp" <=> "BuildTest" <=> "CopyLicense"
   ==> "Test" <=> "GenerateDocumentation"
   ==> "ZipDocumentation"
+  ==> "BuildNuGet"
   ==> "Deploy"
 
 "All" <== ["Deploy"]

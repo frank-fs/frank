@@ -8,7 +8,7 @@
     <ProjectGuid>{762480c7-f12d-475e-a4ac-47978d33faf9}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.AspNet</RootNamespace>
-    <AssemblyName>Frack.AspNet</AssemblyName>
+    <AssemblyName>Frank.AspNet</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank.AspNet</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>

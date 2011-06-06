@@ -8,7 +8,7 @@
     <ProjectGuid>{8e1c1918-d7af-4292-8054-2e567b7a204e}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.Wcf</RootNamespace>
-    <AssemblyName>Frack.Wcf</AssemblyName>
+    <AssemblyName>Frank.Wcf</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank.Wcf</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>

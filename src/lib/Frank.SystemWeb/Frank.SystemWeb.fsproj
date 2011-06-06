@@ -8,7 +8,7 @@
     <ProjectGuid>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Frack.SystemWeb</RootNamespace>
-    <AssemblyName>Frack.SystemWeb</AssemblyName>
+    <AssemblyName>Frank.SystemWeb</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank.SystemWeb</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>

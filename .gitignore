@@ -30,6 +30,5 @@ _ReSharper*/
 build/
 deploy/
 docs/
-tools/FAKE/templates/
+nuget/
 test/
-*_Spliced.*
