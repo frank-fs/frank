@@ -16,7 +16,7 @@ let deployDir = "./deploy/"
 let testDir = "./test/"
 
 (* Tools *)
-let nunitPath = "./tools/Nunit"
+let nunitPath = "./packages/NUnit.2.5.9.10348/Tools"
 let nunitOutput = testDir + "TestResults.xml"
 let zipFileName = deployDir + sprintf "%s-%s.zip" projectName version
 
