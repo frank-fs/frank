@@ -5,15 +5,13 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{762480c7-f12d-475e-a4ac-47978d33faf9}</ProjectGuid>
+    <ProjectGuid>{534ef4b0-5a7b-43f3-8889-0e27560e9a18}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Frack.AspNet</RootNamespace>
-    <AssemblyName>Frack.AspNet</AssemblyName>
+    <RootNamespace>HelloAspNet</RootNamespace>
+    <AssemblyName>HelloAspNet.App</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <Name>Frack.AspNet</Name>
-    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
-    <TargetFrameworkProfile />
-    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
+    <Name>HelloAspNet.App</Name>
+    <FscToolPath>..\..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Frack.AspNet.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Core.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -32,29 +30,41 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.AspNet.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Core.XML</DocumentationFile>
   </PropertyGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <Compile Include="Frack.AspNet.fs" />
-  </ItemGroup>
-  <ItemGroup>
+    <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core">
-      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Abstractions" />
     <Reference Include="System.Web.Routing" />
-    <ProjectReference Include="..\Frack.SystemWeb\Frack.SystemWeb.fsproj">
-      <Name>Frack.SystemWeb</Name>
-      <Project>{b8d3854d-9568-4b4b-8bb2-40dfd5befacc}</Project>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Global.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\lib\Frack.AspNet\Frack.AspNet.fsproj">
+      <Name>Frack.AspNet</Name>
+      <Project>{762480c7-f12d-475e-a4ac-47978d33faf9}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Frack\frack.fsproj">
+    <ProjectReference Include="..\..\..\lib\Frack\frack.fsproj">
       <Name>frack</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
+  <Import Project="..\..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+	     Other similar extension points exist, see Microsoft.Common.targets.
+	<Target Name="BeforeBuild">
+	</Target>
+	<Target Name="AfterBuild">
+	</Target>
+	-->
 </Project>

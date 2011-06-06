@@ -11,6 +11,7 @@
     <AssemblyName>Frack.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frack.Tests</Name>
+    <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -20,7 +21,6 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Frack.Tests.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,10 +29,8 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Frack.Tests.XML</DocumentationFile>
   </PropertyGroup>
-  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
-  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="AsyncSeqSpecs.fs" />
@@ -42,29 +40,28 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
-      <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="FsUnit.NUnit-0.9.0">
-      <HintPath>..\packages\FsUnit.0.9.0\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
+      <HintPath>..\..\..\packages\FsUnit.0.9.0\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.2.5.9.10348\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.mocks">
-      <HintPath>..\packages\NUnit.2.5.9.10348\lib\nunit.mocks.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.mocks.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="pnunit.framework">
-      <HintPath>..\packages\NUnit.2.5.9.10348\lib\pnunit.framework.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\pnunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\src\Frack\frack.fsproj">
+    <ProjectReference Include="..\..\lib\Frack\frack.fsproj">
       <Name>frack</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>

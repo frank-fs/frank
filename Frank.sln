@@ -10,32 +10,32 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\Frack\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "frack", "src\lib\Frack\frack.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.AspNet", "src\Frack.AspNet\Frack.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.AspNet", "src\lib\Frack.AspNet\Frack.AspNet.fsproj", "{762480C7-F12D-475E-A4AC-47978D33FAF9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Hosting", "Hosting", "{0D74C7C2-8D0C-4478-8054-DFA76828D041}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloAspNet.Web", "samples\HelloAspNet\HelloAspNet.Web\HelloAspNet.Web.csproj", "{5E761E95-549D-48E8-9694-C43FB433DB6B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloAspNet.Web", "src\samples\HelloAspNet\HelloAspNet.Web\HelloAspNet.Web.csproj", "{5E761E95-549D-48E8-9694-C43FB433DB6B}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloAspNet.App", "samples\HelloAspNet\HelloAspNet.App\HelloAspNet.App.fsproj", "{534EF4B0-5A7B-43F3-8889-0E27560E9A18}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloAspNet.App", "src\samples\HelloAspNet\HelloAspNet.App\HelloAspNet.App.fsproj", "{534EF4B0-5A7B-43F3-8889-0E27560E9A18}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HelloAspNet", "HelloAspNet", "{7A2392BE-8586-4D58-84C3-ED994FDC7CAC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}"
 	ProjectSection(SolutionItems) = preProject
-		samples\SimpleServer.fsx = samples\SimpleServer.fsx
+		src\samples\SimpleServer.fsx = src\samples\SimpleServer.fsx
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.HttpListener", "src\Frack.HttpListener\Frack.HttpListener.fsproj", "{109BB195-CC41-4548-BC61-BB1F05AE4C44}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.HttpListener", "src\lib\Frack.HttpListener\Frack.HttpListener.fsproj", "{109BB195-CC41-4548-BC61-BB1F05AE4C44}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Wcf", "src\Frack.Wcf\Frack.Wcf.fsproj", "{8E1C1918-D7AF-4292-8054-2E567B7A204E}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Wcf", "src\lib\Frack.Wcf\Frack.Wcf.fsproj", "{8E1C1918-D7AF-4292-8054-2E567B7A204E}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloWcf", "samples\HelloWcf\HelloWcf.fsproj", "{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloWcf", "src\samples\HelloWcf\HelloWcf.fsproj", "{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.SystemWeb", "src\Frack.SystemWeb\Frack.SystemWeb.fsproj", "{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.SystemWeb", "src\lib\Frack.SystemWeb\Frack.SystemWeb.fsproj", "{B8D3854D-9568-4B4B-8BB2-40DFD5BEFACC}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Tests", "Frack.Tests\Frack.Tests.fsproj", "{90ED62B2-D05A-4341-8C95-F729E11197E6}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frack.Tests", "src\tests\Frack.Tests\Frack.Tests.fsproj", "{90ED62B2-D05A-4341-8C95-F729E11197E6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,11 +1,13 @@
 #I "tools/FAKE"
 #r "FakeLib.dll"
+
 open Fake 
-open Fake.MSBuild
 
 (* properties *)
-let projectName = "frack"
-let version = "0.8.0"  
+let projectName = "Frank"
+let projectSummary = "A functional web application hosting and routing domain-specific language."
+let projectDescription = "A functional web application hosting and routing domain-specific language."
+let version = "0.3.0"  
 
 (* Directories *)
 let buildDir = "./build/"
@@ -20,9 +22,8 @@ let zipFileName = deployDir + sprintf "%s-%s.zip" projectName version
 
 (* files *)
 let appReferences =
-    !+ @"src\**\*.csproj" 
-      ++ @"src\**\*.fsproj"
-      -- "**\*_Spliced*" 
+    !+ "src/lib/**/*.fsproj" 
+      -- "**/*_Spliced*" 
         |> Scan
 
 let filesToZip =
@@ -43,15 +44,14 @@ Target? BuildApp <-
           AssemblyInfo 
            (fun p -> 
               {p with
-                 CodeLanguage = FSharp;
-                 AssemblyVersion = buildVersion;
-                 AssemblyTitle = "frack";
-                 AssemblyDescription = "An implementation of NWSGI (.NET Web Server Gateway Interface) written in F#.";
-                 Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996";
-                 OutputFileName = "./src/AssemblyInfo.fs"})
+                 CodeLanguage = FSharp
+                 AssemblyVersion = buildVersion
+                 AssemblyTitle = projectName
+                 AssemblyDescription = projectDescription
+                 Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996"
+                 OutputFileName = "./src/lib/frack/AssemblyInfo.fs"})
 
         appReferences
-          |> Seq.map (RemoveTestsFromProject AllNUnitReferences AllSpecAndTestDataFiles)
           |> MSBuildRelease buildDir "Build"
           |> Log "AppBuild-Output: "
 
@@ -73,7 +73,7 @@ Target? Test <-
 
 Target? GenerateDocumentation <-
     fun _ ->
-      !+ (buildDir + "frack.dll")      
+      !+ (buildDir + "Frank.dll")      
         |> Scan
         |> Docu (fun p ->
             {p with
