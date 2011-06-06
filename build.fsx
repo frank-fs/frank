@@ -24,7 +24,11 @@ let zipFileName = deployDir + sprintf "%s-%s.zip" projectName version
 let appReferences =
     !+ "src/lib/**/*.fsproj" 
       -- "**/*_Spliced*" 
-        |> Scan
+      |> Scan
+
+let testReferences =
+    !+ "src/tests/**/*.fsproj"
+      |> Scan
 
 let filesToZip =
   !+ (buildDir + "/**/*.*")     
@@ -57,7 +61,7 @@ Target? BuildApp <-
 
 Target? BuildTest <-
     fun _ -> 
-        appReferences
+        testReferences
           |> MSBuildDebug testDir "Build"
           |> Log "TestBuild-Output: "
 

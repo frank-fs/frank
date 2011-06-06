@@ -32,31 +32,31 @@
   </PropertyGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
-    <None Include="packages.config" />
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="AsyncSeqSpecs.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="RequestSpecs.fs" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="FsUnit.NUnit-0.9.0">
-      <HintPath>..\..\..\packages\FsUnit.0.9.0\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
+      <HintPath>..\..\..\packages\FsUnit.0.9.1\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
-      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.mocks">
-      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\nunit.mocks.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.mocks.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="pnunit.framework">
-      <HintPath>..\..\..\packages\NUnit.2.5.10.11092\lib\pnunit.framework.dll</HintPath>
+      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\pnunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
