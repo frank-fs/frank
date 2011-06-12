@@ -33,12 +33,21 @@
   </PropertyGroup>
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
+    <None Include="packages.config" />
     <Compile Include="Frack.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Fracture">
+      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\Fracture.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="HttpParser">
+      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\HttpParser.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
