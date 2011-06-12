@@ -1,4 +1,5 @@
-﻿module StreamSpecs
+﻿module Frank.Tests.StreamSpecs
+
 open System
 open System.Collections.Generic
 open System.IO

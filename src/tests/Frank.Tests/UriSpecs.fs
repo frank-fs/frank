@@ -1,4 +1,5 @@
-﻿module UriSpecs
+﻿module Frank.Tests.UriSpecs
+
 open System
 open Frack
 open NUnit.Framework

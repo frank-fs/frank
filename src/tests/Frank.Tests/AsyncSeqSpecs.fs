@@ -1,4 +1,5 @@
-﻿module AsyncSeqSpecs
+﻿module Frank.Tests.AsyncSeqSpecs
+
 open System
 open System.IO
 open Frack.Collections

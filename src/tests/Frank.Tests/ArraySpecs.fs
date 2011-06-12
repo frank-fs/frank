@@ -1,4 +1,5 @@
-﻿module ArraySpecs
+﻿module Frank.Tests.ArraySpecs
+
 open Frack
 open NUnit.Framework
 

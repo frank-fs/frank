@@ -36,7 +36,7 @@
     <Compile Include="ArraySpecs.fs" />
     <Compile Include="AsyncSeqSpecs.fs" />
     <Compile Include="UriSpecs.fs" />
-    <Compile Include="RequestSpecs.fs" />
+    <Compile Include="StreamSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Fracture">
