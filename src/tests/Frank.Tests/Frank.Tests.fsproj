@@ -37,10 +37,23 @@
     <Compile Include="AsyncSeqSpecs.fs" />
     <Compile Include="UriSpecs.fs" />
     <Compile Include="StreamSpecs.fs" />
+    <Compile Include="FrankAppSpecs.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FParsec">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsec.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FParsecCS">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsecCS.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Fracture">
-      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\Fracture.dll</HintPath>
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Fracture.Http">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Core">
@@ -48,10 +61,6 @@
     </Reference>
     <Reference Include="FsUnit.NUnit-0.9.0">
       <HintPath>..\..\..\packages\FsUnit.0.9.1\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="HttpParser">
-      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\HttpParser.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />

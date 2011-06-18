@@ -3,8 +3,8 @@
 open System
 open System.Collections.Generic
 open System.IO
-open Frack
-open Stream
+open Frank
+open Frank.Stream
 open NUnit.Framework
 
 // NOTE: I am not testing every function in the Request module b/c most will be used through Action delegates.

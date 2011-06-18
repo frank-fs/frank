@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank</Name>
     <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,20 +35,32 @@
   <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <None Include="packages.config" />
-    <Compile Include="Frack.fs" />
+    <Compile Include="Collections.fs" />
+    <Compile Include="Utility.fs" />
+    <Compile Include="Stream.fs" />
+    <Compile Include="Routing.fs" />
+    <Compile Include="Response.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FParsec">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsec.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FParsecCS">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsecCS.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Fracture">
-      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\Fracture.dll</HintPath>
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Fracture.Http">
+      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="HttpParser">
-      <HintPath>..\..\..\packages\Fracture.0.1.1\lib\HttpParser.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />

@@ -2,7 +2,7 @@
 
 open System
 open System.IO
-open Frack.Collections
+open Frank
 open NUnit.Framework
 
 type Assert with

@@ -1,4 +1,4 @@
-﻿namespace Frack.Hosting
+﻿namespace Frank.Hosting
 (* License
  *
  * Author: Ryan Riley <ryan.riley@panesofglass.org>
@@ -16,8 +16,7 @@ module Wcf =
   open System.Net.Http
   open System.ServiceModel
   open System.ServiceModel.Web
-  open Frack
-  open Frack.Collections
+  open Frank
 
   [<System.Runtime.CompilerServices.Extension>]
   [<Microsoft.FSharp.Core.CompiledName("ToOwinRequest")>]

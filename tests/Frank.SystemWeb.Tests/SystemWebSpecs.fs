@@ -4,7 +4,7 @@ open System
 open System.Collections.Specialized
 open System.IO
 open System.Web
-open Frack
+open Frank
 open Frack.Hosting.SystemWeb
 open NUnit.Framework
 open FsUnit

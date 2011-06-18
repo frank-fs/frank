@@ -6,17 +6,16 @@
 #r "System.Net.dll"
 #r "System.Web.dll"
 #r "System.Web.Abstractions.dll"
-#r "frack.dll"
-#r "Frack.Collections.dll"
+#r "Frank.dll"
 #r "Frack.HttpListener.dll"
 
 open System
 open System.Collections.Generic
 open System.Net
 open System.Threading
-open Frack
-open Frack.Middleware
-open Frack.Hosting.HttpListener
+open Frank
+open Frank.Middleware
+open Frank.Hosting.HttpListener
 
 printfn "Creating server ..."
 

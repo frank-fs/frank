@@ -1,4 +1,4 @@
-﻿namespace Frack.Hosting
+﻿namespace Frank.Hosting
 
 [<System.Runtime.CompilerServices.Extension>]
 module SystemWeb =
@@ -7,8 +7,7 @@ module SystemWeb =
   open System.IO
   open System.Text
   open System.Web
-  open Frack
-  open Frack.Collections
+  open Frank
 
   [<System.Runtime.CompilerServices.Extension>]
   [<Microsoft.FSharp.Core.CompiledName("ToOwinRequest")>]
@@ -37,7 +36,7 @@ module SystemWeb =
     if headers.ContainsKey("Content-Length") then
       response.ContentType <- headers.["Content-Length"]
 //    headers |> Dict.toSeq |> Seq.iter (fun (k, v) -> response.Headers.Add(k, v))
-    body |> Frack.Response.write response.OutputStream
+    body |> Frank.Response.write response.OutputStream
 
   type HttpResponseBase with
     member response.Reply(status, headers, body) = reply(response, status, headers, body)

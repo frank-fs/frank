@@ -1,7 +1,7 @@
 ﻿module Frank.Tests.UriSpecs
 
 open System
-open Frack
+open Frank
 open NUnit.Framework
 open FsUnit
 

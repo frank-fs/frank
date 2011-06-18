@@ -24,6 +24,7 @@ let nugetDir = "./nuget/"
 let nugetLibDir = nugetDir @@ "lib"
 let nugetDocsDir = nugetDir @@ "docs"
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
+let fractureVersion = GetPackageVersion packagesDir "Fracture"
 
 // params
 let target = getBuildParamOrDefault "target" "All"
@@ -122,6 +123,7 @@ Target "BuildNuGet" (fun _ ->
             Description = projectDescription
             Version = version
             OutputPath = nugetDir
+            Dependencies = ["Fracture",RequireExactly fractureVersion]
             AccessKey = nugetKey
             ToolPath = nugetPath
             Publish = nugetKey <> "" })

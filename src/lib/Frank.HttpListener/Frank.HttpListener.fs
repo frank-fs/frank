@@ -1,4 +1,4 @@
-﻿namespace Frack.Hosting
+﻿namespace Frank.Hosting
 
 [<System.Runtime.CompilerServices.Extension>]
 module HttpListener =
@@ -6,9 +6,8 @@ module HttpListener =
   open System.Collections.Generic
   open System.Net
   open System.Web
-  open Frack
-  open Frack.Collections
-  open Frack.Hosting.SystemWeb
+  open Frank
+  open Frank.Hosting.SystemWeb
 
   [<System.Runtime.CompilerServices.Extension>]
   [<Microsoft.FSharp.Core.CompiledName("ToContextBase")>]

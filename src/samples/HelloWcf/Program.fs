@@ -10,9 +10,8 @@
 
 open System.Collections.Generic
 open Microsoft.ServiceModel.Http
-open Frack
-open Frack.Collections
-open Frack.Hosting.Wcf
+open Frank
+open Frank.Hosting.Wcf
 
 let baseurl = "http://localhost:1000/"
 let processors = [| (fun op -> new PlainTextProcessor(op, MediaTypeProcessorMode.Response) :> System.ServiceModel.Dispatcher.Processor) |]
