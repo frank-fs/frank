@@ -5,8 +5,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		build.bat = build.bat
 		build.fsx = build.fsx
+		build.sh = build.sh
 		frank.nuspec = frank.nuspec
 		LICENSE.txt = LICENSE.txt
+		mono-build.sh = mono-build.sh
 		README.md = README.md
 	EndProjectSection
 EndProject
