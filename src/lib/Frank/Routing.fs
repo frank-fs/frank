@@ -13,57 +13,56 @@ type Body =
   | Segment of ArraySegment<byte> with
   static member Empty = Bytes [||]
   
-type FrankHandler = IDictionary<string, obj> -> Async<string * IDictionary<string, string> * Body>
-
-type Route = {
+type Handler = {
   Method : string
-  Process : FrankHandler } with
-  member this.MatchMethod(httpMethod) =
-    String.Equals(this.Method, httpMethod, StringComparison.InvariantCultureIgnoreCase)
+  Process : IDictionary<string, obj> -> Async<string * IDictionary<string, string> * Body> } with
+  member this.Match(httpMethod) =
+    if this.Method = "*" then true
+    else String.Equals(this.Method, httpMethod, StringComparison.InvariantCultureIgnoreCase)
 
-let route methd handler = { Method = methd; Process = handler }
-let get handler = route "GET" handler
-let post handler = route "POST" handler
-let put handler = route "PUT" handler
-let delete handler = route "DELETE" handler
+let handle methd handler = { Method = methd; Process = handler }
+let get handler = handle "GET" handler
+let post handler = handle "POST" handler
+let put handler = handle "PUT" handler
+let delete handler = handle "DELETE" handler
 
 type FrankMessage =
-  | AddHandler of (Route list -> Route list)
+  | AddHandler of (Handler list -> Handler list)
   | GetPath of AsyncReplyChannel<string>
-  | GetRoutes of AsyncReplyChannel<Route list>
+  | GetRoutes of AsyncReplyChannel<Handler list>
   | Process of IDictionary<string, obj> * AsyncReplyChannel<string * IDictionary<string, string> * Body>
 
 let H405 request = async {
   return ("405 Method not allowed", dict [], Body.Empty) }
 
-let frank path routes = Agent<FrankMessage>.Start(fun inbox ->
+let frank path handlers = Agent<FrankMessage>.Start(fun inbox ->
   //add head and options if not specified
-  let rec loop path (routes:Route list) = async {
+  let rec loop path (handlers:Handler list) = async {
     let! msg = inbox.Receive() 
     match msg with
     | AddHandler f ->
-        return! loop path (f routes)
+        return! loop path (f handlers)
     | GetPath(reply) ->
         reply.Reply path
-        return! loop path routes
+        return! loop path handlers
     | GetRoutes(reply) ->
-        reply.Reply routes
-        return! loop path routes
+        reply.Reply handlers
+        return! loop path handlers
     | Process(request, reply) ->
         let methd = request?RequestMethod :?> string
-        let route = routes |> List.filter (fun r -> r.MatchMethod methd)
+        let handler = handlers |> List.filter (fun r -> r.Match methd)
         // TODO: Should the response be string * IDictionary<string, string> * Async<Body>?
         let! response =
-          match route with
+          match handler with
           | hd::_ -> hd.Process request // Return the first match; there should be only one.
           | _ -> H405 request          // If no matches, return a 405 response.
         reply.Reply response
-        return! loop path routes }
-  loop path routes)
+        return! loop path handlers }
+  loop path handlers)
 
 // TODO: Move this into each platform-specific library, as it can implement IHttpHandler, etc.
-type FrankResource(path, routes) =
-  let agent = frank path routes
+type FrankResource(path, handlers) =
+  let agent = frank path handlers
   member this.AddHandler(f) = agent.Post(AddHandler f)
   member this.AsyncProcess(request) = agent.PostAndAsyncReply(fun reply -> Process(request, reply))
   member this.Process(request) = agent.PostAndReply(fun reply -> Process(request, reply))
@@ -73,12 +72,12 @@ module Extend =
   let withOptions (agent:Agent<FrankMessage>) =
     let createHandler allowedMethods = fun request -> async {
       return ("200 OK", dict [("Allow", allowedMethods)], Body.Empty) }
-    let getMethods routes =
-      List.map (fun (r:Route) -> r.Method) routes
+    let getMethods handlers =
+      List.map (fun (r:Handler) -> r.Method) handlers
       |> Array.ofList
       |> (fun arr -> String.Join(", ", arr))
     let options = createHandler << getMethods
-    let addOptions routes = route "OPTIONS" (options routes) :: routes
+    let addOptions handlers = handle "OPTIONS" (options handlers) :: handlers
     agent.Post(AddHandler addOptions)
     agent
   
