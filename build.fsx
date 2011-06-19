@@ -4,8 +4,9 @@ open Fake
 open System.IO
 
 // properties
+let currentDate = System.DateTime.UtcNow
 let projectName = "Frank"
-let version = "0.3"  
+let version = "0.4." + currentDate.ToString("yMMdd")
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
@@ -23,7 +24,9 @@ let nugetDir = "./nuget/"
 let nugetLibDir = nugetDir @@ "lib"
 let nugetDocsDir = nugetDir @@ "docs"
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
-let fractureVersion = GetPackageVersion packagesDir "Fracture"
+let webApiVersion = GetPackageVersion packagesDir "WebApi.All"
+let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
+let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
 
 // params
 let target = getBuildParamOrDefault "target" "All"
@@ -35,11 +38,11 @@ let nunitPath = "./packages/NUnit.2.5.9.10348/Tools"
 
 // files
 let appReferences =
-    !+ "./src/**/*.fsproj" 
+    !+ "./src/*.fsproj" 
         |> Scan
 
 let testReferences =
-    !+ "./tests/**/*.fsproj"
+    !+ "./tests/*.fsproj"
         |> Scan
 
 let filesToZip =
@@ -63,7 +66,7 @@ Target "BuildApp" (fun _ ->
            AssemblyTitle = projectName
            AssemblyDescription = projectDescription
            Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996"
-           OutputFileName = "./src/Frank/AssemblyInfo.fs"})
+           OutputFileName = "./src/AssemblyInfo.fs"})
 
     MSBuildRelease buildDir "Build" appReferences
         |> Log "AppBuild-Output: "
@@ -108,8 +111,7 @@ Target "BuildNuGet" (fun _ ->
     CleanDirs [nugetDir; nugetLibDir; nugetDocsDir]
 
     XCopy (docsDir |> FullName) nugetDocsDir
-    [buildDir + "Frank.dll"
-     buildDir + "Frank.Wcf.dll"]
+    [buildDir + "Frank.dll"]
       |> CopyTo nugetLibDir
 
     NuGet (fun p ->
@@ -119,7 +121,9 @@ Target "BuildNuGet" (fun _ ->
             Description = projectDescription
             Version = version
             OutputPath = nugetDir
-            Dependencies = ["Fracture",RequireExactly fractureVersion]
+            Dependencies = ["WebApi.All",RequireExactly webApiVersion
+                            "ImpromptuInterface",RequireExactly impromptuInterfaceVersion
+                            "ImpromptuInterface.FSharp",RequireExactly impromptuInterfaceFSharpVersion ]
             AccessKey = nugetKey
             ToolPath = nugetPath
             Publish = nugetKey <> "" })
