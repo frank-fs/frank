@@ -11,7 +11,7 @@
     <AssemblyName>HelloWcf</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>HelloWcf</Name>
-    <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
+    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,7 +34,7 @@
     <PlatformTarget>x86</PlatformTarget>
     <DocumentationFile>bin\Release\HelloWcf.XML</DocumentationFile>
   </PropertyGroup>
-  <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="Program.fs" />
     <None Include="App.config">
@@ -42,37 +42,37 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\lib\Frank.Wcf\Frank.Wcf.fsproj">
+    <ProjectReference Include="..\..\src\Frank.Wcf\Frank.Wcf.fsproj">
       <Name>Frank.Wcf</Name>
       <Project>{8e1c1918-d7af-4292-8054-2e567b7a204e}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\lib\Frank\Frank.fsproj">
+    <ProjectReference Include="..\..\src\Frank\Frank.fsproj">
       <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
     <Reference Include="Microsoft.Net.Http">
-      <HintPath>..\..\..\lib\wcf\Microsoft.Net.Http.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.Net.Http.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.QueryComposition">
-      <HintPath>..\..\..\lib\wcf\Microsoft.QueryComposition.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.QueryComposition.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Runtime.Serialization.Json">
-      <HintPath>..\..\..\lib\wcf\Microsoft.Runtime.Serialization.Json.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.Runtime.Serialization.Json.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceModel.Http">
-      <HintPath>..\..\..\lib\wcf\Microsoft.ServiceModel.Http.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.Http.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceModel.Web.jQuery">
-      <HintPath>..\..\..\lib\wcf\Microsoft.ServiceModel.Web.jQuery.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.Web.jQuery.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.ServiceModel.WebHttp">
-      <HintPath>..\..\..\lib\wcf\Microsoft.ServiceModel.WebHttp.dll</HintPath>
+      <HintPath>..\..\lib\wcf\Microsoft.ServiceModel.WebHttp.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core">
-      <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

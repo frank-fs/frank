@@ -1,5 +1,4 @@
-#I "./packages/FAKE.1.56.7/tools"
-#r "FakeLib.dll"
+#r "./packages/FAKE.1.56.7/tools/FakeLib.dll"
 
 open Fake 
 open System.IO
@@ -36,11 +35,11 @@ let nunitPath = "./packages/NUnit.2.5.9.10348/Tools"
 
 // files
 let appReferences =
-    !+ "./src/lib/**/*.fsproj" 
+    !+ "./src/**/*.fsproj" 
         |> Scan
 
 let testReferences =
-    !+ "./src/tests/**/*.fsproj"
+    !+ "./tests/**/*.fsproj"
         |> Scan
 
 let filesToZip =
@@ -64,7 +63,7 @@ Target "BuildApp" (fun _ ->
            AssemblyTitle = projectName
            AssemblyDescription = projectDescription
            Guid = "5017411A-CF26-4E1A-85D6-1C49470C5996"
-           OutputFileName = "./src/lib/Frank/AssemblyInfo.fs"})
+           OutputFileName = "./src/Frank/AssemblyInfo.fs"})
 
     MSBuildRelease buildDir "Build" appReferences
         |> Log "AppBuild-Output: "
@@ -110,11 +109,8 @@ Target "BuildNuGet" (fun _ ->
 
     XCopy (docsDir |> FullName) nugetDocsDir
     [buildDir + "Frank.dll"
-     buildDir + "Frank.SystemWeb.dll"
-     buildDir + "Frank.AspNet.dll"
-     buildDir + "Frank.HttpListener.dll"
      buildDir + "Frank.Wcf.dll"]
-        |> CopyTo nugetLibDir
+      |> CopyTo nugetLibDir
 
     NuGet (fun p ->
         {p with
@@ -154,3 +150,4 @@ Target "All" DoNothing
 
 // Start build
 Run target
+

@@ -11,7 +11,7 @@
     <AssemblyName>Frank.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank.Tests</Name>
-    <FscToolPath>..\..\..\lib\FSharp\</FscToolPath>
+    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,7 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
   </PropertyGroup>
-  <Import Project="..\..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <None Include="packages.config" />
     <Compile Include="ArraySpecs.fs" />
@@ -41,46 +41,38 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FParsec">
-      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsec.dll</HintPath>
+      <HintPath>..\..\packages\Fracture.0.1.2\lib\FParsec.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FParsecCS">
-      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\FParsecCS.dll</HintPath>
+      <HintPath>..\..\packages\Fracture.0.1.2\lib\FParsecCS.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Fracture">
-      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.dll</HintPath>
+      <HintPath>..\..\packages\Fracture.0.1.2\lib\Fracture.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Fracture.Http">
-      <HintPath>..\..\..\packages\Fracture.0.1.2\lib\Fracture.Http.dll</HintPath>
+      <HintPath>..\..\packages\Fracture.0.1.2\lib\Fracture.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Core">
-      <HintPath>..\..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="FsUnit.NUnit-0.9.0">
-      <HintPath>..\..\..\packages\FsUnit.0.9.1\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
+      <HintPath>..\..\packages\FsUnit.0.9.1\Lib\FsUnit.NUnit-0.9.0.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework">
-      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.mocks">
-      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\nunit.mocks.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="pnunit.framework">
-      <HintPath>..\..\..\packages\NUnit.2.5.9.10348\lib\pnunit.framework.dll</HintPath>
+      <HintPath>..\..\packages\NUnit.2.5.9.10348\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\lib\Frank\Frank.fsproj">
+    <ProjectReference Include="..\..\src\Frank\Frank.fsproj">
       <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
