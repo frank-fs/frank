@@ -26,8 +26,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{A22B5663-9E93-4493-B77B-54E31FCD10C5}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Wcf.Tests", "tests\Frank.Wcf.Tests\Frank.Wcf.Tests.fsproj", "{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,16 +76,6 @@ Global
 		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|x86.ActiveCfg = Release|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -96,6 +84,5 @@ Global
 		{8E1C1918-D7AF-4292-8054-2E567B7A204E} = {0D74C7C2-8D0C-4478-8054-DFA76828D041}
 		{B4146940-AED6-48AE-A0DD-C6422F5DCDC8} = {C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}
 		{90ED62B2-D05A-4341-8C95-F729E11197E6} = {A22B5663-9E93-4493-B77B-54E31FCD10C5}
-		{7C9D87D9-8DB0-45EC-BED4-580C33AD2B85} = {A22B5663-9E93-4493-B77B-54E31FCD10C5}
 	EndGlobalSection
 EndGlobal
