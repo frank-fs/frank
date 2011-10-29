@@ -130,7 +130,7 @@ type FrankHandler() =
         override this.SendAsync(request, cancellationToken) =
           resource.ProcessRequestAsync(request, cancellationToken) } :> DelegatingHandler
 
-let frank (resources : seq<#Resource>) =
+let frankWebApi (resources : seq<#Resource>) =
   // TODO: Auto-wire routes based on the passed-in resources.
   let routes = resources |> Seq.map (fun r -> (r.Path, r.ProcessRequestAsync))
 

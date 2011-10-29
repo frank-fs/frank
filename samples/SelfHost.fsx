@@ -59,7 +59,7 @@ let resource = Resource("", [ get howdy; post echo2 ])
 // The `frank` function creates a `WebApiConfiguration` instance based on our resources.
 // These will be mounted at the `baseUri`. The `frank` function creates a `DelegatingHandler`
 // that will intercept all incoming traffic and route it to our resources.
-let config = frank [| resource |]
+let config = frankWebApi [| resource |]
 
 let baseUri = "http://localhost:1000/"
 // Create a self-hosted service host using an `EmptyService`, as the service
