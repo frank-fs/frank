@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doc>
+<assembly><name>FSharpx.Http</name></assembly>
+<members>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharpx.Http.FsConneg.bestCharset(Microsoft.FSharp.Collections.FSharpList{System.String})">
+ <summary>
+ Intersects accepted and served charsets.
+ Returns the preferred viable charset, or <c>None</c>.
+ </summary>
+ <param name="x"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.negotiateCharset(Microsoft.FSharp.Collections.FSharpList{System.String})">
+ <summary>
+ Intersects accepted and served charsets. 
+ Returns a list of viable charsets, sorted by client preference in descending order
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharpx.Http.FsConneg.matchCharset(System.String,System.String)">
+ <summary>
+ Matches two charset tags
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.bestLanguage(System.Collections.Generic.IEnumerable{System.String})">
+ <summary>
+ Intersects accepted and served media.
+ Returns the preferred viable language, or <c>None</c>.
+ </summary>
+ <param name="x"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.negotiateLanguage(System.Collections.Generic.IEnumerable{System.String})">
+ <summary>
+ Intersects accepted and served languages. 
+ Returns a list of viable languages, sorted by client preference in descending order
+ </summary>
+ <param name="x"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.matchLanguage(System.String,System.String)">
+ <summary>
+ Matches two language tags
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.|AcceptsMedia|_|(System.String,Microsoft.FSharp.Collections.FSharpList{System.String})">
+ <summary>
+ Matches if the media parameter can be handled by the accept list
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.bestMediaType(System.Collections.Generic.IEnumerable{System.String})">
+ <summary>
+ Intersects accepted and served media.
+ Returns the preferred viable media, or <c>None</c>.
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.bestOf``3(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,Microsoft.FSharp.Collections.FSharpList{``2}}},``0,``1)">
+ <summary>
+ Gets the first item from a list of negotiated items
+ </summary>
+ <param name="negotiate"></param>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.negotiateMediaType(System.Collections.Generic.IEnumerable{System.String})">
+ <summary>
+ Intersects accepted and served media. 
+ Returns a list of viable media, sorted by client preference in descending order
+ </summary>
+ <param name="serves">Served media</param>
+ <param name="accepts">Accept header</param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.negotiate``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{System.String,Microsoft.FSharp.Core.FSharpOption{``1}}},System.Collections.Generic.IEnumerable{``0},System.String)">
+ <summary>
+ Filters and maps a list of served items and a Accept-* header of acceptable items using a matcher function
+ </summary>
+ <param name="matcher"></param>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.negotiateList``4(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,Microsoft.FSharp.Core.FSharpOption{System.Tuple`2{``2,``3}}}},System.Collections.Generic.IEnumerable{``0},System.Collections.Generic.IEnumerable{``1})">
+ <summary>
+ Filters and maps two sequences of items using a matcher function.
+ </summary>
+ <param name="matcher"></param>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.matchMediaType(System.String,System.String)">
+ <summary>
+ Finds a match between two media types, handling wildcards.
+ Returns <c>None</c> if no match, otherwise <c>Some media</c>
+ Example: <c>matchMediaType "text/*" "text/plain"</c> -> <c>"text/plain"</c>
+ </summary>
+ <param name="serves"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.filterMediaTypes(System.String,System.String)">
+ <summary>
+ Filters an Accept header by type.
+ E.g. <c>filterMediaTypes "image" "image/png,text/html"</c> -> <c>["image/png"]</c>
+ </summary>
+ <param name="mediaType"></param>
+ <param name="accepts"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.parseMediaTypes(System.String)">
+ <summary>
+ Parses an Accept header into a list of media,(media type, media subtype),q
+ E.g. "text/html",("text","html"),0.8
+ </summary>
+ <param name="l"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.splitMediaTypeSubtype(System.String)">
+ <summary>
+ Splits media type and subtype, e.g. "text/html" -> "text","html"
+ </summary>
+ <param name="m"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.parseFilterSortAccept(System.String)">
+ <summary>
+ Parses any Accept-* header. 
+ Removes all items with q=0 (i.e. not acceptable by client).
+ Sorts by q descending (client preference)
+ </summary>
+ <param name="l"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.filterSortAccept``2(System.Collections.Generic.IEnumerable{System.Tuple`3{``0,``1,System.Double}})">
+ <summary>
+ Takes a list of items with associated numeric quality (preference), and:
+ removes all items with q=0 (i.e. not acceptable by client);
+ sorts by q descending (client preference)
+ </summary>
+ <param name="x"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.parseAccept(System.String)">
+ <summary>
+ Parses any Accept-* header, returns a seq of items with associated q (quality/preference)
+ </summary>
+ <param name="l"></param>
+</member>
+<member name="M:FSharpx.Http.FsConneg.parseQ(System.String[])">
+ <summary>
+ Parses a single Accept-* header item. 
+ Returns item with associated q
+ </summary>
+ <param name="s">Header item split by ';'</param>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharpx.Http.FsConneg">
+
+</member>
+</members>
+</doc>

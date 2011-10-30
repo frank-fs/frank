@@ -1,0 +1,683 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doc>
+<assembly><name>FSharp.AsyncExtensions</name></assembly>
+<members>
+<member name="T:FSharp.Control.Agent`1">
+<summary>
+ Type alias for F# mailbox processor type
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.AsyncSeqInner`1">
+<summary>
+ The interanl type that represents a value returned as a result of
+ evaluating a step of an asynchronous sequence
+</summary>
+</member>
+<member name="T:FSharp.Control.AsyncSeq`1">
+<summary>
+ An asynchronous sequence represents a delayed computation that can be
+ started to produce either Cons value consisting of the next element of the 
+ sequence (head) together with the next asynchronous sequence (tail) or a 
+ special value representing the end of the sequence (Nil)
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.remove_Error(Microsoft.FSharp.Control.FSharpHandler{System.Exception})">
+<summary>
+ Occurs when the execution of the agent results in an exception.
+</summary>
+</member>
+<member name="P:FSharp.Control.AutoCancelAgent`1.Error">
+<summary>
+ Occurs when the execution of the agent results in an exception.
+</summary>
+</member>
+<member name="P:FSharp.Control.AutoCancelAgent`1.CurrentQueueLength">
+<summary>
+ Returns the number of unprocessed messages in the message queue of the agent.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.add_Error(Microsoft.FSharp.Control.FSharpHandler{System.Exception})">
+<summary>
+ Occurs when the execution of the agent results in an exception.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.TryScan``1(Microsoft.FSharp.Core.FSharpFunc`2{`0,Microsoft.FSharp.Core.FSharpOption{Microsoft.FSharp.Control.FSharpAsync{``0}}},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Scans for a message by looking through messages in arrival order until &lt;c&gt;scanner&lt;/c&gt; 
+ returns a Some value. Other messages remain in the queue.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.TryReceive(Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Waits for a message. This will consume the first message in arrival order.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.TryPostAndReply``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpAsyncReplyChannel{``0},`0},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Like PostAndReply, but returns None if no reply within the timeout period.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.Start(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpMailboxProcessor{`0},Microsoft.FSharp.Control.FSharpAsync{Microsoft.FSharp.Core.Unit}})">
+<summary>
+ Start a new disposable agent using the specified body function
+ (the method creates a new cancellation token for the agent)
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.Scan``1(Microsoft.FSharp.Core.FSharpFunc`2{`0,Microsoft.FSharp.Core.FSharpOption{Microsoft.FSharp.Control.FSharpAsync{``0}}},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Scans for a message by looking through messages in arrival order until &lt;c&gt;scanner&lt;/c&gt; 
+ returns a Some value. Other messages remain in the queue.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.Receive(Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Waits for a message. This will consume the first message in arrival order.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.PostAndTryAsyncReply``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpAsyncReplyChannel{``0},`0},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Like PostAndAsyncReply, but returns None if no reply within the timeout period.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.PostAndReply``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpAsyncReplyChannel{``0},`0},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Posts a message to an agent and await a reply on the channel, synchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.PostAndAsyncReply``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpAsyncReplyChannel{``0},`0},Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Posts a message to an agent and await a reply on the channel, asynchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AutoCancelAgent`1.Post(`0)">
+<summary>
+ Posts a message to the message queue of the MailboxProcessor, asynchronously.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.AutoCancelAgent`1">
+<summary>
+ Wrapper for the standard F# agent (MailboxProcessor) that
+ supports stopping of the agent&apos;s body using the IDisposable 
+ interface (the type automatically creates a cancellation token)
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharp.Control.BatchProcessingAgent`1.remove_BatchProduced(Microsoft.FSharp.Control.FSharpHandler{`0[]})">
+<summary>
+ The event is triggered when a group of messages is collected. The
+ group is not empty, but may not be of the specified maximal size
+ (when the timeout elapses before enough messages is collected)
+</summary>
+</member>
+<member name="P:FSharp.Control.BatchProcessingAgent`1.BatchProduced">
+<summary>
+ The event is triggered when a group of messages is collected. The
+ group is not empty, but may not be of the specified maximal size
+ (when the timeout elapses before enough messages is collected)
+</summary>
+</member>
+<member name="M:FSharp.Control.BatchProcessingAgent`1.add_BatchProduced(Microsoft.FSharp.Control.FSharpHandler{`0[]})">
+<summary>
+ The event is triggered when a group of messages is collected. The
+ group is not empty, but may not be of the specified maximal size
+ (when the timeout elapses before enough messages is collected)
+</summary>
+</member>
+<member name="M:FSharp.Control.BatchProcessingAgent`1.Enqueue(`0)">
+<summary>
+ Sends new message to the agent
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.BatchProcessingAgent`1">
+<summary>
+ Agent that can be used to implement batch processing. It creates groups
+ of messages (added using the Enqueue method) and emits them using the 
+ BatchProduced event. A group is produced when it reaches the maximal 
+ size or after the timeout elapses.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:FSharp.Control.BlockingQueueAgent`1.Count">
+<summary>
+ Gets the number of elements currently waiting in the queue.
+</summary>
+</member>
+<member name="M:FSharp.Control.BlockingQueueAgent`1.Get(Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Synchronously gets item from the queue. If there are no items
+ in the queue, the operation will block unitl items are added.
+ This method blocks until value is available!
+</summary>
+</member>
+<member name="M:FSharp.Control.BlockingQueueAgent`1.AsyncGet(Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Asynchronously gets item from the queue. If there are no items
+ in the queue, the operation will block unitl items are added.
+</summary>
+</member>
+<member name="M:FSharp.Control.BlockingQueueAgent`1.AsyncAdd(`0,Microsoft.FSharp.Core.FSharpOption{System.Int32})">
+<summary>
+ Asynchronously adds item to the queue. The operation ends when
+ there is a place for the item. If the queue is full, the operation
+ will block until some items are removed.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.BlockingQueueAgent`1">
+<summary>
+ Agent that implements an asynchronous queue with blocking put
+ and blocking get operation (this implements the producer-consumer 
+ concurrent programming pattern). The constructor takes the maximal
+ size of the buffer.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharp.Control.ConcurrentSetAgent`1.AsyncAdd(System.Object)">
+<summary>
+ Adds the specified element to the set and returns 
+ &apos;false&apos; when it was already present in the set
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.ConcurrentSetAgent`1">
+<summary>
+ Agent that implements a simple concurrent set. The agent exposes a 
+ member that adds value to the set and returns whether the value
+ was already present.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.ObservableUpdate`1">
+<summary>
+ Union type that represents different messages that can be sent to the
+ IObserver interface. The IObserver type is equivalent to a type that has
+ just OnNext method that gets &apos;ObservableUpdate&apos; as an argument.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharp.Control.SlidingWindowAgent`1.remove_WindowProduced(Microsoft.FSharp.Control.FSharpHandler{`0[]})">
+<summary>
+ The event is triggered when a group of messages is collected. 
+ The size of the group is exactly &apos;count&apos; and the values are
+ returned in a fresh array.
+</summary>
+</member>
+<member name="P:FSharp.Control.SlidingWindowAgent`1.WindowProduced">
+<summary>
+ The event is triggered when a group of messages is collected. 
+ The size of the group is exactly &apos;count&apos; and the values are
+ returned in a fresh array.
+</summary>
+</member>
+<member name="M:FSharp.Control.SlidingWindowAgent`1.add_WindowProduced(Microsoft.FSharp.Control.FSharpHandler{`0[]})">
+<summary>
+ The event is triggered when a group of messages is collected. 
+ The size of the group is exactly &apos;count&apos; and the values are
+ returned in a fresh array.
+</summary>
+</member>
+<member name="M:FSharp.Control.SlidingWindowAgent`1.Enqueue(`0)">
+<summary>
+ Sends new message to the agent
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.SlidingWindowAgent`1">
+<summary>
+ Agent that implements the &quot;sliding window&quot; functionality. It collects
+ messages added using the Enqueue method and emits them in overlapping 
+ groups of the specified size. For example, given [1,2,3,4,5...] and a 
+ size 3, the produced groups will be [1,2,3], [2,3,4], [3,4,5], ...
+</summary>
+</member>
+<member name="T:FSharp.Control.AsyncExtensions">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.AsyncSeq.BufferMessage`1">
+<summary>
+ A helper type for implementation of buffering when converting 
+ observable to an asynchronous sequence
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:FSharp.Control.AsyncSeq.AsyncSeqBuilder.For``2(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}},Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}}})">
+<summary>
+ Asynchronous for loop - for all elements from the input sequence,
+ generate all elements produced by the body (asynchronously). See
+ also the AsyncSeq.collect function.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.AsyncSeqBuilder.For``2(System.Collections.Generic.IEnumerable{``0},Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}}})">
+<summary>
+ For loop that iterates over a synchronous sequence (and generates
+ all elements generated by the asynchronous body)
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Control.AsyncSeq.AsyncSeqBuilder">
+<summary>
+ Computation builder that allows creating of asynchronous 
+ sequences using the &apos;asyncSeq { ... }&apos; syntax
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.skip``1(System.Int32,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Skips the first N elements of an asynchronous sequence and
+ then returns the rest of the sequence unmodified.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.take``1(System.Int32,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Returns the first N elements of an asynchronous sequence
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.skipWhile``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,System.Boolean},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Skips elements from an asynchronous sequence while the specified 
+ predicate holds and then returns the rest of the sequence. The 
+ predicate is evaluated asynchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.takeWhile``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,System.Boolean},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Returns elements from an asynchronous sequence while the specified 
+ predicate holds. The predicate is evaluated synchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.skipWhileAsync``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{System.Boolean}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Skips elements from an asynchronous sequence while the specified 
+ predicate holds and then returns the rest of the sequence. The 
+ predicate is evaluated asynchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.takeWhileAsync``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{System.Boolean}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Returns elements from an asynchronous sequence while the specified 
+ predicate holds. The predicate is evaluated asynchronously.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.zip``2(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}})">
+<summary>
+ Combines two asynchronous sequences into a sequence of pairs. 
+ The values from sequences are retrieved in parallel. 
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.cache``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Create a new asynchronous sequence that caches all elements of the 
+ sequence specified as the input. When accessing the resulting sequence
+ multiple times, the input will still be evaluated only once
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.toBlockingSeq``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Converts asynchronous sequence to a synchronous blocking sequence.
+ The elements of the asynchronous sequence are consumed lazily.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.toObservable``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Converts asynchronous sequence to an IObservable&lt;_&gt;. When the client subscribes
+ to the observable, a new copy of asynchronous sequence is started and is 
+ sequentially iterated over (at the maximal possible speed). Disposing of the 
+ observer cancels the iteration over asynchronous sequence. 
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.ofObservable``1(System.IObservable{``0})">
+<summary>
+ Converts observable to an asynchronous sequence. Values that are produced
+ by the observable while the asynchronous sequence is blocked are discarded
+ (this function doesn&apos;t guarantee that asynchronou ssequence will return 
+ all values produced by the observable)
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.ofObservableBuffered``1(System.IObservable{``0})">
+<summary>
+ Converts observable to an asynchronous sequence. Values that are produced
+ by the observable while the asynchronous sequence is blocked are stored to 
+ an unbounded buffer and are returned as next elements of the async sequence.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.ofObservableUsingAgent``1(System.IObservable{``0},Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Control.FSharpMailboxProcessor{FSharp.Control.AsyncSeq.BufferMessage{FSharp.Control.ObservableUpdate{``0}}},Microsoft.FSharp.Control.FSharpAsync{Microsoft.FSharp.Core.Unit}})">
+<summary>
+ Converts observable to an asynchronous sequence using an agent with
+ a body specified as the argument. The returnd async sequence repeatedly 
+ sends &apos;Get&apos; message to the agent to get the next element. The observable
+ sends &apos;Put&apos; message to the agent (as new inputs are generated).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.ofSeq``1(System.Collections.Generic.IEnumerable{``0})">
+<summary>
+ Creates an asynchronous sequence that lazily takes element from an
+ input synchronous sequence and returns them one-by-one.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.filter``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,System.Boolean},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Same as AsyncSeq.filterAsync, but the specified predicate is synchronous
+ and processes the input element immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.choose``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpOption{``1}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Same as AsyncSeq.chooseAsync, but the specified function is synchronous
+ and processes the input element immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.iter``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.Unit},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Same as AsyncSeq.iterAsync, but the specified function is synchronous
+ and performs the side-effect immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.map``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,``1},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Same as AsyncSeq.mapAsync, but the specified function is synchronous
+ and returns the result of projection immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.scan``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,``0}},``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}})">
+<summary>
+ Same as AsyncSeq.scanAsync, but the specified function is synchronous
+ and returns the result of aggregation immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.fold``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,``0}},``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}})">
+<summary>
+ Same as AsyncSeq.foldAsync, but the specified function is synchronous
+ and returns the result of aggregation immediately.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.foldAsync``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,Microsoft.FSharp.Control.FSharpAsync{``0}}},``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}})">
+<summary>
+ Aggregates the elements of the input asynchronous sequence using the
+ specified &apos;aggregation&apos; function. The result is an asynchronous 
+ workflow that returns the final result.
+
+ The aggregation function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.pairwise``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Returns an asynchronous sequence that returns pairs containing an element
+ from the input sequence and its predecessor. Empty sequence is returned for
+ singleton input sequence.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.iterAsync``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{Microsoft.FSharp.Core.Unit}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Iterates over the input sequence and calls the specified function for
+ every value (to perform some side-effect asynchronously).
+
+ The specified function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.scanAsync``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,Microsoft.FSharp.Control.FSharpAsync{``0}}},``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}})">
+<summary>
+ Aggregates the elements of the input asynchronous sequence using the
+ specified &apos;aggregation&apos; function. The result is an asynchronous 
+ sequence of intermediate aggregation result.
+
+ The aggregation function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.firstOrDefault``1(``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Asynchronously returns the first element that was generated by the
+ given asynchronous sequence (or the specified default value).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.lastOrDefault``1(``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Asynchronously returns the last element that was generated by the
+ given asynchronous sequence (or the specified default value).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.filterAsync``1(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{System.Boolean}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Builds a new asynchronous sequence whose elements are those from the
+ input sequence for which the specified function returned true.
+
+ The specified function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.chooseAsync``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{Microsoft.FSharp.Core.FSharpOption{``1}}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Asynchronously iterates over the input sequence and generates &apos;x&apos; for 
+ every input element for which the specified asynchronous function 
+ returned &apos;Some(x)&apos; 
+
+ The specified function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.mapAsync``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{``1}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Builds a new asynchronous sequence whose elements are generated by 
+ applying the specified function to all elements of the input sequence.
+
+ The specified function is asynchronous (and the input sequence will
+ be asked for the next element after the processing of an element completes).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.collect``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``1}}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Creates an asynchronou sequence that iterates over the given input sequence.
+ For every input element, it calls the the specified function and iterates
+ over all elements generated by that asynchronous sequence.
+ This is the &apos;bind&apos; operation of the computation expression (exposed using
+ the &apos;for&apos; keyword in asyncSeq computation).
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.tryFinally``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}},Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Implements the &apos;TryFinally&apos; functionality for computation builder
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.tryWith``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}},Microsoft.FSharp.Core.FSharpFunc`2{System.Exception,Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}}})">
+<summary>
+ Implements the &apos;TryWith&apos; functionality for computation builder
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.tryNext``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Tries to get the next element of an asynchronous sequence
+ and returns either the value or an exception
+</summary>
+</member>
+<member name="P:FSharp.Control.AsyncSeq.asyncSeq">
+<summary>
+ Builds an asynchronou sequence using the computation builder syntax
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.append``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}},Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Yields all elements of the first asynchronous sequence and then 
+ all elements of the second asynchronous sequence.
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.singleton``1(``0)">
+<summary>
+ Creates an asynchronous sequence that generates a single element and then ends
+</summary>
+</member>
+<member name="M:FSharp.Control.AsyncSeq.empty``1">
+<summary>
+ Creates an empty asynchronou sequence that immediately ends
+</summary>
+</member>
+<member name="T:FSharp.Control.AsyncSeq">
+<summary>
+ Module with helper functions for working with asynchronous sequences
+</summary>
+</member>
+<member name="P:FSharp.Control.AsyncSeqExtensions.asyncSeq">
+<summary>
+ Builds an asynchronou sequence using the computation builder syntax
+</summary>
+</member>
+<member name="T:FSharp.Control.AsyncSeqExtensions">
+
+</member>
+<member name="M:FSharp.Control.Observable.asUpdates``1(System.IObservable{``0})">
+<summary>
+ Turns observable into an observable that only calls OnNext method of the
+ observer, but gives it a discriminated union that represents different
+ kinds of events (error, next, completed)
+</summary>
+</member>
+<member name="M:FSharp.Control.Observable.guard``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},System.IObservable{``0})">
+<summary>
+ Creates an observable that calls the specified function (each time)
+ after an observer is attached to the observable. This is useful to 
+ make sure that events triggered by the function are handled. 
+</summary>
+</member>
+<member name="M:FSharp.Control.Observable.windowed``1(System.Int32,System.IObservable{``0})">
+<summary>
+ Returns an observable that yields sliding windows of 
+ containing elements drawn from the input observable. 
+ Each window is returned as a fresh array.
+</summary>
+</member>
+<member name="T:FSharp.Control.Observable">
+
+</member>
+<member name="M:FSharp.Control.ObservableExtensions.synchronize``1(Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Core.FSharpFunc`2{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},Microsoft.FSharp.Core.Unit},``0})">
+<summary>
+ Helper that can be used for writing CPS-style code that resumes
+ on the same thread where the operation was started.
+</summary>
+</member>
+<member name="T:FSharp.Control.ObservableExtensions">
+
+</member>
+<member name="M:FSharp.Control.Seq.ofAsyncSeq``1(Microsoft.FSharp.Control.FSharpAsync{FSharp.Control.AsyncSeqInner{``0}})">
+<summary>
+ Converts asynchronous sequence to a synchronous blocking sequence.
+ The elements of the asynchronous sequence are consumed lazily.
+</summary>
+</member>
+<member name="T:FSharp.Control.Seq">
+
+</member>
+<member name="T:FSharp.IO.IOExtensions">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:FSharp.Net.SocketExtensions">
+
+</member>
+<member name="T:FSharp.Net.HttpExtensions">
+
+</member>
+</members>
+</doc>

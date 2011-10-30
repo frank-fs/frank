@@ -43,11 +43,23 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.AsyncExtensions">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111002\lib\FSharp.AsyncExtensions.dll</HintPath>
+      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharp.AsyncExtensions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharpx.Core">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111002\lib\FSharpx.Core.dll</HintPath>
+      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharpx.Http">
+      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharpx.Stm">
+      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharpx.Stm.Core">
+      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.ApplicationServer.Http">
