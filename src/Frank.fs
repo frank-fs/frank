@@ -13,50 +13,93 @@ module Frank.Core
   
 open System
 open System.Collections.Generic
+open System.IO
 open System.Net
 open System.Net.Http
+open System.Net.Http.Formatting
+open System.Net.Http.Headers
 open System.Text
+open FSharpx
+open FSharpx.Iteratee
 
 // ## Type Aliases and Extensions
 
-type Agent<'a> = MailboxProcessor<'a>
+// An HTTP request body transformer.
+// Specifying this function will transform a stream of content
+// into a type 'a. The simplest transform is the `id` function.
+type RequestBodyT<'a> = HttpContent -> 'a
 
-type HttpResponseMessage with
-  static member MethodNotAllowedHandler(request) = new HttpResponseMessage(HttpStatusCode.MethodNotAllowed)
+// HttpApplication defines the contract for processing a request.
+// An application takes an HttpRequestMessage and
+// returns a function that takes an HttpContent transformer and
+// returns an HttpResponseMessage that can be sent to the client.
+type HttpApplication<'a> = HttpRequestMessage -> RequestBodyT<'a> -> HttpResponseMessage
+
+type Agent<'a> = MailboxProcessor<'a>
 
 type HttpMethod with
   static member All = new HttpMethod("*")
 
+// ## RequestBodyT helper functions
+
+// `readBodyWithMediaTypes<'a>` takes a collection of `MediaTypeFormatter` and
+// returns a `RequestBodyT<'a>`.
+let readBodyWithMediaTypes (mediaTypeFormatters: seq<MediaTypeFormatter>) : RequestBodyT<_> =
+  fun content -> content.ReadAs<_>(mediaTypeFormatters)
+
+// ## HttpApplication helper functions
+
+let private responseWithAllowHeader statusCode (allowedMethods: #seq<HttpMethod>) : HttpApplication<_> =
+  fun _ _ ->
+      let response = new HttpResponseMessage(statusCode)
+      allowedMethods |> Seq.map (fun m -> m.Method) |> Seq.iter response.Content.Headers.Allow.Add
+      response
+
+let options allowedMethods =
+  responseWithAllowHeader HttpStatusCode.OK allowedMethods
+
+// In some instances, you need to respond with a `405 Message Not Allowed` response.
+// The HTTP spec requires that this message include an `Allow` header with the allowed
+// HTTP methods.
+let ``405 Method Not Allowed`` allowedMethods =
+  responseWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+
+// Creates an `HttpApplication` from a function that takes a transformed request body and
+// returns an `HttpResponseMessage`.
+let createHttpAppFromRequestBody<'a> (f:'a -> HttpResponseMessage) : HttpApplication<'a> =
+  fun request requestBodyT -> f <| requestBodyT request.Content
+
 // ## HTTP Resource Agent
 
-type RequestHandler = {
-  Method : HttpMethod
-  ProcessRequest : HttpRequestMessage -> HttpResponseMessage }
-  with
-  member this.Match(httpMethod) =
-    this.Method = HttpMethod.All || this.Method = httpMethod
+type HttpMethodHandler<'a> =
+  { Method : HttpMethod
+    Handler : HttpApplication<'a> }
 
-let private createRequestHandler methd handler = { Method = methd; ProcessRequest = handler }
-let map handler = createRequestHandler HttpMethod.All handler
-let get handler = createRequestHandler HttpMethod.Get handler
-let post handler = createRequestHandler HttpMethod.Post handler
-let put handler = createRequestHandler HttpMethod.Put handler
-let delete handler = createRequestHandler HttpMethod.Delete handler
+let matchMethodHandler httpMethod handler =
+  handler.Method = HttpMethod.All || handler.Method = httpMethod
 
-type ResourceMessage =
-  | AddRequestHandler of (RequestHandler list -> RequestHandler list)
+let createMethodHandler httpMethod handler = { Method = httpMethod; Handler = handler }
+let map handler = createMethodHandler HttpMethod.All handler
+let get handler = createMethodHandler HttpMethod.Get handler
+let post handler = createMethodHandler HttpMethod.Post handler
+let put handler = createMethodHandler HttpMethod.Put handler
+let delete handler = createMethodHandler HttpMethod.Delete handler
+
+type ResourceMessage<'a> =
+  | AddHttpMethodHandler of (HttpMethodHandler<'a> list -> HttpMethodHandler<'a> list)
   | GetPath of AsyncReplyChannel<string>
-  | GetRoutes of AsyncReplyChannel<RequestHandler list>
+  | GetRoutes of AsyncReplyChannel<HttpMethodHandler<'a> list>
   | ProcessRequest of HttpRequestMessage * AsyncReplyChannel<HttpResponseMessage>
 
 // Creates a resource agent for a given path and set of HTTP message handlers.
-let createResourceAgent path handlers = Agent<ResourceMessage>.Start(fun inbox ->
+let createResourceAgent path handlers mediaTypeFormatters = Agent<ResourceMessage<_>>.Start(fun inbox ->
+  let requestBodyT = readBodyWithMediaTypes mediaTypeFormatters
   // The resource agent's loop cycles through messages in its queue,
   // processing both control messages and request messages sequentially.
-  let rec loop path (handlers:RequestHandler list) = async {
+  let rec loop path (handlers:HttpMethodHandler<_> list) = async {
     let! msg = inbox.Receive() 
     match msg with
-    | AddRequestHandler f ->
+    | AddHttpMethodHandler f ->
         return! loop path (f handlers)
     | GetPath(reply) ->
         reply.Reply path
@@ -65,11 +108,11 @@ let createResourceAgent path handlers = Agent<ResourceMessage>.Start(fun inbox -
         reply.Reply handlers
         return! loop path handlers
     | ProcessRequest(request, reply) ->
-        let handler = handlers |> List.filter (fun r -> r.Match request.Method)
+        let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
         let response =
           match handler with
-          | hd::_ -> hd.ProcessRequest request // Return the first match; there should be only one.
-          | _ -> HttpResponseMessage.MethodNotAllowedHandler request
+          | hd::_ -> hd.Handler request requestBodyT
+          | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request requestBodyT
         reply.Reply response
         return! loop path handlers }
   loop path handlers)
@@ -80,33 +123,28 @@ let createResourceAgent path handlers = Agent<ResourceMessage>.Start(fun inbox -
 //
 // In addition, unlike using the agent directly, the path is available instantly as
 // a property of the resource.
-type Resource(path, handlers) =
-  let agent = createResourceAgent path (handlers |> List.ofSeq)
+type Resource(path, handlers, ?mediaTypeFormatters) =
+  let mediaTypeFormatters = defaultArg mediaTypeFormatters Seq.empty
+  let agent = createResourceAgent path (handlers |> List.ofSeq) mediaTypeFormatters
   member this.Path = path
+  // Should another mechanism exist to allow the removal of handlers during runtime?
   member this.AddHandler(f) =
-    agent.Post(AddRequestHandler f)
+    agent.Post(AddHttpMethodHandler f)
   member this.AsyncProcessRequest(request) =
     agent.PostAndAsyncReply(fun reply -> ProcessRequest(request, reply))
   member this.ProcessRequestAsync(request, ?cancellationToken) =
     Async.StartAsTask(this.AsyncProcessRequest(request), ?cancellationToken = cancellationToken)
-  member this.Extend(f:Agent<ResourceMessage> -> Agent<ResourceMessage>) = f agent
+  member this.Extend(f:Agent<ResourceMessage<_>> -> Agent<ResourceMessage<_>>) = f agent
 
 // The Extend module provides the mechanisms for extending simple routing agents with
 // additional functionality.
 module Extend =
-  let withOptions (agent:Agent<ResourceMessage>) =
-
-    let createHandler (allowedMethods : #seq<HttpMethod>) = fun request ->
-      let content = new ByteArrayContent([||])
-      content.Headers.Add("Allow", allowedMethods |> Seq.map (fun m -> m.Method))
-      let message = new HttpResponseMessage()
-      message.Content <- content
-      message
-
-    let getMethods handlers = List.map (fun (r:RequestHandler) -> r.Method) handlers |> Array.ofList
-    let options = createHandler << getMethods
-    let addOptions handlers = createRequestHandler HttpMethod.Options (options handlers) :: handlers
-    agent.Post(AddRequestHandler addOptions)
+  let withOptions (agent:Agent<ResourceMessage<_>>) =
+    // This is incredibly naive. What if the client has already submitted a request
+    // that blocks other methods for a time?
+    let getMethods handlers = List.map (fun (r:HttpMethodHandler<_>) -> r.Method) handlers |> Array.ofList
+    let addOptions handlers = createMethodHandler HttpMethod.Options ((options << getMethods) handlers) :: handlers
+    agent.Post(AddHttpMethodHandler addOptions)
     agent
   
 // TODO: add diagnostics and logging
@@ -130,7 +168,7 @@ type FrankHandler() =
         override this.SendAsync(request, cancellationToken) =
           resource.ProcessRequestAsync(request, cancellationToken) } :> DelegatingHandler
 
-let frankWebApi (resources : seq<#Resource>) =
+let frankWebApi (resources : #seq<#Resource>) =
   // TODO: Auto-wire routes based on the passed-in resources.
   let routes = resources |> Seq.map (fun r -> (r.Path, r.ProcessRequestAsync))
 
