@@ -25,6 +25,7 @@ let nugetLibDir = nugetDir @@ "lib"
 let nugetDocsDir = nugetDir @@ "docs"
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
 let webApiVersion = GetPackageVersion packagesDir "WebApi.All"
+let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
 let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
 let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
 
@@ -122,6 +123,7 @@ Target "BuildNuGet" (fun _ ->
             Version = version
             OutputPath = nugetDir
             Dependencies = ["WebApi.All",RequireExactly webApiVersion
+                            "FSharpx.Core",RequireExactly fsharpxCoreVersion
                             "ImpromptuInterface",RequireExactly impromptuInterfaceVersion
                             "ImpromptuInterface.FSharp",RequireExactly impromptuInterfaceFSharpVersion ]
             AccessKey = nugetKey
