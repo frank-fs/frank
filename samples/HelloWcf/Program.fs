@@ -19,12 +19,14 @@ open Frank
 
 let private main args =
 
+  let requestBodyT (content: HttpContent) = content.ReadAsString()
+
   // A `GET` handler that always returns "Howdy!".
-  let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
+  let howdy request requestBodyT = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
 
   // A simple `POST`-based echo handler that returns the same input as it received.
-  let echo (request : HttpRequestMessage) =
-    let body = request.Content.ReadAsString()
+  let echo (request : HttpRequestMessage) requestBodyT =
+    let body = requestBodyT request.Content
     let response = new HttpResponseMessage<string>(body, HttpStatusCode.OK) :> HttpResponseMessage
     response
 
@@ -32,15 +34,15 @@ let private main args =
   // Here, the actual function shows clearly that we are really using
   // the `id` function to return the very same result.
   let echo2Core = id
-  // The `echo2MapFrom` maps the incoming request to a value that can be used
-  // within the actual computation, or `echo2Core` in this example.
-  let echo2MapFrom (request : HttpRequestMessage) = request.Content.ReadAsString()
+
   // The `echo2MapTo` maps the outgoing message body to an HTTP response.
   let echo2MapTo body = new HttpResponseMessage<_>(body, HttpStatusCode.OK) :> HttpResponseMessage
+
   // This `echo2` is the same in principle as `echo` above, except that the
   // logic for the message transform deals only with the concrete types
   // about which it cares and isn't bothered by the transformations.
-  let echo2 = echo2Core >> echo2MapTo << echo2MapFrom 
+  let echo2 (request: HttpRequestMessage) requestBodyT =
+      requestBodyT request.Content |> echo2Core |> echo2MapTo
 
   // Create a `Resource` instance at the root of the site that responds to `GET` and `POST`.
   let resource = Resource("", [ get howdy; post echo2 ])

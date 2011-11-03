@@ -20,6 +20,7 @@ open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
 open FSharpx
+open FSharpx.Http
 open FSharpx.Iteratee
 
 // ## Type Aliases and Extensions
@@ -42,8 +43,7 @@ type HttpMethod with
 
 // ## RequestBodyT helper functions
 
-// `readBodyWithMediaTypes<'a>` takes a collection of `MediaTypeFormatter` and
-// returns a `RequestBodyT<'a>`.
+// `readBodyWithMediaTypes<'a>` takes a collection of `MediaTypeFormatter` and returns a `RequestBodyT<'a>`.
 let readBodyWithMediaTypes (mediaTypeFormatters: seq<MediaTypeFormatter>) : RequestBodyT<_> =
   fun content -> content.ReadAs<_>(mediaTypeFormatters)
 
@@ -64,10 +64,26 @@ let options allowedMethods =
 let ``405 Method Not Allowed`` allowedMethods =
   responseWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
 
+let ``406 Not Acceptable`` =
+    fun _ _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
+
 // Creates an `HttpApplication` from a function that takes a transformed request body and
 // returns an `HttpResponseMessage`.
-let createHttpAppFromRequestBody<'a> (f:'a -> HttpResponseMessage) : HttpApplication<'a> =
+let handleRequest<'a> (f:'a -> HttpResponseMessage) : HttpApplication<'a> =
   fun request requestBodyT -> f <| requestBodyT request.Content
+
+let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
+
+let negotiateMediaType (f: HttpRequestMessage -> RequestBodyT<'a> -> 'b) (mediaTypeFormatters: (string list * ('b -> HttpResponseMessage)) list) =
+    let servedMedia = List.collect fst mediaTypeFormatters
+    let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
+    let findFormatterFor mediaType = List.find (fst >> Seq.exists ((=) mediaType)) >> snd
+    fun request requestBodyT -> 
+        match bestOf request with
+        | Some mediaType ->
+            let format = findFormatterFor mediaType mediaTypeFormatters 
+            f request requestBodyT |> format
+        | _ -> ``406 Not Acceptable`` request requestBodyT
 
 // ## HTTP Resource Agent
 
@@ -92,30 +108,31 @@ type ResourceMessage<'a> =
   | ProcessRequest of HttpRequestMessage * AsyncReplyChannel<HttpResponseMessage>
 
 // Creates a resource agent for a given path and set of HTTP message handlers.
-let createResourceAgent path handlers mediaTypeFormatters = Agent<ResourceMessage<_>>.Start(fun inbox ->
-  let requestBodyT = readBodyWithMediaTypes mediaTypeFormatters
-  // The resource agent's loop cycles through messages in its queue,
-  // processing both control messages and request messages sequentially.
-  let rec loop path (handlers:HttpMethodHandler<_> list) = async {
-    let! msg = inbox.Receive() 
-    match msg with
-    | AddHttpMethodHandler f ->
-        return! loop path (f handlers)
-    | GetPath(reply) ->
-        reply.Reply path
-        return! loop path handlers
-    | GetRoutes(reply) ->
-        reply.Reply handlers
-        return! loop path handlers
-    | ProcessRequest(request, reply) ->
-        let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
-        let response =
-          match handler with
-          | hd::_ -> hd.Handler request requestBodyT
-          | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request requestBodyT
-        reply.Reply response
-        return! loop path handlers }
-  loop path handlers)
+let createResourceAgent(path, handlers, mediaTypeFormatters) =
+  Agent<ResourceMessage<_>>.Start(fun inbox ->
+    let requestBodyT = readBodyWithMediaTypes mediaTypeFormatters
+    // The resource agent's loop cycles through messages in its queue,
+    // processing both control messages and request messages sequentially.
+    let rec loop path (handlers:HttpMethodHandler<_> list) = async {
+      let! msg = inbox.Receive() 
+      match msg with
+      | AddHttpMethodHandler f ->
+          return! loop path (f handlers)
+      | GetPath(reply) ->
+          reply.Reply path
+          return! loop path handlers
+      | GetRoutes(reply) ->
+          reply.Reply handlers
+          return! loop path handlers
+      | ProcessRequest(request, reply) ->
+          let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
+          let response =
+            match handler with
+            | hd::_ -> hd.Handler request requestBodyT
+            | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request requestBodyT
+          reply.Reply response
+          return! loop path handlers }
+    loop path handlers)
 
 // The Resource wraps the routing agent in a class to provide a more intuitive
 // api for those more familiar with OOP and C#. This also allows easier consumption
@@ -125,7 +142,7 @@ let createResourceAgent path handlers mediaTypeFormatters = Agent<ResourceMessag
 // a property of the resource.
 type Resource(path, handlers, ?mediaTypeFormatters) =
   let mediaTypeFormatters = defaultArg mediaTypeFormatters Seq.empty
-  let agent = createResourceAgent path (handlers |> List.ofSeq) mediaTypeFormatters
+  let agent = createResourceAgent(path, (handlers |> List.ofSeq), mediaTypeFormatters)
   member this.Path = path
   // Should another mechanism exist to allow the removal of handlers during runtime?
   member this.AddHandler(f) =

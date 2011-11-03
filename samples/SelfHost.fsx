@@ -11,6 +11,8 @@ See LICENSE.txt for details.
 
 #r "System.ServiceModel"
 #r "System.ServiceModel.Web"
+#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
+#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
 #r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll"
 #r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll"
 #r @"..\packages\JsonValue.0.5.0\lib\40\Microsoft.Json.dll"
@@ -31,12 +33,14 @@ open System.ServiceModel
 open Microsoft.ApplicationServer.Http
 open Frank
 
+let requestBodyT (content: HttpContent) = content.ReadAsString()
+
 // A `GET` handler that always returns "Howdy!".
-let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
+let howdy request requestBodyT = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
 
 // A simple `POST`-based echo handler that returns the same input as it received.
-let echo (request : HttpRequestMessage) =
-  let body = request.Content.ReadAsString()
+let echo (request : HttpRequestMessage) requestBodyT =
+  let body = requestBodyT request.Content
   let response = new HttpResponseMessage<string>(body, HttpStatusCode.OK) :> HttpResponseMessage
   response
 
@@ -44,15 +48,15 @@ let echo (request : HttpRequestMessage) =
 // Here, the actual function shows clearly that we are really using
 // the `id` function to return the very same result.
 let echo2Core = id
-// The `echo2MapFrom` maps the incoming request to a value that can be used
-// within the actual computation, or `echo2Core` in this example.
-let echo2MapFrom (request : HttpRequestMessage) = request.Content.ReadAsString()
+
 // The `echo2MapTo` maps the outgoing message body to an HTTP response.
 let echo2MapTo body = new HttpResponseMessage<_>(body, HttpStatusCode.OK) :> HttpResponseMessage
+
 // This `echo2` is the same in principle as `echo` above, except that the
 // logic for the message transform deals only with the concrete types
 // about which it cares and isn't bothered by the transformations.
-let echo2 = echo2Core >> echo2MapTo << echo2MapFrom 
+let echo2 (request: HttpRequestMessage) requestBodyT =
+    requestBodyT request.Content |> echo2Core |> echo2MapTo
 
 // Create a `Resource` instance at the root of the site that responds to `GET` and `POST`.
 let resource = Resource("", [ get howdy; post echo2 ])
@@ -65,11 +69,10 @@ let baseUri = "http://localhost:1000/"
 // Create a self-hosted service host using an `EmptyService`, as the service
 // won't actually do anything.
 let host = new HttpServiceHost(typeof<EmptyService>, config, [| baseUri |])
-// Run `host.Open()` to start accepting and responding to requests.
 host.Open()
 
 printfn "Host open.  Hit enter to exit..."
 printfn "Use a web browser and go to %A or do it right and get fiddler!" baseUri
+System.Console.Read() |> ignore
 
-// Run `host.Close()` to close your server.
 host.Close()
