@@ -21,99 +21,107 @@ open System.Net.Http.Headers
 open System.Text
 open FSharpx
 open FSharpx.Http
-open FSharpx.Iteratee
 
 // ## Type Aliases and Extensions
-
-// An HTTP request body transformer.
-// Specifying this function will transform a stream of content
-// into a type 'a. The simplest transform is the `id` function.
-type RequestBodyT<'a> = HttpContent -> 'a
 
 // HttpApplication defines the contract for processing a request.
 // An application takes an HttpRequestMessage and
 // returns a function that takes an HttpContent transformer and
 // returns an HttpResponseMessage that can be sent to the client.
-type HttpApplication<'a> = HttpRequestMessage -> RequestBodyT<'a> -> HttpResponseMessage
+type HttpApplication = HttpRequestMessage -> HttpResponseMessage
 
 type Agent<'a> = MailboxProcessor<'a>
 
 type HttpMethod with
   static member All = new HttpMethod("*")
 
-// ## RequestBodyT helper functions
-
-// `readBodyWithMediaTypes<'a>` takes a collection of `MediaTypeFormatter` and returns a `RequestBodyT<'a>`.
-let readBodyWithMediaTypes (mediaTypeFormatters: seq<MediaTypeFormatter>) : RequestBodyT<_> =
-  fun content -> content.ReadAs<_>(mediaTypeFormatters)
-
 // ## HttpApplication helper functions
 
-let private responseWithAllowHeader statusCode (allowedMethods: #seq<HttpMethod>) : HttpApplication<_> =
-  fun _ _ ->
-      let response = new HttpResponseMessage(statusCode)
-      allowedMethods |> Seq.map (fun m -> m.Method) |> Seq.iter response.Content.Headers.Allow.Add
-      response
+let respond (statusCode: HttpStatusCode) headers body =
+  let response = new HttpResponseMessage<_>(body, statusCode)
+  headers |> Seq.iter (fun (header, values: string) -> response.Headers.Add(header, values))
+  response :> HttpResponseMessage
+
+let private respondWithAllowHeader statusCode (allowedMethods: #seq<HttpMethod>) : HttpApplication =
+  fun _ ->
+    let response = new HttpResponseMessage(statusCode)
+    allowedMethods |> Seq.map (fun m -> m.Method) |> Seq.iter response.Content.Headers.Allow.Add
+    response
 
 let options allowedMethods =
-  responseWithAllowHeader HttpStatusCode.OK allowedMethods
+  respondWithAllowHeader HttpStatusCode.OK allowedMethods
 
 // In some instances, you need to respond with a `405 Message Not Allowed` response.
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  responseWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
 
 let ``406 Not Acceptable`` =
-    fun _ _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
+  fun _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
 
-// Creates an `HttpApplication` from a function that takes a transformed request body and
-// returns an `HttpResponseMessage`.
-let handleRequest<'a> (f:'a -> HttpResponseMessage) : HttpApplication<'a> =
-  fun request requestBodyT -> f <| requestBodyT request.Content
+let findFormatterFor mediaType = Seq.find (fst >> Seq.exists ((=) mediaType)) >> snd
+
+// `readRequestBody` takes a collection of `HttpContent` formatters and returns a typed result from reading the content.
+// This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
+// a similar type against which to calculate a response.
+let readRequestBody mediaTypeReaders =
+  fun (request: HttpRequestMessage) ->
+    let reader = findFormatterFor request.Content.Headers.ContentType.MediaType mediaTypeReaders
+    in reader request
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
-let negotiateMediaType (f: HttpRequestMessage -> RequestBodyT<'a> -> 'b) (mediaTypeFormatters: (string list * ('b -> HttpResponseMessage)) list) =
-    let servedMedia = List.collect fst mediaTypeFormatters
-    let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
-    let findFormatterFor mediaType = List.find (fst >> Seq.exists ((=) mediaType)) >> snd
-    fun request requestBodyT -> 
-        match bestOf request with
-        | Some mediaType ->
-            let format = findFormatterFor mediaType mediaTypeFormatters 
-            f request requestBodyT |> format
-        | _ -> ``406 Not Acceptable`` request requestBodyT
+let negotiateMediaType f formatters : HttpApplication =
+  let servedMedia = Seq.collect fst formatters
+  let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
+  fun request -> 
+    match bestOf request with
+    | Some mediaType ->
+        let format = findFormatterFor mediaType formatters
+        in format <| f request 
+    | _ -> ``406 Not Acceptable`` request
+
+// The most direct way of building an HTTP application is to focus on the actual data types
+// being transacted. These usually come in the form of the content of the request and response
+// message bodies. The `f` function is a standard `map` higher-order function parameter to
+// transform a typed request body `'a` to a typed response body `'b`.
+// 
+// These may be encoded in various formats. So `mediaTypeReaders` and `formatters` are needed to handle
+// the serialization and deserialization of the request and response bodies, respectively.
+//
+// Other mechanisms will be provided in Frank to allow a finer-grained application of both
+// mapping and serialization/deserialization.
+let mapWithConneg f mediaTypeReaders formatters =
+  negotiateMediaType (readRequestBody mediaTypeReaders >> f) formatters
 
 // ## HTTP Resource Agent
 
-type HttpMethodHandler<'a> =
+type HttpMethodHandler =
   { Method : HttpMethod
-    Handler : HttpApplication<'a> }
+    Handler : HttpApplication }
 
 let matchMethodHandler httpMethod handler =
   handler.Method = HttpMethod.All || handler.Method = httpMethod
 
 let createMethodHandler httpMethod handler = { Method = httpMethod; Handler = handler }
-let map handler = createMethodHandler HttpMethod.All handler
 let get handler = createMethodHandler HttpMethod.Get handler
 let post handler = createMethodHandler HttpMethod.Post handler
 let put handler = createMethodHandler HttpMethod.Put handler
 let delete handler = createMethodHandler HttpMethod.Delete handler
 
-type ResourceMessage<'a> =
-  | AddHttpMethodHandler of (HttpMethodHandler<'a> list -> HttpMethodHandler<'a> list)
+type ResourceMessage =
+  | AddHttpMethodHandler of (HttpMethodHandler list -> HttpMethodHandler list)
   | GetPath of AsyncReplyChannel<string>
-  | GetRoutes of AsyncReplyChannel<HttpMethodHandler<'a> list>
+  | GetRoutes of AsyncReplyChannel<HttpMethodHandler list>
   | ProcessRequest of HttpRequestMessage * AsyncReplyChannel<HttpResponseMessage>
 
 // Creates a resource agent for a given path and set of HTTP message handlers.
-let createResourceAgent(path, handlers, mediaTypeFormatters) =
-  Agent<ResourceMessage<_>>.Start(fun inbox ->
-    let requestBodyT = readBodyWithMediaTypes mediaTypeFormatters
+let createResourceAgent(path, handlers, formatters) =
+  Agent<ResourceMessage>.Start(fun inbox ->
     // The resource agent's loop cycles through messages in its queue,
     // processing both control messages and request messages sequentially.
-    let rec loop path (handlers:HttpMethodHandler<_> list) = async {
+    let rec loop path (handlers:HttpMethodHandler list) = async {
       let! msg = inbox.Receive() 
       match msg with
       | AddHttpMethodHandler f ->
@@ -128,8 +136,8 @@ let createResourceAgent(path, handlers, mediaTypeFormatters) =
           let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
           let response =
             match handler with
-            | hd::_ -> hd.Handler request requestBodyT
-            | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request requestBodyT
+            | hd::_ -> hd.Handler request
+            | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request
           reply.Reply response
           return! loop path handlers }
     loop path handlers)
@@ -140,9 +148,9 @@ let createResourceAgent(path, handlers, mediaTypeFormatters) =
 //
 // In addition, unlike using the agent directly, the path is available instantly as
 // a property of the resource.
-type Resource(path, handlers, ?mediaTypeFormatters) =
-  let mediaTypeFormatters = defaultArg mediaTypeFormatters Seq.empty
-  let agent = createResourceAgent(path, (handlers |> List.ofSeq), mediaTypeFormatters)
+type Resource(path, handlers, ?formatters) =
+  let formatters = defaultArg formatters Seq.empty
+  let agent = createResourceAgent(path, (handlers |> List.ofSeq), formatters)
   member this.Path = path
   // Should another mechanism exist to allow the removal of handlers during runtime?
   member this.AddHandler(f) =
@@ -151,15 +159,15 @@ type Resource(path, handlers, ?mediaTypeFormatters) =
     agent.PostAndAsyncReply(fun reply -> ProcessRequest(request, reply))
   member this.ProcessRequestAsync(request, ?cancellationToken) =
     Async.StartAsTask(this.AsyncProcessRequest(request), ?cancellationToken = cancellationToken)
-  member this.Extend(f:Agent<ResourceMessage<_>> -> Agent<ResourceMessage<_>>) = f agent
+  member this.Extend(f:Agent<ResourceMessage> -> Agent<ResourceMessage>) = f agent
 
 // The Extend module provides the mechanisms for extending simple routing agents with
 // additional functionality.
 module Extend =
-  let withOptions (agent:Agent<ResourceMessage<_>>) =
+  let withOptions (agent:Agent<ResourceMessage>) =
     // This is incredibly naive. What if the client has already submitted a request
     // that blocks other methods for a time?
-    let getMethods handlers = List.map (fun (r:HttpMethodHandler<_>) -> r.Method) handlers |> Array.ofList
+    let getMethods handlers = List.map (fun (r:HttpMethodHandler) -> r.Method) handlers |> Array.ofList
     let addOptions handlers = createMethodHandler HttpMethod.Options ((options << getMethods) handlers) :: handlers
     agent.Post(AddHttpMethodHandler addOptions)
     agent
@@ -189,6 +197,10 @@ let frankWebApi (resources : #seq<#Resource>) =
   // TODO: Auto-wire routes based on the passed-in resources.
   let routes = resources |> Seq.map (fun r -> (r.Path, r.ProcessRequestAsync))
 
-  WebApiConfiguration(
-    useMethodPrefixForHttpMethod = false,
-    MessageHandlerFactory = (fun () -> Seq.map FrankHandler.Create resources))
+  let config =
+    WebApiConfiguration(
+      useMethodPrefixForHttpMethod = false,
+      MessageHandlerFactory = (fun () -> Seq.map FrankHandler.Create resources))
+  config.Formatters.Clear()
+  config
+  

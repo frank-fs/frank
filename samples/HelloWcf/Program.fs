@@ -22,30 +22,35 @@ let private main args =
   let requestBodyT (content: HttpContent) = content.ReadAsString()
 
   // A `GET` handler that always returns "Howdy!".
-  let howdy request requestBodyT = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
+  let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
 
   // A simple `POST`-based echo handler that returns the same input as it received.
-  let echo (request : HttpRequestMessage) requestBodyT =
-    let body = requestBodyT request.Content
-    let response = new HttpResponseMessage<string>(body, HttpStatusCode.OK) :> HttpResponseMessage
-    response
+  let echo (request: HttpRequestMessage) =
+    let body = request.Content.ReadAs<string>()
+    respond HttpStatusCode.OK [ "Content-Type", "text/plain" ] body
 
   // A compositional approach to type mapping and handler design.
   // Here, the actual function shows clearly that we are really using
   // the `id` function to return the very same result.
   let echo2Core = id
 
+  // The `echo2MapFrom` reads the incoming HTTP request and "deserializes" the body.
+  let echo2MapFrom (request: HttpRequestMessage) = request.Content.ReadAs<string>()
+
   // The `echo2MapTo` maps the outgoing message body to an HTTP response.
-  let echo2MapTo body = new HttpResponseMessage<_>(body, HttpStatusCode.OK) :> HttpResponseMessage
+  let echo2MapTo body = respond HttpStatusCode.OK [ "Content-Type", "text/plain" ] body
 
   // This `echo2` is the same in principle as `echo` above, except that the
   // logic for the message transform deals only with the concrete types
   // about which it cares and isn't bothered by the transformations.
-  let echo2 (request: HttpRequestMessage) requestBodyT =
-      requestBodyT request.Content |> echo2Core |> echo2MapTo
+  let echo2 = echo2MapFrom >> echo2Core >> echo2MapTo
+
+  // TODO: Show why compositionality is a good thing. Above, one may get the impression
+  // that it merely leads to yet more lines of code.
 
   // Create a `Resource` instance at the root of the site that responds to `GET` and `POST`.
   let resource = Resource("", [ get howdy; post echo2 ])
+
   // The `frank` function creates a `WebApiConfiguration` instance based on our resources.
   // These will be mounted at the `baseUri`. The `frank` function creates a `DelegatingHandler`
   // that will intercept all incoming traffic and route it to our resources.
