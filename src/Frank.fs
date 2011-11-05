@@ -173,33 +173,3 @@ module Extend =
   
 // TODO: add diagnostics and logging
 // TODO: add messages to access diagnostics and logging info from the agent
-
-// ## Web API Hosting
-
-// Open namespaces for Web API support.
-open System.ServiceModel
-open Microsoft.ApplicationServer.Http
-
-[<ServiceContract>]
-type EmptyService() =
-  [<OperationContract>]
-  member x.Invoke() = ()
-
-type FrankHandler() =
-  inherit DelegatingHandler()
-  static member Create(resource : Resource) =
-    { new FrankHandler() with
-        override this.SendAsync(request, cancellationToken) =
-          resource.ProcessRequestAsync(request, cancellationToken) } :> DelegatingHandler
-
-let frankWebApi (resources : #seq<#Resource>) =
-  // TODO: Auto-wire routes based on the passed-in resources.
-  let routes = resources |> Seq.map (fun r -> (r.Path, r.ProcessRequestAsync))
-
-  let config =
-    WebApiConfiguration(
-      useMethodPrefixForHttpMethod = false,
-      MessageHandlerFactory = (fun () -> Seq.map FrankHandler.Create resources))
-  config.Formatters.Clear()
-  config
-  

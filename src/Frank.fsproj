@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="Frank.fs" />
     <Compile Include="Middleware.fs" />
+    <Compile Include="Hosting.fs" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

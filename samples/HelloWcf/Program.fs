@@ -16,10 +16,9 @@ open System.Net.Http
 open System.ServiceModel
 open Microsoft.ApplicationServer.Http
 open Frank
+open Frank.Hosting.Wcf
 
 let private main args =
-
-  let requestBodyT (content: HttpContent) = content.ReadAsString()
 
   // A `GET` handler that always returns "Howdy!".
   let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage

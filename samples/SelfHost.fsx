@@ -24,6 +24,8 @@ See LICENSE.txt for details.
 #r @"..\packages\ImpromptuInterface.5.6.2\lib\net40\ImpromptuInterface.dll"
 #r @"..\packages\ImpromptuInterface.FSharp.1.1.0\lib\net40\ImpromptuInterface.FSharp.dll"
 #load @"..\src\Frank.fs"
+#load @"..\src\Middleware.fs"
+#load @"..\src\Hosting.fs"
 
 open System
 open System.Collections.Generic
@@ -32,6 +34,7 @@ open System.Net.Http
 open System.ServiceModel
 open Microsoft.ApplicationServer.Http
 open Frank
+open Frank.Hosting.Wcf
 
 // A `GET` handler that always returns "Howdy!".
 let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
