@@ -24,10 +24,9 @@ open FSharpx.Http
 
 // ## Type Aliases and Extensions
 
-// HttpApplication defines the contract for processing a request.
-// An application takes an HttpRequestMessage and
-// returns a function that takes an HttpContent transformer and
-// returns an HttpResponseMessage that can be sent to the client.
+// `HttpApplication` defines the contract for processing a request.
+// An application takes an `HttpRequestMessage` and
+// returns an `HttpResponseMessage` that can be sent to the client.
 type HttpApplication = HttpRequestMessage -> HttpResponseMessage
 
 type Agent<'a> = MailboxProcessor<'a>
