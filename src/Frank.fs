@@ -96,40 +96,28 @@ let mapWithConneg f mediaTypeReaders formatters =
 
 // ## HTTP Resource Agent
 
-[<CustomEquality;NoComparison>]
-type HttpMethodHandler =
-  { Method : HttpMethod
-    Handler : HttpApplication }
-  with
-  override this.Equals(other) =
-    other.GetType() = typeof<HttpMethodHandler> && (other :?> HttpMethodHandler).Method = this.Method
-  override this.GetHashCode() = hash this
+let tryFindHandlerFor httpMethod = List.tryFind (fst >> (=) httpMethod) >> Option.map snd
 
-let matchMethodHandler httpMethod handler =
-  handler.Method = HttpMethod.All || handler.Method = httpMethod
-
-let createMethodHandler httpMethod handler = { Method = httpMethod; Handler = handler }
-let get handler = createMethodHandler HttpMethod.Get handler
-let post handler = createMethodHandler HttpMethod.Post handler
-let put handler = createMethodHandler HttpMethod.Put handler
-let delete handler = createMethodHandler HttpMethod.Delete handler
+let get handler = (HttpMethod.Get, handler)
+let post handler = (HttpMethod.Post, handler)
+let put handler = (HttpMethod.Put, handler)
+let delete handler = (HttpMethod.Delete, handler)
 
 type ResourceMessage =
   | GetPath of AsyncReplyChannel<string>
   | ProcessRequest of HttpRequestMessage * AsyncReplyChannel<HttpResponseMessage>
-  | AddHandler of HttpMethodHandler
-  | RemoveHandler of HttpMethodHandler
+  | AddHandler of HttpMethod * HttpApplication
+  | RemoveHandler of HttpMethod
 
-let getMethods = List.map (fun (r: HttpMethodHandler) -> r.Method)
-let addOptions handlers = createMethodHandler HttpMethod.Options ((options << getMethods) handlers) :: handlers
+let getMethods handlers = List.map fst handlers
+let addOptions handlers = (HttpMethod.Options, (options << getMethods) handlers)
 
 // Creates a resource agent for a given path and set of HTTP message handlers.
 let createResourceAgent path handlers =
-  let handlers = addOptions handlers
   Agent<ResourceMessage>.Start(fun inbox ->
     // The resource agent's loop cycles through messages in its queue,
     // processing both control messages and request messages sequentially.
-    let rec loop path (handlers:HttpMethodHandler list) = async {
+    let rec loop path (handlers: (HttpMethod * HttpApplication) list) = async {
       let! msg = inbox.Receive() 
       match msg with
       // TODO: Add BlockHandler and UnblockHandler messages, taking a user token. These should allow the resource to block methods for long-running operations, to be reflected in OPTIONS.
@@ -137,17 +125,17 @@ let createResourceAgent path handlers =
           reply.Reply path
           return! loop path handlers
       | ProcessRequest(request, reply) ->
-          let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
+          let handler = tryFindHandlerFor request.Method handlers
           let response =
             match handler with
-            | hd::_ -> hd.Handler request
-            | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request
+            | Some h -> h request
+            | _ -> ``405 Method Not Allowed`` (List.map fst handlers) request
           reply.Reply response
           return! loop path handlers
-      | AddHandler h ->
-          return! loop path <| h::handlers
-      | RemoveHandler h ->
-          return! loop path <| List.filter ((<>) h) handlers }
+      | AddHandler(httpMethod, handler) ->
+          return! loop path <| (httpMethod, handler)::handlers
+      | RemoveHandler(httpMethod) ->
+          return! loop path <| List.filter (fst >> (<>) httpMethod) handlers }
     loop path handlers)
 
 // The Resource wraps the routing agent in a class to provide a more intuitive
