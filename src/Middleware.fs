@@ -18,26 +18,31 @@ open Microsoft.ApplicationServer.Http
 open Frank
 open ImpromptuInterface.FSharp
 
+// TODO: add diagnostics and logging
+// TODO: add messages to access diagnostics and logging info from the agent
+  
 /// Logs the incoming request and the time to respond.
-let log app = fun (request : HttpRequestMessage) -> 
-  let sw = System.Diagnostics.Stopwatch.StartNew()
-  let response = app request
-  printfn "Received a %A request from %A. Responded in %i ms."
-          request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
-  sw.Reset()
-  response
+let log app =
+  fun (request: HttpRequestMessage) -> 
+    let sw = System.Diagnostics.Stopwatch.StartNew()
+    let response = app request
+    printfn "Received a %A request from %A. Responded in %i ms."
+            request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
+    sw.Reset()
+    response
 
 /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
-let head app = fun (request : HttpRequestMessage) ->
-  if request.Method <> HttpMethod.Head then app request
-  else
-    request.Method <- HttpMethod.Get
-    let (response : HttpResponseMessage) = app request
-    let emptyContent = new ByteArrayContent([||])
-    for KeyValue(header, value) in response.Content.Headers do
-      emptyContent.Headers.Add(header, value)
-    response.Content <- emptyContent
-    response
+let head app =
+  fun (request: HttpRequestMessage) ->
+    if request.Method = HttpMethod.Head then 
+      request.Method <- HttpMethod.Get
+      let (response : HttpResponseMessage) = app request
+      let emptyContent = new ByteArrayContent([||])
+      for KeyValue(header, value) in response.Content.Headers do
+        emptyContent.Headers.Add(header, value)
+      response.Content <- emptyContent
+      response
+    else app request
 
 /// The overridable HTTP methods, used in the methodOverride middleware.
 let private overridableHttpMethods =

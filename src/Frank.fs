@@ -96,9 +96,14 @@ let mapWithConneg f mediaTypeReaders formatters =
 
 // ## HTTP Resource Agent
 
+[<CustomEquality;NoComparison>]
 type HttpMethodHandler =
   { Method : HttpMethod
     Handler : HttpApplication }
+  with
+  override this.Equals(other) =
+    other.GetType() = typeof<HttpMethodHandler> && (other :?> HttpMethodHandler).Method = this.Method
+  override this.GetHashCode() = hash this
 
 let matchMethodHandler httpMethod handler =
   handler.Method = HttpMethod.All || handler.Method = httpMethod
@@ -110,26 +115,26 @@ let put handler = createMethodHandler HttpMethod.Put handler
 let delete handler = createMethodHandler HttpMethod.Delete handler
 
 type ResourceMessage =
-  | AddHttpMethodHandler of (HttpMethodHandler list -> HttpMethodHandler list)
   | GetPath of AsyncReplyChannel<string>
-  | GetRoutes of AsyncReplyChannel<HttpMethodHandler list>
   | ProcessRequest of HttpRequestMessage * AsyncReplyChannel<HttpResponseMessage>
+  | AddHandler of HttpMethodHandler
+  | RemoveHandler of HttpMethodHandler
+
+let getMethods = List.map (fun (r: HttpMethodHandler) -> r.Method)
+let addOptions handlers = createMethodHandler HttpMethod.Options ((options << getMethods) handlers) :: handlers
 
 // Creates a resource agent for a given path and set of HTTP message handlers.
-let createResourceAgent(path, handlers, formatters) =
+let createResourceAgent path handlers =
+  let handlers = addOptions handlers
   Agent<ResourceMessage>.Start(fun inbox ->
     // The resource agent's loop cycles through messages in its queue,
     // processing both control messages and request messages sequentially.
     let rec loop path (handlers:HttpMethodHandler list) = async {
       let! msg = inbox.Receive() 
       match msg with
-      | AddHttpMethodHandler f ->
-          return! loop path (f handlers)
+      // TODO: Add BlockHandler and UnblockHandler messages, taking a user token. These should allow the resource to block methods for long-running operations, to be reflected in OPTIONS.
       | GetPath(reply) ->
           reply.Reply path
-          return! loop path handlers
-      | GetRoutes(reply) ->
-          reply.Reply handlers
           return! loop path handlers
       | ProcessRequest(request, reply) ->
           let handler = handlers |> List.filter (fun r -> matchMethodHandler request.Method r)
@@ -138,7 +143,11 @@ let createResourceAgent(path, handlers, formatters) =
             | hd::_ -> hd.Handler request
             | _ -> ``405 Method Not Allowed`` [ for handler in handlers -> handler.Method ] request
           reply.Reply response
-          return! loop path handlers }
+          return! loop path handlers
+      | AddHandler h ->
+          return! loop path <| h::handlers
+      | RemoveHandler h ->
+          return! loop path <| List.filter ((<>) h) handlers }
     loop path handlers)
 
 // The Resource wraps the routing agent in a class to provide a more intuitive
@@ -147,29 +156,13 @@ let createResourceAgent(path, handlers, formatters) =
 //
 // In addition, unlike using the agent directly, the path is available instantly as
 // a property of the resource.
-type Resource(path, handlers, ?formatters) =
-  let formatters = defaultArg formatters Seq.empty
-  let agent = createResourceAgent(path, (handlers |> List.ofSeq), formatters)
+type Resource(path, handlers) =
+  let agent = createResourceAgent path <| List.ofSeq handlers
   member this.Path = path
-  // Should another mechanism exist to allow the removal of handlers during runtime?
-  member this.AddHandler(f) =
-    agent.Post(AddHttpMethodHandler f)
+  member this.AddHandler(h) = agent.Post(AddHandler h)
+  member this.RemoveHandler(h) = agent.Post(RemoveHandler h)
   member this.AsyncProcessRequest(request) =
     agent.PostAndAsyncReply(fun reply -> ProcessRequest(request, reply))
   member this.ProcessRequestAsync(request, ?cancellationToken) =
     Async.StartAsTask(this.AsyncProcessRequest(request), ?cancellationToken = cancellationToken)
-  member this.Extend(f:Agent<ResourceMessage> -> Agent<ResourceMessage>) = f agent
-
-// The Extend module provides the mechanisms for extending simple routing agents with
-// additional functionality.
-module Extend =
-  let withOptions (agent:Agent<ResourceMessage>) =
-    // This is incredibly naive. What if the client has already submitted a request
-    // that blocks other methods for a time?
-    let getMethods handlers = List.map (fun (r:HttpMethodHandler) -> r.Method) handlers |> Array.ofList
-    let addOptions handlers = createMethodHandler HttpMethod.Options ((options << getMethods) handlers) :: handlers
-    agent.Post(AddHttpMethodHandler addOptions)
-    agent
-  
-// TODO: add diagnostics and logging
-// TODO: add messages to access diagnostics and logging info from the agent
+  member this.Extend(f:Agent<ResourceMessage> -> unit) = f agent
