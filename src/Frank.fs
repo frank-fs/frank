@@ -27,7 +27,7 @@ open FSharpx.Http
 // `HttpApplication` defines the contract for processing a request.
 // An application takes an `HttpRequestMessage` and
 // returns an `HttpResponseMessage` that can be sent to the client.
-type HttpApplication = HttpRequestMessage -> HttpResponseMessage
+type HttpApplication = HttpRequestMessage -> Stream -> HttpResponseMessage
 
 type Agent<'a> = MailboxProcessor<'a>
 
@@ -41,8 +41,10 @@ let respond (statusCode: HttpStatusCode) headers body =
   headers |> Seq.iter (fun (header, values: string) -> response.Headers.Add(header, values))
   response :> HttpResponseMessage
 
+let respondOK headers body = respond HttpStatusCode.OK headers body
+
 let private respondWithAllowHeader statusCode (allowedMethods: #seq<HttpMethod>) : HttpApplication =
-  fun _ ->
+  fun _ _ ->
     let response = new HttpResponseMessage(statusCode)
     allowedMethods |> Seq.map (fun m -> m.Method) |> Seq.iter response.Content.Headers.Allow.Add
     response
@@ -57,7 +59,7 @@ let ``405 Method Not Allowed`` allowedMethods =
   respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
 
 let ``406 Not Acceptable`` =
-  fun _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
+  fun _ _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
 
 let findFormatterFor mediaType = Seq.find (fst >> Seq.exists ((=) mediaType)) >> snd
 
@@ -65,21 +67,20 @@ let findFormatterFor mediaType = Seq.find (fst >> Seq.exists ((=) mediaType)) >>
 // This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
 // a similar type against which to calculate a response.
 let readRequestBody mediaTypeReaders =
-  fun (request: HttpRequestMessage) ->
-    let reader = findFormatterFor request.Content.Headers.ContentType.MediaType mediaTypeReaders
-    in reader request
+  fun (request: HttpRequestMessage) stream ->
+    let format = findFormatterFor request.Content.Headers.ContentType.MediaType mediaTypeReaders
+    in format stream
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
-let negotiateMediaType f formatters : HttpApplication =
+let tryNegotiateMediaType f formatters =
   let servedMedia = Seq.collect fst formatters
   let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
   fun request -> 
-    match bestOf request with
-    | Some mediaType ->
+    bestOf request
+    |> Option.map (fun mediaType ->
         let format = findFormatterFor mediaType formatters
-        in format <| f request 
-    | _ -> ``406 Not Acceptable`` request
+        fun stream -> format <| f request stream)
 
 // The most direct way of building an HTTP application is to focus on the actual data types
 // being transacted. These usually come in the form of the content of the request and response
@@ -92,7 +93,7 @@ let negotiateMediaType f formatters : HttpApplication =
 // Other mechanisms will be provided in Frank to allow a finer-grained application of both
 // mapping and serialization/deserialization.
 let mapWithConneg f mediaTypeReaders formatters =
-  negotiateMediaType (readRequestBody mediaTypeReaders >> f) formatters
+  tryNegotiateMediaType (fun request stream -> readRequestBody mediaTypeReaders request stream |> f) formatters
 
 // ## HTTP Resource Agent
 
@@ -125,11 +126,12 @@ let createResourceAgent path handlers =
           reply.Reply path
           return! loop path handlers
       | ProcessRequest(request, reply) ->
+          let stream = request.Content.ContentReadStream
           let handler = tryFindHandlerFor request.Method handlers
           let response =
             match handler with
-            | Some h -> h request
-            | _ -> ``405 Method Not Allowed`` (List.map fst handlers) request
+            | Some app -> app request stream
+            | _ -> ``405 Method Not Allowed`` (List.map fst handlers) request stream
           reply.Reply response
           return! loop path handlers
       | AddHandler(httpMethod, handler) ->

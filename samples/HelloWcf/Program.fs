@@ -21,12 +21,12 @@ open Frank.Hosting.Wcf
 let private main args =
 
   // A `GET` handler that always returns "Howdy!".
-  let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
+  let howdy request stream = respondOK [] "Howdy!"
 
   // A simple `POST`-based echo handler that returns the same input as it received.
-  let echo (request: HttpRequestMessage) =
+  let echo (request: HttpRequestMessage) stream =
     let body = request.Content.ReadAs<string>()
-    respond HttpStatusCode.OK [ "Content-Type", "text/plain" ] body
+    respondOK [ "Content-Type", "text/plain" ] body
 
   // A compositional approach to type mapping and handler design.
   // Here, the actual function shows clearly that we are really using
@@ -37,7 +37,7 @@ let private main args =
   let echo2MapFrom (request: HttpRequestMessage) = request.Content.ReadAs<string>()
 
   // The `echo2MapTo` maps the outgoing message body to an HTTP response.
-  let echo2MapTo body = respond HttpStatusCode.OK [ "Content-Type", "text/plain" ] body
+  let echo2MapTo body = fun _ -> respondOK [ "Content-Type", "text/plain" ] body
 
   // This `echo2` is the same in principle as `echo` above, except that the
   // logic for the message transform deals only with the concrete types
