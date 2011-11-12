@@ -1,15 +1,15 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 11
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B8E01199-E214-4775-A731-6923932BE7B1}"
 	ProjectSection(SolutionItems) = preProject
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
 		build.bat = build.bat
 		build.fsx = build.fsx
 		build.sh = build.sh
 		frank.nuspec = frank.nuspec
-		LICENSE.txt = LICENSE.txt
 		mono-build.sh = mono-build.sh
-		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank", "src\Frank.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
@@ -18,10 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38F
 	ProjectSection(SolutionItems) = preProject
 		samples\SelfHost.fsx = samples\SelfHost.fsx
 	EndProjectSection
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests.fsproj", "{90ED62B2-D05A-4341-8C95-F729E11197E6}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{A22B5663-9E93-4493-B77B-54E31FCD10C5}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "HelloWcf", "samples\HelloWcf\HelloWcf.fsproj", "{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}"
 EndProject
@@ -45,16 +41,6 @@ Global
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}.Release|x86.ActiveCfg = Release|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{90ED62B2-D05A-4341-8C95-F729E11197E6}.Release|x86.ActiveCfg = Release|Any CPU
 		{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}.Debug|Any CPU.ActiveCfg = Debug|x86
 		{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}.Debug|Any CPU.Build.0 = Debug|x86
 		{B4146940-AED6-48AE-A0DD-C6422F5DCDC8}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
@@ -72,6 +58,5 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B4146940-AED6-48AE-A0DD-C6422F5DCDC8} = {C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}
-		{90ED62B2-D05A-4341-8C95-F729E11197E6} = {A22B5663-9E93-4493-B77B-54E31FCD10C5}
 	EndGlobalSection
 EndGlobal

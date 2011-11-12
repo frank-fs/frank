@@ -35,7 +35,7 @@ let target = getBuildParamOrDefault "target" "All"
 // tools
 let fakePath = "./packages/FAKE.1.56.7/tools"
 let nugetPath = "./lib/NuGet/nuget.exe"
-let nunitPath = "./packages/NUnit.2.5.9.10348/Tools"
+let nunitPath = "./packages/NUnit.2.5.10.11092/Tools"
 
 // files
 let appReferences =
@@ -43,7 +43,7 @@ let appReferences =
         |> Scan
 
 let testReferences =
-    !+ "./tests/*.fsproj"
+    !+ "./src/*.fsproj"
         |> Scan
 
 let filesToZip =
@@ -79,7 +79,7 @@ Target "BuildTest" (fun _ ->
 )
 
 Target "Test" (fun _ ->
-    !+ (testDir + "/*.Tests.dll")
+    !+ (testDir + "Frank.dll")
         |> Scan
         |> NUnit (fun p -> 
             {p with 

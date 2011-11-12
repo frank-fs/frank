@@ -18,6 +18,10 @@ open System.ServiceModel
 open Microsoft.ApplicationServer.Http
 open Frank
 
+type HttpResource with
+  member x.SendAsync(request, cancelationToken) =
+    Async.StartAsTask(async.Return(x.Invoke request request.Content), cancellationToken = cancelationToken)
+
 [<ServiceContract>]
 type EmptyService() =
   [<OperationContract>]
@@ -25,14 +29,14 @@ type EmptyService() =
 
 type FrankHandler() =
   inherit DelegatingHandler()
-  static member Create(resource : Resource) =
+  static member Create(resource: HttpResource) =
     { new FrankHandler() with
-        override this.SendAsync(request, cancellationToken) =
-          resource.ProcessRequestAsync(request, cancellationToken) } :> DelegatingHandler
+        override this.SendAsync(request, cancelationToken) =
+          resource.SendAsync(request, cancelationToken) } :> DelegatingHandler
 
-let frankWebApi (resources : #seq<#Resource>) =
+let frankWebApi (resources : #seq<HttpResource>) =
   // TODO: Auto-wire routes based on the passed-in resources.
-  let routes = resources |> Seq.map (fun r -> (r.Path, r.ProcessRequestAsync))
+  let routes = resources |> Seq.map (fun r -> (r.Uri, r.SendAsync))
 
   WebApiConfiguration(
     useMethodPrefixForHttpMethod = false,

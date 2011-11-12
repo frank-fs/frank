@@ -42,58 +42,46 @@
     <None Include="App.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.AsyncExtensions">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharp.AsyncExtensions.dll</HintPath>
+    <Reference Include="FSharp.AsyncExtensions, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="FSharpx.Core">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll</HintPath>
+    <Reference Include="FSharpx.Core, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="FSharpx.Http">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll</HintPath>
+    <Reference Include="FSharpx.Http, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="FSharpx.Stm">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.dll</HintPath>
+    <Reference Include="FSharpx.Stm, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="FSharpx.Stm.Core">
-      <HintPath>..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.Core.dll</HintPath>
+    <Reference Include="FSharpx.Stm.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.ApplicationServer.Http">
-      <HintPath>..\..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll</HintPath>
+    <Reference Include="Microsoft.ApplicationServer.Http, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.ApplicationServer.HttpEnhancements">
-      <HintPath>..\..\packages\WebApi.Enhancements.0.5.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll</HintPath>
+    <Reference Include="Microsoft.ApplicationServer.HttpEnhancements, Version=0.3.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Json">
-      <HintPath>..\..\packages\JsonValue.0.5.0\lib\40\Microsoft.Json.dll</HintPath>
+    <Reference Include="Microsoft.Json, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Net.Http">
-      <HintPath>..\..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll</HintPath>
+    <Reference Include="Microsoft.Net.Http, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Net.Http.Formatting">
-      <HintPath>..\..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll</HintPath>
+    <Reference Include="Microsoft.Net.Http.Formatting, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Runtime.Serialization.Internal">
-      <HintPath>..\..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll</HintPath>
+    <Reference Include="Microsoft.Runtime.Serialization.Internal, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Server.Common">
-      <HintPath>..\..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Server.Common.dll</HintPath>
+    <Reference Include="Microsoft.Server.Common, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.ServiceModel.Internal">
-      <HintPath>..\..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll</HintPath>
+    <Reference Include="Microsoft.ServiceModel.Internal, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />

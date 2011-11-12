@@ -23,9 +23,9 @@ open ImpromptuInterface.FSharp
   
 /// Logs the incoming request and the time to respond.
 let log app =
-  fun (request: HttpRequestMessage) -> 
+  fun (request: HttpRequestMessage) stream ->
     let sw = System.Diagnostics.Stopwatch.StartNew()
-    let response = app request
+    let response = app request stream
     printfn "Received a %A request from %A. Responded in %i ms."
             request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
     sw.Reset()
@@ -33,16 +33,16 @@ let log app =
 
 /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
 let head app =
-  fun (request: HttpRequestMessage) ->
+  fun (request: HttpRequestMessage) stream ->
     if request.Method = HttpMethod.Head then 
       request.Method <- HttpMethod.Get
-      let (response : HttpResponseMessage) = app request
+      let (response : HttpResponseMessage) = app request stream
       let emptyContent = new ByteArrayContent([||])
       for KeyValue(header, value) in response.Content.Headers do
         emptyContent.Headers.Add(header, value)
       response.Content <- emptyContent
       response
-    else app request
+    else app request stream
 
 /// The overridable HTTP methods, used in the methodOverride middleware.
 let private overridableHttpMethods =
@@ -56,7 +56,7 @@ let private overridableHttpMethods =
 /// Intercepts a request and checks for use of X_HTTP_METHOD_OVERRIDE.
 let methodOverride app =
   // Leave out POST, as that is the method we are overriding.
-  fun (request : HttpRequestMessage) ->
+  fun (request : HttpRequestMessage) stream ->
     let request' =
       if request.Method <> HttpMethod.Post ||
          request.Content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then request
@@ -72,4 +72,4 @@ let methodOverride app =
           request.Content.Headers.Add("methodoverride_original_method", httpMethod.Method)
           request.Method <- HttpMethod.Post
         request
-    app request'
+    app request' stream
