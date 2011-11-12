@@ -22,33 +22,41 @@ open System.Text
 open FSharpx
 open FSharpx.Http
 
-// ## Type Aliases and Extensions
+// ## Define the web application interface
+
+type HttpRequestHandler = Stream -> HttpResponseMessage
 
 // `HttpApplication` defines the contract for processing a request.
 // An application takes an `HttpRequestMessage` and
+// returns a handler function that takes a `Stream` and
 // returns an `HttpResponseMessage` that can be sent to the client.
-type HttpApplication = HttpRequestMessage -> Stream -> HttpResponseMessage
-
-type Agent<'a> = MailboxProcessor<'a>
-
-type HttpMethod with
-  static member All = new HttpMethod("*")
+type HttpApplication = HttpRequestMessage -> HttpRequestHandler
 
 // ## HttpApplication helper functions
 
+// Responding with the actual types can get a bit noisy with the long type names and required
+// type cast to `HttpResponseMessage` (since most responses will include a typed body).
+// The `respond` function simplifies this and also accepts a `seq<string * string>` of headers.
+// While this latter is convenient, it skips the benefits of the statically typed `HttpHeaders`
+// available on the `response` object.
 let respond (statusCode: HttpStatusCode) headers body =
   let response = new HttpResponseMessage<_>(body, statusCode)
   headers |> Seq.iter (fun (header, values: string) -> response.Headers.Add(header, values))
   response :> HttpResponseMessage
 
+// As most successful responses return `200 OK`, a helper to respond with this status code
+// is useful for reducing keystrokes.
 let respondOK headers body = respond HttpStatusCode.OK headers body
 
+// A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
+// `respondWithAllowHeader` allows both methods to share common functionality.
 let private respondWithAllowHeader statusCode (allowedMethods: #seq<HttpMethod>) : HttpApplication =
   fun _ _ ->
     let response = new HttpResponseMessage(statusCode)
     allowedMethods |> Seq.map (fun m -> m.Method) |> Seq.iter response.Content.Headers.Allow.Add
     response
 
+// `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
   respondWithAllowHeader HttpStatusCode.OK allowedMethods
 
@@ -61,48 +69,80 @@ let ``405 Method Not Allowed`` allowedMethods =
 let ``406 Not Acceptable`` =
   fun _ _ -> new HttpResponseMessage(HttpStatusCode.NotAcceptable)
 
-let findFormatterFor mediaType = Seq.find (fst >> Seq.exists ((=) mediaType)) >> snd
+// ## Content Negotiation Helpers
+
+let inline equals y (x: ^M) = (^M : (member Equals: obj -> bool) (x, y))
+
+[<CustomEquality;NoComparison>]
+type Formatter(mediaTypes: #seq<string>, read, write) =
+  member x.MediaTypes = mediaTypes
+  member x.Read<'a>(stream: Stream) = read stream
+  member x.Write(content) : byte[] = write content
+  override x.Equals(other) =
+    other <> null &&
+    match other with
+    | :? Formatter as formatter -> x = formatter
+    | :? string as mediaType -> Seq.exists ((=) mediaType) mediaTypes
+    | _ -> false
+  override x.GetHashCode() = hash x
+
+let findFormatterFor mediaType = Seq.find (equals mediaType)
 
 // `readRequestBody` takes a collection of `HttpContent` formatters and returns a typed result from reading the content.
 // This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
 // a similar type against which to calculate a response.
-let readRequestBody mediaTypeReaders =
+let readRequestBody (formatters: #seq<Formatter>) =
   fun (request: HttpRequestMessage) stream ->
-    let format = findFormatterFor request.Content.Headers.ContentType.MediaType mediaTypeReaders
-    in format stream
+    let formatter = findFormatterFor request.Content.Headers.ContentType.MediaType formatters
+    in formatter.Read(stream)
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
 let tryNegotiateMediaType f formatters =
-  let servedMedia = Seq.collect fst formatters
+  let servedMedia = Seq.collect (fun (f: Formatter) -> f.MediaTypes) formatters
   let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
   fun request -> 
     bestOf request
     |> Option.map (fun mediaType ->
-        let format = findFormatterFor mediaType formatters
-        fun stream -> format <| f request stream)
+        let formatter = findFormatterFor mediaType formatters
+        fun stream -> respondOK ["Content-Type", mediaType] <| formatter.Write(f request stream))
 
-// The most direct way of building an HTTP application is to focus on the actual data types
+// The most direct way of building an HTTP application is to focus on the actual types
 // being transacted. These usually come in the form of the content of the request and response
-// message bodies. The `f` function is a standard `map` higher-order function parameter to
-// transform a typed request body `'a` to a typed response body `'b`.
-// 
-// These may be encoded in various formats. So `mediaTypeReaders` and `formatters` are needed to handle
-// the serialization and deserialization of the request and response bodies, respectively.
-//
-// Other mechanisms will be provided in Frank to allow a finer-grained application of both
-// mapping and serialization/deserialization.
-let mapWithConneg f mediaTypeReaders formatters =
-  tryNegotiateMediaType (fun request stream -> readRequestBody mediaTypeReaders request stream |> f) formatters
+// message bodies. The `f` function accepts the `request` and the deserialized `stream`.
+// The `request` is provided to allow the function access to the request headers, which also
+// allows us to merge several handler functions and select the appropriate handler using
+// request header data.
+let mapWithConneg f formatters =
+  tryNegotiateMediaType (fun request stream -> f request <| readRequestBody formatters request stream) formatters
 
 // ## HTTP Resource Agent
 
-let tryFindHandlerFor httpMethod = List.tryFind (fst >> (=) httpMethod) >> Option.map snd
+let route path handler =
+  // TODO: use a better matching algorithm than `=` for matching the uri.
+  function (request: HttpRequestMessage) when request.RequestUri.AbsolutePath = path -> Some(handler request)
+         | _ -> None
 
-let get handler = (HttpMethod.Get, handler)
-let post handler = (HttpMethod.Post, handler)
-let put handler = (HttpMethod.Put, handler)
-let delete handler = (HttpMethod.Delete, handler)
+let mapHandler(httpMethod, handler) =
+  function (request: HttpRequestMessage) when request.Method.Method = httpMethod -> Some(handler request)
+         | _ -> None
+
+let get handler = mapHandler(HttpMethod.Get.Method, handler)
+let post handler = mapHandler(HttpMethod.Post.Method, handler)
+let put handler = mapHandler(HttpMethod.Put.Method, handler)
+let delete handler = mapHandler(HttpMethod.Delete.Method, handler)
+
+// We can use several methods to merge multiple handlers together into a single resource.
+// Our chosen mechanism here is merging functions into a larger function of the same signature.
+// This allows us to create resources as follows:
+// 
+//     let resource = get app1 <|> post app2 <|> put app3 <|> delete app4
+//
+// The intent here is to build a resource, with at most one handler per HTTP method. This goes
+// against a lot of the "RESTful" approaches that just merge a bunch of method handlers at
+// different URI addresses.
+let orElse right left = fun request -> Option.orElse (left request) (right request)
+let inline (<|>) left right = left |> orElse right
 
 type ResourceMessage =
   | GetPath of AsyncReplyChannel<string>
