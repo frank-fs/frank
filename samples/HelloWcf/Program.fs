@@ -22,7 +22,7 @@ let private main args =
 
   // A `GET` handler that always returns "Howdy!".
   let howdy request content =
-    respond HttpStatusCode.OK noHeaders <| Some "Howdy!"
+    respond HttpStatusCode.OK ignore <| Some "Howdy!"
 
   // A simple `POST`-based echo handler that returns the same input as it received.
   let echo (request: HttpRequestMessage) content =
