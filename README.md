@@ -26,14 +26,12 @@ As F# encourages a functional approach to application development, you'll find t
 
 A `GET` handler that always returns "Howdy!".
 
-      let howdy request = new HttpResponseMessage<string>("Howdy!") :> HttpResponseMessage
+      let howdy request = respond HttpStatusCode.OK ignore <| Some "Howdy!"
 
 A simple `POST`-based echo handler that returns the same input as it received.
 
-      let echo (request : HttpRequestMessage) =
-        let body = request.Content.ReadAsString()
-        let response = new HttpResponseMessage<string>(body, HttpStatusCode.OK) :> HttpResponseMessage
-        response
+      let echo (request: HttpRequestMessage) content =
+        respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Some(request.Content.ReadAsString())
 
 A compositional approach to type mapping and handler design.
 Here, the actual function shows clearly that we are really using
@@ -48,23 +46,24 @@ within the actual computation, or `echo2Core` in this example.
 
 The `echo2MapTo` maps the outgoing message body to an HTTP response.
 
-      let echo2MapTo body = new HttpResponseMessage<_>(body, HttpStatusCode.OK) :> HttpResponseMessage
+      let echo2MapTo body = fun _ -> 
+        respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Some body
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
 about which it cares and isn't bothered by the transformations.
 
-      let echo2 = echo2Core >> echo2MapTo << echo2MapFrom 
+      let echo2 = echo2MapFrom >> echo2Core >> echo2MapTo
 
-Create a `Resource` instance at the root of the site that responds to `GET` and `POST`.
+Create a `HttpResource` instance at the root of the site that responds to `GET` and `POST`.
 
-      let resource = Resource("", [ get howdy; post echo2 ])
+      let resource = routeWithMethodMapping "" [ get howdy; post echo2 ]
 
 The `frank` function creates a `WebApiConfiguration` instance based on our resources.
 These will be mounted at the `baseUri`. The `frank` function creates a `DelegatingHandler`
 that will intercept all incoming traffic and route it to our resources.
 
-      let config = frank [| resource |]
+      let config = frankWebApi [| resource |]
       let baseUri = "http://localhost:1000/"
 
 Create a self-hosted service host using an `EmptyService`, as the service

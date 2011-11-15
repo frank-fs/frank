@@ -91,6 +91,23 @@ type HttpRequestHandler = HttpContent -> HttpResponseMessage
 // An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler`.
 type HttpApplication = HttpRequestMessage -> HttpRequestHandler
 
+// ## Helper Types
+
+type EmptyContent() =
+  inherit HttpContent()
+  override x.SerializeToStreamAsync(stream, context) =
+    new System.Threading.Tasks.Task(fun () -> ())
+  override x.SerializeToStream(stream, context) = ()
+  override x.TryComputeLength(length) =
+    length <- 0L
+    true
+  override x.Equals(other) =
+    other.GetType() = typeof<EmptyContent>
+  override x.GetHashCode() = hash x
+
+type HttpContent with
+  static member Empty = new EmptyContent() :> HttpContent
+
 // ## HTTP Response Combinators
 
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
@@ -100,15 +117,25 @@ type HttpResponseHeadersBuilder = FSharpx.Reader.Reader<HttpResponseMessage, uni
 let headers = FSharpx.Reader.reader
 let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
 
+// Convert an optional response body argument into an actual `HttpContent` type.
+let makeHttpContent =
+  function None -> HttpContent.Empty
+         | Some v ->
+            let v' = box v
+            match v' with
+            | :? Stream -> new StreamContent(v' :?> Stream) :> HttpContent
+            | :? array<byte> -> new ByteArrayContent(v' :?> byte[]) :> HttpContent
+            | :? string -> new StringContent(v' :?> string) :> HttpContent
+            | _ when v' = null -> HttpContent.Empty
+            | _ -> new ObjectContent(v'.GetType(), value = v') :> HttpContent
+
 // Responding with the actual types can get a bit noisy with the long type names and required
 // type cast to `HttpResponseMessage` (since most responses will include a typed body).
 // The `respond` function simplifies this and also accepts an `HttpResponseHeadersBuilder`
 // to allow easy composition and inclusion of headers. This function finally takes an optional
 // `body`.
 let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) body =
-  match body with
-  | Some(body) -> new HttpResponseMessage<_>(body, statusCode) :> HttpResponseMessage
-  | _          -> new HttpResponseMessage(statusCode)
+  new HttpResponseMessage(statusCode, Content = makeHttpContent body)
   |> addHeaders headers
 
 #if DEBUG
@@ -117,12 +144,12 @@ let ``test respond without body``() =
   let statusCode = HttpStatusCode.OK
   let response = respond statusCode ignore None
   test <@ response.StatusCode = statusCode @>
-  test <@ response.Content = null @>
+  test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with body``() =
   let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore (Some body)
+  let response = respond statusCode ignore <| Some body
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content.ReadAsString() = body @>
 #endif
