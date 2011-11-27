@@ -11,14 +11,6 @@ See LICENSE.txt for details.
 [<AutoOpen>]
 module Frank.Core
 
-#if INTERACTIVE
-#r @"..\packages\Unquote.2.1.0\lib\net40\Unquote.dll"
-#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
-#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll"
-#endif
-
 open System
 open System.Collections.Generic
 open System.IO
@@ -44,7 +36,7 @@ Indeed, if you search the web, you're likely to find a large number of approache
 When starting with `Frank`, I wanted to try to find a way to define an HTTP application
 using pure functions and function composition. The closest I found was the following:
 
-    type HttpRequestHandler = Stream -> HttpResponseMessage
+    type HttpRequestHandler = HttpContent -> HttpResponseMessage
     type HttpApplication = HttpRequestMessage -> HttpRequestHandler
     
     let orElse right left = fun request -> Option.orElse (left request) (right request)
@@ -354,7 +346,7 @@ let mapWithConneg formatters f =
 
 // ## HTTP Resources
 
-// HTTP resources expose an `HttpResourceHandler` at a given uri.
+// HTTP resources expose an resource handler function at a given uri.
 // In the common MVC-style frameworks, this would roughly correspond
 // to a `Controller`. Resources should represent a single entity type,
 // and it is important to note that a `Foo` is not the same entity
@@ -368,10 +360,8 @@ type HttpResource =
   // TODO: add a method to match the Uri.
 
   // With the ``405 Method Not Allowed`` function, resources can correctly respond to messages.
-  // Therefore, we'll extend the `HttpResourceHandler` with an `Invoke` method. Previously,
-  // the `HttpResourceHandler was left without any way of actually using the `Handler` it was
-  // provided in it's private record constructor. Here, we bake in not only the mechanism with
-  // which to reply, but we also provide the means to do so through a built-in mechanism.
+  // Therefore, we'll extend the `HttpResource` with an `Invoke` method. Without the `Invoke` method,
+  // the `HttpResource` is left without any true representation of an `HttpApplication`.
   // 
   // Also note that the methods will always be looked up using the latest set. This could
   // probably be memoized so as to save a bit of time, but it allows us to ensure that all
@@ -383,7 +373,7 @@ type HttpResource =
 
 let private makeHandler(httpMethod, handler) =
   function (request: HttpRequestMessage) when request.Method.Method = httpMethod -> Some(handler request)
-                       | _ -> None
+         | _ -> None
 
 // Helpers to more easily map `HttpApplication` functions to methods to be composed into `HttpResource`s.
 let mapResourceHandler(httpMethod, handler) = [httpMethod], makeHandler(httpMethod, handler)
@@ -412,6 +402,20 @@ let route path handler =
     Handler = snd handler }
 
 let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handlers
+
+(* ## HTTP Applications *)
+
+let ``404 Not Found`` : HttpApplication =
+  fun _ _ -> respond HttpStatusCode.NotFound ignore None
+
+let mount notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
+  fun request ->
+    let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
+    let handler = resource |> Option.map (fun r -> r.Invoke) |> (flip defaultArg) notFoundHandler
+    fun content -> handler request content
+
+let mountWithDefaults resources =
+  mount ``404 Not Found`` resources
 
 //let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
 //let testBody = dict [("foo", "bar");("bar", "baz")]

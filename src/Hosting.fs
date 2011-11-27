@@ -1,4 +1,4 @@
-﻿(* # Frank
+﻿(* # Frank Hosting for Web API
 
 ## License
 
@@ -8,7 +8,7 @@ Copyright (c) 2011, Ryan Riley.
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
 *)
-module Frank.Hosting.Wcf
+module Frank.Hosting.WebApi
 
 // ## Web API Hosting
 
@@ -18,27 +18,23 @@ open System.ServiceModel
 open Microsoft.ApplicationServer.Http
 open Frank
 
-type HttpResource with
-  member x.SendAsync(request, cancelationToken) =
-    Async.StartAsTask(async.Return(x.Invoke request request.Content), cancellationToken = cancelationToken)
+let startAsTask (app: HttpApplication) (request, cancelationToken) =
+  Async.StartAsTask(async.Return(app request request.Content), cancellationToken = cancelationToken)
 
 [<ServiceContract>]
-type EmptyService() =
+type FrankApi() =
   [<OperationContract>]
   member x.Invoke() = ()
 
 type FrankHandler() =
   inherit DelegatingHandler()
-  static member Create(resource: HttpResource) =
+  static member Create(app) =
+    let app = startAsTask app
     { new FrankHandler() with
         override this.SendAsync(request, cancelationToken) =
-          resource.SendAsync(request, cancelationToken) } :> DelegatingHandler
+          app(request, cancelationToken) } :> DelegatingHandler
 
-let frankWebApi (resources : #seq<HttpResource>) =
-  // TODO: Auto-wire routes based on the passed-in resources.
-  let routes = resources |> Seq.map (fun r -> (r.Uri, r.SendAsync))
-
+let configure app =
   WebApiConfiguration(
     useMethodPrefixForHttpMethod = false,
-    MessageHandlerFactory = (fun () -> Seq.map FrankHandler.Create resources))
-  
+    MessageHandlerFactory = (fun () -> seq { yield FrankHandler.Create app }))

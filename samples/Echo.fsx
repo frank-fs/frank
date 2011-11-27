@@ -1,4 +1,4 @@
-﻿(* # Frank Self-Hosted Echo Server Sample
+(* # Frank Self-Host Sample
 
 ## License
 
@@ -8,6 +8,21 @@ Copyright (c) 2010-2011, Ryan Riley.
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
 *)
+
+#r "System.ServiceModel"
+#r "System.ServiceModel.Web"
+#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
+#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
+#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll"
+#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll"
+#r @"..\packages\JsonValue.0.5.0\lib\40\Microsoft.Json.dll"
+#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
+#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
+#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Server.Common.dll"
+#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
+#r @"..\packages\WebApi.Enhancements.0.5.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#load @"..\src\Frank.fs"
+#load @"..\src\Hosting.fs"
 
 open System.Net
 open System.Net.Http
@@ -23,9 +38,9 @@ let echo _ (content: HttpContent) =
 // Also note that this application only responds to the root uri. A `404 Not Found`
 // response should be returned for any other uri.
 let resource = routeWithMethodMapping "/" [ post echo ]
-let app = mountWithDefaults [ resource ]
+let app : HttpApplication = mountWithDefaults [ resource ]
 
-let config = WebApi.configureWithTestClient app
+let config = WebApi.configure app
 let baseUri = "http://localhost:1000/"
 let host = new Microsoft.ApplicationServer.Http.HttpServiceHost(typeof<WebApi.FrankApi>, config, [| baseUri |])
 host.Open()
