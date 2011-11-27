@@ -6,7 +6,7 @@ open System.IO
 // properties
 let currentDate = System.DateTime.UtcNow
 let projectName = "Frank"
-let version = "0.4." + currentDate.ToString("yMMdd")
+let version = "0.5." + currentDate.ToString("yMMdd")
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
