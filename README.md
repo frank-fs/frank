@@ -139,7 +139,7 @@ as an application, wrap it in the log middleware, and insert it into the larger 
 ## Hosting
 
 The current hosting options depend entirely upon the options available from the
-[Web API](http://wcf.codeplex.com/] library. In any case, you'll need a 
+[Web API](http://wcf.codeplex.com/) library. In any case, you'll need a 
 `WebApiConfiguration` instance created from each application you want to host.
 The `WebApi.configure` function creates a `DelegatingHandler` that will intercept
 all incoming traffic and route it to our resources.
