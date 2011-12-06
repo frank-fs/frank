@@ -60,7 +60,7 @@ let methodOverride app =
       if request.Method <> HttpMethod.Post ||
          request.Content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then request
       else
-        let form = request.Content.ReadAs<JsonValue>().AsDynamic
+        let form = request.Content.ReadAs<JsonValue>().AsDynamic()
         let httpMethod =
           if (not << String.IsNullOrEmpty) form?_method then
             new HttpMethod(form?_method)

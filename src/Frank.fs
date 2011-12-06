@@ -20,9 +20,11 @@ open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
 open FSharpx
+open FSharpx.Reader
 open FSharpx.Http
 
 #if DEBUG
+open System.Json
 open ImpromptuInterface.FSharp
 open NUnit.Framework
 open Swensen.Unquote.Assertions
@@ -109,17 +111,19 @@ type HttpResponseHeadersBuilder = FSharpx.Reader.Reader<HttpResponseMessage, uni
 let headers = FSharpx.Reader.reader
 let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
 
+type HttpResponseBody =
+  | Empty
+  | Stream of System.IO.Stream
+  | Bytes of byte[]
+  | Str of string
+
 // Convert an optional response body argument into an actual `HttpContent` type.
-let makeHttpContent =
-  function None -> HttpContent.Empty
-         | Some v ->
-            let v' = box v
-            match v' with
-            | :? Stream -> new StreamContent(v' :?> Stream) :> HttpContent
-            | :? array<byte> -> new ByteArrayContent(v' :?> byte[]) :> HttpContent
-            | :? string -> new StringContent(v' :?> string) :> HttpContent
-            | _ when v' = null -> HttpContent.Empty
-            | _ -> new ObjectContent(v'.GetType(), value = v') :> HttpContent
+let inline makeHttpContent body =
+  match body with
+  | Empty -> HttpContent.Empty
+  | Stream v -> new StreamContent(v) :> HttpContent
+  | Bytes v -> new ByteArrayContent(v) :> HttpContent
+  | Str v -> new StringContent(v) :> HttpContent
 
 // Responding with the actual types can get a bit noisy with the long type names and required
 // type cast to `HttpResponseMessage` (since most responses will include a typed body).
@@ -134,14 +138,14 @@ let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) b
 [<Test>]
 let ``test respond without body``() =
   let statusCode = HttpStatusCode.OK
-  let response = respond statusCode ignore None
+  let response = respond statusCode ignore Empty
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with body``() =
   let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore <| Some body
+  let response = respond statusCode ignore <| Str body
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content.ReadAsString() = body @>
 #endif
@@ -242,7 +246,7 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
 let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) =
-  fun _ _ -> respond statusCode (Allow allowedMethods) None
+  fun _ _ -> respond statusCode (Allow allowedMethods) Empty
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -279,7 +283,7 @@ let ``test 405 Method Not Allowed``() =
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` =
-  fun _ _ -> respond HttpStatusCode.NotAcceptable ignore None
+  fun _ _ -> respond HttpStatusCode.NotAcceptable ignore Empty
 
 #if DEBUG
 [<Test>]
@@ -299,41 +303,57 @@ let findFormatterFor mediaType =
 // a similar type against which to calculate a response.
 let readRequestBody formatters =
   fun (request: HttpRequestMessage) (content: HttpContent) ->
-    let formatter = findFormatterFor request.Content.Headers.ContentType.MediaType formatters
-    in content.ReadAs<_>([| formatter |])
+    if request.Content <> null &&
+       request.Content.Headers <> null &&
+       request.Content.Headers.ContentType <> null then
+      let formatter = findFormatterFor request.Content.Headers.ContentType.MediaType formatters
+      let body = content.ReadAs<_>([| formatter |])
+      body
+    else Unchecked.defaultof<_>
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
 // `formatWith` allows you to specify a specific `formatter` with which to render a representation
 // of your content body.
 // 
-// The `WCF Web API` tries to do this for you at this time, so this function
-// is likely to be clobbered, or rather, wrapped again in another representation. Hopefully, this
-// will get fixed in a future release.
+// The `Web API` tries to do this for you at this time, so this function is likely to be clobbered,
+// or rather, wrapped again in another representation. Hopefully, this will get fixed in a future release.
 // 
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
-let formatWith formatter body =
-  let content = new ObjectContent<_>(value = body, formatters = [| formatter |])
-  in content.ReadAsByteArray()
+let formatWith (mediaType: string) formatter body =
+  let content = new ObjectContent<_>(body, mediaType, [formatter]) :> HttpContent
+  content.ReadAsByteArray()
+
+#if DEBUG
+type TestType = { FirstName : string; LastName : string }
+
+[<Test>]
+let ``test makeHttpContent creates an object content when given a non-primitive type``() =
+  let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
+  let body = { FirstName = "Ryan"; LastName = "Riley" }
+  let content = makeHttpContent <| Bytes(body |> formatWith "application/json" formatter)
+  let result = content.ReadAsString()
+  test <@ result = "{\"FirstName@\":\"Ryan\",\"LastName@\":\"Riley\"}" @>
+#endif
 
 // When you want to negotiate the format of the response based on the available representations and
 // the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
 // `formatters` and attempts to match the best with the provided `Accept` header values using
 // functions from `FSharpx.Http`.
-let tryNegotiateMediaType formatters f =
+let negotiateMediaType formatters f =
   let servedMedia =
     formatters
     |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
     |> Seq.map (fun value -> value.MediaType)
   let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
-  fun request -> 
-    bestOf request
-    |> Option.map (fun mediaType ->
+  fun request ->
+    match bestOf request with
+    | Some mediaType ->
         let formatter = findFormatterFor mediaType formatters
         fun content ->
-          respond HttpStatusCode.OK (``Content-Type`` mediaType)
-          <| Some(f request content |> formatWith formatter))
+          respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") <| Bytes(f request content |> formatWith mediaType formatter)
+    | _ -> ``406 Not Acceptable`` request
 
 // The most direct way of building an HTTP application is to focus on the actual types
 // being transacted. These usually come in the form of the content of the request and response
@@ -342,7 +362,7 @@ let tryNegotiateMediaType formatters f =
 // allows us to merge several handler functions and select the appropriate handler using
 // request header data.
 let mapWithConneg formatters f =
-  tryNegotiateMediaType formatters <| fun request content -> f request <| readRequestBody formatters request content
+  negotiateMediaType formatters <| fun request content -> f request <| readRequestBody formatters request content
 
 // ## HTTP Resources
 
@@ -406,16 +426,16 @@ let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handl
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun _ _ -> respond HttpStatusCode.NotFound ignore None
+  fun _ _ -> respond HttpStatusCode.NotFound ignore Empty
 
-let mount notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
+let mergeWithCustom404 notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
   fun request ->
     let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
     let handler = resource |> Option.map (fun r -> r.Invoke) |> (flip defaultArg) notFoundHandler
     fun content -> handler request content
 
-let mountWithDefaults resources =
-  mount ``404 Not Found`` resources
+let merge resources =
+  mergeWithCustom404 ``404 Not Found`` resources
 
 //let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
 //let testBody = dict [("foo", "bar");("bar", "baz")]
