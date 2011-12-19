@@ -13,13 +13,13 @@ See LICENSE.txt for details.
 #r "System.ServiceModel.Web"
 #r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
 #r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Server.Common.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
-#r @"..\packages\WebApi.Enhancements.0.5.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#r @"..\packages\HttpClient.0.6.0\lib\40\System.Net.Http.dll"
+#r @"..\packages\HttpClient.0.6.0\lib\40\Microsoft.Net.Http.Formatting.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
+#r @"..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
 #load @"..\src\Frank.fs"
 #load @"..\src\Hosting.fs"
 
@@ -28,7 +28,7 @@ open System.Net.Http
 open Frank
 open Frank.Hosting
 
-let helloWorld _ _ = respond HttpStatusCode.OK ignore <| Some "Hello, world!"
+let helloWorld _ _ = respond HttpStatusCode.OK ignore <| Str "Hello, world!"
 
 let config = WebApi.configure helloWorld
 let baseUri = "http://localhost:1000/"

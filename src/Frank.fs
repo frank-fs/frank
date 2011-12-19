@@ -91,7 +91,6 @@ type EmptyContent() =
   inherit HttpContent()
   override x.SerializeToStreamAsync(stream, context) =
     new System.Threading.Tasks.Task(fun () -> ())
-  override x.SerializeToStream(stream, context) = ()
   override x.TryComputeLength(length) =
     length <- 0L
     true
@@ -147,7 +146,7 @@ let ``test respond with body``() =
   let statusCode, body = HttpStatusCode.OK, "Howdy"
   let response = respond statusCode ignore <| Str body
   test <@ response.StatusCode = statusCode @>
-  test <@ response.Content.ReadAsString() = body @>
+  test <@ response.Content.ReadAsStringAsync().Result = body @>
 #endif
 
 // ### General Headers
@@ -307,8 +306,7 @@ let readRequestBody formatters =
        request.Content.Headers <> null &&
        request.Content.Headers.ContentType <> null then
       let formatter = findFormatterFor request.Content.Headers.ContentType.MediaType formatters
-      let body = content.ReadAs<_>([| formatter |])
-      body
+      content.ReadAsAsync<_>([| formatter |]).Result
     else Unchecked.defaultof<_>
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
@@ -323,7 +321,8 @@ let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToS
 // not optimal. Hopefully this, too, will be resolved in a future release.
 let formatWith (mediaType: string) formatter body =
   let content = new ObjectContent<_>(body, mediaType, [formatter]) :> HttpContent
-  content.ReadAsByteArray()
+  // We know that this should be able to return immediately since we just created the content object.
+  content.ReadAsByteArrayAsync().Result
 
 #if DEBUG
 type TestType = { FirstName : string; LastName : string }
@@ -333,7 +332,7 @@ let ``test makeHttpContent creates an object content when given a non-primitive 
   let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
   let body = { FirstName = "Ryan"; LastName = "Riley" }
   let content = makeHttpContent <| Bytes(body |> formatWith "application/json" formatter)
-  let result = content.ReadAsString()
+  let result = content.ReadAsStringAsync().Result
   test <@ result = "{\"FirstName@\":\"Ryan\",\"LastName@\":\"Riley\"}" @>
 #endif
 

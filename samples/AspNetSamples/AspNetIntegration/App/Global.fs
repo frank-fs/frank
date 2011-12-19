@@ -12,8 +12,7 @@ type Global() =
 
     let formatters = [| new Microsoft.ApplicationServer.Http.PlainTextFormatter() :> Formatting.MediaTypeFormatter
                         new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-                        new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-                        new Microsoft.ApplicationServer.Http.FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
+                        new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
     // Respond with a plain text "Hello, world!"
     let helloWorld = mapWithConneg formatters (fun _ _ -> "Hello, world!")

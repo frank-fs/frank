@@ -13,14 +13,13 @@ See LICENSE.txt for details.
 #r "System.ServiceModel.Web"
 #r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
 #r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.dll"
-#r @"..\packages\HttpClient.0.5.0\lib\40\Microsoft.Net.Http.Formatting.dll"
-#r @"..\packages\JsonValue.0.5.0\lib\40\Microsoft.Json.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.Server.Common.dll"
-#r @"..\packages\WebApi.0.5.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
-#r @"..\packages\WebApi.Enhancements.0.5.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#r @"..\packages\HttpClient.0.6.0\lib\40\System.Net.Http.dll"
+#r @"..\packages\HttpClient.0.6.0\lib\40\Microsoft.Net.Http.Formatting.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll"
+#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
+#r @"..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
 #load @"..\src\Frank.fs"
 #load @"..\src\Hosting.fs"
 
@@ -31,14 +30,14 @@ open Frank.Hosting
 
 // Respond with the request content, if any.
 let echo _ (content: HttpContent) =
-  respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Some(content.ReadAsString())
+  respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Str(content.ReadAsStringAsync().Result)
 
 // Create an application from an `HttpResource` that only responds to `POST` requests.
 // Try sending a GET or other method to see a `405 Method Not Allowed` response.
 // Also note that this application only responds to the root uri. A `404 Not Found`
 // response should be returned for any other uri.
 let resource = routeWithMethodMapping "/" [ post echo ]
-let app : HttpApplication = mountWithDefaults [ resource ]
+let app : HttpApplication = merge [ resource ]
 
 let config = WebApi.configure app
 let baseUri = "http://localhost:1000/"
