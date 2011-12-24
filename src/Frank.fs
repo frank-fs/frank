@@ -38,7 +38,7 @@ Indeed, if you search the web, you're likely to find a large number of approache
 When starting with `Frank`, I wanted to try to find a way to define an HTTP application
 using pure functions and function composition. The closest I found was the following:
 
-    type HttpRequestHandler = HttpContent -> HttpResponseMessage
+    type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
     type HttpApplication = HttpRequestMessage -> HttpRequestHandler
     
     let orElse right left = fun request -> Option.orElse (left request) (right request)
@@ -79,7 +79,7 @@ to better fit the signatures below.
 // select an appropriate handler that returns that type. It also allows you to return
 // a 404, 405, or other message before reading the content, should you determine that
 // the request is invalid based on its headers.
-type HttpRequestHandler = HttpContent -> HttpResponseMessage
+type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
 
 // `HttpApplication` defines the contract for processing any request.
 // An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler`.
@@ -106,8 +106,8 @@ type HttpContent with
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
 // First of all, it allows for the explicit declaration of side effects. Second, a number
 // of combinators are already defined that allows you to more easily compose headers.
-type HttpResponseHeadersBuilder = FSharpx.Reader.Reader<HttpResponseMessage, unit>
-let headers = FSharpx.Reader.reader
+type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
+let headers = Reader.reader
 let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
 
 type HttpResponseBody =
@@ -132,19 +132,20 @@ let inline makeHttpContent body =
 let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) body =
   new HttpResponseMessage(statusCode, Content = makeHttpContent body)
   |> addHeaders headers
+  |> async.Return
 
 #if DEBUG
 [<Test>]
 let ``test respond without body``() =
   let statusCode = HttpStatusCode.OK
-  let response = respond statusCode ignore Empty
+  let response = respond statusCode ignore Empty |> Async.RunSynchronously
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with body``() =
   let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore <| Str body
+  let response = respond statusCode ignore <| Str body |> Async.RunSynchronously
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content.ReadAsStringAsync().Result = body @>
 #endif
@@ -244,17 +245,18 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
-let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) =
-  fun _ _ -> respond statusCode (Allow allowedMethods) Empty
+let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) body =
+  fun _ _ ->
+    respond statusCode (Allow allowedMethods) body
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
-  respondWithAllowHeader HttpStatusCode.OK allowedMethods
+  respondWithAllowHeader HttpStatusCode.OK allowedMethods Empty
 
 #if DEBUG
 [<Test>]
 let ``test options``() =
-  let response = options ["GET";"POST"] (obj()) (obj())
+  let response = options ["GET";"POST"] (obj()) (obj()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -266,12 +268,12 @@ let ``test options``() =
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| Str "405 Method Not Allowed"
 
 #if DEBUG
 [<Test>]
 let ``test 405 Method Not Allowed``() =
-  let response = ``405 Method Not Allowed`` ["GET";"POST"] (obj()) (obj())
+  let response = ``405 Method Not Allowed`` ["GET";"POST"] (obj()) (obj()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.MethodNotAllowed @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -282,12 +284,13 @@ let ``test 405 Method Not Allowed``() =
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` =
-  fun _ _ -> respond HttpStatusCode.NotAcceptable ignore Empty
+  fun _ _ ->
+    respond HttpStatusCode.NotAcceptable ignore <| Str "406 Not Acceptable"
 
 #if DEBUG
 [<Test>]
 let ``test 406 Not Acceptable``() =
-  let response = ``406 Not Acceptable`` (obj()) (obj())
+  let response = ``406 Not Acceptable`` (obj()) (obj()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotAcceptable @>
 #endif
 
@@ -300,14 +303,7 @@ let findFormatterFor mediaType =
 // `readRequestBody` takes a collection of `HttpContent` formatters and returns a typed result from reading the content.
 // This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
 // a similar type against which to calculate a response.
-let readRequestBody formatters =
-  fun (request: HttpRequestMessage) (content: HttpContent) ->
-    if request.Content <> null &&
-       request.Content.Headers <> null &&
-       request.Content.Headers.ContentType <> null then
-      let formatter = findFormatterFor request.Content.Headers.ContentType.MediaType formatters
-      content.ReadAsAsync<_>([| formatter |]).Result
-    else Unchecked.defaultof<_>
+let readRequestBody (content: HttpContent) = Async.AwaitTask <| content.ReadAsStreamAsync()
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
@@ -319,19 +315,20 @@ let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToS
 // 
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
-let formatWith (mediaType: string) formatter body =
-  let content = new ObjectContent<_>(body, mediaType, [formatter]) :> HttpContent
-  // We know that this should be able to return immediately since we just created the content object.
-  content.ReadAsByteArrayAsync().Result
+let formatWith (mediaType: string) formatter body = async {
+  let content = new ObjectContent<_>(body, mediaType, [| formatter |]) :> HttpContent
+  let! formattedBody = Async.AwaitTask <| content.ReadAsStreamAsync()
+  return formattedBody }
 
 #if DEBUG
 type TestType = { FirstName : string; LastName : string }
 
 [<Test>]
-let ``test makeHttpContent creates an object content when given a non-primitive type``() =
+let ``test formatWith and makeHttpContent properly format as application/json``() =
   let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
   let body = { FirstName = "Ryan"; LastName = "Riley" }
-  let content = makeHttpContent <| Bytes(body |> formatWith "application/json" formatter)
+  let formattedBody = body |> formatWith "application/json" formatter |> Async.RunSynchronously
+  let content = makeHttpContent <| Stream formattedBody
   let result = content.ReadAsStringAsync().Result
   test <@ result = "{\"FirstName@\":\"Ryan\",\"LastName@\":\"Riley\"}" @>
 #endif
@@ -350,8 +347,10 @@ let negotiateMediaType formatters f =
     match bestOf request with
     | Some mediaType ->
         let formatter = findFormatterFor mediaType formatters
-        fun content ->
-          respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") <| Bytes(f request content |> formatWith mediaType formatter)
+        fun content -> async {
+          let! responseBody = f request content
+          let! formattedBody = responseBody |> formatWith mediaType formatter
+          return! respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") <| Stream formattedBody }
     | _ -> ``406 Not Acceptable`` request
 
 // The most direct way of building an HTTP application is to focus on the actual types
@@ -361,7 +360,10 @@ let negotiateMediaType formatters f =
 // allows us to merge several handler functions and select the appropriate handler using
 // request header data.
 let mapWithConneg formatters f =
-  negotiateMediaType formatters <| fun request content -> f request <| readRequestBody formatters request content
+  negotiateMediaType formatters
+  <| fun request content -> async {
+      let! requestBody = readRequestBody content
+      return f request requestBody }
 
 // ## HTTP Resources
 
@@ -387,7 +389,7 @@ type HttpResource =
   // available methods are reported.
   member x.Invoke(request) =
     match x.Handler request with
-    | Some(h) -> h
+    | Some h -> h
     | _ -> ``405 Method Not Allowed`` x.Methods request
 
 let private makeHandler(httpMethod, handler) =
@@ -425,16 +427,99 @@ let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handl
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun _ _ -> respond HttpStatusCode.NotFound ignore Empty
+  fun _ _ -> respond HttpStatusCode.NotFound ignore <| Str "404 Not Found"
 
-let mergeWithCustom404 notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
+let findApplicationFor resources (request: HttpRequestMessage) =
+  let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
+  let handler = resource |> Option.map (fun r -> r.Invoke)
+  handler
+
+#if DEBUG
+let stub _ _ = respond HttpStatusCode.OK ignore Empty
+let resource1 = route "/" (get stub <|> post stub)
+let resource2 = route "/stub" <| get stub
+
+[<Test>]
+let ``test should find nothing at GET /baduri``() =
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/baduri"))
+  let handler = findApplicationFor [resource1; resource2] request
+  test <@ handler.IsNone @>
+
+[<Test>]
+let ``test should find stub at GET /``() =
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/"))
+  let handler = findApplicationFor [resource1; resource2] request
+  test <@ handler.IsSome @>
+
+[<Test>]
+let ``test should find stub at POST /``() =
+  let request = new HttpRequestMessage(HttpMethod.Post, new Uri("http://example.org/")) 
+  let handler = findApplicationFor [resource1; resource2] request
+  test <@ handler.IsSome @>
+
+[<Test>]
+let ``test should find stub at GET /stub``() =
+  let request = new HttpRequestMessage(HttpMethod.Post, new Uri("http://example.org/"))
+  let handler = findApplicationFor [resource1; resource2] request
+  test <@ handler.IsSome @>
+#endif
+
+let mergeWithNotFound notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
   fun request ->
-    let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
-    let handler = resource |> Option.map (fun r -> r.Invoke) |> (flip defaultArg) notFoundHandler
-    fun content -> handler request content
+    let handler = findApplicationFor resources request |> (flip defaultArg) notFoundHandler
+    fun content -> async {
+      let! response = handler request content
+      return response }
 
-let merge resources =
-  mergeWithCustom404 ``404 Not Found`` resources
+let merge resources = mergeWithNotFound ``404 Not Found`` resources
+
+#if DEBUG
+[<Test>]
+let ``test should return 404 Not Found as the handler``() =
+  let app = merge []
+  let request = new HttpRequestMessage()
+  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  test <@ response.StatusCode = HttpStatusCode.NotFound @>
+
+[<Test>]
+let ``test should return 404 Not Found as the handler when other resources are available``() =
+  let app = merge [resource1; resource2]
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/baduri"))
+  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  test <@ response.StatusCode = HttpStatusCode.NotFound @>
+
+[<Test>]
+let ``test should return stub at GET /``() =
+  let app = merge [resource1; resource2]
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/"))
+  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+
+[<Test>]
+let ``test should return stub at POST /``() =
+  let app = merge [resource1; resource2]
+  let request = new HttpRequestMessage(HttpMethod.Post, new Uri("http://example.org/")) 
+  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+
+[<Test>]
+let ``test should return stub at GET /stub``() =
+  let app = merge [resource1; resource2]
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/stub"))
+  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+#endif
+
+let private startAsTask (app: HttpApplication) (request, cancelationToken) =
+  Async.StartAsTask(app request request.Content, cancellationToken = cancelationToken)
+
+type FrankHandler() =
+  inherit DelegatingHandler()
+  static member Create(app) =
+    let app = startAsTask app
+    { new FrankHandler() with
+        override this.SendAsync(request, cancelationToken) =
+          app(request, cancelationToken) } :> DelegatingHandler
 
 //let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
 //let testBody = dict [("foo", "bar");("bar", "baz")]

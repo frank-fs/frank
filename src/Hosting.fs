@@ -15,26 +15,14 @@ module Frank.Hosting.WebApi
 // Open namespaces for Web API support.
 open System.Net.Http
 open System.ServiceModel
-open Microsoft.ApplicationServer.Http
 open Frank
-
-let startAsTask (app: HttpApplication) (request, cancelationToken) =
-  Async.StartAsTask(async.Return(app request request.Content), cancellationToken = cancelationToken)
 
 [<ServiceContract>]
 type FrankApi() =
   [<OperationContract>]
   member x.Invoke() = ()
 
-type FrankHandler() =
-  inherit DelegatingHandler()
-  static member Create(app) =
-    let app = startAsTask app
-    { new FrankHandler() with
-        override this.SendAsync(request, cancelationToken) =
-          app(request, cancelationToken) } :> DelegatingHandler
-
 let configure app =
-  WebApiConfiguration(
+  Microsoft.ApplicationServer.Http.WebApiConfiguration(
     useMethodPrefixForHttpMethod = false,
     MessageHandlerFactory = (fun () -> seq { yield FrankHandler.Create app }))

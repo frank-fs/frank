@@ -14,19 +14,28 @@ type Global() =
                         new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter
                         new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
-    // Respond with a plain text "Hello, world!"
-    let helloWorld = mapWithConneg formatters (fun _ _ -> "Hello, world!")
+    // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
+    let helloWorld _ _ =
+      respond HttpStatusCode.OK (``Content-Type`` "text/html")
+      <| Str @"<!doctype html>
+<meta charset=utf-8>
+<title>Hello</title>
+<p>Hello, world!
+<form action=""/"" method=""post"">
+<input type=""hidden"" name=""text"" value=""testing"">
+<input type=""submit"">"
 
     // Respond with the request content, if any.
-    let echo = mapWithConneg formatters (fun _ content -> content)
+    let echo = mapWithConneg formatters <| fun _ stream -> 
+      use reader = new System.IO.StreamReader(stream)
+      reader.ReadToEnd()
     
     let resource = route "/" (get helloWorld <|> post echo)
 
     // Mount the app and add a middleware to support HEAD requests.
-    let app : HttpApplication = merge [ resource ] |> Middleware.head
+    let app = merge [ resource ] //|> Middleware.head
     
     let config = WebApi.configure app
-    let baseUri = "http://localhost:1000/"
 
     member x.Start() =
         RouteTable.Routes.MapServiceRoute<WebApi.FrankApi>("", config)
