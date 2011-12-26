@@ -100,6 +100,20 @@ type EmptyContent() =
 
 type HttpContent with
   static member Empty = new EmptyContent() :> HttpContent
+  member x.AsyncReadAs<'a>() = Async.AwaitTask <| x.ReadAsAsync<'a>()
+  member x.AsyncReadAs<'a>(formatters) = Async.AwaitTask <| x.ReadAsAsync<'a>(formatters)
+  member x.AsyncReadAs(type') = Async.AwaitTask <| x.ReadAsAsync(type')
+  member x.AsyncReadAs(type', formatters) = Async.AwaitTask <| x.ReadAsAsync(type', formatters)
+  member x.AsyncReadAsByteArray() = Async.AwaitTask <| x.ReadAsByteArrayAsync()
+  member x.AsyncReadAsMultipart() = Async.AwaitTask <| x.ReadAsMultipartAsync()
+  member x.AsyncReadAsMultipart(streamProvider) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider)
+  member x.AsyncReadAsMultipart(streamProvider, bufferSize) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider, bufferSize)
+  member x.AsyncReadAsOrDefault<'a>() = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>()
+  member x.AsyncReadAsOrDefault<'a>(formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>(formatters)
+  member x.AsyncReadAsOrDefault(type') = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type')
+  member x.AsyncReadAsOrDefault(type', formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type', formatters)
+  member x.AsyncReadAsStream() = Async.AwaitTask <| x.ReadAsStreamAsync()
+  member x.AsyncReadAsString() = Async.AwaitTask <| x.ReadAsStringAsync()
 
 // ## HTTP Response Combinators
 
@@ -303,7 +317,7 @@ let findFormatterFor mediaType =
 // `readRequestBody` takes a collection of `HttpContent` formatters and returns a typed result from reading the content.
 // This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
 // a similar type against which to calculate a response.
-let readRequestBody (content: HttpContent) = Async.AwaitTask <| content.ReadAsStreamAsync()
+let readRequestBody formatters (content: HttpContent) = content.AsyncReadAsStream()
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
@@ -317,7 +331,7 @@ let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToS
 // not optimal. Hopefully this, too, will be resolved in a future release.
 let formatWith (mediaType: string) formatter body = async {
   let content = new ObjectContent<_>(body, mediaType, [| formatter |]) :> HttpContent
-  let! formattedBody = Async.AwaitTask <| content.ReadAsStreamAsync()
+  let! formattedBody = content.AsyncReadAsStream()
   return formattedBody }
 
 #if DEBUG
@@ -362,7 +376,7 @@ let negotiateMediaType formatters f =
 let mapWithConneg formatters f =
   negotiateMediaType formatters
   <| fun request content -> async {
-      let! requestBody = readRequestBody content
+      let! requestBody = readRequestBody formatters content
       return f request requestBody }
 
 // ## HTTP Resources
