@@ -28,7 +28,7 @@ open System.Net.Http
 open Frank
 open Frank.Hosting
 
-let helloWorld _ _ = respond HttpStatusCode.OK ignore <| Str "Hello, world!"
+let helloWorld _ _ = respond HttpStatusCode.OK ignore <| new StringContent("Hello, world!")
 
 let config = WebApi.configure helloWorld
 let baseUri = "http://localhost:1000/"
@@ -38,5 +38,4 @@ host.Open()
 printfn "Host open for one minute..."
 printfn "Use a web browser and go to %s or do it right and get fiddler!" baseUri
 
-System.Threading.Thread.Sleep(60000)
 host.Close()

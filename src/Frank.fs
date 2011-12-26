@@ -124,27 +124,13 @@ type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let headers = Reader.reader
 let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
 
-type HttpResponseBody =
-  | Empty
-  | Stream of System.IO.Stream
-  | Bytes of byte[]
-  | Str of string
-
-// Convert an optional response body argument into an actual `HttpContent` type.
-let inline makeHttpContent body =
-  match body with
-  | Empty -> HttpContent.Empty
-  | Stream v -> new StreamContent(v) :> HttpContent
-  | Bytes v -> new ByteArrayContent(v) :> HttpContent
-  | Str v -> new StringContent(v) :> HttpContent
-
 // Responding with the actual types can get a bit noisy with the long type names and required
 // type cast to `HttpResponseMessage` (since most responses will include a typed body).
 // The `respond` function simplifies this and also accepts an `HttpResponseHeadersBuilder`
 // to allow easy composition and inclusion of headers. This function finally takes an optional
 // `body`.
 let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) body =
-  new HttpResponseMessage(statusCode, Content = makeHttpContent body)
+  new HttpResponseMessage(statusCode, Content = body)
   |> addHeaders headers
   |> async.Return
 
@@ -152,14 +138,14 @@ let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) b
 [<Test>]
 let ``test respond without body``() =
   let statusCode = HttpStatusCode.OK
-  let response = respond statusCode ignore Empty |> Async.RunSynchronously
+  let response = respond statusCode ignore HttpContent.Empty |> Async.RunSynchronously
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with body``() =
   let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore <| Str body |> Async.RunSynchronously
+  let response = respond statusCode ignore <| new StringContent(body) |> Async.RunSynchronously
   test <@ response.StatusCode = statusCode @>
   test <@ response.Content.ReadAsStringAsync().Result = body @>
 #endif
@@ -265,7 +251,7 @@ let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) bod
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
-  respondWithAllowHeader HttpStatusCode.OK allowedMethods Empty
+  respondWithAllowHeader HttpStatusCode.OK allowedMethods HttpContent.Empty
 
 #if DEBUG
 [<Test>]
@@ -282,7 +268,7 @@ let ``test options``() =
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| Str "405 Method Not Allowed"
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
 
 #if DEBUG
 [<Test>]
@@ -299,7 +285,7 @@ let ``test 405 Method Not Allowed``() =
 
 let ``406 Not Acceptable`` =
   fun _ _ ->
-    respond HttpStatusCode.NotAcceptable ignore <| Str "406 Not Acceptable"
+    respond HttpStatusCode.NotAcceptable ignore <| new StringContent("406 Not Acceptable")
 
 #if DEBUG
 [<Test>]
@@ -314,13 +300,6 @@ let findFormatterFor mediaType =
     |> Seq.map (fun value -> value.MediaType)
     |> Seq.exists ((=) mediaType))
 
-// `readRequestBody` takes a collection of `HttpContent` formatters and returns a typed result from reading the content.
-// This is useful if you have several options for receiving data such as JSON, XML, or form-urlencoded and want to produce
-// a similar type against which to calculate a response.
-let readRequestBody formatters (content: HttpContent) = content.AsyncReadAsStream()
-
-let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
-
 // `formatWith` allows you to specify a specific `formatter` with which to render a representation
 // of your content body.
 // 
@@ -329,29 +308,68 @@ let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToS
 // 
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
-let formatWith (mediaType: string) formatter body = async {
-  let content = new ObjectContent<_>(body, mediaType, [| formatter |]) :> HttpContent
-  let! formattedBody = content.AsyncReadAsStream()
-  return formattedBody }
+let formatWith mediaType formatter body =
+  new ObjectContent<_>(body, MediaTypeHeaderValue(mediaType), [| formatter |]) :> HttpContent
 
 #if DEBUG
-type TestType = { FirstName : string; LastName : string }
+[<Serializable>]
+type TestType() =
+  let mutable firstName = ""
+  let mutable lastName = ""
+  member x.FirstName
+    with get() = firstName
+    and set(v) = firstName <- v
+  member x.LastName
+    with get() = lastName
+    and set(v) = lastName <- v
+  override x.ToString() = firstName + " " + lastName
 
 [<Test>]
-let ``test formatWith and makeHttpContent properly format as application/json``() =
+let ``test formatWith properly format as application/json``() =
   let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
-  let body = { FirstName = "Ryan"; LastName = "Riley" }
-  let formattedBody = body |> formatWith "application/json" formatter |> Async.RunSynchronously
-  let content = makeHttpContent <| Stream formattedBody
-  let result = content.ReadAsStringAsync().Result
-  test <@ result = "{\"FirstName@\":\"Ryan\",\"LastName@\":\"Riley\"}" @>
+  let body = TestType(FirstName = "Ryan", LastName = "Riley")
+  let content = body |> formatWith "application/json" formatter
+  test <@ content.Headers.ContentType.MediaType = "application/json" @>
+  let result = content.AsyncReadAsString() |> Async.RunSynchronously
+  test <@ result = "{\"firstName\":\"Ryan\",\"lastName\":\"Riley\"}" @>
+
+[<Test>]
+let ``test formatWith properly format as text/plain and read as string``() =
+  let formatter = new Microsoft.ApplicationServer.Http.PlainTextFormatter()
+  let body = TestType(FirstName = "Ryan", LastName = "Riley").ToString()
+  let content = body |> formatWith "text/plain" formatter
+  test <@ content.Headers.ContentType.MediaType = "text/plain" @>
+  let result = content.AsyncReadAs<string>([| formatter |]) |> Async.RunSynchronously
+  test <@ result = body @>
+
+[<Test>]
+let ``test formatWith properly format as application/xml and read as TestType``() =
+  let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
+  let body = TestType(FirstName = "Ryan", LastName = "Riley")
+  let content = body |> formatWith "application/xml" formatter
+  test <@ content.Headers.ContentType.MediaType = "application/xml" @>
+  let result = content.AsyncReadAs<TestType>([| formatter |]) |> Async.RunSynchronously
+  test <@ result = body @>
+
+[<Test;Ignore>]
+let ``test formatWith properly format as application/x-www-form-urlencoded and read as JsonValue``() =
+  let formatter = new System.Net.Http.Formatting.JsonValueMediaTypeFormatter()
+  let body = TestType(FirstName = "Ryan", LastName = "Riley")
+  let content = body |> formatWith "application/x-www-form-urlencoded" formatter
+  test <@ content.Headers.ContentType.MediaType = "application/x-www-form-urlencoded" @>
+  let interim = content.AsyncReadAs<JsonValue>([| formatter |]) |> Async.RunSynchronously
+  let result = interim.AsDynamic()
+  test <@ result?firstName = body.FirstName @>
+  test <@ result?lastName = body.LastName @>
 #endif
+
+let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
 // When you want to negotiate the format of the response based on the available representations and
 // the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
 // `formatters` and attempts to match the best with the provided `Accept` header values using
 // functions from `FSharpx.Http`.
-let negotiateMediaType formatters f =
+let negotiateMediaType formatters (f: HttpRequestMessage -> HttpContent -> Async<_>) =
   let servedMedia =
     formatters
     |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
@@ -363,21 +381,9 @@ let negotiateMediaType formatters f =
         let formatter = findFormatterFor mediaType formatters
         fun content -> async {
           let! responseBody = f request content
-          let! formattedBody = responseBody |> formatWith mediaType formatter
-          return! respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") <| Stream formattedBody }
+          let formattedBody = responseBody |> formatWith mediaType formatter
+          return! respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") formattedBody }
     | _ -> ``406 Not Acceptable`` request
-
-// The most direct way of building an HTTP application is to focus on the actual types
-// being transacted. These usually come in the form of the content of the request and response
-// message bodies. The `f` function accepts the `request` and the deserialized `content`.
-// The `request` is provided to allow the function access to the request headers, which also
-// allows us to merge several handler functions and select the appropriate handler using
-// request header data.
-let mapWithConneg formatters f =
-  negotiateMediaType formatters
-  <| fun request content -> async {
-      let! requestBody = readRequestBody formatters content
-      return f request requestBody }
 
 // ## HTTP Resources
 
@@ -441,7 +447,7 @@ let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handl
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun _ _ -> respond HttpStatusCode.NotFound ignore <| Str "404 Not Found"
+  fun _ _ -> respond HttpStatusCode.NotFound ignore <| new StringContent("404 Not Found")
 
 let findApplicationFor resources (request: HttpRequestMessage) =
   let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
@@ -449,7 +455,7 @@ let findApplicationFor resources (request: HttpRequestMessage) =
   handler
 
 #if DEBUG
-let stub _ _ = respond HttpStatusCode.OK ignore Empty
+let stub _ _ = respond HttpStatusCode.OK ignore HttpContent.Empty
 let resource1 = route "/" (get stub <|> post stub)
 let resource2 = route "/stub" <| get stub
 
