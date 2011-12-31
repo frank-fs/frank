@@ -17,7 +17,7 @@ Indeed, if you search the web, you're likely to find a large number of approache
 When starting with Frank, I wanted to try to find a way to define an HTTP application
 using pure functions and function composition. The closest I found was the following:
 
-    type HttpRequestHandler = HttpContent -> HttpResponseMessage
+    type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
     type HttpApplication = HttpRequestMessage -> HttpRequestHandler
     
     let orElse right left = fun request -> Option.orElse (left request) (right request)
@@ -35,7 +35,8 @@ A "Hello, world!" application using these signatures would look like the followi
 A simple echo handler that returns the same input as it received might look like the following:
 
     let echo _ (content: HttpContent) =
-      respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Some(content.ReadAsString())
+      respond HttpStatusCode.OK (``Content-Type`` "text/plain")
+      <| new StringContent(content.ReadAsStringAsync().Result)
 
 ### Define an HTTP Resource
 
@@ -90,12 +91,13 @@ the `id` function to return the very same result.
 The `echo2MapFrom` maps the incoming request to a value that can be used
 within the actual computation, or `echo2Core` in this example.
 
-      let echo2MapFrom (request : HttpRequestMessage) = request.Content.ReadAsString()
+      let echo2MapFrom _ (content: HttpContent) = request.Content.ReadAsStringAsync().Result
 
 The `echo2MapTo` maps the outgoing message body to an HTTP response.
 
-      let echo2MapTo body = fun _ -> 
-        respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| Some body
+      let echo2MapTo body =
+        respond HttpStatusCode.OK (``Content-Type`` "text/plain")
+        <| new StringContent(body)
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
@@ -105,7 +107,7 @@ about which it cares and isn't bothered by the transformations.
 
 Create a `HttpResource` instance at the root of the site that responds to `POST`.
 
-      let resource = routeWithMethodMapping "/" [ post echo2 ]
+      let resource = route "/" <| post echo2
 
 Other combinators are available to handle other scenarios, such as:
 
@@ -123,13 +125,13 @@ Frank middlewares take an `HttpApplication` and return an `HttpApplication`.
 The `Frank.Middleware` module defines several, simple middlewares, such as the `log` middleware that
 intercepts logs incoming requests and the time taken to respond:
 
-    let log app = fun (request : HttpRequestMessage) content -> 
+    let log app = fun (request : HttpRequestMessage) content -> async {
       let sw = System.Diagnostics.Stopwatch.StartNew()
-      let response = app request content
+      let! response = app request content
       printfn "Received a %A request from %A. Responded in %i ms."
               request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
       sw.Reset()
-      response
+      return response }
 
 The most likely place to insert middlewares is the outer edge of your application.
 However, since middlewares are themselves just `HttpApplication`s, you can compose them into a Frank application
