@@ -29,8 +29,8 @@ open Frank
 open Frank.Hosting
 
 // Respond with the request content, if any.
-let echo _ (content: HttpContent) =
-  respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| new StringContent(content.ReadAsStringAsync().Result)
+let echo (request: HttpRequestMessage) =
+  respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| new StringContent(request.Content.ReadAsStringAsync().Result)
 
 // Create an application from an `HttpResource` that only responds to `POST` requests.
 // Try sending a GET or other method to see a `405 Method Not Allowed` response.

@@ -28,7 +28,7 @@ open System.Net.Http
 open Frank
 open Frank.Hosting
 
-let helloWorld _ _ = respond HttpStatusCode.OK ignore <| new StringContent("Hello, world!")
+let helloWorld _ = respond HttpStatusCode.OK ignore <| new StringContent("Hello, world!")
 
 let config = WebApi.configure helloWorld
 let baseUri = "http://localhost:1000/"

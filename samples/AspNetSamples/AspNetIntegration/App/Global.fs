@@ -15,7 +15,7 @@ type Global() =
                         new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
     // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
-    let helloWorld _ _ =
+    let helloWorld _ =
       respond HttpStatusCode.OK (``Content-Type`` "text/html")
       <| new StringContent(@"<!doctype html>
 <meta charset=utf-8>
@@ -26,7 +26,9 @@ type Global() =
 <input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
 
     // Respond with the request content, if any.
-    let echo = negotiateMediaType formatters <| fun _ content -> content.AsyncReadAsString()
+    let echo =
+      negotiateMediaType formatters
+      <| fun request -> request.Content.AsyncReadAsString()
     
     let resource = route "/" (get helloWorld <|> post echo)
 
