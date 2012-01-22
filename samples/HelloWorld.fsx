@@ -20,6 +20,7 @@ See LICENSE.txt for details.
 #r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll"
 #r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
 #r @"..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#load @"..\src\System.Net.Http.fs"
 #load @"..\src\Frank.fs"
 #load @"..\src\Hosting.fs"
 
@@ -28,7 +29,8 @@ open System.Net.Http
 open Frank
 open Frank.Hosting
 
-let helloWorld _ _ = respond HttpStatusCode.OK ignore <| new StringContent("Hello, world!")
+let helloWorld request =
+  async.Return <| HttpResponseMessage.ReplyTo(request, "Hello, world!")
 
 let config = WebApi.configure helloWorld
 let baseUri = "http://localhost:1000/"

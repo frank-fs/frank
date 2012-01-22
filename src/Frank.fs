@@ -33,122 +33,33 @@ open Swensen.Unquote.Assertions
 // ## Define the web application interface
 
 (*
-One may define a web application interface using a large variety of signatures.
-Indeed, if you search the web, you're likely to find a large number of approaches.
-When starting with `Frank`, I wanted to try to find a way to define an HTTP application
-using pure functions and function composition. The closest I found was the following:
+One may define a web application interface using a large variety of signatures. Indeed, if you search the web, you're likely to find a large number of approaches. When starting with `Frank`, I wanted to try to find a way to define an HTTP application using pure functions and function composition. The closest I found was the following:
 
-    type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
-    type HttpApplication = HttpRequestMessage -> HttpRequestHandler
+    type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
     
-    let orElse right left = fun request -> Option.orElse (left request) (right request)
-    let inline (<|>) left right = orElse right left
+    let orElse left right = fun request -> Option.orElse (left request) (right request)
+    let inline (<|>) left right = orElse left right 
 
-The last of these was a means for merging multiple applications together into a single
-application. This allowed for a nice symmetry and elegance in that everything you composed
-would always have the same signature. Additional functions would allow you to map
-applications to specific methods or uri patterns.
+These signatures represent both the application signature and a means for merging multiple applications together into a single application. This allowed for a nice symmetry and elegance in that everything you composed would always have the same signature. Additional functions allow you to map applications to specific methods or uri patterns.
 
-Alas, this approach works only so well. HTTP is a rich communication specification.
-The simplicity and elegance of a purely functional approach quickly loses the ability
-to communicate back options to the client. For instance, given the above, how do you
-return a meaningful `405 Method Not Allowed` response? The HTTP specification requires
-that you list the allowed methods, but if you merge all the logic for selecting an
-application into the functions, there is no easy way to recall all the allowed methods,
-short of trying them all. You could require that the developer add the list of used
-methods, but that, too, misses the point that the application should be collecting this
-and helping the developer by taking care of all of the nuts and bolts items
+Alas, this approach works only so well. HTTP is a rich communication specification. The simplicity and elegance of a purely functional approach quickly loses the ability to communicate back options to the client. For instance, given the above, how do you return a meaningful `405 Method Not Allowed` response? The HTTP specification requires that you list the allowed methods, but if you merge all the logic for selecting an application into the functions, there is no easy way to recall all the allowed methods, short of trying them all. You could require that the developer add the list of used methods, but that, too, misses the point that the application should be collecting this and helping the developer by taking care of all of the nuts and bolts items.
 
-The next approach I tried involved using a tuple of a list of allowed HTTP methods and
-the application handler, which used the merged function approach described above for
-actually executing the application. However, once again, there are limitations. This
-structure accurately represents a resource, but it does not allow for multiple resources
-to coexist side-by-side. Another tuple of uri pattern matching expressions could wrap
-a list of these method * handler tuples, but at this point I realized I would be better
-served by using real types and thus arrived at the signatures below.
+The next approach I tried involved using a tuple of a list of allowed HTTP methods and the application handler, which used the merged function approach described above for actually executing the application. However, once again, there are limitations. This structure accurately represents a resource, but it does not allow for multiple resources to coexist side-by-side. Another tuple of uri pattern matching expressions could wrap a list of these method * handler tuples, but at this point I realized I would be better served by using real types and thus arrived at the signatures below.
 
-You'll see the signatures above are still mostly present, though they have been changed
-to better fit the signatures below.
+You'll see the signatures above are still mostly present, though they have been changed to better fit the signatures below.
 *)
 
-// An `HttpRequestHandler` takes an `HttpContent`, or request body, and returns the
-// appropriate `HttpResponseMessage`. This handler is returned by an `HttpApplication`.
-// Why the split? Splitting the acceptance of the request headers from the actual
-// request body allows you to decide what you want to do earlier. Thus, should you
-// receive a request header specifying a specific `Accept`-ed content type, you can
-// select an appropriate handler that returns that type. It also allows you to return
-// a 404, 405, or other message before reading the content, should you determine that
-// the request is invalid based on its headers.
-type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
-
 // `HttpApplication` defines the contract for processing any request.
-// An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler`.
-type HttpApplication = HttpRequestMessage -> HttpRequestHandler
+// An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.
+type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 
-// ## Helper Types
-
-type EmptyContent() =
-  inherit HttpContent()
-  override x.SerializeToStreamAsync(stream, context) =
-    new System.Threading.Tasks.Task(fun () -> ())
-  override x.TryComputeLength(length) =
-    length <- 0L
-    true
-  override x.Equals(other) =
-    other.GetType() = typeof<EmptyContent>
-  override x.GetHashCode() = hash x
-
-type HttpContent with
-  static member Empty = new EmptyContent() :> HttpContent
-  member x.AsyncReadAs<'a>() = Async.AwaitTask <| x.ReadAsAsync<'a>()
-  member x.AsyncReadAs<'a>(formatters) = Async.AwaitTask <| x.ReadAsAsync<'a>(formatters)
-  member x.AsyncReadAs(type') = Async.AwaitTask <| x.ReadAsAsync(type')
-  member x.AsyncReadAs(type', formatters) = Async.AwaitTask <| x.ReadAsAsync(type', formatters)
-  member x.AsyncReadAsByteArray() = Async.AwaitTask <| x.ReadAsByteArrayAsync()
-  member x.AsyncReadAsMultipart() = Async.AwaitTask <| x.ReadAsMultipartAsync()
-  member x.AsyncReadAsMultipart(streamProvider) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider)
-  member x.AsyncReadAsMultipart(streamProvider, bufferSize) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider, bufferSize)
-  member x.AsyncReadAsOrDefault<'a>() = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>()
-  member x.AsyncReadAsOrDefault<'a>(formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>(formatters)
-  member x.AsyncReadAsOrDefault(type') = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type')
-  member x.AsyncReadAsOrDefault(type', formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type', formatters)
-  member x.AsyncReadAsStream() = Async.AwaitTask <| x.ReadAsStreamAsync()
-  member x.AsyncReadAsString() = Async.AwaitTask <| x.ReadAsStringAsync()
-
-// ## HTTP Response Combinators
+// ## HTTP Response Header Combinators
 
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
 // First of all, it allows for the explicit declaration of side effects. Second, a number
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let headers = Reader.reader
-let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
-
-// Responding with the actual types can get a bit noisy with the long type names and required
-// type cast to `HttpResponseMessage` (since most responses will include a typed body).
-// The `respond` function simplifies this and also accepts an `HttpResponseHeadersBuilder`
-// to allow easy composition and inclusion of headers. This function finally takes an optional
-// `body`.
-let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) body =
-  new HttpResponseMessage(statusCode, Content = body)
-  |> addHeaders headers
-  |> async.Return
-
-#if DEBUG
-[<Test>]
-let ``test respond without body``() =
-  let statusCode = HttpStatusCode.OK
-  let response = respond statusCode ignore HttpContent.Empty |> Async.RunSynchronously
-  test <@ response.StatusCode = statusCode @>
-  test <@ response.Content = HttpContent.Empty @>
-
-[<Test>]
-let ``test respond with body``() =
-  let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore <| new StringContent(body) |> Async.RunSynchronously
-  test <@ response.StatusCode = statusCode @>
-  test <@ response.Content.ReadAsStringAsync().Result = body @>
-#endif
 
 // ### General Headers
 // TODO: Rely less upon the `Parse` and `ParseAdd` methods and pass in more of the parameters.
@@ -245,9 +156,9 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
-let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) body =
-  fun _ _ ->
-    respond statusCode (Allow allowedMethods) body
+let internal respondWithAllowHeader statusCode allowedMethods body =
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, body, statusCode, Allow allowedMethods)
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -256,7 +167,7 @@ let options allowedMethods =
 #if DEBUG
 [<Test>]
 let ``test options``() =
-  let response = options ["GET";"POST"] (obj()) (obj()) |> Async.RunSynchronously
+  let response = options ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -268,12 +179,13 @@ let ``test options``() =
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  <| new StringContent("405 Method Not Allowed")
 
 #if DEBUG
 [<Test>]
 let ``test 405 Method Not Allowed``() =
-  let response = ``405 Method Not Allowed`` ["GET";"POST"] (obj()) (obj()) |> Async.RunSynchronously
+  let response = ``405 Method Not Allowed`` ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.MethodNotAllowed @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -284,13 +196,13 @@ let ``test 405 Method Not Allowed``() =
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` =
-  fun _ _ ->
-    respond HttpStatusCode.NotAcceptable ignore <| new StringContent("406 Not Acceptable")
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("406 Not Acceptable"), HttpStatusCode.NotAcceptable)
 
 #if DEBUG
 [<Test>]
 let ``test 406 Not Acceptable``() =
-  let response = ``406 Not Acceptable`` (obj()) (obj()) |> Async.RunSynchronously
+  let response = ``406 Not Acceptable`` (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotAcceptable @>
 #endif
 
@@ -369,7 +281,7 @@ let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToS
 // the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
 // `formatters` and attempts to match the best with the provided `Accept` header values using
 // functions from `FSharpx.Http`.
-let negotiateMediaType formatters (f: HttpRequestMessage -> HttpContent -> Async<_>) =
+let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
   let servedMedia =
     formatters
     |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
@@ -379,10 +291,10 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> HttpContent -> Async
     match bestOf request with
     | Some mediaType ->
         let formatter = findFormatterFor mediaType formatters
-        fun content -> async {
-          let! responseBody = f request content
+        async {
+          let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return! respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") formattedBody }
+          return HttpResponseMessage.ReplyTo(request, formattedBody, ``Content-Type`` mediaType *> ``Vary`` "Accept") }
     | _ -> ``406 Not Acceptable`` request
 
 // ## HTTP Resources
@@ -395,7 +307,7 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> HttpContent -> Async
 type HttpResource =
   { Uri: string
     Methods: string list
-    Handler: HttpRequestMessage -> HttpRequestHandler option }
+    Handler: HttpRequestMessage -> Async<HttpResponseMessage> option }
   with
 
   // TODO: add a method to match the Uri.
@@ -432,10 +344,10 @@ let delete handler = mapResourceHandler(HttpMethod.Delete.Method, handler)
 // The intent here is to build a resource, with at most one handler per HTTP method. This goes
 // against a lot of the "RESTful" approaches that just merge a bunch of method handlers at
 // different URI addresses.
-let orElse right left =
+let orElse left right =
   fst left @ fst right,
   fun request -> Option.orElse (snd left request) (snd right request)
-let inline (<|>) left right = left |> orElse right
+let inline (<|>) left right = orElse left right
 
 let route path handler =
   { Uri = path
@@ -447,15 +359,15 @@ let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handl
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun _ _ -> respond HttpStatusCode.NotFound ignore <| new StringContent("404 Not Found")
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
 
 let findApplicationFor resources (request: HttpRequestMessage) =
   let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
-  let handler = resource |> Option.map (fun r -> r.Invoke)
-  handler
+  resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
-let stub _ _ = respond HttpStatusCode.OK ignore HttpContent.Empty
+let stub request = async.Return <| HttpResponseMessage.ReplyTo(request)
 let resource1 = route "/" (get stub <|> post stub)
 let resource2 = route "/stub" <| get stub
 
@@ -487,9 +399,7 @@ let ``test should find stub at GET /stub``() =
 let mergeWithNotFound notFoundHandler (resources: #seq<HttpResource>) : HttpApplication =
   fun request ->
     let handler = findApplicationFor resources request |> (flip defaultArg) notFoundHandler
-    fun content -> async {
-      let! response = handler request content
-      return response }
+    handler request
 
 let merge resources = mergeWithNotFound ``404 Not Found`` resources
 
@@ -498,111 +408,45 @@ let merge resources = mergeWithNotFound ``404 Not Found`` resources
 let ``test should return 404 Not Found as the handler``() =
   let app = merge []
   let request = new HttpRequestMessage()
-  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotFound @>
 
 [<Test>]
 let ``test should return 404 Not Found as the handler when other resources are available``() =
   let app = merge [resource1; resource2]
   let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/baduri"))
-  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotFound @>
 
 [<Test>]
 let ``test should return stub at GET /``() =
   let app = merge [resource1; resource2]
   let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/"))
-  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
 
 [<Test>]
 let ``test should return stub at POST /``() =
   let app = merge [resource1; resource2]
   let request = new HttpRequestMessage(HttpMethod.Post, new Uri("http://example.org/")) 
-  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
 
 [<Test>]
 let ``test should return stub at GET /stub``() =
   let app = merge [resource1; resource2]
   let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/stub"))
-  let response = app request HttpContent.Empty |> Async.RunSynchronously
+  let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
 #endif
 
-let private startAsTask (app: HttpApplication) (request, cancelationToken) =
-  Async.StartAsTask(app request request.Content, cancellationToken = cancelationToken)
+let internal startAsTask (app: HttpApplication) (request, cancelationToken) =
+  Async.StartAsTask(app request, cancellationToken = cancelationToken)
 
-type FrankHandler() =
+type FrankHandler private () =
   inherit DelegatingHandler()
-  static member Create(app) =
+  static member Start app =
     let app = startAsTask app
     { new FrankHandler() with
         override this.SendAsync(request, cancelationToken) =
           app(request, cancelationToken) } :> DelegatingHandler
-
-//let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-//let testBody = dict [("foo", "bar");("bar", "baz")]
-//let createTestRequest() =
-//  new HttpRequestMessage(
-//    HttpMethod.Post, Uri("http://frankfs.net/"),
-//    Version = Version(1,1),
-//    Content = new FormUrlEncodedContent(testBody))
-//
-//// HttpRequestMessage -> HttpResponseMessage
-//let echo (request : HttpRequestMessage) = 
-//  let body = request.Content.ReadAs<JsonValue>(seq { yield formatter })
-//  let response = new HttpResponseMessage<JsonValue>(body, HttpStatusCode.OK)
-//  response.Content.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  response
-//
-//[<Test>]
-//let ``test echo should return a response of 200 OK``() =
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.StatusCode = HttpStatusCode.OK @>
-//
-//[<Test>]
-//let ``test echo should return a response with one header for Content_Type of application/x-www-form-urlencoded``() =
-//  let expected = Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.Content.Headers.ContentType = expected @>
-//
-//[<Test>]
-//let ``test echo should return a response with a body of echoing the request body``() =
-//  let response = echo <| createTestRequest()
-//  let actual = response.Content.ReadAs()
-//  test <@ actual?foo = "bar" @>
-//  test <@ actual?bar = "baz" @>
-//
-//let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-//let testBody = dict [("foo", "bar");("bar", "baz")]
-//let createTestRequest() =
-//  new HttpRequestMessage(
-//    HttpMethod.Post, Uri("http://frankfs.net/"),
-//    Version = Version(1,1),
-//    Content = new FormUrlEncodedContent(testBody))
-//
-//// HttpRequestMessage -> HttpResponseMessage
-//let echo (request : HttpRequestMessage) = 
-//  let body = request.Content.ReadAs<JsonValue>(seq { yield formatter })
-//  let response = new HttpResponseMessage<JsonValue>(body, HttpStatusCode.OK)
-//  response.Content.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  response
-//
-//[<Test>]
-//let ``test echo should return a response of 200 OK``() =
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.StatusCode = HttpStatusCode.OK @>
-//
-//[<Test>]
-//let ``test echo should return a response with one header for Content_Type of application/x-www-form-urlencoded``() =
-//  let expected = Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.Content.Headers.ContentType = expected @>
-//
-//[<Test>]
-//let ``test echo should return a response with a body of echoing the request body``() =
-//  let response = echo <| createTestRequest()
-//  let actual = response.Content.ReadAs()
-//  test <@ actual?foo = "bar" @>
-//  test <@ actual?bar = "baz" @>

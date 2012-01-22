@@ -23,9 +23,9 @@ open ImpromptuInterface.FSharp
   
 /// Logs the incoming request and the time to respond.
 let log app =
-  fun (request: HttpRequestMessage) content -> async {
+  fun (request: HttpRequestMessage) -> async {
     let sw = System.Diagnostics.Stopwatch.StartNew()
-    let! response = app request content
+    let! response = app request
     printfn "Received a %A request from %A. Responded in %i ms."
             request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
     sw.Reset()
@@ -33,16 +33,16 @@ let log app =
 
 /// Intercepts a request using the HEAD method and strips away the returned body from a GET response.
 let head app =
-  fun (request: HttpRequestMessage) content ->
+  fun (request: HttpRequestMessage) ->
     if request.Method = HttpMethod.Head then 
       async {
         request.Method <- HttpMethod.Get
-        let! (response : HttpResponseMessage) = app request content
+        let! (response : HttpResponseMessage) = app request
         let emptyContent = HttpContent.Empty
         for KeyValue(header, value) in response.Content.Headers do
           emptyContent.Headers.Add(header, value)
         return response }
-    else app request content
+    else app request
 
 /// The overridable HTTP methods, used in the methodOverride middleware.
 let private overridableHttpMethods =
@@ -56,9 +56,10 @@ let private overridableHttpMethods =
 /// Intercepts a request and checks for use of X_HTTP_METHOD_OVERRIDE.
 let methodOverride app =
   // Leave out POST, as that is the method we are overriding.
-  fun (request : HttpRequestMessage) (content: HttpContent) -> async {
+  fun (request: HttpRequestMessage) -> async {
+    let content = request.Content
     if request.Method = HttpMethod.Post &&
-       request.Content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then
+       content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then
       let! value = Async.AwaitTask (content.ReadAsAsync<JsonValue>())
       let form = value.AsDynamic()
       let httpMethod =
@@ -70,4 +71,4 @@ let methodOverride app =
       if overridableHttpMethods |> List.exists ((=) httpMethod) then
         request.Content.Headers.Add("methodoverride_original_method", httpMethod.Method)
         request.Method <- HttpMethod.Post
-    return! app request content }
+    return! app request }
