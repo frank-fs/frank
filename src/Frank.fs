@@ -81,33 +81,6 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let headers = Reader.reader
-let addHeaders (headers: HttpResponseHeadersBuilder) response = headers response; response
-
-// Responding with the actual types can get a bit noisy with the long type names and required
-// type cast to `HttpResponseMessage` (since most responses will include a typed body).
-// The `respond` function simplifies this and also accepts an `HttpResponseHeadersBuilder`
-// to allow easy composition and inclusion of headers. This function finally takes an optional
-// `body`.
-let respond (statusCode: HttpStatusCode) (headers: HttpResponseHeadersBuilder) body =
-  new HttpResponseMessage(statusCode, Content = body)
-  |> addHeaders headers
-  |> async.Return
-
-#if DEBUG
-[<Test>]
-let ``test respond without body``() =
-  let statusCode = HttpStatusCode.OK
-  let response = respond statusCode ignore HttpContent.Empty |> Async.RunSynchronously
-  test <@ response.StatusCode = statusCode @>
-  test <@ response.Content = HttpContent.Empty @>
-
-[<Test>]
-let ``test respond with body``() =
-  let statusCode, body = HttpStatusCode.OK, "Howdy"
-  let response = respond statusCode ignore <| new StringContent(body) |> Async.RunSynchronously
-  test <@ response.StatusCode = statusCode @>
-  test <@ response.Content.ReadAsStringAsync().Result = body @>
-#endif
 
 // ### General Headers
 // TODO: Rely less upon the `Parse` and `ParseAdd` methods and pass in more of the parameters.
@@ -204,8 +177,9 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
-let private respondWithAllowHeader statusCode (allowedMethods: #seq<string>) body =
-  fun _ -> respond statusCode (Allow allowedMethods) body
+let internal respondWithAllowHeader statusCode allowedMethods body =
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, body, statusCode, Allow allowedMethods)
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -214,7 +188,7 @@ let options allowedMethods =
 #if DEBUG
 [<Test>]
 let ``test options``() =
-  let response = options ["GET";"POST"] (obj()) |> Async.RunSynchronously
+  let response = options ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -226,12 +200,13 @@ let ``test options``() =
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  <| new StringContent("405 Method Not Allowed")
 
 #if DEBUG
 [<Test>]
 let ``test 405 Method Not Allowed``() =
-  let response = ``405 Method Not Allowed`` ["GET";"POST"] (obj()) |> Async.RunSynchronously
+  let response = ``405 Method Not Allowed`` ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.MethodNotAllowed @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -242,12 +217,13 @@ let ``test 405 Method Not Allowed``() =
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` =
-  fun _ -> respond HttpStatusCode.NotAcceptable ignore <| new StringContent("406 Not Acceptable")
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("406 Not Acceptable"), HttpStatusCode.NotAcceptable)
 
 #if DEBUG
 [<Test>]
 let ``test 406 Not Acceptable``() =
-  let response = ``406 Not Acceptable`` (obj()) |> Async.RunSynchronously
+  let response = ``406 Not Acceptable`` (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotAcceptable @>
 #endif
 
@@ -339,7 +315,7 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return! respond HttpStatusCode.OK (``Content-Type`` mediaType *> ``Vary`` "Accept") formattedBody }
+          return HttpResponseMessage.ReplyTo(request, formattedBody, ``Content-Type`` mediaType *> ``Vary`` "Accept") }
     | _ -> ``406 Not Acceptable`` request
 
 // ## HTTP Resources
@@ -404,15 +380,15 @@ let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handl
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun _ -> respond HttpStatusCode.NotFound ignore <| new StringContent("404 Not Found")
+  fun request ->
+    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
 
 let findApplicationFor resources (request: HttpRequestMessage) =
   let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
-  let handler = resource |> Option.map (fun r -> r.Invoke)
-  handler
+  resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
-let stub _ = respond HttpStatusCode.OK ignore HttpContent.Empty
+let stub request = async.Return <| HttpResponseMessage.ReplyTo(request)
 let resource1 = route "/" (get stub <|> post stub)
 let resource2 = route "/stub" <| get stub
 
