@@ -304,23 +304,28 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
 // to a `Controller`. Resources should represent a single entity type,
 // and it is important to note that a `Foo` is not the same entity
 // type as a `Foo list`, which is where most MVC approaches go wrong. 
-type HttpResource =
-  { Uri: string
-    Methods: string list
-    Handler: HttpRequestMessage -> Async<HttpResponseMessage> option }
+type HttpResource(uriTemplate, methods, handler, ?uriMatcher) =
+  let mutable uriTemplate = uriTemplate
+  let uriMatcher = defaultArg uriMatcher (=)
   with
+  member x.UriTemplate
+    with get() = uriTemplate
+    and set(v) = uriTemplate <- v
 
-  // TODO: add a method to match the Uri.
+  member x.Methods = methods
+
+  member x.RespondsTo(uri) = uriMatcher uriTemplate uri
 
   // With the ``405 Method Not Allowed`` function, resources can correctly respond to messages.
-  // Therefore, we'll extend the `HttpResource` with an `Invoke` method. Without the `Invoke` method,
-  // the `HttpResource` is left without any true representation of an `HttpApplication`.
+  // Therefore, we'll extend the `HttpResource` with an `Invoke` method.
+  // Without the `Invoke` method, the `HttpResource` is left without any true
+  // representation of an `HttpApplication`.
   // 
   // Also note that the methods will always be looked up using the latest set. This could
   // probably be memoized so as to save a bit of time, but it allows us to ensure that all
   // available methods are reported.
   member x.Invoke(request) =
-    match x.Handler request with
+    match handler request with
     | Some h -> h
     | _ -> ``405 Method Not Allowed`` x.Methods request
 
@@ -349,12 +354,17 @@ let orElse left right =
   fun request -> Option.orElse (snd left request) (snd right request)
 let inline (<|>) left right = orElse left right
 
-let route path handler =
-  { Uri = path
-    Methods = fst handler
-    Handler = snd handler }
+let route uri handler =
+  HttpResource(uri, fst handler, snd handler)
 
-let routeWithMethodMapping path handlers = route path <| Seq.reduce orElse handlers
+let routeTemplate uriTemplate uriMatcher handler =
+  HttpResource(uriTemplate, fst handler, snd handler, uriMatcher)
+
+let routeResource uri handlers =
+  route uri <| Seq.reduce orElse handlers
+
+let routeTemplatedResource uriTemplate uriMatcher handlers =
+  routeTemplate uriTemplate uriMatcher <| Seq.reduce orElse handlers
 
 (* ## HTTP Applications *)
 
@@ -363,7 +373,7 @@ let ``404 Not Found`` : HttpApplication =
     async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
 
 let findApplicationFor resources (request: HttpRequestMessage) =
-  let resource = Seq.tryFind (fun r -> r.Uri = request.RequestUri.AbsolutePath) resources
+  let resource = Seq.tryFind (fun (r: HttpResource) -> r.RespondsTo(request.RequestUri.PathAndQuery)) resources
   resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
@@ -402,6 +412,8 @@ let mergeWithNotFound notFoundHandler (resources: #seq<HttpResource>) : HttpAppl
     handler request
 
 let merge resources = mergeWithNotFound ``404 Not Found`` resources
+
+// TODO: Need to provide a way to adjust the UriTemplate of each resource as it is nested deeper.
 
 #if DEBUG
 [<Test>]
