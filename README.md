@@ -17,11 +17,10 @@ Indeed, if you search the web, you're likely to find a large number of approache
 When starting with Frank, I wanted to try to find a way to define an HTTP application
 using pure functions and function composition. The closest I found was the following:
 
-    type HttpRequestHandler = HttpContent -> Async<HttpResponseMessage>
-    type HttpApplication = HttpRequestMessage -> HttpRequestHandler
+    type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
     
-    let orElse right left = fun request -> Option.orElse (left request) (right request)
-    let inline (<|>) left right = orElse right left
+    let orElse left right = fun request -> Option.orElse (left request) (right request)
+    let inline (<|>) left right = orElse left right
 
 The last of these was a means for merging multiple applications together into a single
 application. This allowed for a nice symmetry and elegance in that everything you composed
@@ -30,13 +29,13 @@ applications to specific methods or uri patterns.
 
 A "Hello, world!" application using these signatures would look like the following:
 
-    let helloWorld _ _ = respond HttpStatusCode.OK ignore <| Some "Hello, world!"
+    let helloWorld request =
+      async.Return <| HttpResponseMessage.ReplyTo(request, "Hello, world!")
 
 A simple echo handler that returns the same input as it received might look like the following:
 
-    let echo _ (content: HttpContent) =
-      respond HttpStatusCode.OK (``Content-Type`` "text/plain")
-      <| new StringContent(content.ReadAsStringAsync().Result)
+    let echo (request: HttpRequestMessage) =
+      async.Return <| HttpResponseMessage.ReplyTo(request, request.Content, ``Content-Type`` "text/plain")
 
 ### Define an HTTP Resource
 
@@ -67,7 +66,7 @@ type as a `Foo list`, which is where the typical MVC approach goes wrong.
     type HttpResource =
       { Uri: string
         Methods: string list
-        Handler: HttpRequestMessage -> HttpRequestHandler option }
+        Handler: HttpRequestMessage -> Async<HttpResponseMessage> option }
       with
       member x.Invoke(request) =
         match x.Handler request with
@@ -86,24 +85,29 @@ A compositional approach to type mapping and handler design.
 Here, the actual function shows clearly that we are really using
 the `id` function to return the very same result.
 
-      let echo2Core = id
+      let echo2Transform = id
 
-The `echo2MapFrom` maps the incoming request to a value that can be used
-within the actual computation, or `echo2Core` in this example.
+The `echo2ReadRequest` maps the incoming request to a value that can be used
+within the actual computation, or `echo2Transform` in this example.
 
-      let echo2MapFrom _ (content: HttpContent) = request.Content.ReadAsStringAsync().Result
+      let echo2ReadRequest (request: HttpRequestMessage) =
+          async { return! request.Content.AsyncReadAsString() }
 
-The `echo2MapTo` maps the outgoing message body to an HTTP response.
+The `echo2Respond` maps the outgoing message body to an HTTP response.
 
-      let echo2MapTo body =
-        respond HttpStatusCode.OK (``Content-Type`` "text/plain")
-        <| new StringContent(body)
+      let echo2Respond request body =
+        async {
+            return HttpResponseMessage.ReplyTo(request, body, ``Content-Type`` "text/plain") }
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
 about which it cares and isn't bothered by the transformations.
 
-      let echo2 = echo2MapFrom >> echo2Core >> echo2MapTo
+      let echo2 request =
+        async {
+          let! content = echo2ReadRequest request
+          let body = echo2Transform content
+          return echo2Respond request body }
 
 Create a `HttpResource` instance at the root of the site that responds to `POST`.
 
@@ -120,23 +124,19 @@ Check the samples for more examples of these combinators.
 
 ### Define a Middleware
 
-Middlewares follow a Russian-doll model for wrapping resource handlers with additional functionality.
-Frank middlewares take an `HttpApplication` and return an `HttpApplication`.
-The `Frank.Middleware` module defines several, simple middlewares, such as the `log` middleware that
-intercepts logs incoming requests and the time taken to respond:
+Middlewares follow a Russian-doll model for wrapping resource handlers with additional functionality. Frank middlewares take an `HttpApplication` and return an `HttpApplication`.
+The `Frank.Middleware` module defines several, simple middlewares, such as the `log` middleware that intercepts logs incoming requests and the time taken to respond:
 
-    let log app = fun (request : HttpRequestMessage) content -> async {
-      let sw = System.Diagnostics.Stopwatch.StartNew()
-      let! response = app request content
-      printfn "Received a %A request from %A. Responded in %i ms."
-              request.Method.Method request.RequestUri.PathAndQuery sw.ElapsedMilliseconds
-      sw.Reset()
-      return response }
+    let log app = fun (request : HttpRequestMessage) ->
+      async {
+        let sw = System.Diagnostics.Stopwatch.StartNew()
+        let! response = app request
+        printfn "Received a %A request from %A. Responded in %i ms."
+                request.Method.Method request.RequestUri.PathAndQuery                                  sw.ElapsedMilliseconds
+        sw.Reset()
+        return response }
 
-The most likely place to insert middlewares is the outer edge of your application.
-However, since middlewares are themselves just `HttpApplication`s, you can compose them into a Frank application
-at any level. Want to support logging only on one troublesome resource? No problem. Expose the resource
-as an application, wrap it in the log middleware, and insert it into the larger application as you did before.
+The most likely place to insert middlewares is the outer edge of your application. However, since middlewares are themselves just `HttpApplication`s, you can compose them into a Frank application at any level. Want to support logging only on one troublesome resource? No problem. Expose the resource as an application, wrap it in the log middleware, and insert it into the larger application as you did before.
 
 ## Hosting
 

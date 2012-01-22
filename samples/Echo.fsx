@@ -20,6 +20,7 @@ See LICENSE.txt for details.
 #r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll"
 #r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
 #r @"..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#load @"..\src\System.Net.Http.fs"
 #load @"..\src\Frank.fs"
 #load @"..\src\Hosting.fs"
 
@@ -29,8 +30,8 @@ open Frank
 open Frank.Hosting
 
 // Respond with the request content, if any.
-let echo _ (content: HttpContent) =
-  respond HttpStatusCode.OK (``Content-Type`` "text/plain") <| new StringContent(content.ReadAsStringAsync().Result)
+let echo (request: HttpRequestMessage) =
+  async.Return <| HttpResponseMessage.ReplyTo(request, request.Content, ``Content-Type`` "text/plain")
 
 // Create an application from an `HttpResource` that only responds to `POST` requests.
 // Try sending a GET or other method to see a `405 Method Not Allowed` response.

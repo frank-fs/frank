@@ -37,6 +37,7 @@
   </PropertyGroup>
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
+    <Compile Include="System.Net.Http.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="Middleware.fs" />
     <Compile Include="Hosting.fs" />
@@ -75,10 +76,6 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Data.Spatial">
-      <HintPath>..\packages\WebApi.OData.0.6.0\lib\40-Full\Microsoft.Data.Spatial.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="Microsoft.Json">
       <HintPath>..\packages\JsonValue.0.6.0\lib\40\Microsoft.Json.dll</HintPath>
       <Private>True</Private>
@@ -105,12 +102,6 @@
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="nunit.framework, Version=2.5.9.10348, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.mocks, Version=2.5.9.10348, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="pnunit.framework, Version=1.0.4000.25744, Culture=neutral, PublicKeyToken=null">
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />

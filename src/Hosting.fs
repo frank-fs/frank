@@ -25,4 +25,4 @@ type FrankApi() =
 let configure app =
   Microsoft.ApplicationServer.Http.WebApiConfiguration(
     useMethodPrefixForHttpMethod = false,
-    MessageHandlerFactory = (fun () -> seq { yield FrankHandler.Create app }))
+    MessageHandlerFactory = (fun () -> seq { yield FrankHandler.Start app }))

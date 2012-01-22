@@ -39,10 +39,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="EntityDataModel">
-      <HintPath>..\..\..\..\packages\WebApi.OData.0.6.0\lib\40-Full\EntityDataModel.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="FSharp.AsyncExtensions">
       <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharp.AsyncExtensions.dll</HintPath>
       <Private>True</Private>
@@ -53,14 +49,6 @@
     </Reference>
     <Reference Include="FSharpx.Http">
       <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharpx.Stm">
-      <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharpx.Stm.Core">
-      <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Stm.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.ApplicationServer.Http">
