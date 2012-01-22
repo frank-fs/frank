@@ -33,48 +33,27 @@ open Swensen.Unquote.Assertions
 // ## Define the web application interface
 
 (*
-One may define a web application interface using a large variety of signatures.
-Indeed, if you search the web, you're likely to find a large number of approaches.
-When starting with `Frank`, I wanted to try to find a way to define an HTTP application
-using pure functions and function composition. The closest I found was the following:
+One may define a web application interface using a large variety of signatures. Indeed, if you search the web, you're likely to find a large number of approaches. When starting with `Frank`, I wanted to try to find a way to define an HTTP application using pure functions and function composition. The closest I found was the following:
 
     type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
     
-    let orElse right left = fun request -> Option.orElse (left request) (right request)
-    let inline (<|>) left right = orElse right left
+    let orElse left right = fun request -> Option.orElse (left request) (right request)
+    let inline (<|>) left right = orElse left right 
 
-The last of these was a means for merging multiple applications together into a single
-application. This allowed for a nice symmetry and elegance in that everything you composed
-would always have the same signature. Additional functions would allow you to map
-applications to specific methods or uri patterns.
+These signatures represent both the application signature and a means for merging multiple applications together into a single application. This allowed for a nice symmetry and elegance in that everything you composed would always have the same signature. Additional functions allow you to map applications to specific methods or uri patterns.
 
-Alas, this approach works only so well. HTTP is a rich communication specification.
-The simplicity and elegance of a purely functional approach quickly loses the ability
-to communicate back options to the client. For instance, given the above, how do you
-return a meaningful `405 Method Not Allowed` response? The HTTP specification requires
-that you list the allowed methods, but if you merge all the logic for selecting an
-application into the functions, there is no easy way to recall all the allowed methods,
-short of trying them all. You could require that the developer add the list of used
-methods, but that, too, misses the point that the application should be collecting this
-and helping the developer by taking care of all of the nuts and bolts items
+Alas, this approach works only so well. HTTP is a rich communication specification. The simplicity and elegance of a purely functional approach quickly loses the ability to communicate back options to the client. For instance, given the above, how do you return a meaningful `405 Method Not Allowed` response? The HTTP specification requires that you list the allowed methods, but if you merge all the logic for selecting an application into the functions, there is no easy way to recall all the allowed methods, short of trying them all. You could require that the developer add the list of used methods, but that, too, misses the point that the application should be collecting this and helping the developer by taking care of all of the nuts and bolts items.
 
-The next approach I tried involved using a tuple of a list of allowed HTTP methods and
-the application handler, which used the merged function approach described above for
-actually executing the application. However, once again, there are limitations. This
-structure accurately represents a resource, but it does not allow for multiple resources
-to coexist side-by-side. Another tuple of uri pattern matching expressions could wrap
-a list of these method * handler tuples, but at this point I realized I would be better
-served by using real types and thus arrived at the signatures below.
+The next approach I tried involved using a tuple of a list of allowed HTTP methods and the application handler, which used the merged function approach described above for actually executing the application. However, once again, there are limitations. This structure accurately represents a resource, but it does not allow for multiple resources to coexist side-by-side. Another tuple of uri pattern matching expressions could wrap a list of these method * handler tuples, but at this point I realized I would be better served by using real types and thus arrived at the signatures below.
 
-You'll see the signatures above are still mostly present, though they have been changed
-to better fit the signatures below.
+You'll see the signatures above are still mostly present, though they have been changed to better fit the signatures below.
 *)
 
 // `HttpApplication` defines the contract for processing any request.
-// An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler`.
+// An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.
 type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 
-// ## HTTP Response Combinators
+// ## HTTP Response Header Combinators
 
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
 // First of all, it allows for the explicit declaration of side effects. Second, a number
@@ -365,10 +344,10 @@ let delete handler = mapResourceHandler(HttpMethod.Delete.Method, handler)
 // The intent here is to build a resource, with at most one handler per HTTP method. This goes
 // against a lot of the "RESTful" approaches that just merge a bunch of method handlers at
 // different URI addresses.
-let orElse right left =
+let orElse left right =
   fst left @ fst right,
   fun request -> Option.orElse (snd left request) (snd right request)
-let inline (<|>) left right = left |> orElse right
+let inline (<|>) left right = orElse left right
 
 let route path handler =
   { Uri = path
@@ -471,69 +450,3 @@ type FrankHandler private () =
     { new FrankHandler() with
         override this.SendAsync(request, cancelationToken) =
           app(request, cancelationToken) } :> DelegatingHandler
-
-//let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-//let testBody = dict [("foo", "bar");("bar", "baz")]
-//let createTestRequest() =
-//  new HttpRequestMessage(
-//    HttpMethod.Post, Uri("http://frankfs.net/"),
-//    Version = Version(1,1),
-//    Content = new FormUrlEncodedContent(testBody))
-//
-//// HttpRequestMessage -> HttpResponseMessage
-//let echo (request : HttpRequestMessage) = 
-//  let body = request.Content.ReadAs<JsonValue>(seq { yield formatter })
-//  let response = new HttpResponseMessage<JsonValue>(body, HttpStatusCode.OK)
-//  response.Content.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  response
-//
-//[<Test>]
-//let ``test echo should return a response of 200 OK``() =
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.StatusCode = HttpStatusCode.OK @>
-//
-//[<Test>]
-//let ``test echo should return a response with one header for Content_Type of application/x-www-form-urlencoded``() =
-//  let expected = Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.Content.Headers.ContentType = expected @>
-//
-//[<Test>]
-//let ``test echo should return a response with a body of echoing the request body``() =
-//  let response = echo <| createTestRequest()
-//  let actual = response.Content.ReadAs()
-//  test <@ actual?foo = "bar" @>
-//  test <@ actual?bar = "baz" @>
-//
-//let formatter = FormUrlEncodedMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-//let testBody = dict [("foo", "bar");("bar", "baz")]
-//let createTestRequest() =
-//  new HttpRequestMessage(
-//    HttpMethod.Post, Uri("http://frankfs.net/"),
-//    Version = Version(1,1),
-//    Content = new FormUrlEncodedContent(testBody))
-//
-//// HttpRequestMessage -> HttpResponseMessage
-//let echo (request : HttpRequestMessage) = 
-//  let body = request.Content.ReadAs<JsonValue>(seq { yield formatter })
-//  let response = new HttpResponseMessage<JsonValue>(body, HttpStatusCode.OK)
-//  response.Content.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  response
-//
-//[<Test>]
-//let ``test echo should return a response of 200 OK``() =
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.StatusCode = HttpStatusCode.OK @>
-//
-//[<Test>]
-//let ``test echo should return a response with one header for Content_Type of application/x-www-form-urlencoded``() =
-//  let expected = Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded")
-//  let actual = echo <| createTestRequest()
-//  test <@ actual.Content.Headers.ContentType = expected @>
-//
-//[<Test>]
-//let ``test echo should return a response with a body of echoing the request body``() =
-//  let response = echo <| createTestRequest()
-//  let actual = response.Content.ReadAs()
-//  test <@ actual?foo = "bar" @>
-//  test <@ actual?bar = "baz" @>
