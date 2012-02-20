@@ -39,52 +39,12 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.AsyncExtensions">
-      <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharp.AsyncExtensions.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="FSharpx.Core">
       <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharpx.Http">
       <HintPath>..\..\..\..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.ApplicationServer.Http">
-      <HintPath>..\..\..\..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.ApplicationServer.HttpEnhancements">
-      <HintPath>..\..\..\..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Data.Spatial">
-      <HintPath>..\..\..\..\packages\WebApi.OData.0.6.0\lib\40-Full\Microsoft.Data.Spatial.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Json">
-      <HintPath>..\..\..\..\packages\JsonValue.0.6.0\lib\40\Microsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Net.Http.Formatting">
-      <HintPath>..\..\..\..\packages\HttpClient.0.6.0\lib\40\Microsoft.Net.Http.Formatting.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Net.Http.Formatting.OData">
-      <HintPath>..\..\..\..\packages\WebApi.OData.0.6.0\lib\40-Full\Microsoft.Net.Http.Formatting.OData.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Runtime.Serialization.Internal">
-      <HintPath>..\..\..\..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Server.Common">
-      <HintPath>..\..\..\..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.ServiceModel.Internal">
-      <HintPath>..\..\..\..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
@@ -95,12 +55,16 @@
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data.OData">
-      <HintPath>..\..\..\..\packages\WebApi.OData.0.6.0\lib\40-Full\System.Data.OData.dll</HintPath>
+    <Reference Include="System.Net.Http">
+      <HintPath>..\..\..\..\packages\System.Net.Http.2.0.20126.16343\lib\net40\System.Net.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="System.Net.Http">
-      <HintPath>..\..\..\..\packages\HttpClient.0.6.0\lib\40\System.Net.Http.dll</HintPath>
+    <Reference Include="System.Net.Http.Formatting">
+      <HintPath>..\..\..\..\packages\System.Net.Http.Formatting.4.0.20126.16343\lib\net40\System.Net.Http.Formatting.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Net.Http.WebRequest">
+      <HintPath>..\..\..\..\packages\System.Net.Http.2.0.20126.16343\lib\net40\System.Net.Http.WebRequest.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Numerics" />
@@ -110,6 +74,18 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.ApplicationServices" />
     <Reference Include="System.Web.Abstractions" />
+    <Reference Include="System.Web.Http">
+      <HintPath>..\..\..\..\packages\AspNetWebApi.Core.4.0.20126.16343\lib\net40\System.Web.Http.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.Http.Common">
+      <HintPath>..\..\..\..\packages\System.Web.Http.Common.4.0.20126.16343\lib\net40\System.Web.Http.Common.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.Http.WebHost">
+      <HintPath>..\..\..\..\packages\AspNetWebApi.4.0.20126.16343\lib\net40\System.Web.Http.WebHost.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Web.Mvc, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
       <HintPath>"$(MSBuildExtensionsPath32)\..\Microsoft ASP.NET\ASP.NET MVC 3\Assemblies\System.Web.Mvc.dll</HintPath>
       <SpecificVersion>True</SpecificVersion>

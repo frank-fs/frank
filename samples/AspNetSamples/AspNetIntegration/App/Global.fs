@@ -35,4 +35,4 @@ type Global() =
     let config = WebApi.configure app
 
     member x.Start() =
-        RouteTable.Routes.MapServiceRoute<WebApi.FrankApi>("", config)
+        

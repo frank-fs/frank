@@ -14,7 +14,6 @@ open System
 open System.Collections.Generic
 open System.Json
 open System.Net.Http
-open Microsoft.ApplicationServer.Http
 open Frank
 open ImpromptuInterface.FSharp
 

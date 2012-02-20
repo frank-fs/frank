@@ -9,35 +9,42 @@ Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
 *)
 
+#r "System"
+#r "System.Core"
 #r "System.ServiceModel"
 #r "System.ServiceModel.Web"
-#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Core.dll"
-#r @"..\packages\FSharpx.Core.1.3.111030\lib\FSharpx.Http.dll"
-#r @"..\packages\HttpClient.0.6.0\lib\40\System.Net.Http.dll"
-#r @"..\packages\HttpClient.0.6.0\lib\40\Microsoft.Net.Http.Formatting.dll"
-#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Runtime.Serialization.Internal.dll"
-#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ServiceModel.Internal.dll"
-#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.Server.Common.dll"
-#r @"..\packages\WebApi.0.6.0\lib\40-Full\Microsoft.ApplicationServer.Http.dll"
-#r @"..\packages\WebApi.Enhancements.0.6.0\lib\40-Full\Microsoft.ApplicationServer.HttpEnhancements.dll"
+#r @"..\packages\FSharpx.Core.1.4.120213\lib\FSharpx.Core.dll"
+#r @"..\packages\FSharpx.Core.1.4.120213\lib\FSharpx.Http.dll"
+#r @"..\packages\System.Net.Http.2.0.20126.16343\lib\net40\System.Net.Http.dll"
+#r @"..\packages\System.Net.Http.2.0.20126.16343\lib\net40\System.Net.Http.WebRequest.dll"
+#r @"..\packages\System.Net.Http.Formatting.4.0.20126.16343\lib\net40\System.Net.Http.Formatting.dll"
+#r @"..\packages\AspNetWebApi.Core.4.0.20126.16343\lib\net40\System.Web.Http.dll"
+#r @"..\packages\System.Web.Http.Common.4.0.20126.16343\lib\net40\System.Web.Http.Common.dll"
+#r @"..\packages\AspNetWebApi.SelfHost.4.0.20126.16343\lib\net40\System.Web.Http.SelfHost.dll"
 #load @"..\src\System.Net.Http.fs"
 #load @"..\src\Frank.fs"
-#load @"..\src\Hosting.fs"
+#load @"..\src\Middleware.fs"
+#load @"..\src\System.Web.Http.fs"
 
-open System.Net
+open System
 open System.Net.Http
+open System.Web.Http
+open System.Web.Http.SelfHost
 open Frank
-open Frank.Hosting
 
-let helloWorld request =
-  async.Return <| HttpResponseMessage.ReplyTo(request, "Hello, world!")
+let helloWorld request = async {
+  return HttpResponseMessage.ReplyTo(request, "Hello, world!")
+}
 
-let config = WebApi.configure helloWorld
-let baseUri = "http://localhost:1000/"
-let host = new Microsoft.ApplicationServer.Http.HttpServiceHost(typeof<WebApi.FrankApi>, config, [| baseUri |])
-host.Open()
+let baseUri = "http://127.0.0.1:1000"
+let config = new HttpSelfHostConfiguration(baseUri)
+config.Register helloWorld
 
-printfn "Host open for one minute..."
-printfn "Use a web browser and go to %s or do it right and get fiddler!" baseUri
+let server = new HttpSelfHostServer(config)
+server.OpenAsync().Wait()
 
-host.Close()
+Console.WriteLine("Running on " + baseUri)
+Console.WriteLine("Press any key to stop.")
+Console.ReadKey() |> ignore
+
+server.CloseAsync().Wait()

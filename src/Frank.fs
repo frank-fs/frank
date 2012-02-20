@@ -21,7 +21,6 @@ open System.Net.Http.Headers
 open System.Text
 open FSharpx
 open FSharpx.Reader
-open FSharpx.Http
 
 #if DEBUG
 open System.Json
@@ -62,7 +61,6 @@ type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let headers = Reader.reader
 
 // ### General Headers
-// TODO: Rely less upon the `Parse` and `ParseAdd` methods and pass in more of the parameters.
 let Date x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.Date <- Nullable.create x
 
@@ -221,7 +219,7 @@ let findFormatterFor mediaType =
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
 let formatWith mediaType formatter body =
-  new ObjectContent<_>(body, MediaTypeHeaderValue(mediaType), [| formatter |]) :> HttpContent
+  new SimpleObjectContent<_>(body, formatter) :> HttpContent
 
 #if DEBUG
 [<Serializable>]
@@ -246,15 +244,6 @@ let ``test formatWith properly format as application/json``() =
   test <@ result = "{\"firstName\":\"Ryan\",\"lastName\":\"Riley\"}" @>
 
 [<Test>]
-let ``test formatWith properly format as text/plain and read as string``() =
-  let formatter = new Microsoft.ApplicationServer.Http.PlainTextFormatter()
-  let body = TestType(FirstName = "Ryan", LastName = "Riley").ToString()
-  let content = body |> formatWith "text/plain" formatter
-  test <@ content.Headers.ContentType.MediaType = "text/plain" @>
-  let result = content.AsyncReadAs<string>([| formatter |]) |> Async.RunSynchronously
-  test <@ result = body @>
-
-[<Test>]
 let ``test formatWith properly format as application/xml and read as TestType``() =
   let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
@@ -265,7 +254,7 @@ let ``test formatWith properly format as application/xml and read as TestType``(
 
 [<Test;Ignore>]
 let ``test formatWith properly format as application/x-www-form-urlencoded and read as JsonValue``() =
-  let formatter = new System.Net.Http.Formatting.JsonValueMediaTypeFormatter()
+  let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/x-www-form-urlencoded" formatter
   test <@ content.Headers.ContentType.MediaType = "application/x-www-form-urlencoded" @>
@@ -286,7 +275,7 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
     formatters
     |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
     |> Seq.map (fun value -> value.MediaType)
-  let bestOf = accepted >> FsConneg.bestMediaType servedMedia >> Option.map fst
+  let bestOf = accepted >> Http.Conneg.bestMediaType servedMedia >> Option.map fst
   fun request ->
     match bestOf request with
     | Some mediaType ->
@@ -304,17 +293,15 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
 // to a `Controller`. Resources should represent a single entity type,
 // and it is important to note that a `Foo` is not the same entity
 // type as a `Foo list`, which is where most MVC approaches go wrong. 
+// The optional `uriMatcher` parameter allows the consumer to provide
+// a more advanced uri matching algorithm, such as one using regular
+// expressions.
 type HttpResource(uriTemplate, methods, handler, ?uriMatcher) =
   let mutable uriTemplate = uriTemplate
-  let uriMatcher = defaultArg uriMatcher (=)
+  let uriMatcher = defaultArg uriMatcher <| fun template (uri: Uri) -> template = uri.AbsolutePath
   with
-  member x.UriTemplate
-    with get() = uriTemplate
-    and set(v) = uriTemplate <- v
-
   member x.Methods = methods
-
-  member x.RespondsTo(uri) = uriMatcher uriTemplate uri
+  member x.IsIdentifiedBy(uri) = uriMatcher uriTemplate uri
 
   // With the ``405 Method Not Allowed`` function, resources can correctly respond to messages.
   // Therefore, we'll extend the `HttpResource` with an `Invoke` method.
@@ -373,8 +360,8 @@ let ``404 Not Found`` : HttpApplication =
     async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
 
 let findApplicationFor resources (request: HttpRequestMessage) =
-  let resource = Seq.tryFind (fun (r: HttpResource) -> r.RespondsTo(request.RequestUri.PathAndQuery)) resources
-  resource |> Option.map (fun r -> r.Invoke)
+  Seq.tryFind (fun (r: HttpResource) -> r.IsIdentifiedBy(request.RequestUri)) resources
+  |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
 let stub request = async.Return <| HttpResponseMessage.ReplyTo(request)

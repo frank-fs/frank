@@ -1,5 +1,8 @@
 ﻿namespace System.Net.Http
 
+open System.Net.Http
+open System.Net.Http.Formatting
+
 type EmptyContent() =
   inherit HttpContent()
   override x.SerializeToStreamAsync(stream, context) =
@@ -11,10 +14,20 @@ type EmptyContent() =
     other.GetType() = typeof<EmptyContent>
   override x.GetHashCode() = hash x
 
+type SimpleObjectContent<'a>(body: 'a, formatter: MediaTypeFormatter) =
+  inherit HttpContent()
+  override x.SerializeToStreamAsync(stream, context) =
+    let mediaType = formatter.SupportedMediaTypes |> Seq.head
+    formatter.WriteToStreamAsync(typeof<'a>, body, stream, x.Headers, FormatterContext(mediaType, false), context)
+  override x.TryComputeLength(length) =
+    length <- -1L
+    false
+
 [<AutoOpen>]
 module Extensions =
   open System.Net
-  open System.Net.Http.Formatting
+  open System.Net.Http
+  open System.Net.Http.Headers
 
   type HttpContent with
     static member Empty = new EmptyContent() :> HttpContent
