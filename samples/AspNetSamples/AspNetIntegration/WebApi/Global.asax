@@ -1,4 +1,5 @@
-﻿<%@ Application Inherits="FSharpMVC3.Core.Global" Language="C#" %>
+﻿<%@ Application Inherits="WebApi.WebApiApplication" Language="C#" %>
+
 <script Language="C#" RunAt="server">
 
   protected void Application_Start(Object sender, EventArgs e) {

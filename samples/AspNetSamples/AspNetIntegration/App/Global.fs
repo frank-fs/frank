@@ -1,18 +1,17 @@
-﻿namespace FSharpMVC3.Core
+﻿namespace WebApi
 
 open System
 open System.Net
 open System.Net.Http
+open System.Web.Http
 open System.Web.Routing
 open Frank
-open Frank.Hosting
 
-type Global() =
+type WebApiApplication() =
     inherit System.Web.HttpApplication()
 
-    let formatters = [| new Microsoft.ApplicationServer.Http.PlainTextFormatter() :> Formatting.MediaTypeFormatter
-                        new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter
-                        new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
+    let formatters = [| new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter
+                        new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
     // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
     let helloWorld request =
@@ -32,7 +31,5 @@ type Global() =
     // Mount the app and add a middleware to support HEAD requests.
     let app = merge [ resource ] //|> Middleware.head
     
-    let config = WebApi.configure app
-
     member x.Start() =
-        
+        GlobalConfiguration.Configuration.Register app
