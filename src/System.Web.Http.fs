@@ -25,5 +25,5 @@ module WebApi =
   type HttpConfiguration with
     member x.Register app =
       // TODO: Expose the routes in order to hook them into the Routing infrastructure?
-      HttpRouteCollectionExtensions.MapHttpRoute(x.Routes, "Frank", "{controller}", { Controller = "Noop" }) |> ignore
+      HttpRouteCollectionExtensions.MapHttpRoute(x.Routes, "Frank", "") |> ignore
       x.MessageHandlers.Add(FrankHandler.Start app) 
