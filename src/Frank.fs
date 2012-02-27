@@ -298,7 +298,10 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
 // expressions.
 type HttpResource(uriTemplate, methods, handler, ?uriMatcher) =
   let mutable uriTemplate = uriTemplate
-  let uriMatcher = defaultArg uriMatcher <| fun template (uri: Uri) -> template = uri.AbsolutePath
+  let uriMatcher =
+    defaultArg uriMatcher
+    <| fun template (request: HttpRequestMessage) ->
+        template = request.RequestUri.AbsolutePath
   with
   member x.Methods = methods
   member x.IsIdentifiedBy(uri) = uriMatcher uriTemplate uri
@@ -360,8 +363,8 @@ let ``404 Not Found`` : HttpApplication =
     async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
 
 let findApplicationFor resources (request: HttpRequestMessage) =
-  Seq.tryFind (fun (r: HttpResource) -> r.IsIdentifiedBy(request.RequestUri)) resources
-  |> Option.map (fun r -> r.Invoke)
+  let resource = Seq.tryFind (fun (r: HttpResource) -> r.IsIdentifiedBy request) resources
+  resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
 let stub request = async.Return <| HttpResponseMessage.ReplyTo(request)

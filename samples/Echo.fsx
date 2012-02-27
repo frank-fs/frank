@@ -24,7 +24,7 @@ See LICENSE.txt for details.
 #load @"..\src\System.Net.Http.fs"
 #load @"..\src\Frank.fs"
 #load @"..\src\Middleware.fs"
-#load @"..\src\Hosting.fs"
+#load @"..\src\System.Web.Http.fs"
 
 open System
 open System.Net.Http
