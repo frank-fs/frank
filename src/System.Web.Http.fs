@@ -11,14 +11,8 @@ See LICENSE.txt for details.
 
 namespace System.Web.Http
 
+open System.Net.Http
 open System.Web.Http
-open Frank
-
-type NoopController() =
-  inherit ApiController()
-
-type RouteData =
-  { Controller: string }
 
 [<AutoOpen>]
 module WebApi =
@@ -26,4 +20,4 @@ module WebApi =
     member x.Register app =
       // TODO: Expose the routes in order to hook them into the Routing infrastructure?
       HttpRouteCollectionExtensions.MapHttpRoute(x.Routes, "Frank", "") |> ignore
-      x.MessageHandlers.Add(FrankHandler.Start app) 
+      x.MessageHandlers.Add(new AsyncHandler(app))

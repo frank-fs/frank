@@ -38,9 +38,9 @@
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="System.Net.Http.fs" />
+    <Compile Include="System.Web.Http.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="Middleware.fs" />
-    <Compile Include="System.Web.Http.fs" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
