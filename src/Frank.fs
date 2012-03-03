@@ -57,106 +57,137 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
 // First of all, it allows for the explicit declaration of side effects. Second, a number
 // of combinators are already defined that allows you to more easily compose headers.
-type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
-let headers = Reader.reader
+type HttpResponseBuilder = Reader<HttpResponseMessage, unit>
+let respond statusCode builder = let response = new HttpResponseMessage(statusCode) in builder response; response
 
 // ### General Headers
-let Date x : HttpResponseHeadersBuilder =
+let Date x : HttpResponseBuilder =
   fun response -> response.Headers.Date <- Nullable.create x
 
-let Connection x : HttpResponseHeadersBuilder =
+let Connection x : HttpResponseBuilder =
   fun response -> response.Headers.Connection.ParseAdd x
 
-let Trailer x : HttpResponseHeadersBuilder =
+let Trailer x : HttpResponseBuilder =
   fun response -> response.Headers.Trailer.ParseAdd x
 
-let ``Transfer-Encoding`` x : HttpResponseHeadersBuilder =
+let ``Transfer-Encoding`` x : HttpResponseBuilder =
   fun response -> response.Headers.TransferEncoding.ParseAdd x
 
-let Upgrade x : HttpResponseHeadersBuilder =
+let Upgrade x : HttpResponseBuilder =
   fun response -> response.Headers.Upgrade.ParseAdd x
 
-let Via x : HttpResponseHeadersBuilder =
+let Via x : HttpResponseBuilder =
   fun response -> response.Headers.Via.ParseAdd x
 
-let ``Cache-Control`` x : HttpResponseHeadersBuilder =
+let ``Cache-Control`` x : HttpResponseBuilder =
   fun response -> response.Headers.CacheControl <- CacheControlHeaderValue.Parse x
 
-let Pragma x : HttpResponseHeadersBuilder =
+let Pragma x : HttpResponseBuilder =
   fun response -> response.Headers.Pragma.ParseAdd x
 
 // ### Response Headers
-let Age x : HttpResponseHeadersBuilder =
+let Age x : HttpResponseBuilder =
   fun response -> response.Headers.Age <- Nullable.create x
 
-let ``Retry-After`` x : HttpResponseHeadersBuilder =
+let ``Retry-After`` x : HttpResponseBuilder =
   fun response -> response.Headers.RetryAfter <- RetryConditionHeaderValue.Parse x
 
-let Server x : HttpResponseHeadersBuilder =
+let Server x : HttpResponseBuilder =
   fun response -> response.Headers.Server.ParseAdd x
 
-let Warning x : HttpResponseHeadersBuilder =
+let Warning x : HttpResponseBuilder =
   fun response -> response.Headers.Warning.ParseAdd x
 
-let ``Accept-Ranges`` x : HttpResponseHeadersBuilder =
+let ``Accept-Ranges`` x : HttpResponseBuilder =
   fun response -> response.Headers.AcceptRanges.ParseAdd x
 
-let Vary x : HttpResponseHeadersBuilder =
+let Vary x : HttpResponseBuilder =
   fun response -> response.Headers.Vary.ParseAdd x
 
-let ``Proxy-Authenticate`` x : HttpResponseHeadersBuilder =
+let ``Proxy-Authenticate`` x : HttpResponseBuilder =
   fun response -> response.Headers.ProxyAuthenticate.ParseAdd x
 
-let ``WWW-Authenticate`` x : HttpResponseHeadersBuilder =
+let ``WWW-Authenticate`` x : HttpResponseBuilder =
   fun response -> response.Headers.WwwAuthenticate.ParseAdd x
 
 // ### Entity Headers
-let Allow x : HttpResponseHeadersBuilder =
+let Allow x : HttpResponseBuilder =
   fun response -> Seq.iter response.Content.Headers.Allow.Add x
 
-let Location x : HttpResponseHeadersBuilder =
+let Location x : HttpResponseBuilder =
   fun response -> response.Headers.Location <- x
 
-let ``Content-Disposition`` x : HttpResponseHeadersBuilder =
+let ``Content-Disposition`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentDisposition <- ContentDispositionHeaderValue x
 
-let ``Content-Encoding`` x : HttpResponseHeadersBuilder =
+let ``Content-Encoding`` x : HttpResponseBuilder =
   fun response -> Seq.iter response.Content.Headers.ContentEncoding.Add x
 
-let ``Content-Language`` x : HttpResponseHeadersBuilder =
+let ``Content-Language`` x : HttpResponseBuilder =
   fun response -> Seq.iter response.Content.Headers.ContentLanguage.Add x 
 
-let ``Content-Length`` x : HttpResponseHeadersBuilder =
+let ``Content-Length`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentLength <- Nullable.create x
 
-let ``Content-Location`` x : HttpResponseHeadersBuilder =
+let ``Content-Location`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentLocation <- x
 
-let ``Content-MD5`` x : HttpResponseHeadersBuilder =
+let ``Content-MD5`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentMD5 <- x
 
-let ``Content-Range`` from _to length : HttpResponseHeadersBuilder =
+let ``Content-Range`` from _to length : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentRange <- ContentRangeHeaderValue(from, _to, length)
 
-let ``Content-Type`` x : HttpResponseHeadersBuilder =
+let ``Content-Type`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.ContentType <- MediaTypeHeaderValue x
 
-let ETag tag isWeak : HttpResponseHeadersBuilder =
+let ETag tag isWeak : HttpResponseBuilder =
   fun response -> response.Headers.ETag <- EntityTagHeaderValue(tag, isWeak)
 
-let Expires x : HttpResponseHeadersBuilder =
+let Expires x : HttpResponseBuilder =
   fun response -> response.Content.Headers.Expires <- Nullable.create x
 
-let ``Last Modified`` x : HttpResponseHeadersBuilder =
+let ``Last Modified`` x : HttpResponseBuilder =
   fun response -> response.Content.Headers.LastModified <- Nullable.create x
+
+// ### Content
+let Body content : HttpResponseBuilder =
+  fun response -> response.Content <- content
+
+#if DEBUG
+open System.Json
+open ImpromptuInterface.FSharp
+open NUnit.Framework
+open Swensen.Unquote.Assertions
+
+[<Test>]
+let ``test respond without body``() =
+  let response = new HttpResponseMessage(HttpStatusCode.OK)
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+  test <@ response.Content = HttpContent.Empty @>
+
+[<Test>]
+let ``test respond with StringContent``() =
+  let body = "Howdy"
+  let response = respond HttpStatusCode.OK <| Body (new StringContent(body))
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+  test <@ response.Content.ReadAsStringAsync().Result = body @>
+
+[<Test>]
+let ``test respond with negotiated body``() =
+  let body = "Howdy"
+  let response = respond HttpStatusCode.OK <| Body (new SimpleObjectContent<_>(body, "text/plain", new XmlMediaTypeFormatter()))
+  test <@ response.StatusCode = HttpStatusCode.OK @>
+  test <@ response.Content.ReadAsStringAsync().Result = "<?xml version=\"1.0\" encoding=\"utf-8\"?><string>Howdy</string>" @>
+#endif
 
 // ### Allow Header Helpers
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
 let internal respondWithAllowHeader statusCode allowedMethods body =
-  fun request ->
-    async.Return <| HttpResponseMessage.ReplyTo(request, body, statusCode, Allow allowedMethods)
+  fun _ -> async {
+    return respond statusCode <| Allow allowedMethods *> Body body }
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -194,8 +225,8 @@ let ``test 405 Method Not Allowed``() =
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` =
-  fun request ->
-    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("406 Not Acceptable"), HttpStatusCode.NotAcceptable)
+  fun _ -> async {
+    return respond HttpStatusCode.NotAcceptable <| Body (new StringContent("406 Not Acceptable")) }
 
 #if DEBUG
 [<Test>]
@@ -219,7 +250,7 @@ let findFormatterFor mediaType =
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
 let formatWith mediaType formatter body =
-  new SimpleObjectContent<_>(body, formatter) :> HttpContent
+  new SimpleObjectContent<_>(body, mediaType, formatter) :> HttpContent
 
 #if DEBUG
 [<Serializable>]
@@ -266,16 +297,19 @@ let ``test formatWith properly format as application/x-www-form-urlencoded and r
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
-// When you want to negotiate the format of the response based on the available representations and
-// the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
-// `formatters` and attempts to match the best with the provided `Accept` header values using
-// functions from `FSharpx.Http`.
-let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
+let negotiateMediaType formatters =
   let servedMedia =
     formatters
     |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
     |> Seq.map (fun value -> value.MediaType)
-  let bestOf = accepted >> Http.Conneg.bestMediaType servedMedia >> Option.map fst
+  accepted >> Http.Conneg.bestMediaType servedMedia >> Option.map fst
+
+// When you want to negotiate the format of the response based on the available representations and
+// the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
+// `formatters` and attempts to match the best with the provided `Accept` header values using
+// functions from `FSharpx.Http`.
+let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
+  let bestOf = negotiateMediaType formatters
   fun request ->
     match bestOf request with
     | Some mediaType ->
@@ -283,7 +317,7 @@ let negotiateMediaType formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return HttpResponseMessage.ReplyTo(request, formattedBody, ``Content-Type`` mediaType *> ``Vary`` "Accept") }
+          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" *> Body formattedBody }
     | _ -> ``406 Not Acceptable`` request
 
 // ## HTTP Resources
@@ -359,8 +393,8 @@ let routeTemplatedResource uriTemplate uriMatcher handlers =
 (* ## HTTP Applications *)
 
 let ``404 Not Found`` : HttpApplication =
-  fun request ->
-    async.Return <| HttpResponseMessage.ReplyTo(request, new StringContent("404 Not Found"), HttpStatusCode.NotFound)
+  fun request -> async {
+    return respond HttpStatusCode.NotFound <| Body (new StringContent("404 Not Found")) }
 
 let findApplicationFor resources (request: HttpRequestMessage) =
   let resource = Seq.tryFind (fun (r: HttpResource) -> r.IsIdentifiedBy request) resources
@@ -441,14 +475,3 @@ let ``test should return stub at GET /stub``() =
   let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
 #endif
-
-let internal startAsTask (app: HttpApplication) (request, cancelationToken) =
-  Async.StartAsTask(app request, cancellationToken = cancelationToken)
-
-type FrankHandler private () =
-  inherit DelegatingHandler()
-  static member Start app =
-    let app = startAsTask app
-    { new FrankHandler() with
-        override this.SendAsync(request, cancelationToken) =
-          app(request, cancelationToken) } :> DelegatingHandler
