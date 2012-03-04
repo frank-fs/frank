@@ -401,7 +401,7 @@ let findApplicationFor resources (request: HttpRequestMessage) =
   resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
-let stub request = async.Return <| HttpResponseMessage.ReplyTo(request)
+let stub request = async { return new HttpResponseMessage(RequestMessage = request) }
 let resource1 = route "/" (get stub <|> post stub)
 let resource2 = route "/stub" <| get stub
 
