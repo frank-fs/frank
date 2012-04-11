@@ -328,15 +328,25 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
 // The optional `uriMatcher` parameter allows the consumer to provide
 // a more advanced uri matching algorithm, such as one using regular
 // expressions.
-type HttpResource(uriTemplate, methods, handler, ?uriMatcher) =
-  let mutable uriTemplate = uriTemplate
-  let uriMatcher =
-    defaultArg uriMatcher
-    <| fun template (request: HttpRequestMessage) ->
-        template = request.RequestUri.AbsolutePath
+// 
+// Additional notes:
+//   Should this type subclass HttpServer? If it did it could get
+//   it's own configration and have its own route table. I'm not
+//   convinced System.Web.Routing is worth it, but it's an option.
+type HttpResource(uriTemplate, methods, handler) =
+  // TODO: Swap this out for http://uritemplates.codeplex.com/ when matching is implemented.
+  let mutable uriTemplate = UriTemplate(uriTemplate)
   with
   member x.Methods = methods
-  member x.IsIdentifiedBy(uri) = uriMatcher uriTemplate uri
+  member x.Match(request: HttpRequestMessage) =
+    let baseUri = Uri(request.RequestUri.GetLeftPart(UriPartial.Authority))
+    match uriTemplate.Match(baseUri, request.RequestUri) with
+    | null -> false
+    | result ->
+        let coll = NameValueCollection.concat result.BoundVariables result.QueryParameters
+        request.Properties.["params"] <-
+          coll.AllKeys |> Array.collect (fun k -> coll.GetValues k |> Array.map (fun v -> k, v))
+        true
 
   // With the ``405 Method Not Allowed`` function, resources can correctly respond to messages.
   // Therefore, we'll extend the `HttpResource` with an `Invoke` method.
@@ -346,7 +356,10 @@ type HttpResource(uriTemplate, methods, handler, ?uriMatcher) =
   // Also note that the methods will always be looked up using the latest set. This could
   // probably be memoized so as to save a bit of time, but it allows us to ensure that all
   // available methods are reported.
-  member x.Invoke(request) =
+  member x.Invoke(request: HttpRequestMessage) =
+    // TODO: Should the signature of a handler change to always accept a params array?
+//    let params' = request.Properties.["params"] :?> (string * string)[]
+//    match handler request params' with
     match handler request with
     | Some h -> h
     | _ -> ``405 Method Not Allowed`` x.Methods request
@@ -379,14 +392,8 @@ let inline (<|>) left right = orElse left right
 let route uri handler =
   HttpResource(uri, fst handler, snd handler)
 
-let routeTemplate uriTemplate uriMatcher handler =
-  HttpResource(uriTemplate, fst handler, snd handler, uriMatcher)
-
 let routeResource uri handlers =
   route uri <| Seq.reduce orElse handlers
-
-let routeTemplatedResource uriTemplate uriMatcher handlers =
-  routeTemplate uriTemplate uriMatcher <| Seq.reduce orElse handlers
 
 (* ## HTTP Applications *)
 
@@ -395,7 +402,7 @@ let ``404 Not Found`` : HttpApplication =
     return respond HttpStatusCode.NotFound (new StringContent("404 Not Found")) ignore }
 
 let findApplicationFor resources (request: HttpRequestMessage) =
-  let resource = Seq.tryFind (fun (r: HttpResource) -> r.IsIdentifiedBy request) resources
+  let resource = Seq.tryFind (fun (r: HttpResource) -> r.Match request) resources
   resource |> Option.map (fun r -> r.Invoke)
 
 #if DEBUG
@@ -436,6 +443,7 @@ let mergeWithNotFound notFoundHandler (resources: #seq<HttpResource>) : HttpAppl
 let merge resources = mergeWithNotFound ``404 Not Found`` resources
 
 // TODO: Need to provide a way to adjust the UriTemplate of each resource as it is nested deeper.
+// NOTE: The UriTemplateMatch includes path segments that might be helpful for this purpose.
 
 #if DEBUG
 [<Test>]
