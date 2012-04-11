@@ -15,11 +15,11 @@ type EmptyContent() =
     other.GetType() = typeof<EmptyContent>
   override x.GetHashCode() = hash x
 
-type SimpleObjectContent<'a>(body: 'a, mediaType: string, formatter: MediaTypeFormatter) =
+type SimpleObjectContent<'a>(body: 'a, mediaType: string, formatter: MediaTypeFormatter) as x =
   inherit HttpContent()
+  do x.Headers.ContentType <- MediaTypeHeaderValue(mediaType)
   override x.SerializeToStreamAsync(stream, context) =
-    let mt = MediaTypeHeaderValue(mediaType)
-    formatter.WriteToStreamAsync(typeof<'a>, body, stream, x.Headers, FormatterContext(mt, false), context)
+    formatter.WriteToStreamAsync(typeof<'a>, body, stream, x.Headers, FormatterContext(x.Headers.ContentType, false), context)
   override x.TryComputeLength(length) =
     length <- -1L
     false
