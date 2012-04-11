@@ -36,6 +36,7 @@
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <ItemGroup>
     <Compile Include="System.Net.Http.fs" />
     <Compile Include="System.Web.Http.fs" />
@@ -107,7 +108,4 @@
       <Private>True</Private>
     </Reference>
   </ItemGroup>
-  <PropertyGroup>
-    <PreBuildEvent>$(SolutionDir)lib\NuGet\Nuget.exe install $(ProjectDir)packages.config -o $(SolutionDir)Packages</PreBuildEvent>
-  </PropertyGroup>
 </Project>
