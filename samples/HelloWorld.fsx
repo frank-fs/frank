@@ -27,13 +27,14 @@ See LICENSE.txt for details.
 #load @"..\src\System.Web.Http.fs"
 
 open System
+open System.Net
 open System.Net.Http
 open System.Web.Http
 open System.Web.Http.SelfHost
 open Frank
 
 let helloWorld request = async {
-  return HttpResponseMessage.ReplyTo(request, "Hello, world!")
+  return respond HttpStatusCode.OK (new StringContent("Hello, world!")) ignore
 }
 
 let baseUri = "http://127.0.0.1:1000"

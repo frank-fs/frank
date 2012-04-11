@@ -32,6 +32,7 @@ open System.Net.Http.Headers
 open System.Web.Http
 open System.Web.Http.SelfHost
 open Frank
+open FSharpx.Option
 open ImpromptuInterface.FSharp
 
 module Model =
@@ -133,20 +134,21 @@ module Resources =
   
   // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
   let helloWorld request = async {
-    return HttpResponseMessage.ReplyTo(request, new StringContent(@"<!doctype html>
+    return respond HttpStatusCode.OK (new StringContent(@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"), ``Content-Type`` "text/html")
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
+           <| ``Content-Type`` "text/html"
   }
 
   let helloResource = route "/" <| get helloWorld
 
   (* Contacts resource *)
 
-  let all = negotiateMediaType formatters <| fun _ -> Data.contacts.AsyncGetAll()
+  let all = runConneg formatters <| fun _ -> Data.contacts.AsyncGetAll()
 
   let create (request: HttpRequestMessage) = async {
     let! value = request.Content.AsyncReadAs<JsonValue>()
@@ -162,7 +164,12 @@ module Resources =
         Twitter = formData?twitter
       }
     do! Data.contacts.AsyncPost(contact)
-    return HttpResponseMessage.ReplyTo(request, body = contact, statusCode = HttpStatusCode.Created, formatters = formatters)
+    match negotiateMediaType formatters request with
+    | Some mediaType ->
+        let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
+        let content = formatWith mediaType formatter contact
+        return respond HttpStatusCode.Created content ignore
+    | _ -> return! ``406 Not Acceptable`` request
   }
 
   let contacts = route "/contacts" (get all <|> post create)
@@ -172,9 +179,16 @@ module Resources =
   let single (request: HttpRequestMessage) = async {
     let path = request.RequestUri.Segments
     let id = int (path.[path.Length - 1])
-    match Data.contacts.Get id with
-    | Some contact -> return HttpResponseMessage.ReplyTo(request, contact, HttpStatusCode.OK, formatters)
-    | _ -> return new HttpResponseMessage(HttpStatusCode.NotFound)
+    let result = maybe {
+      let! contact = Data.contacts.Get id
+      let! mediaType = negotiateMediaType formatters request
+      let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
+      let content = formatWith mediaType formatter contact
+      return respond HttpStatusCode.OK content ignore
+    }
+    match result with
+    | Some r -> return r
+    | _ -> return! ``404 Not Found`` request
   }
 
   let update request = async {

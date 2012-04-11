@@ -27,6 +27,7 @@ See LICENSE.txt for details.
 #load @"..\src\System.Web.Http.fs"
 
 open System
+open System.Net
 open System.Net.Http
 open System.Web.Http
 open System.Web.Http.SelfHost
@@ -34,7 +35,7 @@ open Frank
 
 // Respond with the request content, if any.
 let echo (request: HttpRequestMessage) = async {
-  return HttpResponseMessage.ReplyTo(request, request.Content, ``Content-Type`` "text/plain")
+  return respond HttpStatusCode.OK request.Content <| ``Content-Type`` "text/plain"
 }
 
 // Create an application from an `HttpResource` that only responds to `POST` requests.
