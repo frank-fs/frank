@@ -375,6 +375,11 @@ let post handler = mapResourceHandler(HttpMethod.Post.Method, handler)
 let put handler = mapResourceHandler(HttpMethod.Put.Method, handler)
 let delete handler = mapResourceHandler(HttpMethod.Delete.Method, handler)
 
+// Helper to more easily access URL params
+let getParam (request:HttpRequestMessage) key =
+    request.Properties.["params"] |> unbox 
+    |> Array.find (fun p -> fst p = key.ToString().ToUpper()) |> snd
+
 // We can use several methods to merge multiple handlers together into a single resource.
 // Our chosen mechanism here is merging functions into a larger function of the same signature.
 // This allows us to create resources as follows:
@@ -409,6 +414,7 @@ let findApplicationFor resources (request: HttpRequestMessage) =
 let stub request = async { return new HttpResponseMessage(RequestMessage = request) }
 let resource1 = route "/" (get stub <|> post stub)
 let resource2 = route "/stub" <| get stub
+let resource3 = route "/stub/{id}" <| get stub
 
 [<Test>]
 let ``test should find nothing at GET /baduri``() =
@@ -452,6 +458,14 @@ let ``test should return 404 Not Found as the handler``() =
   let request = new HttpRequestMessage()
   let response = app request |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotFound @>
+
+[<Test>]
+let ``test should return a param value``() =
+  let app = merge [resource3]
+  let request = new HttpRequestMessage(HttpMethod.Get, new Uri("http://example.org/stub/1"))  
+  let response = app request |> Async.RunSynchronously 
+  let result = getParam response.RequestMessage "id" 
+  test <@ result = "1" @>
 
 [<Test>]
 let ``test should return 404 Not Found as the handler when other resources are available``() =
