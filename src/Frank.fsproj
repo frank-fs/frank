@@ -47,6 +47,7 @@
   <ItemGroup>
     <Reference Include="FSharp.Core">
       <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="FSharpx.Async">
       <HintPath>..\packages\FSharpx.Core.1.4.120213\lib\FSharpx.Async.dll</HintPath>
