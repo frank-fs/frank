@@ -24,10 +24,6 @@ let nugetDir = "./nuget/"
 let nugetLibDir = nugetDir @@ "lib"
 let nugetDocsDir = nugetDir @@ "docs"
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
-let webApiVersion = GetPackageVersion packagesDir "AspNetWebApi.Core"
-let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
-let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
-let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
 
 // params
 let target = getBuildParamOrDefault "target" "All"
@@ -114,6 +110,11 @@ Target "BuildNuGet" (fun _ ->
     XCopy (docsDir |> FullName) nugetDocsDir
     [buildDir + "Frank.dll"]
       |> CopyTo nugetLibDir
+
+    let webApiVersion = GetPackageVersion packagesDir "AspNetWebApi.Core"
+    let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
+    let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
+    let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
 
     NuGet (fun p ->
         {p with
