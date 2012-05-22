@@ -1,4 +1,4 @@
-#r "./packages/FAKE.1.56.7/tools/FakeLib.dll"
+#r "./packages/FAKE.1.64.6/tools/FakeLib.dll"
 
 open Fake 
 open System.IO
@@ -33,8 +33,8 @@ let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuIn
 let target = getBuildParamOrDefault "target" "All"
 
 // tools
-let fakePath = "./packages/FAKE.1.56.7/tools"
-let nugetPath = "./lib/NuGet/nuget.exe"
+let fakePath = "./packages/FAKE.1.64.6/tools"
+let nugetPath = "./.nuget/nuget.exe"
 let nunitPath = "./packages/NUnit.2.5.10.11092/Tools"
 
 // files

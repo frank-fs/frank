@@ -11,7 +11,68 @@
 <member name="">
 
 </member>
+<member name="M:Fake.AdditionalSyntax.op_EqualsQmarkGreater(System.String,System.String,System.Boolean)">
+<summary>
+ Defines a conditional dependency - y is dependent on x if the condition is true
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.op_LessEqualsGreater(System.String,System.String)">
+<summary>
+ Defines that x and y are not dependent on each other but y is dependent on all dependencies of x.
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.op_EqualsEqualsGreater(System.String,System.String)">
+<summary>
+ Defines a dependency - y is dependent on x
+</summary>
+</member>
 <member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:Fake.AdditionalSyntax.sameLevels">
+<summary>
+ Stores which targets are on the same level
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.RunParameterTargetOrDefault(System.String,System.String)">
+<summary>
+ Runs the target given by the build script parameter or the given default target
+</summary>
+</member>
+<member name="P:Fake.AdditionalSyntax.Run">
+<summary>
+ Runs a Target and its dependencies
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.And``1(``0,Microsoft.FSharp.Collections.FSharpList{``0})">
+<summary>
+ Appends the dependency to the list of dependencies
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.Dependency``1(``0)">
+<summary>
+ Converts a dependency into a list
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.For(System.String,Microsoft.FSharp.Collections.FSharpList{System.String})">
+<summary>
+ Allows to use For? syntax for Dependencies
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.op_DynamicAssignment``3(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,``2}},``0,``1)">
+<summary>
+ Allows to use Tokens instead of strings for TargetNames
+</summary>
+</member>
+<member name="M:Fake.AdditionalSyntax.op_Dynamic``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,``1},``0)">
+<summary>
+ Allows to use Tokens instead of strings
+</summary>
+</member>
+<member name="T:Fake.AdditionalSyntax">
 
 </member>
 <member name="">
@@ -85,6 +146,35 @@
 </member>
 <member name="">
 
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:Fake.AssemblyInfoHelper.AssemblyInfoReplacementDefaults">
+<summary>
+ AssemblyInfoReplacement default params
+</summary>
 </member>
 <member name="M:Fake.AssemblyInfoHelper.AssemblyInfo(Microsoft.FSharp.Core.FSharpFunc`2{Fake.AssemblyInfoHelper.AssemblyInfoParams,Fake.AssemblyInfoHelper.AssemblyInfoParams})">
 <summary>
@@ -132,6 +222,9 @@
 <member name="">
 
 </member>
+<member name="">
+
+</member>
 <member name="T:Fake.BuildServerHelper.BuildServer">
 <summary>
  The BuildServer type.
@@ -155,6 +248,11 @@
 <member name="P:Fake.BuildServerHelper.ccBuildLabel">
 <summary>
  CruiseControl.NET Build label
+</summary>
+</member>
+<member name="P:Fake.BuildServerHelper.jenkinsBuildNumber">
+<summary>
+ Build number retrieved from Jenkins
 </summary>
 </member>
 <member name="P:Fake.BuildServerHelper.tcBuildNumber">
@@ -214,6 +312,9 @@
 </summary>
 </member>
 <member name="T:Fake.DocuHelper">
+
+</member>
+<member name="">
 
 </member>
 <member name="">
@@ -279,7 +380,12 @@
 </member>
 <member name="M:Fake.EnvironmentHelper.op_AtAt(System.String,System.String)">
 <summary>
- Combines to path strings
+ Combines two path strings
+</summary>
+</member>
+<member name="M:Fake.EnvironmentHelper.combinePaths(System.String,System.String)">
+<summary>
+ Combines two path strings
 </summary>
 </member>
 <member name="M:Fake.EnvironmentHelper.environVar(System.String)">
@@ -290,7 +396,7 @@
 <member name="T:Fake.EnvironmentHelper">
 
 </member>
-<member name="M:Fake.FSIHelper.runBuildScript(System.String,System.Collections.Generic.IEnumerable{System.Tuple`2{System.String,System.String}})">
+<member name="M:Fake.FSIHelper.runBuildScript(System.Boolean,System.String,System.Collections.Generic.IEnumerable{System.Tuple`2{System.String,System.String}})">
 <summary>
  Run the given buildscript with fsi.exe
 </summary>
@@ -634,18 +740,6 @@
 <summary>
  Ensures that the last character of the given &lt;see cref=&quot;string&quot; /&gt;
  matches Path.DirectorySeparatorChar.          
-</summary>
-</member>
-<member name="M:Fake.FileSetHelper.endsWithSlash(System.String)">
-<summary>
- Determines whether the last character of the given &lt;see cref=&quot;string&quot; /&gt;
- matches Path.DirectorySeparatorChar.         
-</summary>
-</member>
-<member name="M:Fake.FileSetHelper.endsWithChar(System.String,System.Char)">
-<summary>
- Determines whether the last character of the given &lt;see cref=&quot;string&quot; /&gt;
- matches the specified character.    
 </summary>
 </member>
 <member name="M:Fake.FileSetHelper.baseDirectory(System.String)">
@@ -1647,12 +1741,47 @@
 <member name="">
 
 </member>
+<member name="">
+
+</member>
 <member name="P:Fake.MSBuildHelper.msBuildExe">
 <summary>
  MSBuild exe fileName
 </summary>
 </member>
 <member name="T:Fake.MSBuildHelper">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:Fake.MSIHelper.MSIDefaults">
+<summary>
+ MSI default params  
+</summary>
+</member>
+<member name="T:Fake.MSIHelper">
 
 </member>
 <member name="">
@@ -1688,32 +1817,6 @@
 </summary>
 </member>
 <member name="T:Fake.MSpecHelper">
-
-</member>
-<member name="">
-
-</member>
-<member name="">
-
-</member>
-<member name="">
-
-</member>
-<member name="">
-
-</member>
-<member name="M:Fake.MailBoxHelper.MessageBoxIsEmpty">
-<summary>
- Checks if the current message queue is empty
-</summary>
-</member>
-<member name="">
-
-</member>
-<member name="">
-
-</member>
-<member name="T:Fake.MailBoxHelper">
 
 </member>
 <member name="M:Fake.MessageHelper.WaitForMessageFile(System.String,System.TimeSpan)">
@@ -1865,6 +1968,9 @@
 <member name="">
 
 </member>
+<member name="">
+
+</member>
 <member name="M:Fake.NUnitHelper.writeXMLOutput(Fake.NUnitHelper.TestSuite,System.String)">
 <summary>
  writes the given TestSuite as XML file in NUnit style
@@ -1879,9 +1985,6 @@
 <summary>
  NUnit default params  
 </summary>
-</member>
-<member name="">
-
 </member>
 <member name="T:Fake.NUnitHelper">
 
@@ -2016,6 +2119,15 @@
 <summary>
  Execute an external program and return the exit code.
 </summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
 </member>
 <member name="M:Fake.ProcessHelper.asyncShellExec(Fake.ProcessHelper.ExecParams)">
 <summary>
@@ -2191,6 +2303,31 @@
 <member name="">
 
 </member>
+<member name="M:Fake.RegAsmHelper.RegAsm(Microsoft.FSharp.Core.FSharpFunc`2{Fake.RegAsmHelper.RegAsmParams,Fake.RegAsmHelper.RegAsmParams},System.String)">
+<summary>
+ Runs regasm on the given lib
+</summary>
+</member>
+<member name="P:Fake.RegAsmHelper.RegAsmDefaults">
+<summary>
+ RegAsm default params  
+</summary>
+</member>
+<member name="T:Fake.RegAsmHelper">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
 <member name="">
 
 </member>
@@ -2229,6 +2366,12 @@
 </summary>
 </member>
 <member name="T:Fake.SCPHelper">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
 
 </member>
 <member name="M:Fake.Seq.contains``1(``0)">
@@ -2274,25 +2417,8 @@
 <member name="">
 
 </member>
-<member name="M:Fake.StringHelper.op_LessMultiply(System.String,System.String)">
-<summary>
- Checks wether the given text starts with the given prefix
-</summary>
-</member>
-<member name="M:Fake.StringHelper.toLines(System.Collections.Generic.IEnumerable{System.String})">
-<summary>
- Converts a sequence of strings into a string separated with line ends
-</summary>
-</member>
-<member name="M:Fake.StringHelper.trimSlash(System.String)">
-<summary>
- Removes the slashes from the end of the given string
-</summary>
-</member>
-<member name="M:Fake.StringHelper.shortenCurrentDirectory(System.String)">
-<summary>
- Replaces any occurence of the currentDirectory with .
-</summary>
+<member name="">
+
 </member>
 <member name="M:Fake.StringHelper.toRelativePath(System.String)">
 <summary>
@@ -2364,9 +2490,65 @@
 <member name="">
 
 </member>
-<member name="M:Fake.StringHelper.replace(System.String,System.String,System.String)">
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fake.StringHelper.ReplaceInFile(Microsoft.FSharp.Core.FSharpFunc`2{System.String,System.String},System.String)">
 <summary>
- Replaces the given pattern in the given text with the replacement
+ Replaces the text in the given file
+</summary>
+</member>
+<member name="P:Fake.StringHelper.endsWithSlash">
+<summary>
+ Determines whether the last character of the given &lt;see cref=&quot;string&quot; /&gt;
+ matches Path.DirectorySeparatorChar.         
+</summary>
+</member>
+<member name="M:Fake.StringHelper.endsWith(System.String,System.String)">
+<summary>
+ Checks wether the given text ends with the given suffix
+</summary>
+</member>
+<member name="M:Fake.StringHelper.op_LessMultiply(System.String,System.String)">
+<summary>
+ Checks wether the given text starts with the given prefix
+</summary>
+</member>
+<member name="M:Fake.StringHelper.startsWith(System.String,System.String)">
+<summary>
+ Checks wether the given text starts with the given prefix
+</summary>
+</member>
+<member name="M:Fake.StringHelper.toLines(System.Collections.Generic.IEnumerable{System.String})">
+<summary>
+ Converts a sequence of strings into a string separated with line ends
+</summary>
+</member>
+<member name="M:Fake.StringHelper.split(System.Char,System.String)">
+<summary>
+ Splits the given string at the given delimiter
+</summary>
+</member>
+<member name="M:Fake.StringHelper.trimSlash(System.String)">
+<summary>
+ Removes the slashes from the end of the given string
+</summary>
+</member>
+<member name="M:Fake.StringHelper.shortenCurrentDirectory(System.String)">
+<summary>
+ Replaces any occurence of the currentDirectory with .
 </summary>
 </member>
 <member name="M:Fake.StringHelper.ReadFileAsString(System.String)">
@@ -2377,6 +2559,11 @@
 <member name="M:Fake.StringHelper.separated(System.String,System.Collections.Generic.IEnumerable{System.String})">
 <summary>
  Converts a sequence of strings to a string with delimiters
+</summary>
+</member>
+<member name="M:Fake.StringHelper.replace(System.String,System.String,System.String)">
+<summary>
+ Replaces the given pattern in the given text with the replacement
 </summary>
 </member>
 <member name="M:Fake.StringHelper.AppendToFile(System.String,System.Collections.Generic.IEnumerable{System.String})">
@@ -2463,61 +2650,11 @@
 <member name="">
 
 </member>
-<member name="M:Fake.TargetHelper.op_LessEqualsGreater(System.String,System.String)">
-<summary>
- Defines that x and y are not dependent on each other but y is dependent on all dependencies of x.
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.op_EqualsEqualsGreater(System.String,System.String)">
-<summary>
- Defines a dependency - y is dependent on x
-</summary>
-</member>
 <member name="">
 
 </member>
 <member name="">
 
-</member>
-<member name="P:Fake.TargetHelper.sameLevels">
-<summary>
- Stores which targets are on the same level
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.RunParameterTargetOrDefault(System.String,System.String)">
-<summary>
- Runs the target given by the build script parameter or the given default target
-</summary>
-</member>
-<member name="P:Fake.TargetHelper.Run">
-<summary>
- Runs a Target and its dependencies
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.And``1(``0,Microsoft.FSharp.Collections.FSharpList{``0})">
-<summary>
- Appends the dependency to the list of dependencies
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.Dependency``1(``0)">
-<summary>
- Converts a dependency into a list
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.For(System.String,Microsoft.FSharp.Collections.FSharpList{System.String})">
-<summary>
- Allows to use For? syntax for Dependencies
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.op_DynamicAssignment``3(Microsoft.FSharp.Core.FSharpFunc`2{``0,Microsoft.FSharp.Core.FSharpFunc`2{``1,``2}},``0,``1)">
-<summary>
- Allows to use Tokens instead of strings for TargetNames
-</summary>
-</member>
-<member name="M:Fake.TargetHelper.op_Dynamic``2(Microsoft.FSharp.Core.FSharpFunc`2{``0,``1},``0)">
-<summary>
- Allows to use Tokens instead of strings
-</summary>
 </member>
 <member name="M:Fake.TargetHelper.ActivateFinalTarget(System.String)">
 <summary>
@@ -2532,6 +2669,12 @@
 <member name="M:Fake.TargetHelper.run(System.String)">
  <summary>Runs a target and its dependencies</summary>
  <param name="targetName">The target to run.</param>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
 </member>
 <member name="">
 
@@ -2614,7 +2757,7 @@
  Adds the dependency to the front of the list of dependencies
 </summary>
 </member>
-<member name="M:Fake.TargetHelper.checkIfDependencyCanBeAdd(System.String,System.String)">
+<member name="M:Fake.TargetHelper.checkIfDependencyCanBeAdded(System.String,System.String)">
 <summary>
  Checks wether the dependency can be add
 </summary>
@@ -2658,6 +2801,14 @@
 <summary>
  TargetDictionary  
 </summary>
+</member>
+<member name="M:Fake.TargetHelper.Description(System.String)">
+<summary>
+ Sets the Description for the next target
+</summary>
+</member>
+<member name="">
+
 </member>
 <member name="">
 
@@ -2928,7 +3079,7 @@
  Traces the end of a target   
 </summary>
 </member>
-<member name="M:Fake.TraceHelper.traceStartTarget(System.String,System.String)">
+<member name="M:Fake.TraceHelper.traceStartTarget(System.String,System.String,System.String)">
 <summary>
  Traces the begin of a target
 </summary>
@@ -3027,11 +3178,6 @@
  Logs the specified string        
 </summary>
 </member>
-<member name="M:Fake.TraceHelper.WaitUntilEverythingIsPrinted">
-<summary>
- Waits until the message queue is empty
-</summary>
-</member>
 <member name="">
 
 </member>
@@ -3121,6 +3267,9 @@
 <summary>
  Defines Tracing information for TraceListeners
 </summary>
+</member>
+<member name="">
+
 </member>
 <member name="">
 
