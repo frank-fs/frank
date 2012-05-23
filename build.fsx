@@ -122,7 +122,7 @@ Target "BuildNuGet" (fun _ ->
             Description = projectDescription
             Version = version
             OutputPath = nugetDir
-            Dependencies = ["WebApi.All",RequireExactly webApiVersion
+            Dependencies = ["AspNetWebApi.Core",RequireExactly webApiVersion
                             "FSharpx.Core",RequireExactly fsharpxCoreVersion
                             "ImpromptuInterface",RequireExactly impromptuInterfaceVersion
                             "ImpromptuInterface.FSharp",RequireExactly impromptuInterfaceFSharpVersion ]
