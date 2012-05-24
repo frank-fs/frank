@@ -3,7 +3,7 @@
 ## License
 
 Author: Ryan Riley <ryan.riley@panesofglass.org>
-Copyright (c) 2011, Ryan Riley.
+Copyright (c) 2011-2012, Ryan Riley.
 
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
