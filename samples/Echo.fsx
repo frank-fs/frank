@@ -37,7 +37,8 @@ open Frank
 
 // Respond with the request content, if any.
 let echo (request: HttpRequestMessage) = async {
-  return respond HttpStatusCode.OK request.Content <| ``Content-Type`` "text/plain"
+    let! content = request.Content.AsyncReadAsString()
+    return respond HttpStatusCode.OK <| new StringContent(content) <| ``Content-Type`` "text/plain"
 }
 
 // Create an application from an `HttpResource` that only responds to `POST` requests.

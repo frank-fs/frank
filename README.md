@@ -1,12 +1,12 @@
 # Frank
 
-Frank is resource-oriented wrapper library for working with the [Web API](http://wcf.codeplex.com/) and is developed in [F#](http://fsharp.net/).
+Frank is resource-oriented wrapper library for working with the [Web API](http://asp.net/web-api/) and is developed in [F#](http://fsharp.net/).
 
 ## Goals
 
-1. Provide a simple, to-the-metal framework for quickly building HTTP applications and services without a lot of hassle. In this case, "to-the-metal" means utilizing the new [HTTP stack coming in .NET 4.5](http://msdn.microsoft.com/en-us/library/hh193585.aspx) and available now in the [`HttpClient`](http://nuget.org/List/Packages/HttpClient) library available with [Web API](http://nuget.org/List/Packages/WebApi.All).
+1. Provide a simple, to-the-metal framework for quickly building HTTP applications and services without a lot of hassle. In this case, "to-the-metal" means utilizing the new [HTTP stack coming in .NET 4.5](http://msdn.microsoft.com/en-us/library/hh193585.aspx) and available now in the [`HttpClient`](http://nuget.org/List/Packages/HttpClient) library available with [Web API](http://nuget.org/List/Packages/AspNetWebApi.Core).
 2. Focus on composition over everything else. Based in F#, composition comes fairly naturally.
-3. Run on a number of server platforms. Frank currently uses the [Web API](http://wcf.codeplex.com/) platform to allow it to run either atop [ASP.NET](http://asp.net/) or self-hosted using the `HttpServiceHost`. Other hosting options will be made available soon.
+3. Run on a number of server platforms. Frank currently uses the [Web API](http://asp.net/web-api/) platform to allow it to run either atop [ASP.NET](http://asp.net/) or self-hosted using the `HttpSelfHostServer`. Other hosting options will be made available soon.
 
 ## Usage
 
@@ -30,12 +30,14 @@ applications to specific methods or uri patterns.
 A "Hello, world!" application using these signatures would look like the following:
 
     let helloWorld request =
-      async.Return <| HttpResponseMessage.ReplyTo(request, "Hello, world!")
+      respond HttpStatusCode.OK "Hello, world!" |> async.Return
 
 A simple echo handler that returns the same input as it received might look like the following:
 
-    let echo (request: HttpRequestMessage) =
-      async.Return <| HttpResponseMessage.ReplyTo(request, request.Content, ``Content-Type`` "text/plain")
+    let echo (request: HttpRequestMessage) = async {
+        let! content = request.Content.AsyncReadAsString()
+        return respond HttpStatusCode.OK <| new StringContent(content) <| ``Content-Type`` "text/plain"
+    }
 
 ### Define an HTTP Resource
 
@@ -63,16 +65,6 @@ to a `Controller`. Resources should represent a single entity type,
 and it is important to note that a `Foo` is not the same entity
 type as a `Foo list`, which is where the typical MVC approach goes wrong. 
 
-    type HttpResource =
-      { Uri: string
-        Methods: string list
-        Handler: HttpRequestMessage -> Async<HttpResponseMessage> option }
-      with
-      member x.Invoke(request) =
-        match x.Handler request with
-        | Some(h) -> h
-        | _ -> ``405 Method Not Allowed`` x.Methods request
-
 The ``405 Method Not Allowed`` function allows a resource to correctly respond to messages.
 Therefore, we extend the `HttpResource` with an `Invoke` method.
 Also note that the methods will always be looked up using the latest set. This could
@@ -91,23 +83,22 @@ The `echo2ReadRequest` maps the incoming request to a value that can be used
 within the actual computation, or `echo2Transform` in this example.
 
       let echo2ReadRequest (request: HttpRequestMessage) =
-          async { return! request.Content.AsyncReadAsString() }
+          request.Content.AsyncReadAsString()
 
 The `echo2Respond` maps the outgoing message body to an HTTP response.
 
-      let echo2Respond request body =
-        async {
-            return HttpResponseMessage.ReplyTo(request, body, ``Content-Type`` "text/plain") }
+      let echo2Respond body =
+          respond body <| ``Content-Type`` "text/plain"
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
 about which it cares and isn't bothered by the transformations.
 
-      let echo2 request =
-        async {
+      let echo2 request = async {
           let! content = echo2ReadRequest request
           let body = echo2Transform content
-          return echo2Respond request body }
+          return echo2Respond <| new StringContent(body)
+      }
 
 Create a `HttpResource` instance at the root of the site that responds to `POST`.
 
@@ -127,59 +118,38 @@ Check the samples for more examples of these combinators.
 Middlewares follow a Russian-doll model for wrapping resource handlers with additional functionality. Frank middlewares take an `HttpApplication` and return an `HttpApplication`.
 The `Frank.Middleware` module defines several, simple middlewares, such as the `log` middleware that intercepts logs incoming requests and the time taken to respond:
 
-    let log app = fun (request : HttpRequestMessage) ->
-      async {
+    let log app = fun (request : HttpRequestMessage) -> async {
         let sw = System.Diagnostics.Stopwatch.StartNew()
         let! response = app request
         printfn "Received a %A request from %A. Responded in %i ms."
                 request.Method.Method request.RequestUri.PathAndQuery                                  sw.ElapsedMilliseconds
         sw.Reset()
-        return response }
+        return response
+    }
 
 The most likely place to insert middlewares is the outer edge of your application. However, since middlewares are themselves just `HttpApplication`s, you can compose them into a Frank application at any level. Want to support logging only on one troublesome resource? No problem. Expose the resource as an application, wrap it in the log middleware, and insert it into the larger application as you did before.
 
 ## Hosting
 
-The current hosting options depend entirely upon the options available from the
-[Web API](http://wcf.codeplex.com/) library. In any case, you'll need a 
-`WebApiConfiguration` instance created from each application you want to host.
-The `WebApi.configure` function creates a `DelegatingHandler` that will intercept
-all incoming traffic and route it to our resources.
+Frank will run on any hosting platform that supports the
+[Web API](http://asp.net/web-api/) library. To hook up your Frank application,
+use the `Register` extension method Frank adds to instances of `HttpConfiguration`.
 
-    let config = WebApi.configure app
+    config.Register app
 
-### Self-hosting
+This extension adds a default route to your `HttpConfiguration` instance and
+adds a `DelegatingHandler` instance to the `HttpConfiguration.MessageHandlers` collection.
+If you want to add a Frank application to an existing Web API app, you should
+explicitly add your route and handler, as order is very important.
 
-Create a self-hosted service host using an `WebApi.FrankApi`, as the service
-won't actually do anything. The `WebApi.FrankApi` is simply a stub for the
-`HttpServiceHost` to satisfy its requirements.
+## TODO
 
-    let baseUri = "http://localhost:1000/"
-    let host = new HttpServiceHost(typeof<WebApi.FrankApi>, config, [| baseUri |])
-    host.Open()
-
-    printfn "Host open.  Hit enter to exit..."
-    printfn "Use a web browser and go to %A or do it right and get fiddler!" baseUri
-    System.Console.Read() |> ignore
-
-    host.Close()
-
-### ASP.NET / IIS
-
-[Web API](http://wcf.codeplex.com/) provides a `ServiceRoute` subclass of `RouteHandler`
-with which to mount Web API applications. We can use this to mount Frank applications, as well.
-
-    RouteTable.Routes.Add(new ServiceRoute("", new HttpServiceHostFactory(Configuration = config), typeof<WebApi.FrankApi>))
-
-You may also use the extension to the `System.Web.RouteTable.Routes` to mount your Frank application:
-
-    RouteTable.Routes.MapServiceRoute<WebApi.FrankApi>("", config)
-
-or if you have a number of routes to set:
-
-    RouteTable.Routes.SetDefaultHttpConfiguration(config)
-    RouteTable.Routes.MapServiceRoute<WebApi.FrankApi>("")
+* Loads of documentation
+* Work out a better hierarchical
+* and type-checked routing mechanism
+* that plays well with MVC routing
+* Samples using [Owin](http://owin.org/)
 
 ## Team
 
-* [Ryan Riley](http://codemav.com/panesofglass)
+* [Ryan Riley](http://github.com/panesofglass)
