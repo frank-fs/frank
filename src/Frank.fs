@@ -23,8 +23,8 @@ open FSharpx
 open FSharpx.Reader
 
 #if DEBUG
-open System.Json
 open ImpromptuInterface.FSharp
+open Newtonsoft.Json.Linq
 open NUnit.Framework
 open Swensen.Unquote.Assertions
 #endif
@@ -153,8 +153,8 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
   fun response -> response.Content.Headers.LastModified <- Nullable.create x
 
 #if DEBUG
-open System.Json
 open ImpromptuInterface.FSharp
+open Newtonsoft.Json.Linq
 open NUnit.Framework
 open Swensen.Unquote.Assertions
 
@@ -174,9 +174,9 @@ let ``test respond with StringContent``() =
 [<Test>]
 let ``test respond with negotiated body``() =
   let body = "Howdy"
-  let response = respond HttpStatusCode.OK (new SimpleObjectContent<_>(body, "text/plain", new XmlMediaTypeFormatter())) ignore
+  let response = respond HttpStatusCode.OK (new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain")) ignore
   test <@ response.StatusCode = HttpStatusCode.OK @>
-  test <@ response.Content.ReadAsStringAsync().Result = "<?xml version=\"1.0\" encoding=\"utf-8\"?><string>Howdy</string>" @>
+  test <@ response.Content.ReadAsStringAsync().Result = @"<string xmlns=""http://schemas.microsoft.com/2003/10/Serialization/"">Howdy</string>" @>
 #endif
 
 // ### Allow Header Helpers
@@ -248,7 +248,7 @@ let findFormatterFor mediaType =
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
 let formatWith mediaType formatter body =
-  new SimpleObjectContent<_>(body, mediaType, formatter) :> HttpContent
+  new ObjectContent<_>(body, formatter, mediaType) :> HttpContent
 
 #if DEBUG
 [<Serializable>]
@@ -279,7 +279,7 @@ let ``test formatWith properly format as application/xml and read as TestType``(
   let content = body |> formatWith "application/xml" formatter
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
   let result = content.AsyncReadAsString() |> Async.RunSynchronously
-  test <@ result = @"<?xml version=""1.0"" encoding=""utf-8""?><TestType xmlns:xsd=""http://www.w3.org/2001/XMLSchema"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""><FirstName>Ryan</FirstName><LastName>Riley</LastName></TestType>" @>
+  test <@ result = @"<Core.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Core.TestType>" @>
 
 [<Test;Ignore>]
 let ``test formatWith properly format as application/x-www-form-urlencoded and read as JsonValue``() =
@@ -287,8 +287,7 @@ let ``test formatWith properly format as application/x-www-form-urlencoded and r
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/x-www-form-urlencoded" formatter
   test <@ content.Headers.ContentType.MediaType = "application/x-www-form-urlencoded" @>
-  let interim = content.AsyncReadAs<JsonValue>([| formatter |]) |> Async.RunSynchronously
-  let result = interim.AsDynamic()
+  let result = content.AsyncReadAs<JToken>([| formatter |]) |> Async.RunSynchronously
   test <@ result?firstName = body.FirstName @>
   test <@ result?lastName = body.LastName @>
 #endif

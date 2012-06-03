@@ -25,15 +25,6 @@ type EmptyContent() =
     other.GetType() = typeof<EmptyContent>
   override x.GetHashCode() = hash x
 
-type SimpleObjectContent<'a>(body: 'a, mediaType: string, formatter: MediaTypeFormatter) as x =
-  inherit HttpContent()
-  do x.Headers.ContentType <- MediaTypeHeaderValue(mediaType)
-  override x.SerializeToStreamAsync(stream, context) =
-    formatter.WriteToStreamAsync(typeof<'a>, body, stream, x.Headers, FormatterContext(x.Headers.ContentType, false), context)
-  override x.TryComputeLength(length) =
-    length <- -1L
-    false
-
 type AsyncHandler =
   inherit DelegatingHandler
   val AsyncSend : HttpRequestMessage -> Async<HttpResponseMessage>
@@ -58,9 +49,5 @@ module Extensions =
     member x.AsyncReadAsMultipart() = Async.AwaitTask <| x.ReadAsMultipartAsync()
     member x.AsyncReadAsMultipart(streamProvider) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider)
     member x.AsyncReadAsMultipart(streamProvider, bufferSize) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider, bufferSize)
-    member x.AsyncReadAsOrDefault<'a>() = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>()
-    member x.AsyncReadAsOrDefault<'a>(formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync<'a>(formatters)
-    member x.AsyncReadAsOrDefault(type') = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type')
-    member x.AsyncReadAsOrDefault(type', formatters) = Async.AwaitTask <| x.ReadAsOrDefaultAsync(type', formatters)
     member x.AsyncReadAsStream() = Async.AwaitTask <| x.ReadAsStreamAsync()
     member x.AsyncReadAsString() = Async.AwaitTask <| x.ReadAsStringAsync()

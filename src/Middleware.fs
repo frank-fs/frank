@@ -12,10 +12,10 @@ module Frank.Middleware
 
 open System
 open System.Collections.Generic
-open System.Json
 open System.Net.Http
 open Frank
 open ImpromptuInterface.FSharp
+open Newtonsoft.Json.Linq
 
 // TODO: add diagnostics and logging
 // TODO: add messages to access diagnostics and logging info from the agent
@@ -59,8 +59,7 @@ let methodOverride app =
     let content = request.Content
     if request.Method = HttpMethod.Post &&
        content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then
-      let! value = Async.AwaitTask (content.ReadAsAsync<JsonValue>())
-      let form = value.AsDynamic()
+      let! form = Async.AwaitTask <| content.ReadAsAsync<JToken>()
       let httpMethod =
         if (not << String.IsNullOrEmpty) form?_method then
           new HttpMethod(form?_method)
