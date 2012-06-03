@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="Global.fs" />
     <None Include="packages.config" />
+    <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharpx.Core, Version=1.5.67.0, Culture=neutral, PublicKeyToken=null">

@@ -59,7 +59,7 @@ let methodOverride app =
     let content = request.Content
     if request.Method = HttpMethod.Post &&
        content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then
-      let! form = Async.AwaitTask <| content.ReadAsAsync<JToken>()
+      let! form = content.AsyncReadAs<JToken>()
       let httpMethod =
         if (not << String.IsNullOrEmpty) form?_method then
           new HttpMethod(form?_method)

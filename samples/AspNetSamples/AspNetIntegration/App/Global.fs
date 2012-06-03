@@ -15,14 +15,15 @@ type WebApiApplication() =
 
     // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
     let helloWorld request = async {
-      return respond HttpStatusCode.OK (new StringContent(@"<!doctype html>
+      return respond HttpStatusCode.OK
+             <| ``Content-Type`` "text/html"
+             <| new StringContent(@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
-             <| ``Content-Type`` "text/html"
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
     }
 
     // Respond with the request content, if any.

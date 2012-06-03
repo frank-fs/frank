@@ -114,14 +114,15 @@ module Resources =
   
   // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
   let helloWorld request = async {
-    return respond HttpStatusCode.OK (new StringContent(@"<!doctype html>
+    return respond HttpStatusCode.OK 
+           <| ``Content-Type`` "text/html"
+           <| new StringContent(@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
-           <| ``Content-Type`` "text/html"
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
   }
 
   let helloResource = route "/" <| get helloWorld
@@ -147,7 +148,7 @@ module Resources =
     | Some mediaType ->
         let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
         let content = formatWith mediaType formatter contact
-        return respond HttpStatusCode.Created content ignore
+        return respond HttpStatusCode.Created ignore content
     | _ -> return! ``406 Not Acceptable`` request
   }
 
@@ -162,7 +163,7 @@ module Resources =
       let! mediaType = negotiateMediaType formatters request
       let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
       let content = formatWith mediaType formatter contact
-      return respond HttpStatusCode.OK content ignore
+      return respond HttpStatusCode.OK ignore content
     }
     match result with
     | Some r -> return r

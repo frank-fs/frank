@@ -58,7 +58,7 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // First of all, it allows for the explicit declaration of side effects. Second, a number
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
-let respond statusCode content headers =
+let respond statusCode headers content =
   let response = new HttpResponseMessage(statusCode, Content = content) in
   headers response; response
 
@@ -152,6 +152,9 @@ let Expires x : HttpResponseHeadersBuilder =
 let ``Last Modified`` x : HttpResponseHeadersBuilder =
   fun response -> response.Content.Headers.LastModified <- Nullable.create x
 
+// Response helpers - shortcuts for common responses.
+let OK headers content = respond HttpStatusCode.OK headers content
+
 #if DEBUG
 open ImpromptuInterface.FSharp
 open Newtonsoft.Json.Linq
@@ -160,21 +163,21 @@ open Swensen.Unquote.Assertions
 
 [<Test>]
 let ``test respond without body``() =
-  let response = respond HttpStatusCode.OK HttpContent.Empty ignore
+  let response = respond HttpStatusCode.OK ignore HttpContent.Empty
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with StringContent``() =
   let body = "Howdy"
-  let response = respond HttpStatusCode.OK (new StringContent(body)) ignore
+  let response = OK ignore <| new StringContent(body)
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = body @>
 
 [<Test>]
 let ``test respond with negotiated body``() =
   let body = "Howdy"
-  let response = respond HttpStatusCode.OK (new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain")) ignore
+  let response = OK ignore <| new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain")
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = @"<string xmlns=""http://schemas.microsoft.com/2003/10/Serialization/"">Howdy</string>" @>
 #endif
@@ -183,9 +186,9 @@ let ``test respond with negotiated body``() =
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
-let internal respondWithAllowHeader statusCode allowedMethods body =
+let private respondWithAllowHeader statusCode allowedMethods body =
   fun _ -> async {
-    return respond statusCode body <| Allow allowedMethods }
+    return respond statusCode <| Allow allowedMethods <| body }
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -224,12 +227,12 @@ let ``test 405 Method Not Allowed``() =
 
 let ``406 Not Acceptable`` =
   fun _ -> async {
-    return respond HttpStatusCode.NotAcceptable (new StringContent("406 Not Acceptable")) ignore }
+    return respond HttpStatusCode.NotAcceptable ignore <| new StringContent("406 Not Acceptable") }
 
 #if DEBUG
 [<Test>]
 let ``test 406 Not Acceptable``() =
-  let response = ``406 Not Acceptable`` (new HttpRequestMessage()) |> Async.RunSynchronously
+  let response = ``406 Not Acceptable`` <| new HttpRequestMessage() |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.NotAcceptable @>
 #endif
 
@@ -280,16 +283,6 @@ let ``test formatWith properly format as application/xml and read as TestType``(
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
   let result = content.AsyncReadAsString() |> Async.RunSynchronously
   test <@ result = @"<Core.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Core.TestType>" @>
-
-[<Test;Ignore>]
-let ``test formatWith properly format as application/x-www-form-urlencoded and read as JsonValue``() =
-  let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
-  let body = TestType(FirstName = "Ryan", LastName = "Riley")
-  let content = body |> formatWith "application/x-www-form-urlencoded" formatter
-  test <@ content.Headers.ContentType.MediaType = "application/x-www-form-urlencoded" @>
-  let result = content.AsyncReadAs<JToken>([| formatter |]) |> Async.RunSynchronously
-  test <@ result?firstName = body.FirstName @>
-  test <@ result?lastName = body.LastName @>
 #endif
 
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
@@ -314,7 +307,7 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return respond HttpStatusCode.OK formattedBody <| ``Content-Type`` mediaType *> ``Vary`` "Accept" }
+          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody }
     | _ -> ``406 Not Acceptable`` request
 
 // ## HTTP Resources
@@ -403,7 +396,7 @@ let routeResource uri handlers =
 
 let ``404 Not Found`` : HttpApplication =
   fun request -> async {
-    return respond HttpStatusCode.NotFound (new StringContent("404 Not Found")) ignore }
+    return respond HttpStatusCode.NotFound ignore <| new StringContent("404 Not Found") }
 
 let findApplicationFor resources (request: HttpRequestMessage) =
   let resource = Seq.tryFind (fun (r: HttpResource) -> r.Match request) resources
