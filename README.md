@@ -30,14 +30,26 @@ applications to specific methods or uri patterns.
 A "Hello, world!" application using these signatures would look like the following:
 
     let helloWorld request =
-      respond HttpStatusCode.OK "Hello, world!" |> async.Return
+      OK ignore <| Str "Hello, world!"
+	  |> async.Return
 
 A simple echo handler that returns the same input as it received might look like the following:
 
     let echo (request: HttpRequestMessage) = async {
         let! content = request.Content.AsyncReadAsString()
-        return respond HttpStatusCode.OK <| new StringContent(content) <| ``Content-Type`` "text/plain"
+        return respond HttpStatusCode.OK
+		       <| ``Content-Type`` "text/plain"
+			   <| new StringContent(content)
     }
+
+or just:
+
+    let echo (request: HttpRequestMessage) =
+	    OK <| ``Content-Type`` "text/plain" <| request.Content.AsyncReadAsString()
+
+If you want to provide content negotiation, use:
+
+    let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
 
 ### Define an HTTP Resource
 
@@ -88,7 +100,7 @@ within the actual computation, or `echo2Transform` in this example.
 The `echo2Respond` maps the outgoing message body to an HTTP response.
 
       let echo2Respond body =
-          respond body <| ``Content-Type`` "text/plain"
+          respond <| ``Content-Type`` "text/plain" <| body
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
