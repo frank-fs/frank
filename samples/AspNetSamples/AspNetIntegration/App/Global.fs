@@ -17,7 +17,7 @@ type WebApiApplication() =
     let helloWorld request = async {
       return respond HttpStatusCode.OK
              <| ``Content-Type`` "text/html"
-             <| new StringContent(@"<!doctype html>
+             <| Formatted (@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!

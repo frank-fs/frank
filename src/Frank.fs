@@ -285,6 +285,14 @@ let ``test formatWith properly format as application/xml and read as TestType``(
   test <@ result = @"<Core.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Core.TestType>" @>
 #endif
 
+let IO stream = new StreamContent(stream) :> HttpContent
+let Str s = new StringContent(s) :> HttpContent
+let Formatted (s, encoding, mediaType) = new StringContent(s, encoding, mediaType) :> HttpContent
+let Form pairs = new FormUrlEncodedContent(pairs |> Seq.map (fun (k,v) -> new KeyValuePair<_,_>(k,v))) :> HttpContent
+let Bytes bytes = new ByteArrayContent(bytes) :> HttpContent
+let Segment (segment: ArraySegment<byte>) =
+  new ByteArrayContent(segment.Array, segment.Offset, segment.Count) :> HttpContent
+
 let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
 
 let negotiateMediaType formatters =
