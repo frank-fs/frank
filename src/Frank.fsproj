@@ -38,7 +38,6 @@
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="packages.config" />
     <Compile Include="System.Net.Http.fs" />
     <Compile Include="System.Web.Http.fs" />
