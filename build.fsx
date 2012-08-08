@@ -24,12 +24,6 @@ let nugetDir = "./nuget/"
 let nugetLibDir = nugetDir @@ "lib"
 let nugetDocsDir = nugetDir @@ "docs"
 
-let webApiVersion = GetPackageVersion packagesDir "AspNetWebApi.Core"
-let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
-let fsharpxHttpVersion = GetPackageVersion packagesDir "FSharpx.Http"
-let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
-let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
-
 // params
 let target = getBuildParamOrDefault "target" "All"
 
@@ -116,6 +110,12 @@ Target "BuildNuGet" (fun _ ->
     [buildDir + "Frank.dll"]
       |> CopyTo nugetLibDir
 
+    let webApiVersion = GetPackageVersion packagesDir "AspNetWebApi.Core"
+    let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
+    let fsharpxHttpVersion = GetPackageVersion packagesDir "FSharpx.Http"
+    let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
+    let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
+
     NuGet (fun p ->
         {p with
             Authors = authors
@@ -162,4 +162,3 @@ Target "All" DoNothing
 
 // Start build
 Run target
-
