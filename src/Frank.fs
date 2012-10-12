@@ -267,6 +267,17 @@ type TestType() =
   override x.ToString() = firstName + " " + lastName
 
 [<Test>]
+let ``test formatWith properly format as application/json raw``() =
+  let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
+  let body = TestType(FirstName = "Ryan", LastName = "Riley")
+  let content = new ObjectContent<_>(body, formatter, "application/json") :> HttpContent
+  test <@ content.Headers.ContentType.MediaType = "application/json" @>
+  let result = content.ReadAsStringAsync()
+               |> Async.AwaitTask
+               |> Async.RunSynchronously
+  test <@ result = "{\"firstName\":\"Ryan\",\"lastName\":\"Riley\"}" @>
+
+[<Test>]
 let ``test formatWith properly format as application/json``() =
   let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
