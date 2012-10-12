@@ -44,11 +44,11 @@
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharpx.Core, Version=1.5.67.0, Culture=neutral, PublicKeyToken=null">
-      <Private>True</Private>
+    <Reference Include="FSharpx.Core">
+      <HintPath>..\..\..\..\packages\FSharpx.Core.1.6.83\lib\40\Fsharpx.Core.dll</HintPath>
     </Reference>
-    <Reference Include="FSharpx.Http, Version=1.5.67.0, Culture=neutral, PublicKeyToken=null">
-      <Private>True</Private>
+    <Reference Include="FSharpx.Http">
+      <HintPath>..\..\..\..\packages\FSharpx.Http.1.6.83\lib\40\Fsharpx.Http.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">

@@ -24,9 +24,9 @@ exception ReturnNoneException183c26a427ae489c8fd92ec21a0c9a59
 
 [<assembly: AssemblyProduct ("Frank")>]
 
-[<assembly: AssemblyVersion ("LocalBuild")>]
+[<assembly: AssemblyVersion ("0.8.121011")>]
 
-[<assembly: AssemblyFileVersion ("LocalBuild")>]
+[<assembly: AssemblyFileVersion ("0.8.121011")>]
 
 [<assembly: AssemblyDelaySign (false)>]
 

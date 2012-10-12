@@ -250,7 +250,7 @@ let findFormatterFor mediaType =
 // 
 // Further note that the current solution requires creation of `ObjectContent<_>`, which is certainly
 // not optimal. Hopefully this, too, will be resolved in a future release.
-let formatWith mediaType formatter body =
+let formatWith (mediaType: string) formatter body =
   new ObjectContent<_>(body, formatter, mediaType) :> HttpContent
 
 #if DEBUG
