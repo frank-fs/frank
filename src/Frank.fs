@@ -254,7 +254,6 @@ let formatWith (mediaType: string) formatter body =
   new ObjectContent<_>(body, formatter, mediaType) :> HttpContent
 
 #if DEBUG
-[<Serializable>]
 type TestType() =
   let mutable firstName = ""
   let mutable lastName = ""
@@ -287,13 +286,22 @@ let ``test formatWith properly format as application/json``() =
   test <@ result = "{\"firstName\":\"Ryan\",\"lastName\":\"Riley\"}" @>
 
 [<Test>]
-let ``test formatWith properly format as application/xml and read as TestType``() =
+let ``test formatWith properly format as application/xml``() =
   let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/xml" formatter
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
   let result = content.AsyncReadAsString() |> Async.RunSynchronously
   test <@ result = @"<Core.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Core.TestType>" @>
+
+[<Test>]
+let ``test formatWith properly format as application/xml and read as TestType``() =
+  let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
+  let body = TestType(FirstName = "Ryan", LastName = "Riley")
+  let content = body |> formatWith "application/xml" formatter
+  test <@ content.Headers.ContentType.MediaType = "application/xml" @>
+  let result = content.AsyncReadAs<TestType>() |> Async.RunSynchronously
+  test <@ result.FirstName = body.FirstName && result.LastName = body.LastName @>
 #endif
 
 let IO stream = new StreamContent(stream) :> HttpContent
