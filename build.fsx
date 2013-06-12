@@ -35,7 +35,7 @@ let packagesDir = "./packages/"
 let deployDir = "./deploy/"
 let testDir = "./test/"
 let nugetDir = "./nuget/"
-let nugetLibDir = nugetDir @@ "lib"
+let nugetLibDir = nugetDir @@ "lib/net40"
 
 // tools
 let nugetPath = ".nuget/NuGet.exe"
