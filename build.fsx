@@ -16,13 +16,11 @@ let buildDir = "./build/"
 let packagesDir = "./packages/"
 let testDir = "./test/"
 let deployDir = "./deploy/"
-let docsDir = "./docs/" 
 
 let targetPlatformDir = getTargetPlatformDir "4.0.30139"
 
 let nugetDir = "./nuget/"
-let nugetLibDir = nugetDir @@ "lib"
-let nugetDocsDir = nugetDir @@ "docs"
+let nugetLibDir = nugetDir @@ "lib/net40"
 
 // params
 let target = getBuildParamOrDefault "target" "All"
@@ -48,13 +46,10 @@ let filesToZip =
 
 // targets
 Target "Clean" (fun _ ->
-    CleanDirs [buildDir; testDir; deployDir; docsDir]
+    CleanDirs [buildDir; testDir; deployDir; nugetDir; nugetLibDir]
 )
 
 Target "BuildApp" (fun _ ->
-    if isLocalBuild then
-      Git.Submodule.init "" ""
-
     AssemblyInfo (fun p -> 
         {p with
            CodeLanguage = FSharp
@@ -83,34 +78,15 @@ Target "Test" (fun _ ->
                OutputFile = testDir + "TestResults.xml" }) 
 )
 
-Target "GenerateDocumentation" (fun _ ->
-    !+ (buildDir + "Frank.dll")      
-        |> Scan
-        |> Docu (fun p ->
-            {p with
-               ToolPath = fakePath + "/docu.exe"
-               TemplatesPath = "./lib/templates"
-               OutputPath = docsDir })
-)
-
 Target "CopyLicense" (fun _ ->
     [ "LICENSE.txt" ] |> CopyTo buildDir
 )
 
-Target "ZipDocumentation" (fun _ ->    
-    !+ (docsDir + "/**/*.*")
-        |> Scan
-        |> Zip docsDir (deployDir + sprintf "Documentation-%s.zip" version)
-)
-
 Target "BuildNuGet" (fun _ ->
-    CleanDirs [nugetDir; nugetLibDir; nugetDocsDir]
-
-    XCopy (docsDir |> FullName) nugetDocsDir
     [buildDir + "Frank.dll"]
       |> CopyTo nugetLibDir
 
-    let webApiVersion = GetPackageVersion packagesDir "AspNetWebApi.Core"
+    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
     let fsharpxHttpVersion = GetPackageVersion packagesDir "FSharpx.Http"
     let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
@@ -123,7 +99,7 @@ Target "BuildNuGet" (fun _ ->
             Description = projectDescription
             Version = version
             OutputPath = nugetDir
-            Dependencies = ["AspNetWebApi.Core",RequireExactly webApiVersion
+            Dependencies = ["Microsoft.AspNet.WebApi.Core",RequireExactly webApiVersion
                             "FSharpx.Core",RequireExactly fsharpxCoreVersion
                             "FSharpx.Http",RequireExactly fsharpxHttpVersion
                             "ImpromptuInterface",RequireExactly impromptuInterfaceVersion
@@ -152,8 +128,7 @@ Target "All" DoNothing
 // Build order
 "Clean"
   ==> "BuildApp" <=> "BuildTest" <=> "CopyLicense"
-  ==> "Test" <=> "GenerateDocumentation"
-  ==> "ZipDocumentation"
+  ==> "Test"
   ==> "BuildNuGet"
   ==> "DeployZip"
   ==> "Deploy"
