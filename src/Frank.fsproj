@@ -45,8 +45,20 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FSharp.CodeFormat">
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CodeFormat.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.CompilerBinding">
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CompilerBinding.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Markdown">
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.Markdown.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharpx.Core">
