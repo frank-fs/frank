@@ -16,6 +16,7 @@ FB.Prepare {
 
 #load ".build/boot.fsx"
 
+open System.IO
 open Fake 
 open Fake.AssemblyInfoFile
 open Fake.MSBuild
@@ -36,6 +37,10 @@ let deployDir = "./deploy/"
 let testDir = "./test/"
 let nugetDir = "./nuget/"
 let nugetLibDir = nugetDir @@ "lib/net40"
+let template = __SOURCE_DIRECTORY__ @@ "template.html"
+let sources = __SOURCE_DIRECTORY__ @@ "src"
+let docsDir = __SOURCE_DIRECTORY__ @@ "docs"
+let docRoot = getBuildParamOrDefault "docroot" homepage
 
 // tools
 let nugetPath = ".nuget/NuGet.exe"
@@ -57,7 +62,7 @@ let filesToZip =
 
 // targets
 Target "Clean" (fun _ ->
-    CleanDirs [buildDir; testDir; deployDir; nugetDir; nugetLibDir]
+    CleanDirs [buildDir; testDir; deployDir; nugetDir; nugetLibDir; docsDir]
 )
 
 Target "BuildApp" (fun _ ->

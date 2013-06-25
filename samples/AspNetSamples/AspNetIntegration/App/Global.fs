@@ -30,9 +30,8 @@ type WebApiApplication() =
     let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
     
     let resource = route "/" (get helloWorld <|> post echo)
-
-    // Mount the app and add a middleware to support HEAD requests.
-    let app = merge [ resource ] //|> Middleware.head
     
     member x.Start() =
-        GlobalConfiguration.Configuration.Register app
+        GlobalConfiguration.Configuration
+        |> register [resource]
+        |> ignore

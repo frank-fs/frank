@@ -157,7 +157,7 @@ module Resources =
   (* Contact resource *)
 
   let single (request: HttpRequestMessage) = async {
-    let id = int <| getParam request "id"
+    let id = getParam request "id" |> unbox
     let result = maybe {
       let! contact = Data.contacts.Get id
       let! mediaType = negotiateMediaType formatters request
@@ -182,11 +182,10 @@ module Resources =
 
 (* Configure and run the application *)
 
-let app = merge [ Resources.helloResource; Resources.contacts; Resources.contact ] |> Middleware.log
-
 let baseUri = "http://127.0.0.1:1000"
-let config = new HttpSelfHostConfiguration(baseUri)
-config.Register app
+let config =
+  new HttpSelfHostConfiguration(baseUri)
+  |> register [ Resources.helloResource; Resources.contacts; Resources.contact ]
 
 let server = new HttpSelfHostServer(config)
 server.OpenAsync().Wait()
