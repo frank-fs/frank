@@ -109,8 +109,6 @@ Target "CreateNuGet" (fun _ ->
     let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
     let fsharpxHttpVersion = GetPackageVersion packagesDir "FSharpx.Http"
-    let impromptuInterfaceVersion = GetPackageVersion packagesDir "ImpromptuInterface"
-    let impromptuInterfaceFSharpVersion = GetPackageVersion packagesDir "ImpromptuInterface.FSharp"
 
     NuGet (fun p ->
         {p with
@@ -122,9 +120,7 @@ Target "CreateNuGet" (fun _ ->
             ToolPath = nugetPath
             Dependencies = ["Microsoft.AspNet.WebApi.Core",RequireExactly webApiVersion
                             "FSharpx.Core",RequireExactly fsharpxCoreVersion
-                            "FSharpx.Http",RequireExactly fsharpxHttpVersion
-                            "ImpromptuInterface",RequireExactly impromptuInterfaceVersion
-                            "ImpromptuInterface.FSharp",RequireExactly impromptuInterfaceFSharpVersion ]
+                            "FSharpx.Http",RequireExactly fsharpxHttpVersion ]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"

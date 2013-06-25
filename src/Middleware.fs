@@ -14,7 +14,6 @@ open System
 open System.Collections.Generic
 open System.Net.Http
 open Frank
-open ImpromptuInterface.FSharp
 open Newtonsoft.Json.Linq
 
 // TODO: add diagnostics and logging
@@ -61,8 +60,9 @@ let methodOverride app =
        content.Headers.ContentType.MediaType <> "application/x-http-form-urlencoded" then
       let! form = content.AsyncReadAs<JToken>()
       let httpMethod =
-        if (not << String.IsNullOrEmpty) form?_method then
-          new HttpMethod(form?_method)
+        let _method = (form.SelectToken("_method") |> string)
+        if (not << String.IsNullOrEmpty) _method then
+          new HttpMethod(_method)
         elif request.Content.Headers.Contains("HTTP_X_HTTP_METHOD_OVERRIDE") then
           let m = request.Content.Headers.GetValues("HTTP_X_HTTP_METHOD_OVERRIDE") |> Seq.head in new HttpMethod(m)
         else request.Method
