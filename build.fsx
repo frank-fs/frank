@@ -23,7 +23,7 @@ open Fake.MSBuild
 
 // properties
 let projectName = "Frank"
-let version = if isLocalBuild then "0.8.28" else buildVersion
+let version = if isLocalBuild then "0.8." + System.DateTime.UtcNow.ToString("yMMdd") else buildVersion
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
@@ -66,7 +66,7 @@ Target "Clean" (fun _ ->
 )
 
 Target "BuildApp" (fun _ ->
-    if isLocalBuild then
+    if not isLocalBuild then
         [ Attribute.Version(buildVersion)
           Attribute.Title(projectName)
           Attribute.Description(projectDescription)
