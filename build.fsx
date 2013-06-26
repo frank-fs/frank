@@ -23,7 +23,7 @@ open Fake.MSBuild
 
 // properties
 let projectName = "Frank"
-let version = if isLocalBuild then "0.8." + System.DateTime.UtcNow.ToString("yMMdd") else buildVersion
+let version = if isLocalBuild then "0.8.28" else buildVersion
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
@@ -66,7 +66,7 @@ Target "Clean" (fun _ ->
 )
 
 Target "BuildApp" (fun _ ->
-    if not isLocalBuild then
+    if isLocalBuild then
         [ Attribute.Version(buildVersion)
           Attribute.Title(projectName)
           Attribute.Description(projectDescription)
@@ -108,7 +108,6 @@ Target "CreateNuGet" (fun _ ->
 
     let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
-    let fsharpxHttpVersion = GetPackageVersion packagesDir "FSharpx.Http"
 
     NuGet (fun p ->
         {p with
@@ -119,8 +118,7 @@ Target "CreateNuGet" (fun _ ->
             OutputPath = nugetDir
             ToolPath = nugetPath
             Dependencies = ["Microsoft.AspNet.WebApi.Core",RequireExactly webApiVersion
-                            "FSharpx.Core",RequireExactly fsharpxCoreVersion
-                            "FSharpx.Http",RequireExactly fsharpxHttpVersion ]
+                            "FSharpx.Core",RequireExactly fsharpxCoreVersion ]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"

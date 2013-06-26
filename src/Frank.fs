@@ -23,7 +23,6 @@ open FSharpx
 open FSharpx.Reader
 
 #if DEBUG
-open ImpromptuInterface.FSharp
 open Newtonsoft.Json.Linq
 open NUnit.Framework
 open Swensen.Unquote.Assertions
@@ -156,7 +155,6 @@ let ``Last Modified`` x : HttpResponseHeadersBuilder =
 let OK headers content = respond HttpStatusCode.OK headers content
 
 #if DEBUG
-open ImpromptuInterface.FSharp
 open Newtonsoft.Json.Linq
 open NUnit.Framework
 open Swensen.Unquote.Assertions
@@ -312,14 +310,17 @@ let Bytes bytes = new ByteArrayContent(bytes) :> HttpContent
 let Segment (segment: ArraySegment<byte>) =
   new ByteArrayContent(segment.Array, segment.Offset, segment.Count) :> HttpContent
 
-let internal accepted (request: HttpRequestMessage) = request.Headers.Accept.ToString()
+type internal ConnegFormatter(mediaType) as x =
+  inherit MediaTypeFormatter()
+  do x.SupportedMediaTypes.Add(MediaTypeHeaderValue(mediaType))
+  override x.CanReadType(_) = true
+  override x.CanWriteType(_) = true
 
-let negotiateMediaType formatters =
-  let servedMedia =
-    formatters
-    |> Seq.collect (fun (formatter: MediaTypeFormatter) -> formatter.SupportedMediaTypes)
-    |> Seq.map (fun value -> value.MediaType)
-  accepted >> Http.Conneg.bestMediaType servedMedia >> Option.map fst
+let negotiateMediaType formatters request =
+  let negotiator = new System.Net.Http.Formatting.DefaultContentNegotiator()
+  match negotiator.Negotiate(typeof<obj>, request, formatters) with
+  | null -> None
+  | result -> Some(result.MediaType.MediaType)
 
 // When you want to negotiate the format of the response based on the available representations and
 // the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
