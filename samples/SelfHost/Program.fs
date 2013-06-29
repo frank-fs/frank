@@ -11,7 +11,6 @@ open System.Web.Http.SelfHost
 open Frank
 open FSharpx.Option
 open Newtonsoft.Json.Linq
-open ImpromptuInterface.FSharp
 
 module Model =
   type ContactId = int
@@ -130,6 +129,9 @@ module Resources =
   (* Contacts resource *)
 
   let all = runConneg formatters <| fun _ -> Data.contacts.AsyncGetAll()
+
+  // Dynamic lookup helper for JToken
+  let (?) (data: JToken) name = data.SelectToken(name) |> string
 
   let create (request: HttpRequestMessage) = async {
     let! formData = request.Content.AsyncReadAs<JToken>()
