@@ -159,7 +159,7 @@ module Resources =
   (* Contact resource *)
 
   let single (request: HttpRequestMessage) = async {
-    let id = getParam request "id" |> unbox
+    let id = getParam<int> request "id" |> Option.get
     let result = maybe {
       let! contact = Data.contacts.Get id
       let! mediaType = negotiateMediaType formatters request

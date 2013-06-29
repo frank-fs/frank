@@ -379,11 +379,11 @@ let put handler = mapResourceHandler(HttpMethod.Put.Method, handler)
 let delete handler = mapResourceHandler(HttpMethod.Delete.Method, handler)
 
 // Helper to more easily access URL params
-let getParam (request:HttpRequestMessage) key =
-    let result =
-        request.GetRouteData().Values
-        |> Seq.find (fun (KeyValue(k,v)) -> k = key.ToString().ToUpper())
-    result.Value
+let getParam<'T> (request:HttpRequestMessage) key =
+    let values = request.GetRouteData().Values
+    if values.ContainsKey(key) then
+        Some(values.[key] :?> 'T)
+    else None
 
 // We can use several methods to merge multiple handlers together into a single resource.
 // Our chosen mechanism here is merging functions into a larger function of the same signature.
