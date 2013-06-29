@@ -1,4 +1,4 @@
-﻿(* # Frank Extensions to System.Net.Http
+﻿(* # F# Extensions to System.Net.Http
 
 ## License
 

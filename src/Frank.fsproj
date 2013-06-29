@@ -38,8 +38,6 @@
   <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <ItemGroup>
-    <Compile Include="System.Net.Http.fs" />
-    <Compile Include="System.Web.Http.fs" />
     <Compile Include="Frank.fs" />
     <Compile Include="Middleware.fs" />
     <None Include="packages.config" />
@@ -98,5 +96,12 @@
       <HintPath>..\packages\Unquote.2.2.2\lib\net40\Unquote.dll</HintPath>
       <Private>True</Private>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="FSharp.Net.Http\FSharp.Net.Http.fsproj">
+      <Name>FSharp.Net.Http</Name>
+      <Project>{703a3f38-390d-47e4-9596-145e670d33df}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
 </Project>
