@@ -89,6 +89,11 @@
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\FSharp.Net.Http\FSharp.Net.Http.fsproj">
+      <Name>FSharp.Net.Http</Name>
+      <Project>{703a3f38-390d-47e4-9596-145e670d33df}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
