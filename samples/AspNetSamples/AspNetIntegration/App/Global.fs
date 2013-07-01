@@ -4,6 +4,7 @@ open System
 open System.Net
 open System.Net.Http
 open System.Web.Http
+open System.Web.Http.HttpResource
 open System.Web.Routing
 open Frank
 

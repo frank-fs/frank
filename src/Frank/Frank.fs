@@ -272,34 +272,3 @@ let getParam<'T> (request:HttpRequestMessage) key =
     if values.ContainsKey(key) then
         Some(values.[key] :?> 'T)
     else None
-
-// We can use several methods to merge multiple handlers together into a single resource.
-// Our chosen mechanism here is merging functions into a larger function of the same signature.
-// This allows us to create resources as follows:
-// 
-//     let resource = get app1 <|> post app2 <|> put app3 <|> delete app4
-//
-// The intent here is to build a resource, with at most one handler per HTTP method. This goes
-// against a lot of the "RESTful" approaches that just merge a bunch of method handlers at
-// different URI addresses.
-let orElse left right =
-  fst left @ fst right,
-  fun request -> Option.orElse (snd left request) (snd right request)
-let inline (<|>) left right = orElse left right
-
-let route uri handler =
-  HttpResource(uri, fst handler, snd handler)
-
-let routeResource uri handlers =
-  route uri <| Seq.reduce orElse handlers
-
-let ``404 Not Found`` (request: HttpRequestMessage) = async {
-  return request.CreateResponse(HttpStatusCode.NotFound)
-}
-
-let register<'a when 'a :> System.Web.Http.HttpConfiguration> (resources: seq<HttpResource>) (config: 'a) =
-  for resource in resources do
-    config.Routes.Add(resource.Name, resource)
-  config
-
-// TODO: Re-add support to apply middleware across resources.

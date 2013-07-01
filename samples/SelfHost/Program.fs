@@ -7,6 +7,7 @@ open System.Net.Http
 open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Web.Http
+open System.Web.Http.HttpResource
 open System.Web.Http.SelfHost
 open Frank
 open FSharpx.Option

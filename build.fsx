@@ -48,11 +48,11 @@ let nunitPath = "packages/NUnit.Runners.2.6.2/tools"
 
 // files
 let appReferences =
-    !+ "src/*.fsproj" 
+    !+ "src/**/*.fsproj" 
         |> Scan
 
 let testReferences =
-    !+ "src/*.fsproj"
+    !+ "tests/**/*.fsproj"
         |> Scan
 
 let filesToZip =
@@ -70,9 +70,25 @@ Target "BuildApp" (fun _ ->
         [ Attribute.Version(buildVersion)
           Attribute.Title(projectName)
           Attribute.Description(projectDescription)
+          Attribute.Guid("703a3f38-390d-47e4-9596-145e670d33df")
+        ]
+        |> CreateFSharpAssemblyInfo "src/FSharp.Net.Http/AssemblyInfo.fs"
+
+    if not isLocalBuild then
+        [ Attribute.Version(buildVersion)
+          Attribute.Title(projectName)
+          Attribute.Description(projectDescription)
+          Attribute.Guid("853af415-e371-490b-9105-82427fcef2c0")
+        ]
+        |> CreateFSharpAssemblyInfo "src/FSharp.Web.Http/AssemblyInfo.fs"
+
+    if not isLocalBuild then
+        [ Attribute.Version(buildVersion)
+          Attribute.Title(projectName)
+          Attribute.Description(projectDescription)
           Attribute.Guid("5017411A-CF26-4E1A-85D6-1C49470C5996")
         ]
-        |> CreateFSharpAssemblyInfo "src/AssemblyInfo.fs"
+        |> CreateFSharpAssemblyInfo "src/Frank/AssemblyInfo.fs"
 
     MSBuildRelease buildDir "Build" appReferences
         |> Log "AppBuild-Output: "

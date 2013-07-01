@@ -72,7 +72,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Frank.fsproj">
+    <ProjectReference Include="..\..\src\Frank\Frank.fsproj">
       <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
       <Private>True</Private>

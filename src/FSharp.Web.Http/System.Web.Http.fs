@@ -8,7 +8,7 @@ Copyright (c) 2011-2012, Ryan Riley.
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
 *)
-namespace FSharp.Web.Http
+namespace System.Web.Http
 
 open System.Net
 open System.Net.Http
@@ -16,10 +16,15 @@ open System.Web.Http
 
 // ## HTTP Resources
 module internal Helper =
-    let internal resourceHandlerOrDefault methods handler request =
+    let internal resourceHandlerOrDefault methods handler (request: HttpRequestMessage) =
         match handler request with
-        | Some h -> h
-        | _ -> ``405 Method Not Allowed`` methods request
+        | Some response -> response
+        | _ ->
+            async {
+                let response = request.CreateResponse(HttpStatusCode.MethodNotAllowed, Content = new StringContent("405 Method Not Allowed"))
+                methods |> Seq.iter response.Content.Headers.Allow.Add
+                return response
+            }
 
 // HTTP resources expose an resource handler function at a given uri.
 // In the common MVC-style frameworks, this would roughly correspond
@@ -39,7 +44,7 @@ type HttpResource(template, methods, handler) =
                                               defaults = null,
                                               constraints = null,
                                               dataTokens = null,
-                                              handler = new AsyncHandler(resourceHandlerOrDefault methods handler))
+                                              handler = new AsyncHandler(Helper.resourceHandlerOrDefault methods handler))
     with
     member x.Name = template
 
@@ -74,7 +79,11 @@ module HttpResource =
     // different URI addresses.
     let orElse left right =
         fst left @ fst right,
-        fun request -> Option.orElse (snd left request) (snd right request)
+        fun request ->
+            match snd left request with
+            | None -> snd right request
+            | result -> result
+
     let inline (<|>) left right = orElse left right
 
     let route uri handler = HttpResource(uri, fst handler, snd handler)
