@@ -95,7 +95,7 @@ let ``test formatWith properly format as application/xml``() =
   let content = body |> formatWith "application/xml" formatter
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
   let result = content.AsyncReadAsString() |> Async.RunSynchronously
-  test <@ result = @"<Core.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Core.TestType>" @>
+  test <@ result = @"<Tests.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Tests.TestType>" @>
 
 [<Test>]
 let ``test formatWith properly format as application/xml and read as TestType``() =

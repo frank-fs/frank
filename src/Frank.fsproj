@@ -11,9 +11,10 @@
     <AssemblyName>Frank</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Frank</Name>
-    <FscToolPath>..\..\lib\FSharp\</FscToolPath>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
+    <FscToolPath>..\lib\FSharp\</FscToolPath>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -34,64 +35,65 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\frack.XML</DocumentationFile>
   </PropertyGroup>
-  <Import Project="..\..\lib\FSharp\Microsoft.FSharp.Targets" />
+  <Import Project="..\lib\FSharp\Microsoft.FSharp.Targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <ItemGroup>
-    <Compile Include="Frank.fs" />
     <None Include="packages.config" />
+    <Compile Include="System.Net.Http.fs" />
+    <Compile Include="System.Web.Http.fs" />
+    <Compile Include="Frank.fs" />
+    <Compile Include="Tests.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.CodeFormat">
-      <HintPath>..\..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CodeFormat.dll</HintPath>
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CodeFormat.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.CompilerBinding">
-      <HintPath>..\..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CompilerBinding.dll</HintPath>
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.CompilerBinding.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Core">
-      <HintPath>..\..\lib\FSharp\FSharp.Core.dll</HintPath>
+      <HintPath>..\lib\FSharp\FSharp.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Markdown">
-      <HintPath>..\..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.Markdown.dll</HintPath>
+      <HintPath>..\packages\FSharp.Formatting.1.0.15\lib\net40\FSharp.Markdown.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharpx.Core">
-      <HintPath>..\..\packages\FSharpx.Core.1.8.29\lib\40\FSharpx.Core.dll</HintPath>
+      <HintPath>..\packages\FSharpx.Core.1.8.29\lib\40\FSharpx.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="mscorlib" />
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\packages\Newtonsoft.Json.4.5.10\lib\net40\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\packages\Newtonsoft.Json.4.5.10\lib\net40\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>..\packages\NUnit.2.6.2\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Net.Http">
-      <HintPath>..\..\packages\Microsoft.Net.Http.2.0.20710.0\lib\net40\System.Net.Http.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Net.Http.2.0.20710.0\lib\net40\System.Net.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Net.Http.Formatting">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Client.4.0.20710.0\lib\net40\System.Net.Http.Formatting.dll</HintPath>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.4.0.20710.0\lib\net40\System.Net.Http.Formatting.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Net.Http.WebRequest">
-      <HintPath>..\..\packages\Microsoft.Net.Http.2.0.20710.0\lib\net40\System.Net.Http.WebRequest.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Net.Http.2.0.20710.0\lib\net40\System.Net.Http.WebRequest.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Web.Http">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Core.4.0.20710.0\lib\net40\System.Web.Http.dll</HintPath>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Core.4.0.20710.0\lib\net40\System.Web.Http.dll</HintPath>
       <Private>True</Private>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FSharp.Net.Http\FSharp.Net.Http.fsproj">
-      <Name>FSharp.Net.Http</Name>
-      <Project>{703a3f38-390d-47e4-9596-145e670d33df}</Project>
-      <Private>True</Private>
-    </ProjectReference>
+    <Reference Include="Unquote">
+      <HintPath>..\packages\Unquote.2.2.2\lib\net40\Unquote.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

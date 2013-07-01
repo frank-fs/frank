@@ -84,19 +84,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Frank\Frank.fsproj">
+    <ProjectReference Include="..\..\src\Frank.fsproj">
       <Name>Frank</Name>
       <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\FSharp.Net.Http\FSharp.Net.Http.fsproj">
-      <Name>FSharp.Net.Http</Name>
-      <Project>{703a3f38-390d-47e4-9596-145e670d33df}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\FSharp.Web.Http\FSharp.Web.Http.fsproj">
-      <Name>FSharp.Web.Http</Name>
-      <Project>{853af415-e371-490b-9105-82427fcef2c0}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
