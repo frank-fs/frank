@@ -121,7 +121,6 @@ Target "CreateWebHttpNuGet" (fun _ ->
 Target "CreateFrankNuGet" (fun _ ->
     XCopy (sources @@ "Frank.fs") nugetFrankDir
 
-    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
 
     NuGet (fun p ->
@@ -132,9 +131,8 @@ Target "CreateFrankNuGet" (fun _ ->
             Version = version
             OutputPath = nugetFrankDir
             ToolPath = nugetPath
-            Dependencies = ["Microsoft.AspNet.WebApi.Core",RequireExactly webApiVersion
-                            "FSharpx.Core",RequireExactly fsharpxCoreVersion
-                            "FSharp.Net.Http", version]
+            Dependencies = ["FSharpx.Core",RequireExactly fsharpxCoreVersion
+                            "FSharp.Web.Http", version]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"
