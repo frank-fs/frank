@@ -35,9 +35,12 @@ let deployDir = __SOURCE_DIRECTORY__ @@ "deploy"
 let packagesDir = __SOURCE_DIRECTORY__ @@ "packages"
 let testDir = __SOURCE_DIRECTORY__ @@ "test"
 let nugetDir = __SOURCE_DIRECTORY__ @@ "nuget"
-let nugetNetHttpDir = nugetDir @@ "FSharp.Net.Http" @@ "content"
-let nugetWebHttpDir = nugetDir @@ "FSharp.Web.Http" @@ "content"
-let nugetFrankDir = nugetDir @@ "Frank" @@ "content"
+let nugetNetHttpDir = nugetDir @@ "FSharp.Net.Http"
+let nugetWebHttpDir = nugetDir @@ "FSharp.Web.Http"
+let nugetFrankDir = nugetDir @@ "Frank"
+let nugetNetHttpContent = nugetNetHttpDir @@ "content"
+let nugetWebHttpContent = nugetWebHttpDir @@ "content"
+let nugetFrankContent = nugetFrankDir @@ "content"
 let template = __SOURCE_DIRECTORY__ @@ "template.html"
 let sources = __SOURCE_DIRECTORY__ @@ "src"
 let docsDir = __SOURCE_DIRECTORY__ @@ "docs"
@@ -54,7 +57,16 @@ let testReferences =
 
 // targets
 Target "Clean" (fun _ ->
-    CleanDirs [deployDir; testDir; nugetDir; nugetNetHttpDir; nugetWebHttpDir; nugetFrankDir; docsDir]
+    CleanDirs [deployDir
+               docsDir
+               testDir
+               nugetDir
+               nugetNetHttpDir
+               nugetNetHttpContent
+               nugetWebHttpDir
+               nugetWebHttpContent
+               nugetFrankDir
+               nugetFrankContent]
 )
 
 Target "BuildTest" (fun _ -> 
@@ -74,7 +86,7 @@ Target "Test" (fun _ ->
 )
 
 Target "CreateNetHttpNuGet" (fun _ ->
-    XCopy (sources @@ "System.Net.Http.fs") nugetNetHttpDir
+    XCopy (sources @@ "System.Net.Http.fs") nugetNetHttpContent
 
     let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Client"
 
@@ -96,7 +108,7 @@ Target "CreateNetHttpNuGet" (fun _ ->
 )
 
 Target "CreateWebHttpNuGet" (fun _ ->
-    XCopy (sources @@ "System.Web.Http.fs") nugetWebHttpDir
+    XCopy (sources @@ "System.Web.Http.fs") nugetWebHttpContent
 
     let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
 
@@ -119,7 +131,7 @@ Target "CreateWebHttpNuGet" (fun _ ->
 )
 
 Target "CreateFrankNuGet" (fun _ ->
-    XCopy (sources @@ "Frank.fs") nugetFrankDir
+    XCopy (sources @@ "Frank.fs") nugetFrankContent
 
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
 
