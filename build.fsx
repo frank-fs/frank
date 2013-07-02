@@ -86,7 +86,7 @@ Target "CreateNetHttpNuGet" (fun _ ->
             Version = version
             OutputPath = nugetNetHttpDir
             ToolPath = nugetPath
-            Dependencies = ["Microsoft.AspNet.WebApi.Client",RequireExactly webApiVersion]
+            Dependencies = ["Microsoft.AspNet.WebApi.Client", webApiVersion]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"
@@ -108,7 +108,7 @@ Target "CreateWebHttpNuGet" (fun _ ->
             Version = version
             OutputPath = nugetWebHttpDir
             ToolPath = nugetPath
-            Dependencies = ["Microsoft.AspNet.WebApi.Core",RequireExactly webApiVersion
+            Dependencies = ["Microsoft.AspNet.WebApi.Core", webApiVersion
                             "FSharp.Net.Http", version]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
@@ -131,7 +131,7 @@ Target "CreateFrankNuGet" (fun _ ->
             Version = version
             OutputPath = nugetFrankDir
             ToolPath = nugetPath
-            Dependencies = ["FSharpx.Core",RequireExactly fsharpxCoreVersion
+            Dependencies = ["FSharpx.Core", fsharpxCoreVersion
                             "FSharp.Web.Http", version]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
