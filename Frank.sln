@@ -16,6 +16,9 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank", "src\Frank.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C38FB85D-B510-4EF0-B4BA-0A5133FD3A11}"
+	ProjectSection(SolutionItems) = preProject
+		samples\HelloWorld.fsx = samples\HelloWorld.fsx
+	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SelfHost", "samples\SelfHost\SelfHost.fsproj", "{0EBC699E-0E13-4459-8A57-F7615EDE2DC7}"
 EndProject
