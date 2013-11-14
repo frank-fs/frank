@@ -65,7 +65,7 @@ module Extensions =
   type HttpContent with
     static member Empty = emptyContent
     member x.AsyncReadAs<'a>() = Async.AwaitTask <| x.ReadAsAsync<'a>()
-    member x.AsyncReadAs<'a>(formatters) = Async.AwaitTask <| x.ReadAsAsync<'a>(formatters)
+    member x.AsyncReadAs<'a>(formatters:Formatting.MediaTypeFormatter seq) = Async.AwaitTask <| x.ReadAsAsync<'a>(formatters)
     member x.AsyncReadAs(type') = Async.AwaitTask <| x.ReadAsAsync(type')
     member x.AsyncReadAs(type', formatters) = Async.AwaitTask <| x.ReadAsAsync(type', formatters)
     member x.AsyncReadAsByteArray() = Async.AwaitTask <| x.ReadAsByteArrayAsync()
@@ -73,6 +73,6 @@ module Extensions =
     member x.AsyncReadAsHttpResponseMessage() = Async.AwaitTask <| x.ReadAsHttpResponseMessageAsync()
     member x.AsyncReadAsMultipart() = Async.AwaitTask <| x.ReadAsMultipartAsync()
     member x.AsyncReadAsMultipart(streamProvider) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider)
-    member x.AsyncReadAsMultipart(streamProvider, bufferSize) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider, bufferSize)
+    member x.AsyncReadAsMultipart(streamProvider, bufferSize:int) = Async.AwaitTask <| x.ReadAsMultipartAsync(streamProvider, bufferSize)
     member x.AsyncReadAsStream() = Async.AwaitTask <| x.ReadAsStreamAsync()
     member x.AsyncReadAsString() = Async.AwaitTask <| x.ReadAsStringAsync()
