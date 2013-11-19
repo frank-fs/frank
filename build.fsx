@@ -52,8 +52,7 @@ let nunitPath = "packages/NUnit.Runners.2.6.2/tools"
 
 // files
 let testReferences =
-    !+ "src/*.fsproj"
-        |> Scan
+    !! "src/*.fsproj"
 
 // targets
 Target "Clean" (fun _ ->
@@ -76,8 +75,7 @@ Target "BuildTest" (fun _ ->
 
 Target "Test" (fun _ ->
     let nunitOutput = testDir @@ "TestResults.xml"
-    !+ (testDir @@ "Frank.dll")
-        |> Scan
+    !! (testDir @@ "Frank.dll")
         |> NUnit (fun p -> 
                     {p with 
                         ToolPath = nunitPath
