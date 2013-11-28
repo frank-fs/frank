@@ -46,8 +46,8 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // First of all, it allows for the explicit declaration of side effects. Second, a number
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
-let respond statusCode headers content =
-  let response = new HttpResponseMessage(statusCode, Content = content) in
+let respond statusCode headers content (request: HttpRequestMessage) =
+  let response = new HttpResponseMessage(statusCode, Content = content, RequestMessage = request) in
   headers response; response
 
 // ### General Headers
@@ -147,9 +147,12 @@ let OK headers content = respond HttpStatusCode.OK headers content
 
 // A few responses should return allowed methods (`OPTIONS` and `405 Method Not Allowed`).
 // `respondWithAllowHeader` allows both methods to share common functionality.
-let private respondWithAllowHeader statusCode allowedMethods body =
-  fun _ -> async {
-    return respond statusCode <| Allow allowedMethods <| body }
+let private respondWithAllowHeader statusCode allowedMethods body request =
+    respond statusCode
+    <| Allow allowedMethods
+    <| body
+    <| request
+    |> async.Return
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
@@ -159,14 +162,12 @@ let options allowedMethods =
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
-  <| new StringContent("405 Method Not Allowed")
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
 
 // ## Content Negotiation Helpers
 
-let ``406 Not Acceptable`` =
-  fun _ -> async {
-    return respond HttpStatusCode.NotAcceptable ignore <| new StringContent("406 Not Acceptable") }
+let ``406 Not Acceptable`` request =
+    request |> respond HttpStatusCode.NotAcceptable ignore (new StringContent("406 Not Acceptable")) |> async.Return
 
 let findFormatterFor mediaType =
   Seq.find (fun (formatter: MediaTypeFormatter) ->
@@ -207,8 +208,7 @@ let negotiateMediaType formatters request =
 
 // When you want to negotiate the format of the response based on the available representations and
 // the `request`'s `Accept` headers, you can `tryNegotiateMediaType`. This takes a set of available
-// `formatters` and attempts to match the best with the provided `Accept` header values using
-// functions from `FSharpx.Http`.
+// `formatters` and attempts to match the best with the provided `Accept` header values.
 let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
   let bestOf = negotiateMediaType formatters
   fun request ->
@@ -218,5 +218,6 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody }
+          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody <| request
+        }
     | _ -> ``406 Not Acceptable`` request

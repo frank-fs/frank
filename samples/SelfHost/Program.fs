@@ -123,6 +123,7 @@ module Resources =
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
 <input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
+           <| request
   }
 
   let helloResource = route "/" <| get helloWorld
@@ -151,7 +152,7 @@ module Resources =
     | Some mediaType ->
         let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
         let content = formatWith mediaType formatter contact
-        return respond HttpStatusCode.Created ignore content
+        return request |> respond HttpStatusCode.Created ignore content
     | _ -> return! ``406 Not Acceptable`` request
   }
 
@@ -166,7 +167,7 @@ module Resources =
       let! mediaType = negotiateMediaType formatters request
       let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
       let content = formatWith mediaType formatter contact
-      return respond HttpStatusCode.OK ignore content
+      return request |> respond HttpStatusCode.OK ignore content
     }
     match result with
     | Some r -> return r
