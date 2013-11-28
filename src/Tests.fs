@@ -16,21 +16,21 @@ open Swensen.Unquote.Assertions
 
 [<Test>]
 let ``test respond without body``() =
-  let response = respond HttpStatusCode.OK ignore HttpContent.Empty
+  let response = new HttpRequestMessage() |> respond HttpStatusCode.OK ignore HttpContent.Empty
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content = HttpContent.Empty @>
 
 [<Test>]
 let ``test respond with StringContent``() =
   let body = "Howdy"
-  let response = OK ignore <| new StringContent(body)
+  let response = new HttpRequestMessage() |> OK ignore (new StringContent(body))
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = body @>
 
 [<Test>]
 let ``test respond with negotiated body``() =
   let body = "Howdy"
-  let response = OK ignore <| new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain")
+  let response = new HttpRequestMessage() |> OK ignore (new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain"))
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = @"<string xmlns=""http://schemas.microsoft.com/2003/10/Serialization/"">Howdy</string>" @>
 

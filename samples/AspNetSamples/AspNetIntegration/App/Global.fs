@@ -25,6 +25,7 @@ type WebApiApplication() =
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
 <input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
+             <| request
     }
 
     // Respond with the request content, if any.
