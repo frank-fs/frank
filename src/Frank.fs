@@ -48,8 +48,12 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let respond statusCode headers content (request: HttpRequestMessage) =
-  let response = new HttpResponseMessage(statusCode, Content = content, RequestMessage = request) in
-  headers response; response
+  let response =
+    match content with
+    | Some c -> new HttpResponseMessage(statusCode, Content = c, RequestMessage = request)
+    | None   -> request.CreateResponse(statusCode)
+  headers response
+  response
 
 // ### General Headers
 let Date x : HttpResponseHeadersBuilder =
@@ -102,7 +106,7 @@ let ``WWW-Authenticate`` x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.WwwAuthenticate.ParseAdd x
 
 // ### Entity Headers
-let Allow allowedMethods : HttpResponseHeadersBuilder =
+let Allow (allowedMethods: #seq<HttpMethod>) : HttpResponseHeadersBuilder =
   fun response ->
     allowedMethods
     |> Seq.map (fun (m: HttpMethod) -> m.Method)
@@ -160,18 +164,21 @@ let private respondWithAllowHeader statusCode allowedMethods body request =
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
-  respondWithAllowHeader HttpStatusCode.OK allowedMethods HttpContent.Empty
+  respondWithAllowHeader HttpStatusCode.OK allowedMethods None
 
 // In some instances, you need to respond with a `405 Message Not Allowed` response.
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  <| Some(new StringContent("405 Method Not Allowed"))
 
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` request =
-    request |> respond HttpStatusCode.NotAcceptable ignore (new StringContent("406 Not Acceptable")) |> async.Return
+    request
+    |> respond HttpStatusCode.NotAcceptable ignore (Some(new StringContent("406 Not Acceptable")))
+    |> async.Return
 
 let findFormatterFor mediaType =
   Seq.find (fun (formatter: MediaTypeFormatter) ->
@@ -222,7 +229,7 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody <| request
+          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| Some formattedBody <| request
         }
     | _ -> ``406 Not Acceptable`` request
 

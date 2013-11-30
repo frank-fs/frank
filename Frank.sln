@@ -26,10 +26,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0E4239
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
-		.nuget\packages.config = .nuget\packages.config
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "WebApi", "samples\AspNetSamples\AspNetIntegration\App\WebApi.fsproj", "{AE975F69-FE55-4662-BF36-8B3E980245A1}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests.fsproj", "{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -71,6 +72,16 @@ Global
 		{AE975F69-FE55-4662-BF36-8B3E980245A1}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{AE975F69-FE55-4662-BF36-8B3E980245A1}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{AE975F69-FE55-4662-BF36-8B3E980245A1}.Release|x86.ActiveCfg = Release|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
