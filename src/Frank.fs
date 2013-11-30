@@ -40,6 +40,7 @@ You'll see the signatures above are still mostly present, though they have been 
 // An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.
 type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 
+
 // ## HTTP Response Header Combinators
 
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
@@ -101,8 +102,11 @@ let ``WWW-Authenticate`` x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.WwwAuthenticate.ParseAdd x
 
 // ### Entity Headers
-let Allow x : HttpResponseHeadersBuilder =
-  fun response -> Seq.iter response.Content.Headers.Allow.Add x
+let Allow allowedMethods : HttpResponseHeadersBuilder =
+  fun response ->
+    allowedMethods
+    |> Seq.map (fun (m: HttpMethod) -> m.Method)
+    |> Seq.iter response.Content.Headers.Allow.Add
 
 let Location x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.Location <- x
@@ -221,3 +225,120 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
           return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody <| request
         }
     | _ -> ``406 Not Acceptable`` request
+
+
+// ## Routing
+
+/// Alias `MailboxProcessor<'T>` as `Agent<'T>`.
+type Agent<'T> = MailboxProcessor<'T>
+
+/// Messages used by the HTTP resource agent.
+type internal ResourceMessage =
+    | Request of HttpRequestMessage * Stream
+    | SetHandler of HttpMethod * HttpApplication
+    | Error of exn
+    | Shutdown
+
+/// An HTTP resource agent.
+type Resource private (uriTemplate, allowedMethods, handlers) =
+    let onError = new Event<exn>()
+    let agent = Agent<ResourceMessage>.Start(fun inbox ->
+        let rec loop handlers = async {
+            let! msg = inbox.Receive()
+            match msg with
+            | Request(request, out) ->
+                let! response =
+                    match handlers |> List.tryFind (fun (m, _) -> m = request.Method) with
+                    | Some (_, h) -> h request
+                    | None -> ``405 Method Not Allowed`` allowedMethods request
+                do out.WriteByte(0uy) // TODO: write the response to the out stream
+                return! loop handlers
+            | SetHandler(httpMethod, handler) ->
+                let handlers' =
+                    match allowedMethods |> List.tryFind (fun m -> m = httpMethod) with
+                    | None -> handlers
+                    | Some _ -> (httpMethod, handler)::(List.filter (fun (m,h) -> m <> httpMethod) handlers)
+                return! loop handlers'
+            | Error exn ->
+                onError.Trigger(exn)
+                return! loop handlers
+            | Shutdown -> ()
+        }
+            
+        loop handlers
+    )
+
+    new (uriTemplate, handlers) =
+        let allowedMethods = handlers |> List.map fst
+        Resource(uriTemplate, allowedMethods, handlers)
+
+    new (uriTemplate, allowedMethods) =
+        Resource(uriTemplate, allowedMethods, [])
+
+    /// Connect the resource to the request event stream.
+    /// This method applies a default filter to subscribe only to events
+    /// matching the `Resource`'s `uriTemplate`.
+    // NOTE: This should be internal if used in a type provider.
+    abstract Connect : IObservable<HttpRequestMessage * Stream> -> IDisposable
+    default x.Connect(observable) =
+        (observable
+         |> Observable.filter (fun (r: HttpRequestMessage, _) -> r.RequestUri.AbsolutePath = uriTemplate)
+        ).Subscribe(x)
+
+    /// Sets the handler for the specified `HttpMethod`.
+    /// Ideally, we would expose methods matching the allowed methods.
+    member x.SetHandler(httpMethod, handler) =
+        agent.Post <| SetHandler(httpMethod, handler)
+
+    /// Provide stream of `exn` for logging purposes.
+    [<CLIEvent>]
+    member x.Error = onError.Publish
+
+    /// Implement `IObserver` to allow the `Resource` to subscribe to the request event stream.
+    interface IObserver<HttpRequestMessage * Stream> with
+        member x.OnNext(value) = agent.Post <| Request value
+        member x.OnError(exn) = agent.Post <| Error exn
+        member x.OnCompleted() = agent.Post Shutdown
+
+// TODO: Create a ResourceManager or some form of Supervisor to serve as the App.
+// Example:
+
+type App () as x =
+    // Should this also be an Agent<'T>?
+
+    let onRequest = new Event<HttpRequestMessage * Stream>()
+    let onError = new Event<exn>()
+
+    // This shows that strings are used, but they should be hidden behind generated types.
+    let rootR = Resource("/", [ HttpMethod.Get ])
+    let aboutR = Resource("/about", [ HttpMethod.Get ])
+    let customersR = Resource("/customers", [ HttpMethod.Get; HttpMethod.Post ])
+    let customerR = Resource("/customers/{id:int}", [ HttpMethod.Get; HttpMethod.Put; HttpMethod.Delete ])
+
+    let subscriptions = [
+        rootR.Connect(x :> IObservable<_>)
+        aboutR.Connect(x :> IObservable<_>)
+        customersR.Connect(x :> IObservable<_>)
+        customerR.Connect(x :> IObservable<_>) ]
+
+    member x.RootR = rootR
+    member x.AboutR = aboutR
+    member x.CustomersR = customersR
+    member x.CustomerR = customerR
+
+    member x.Dispose() =
+        for disposable in subscriptions do disposable.Dispose()
+
+    [<CLIEvent>]
+    member x.Error = onError.Publish
+
+    interface IObservable<HttpRequestMessage * Stream> with
+        member x.Subscribe(observer) = onRequest.Publish.Subscribe(observer)
+
+    interface IObserver<HttpRequestMessage * Stream> with
+        member x.OnNext(value) = onRequest.Trigger(value)
+        member x.OnError(exn) = onError.Trigger(exn)
+        member x.OnCompleted() = () // dispose the resources
+
+    interface IDisposable with
+        member x.Dispose() = x.Dispose()

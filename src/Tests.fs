@@ -36,7 +36,7 @@ let ``test respond with negotiated body``() =
 
 [<Test>]
 let ``test options``() =
-  let response = options ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
+  let response = options [HttpMethod.Get; HttpMethod.Post] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -45,7 +45,7 @@ let ``test options``() =
 
 [<Test>]
 let ``test 405 Method Not Allowed``() =
-  let response = ``405 Method Not Allowed`` ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
+  let response = ``405 Method Not Allowed`` [HttpMethod.Get; HttpMethod.Post] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.MethodNotAllowed @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
