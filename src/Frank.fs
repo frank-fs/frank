@@ -163,7 +163,7 @@ let private respondWithAllowHeader statusCode allowedMethods body request =
     |> async.Return
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
-let options allowedMethods =
+let respondOptions allowedMethods =
   respondWithAllowHeader HttpStatusCode.OK allowedMethods None
 
 // In some instances, you need to respond with a `405 Message Not Allowed` response.
@@ -235,6 +235,16 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
 
 
 // ## Routing
+
+type HttpAction = HttpMethod * HttpApplication
+
+let get h : HttpAction = HttpMethod.Get, h
+let head h : HttpAction = HttpMethod.Head, h
+let put h : HttpAction = HttpMethod.Put, h
+let post h : HttpAction = HttpMethod.Post, h
+let delete h : HttpAction = HttpMethod.Delete, h
+let trace h : HttpAction = HttpMethod.Trace, h
+let options h : HttpAction = HttpMethod.Options, h
 
 /// Alias `MailboxProcessor<'T>` as `Agent<'T>`.
 type Agent<'T> = MailboxProcessor<'T>

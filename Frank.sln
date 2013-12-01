@@ -28,7 +28,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0E4239
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "WebApi", "samples\AspNetSamples\AspNetIntegration\App\WebApi.fsproj", "{AE975F69-FE55-4662-BF36-8B3E980245A1}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AspNet", "samples\AspNet\AspNet.fsproj", "{AE975F69-FE55-4662-BF36-8B3E980245A1}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests.fsproj", "{534F1703-6FA3-4565-BEEE-F39F3FB4EE1F}"
 EndProject

@@ -1,16 +1,14 @@
-﻿namespace WebApi
+﻿namespace AspNet
 
 open System
 open System.Net
 open System.Net.Http
-open System.Web.Http
-open System.Web.Http.HttpResource
-open System.Web.Routing
+open System.Threading.Tasks
+open Owin
+open Microsoft.Owin
 open Frank
 
-type WebApiApplication() =
-    inherit System.Web.HttpApplication()
-
+type Startup() =
     let formatters = [| new Formatting.JsonMediaTypeFormatter() :> Formatting.MediaTypeFormatter
                         new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
@@ -18,22 +16,26 @@ type WebApiApplication() =
     let helloWorld request = async {
       return respond HttpStatusCode.OK
              <| ``Content-Type`` "text/html"
-             <| Formatted (@"<!doctype html>
+             <| Some(Formatted (@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
              <| request
     }
 
     // Respond with the request content, if any.
-    let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
+    let echo =
+        runConneg formatters <| fun request ->
+            Async.AwaitTask <| request.Content.ReadAsStringAsync()
     
-    let resource = route "/" (get helloWorld <|> post echo)
+    let resource = Resource("/", [ get helloWorld; post echo ])
     
-    member x.Start() =
-        GlobalConfiguration.Configuration
-        |> register [resource]
-        |> ignore
+    member x.Configuration(app: IAppBuilder) =
+        app.Use(Func<IOwinContext, Func<Task>, Task>(fun ctx h ->
+            // TODO: Map IOwinContext to something Frank can handle.
+            // TODO: Use dyfrig.
+            h.Invoke()
+        ))
