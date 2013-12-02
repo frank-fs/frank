@@ -342,6 +342,12 @@ type RouteSpec<'T> =
     | RouteNode of RouteDef<'T> * RouteSpec<'T> list
 
 /// Manages traffic flow within the application to specific routes.
+/// Connect resource handlers using:
+///     let app = ResourceManager<Routes>(spec)
+///     app.[Root].SetHandler(HttpMethod.Get, (fun request -> async { return response }))
+/// A type provider could make this much nicer, e.g.:
+///     let app = ResourceManager<"path/to/spec/as/string">
+///     app.Root.Get(fun request -> async { return response })
 type ResourceManager<'T when 'T : equality>(routeSpec: RouteSpec<'T>) as x =
     // Should this also be an Agent<'T>?
     inherit Dictionary<'T, Resource>(HashIdentity.Structural)
