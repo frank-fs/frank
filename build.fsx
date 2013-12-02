@@ -31,6 +31,7 @@ let mail = "ryan@frankfs.net"
 let homepage = "http://frankfs.net/"
 
 // directories
+let buildDir = __SOURCE_DIRECTORY__ @@ "build"
 let deployDir = __SOURCE_DIRECTORY__ @@ "deploy"
 let packagesDir = __SOURCE_DIRECTORY__ @@ "packages"
 let testDir = __SOURCE_DIRECTORY__ @@ "test"
@@ -40,7 +41,7 @@ let nugetWebHttpDir = nugetDir @@ "FSharp.Web.Http"
 let nugetFrankDir = nugetDir @@ "Frank"
 let nugetNetHttpContent = nugetNetHttpDir @@ "content"
 let nugetWebHttpContent = nugetWebHttpDir @@ "content"
-let nugetFrankContent = nugetFrankDir @@ "content"
+let nugetFrankLib = nugetFrankDir @@ "lib/net40"
 let template = __SOURCE_DIRECTORY__ @@ "template.html"
 let sources = __SOURCE_DIRECTORY__ @@ "src"
 let docsDir = __SOURCE_DIRECTORY__ @@ "docs"
@@ -51,9 +52,11 @@ let nugetPath = ".nuget/NuGet.exe"
 let nunitPath = "packages/NUnit.Runners.2.6.2/tools"
 
 // files
+let srcReferences =
+    !! "src/*.fsproj"
+
 let testReferences =
-    !+ "src/*.fsproj"
-        |> Scan
+    !! "tests/*.fsproj"
 
 // targets
 Target "Clean" (fun _ ->
@@ -66,7 +69,20 @@ Target "Clean" (fun _ ->
                nugetWebHttpDir
                nugetWebHttpContent
                nugetFrankDir
-               nugetFrankContent]
+               nugetFrankLib]
+)
+
+Target "BuildApp" (fun _ -> 
+    if not isLocalBuild then
+        [ Attribute.Version(buildVersion)
+          Attribute.Title(projectName)
+          Attribute.Description(projectDescription)
+          Attribute.Guid("020697d7-24a3-4ce4-a326-d2c7c204ffde")
+        ]
+        |> CreateFSharpAssemblyInfo "src/fracture/AssemblyInfo.fs"
+
+    MSBuildDebug buildDir "Build" srcReferences
+        |> Log "AppBuild-Output: "
 )
 
 Target "BuildTest" (fun _ -> 
@@ -76,8 +92,7 @@ Target "BuildTest" (fun _ ->
 
 Target "Test" (fun _ ->
     let nunitOutput = testDir @@ "TestResults.xml"
-    !+ (testDir @@ "Frank.dll")
-        |> Scan
+    !! (testDir @@ "Frank.dll")
         |> NUnit (fun p -> 
                     {p with 
                         ToolPath = nunitPath
@@ -85,55 +100,18 @@ Target "Test" (fun _ ->
                         OutputFile = nunitOutput})
 )
 
-Target "CreateNetHttpNuGet" (fun _ ->
-    XCopy (sources @@ "System.Net.Http.fs") nugetNetHttpContent
-
-    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Client"
-
-    NuGet (fun p ->
-        {p with
-            Authors = authors
-            Project = "FSharp.Net.Http"
-            Description = "F# extensions for System.Net.Http"
-            Version = version
-            OutputPath = nugetNetHttpDir
-            ToolPath = nugetPath
-            Dependencies = ["Microsoft.AspNet.WebApi.Client", webApiVersion]
-            AccessKey = getBuildParamOrDefault "nugetkey" ""
-            Publish = hasBuildParam "nugetkey" })
-        "frank.nuspec"
-
-    !! (nugetNetHttpDir @@ sprintf "FSharp.Net.Http.%s.nupkg" version)
-        |> CopyTo deployDir
+Target "CopyLicense" (fun _ ->
+    [ "LICENSE.txt" ] |> CopyTo buildDir
 )
 
-Target "CreateWebHttpNuGet" (fun _ ->
-    XCopy (sources @@ "System.Web.Http.fs") nugetWebHttpContent
+Target "CreateNuGet" (fun _ ->
+    [ buildDir @@ "Frank.dll"
+      buildDir @@ "Frank.pdb" ]
+        |> CopyTo nugetFrankLib
 
-    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
-
-    NuGet (fun p ->
-        {p with
-            Authors = authors
-            Project = "FSharp.Web.Http"
-            Description = "F# extensions for System.Web.Http"
-            Version = version
-            OutputPath = nugetWebHttpDir
-            ToolPath = nugetPath
-            Dependencies = ["Microsoft.AspNet.WebApi.Core", webApiVersion
-                            "FSharp.Net.Http", version]
-            AccessKey = getBuildParamOrDefault "nugetkey" ""
-            Publish = hasBuildParam "nugetkey" })
-        "frank.nuspec"
-
-    !! (nugetWebHttpDir @@ sprintf "FSharp.Web.Http.%s.nupkg" version)
-        |> CopyTo deployDir
-)
-
-Target "CreateFrankNuGet" (fun _ ->
-    XCopy (sources @@ "Frank.fs") nugetFrankContent
-
+    let fsharpCoreVersion = GetPackageVersion packagesDir "FSharp.Core.3"
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
+    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Client"
 
     NuGet (fun p ->
         {p with
@@ -143,8 +121,10 @@ Target "CreateFrankNuGet" (fun _ ->
             Version = version
             OutputPath = nugetFrankDir
             ToolPath = nugetPath
-            Dependencies = ["FSharpx.Core", fsharpxCoreVersion
-                            "FSharp.Web.Http", version]
+            Dependencies = ["FSharp.Core.3", fsharpCoreVersion
+                            "FSharpx.Core", fsharpxCoreVersion
+                            "Microsoft.AspNet.WebApi.Client", webApiVersion]
+                            
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"
@@ -162,11 +142,9 @@ Target "Default" DoNothing
 
 // Build order
 "Clean"
-    ==> "BuildTest"
+    ==> "BuildApp" <=> "CopyLicense" <=> "BuildTest"
     ==> "Test"
-    ==> "CreateNetHttpNuGet"
-    ==> "CreateWebHttpNuGet"
-    ==> "CreateFrankNuGet"
+    ==> "CreateNuGet"
     ==> "Deploy"
 
 "Default" <== ["Deploy"]
