@@ -307,6 +307,9 @@ type Resource private (uriTemplate, allowedMethods, handlers) =
     member x.SetHandler(httpMethod, handler) =
         agent.Post <| SetHandler(httpMethod, handler)
 
+    /// Stops the resource agent.
+    member x.Shutdown() = agent.Post Shutdown
+
     /// Provide stream of `exn` for logging purposes.
     [<CLIEvent>]
     member x.Error = onError.Publish
@@ -317,34 +320,66 @@ type Resource private (uriTemplate, allowedMethods, handlers) =
         member x.OnError(exn) = agent.Post <| Error exn
         member x.OnCompleted() = agent.Post Shutdown
 
-// TODO: Create a ResourceManager or some form of Supervisor to serve as the App.
-// Example:
 
-type App () as x =
+/// Type alias for URI templates
+type UriRouteTemplate = string
+
+/// Defines the route for a specific resource
+type RouteDef<'T> = 'T * UriRouteTemplate * HttpMethod list
+
+/// Defines the tree type for specifying resource routes
+/// Example:
+///     type Routes = Root | About | Customers | Customer
+///     let spec =
+///         RouteNode((Home, "", [HttpMethod.Get]),
+///                   [ RouteLeaf((About, "about", [HttpMethod.Get]))
+///                     RouteNode((Customers, "customers", [HttpMethod.Get; HttpMethod.Post]),
+///                               [ RouteLeaf((Customer, "{id}", [HttpMethod.Get; HttpMethod.Put; HttpMethod.Delete]))
+///                               ])
+///                   ])            
+type RouteSpec<'T> =
+    | RouteLeaf of RouteDef<'T>
+    | RouteNode of RouteDef<'T> * RouteSpec<'T> list
+
+/// Manages traffic flow within the application to specific routes.
+type ResourceManager<'T when 'T : equality>(routeSpec: RouteSpec<'T>) as x =
     // Should this also be an Agent<'T>?
+    inherit Dictionary<'T, Resource>(HashIdentity.Structural)
 
     let onRequest = new Event<HttpRequestMessage * Stream>()
     let onError = new Event<exn>()
 
-    // This shows that strings are used, but they should be hidden behind generated types.
-    let rootR = Resource("/", [ HttpMethod.Get ])
-    let aboutR = Resource("/about", [ HttpMethod.Get ])
-    let customersR = Resource("/customers", [ HttpMethod.Get; HttpMethod.Post ])
-    let customerR = Resource("/customers/{id:int}", [ HttpMethod.Get; HttpMethod.Put; HttpMethod.Delete ])
+    let apply resources subscriptions name uriTemplate (allowedMethods: HttpMethod list) =
+        let resource = new Resource(uriTemplate, allowedMethods)
+        let resources' = (name, resource) :: resources
+        let subscriptions' = resource.Connect x :: subscriptions
+        resources', subscriptions'
 
-    let subscriptions = [
-        rootR.Connect(x :> IObservable<_>)
-        aboutR.Connect(x :> IObservable<_>)
-        customersR.Connect(x :> IObservable<_>)
-        customerR.Connect(x :> IObservable<_>) ]
+    let rec applyRouteSpec uriTemplate resources subscriptions = function
+        | RouteNode((name, template, allowedMethods), nestedRoutes) ->
+            let uriTemplate' = uriTemplate + "/" + template
+            let resources', subscriptions' = apply resources subscriptions name uriTemplate' allowedMethods
+            applyNestedRoutes uriTemplate' resources' subscriptions' nestedRoutes
+        | RouteLeaf(name, template, allowedMethods) ->
+            let uriTemplate' = uriTemplate + "/" + template
+            apply resources subscriptions name uriTemplate' allowedMethods
+    and applyNestedRoutes uriTemplate resources subscriptions routes =
+        match routes with
+        | [] -> resources, subscriptions
+        | route::routes ->
+            let resources', subscriptions' = applyRouteSpec uriTemplate resources subscriptions route
+            match routes with
+            | [] -> resources', subscriptions'
+            | _ -> applyNestedRoutes uriTemplate resources' subscriptions' routes
 
-    member x.RootR = rootR
-    member x.AboutR = aboutR
-    member x.CustomersR = customersR
-    member x.CustomerR = customerR
+    let resources, subscriptions = applyRouteSpec "" [] [] routeSpec
+    do for name, resource in resources do x.Add(name, resource)
 
     member x.Dispose() =
+        // Dispose all current event subscriptions.
         for disposable in subscriptions do disposable.Dispose()
+        // Shutdown all resource agents.
+        for resource in x.Values do resource.Shutdown()
 
     [<CLIEvent>]
     member x.Error = onError.Publish
