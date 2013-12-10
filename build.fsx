@@ -23,7 +23,7 @@ open Fake.MSBuild
 
 // properties
 let projectName = "Frank"
-let version = if isLocalBuild then "0.9." + System.DateTime.UtcNow.ToString("yMMdd") else buildVersion
+let version = if isLocalBuild then "1.0." + System.DateTime.UtcNow.ToString("yMMdd") else buildVersion
 let projectSummary = "A functional web application hosting and routing domain-specific language."
 let projectDescription = "A functional web application hosting and routing domain-specific language."
 let authors = ["Ryan Riley"]
@@ -132,6 +132,7 @@ Target "CreateFrankNuGet" (fun _ ->
     XCopy (sources @@ "Frank.fs") nugetFrankContent
 
     let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
+    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Client"
 
     NuGet (fun p ->
         {p with
@@ -142,7 +143,7 @@ Target "CreateFrankNuGet" (fun _ ->
             OutputPath = nugetFrankDir
             ToolPath = nugetPath
             Dependencies = ["FSharpx.Core", fsharpxCoreVersion
-                            "FSharp.Web.Http", version]
+                            "Microsoft.AspNet.WebApi.Client", webApiVersion]
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey" })
         "frank.nuspec"
