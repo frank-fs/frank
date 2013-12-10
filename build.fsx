@@ -94,6 +94,7 @@ Target "CreateNetHttpNuGet" (fun _ ->
             Project = "FSharp.Net.Http"
             Description = "F# extensions for System.Net.Http"
             Version = version
+            WorkingDir = nugetNetHttpDir
             OutputPath = nugetNetHttpDir
             ToolPath = nugetPath
             Dependencies = ["Microsoft.AspNet.WebApi.Client", webApiVersion]
@@ -116,6 +117,7 @@ Target "CreateWebHttpNuGet" (fun _ ->
             Project = "FSharp.Web.Http"
             Description = "F# extensions for System.Web.Http"
             Version = version
+            WorkingDir = nugetWebHttpDir
             OutputPath = nugetWebHttpDir
             ToolPath = nugetPath
             Dependencies = ["Microsoft.AspNet.WebApi.Core", webApiVersion
@@ -140,6 +142,7 @@ Target "CreateFrankNuGet" (fun _ ->
             Project = projectName
             Description = projectDescription
             Version = version
+            WorkingDir = nugetFrankDir
             OutputPath = nugetFrankDir
             ToolPath = nugetPath
             Dependencies = ["FSharpx.Core", fsharpxCoreVersion
