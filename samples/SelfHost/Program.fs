@@ -113,18 +113,18 @@ module Resources =
                       new FormUrlEncodedMediaTypeFormatter() :> MediaTypeFormatter |]
   
   // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
-  let helloWorld request = async {
-    return respond HttpStatusCode.OK 
-           <| ``Content-Type`` "text/html"
-           <| Formatted (@"<!doctype html>
+  let helloWorld request =
+    respond HttpStatusCode.OK 
+    <| ``Content-Type`` "text/html"
+    <| Some(Formatted (@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
-           <| request
-  }
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
+    <| request
+    |> async.Return
 
   let helloResource = route "/" <| get helloWorld
 
@@ -152,7 +152,7 @@ module Resources =
     | Some mediaType ->
         let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
         let content = formatWith mediaType formatter contact
-        return request |> respond HttpStatusCode.Created ignore content
+        return request |> respond HttpStatusCode.Created ignore (Some content)
     | _ -> return! ``406 Not Acceptable`` request
   }
 
@@ -167,7 +167,7 @@ module Resources =
       let! mediaType = negotiateMediaType formatters request
       let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
       let content = formatWith mediaType formatter contact
-      return request |> respond HttpStatusCode.OK ignore content
+      return request |> respond HttpStatusCode.OK ignore (Some content)
     }
     match result with
     | Some r -> return r

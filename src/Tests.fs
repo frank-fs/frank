@@ -11,32 +11,32 @@ open System.Text
 open FSharpx
 open FSharpx.Reader
 open Newtonsoft.Json.Linq
-open NUnit.Framework
+open NUnit.Framework 
 open Swensen.Unquote.Assertions
 
 [<Test>]
 let ``test respond without body``() =
-  let response = new HttpRequestMessage() |> respond HttpStatusCode.OK ignore HttpContent.Empty
+  let response = new HttpRequestMessage() |> respond HttpStatusCode.OK ignore None
   test <@ response.StatusCode = HttpStatusCode.OK @>
-  test <@ response.Content = HttpContent.Empty @>
+  test <@ response.Content = Unchecked.defaultof<HttpContent> @>
 
 [<Test>]
 let ``test respond with StringContent``() =
   let body = "Howdy"
-  let response = new HttpRequestMessage() |> OK ignore (new StringContent(body))
+  let response = new HttpRequestMessage() |> OK ignore (Some(new StringContent(body)))
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = body @>
 
 [<Test>]
 let ``test respond with negotiated body``() =
   let body = "Howdy"
-  let response = new HttpRequestMessage() |> OK ignore (new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain"))
+  let response = new HttpRequestMessage() |> OK ignore (Some(new ObjectContent<_>(body, new XmlMediaTypeFormatter(), "text/plain")))
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.ReadAsStringAsync().Result = @"<string xmlns=""http://schemas.microsoft.com/2003/10/Serialization/"">Howdy</string>" @>
 
 [<Test>]
 let ``test options``() =
-  let response = options ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
+  let response = options [HttpMethod.Get; HttpMethod.Post] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.OK @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -45,7 +45,7 @@ let ``test options``() =
 
 [<Test>]
 let ``test 405 Method Not Allowed``() =
-  let response = ``405 Method Not Allowed`` ["GET";"POST"] (new HttpRequestMessage()) |> Async.RunSynchronously
+  let response = ``405 Method Not Allowed`` [HttpMethod.Get; HttpMethod.Post] (new HttpRequestMessage()) |> Async.RunSynchronously
   test <@ response.StatusCode = HttpStatusCode.MethodNotAllowed @>
   test <@ response.Content.Headers.Allow.Contains("GET") @>
   test <@ response.Content.Headers.Allow.Contains("POST") @>
@@ -85,7 +85,7 @@ let ``test formatWith properly format as application/json``() =
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/json" formatter
   test <@ content.Headers.ContentType.MediaType = "application/json" @>
-  let result = content.AsyncReadAsString() |> Async.RunSynchronously
+  let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
   test <@ result = "{\"firstName\":\"Ryan\",\"lastName\":\"Riley\"}" @>
 
 [<Test>]
@@ -94,7 +94,7 @@ let ``test formatWith properly format as application/xml``() =
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/xml" formatter
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
-  let result = content.AsyncReadAsString() |> Async.RunSynchronously
+  let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
   test <@ result = @"<Tests.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Tests.TestType>" @>
 
 [<Test>]
@@ -103,5 +103,5 @@ let ``test formatWith properly format as application/xml and read as TestType``(
   let body = TestType(FirstName = "Ryan", LastName = "Riley")
   let content = body |> formatWith "application/xml" formatter
   test <@ content.Headers.ContentType.MediaType = "application/xml" @>
-  let result = content.AsyncReadAs<TestType>() |> Async.RunSynchronously
+  let result = content.ReadAsAsync<TestType>() |> Async.AwaitTask |> Async.RunSynchronously
   test <@ result.FirstName = body.FirstName && result.LastName = body.LastName @>

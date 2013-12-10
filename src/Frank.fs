@@ -19,6 +19,7 @@ open System.Net.Http
 open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
+open System.Threading.Tasks
 open FSharpx
 open FSharpx.Reader
 
@@ -40,6 +41,22 @@ You'll see the signatures above are still mostly present, though they have been 
 // An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.
 type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 
+/// An empty `HttpContent` type.
+type EmptyContent() =
+  inherit HttpContent()
+  override x.SerializeToStreamAsync(stream, context) =
+    let tcs = new TaskCompletionSource<_>(TaskCreationOptions.None)
+    tcs.SetResult(())
+    tcs.Task :> Task
+  override x.TryComputeLength(length) =
+    length <- 0L
+    true
+  override x.Equals(other) =
+    other.GetType() = typeof<EmptyContent>
+  override x.GetHashCode() = hash x
+
+let emptyContent = new EmptyContent() :> HttpContent
+
 // ## HTTP Response Header Combinators
 
 // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
@@ -47,8 +64,12 @@ type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 // of combinators are already defined that allows you to more easily compose headers.
 type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
 let respond statusCode headers content (request: HttpRequestMessage) =
-  let response = new HttpResponseMessage(statusCode, Content = content, RequestMessage = request) in
-  headers response; response
+  let response =
+    match content with
+    | Some c -> new HttpResponseMessage(statusCode, Content = c, RequestMessage = request)
+    | None   -> request.CreateResponse(statusCode)
+  headers response
+  response
 
 // ### General Headers
 let Date x : HttpResponseHeadersBuilder =
@@ -101,8 +122,11 @@ let ``WWW-Authenticate`` x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.WwwAuthenticate.ParseAdd x
 
 // ### Entity Headers
-let Allow x : HttpResponseHeadersBuilder =
-  fun response -> Seq.iter response.Content.Headers.Allow.Add x
+let Allow (allowedMethods: #seq<HttpMethod>) : HttpResponseHeadersBuilder =
+  fun response ->
+    allowedMethods
+    |> Seq.map (fun (m: HttpMethod) -> m.Method)
+    |> Seq.iter response.Content.Headers.Allow.Add
 
 let Location x : HttpResponseHeadersBuilder =
   fun response -> response.Headers.Location <- x
@@ -156,18 +180,21 @@ let private respondWithAllowHeader statusCode allowedMethods body request =
 
 // `OPTIONS` responses should return the allowed methods, and this helper facilitates method calls.
 let options allowedMethods =
-  respondWithAllowHeader HttpStatusCode.OK allowedMethods HttpContent.Empty
+  respondWithAllowHeader HttpStatusCode.OK allowedMethods <| Some emptyContent
 
 // In some instances, you need to respond with a `405 Message Not Allowed` response.
 // The HTTP spec requires that this message include an `Allow` header with the allowed
 // HTTP methods.
 let ``405 Method Not Allowed`` allowedMethods =
-  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods <| new StringContent("405 Method Not Allowed")
+  respondWithAllowHeader HttpStatusCode.MethodNotAllowed allowedMethods
+  <| Some (new StringContent("405 Method Not Allowed"))
 
 // ## Content Negotiation Helpers
 
 let ``406 Not Acceptable`` request =
-    request |> respond HttpStatusCode.NotAcceptable ignore (new StringContent("406 Not Acceptable")) |> async.Return
+    request
+    |> respond HttpStatusCode.NotAcceptable ignore (Some(new StringContent("406 Not Acceptable")))
+    |> async.Return
 
 let findFormatterFor mediaType =
   Seq.find (fun (formatter: MediaTypeFormatter) ->
@@ -218,6 +245,6 @@ let runConneg formatters (f: HttpRequestMessage -> Async<_>) =
         async {
           let! responseBody = f request
           let formattedBody = responseBody |> formatWith mediaType formatter
-          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| formattedBody <| request
+          return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| Some formattedBody <| request
         }
     | _ -> ``406 Not Acceptable`` request
