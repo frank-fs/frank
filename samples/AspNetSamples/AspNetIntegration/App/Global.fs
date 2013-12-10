@@ -15,17 +15,18 @@ type WebApiApplication() =
                         new Formatting.XmlMediaTypeFormatter() :> Formatting.MediaTypeFormatter |]
 
     // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
-    let helloWorld request = async {
-      return respond HttpStatusCode.OK
-             <| ``Content-Type`` "text/html"
-             <| Formatted (@"<!doctype html>
+    let helloWorld request = 
+      respond HttpStatusCode.OK
+      <| ``Content-Type`` "text/html"
+      <| Some(Formatted (@"<!doctype html>
 <meta charset=utf-8>
 <title>Hello</title>
 <p>Hello, world!
 <form action=""/"" method=""post"">
 <input type=""hidden"" name=""text"" value=""testing"">
-<input type=""submit"">", System.Text.Encoding.UTF8, "text/html")
-    }
+<input type=""submit"">", System.Text.Encoding.UTF8, "text/html"))
+      <| request
+      |> async.Return
 
     // Respond with the request content, if any.
     let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
