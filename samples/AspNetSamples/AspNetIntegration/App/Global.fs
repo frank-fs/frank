@@ -34,6 +34,4 @@ type WebApiApplication() =
     let resource = route "/" (get helloWorld <|> post echo)
     
     member x.Start() =
-        GlobalConfiguration.Configuration
-        |> register [resource]
-        |> ignore
+        GlobalConfiguration.Configuration |> register [resource]

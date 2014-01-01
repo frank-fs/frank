@@ -187,9 +187,8 @@ module Resources =
 (* Configure and run the application *)
 
 let baseUri = "http://127.0.0.1:1000"
-let config =
-  new HttpSelfHostConfiguration(baseUri)
-  |> register [ Resources.helloResource; Resources.contacts; Resources.contact ]
+let config = new HttpSelfHostConfiguration(baseUri)
+config |> register [ Resources.helloResource; Resources.contacts; Resources.contact ]
 
 let server = new HttpSelfHostServer(config)
 server.OpenAsync().Wait()
