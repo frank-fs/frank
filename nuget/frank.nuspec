@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-    <description>@description@</description>
     <id>@project@</id>
     <version>@build.number@</version>
     <authors>@authors@</authors>
     <owners>@authors@</owners>
     <language>en-US</language>
+    <projectUrl>https://github.com/frank-fs/frank</projectUrl>
+    <iconUrl>https://raw.github.com/fsharp/FSharp.ProjectScaffold/master/nuget/logo.png</iconUrl>
+    <licenseUrl>https://github.com/frank-fs/frank/raw/master/LICENSE.txt</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>@summary@</summary>
-    <projectUrl>http://github.com/frank-fs/frank</projectUrl>
-    <licenseUrl>http://github.com/frank-fs/frank/raw/master/LICENSE.txt</licenseUrl>
-    <tags>web http fsharp webapi</tags>
+    <description>@description@</description>
+    <releaseNotes>@releaseNotes@</releaseNotes>
+    <copyright>Copyright 2010-2014</copyright>
+    <tags>@tags@</tags>
     @dependencies@
   </metadata>
+  <files>
+    <file src="..\bin\Frank.dll" target="lib/net40" />
+    <file src="..\bin\Frank.xml" target="lib/net40" />
+  </files>
 </package>

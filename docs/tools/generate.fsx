@@ -4,17 +4,17 @@
 // --------------------------------------------------------------------------------------
 
 // Binaries that have XML documentation (in a corresponding generated XML file)
-let referenceBinaries = [ "FSharp.ProjectTemplate.dll" ]
+let referenceBinaries = [ "Frank.dll" ]
 // Web site location for the generated documentation
-let website = "/FSharp.ProjectScaffold"
+let website = "/Frank"
 
 // Specify more information about your project
 let info =
-  [ "project-name", "FSharp.ProjectScaffold"
-    "project-author", "Your Name"
-    "project-summary", "A short summary of your project"
-    "project-github", "http://github.com/pblasucci/FSharp.ProjectScaffold"
-    "project-nuget", "http://nuget.com/packages/FSharp.ProjectScaffold" ]
+  [ "project-name", "Frank"
+    "project-author", "Ryan Riley"
+    "project-summary", "A functional web application DSL for ASP.NET Web API"
+    "project-github", "http://github.com/frank-fs/frank"
+    "project-nuget", "http://nuget.com/packages/Frank" ]
 
 // --------------------------------------------------------------------------------------
 // For typical project, no changes are needed below

@@ -25,7 +25,7 @@ let project = "Frank"
 
 // Short summary of the project
 // (used as description in AssemblyInfo and as a short summary for NuGet package)
-let summary = "A functional web application domain-specific language."
+let summary = "A functional web application DSL for ASP.NET Web API."
 
 // Longer description of the project
 // (used as a description for NuGet package; line breaks are automatically cleaned up)
@@ -42,7 +42,7 @@ let tags = "F# fsharp web http rest webapi"
 // (<solutionFile>.sln is built during the building process)
 let solutionFile  = "Frank"
 // Pattern specifying assemblies to be tested using NUnit
-let testAssemblies = ["tests/*/bin/*/Frank*Tests*.dll"]
+let testAssemblies = "tests/*/bin/*/Frank*Tests*dll"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted 
@@ -84,14 +84,17 @@ Target "CleanDocs" (fun _ ->
 
 Target "Build" (fun _ ->
     !! (solutionFile + ".sln")
-    |> MSBuildRelease "" "Rebuild"
+    |> MSBuildRelease "bin" "Rebuild"
     |> ignore)
 
+Target "CopyLicense" (fun _ ->
+    [ "LICENSE.txt" ] |> CopyTo "bin")
+
 // --------------------------------------------------------------------------------------
-// Run the unit tests using test runner & kill test runner when complete
+// Run the unit tests using test runner
 
 Target "RunTests" (fun _ ->
-    testAssemblies
+    !! testAssemblies
     |> NUnit (fun p ->
         { p with
             DisableShadowCopy = true
@@ -153,6 +156,7 @@ Target "All" DoNothing
   ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
+  ==> "CopyLicense"
   ==> "RunTests"
   ==> "All"
 

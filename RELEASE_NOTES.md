@@ -1,5 +1,4 @@
-### New in 2.0.0 - (Released 1014/01/05)
-* Update to Web API 2.0.
+### New in 1.2.0 - (Released 1014/01/06)
 * Release assembly rather than source code files:
  * FSharp.Net.Http
  * FSharp.Web.Http
