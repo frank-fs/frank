@@ -83,10 +83,7 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
-    { BaseDirectory = __SOURCE_DIRECTORY__
-      Includes = [ solutionFile +       ".sln"
-                   solutionFile + ".Tests.sln" ]
-      Excludes = [] } 
+    !! (solutionFile + ".sln")
     |> MSBuildRelease "" "Rebuild"
     |> ignore)
 
@@ -94,21 +91,12 @@ Target "Build" (fun _ ->
 // Run the unit tests using test runner & kill test runner when complete
 
 Target "RunTests" (fun _ ->
-    ActivateFinalTarget "CloseTestRunner"
-
-    { BaseDirectory = __SOURCE_DIRECTORY__
-      Includes = testAssemblies
-      Excludes = [] } 
+    testAssemblies
     |> NUnit (fun p ->
         { p with
             DisableShadowCopy = true
             TimeOut = TimeSpan.FromMinutes 20.
-            OutputFile = "TestResults.xml" })
-)
-
-FinalTarget "CloseTestRunner" (fun _ ->  
-    ProcessHelper.killProcess "nunit-agent.exe"
-)
+            OutputFile = "TestResults.xml" }))
 
 // --------------------------------------------------------------------------------------
 // Build a NuGet package
@@ -118,11 +106,6 @@ let referenceDependencies dependencies =
     [ for dependency in dependencies -> dependency, GetPackageVersion packagesDir dependency ]
 
 Target "NuGet" (fun _ ->
-    // Format the description to fit on a single line (remove \r\n and double-spaces)
-    let description = description.Replace("\r", "")
-                                 .Replace("\n", "")
-                                 .Replace("  ", " ")
-
     NuGet (fun p -> 
         { p with   
             Authors = authors
