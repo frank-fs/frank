@@ -6,7 +6,7 @@
 // Binaries that have XML documentation (in a corresponding generated XML file)
 let referenceBinaries = [ "Frank.dll" ]
 // Web site location for the generated documentation
-let website = "/Frank"
+let website = "/frank"
 
 // Specify more information about your project
 let info =
