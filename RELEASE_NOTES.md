@@ -1,8 +1,12 @@
-### New in 1.2.0 - (Released 1014/01/06)
-* Release assembly rather than source code files:
+### New in 2.0.0 - (Not yet released)
+* Generate documentation with every release
+* Fix a minor bug in routing (leading '/' was not stripped)
+* Reference FSharp.Core.3 NuGet package
+* Release assembly rather than current source packages:
  * FSharp.Net.Http
  * FSharp.Web.Http
  * Frank
+* Adopt the FSharp.ProjectScaffold structure
 
 ### New in 1.1.1 - (Released 2014/01/01)
 * Correct spacing and specify additional types in HttpContent extensions.
