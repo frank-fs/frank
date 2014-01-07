@@ -40,7 +40,7 @@ You'll see the signatures above are still mostly present, though they have been 
 // An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.
 type HttpApplication = HttpRequestMessage -> Async<HttpResponseMessage>
 
-/// An empty <see cref="HttpContent" /> type.
+/// An empty `HttpContent` type.
 type EmptyContent() =
     inherit HttpContent()
     override x.SerializeToStreamAsync(stream, context) =
@@ -59,7 +59,7 @@ module Core =
     let private emptyContent = new EmptyContent() :> HttpContent
 
     type HttpContent with
-        /// Returns an <see cref="EmptyContent" />.
+        /// Returns an `EmptyContent`.
         member x.Empty = emptyContent
 
     // ## HTTP Response Header Combinators
@@ -267,8 +267,7 @@ module Core =
                 return response
             }
 
-/// Adapts an <see cref="HttpApplication" /> function into a
-/// <see cref="System.Net.Http.DelegatingHandler" />.
+/// Adapts an `HttpApplication` function into a `System.Net.Http.DelegatingHandler`.
 type AsyncHandler =
     inherit DelegatingHandler
     val AsyncSend : HttpRequestMessage -> Async<HttpResponseMessage>

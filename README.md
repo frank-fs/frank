@@ -30,22 +30,22 @@ applications to specific methods or uri patterns.
 A "Hello, world!" application using these signatures would look like the following:
 
     let helloWorld request =
-      OK ignore <| Str "Hello, world!"
-	  |> async.Return
+        OK ignore <| Str "Hello, world!"
+        |> async.Return
 
 A simple echo handler that returns the same input as it received might look like the following:
 
     let echo (request: HttpRequestMessage) = async {
         let! content = request.Content.AsyncReadAsString()
         return respond HttpStatusCode.OK
-		       <| ``Content-Type`` "text/plain"
-			   <| new StringContent(content)
+               <| ``Content-Type`` "text/plain"
+               <| new StringContent(content)
     }
 
 or just:
 
     let echo (request: HttpRequestMessage) =
-	    OK <| ``Content-Type`` "text/plain" <| request.Content.AsyncReadAsString()
+        OK <| ``Content-Type`` "text/plain" <| request.Content.AsyncReadAsString()
 
 If you want to provide content negotiation, use:
 
@@ -89,32 +89,32 @@ A compositional approach to type mapping and handler design.
 Here, the actual function shows clearly that we are really using
 the `id` function to return the very same result.
 
-      let echo2Transform = id
+    let echo2Transform = id
 
 The `echo2ReadRequest` maps the incoming request to a value that can be used
 within the actual computation, or `echo2Transform` in this example.
 
-      let echo2ReadRequest (request: HttpRequestMessage) =
-          request.Content.AsyncReadAsString()
+    let echo2ReadRequest (request: HttpRequestMessage) =
+        request.Content.AsyncReadAsString()
 
 The `echo2Respond` maps the outgoing message body to an HTTP response.
 
-      let echo2Respond body =
-          respond <| ``Content-Type`` "text/plain" <| body
+    let echo2Respond body =
+        respond <| ``Content-Type`` "text/plain" <| body
 
 This `echo2` is the same in principle as `echo` above, except that the
 logic for the message transform deals only with the concrete types
 about which it cares and isn't bothered by the transformations.
 
-      let echo2 request = async {
-          let! content = echo2ReadRequest request
-          let body = echo2Transform content
-          return echo2Respond <| new StringContent(body)
-      }
+    let echo2 request = async {
+        let! content = echo2ReadRequest request
+        let body = echo2Transform content
+        return echo2Respond <| new StringContent(body)
+    }
 
 Create a `HttpResource` instance at the root of the site that responds to `POST`.
 
-      let resource = route "/" <| post echo2
+    let resource = route "/" <| post echo2
 
 Other combinators are available to handle other scenarios, such as:
 
@@ -134,7 +134,9 @@ The `Frank.Middleware` module defines several, simple middlewares, such as the `
         let sw = System.Diagnostics.Stopwatch.StartNew()
         let! response = app request
         printfn "Received a %A request from %A. Responded in %i ms."
-                request.Method.Method request.RequestUri.PathAndQuery                                  sw.ElapsedMilliseconds
+                request.Method.Method
+                request.RequestUri.PathAndQuery
+                sw.ElapsedMilliseconds
         sw.Reset()
         return response
     }
@@ -145,22 +147,17 @@ The most likely place to insert middlewares is the outer edge of your applicatio
 
 Frank will run on any hosting platform that supports the
 [Web API](http://asp.net/web-api/) library. To hook up your Frank application,
-use the `Register` extension method Frank adds to instances of `HttpConfiguration`.
+use the `register` function, passing in the resources and the instance of `HttpConfiguration`.
 
-    config.Register app
+    register [resource] config
 
 This extension adds a default route to your `HttpConfiguration` instance and
-adds a `DelegatingHandler` instance to the `HttpConfiguration.MessageHandlers` collection.
-If you want to add a Frank application to an existing Web API app, you should
-explicitly add your route and handler, as order is very important.
+adds a `DelegatingHandler` instance to the route's `HttpConfiguration.MessageHandlers` collection.
 
 ## TODO
 
 * Loads of documentation
-* Work out a better hierarchical
-* and type-checked routing mechanism
-* that plays well with MVC routing
-* Samples using [Owin](http://owin.org/)
+* Integrate with [Dyfrig](https://github.com/fsprojects/dyfrig)
 
 ## Team
 
