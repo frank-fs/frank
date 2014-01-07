@@ -13,20 +13,7 @@ namespace System.Web.Http
 open System.Net
 open System.Net.Http
 open System.Web.Http
-
-// ## HTTP Resources
-module internal Helper =
-    let internal resourceHandlerOrDefault methods handler (request: HttpRequestMessage) =
-        match handler request with
-        | Some response -> response
-        | _ ->
-            async {
-                let response = request.CreateResponse(HttpStatusCode.MethodNotAllowed, Content = new StringContent("405 Method Not Allowed"))
-                methods
-                |> Seq.map (fun (m: HttpMethod) -> m.Method)
-                |> Seq.iter response.Content.Headers.Allow.Add
-                return response
-            }
+open Frank
 
 // HTTP resources expose an resource handler function at a given uri.
 // In the common MVC-style frameworks, this would roughly correspond
@@ -46,7 +33,7 @@ type HttpResource(template: string, methods, handler) =
                                               defaults = null,
                                               constraints = null,
                                               dataTokens = null,
-                                              handler = new AsyncHandler(Helper.resourceHandlerOrDefault methods handler))
+                                              handler = new AsyncHandler(resourceHandlerOrDefault methods handler))
     with
     member x.Name = template
 
