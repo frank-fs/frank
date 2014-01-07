@@ -42,7 +42,7 @@ let tags = "F# fsharp web http rest webapi"
 // (<solutionFile>.sln is built during the building process)
 let solutionFile  = "Frank"
 // Pattern specifying assemblies to be tested using NUnit
-let testAssemblies = "tests/*/bin/*/Frank*Tests*dll"
+let testAssemblies = "bin/Frank*Tests*exe"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted 

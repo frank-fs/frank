@@ -1,6 +1,4 @@
-﻿module Frank.Tests
-
-open System
+﻿open System
 open System.Collections.Generic
 open System.IO
 open System.Net
@@ -8,6 +6,7 @@ open System.Net.Http
 open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
+open Frank
 open FSharpx
 open FSharpx.Reader
 open Newtonsoft.Json.Linq
@@ -95,7 +94,7 @@ let ``test formatWith properly format as application/xml``() =
     let content = body |> formatWith "application/xml" formatter
     test <@ content.Headers.ContentType.MediaType = "application/xml" @>
     let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
-    test <@ result = @"<Tests.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></Tests.TestType>" @>
+    test <@ result = @"<Program.TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/""><firstName>Ryan</firstName><lastName>Riley</lastName></Program.TestType>" @>
 
 [<Test>]
 let ``test formatWith properly format as application/xml and read as TestType``() =
@@ -105,3 +104,7 @@ let ``test formatWith properly format as application/xml and read as TestType``(
     test <@ content.Headers.ContentType.MediaType = "application/xml" @>
     let result = content.ReadAsAsync<TestType>() |> Async.AwaitTask |> Async.RunSynchronously
     test <@ result.FirstName = body.FirstName && result.LastName = body.LastName @>
+
+[<EntryPoint>]
+let main args =
+    0
