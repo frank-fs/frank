@@ -177,9 +177,9 @@ Target "All" DoNothing
 "All" 
   ==> "CleanDocs"
   ==> "GenerateDocs"
+  ==> "Release"
   ==> "ReleaseDocs"
   ==> "PublishWebsite"
-  ==> "Release"
 
 RunTargetOrDefault "All"
 
