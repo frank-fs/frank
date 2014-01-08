@@ -42,7 +42,9 @@ let helloWorld request =
     OK ignore <| Str "Hello, world!"
     |> async.Return
 
-// A simple echo handler that returns the same input as it received might look like the following:
+(**
+A simple echo handler that returns the same input as it received might look like the following:
+*)
 
 let echo (request: HttpRequestMessage) = async {
     let! content = request.Content.AsyncReadAsString()
@@ -51,12 +53,16 @@ let echo (request: HttpRequestMessage) = async {
            <| new StringContent(content)
 }
 
-// or just:
+(**
+or just:
+*)
 
 let echo (request: HttpRequestMessage) =
     OK <| ``Content-Type`` "text/plain" <| request.Content.AsyncReadAsString()
 
-// If you want to provide content negotiation, use:
+(**
+If you want to provide content negotiation, use:
+*)
 
 let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
 
@@ -110,7 +116,9 @@ within the actual computation, or `echo2Transform` in this example.
 let echo2ReadRequest (request: HttpRequestMessage) =
     request.Content.AsyncReadAsString()
 
-// The `echo2Respond` maps the outgoing message body to an HTTP response.
+(**
+The `echo2Respond` maps the outgoing message body to an HTTP response.
+*)
 
 let echo2Respond body =
     respond <| ``Content-Type`` "text/plain" <| body
@@ -127,7 +135,9 @@ let echo2 request = async {
     return echo2Respond <| new StringContent(body)
 }
 
-// Create a `HttpResource` instance at the root of the site that responds to `POST`.
+(**
+Create a `HttpResource` instance at the root of the site that responds to `POST`.
+*)
 
 let resource = route "/" <| post echo2
 
