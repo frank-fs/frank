@@ -47,7 +47,7 @@ A simple echo handler that returns the same input as it received might look like
 *)
 
 let echo (request: HttpRequestMessage) = async {
-    let! content = request.Content.AsyncReadAsString()
+    let! content = Async.AwaitTask <| request.Content.ReadAsStringAsync()
     return respond HttpStatusCode.OK
            <| ``Content-Type`` "text/plain"
            <| new StringContent(content)
@@ -58,13 +58,15 @@ or just:
 *)
 
 let echo (request: HttpRequestMessage) =
-    OK <| ``Content-Type`` "text/plain" <| request.Content.AsyncReadAsString()
+    OK <| ``Content-Type`` "text/plain"
+       <| (Async.AwaitTask <| request.Content.ReadAsStringAsync())
 
 (**
 If you want to provide content negotiation, use:
 *)
 
-let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
+let echo = runConneg formatters <| fun request ->
+    Async.AwaitTask <| request.Content.ReadAsStringAsync()
 
 (**
 ### Define an HTTP Resource
@@ -114,7 +116,7 @@ within the actual computation, or `echo2Transform` in this example.
 *)
 
 let echo2ReadRequest (request: HttpRequestMessage) =
-    request.Content.AsyncReadAsString()
+    Async.AwaitTask <| request.Content.ReadAsStringAsync()
 
 (**
 The `echo2Respond` maps the outgoing message body to an HTTP response.
