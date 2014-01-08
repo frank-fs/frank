@@ -10,6 +10,7 @@ open System.Web.Http
 open System.Web.Http.HttpResource
 open System.Web.Http.SelfHost
 open Frank
+open FSharp.Control
 open FSharpx.Option
 open Newtonsoft.Json.Linq
 
@@ -104,13 +105,13 @@ module Formatters =
     override x.CanWriteType(type') = true
     override x.WriteToStream(type', value, stream, contentHeaders) = ()
 
-module Resources =
-  open Model
-
   // Common formatters
   let formatters = [| new JsonMediaTypeFormatter() :> MediaTypeFormatter
                       new XmlMediaTypeFormatter() :> MediaTypeFormatter
                       new FormUrlEncodedMediaTypeFormatter() :> MediaTypeFormatter |]
+
+module HelloResource =
+
   
   // Respond with a web page containing "Hello, world!" and a form submission to use the POST method of the resource.
   let helloWorld request =
@@ -126,17 +127,20 @@ module Resources =
     <| request
     |> async.Return
 
-  let helloResource = route "/" <| get helloWorld
+  let echo = runConneg Formatters.formatters <| fun request -> request.Content.ReadAsStringAsync() |> Async.AwaitTask
+    
+  let helloResource = route "/" (get helloWorld <|> post echo)
 
-  (* Contacts resource *)
+module ContactsResource =
+  open Model
 
-  let all = runConneg formatters <| fun _ -> Data.contacts.AsyncGetAll()
+  let all = runConneg Formatters.formatters <| fun _ -> Data.contacts.AsyncGetAll()
 
   // Dynamic lookup helper for JToken
   let (?) (data: JToken) name = data.SelectToken(name) |> string
 
   let create (request: HttpRequestMessage) = async {
-    let! formData = request.Content.AsyncReadAs<JToken>()
+    let! formData = request.Content.ReadAsAsync<JToken>()
     let contact =
       { ContactId = 0
         Name = formData?name
@@ -148,9 +152,9 @@ module Resources =
         Twitter = formData?twitter
       }
     do! Data.contacts.AsyncPost(contact)
-    match negotiateMediaType formatters request with
+    match negotiateMediaType Formatters.formatters request with
     | Some mediaType ->
-        let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
+        let formatter = Formatters.formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
         let content = formatWith mediaType formatter contact
         return request |> respond HttpStatusCode.Created ignore (Some content)
     | _ -> return! ``406 Not Acceptable`` request
@@ -164,8 +168,8 @@ module Resources =
     let id = getParam<int> request "id" |> Option.get
     let result = maybe {
       let! contact = Data.contacts.Get id
-      let! mediaType = negotiateMediaType formatters request
-      let formatter = formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
+      let! mediaType = negotiateMediaType Formatters.formatters request
+      let formatter = Formatters.formatters |> Seq.find (fun f -> f.SupportedMediaTypes.Contains(MediaTypeHeaderValue(mediaType)))
       let content = formatWith mediaType formatter contact
       return request |> respond HttpStatusCode.OK ignore (Some content)
     }
@@ -188,7 +192,7 @@ module Resources =
 
 let baseUri = "http://127.0.0.1:1000"
 let config = new HttpSelfHostConfiguration(baseUri)
-config |> register [ Resources.helloResource; Resources.contacts; Resources.contact ]
+config |> register [ HelloResource.helloResource; ContactsResource.contacts; ContactsResource.contact ]
 
 let server = new HttpSelfHostServer(config)
 server.OpenAsync().Wait()

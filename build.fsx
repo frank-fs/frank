@@ -39,8 +39,8 @@ let authors = [ "Ryan Riley" ]
 let tags = "F# fsharp web http rest webapi"
 
 // File system information 
-// (<solutionFile>.sln is built during the building process)
-let solutionFile  = "Frank"
+// (<projectFile>.*proj is built during the building process)
+let projectFile = "Frank"
 // Pattern specifying assemblies to be tested using NUnit
 let testAssemblies = "bin/Frank*Tests*exe"
 
@@ -83,7 +83,7 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
-    !! (solutionFile + ".sln")
+    !! ("*/**/" + projectFile + "*.*proj")
     |> MSBuildRelease "bin" "Rebuild"
     |> ignore)
 

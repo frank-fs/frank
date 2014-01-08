@@ -29,7 +29,7 @@ type WebApiApplication() =
       |> async.Return
 
     // Respond with the request content, if any.
-    let echo = runConneg formatters <| fun request -> request.Content.AsyncReadAsString()
+    let echo = runConneg formatters <| fun request -> request.Content.ReadAsStringAsync() |> Async.AwaitTask
     
     let resource = route "/" (get helloWorld <|> post echo)
     
