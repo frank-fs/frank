@@ -9,6 +9,9 @@
 #r "System.Web.Http.dll"
 #r "FSharpx.Core.dll"
 #r "Frank.dll"
+open System.Net
+open System.Net.Http
+open Frank
 
 (**
 Frank

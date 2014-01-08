@@ -9,6 +9,13 @@
 #r "System.Web.Http.dll"
 #r "FSharpx.Core.dll"
 #r "Frank.dll"
+open System
+open System.Net
+open System.Net.Http
+open System.Web.Http
+open System.Web.Http.HttpResource
+open FSharp.Control
+open Frank
 
 (**
 Getting Started
