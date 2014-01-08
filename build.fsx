@@ -49,6 +49,8 @@ let testAssemblies = "bin/Frank*Tests*exe"
 let gitHome = "https://github.com/frank-fs"
 // The name of the project on GitHub
 let gitName = "frank"
+// The git repository used to host the website.
+let gitWebsite = "https://github.com/frank-fs/frank-fs.github.io"
 
 // --------------------------------------------------------------------------------------
 // The rest of the file includes standard build steps 
@@ -134,16 +136,27 @@ Target "GenerateDocs" (fun _ ->
 // Release Scripts
 
 Target "ReleaseDocs" (fun _ ->
-    let ghPages      = "gh-pages"
-    let ghPagesLocal = "temp/gh-pages"
-    Repository.clone "temp" (gitHome + "/" + gitName + ".git") ghPages
-    Branches.checkoutBranch ghPagesLocal ghPages
-    fullclean ghPagesLocal
-    CopyRecursive "docs/output" ghPagesLocal true |> printfn "%A"
-    CommandHelper.runSimpleGitCommand ghPagesLocal "add ." |> printfn "%s"
-    let cmd = sprintf """commit -a -m "Update generated documentation for version %s""" release.NugetVersion
-    CommandHelper.runSimpleGitCommand ghPagesLocal cmd |> printfn "%s"
-    Branches.push ghPagesLocal)
+    let ghPages = "gh-pages"
+    CleanDir ghPages
+    Repository.cloneSingleBranch "" (gitHome + "/" + gitName + ".git") ghPages ghPages
+
+    fullclean ghPages
+    CopyRecursive "docs/output" ghPages true |> tracefn "%A"
+    StageAll ghPages
+    Commit ghPages (sprintf "Update generated documentation for version %s" release.NugetVersion)
+    Branches.push ghPages)
+
+Target "PublishWebsite" (fun _ ->
+    let ghPages = "website"
+    CleanDir ghPages
+    Repository.clone "" (gitWebsite + ".git") ghPages
+
+    fullclean ghPages
+    CopyRecursive "docs/output" ghPages true |> tracefn "%A"
+    CopyFile ghPages "CNAME" |> tracefn "%A"
+    StageAll ghPages
+    Commit ghPages (sprintf "Publish website for version %s" release.NugetVersion)
+    Branches.push ghPages)
 
 Target "Release" DoNothing
 
@@ -158,40 +171,18 @@ Target "All" DoNothing
   ==> "Build"
   ==> "CopyLicense"
   ==> "RunTests"
+  ==> "NuGet"
   ==> "All"
 
 "All" 
   ==> "CleanDocs"
   ==> "GenerateDocs"
   ==> "ReleaseDocs"
-  ==> "NuGet"
+  ==> "PublishWebsite"
   ==> "Release"
 
 RunTargetOrDefault "All"
 
-//Target "CreateNetHttpNuGet" (fun _ ->
-//    XCopy (sources @@ "System.Net.Http.fs") nugetNetHttpContent
-//
-//    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Client"
-//
-//    NuGet (fun p ->
-//        {p with
-//            Authors = authors
-//            Project = "FSharp.Net.Http"
-//            Description = "F# extensions for System.Net.Http"
-//            Version = version
-//            WorkingDir = nugetNetHttpDir
-//            OutputPath = nugetNetHttpDir
-//            ToolPath = nugetPath
-//            Dependencies = ["Microsoft.AspNet.WebApi.Client", webApiVersion]
-//            AccessKey = getBuildParamOrDefault "nugetkey" ""
-//            Publish = hasBuildParam "nugetkey" })
-//        "frank.nuspec"
-//
-//    !! (nugetNetHttpDir @@ sprintf "FSharp.Net.Http.%s.nupkg" version)
-//        |> CopyTo deployDir
-//)
-//
 //Target "CreateWebHttpNuGet" (fun _ ->
 //    XCopy (sources @@ "System.Web.Http.fs") nugetWebHttpContent
 //
