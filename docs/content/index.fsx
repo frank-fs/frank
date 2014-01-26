@@ -45,8 +45,8 @@ let helloWorld request =
 Samples & documentation
 -----------------------
 
-The library comes with comprehensible documentation. 
-It can include a tutorials automatically generated from `*.fsx` files in [the content folder][content]. 
+The library comes with comprehensive documentation. 
+It can include a tutorial automatically generated from `*.fsx` files in [the content folder][content]. 
 The API reference is automatically generated from Markdown comments in the library implementation.
 
  * [Getting Started](tutorial.html) contains a further explanation of this library.
@@ -60,7 +60,7 @@ Contributing and copyright
 
 The project is hosted on [GitHub][gh] where you can [report issues][issues], fork 
 the project and submit pull requests. If you're adding new public API, please also 
-consider adding [samples][content] that can be turned into a documentation. You might
+consider adding [samples][content] that can be turned into documentation. You might
 also want to read [library design notes][readme] to understand how it works.
 
 The library is available under Public Domain license, which allows modification and 
