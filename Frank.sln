@@ -50,6 +50,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "img", "img", "{CC272FB5-098
 		docs\files\img\logo.png = docs\files\img\logo.png
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "templates", "templates", "{1EE713FC-6F76-4B54-A72F-200B5FFDB192}"
+	ProjectSection(SolutionItems) = preProject
+		docs\tools\templates\template.cshtml = docs\tools\templates\template.cshtml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,6 +83,7 @@ Global
 		{3F702ECF-8700-4592-8685-19342CB67D2E} = {1B6F8BCF-6048-42D1-A991-373200D57143}
 		{FE1776D3-EB9A-4816-B7E6-D26A57313097} = {1B6F8BCF-6048-42D1-A991-373200D57143}
 		{DB5615DC-AA78-4A96-859B-D957B6581A1E} = {1B6F8BCF-6048-42D1-A991-373200D57143}
+		{1EE713FC-6F76-4B54-A72F-200B5FFDB192} = {FE1776D3-EB9A-4816-B7E6-D26A57313097}
 		{D48605F7-9B14-4AD6-91B7-6AA15609820E} = {2E3D20FF-0044-400D-9ECB-2BF048AFE478}
 		{CC272FB5-0983-4C02-91F2-4D07352E4E52} = {DB5615DC-AA78-4A96-859B-D957B6581A1E}
 	EndGlobalSection
