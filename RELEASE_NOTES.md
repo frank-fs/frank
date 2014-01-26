@@ -1,4 +1,4 @@
-### New in 2.0.1 - (Released 2014/01/26)
+### New in 2.0.2 - (Released 2014/01/26)
 * Remove FSharp.Core.3 as a package dependency.
 
 ### New in 2.0.0 - (Released 2014/01/07)
