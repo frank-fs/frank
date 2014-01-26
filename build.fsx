@@ -46,11 +46,9 @@ let testAssemblies = "bin/Frank*Tests*exe"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted 
-let gitHome = "https://github.com/frank-fs"
+let gitHome = "git@github.com:frank-fs"
 // The name of the project on GitHub
 let gitName = "frank"
-// The git repository used to host the website.
-let gitWebsite = "https://github.com/frank-fs/frank-fs.github.io"
 
 // --------------------------------------------------------------------------------------
 // The rest of the file includes standard build steps 
@@ -123,7 +121,7 @@ Target "NuGet" (fun _ ->
             OutputPath = "bin"
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
-            Dependencies = referenceDependencies ["FSharp.Core.3"; "FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"] })
+            Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"] })
         ("nuget/" + project + ".nuspec"))
 
 // --------------------------------------------------------------------------------------
@@ -146,18 +144,6 @@ Target "ReleaseDocs" (fun _ ->
     Commit ghPages (sprintf "Update generated documentation for version %s" release.NugetVersion)
     Branches.push ghPages)
 
-Target "PublishWebsite" (fun _ ->
-    let ghPages = "website"
-    CleanDir ghPages
-    Repository.clone "" (gitWebsite + ".git") ghPages
-
-    fullclean ghPages
-    CopyRecursive "docs/output" ghPages true |> tracefn "%A"
-    CopyFile ghPages "CNAME" |> tracefn "%A"
-    StageAll ghPages
-    Commit ghPages (sprintf "Publish website for version %s" release.NugetVersion)
-    Branches.push ghPages)
-
 Target "Release" DoNothing
 
 // --------------------------------------------------------------------------------------
@@ -177,9 +163,8 @@ Target "All" DoNothing
 "All" 
   ==> "CleanDocs"
   ==> "GenerateDocs"
-  ==> "Release"
   ==> "ReleaseDocs"
-  ==> "PublishWebsite"
+  ==> "Release"
 
 RunTargetOrDefault "All"
 
