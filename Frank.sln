@@ -40,6 +40,16 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.
 		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2} = {06DBE12F-D4BE-40C4-86D8-81F0202DACC2}
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "files", "files", "{DB5615DC-AA78-4A96-859B-D957B6581A1E}"
+	ProjectSection(SolutionItems) = preProject
+		docs\files\CNAME = docs\files\CNAME
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "img", "img", "{CC272FB5-0983-4C02-91F2-4D07352E4E52}"
+	ProjectSection(SolutionItems) = preProject
+		docs\files\img\logo.png = docs\files\img\logo.png
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,6 +77,8 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{3F702ECF-8700-4592-8685-19342CB67D2E} = {1B6F8BCF-6048-42D1-A991-373200D57143}
 		{FE1776D3-EB9A-4816-B7E6-D26A57313097} = {1B6F8BCF-6048-42D1-A991-373200D57143}
+		{DB5615DC-AA78-4A96-859B-D957B6581A1E} = {1B6F8BCF-6048-42D1-A991-373200D57143}
 		{D48605F7-9B14-4AD6-91B7-6AA15609820E} = {2E3D20FF-0044-400D-9ECB-2BF048AFE478}
+		{CC272FB5-0983-4C02-91F2-4D07352E4E52} = {DB5615DC-AA78-4A96-859B-D957B6581A1E}
 	EndGlobalSection
 EndGlobal
