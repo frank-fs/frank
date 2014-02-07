@@ -3,11 +3,14 @@
 // --------------------------------------------------------------------------------------
 
 #r @"packages/FAKE/tools/FakeLib.dll"
+#load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
 open System
+open System.IO
 open Fake 
 open Fake.AssemblyInfoFile
 open Fake.Git
 open Fake.ReleaseNotesHelper
+open SourceLink
 
 // --------------------------------------------------------------------------------------
 // Provide project-specific details below
@@ -87,6 +90,20 @@ Target "Build" (fun _ ->
     |> MSBuildRelease "bin" "Rebuild"
     |> ignore)
 
+Target "SourceLink" (fun _ ->
+    use repo = new GitRepo(__SOURCE_DIRECTORY__)
+    !! ("*/**/" + projectFile + "*.*proj")
+    |> Seq.iter (fun f ->
+        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ "bin"]
+        logfn "source linking %s" proj.OutputFilePdb
+        let files = proj.Compiles -- "**/AssemblyInfo.fs"
+        repo.VerifyChecksums files
+        proj.VerifyPdbChecksums files
+        proj.CreateSrcSrv "https://raw.github.com/panesofglass/frank/{0}/%var2%" repo.Revision (repo.Paths files)
+        Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
+    )
+)
+
 Target "CopyLicense" (fun _ ->
     [ "LICENSE.txt" ] |> CopyTo "bin")
 
@@ -155,6 +172,7 @@ Target "All" DoNothing
   ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
+  ==> "SourceLink"
   ==> "CopyLicense"
   ==> "RunTests"
   ==> "NuGet"
