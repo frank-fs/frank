@@ -5,6 +5,7 @@
 #r @"packages/FAKE/tools/FakeLib.dll"
 #load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
 open System
+open System.IO
 open Fake 
 open Fake.AssemblyInfoFile
 open Fake.Git
@@ -93,7 +94,7 @@ Target "SourceLink" (fun _ ->
     use repo = new GitRepo(__SOURCE_DIRECTORY__)
     !! ("*/**/" + projectFile + "*.*proj")
     |> Seq.iter (fun f ->
-        let proj = VsProj.LoadRelease f
+        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ "bin"]
         logfn "source linking %s" proj.OutputFilePdb
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
         repo.VerifyChecksums files
