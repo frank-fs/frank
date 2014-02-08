@@ -77,10 +77,12 @@ Target "AssemblyInfo" (fun _ ->
 Target "RestorePackages" RestorePackages
 
 Target "Clean" (fun _ ->
-    CleanDirs ["bin"; "temp"])
+    CleanDirs ["bin"; "temp"]
+)
 
 Target "CleanDocs" (fun _ ->
-    CleanDirs ["docs/output"])
+    CleanDirs ["docs/output"]
+)
 
 // --------------------------------------------------------------------------------------
 // Build library & test project
@@ -88,7 +90,8 @@ Target "CleanDocs" (fun _ ->
 Target "Build" (fun _ ->
     !! ("*/**/" + projectFile + "*.*proj")
     |> MSBuildRelease "bin" "Rebuild"
-    |> ignore)
+    |> ignore
+)
 
 Target "SourceLink" (fun _ ->
     use repo = new GitRepo(__SOURCE_DIRECTORY__)
@@ -99,13 +102,14 @@ Target "SourceLink" (fun _ ->
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
         repo.VerifyChecksums files
         proj.VerifyPdbChecksums files
-        proj.CreateSrcSrv "https://raw.github.com/panesofglass/frank/{0}/%var2%" repo.Revision (repo.Paths files)
+        proj.CreateSrcSrv "https://raw.github.com/frank-fs/frank/{0}/%var2%" repo.Revision (repo.Paths files)
         Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
     )
 )
 
 Target "CopyLicense" (fun _ ->
-    [ "LICENSE.txt" ] |> CopyTo "bin")
+    [ "LICENSE.txt" ] |> CopyTo "bin"
+)
 
 // --------------------------------------------------------------------------------------
 // Run the unit tests using test runner
@@ -116,7 +120,8 @@ Target "RunTests" (fun _ ->
         { p with
             DisableShadowCopy = true
             TimeOut = TimeSpan.FromMinutes 20.
-            OutputFile = "TestResults.xml" }))
+            OutputFile = "TestResults.xml" })
+)
 
 // --------------------------------------------------------------------------------------
 // Build a NuGet package
@@ -139,27 +144,30 @@ Target "NuGet" (fun _ ->
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
             Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"] })
-        ("nuget/" + project + ".nuspec"))
+        ("nuget/" + project + ".nuspec")
+)
 
 // --------------------------------------------------------------------------------------
 // Generate the documentation
 
 Target "GenerateDocs" (fun _ ->
-    executeFSIWithArgs "docs/tools" "generate.fsx" ["--define:RELEASE"] [] |> ignore)
+    executeFSIWithArgs "docs/tools" "generate.fsx" ["--define:RELEASE"] [] |> ignore
+)
 
 // --------------------------------------------------------------------------------------
 // Release Scripts
 
 Target "ReleaseDocs" (fun _ ->
-    let ghPages = "gh-pages"
-    CleanDir ghPages
-    Repository.cloneSingleBranch "" (gitHome + "/" + gitName + ".git") ghPages ghPages
+    let tempDocsDir = "temp/gh-pages"
+    CleanDir tempDocsDir
+    Repository.cloneSingleBranch "" (gitHome + "/" + gitName + ".git") "gh-pages" tempDocsDir
 
-    fullclean ghPages
-    CopyRecursive "docs/output" ghPages true |> tracefn "%A"
-    StageAll ghPages
-    Commit ghPages (sprintf "Update generated documentation for version %s" release.NugetVersion)
-    Branches.push ghPages)
+    fullclean tempDocsDir
+    CopyRecursive "docs/output" tempDocsDir true |> tracefn "%A"
+    StageAll tempDocsDir
+    Commit tempDocsDir (sprintf "Update generated documentation for version %s" release.NugetVersion)
+    Branches.push tempDocsDir
+)
 
 Target "Release" DoNothing
 

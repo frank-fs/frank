@@ -1,3 +1,6 @@
+### New in 2.0.3 - (Released 2014/02/07)
+* Add SourceLink to link to GitHub sources (courtesy Cameron Taggart).
+
 ### New in 2.0.2 - (Released 2014/01/26)
 * Remove FSharp.Core.3 as a package dependency.
 
