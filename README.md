@@ -1,5 +1,7 @@
 # Frank
 
+[![Build Status](https://travis-ci.org/frank-fs/frank.png?branch=master)](https://travis-ci.org/frank-fs/frank)
+
 Frank is resource-oriented wrapper library for working with the [Web API](http://asp.net/web-api/) and is developed in [F#](http://fsharp.net/).
 
 ## Goals
