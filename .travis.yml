@@ -1,6 +1,8 @@
 language: objective-c
 
 env:
+  global:
+    - EnableNuGetPackageRestore=true
   matrix:
     - MONO_VERSION="3.2.5"
 
