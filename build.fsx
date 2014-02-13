@@ -2,7 +2,8 @@
 // FAKE build script 
 // --------------------------------------------------------------------------------------
 
-#r @"packages/FAKE/tools/FakeLib.dll"
+#r "packages/FAKE/tools/FakeLib.dll"
+#r "packages/FAKE/tools/NuGet.Core.dll"
 #load "packages/SourceLink.Fake/tools/SourceLink.fsx"
 open System
 open System.IO
