@@ -2,7 +2,7 @@
 // FAKE build script 
 // --------------------------------------------------------------------------------------
 
-#r @"packages/FAKE/tools/FakeLib.dll"
+#r "packages/FAKE/tools/FakeLib.dll"
 #load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
 open System
 open Fake 
@@ -68,7 +68,8 @@ Target "AssemblyInfo" (fun _ ->
         Attribute.Product project
         Attribute.Description summary
         Attribute.Version release.AssemblyVersion
-        Attribute.FileVersion release.AssemblyVersion ] )
+        Attribute.FileVersion release.AssemblyVersion ]
+)
 
 // --------------------------------------------------------------------------------------
 // Clean build results & restore NuGet packages
@@ -179,7 +180,6 @@ Target "All" DoNothing
   ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
-  ==> "SourceLink"
   ==> "CopyLicense"
   ==> "RunTests"
   ==> "NuGet"
