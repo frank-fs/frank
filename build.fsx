@@ -3,7 +3,7 @@
 // --------------------------------------------------------------------------------------
 
 #r @"packages/FAKE/tools/FakeLib.dll"
-#load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
+#load "packages/SourceLink.Fake/tools/SourceLink.fsx"
 open System
 open System.IO
 open Fake 
