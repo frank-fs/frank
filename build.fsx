@@ -4,6 +4,7 @@
 
 #r "packages/FAKE/tools/FakeLib.dll"
 #r "packages/FAKE/tools/NuGet.Core.dll"
+#r "packages/SourceLink.Fake/tools/SourceLink.dll"
 #load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
 open System
 open System.IO
@@ -41,12 +42,14 @@ let description = """
 let authors = [ "Ryan Riley" ]
 // Tags for your project (for NuGet package)
 let tags = "F# fsharp web http rest webapi"
+// Set the output path
+let bin = if isTfsBuild then "../bin" else "bin" 
 
 // File system information 
 // (<projectFile>.*proj is built during the building process)
 let projectFile = "Frank"
 // Pattern specifying assemblies to be tested using NUnit
-let testAssemblies = "bin/Frank*Tests*exe"
+let testAssemblies = bin @@ "Frank*Tests*exe"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted 
@@ -78,7 +81,7 @@ Target "AssemblyInfo" (fun _ ->
 Target "RestorePackages" RestorePackages
 
 Target "Clean" (fun _ ->
-    CleanDirs ["bin"; "temp"]
+    CleanDirs [bin; "temp"]
 )
 
 Target "CleanDocs" (fun _ ->
@@ -90,15 +93,18 @@ Target "CleanDocs" (fun _ ->
 
 Target "Build" (fun _ ->
     !! ("*/**/" + projectFile + "*.*proj")
-    |> MSBuildRelease "bin" "Rebuild"
+    |> MSBuildRelease bin "Rebuild"
     |> ignore
 )
 
 Target "SourceLink" (fun _ ->
+    #if MONO
+    ()
+    #else
     use repo = new GitRepo(__SOURCE_DIRECTORY__)
     !! ("*/**/" + projectFile + "*.*proj")
     |> Seq.iter (fun f ->
-        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ "bin"]
+        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ bin]
         logfn "source linking %s" proj.OutputFilePdb
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
         repo.VerifyChecksums files
@@ -106,10 +112,11 @@ Target "SourceLink" (fun _ ->
         proj.CreateSrcSrv "https://raw.github.com/frank-fs/frank/{0}/%var2%" repo.Revision (repo.Paths files)
         Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
     )
+    #endif
 )
 
 Target "CopyLicense" (fun _ ->
-    [ "LICENSE.txt" ] |> CopyTo "bin"
+    [ "LICENSE.txt" ] |> CopyTo bin
 )
 
 // --------------------------------------------------------------------------------------
@@ -141,7 +148,7 @@ Target "NuGet" (fun _ ->
             Version = release.NugetVersion
             ReleaseNotes = String.Join(Environment.NewLine, release.Notes)
             Tags = tags
-            OutputPath = "bin"
+            OutputPath = bin
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
             Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"] })
@@ -181,7 +188,7 @@ Target "All" DoNothing
   ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
-  ==> "SourceLink"
+  =?> ("SourceLink", isMono = false && hasBuildParam "skipSourceLink" = false)
   ==> "CopyLicense"
   ==> "RunTests"
   ==> "NuGet"
@@ -195,50 +202,3 @@ Target "All" DoNothing
 
 RunTargetOrDefault "All"
 
-//Target "CreateWebHttpNuGet" (fun _ ->
-//    XCopy (sources @@ "System.Web.Http.fs") nugetWebHttpContent
-//
-//    let webApiVersion = GetPackageVersion packagesDir "Microsoft.AspNet.WebApi.Core"
-//
-//    NuGet (fun p ->
-//        {p with
-//            Authors = authors
-//            Project = "FSharp.Web.Http"
-//            Description = "F# extensions for System.Web.Http"
-//            Version = version
-//            WorkingDir = nugetWebHttpDir
-//            OutputPath = nugetWebHttpDir
-//            ToolPath = nugetPath
-//            Dependencies = ["Microsoft.AspNet.WebApi.Core", webApiVersion
-//                            "FSharp.Net.Http", version]
-//            AccessKey = getBuildParamOrDefault "nugetkey" ""
-//            Publish = hasBuildParam "nugetkey" })
-//        "frank.nuspec"
-//
-//    !! (nugetWebHttpDir @@ sprintf "FSharp.Web.Http.%s.nupkg" version)
-//        |> CopyTo deployDir
-//)
-//
-//Target "CreateFrankNuGet" (fun _ ->
-//    XCopy (sources @@ "Frank.fs") nugetFrankContent
-//
-//    let fsharpxCoreVersion = GetPackageVersion packagesDir "FSharpx.Core"
-//
-//    NuGet (fun p ->
-//        {p with
-//            Authors = authors
-//            Project = projectName
-//            Description = projectDescription
-//            Version = version
-//            WorkingDir = nugetFrankDir
-//            OutputPath = nugetFrankDir
-//            ToolPath = nugetPath
-//            Dependencies = ["FSharpx.Core", fsharpxCoreVersion
-//                            "FSharp.Web.Http", version]
-//            AccessKey = getBuildParamOrDefault "nugetkey" ""
-//            Publish = hasBuildParam "nugetkey" })
-//        "frank.nuspec"
-//
-//    !! (nugetFrankDir @@ sprintf "Frank.%s.nupkg" version)
-//        |> CopyTo deployDir
-//)
