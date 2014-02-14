@@ -89,6 +89,7 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "BuildNumber" (fun _ ->
+    let buildVersion = sprintf "%s %s" release.AssemblyVersion (dt.ToString "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'")
     use tb = getTfsBuild()
     tb.Build.BuildNumber <- sprintf "Frank.%s" buildVersion
     tb.Build.Save()
