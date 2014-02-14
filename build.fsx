@@ -4,7 +4,6 @@
 
 #r "packages/FAKE/tools/FakeLib.dll"
 #r "packages/FAKE/tools/NuGet.Core.dll"
-#r "packages/SourceLink.Fake/tools/SourceLink.dll"
 #load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
 open System
 open System.IO
@@ -42,14 +41,12 @@ let description = """
 let authors = [ "Ryan Riley" ]
 // Tags for your project (for NuGet package)
 let tags = "F# fsharp web http rest webapi"
-// Set the output path
-let bin = if isTfsBuild then "../bin" else "bin" 
 
 // File system information 
 // (<projectFile>.*proj is built during the building process)
 let projectFile = "Frank"
 // Pattern specifying assemblies to be tested using NUnit
-let testAssemblies = bin @@ "Frank*Tests*exe"
+let testAssemblies = "bin/Frank*Tests*exe"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted 
@@ -81,7 +78,7 @@ Target "AssemblyInfo" (fun _ ->
 Target "RestorePackages" RestorePackages
 
 Target "Clean" (fun _ ->
-    CleanDirs [bin; "temp"]
+    CleanDirs ["bin"; "temp"]
 )
 
 Target "CleanDocs" (fun _ ->
@@ -91,9 +88,15 @@ Target "CleanDocs" (fun _ ->
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
+Target "BuildNumber" (fun _ ->
+    use tb = getTfsBuild()
+    tb.Build.BuildNumber <- sprintf "Frank.%s" buildVersion
+    tb.Build.Save()
+)
+
 Target "Build" (fun _ ->
     !! ("*/**/" + projectFile + "*.*proj")
-    |> MSBuildRelease bin "Rebuild"
+    |> MSBuildRelease "bin" "Rebuild"
     |> ignore
 )
 
@@ -104,7 +107,7 @@ Target "SourceLink" (fun _ ->
     use repo = new GitRepo(__SOURCE_DIRECTORY__)
     !! ("*/**/" + projectFile + "*.*proj")
     |> Seq.iter (fun f ->
-        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ bin]
+        let proj = VsProj.Load f ["Configuration", "Release"; "OutputPath", Path.combine __SOURCE_DIRECTORY__ "bin"]
         logfn "source linking %s" proj.OutputFilePdb
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
         repo.VerifyChecksums files
@@ -116,7 +119,7 @@ Target "SourceLink" (fun _ ->
 )
 
 Target "CopyLicense" (fun _ ->
-    [ "LICENSE.txt" ] |> CopyTo bin
+    [ "LICENSE.txt" ] |> CopyTo "bin"
 )
 
 // --------------------------------------------------------------------------------------
@@ -139,6 +142,8 @@ let referenceDependencies dependencies =
     [ for dependency in dependencies -> dependency, GetPackageVersion packagesDir dependency ]
 
 Target "NuGet" (fun _ ->
+    let bin = if isTfsBuild then "../bin" else "bin"
+    Directory.CreateDirectory bin |> ignore
     NuGet (fun p -> 
         { p with   
             Authors = authors
@@ -186,6 +191,7 @@ Target "All" DoNothing
 
 "Clean"
   ==> "RestorePackages"
+  =?> ("BuildNumber", isTfsBuild)
   ==> "AssemblyInfo"
   ==> "Build"
   =?> ("SourceLink", isMono = false && hasBuildParam "skipSourceLink" = false)
