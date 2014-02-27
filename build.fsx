@@ -194,10 +194,10 @@ Target "All" DoNothing
   =?> ("BuildNumber", isTfsBuild)
   ==> "AssemblyInfo"
   ==> "Build"
-  =?> ("SourceLink", isMono = false && hasBuildParam "skipSourceLink" = false)
+  =?> ("SourceLink", not isMono && not (hasBuildParam "skipSourceLink"))
   ==> "CopyLicense"
   ==> "RunTests"
-  ==> "NuGet"
+  ==> ("NuGet", not isMono)
   ==> "All"
 
 "All" 
