@@ -16,9 +16,10 @@ open Newtonsoft.Json.Serialization
 open NUnit.Framework 
 open Swensen.Unquote.Assertions
 
-type TestType() =
-    member val FirstName = "" with get, set
-    member val LastName = "" with get, set
+[<CLIMutable>]
+type TestType =
+    { FirstName : string; LastName: string }
+    with
     override x.ToString() = x.FirstName + " " + x.LastName
 
 module Tests =
@@ -70,7 +71,7 @@ module Tests =
     let ``test formatWith properly format as application/json raw``() =
         let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
         formatter.SerializerSettings.ContractResolver <- CamelCasePropertyNamesContractResolver()
-        let body = TestType(FirstName = "Ryan", LastName = "Riley")
+        let body = { FirstName = "Ryan"; LastName = "Riley" }
         let content = new ObjectContent<_>(body, formatter, "application/json") :> HttpContent
         test <@ content.Headers.ContentType.MediaType = "application/json" @>
         let result = content.ReadAsStringAsync()
@@ -82,7 +83,7 @@ module Tests =
     let ``test formatWith properly format as application/json``() =
         let formatter = new System.Net.Http.Formatting.JsonMediaTypeFormatter()
         formatter.SerializerSettings.ContractResolver <- CamelCasePropertyNamesContractResolver()
-        let body = TestType(FirstName = "Ryan", LastName = "Riley")
+        let body = { FirstName = "Ryan"; LastName = "Riley" }
         let content = body |> formatWith "application/json" formatter
         test <@ content.Headers.ContentType.MediaType = "application/json" @>
         let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
@@ -91,16 +92,16 @@ module Tests =
     [<Test>]
     let ``test formatWith properly format as application/xml``() =
         let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
-        let body = TestType(FirstName = "Ryan", LastName = "Riley")
+        let body = { FirstName = "Ryan"; LastName = "Riley" }
         let content = body |> formatWith "application/xml" formatter
         test <@ content.Headers.ContentType.MediaType = "application/xml" @>
         let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
-        test <@ result = """<TestType xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Frank"><FirstName>Ryan</FirstName><LastName>Riley</LastName></TestType>""" @>
+        test <@ result = """<TestType xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Frank"><FirstName_x0040_>Ryan</FirstName_x0040_><LastName_x0040_>Riley</LastName_x0040_></TestType>""" @>
 
     [<Test>]
     let ``test formatWith properly format as application/xml and read as TestType``() =
         let formatter = new System.Net.Http.Formatting.XmlMediaTypeFormatter()
-        let body = TestType(FirstName = "Ryan", LastName = "Riley")
+        let body = { FirstName = "Ryan"; LastName = "Riley" }
         let content = body |> formatWith "application/xml" formatter
         test <@ content.Headers.ContentType.MediaType = "application/xml" @>
         let result = content.ReadAsAsync<TestType>() |> Async.AwaitTask |> Async.RunSynchronously
