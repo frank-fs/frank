@@ -93,7 +93,7 @@ module Tests =
         let content = body |> formatWith "application/xml" formatter
         test <@ content.Headers.ContentType.MediaType = "application/xml" @>
         let result = content.ReadAsStringAsync() |> Async.AwaitTask |> Async.RunSynchronously
-        test <@ result = @"<TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/""><firstName>Ryan</firstName><lastName>Riley</lastName></TestType>" @>
+        test <@ result = @"<TestType xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/Frank""><firstName>Ryan</firstName><lastName>Riley</lastName></TestType>" @>
 
     [<Test>]
     let ``test formatWith properly format as application/xml and read as TestType``() =
