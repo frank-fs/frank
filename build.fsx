@@ -2,16 +2,20 @@
 // FAKE build script 
 // --------------------------------------------------------------------------------------
 
-#r "packages/FAKE/tools/FakeLib.dll"
-#r "packages/FAKE/tools/NuGet.Core.dll"
+#I @"packages/FAKE/tools/"
+#r @"FakeLib.dll"
+
+#if MONO
+#else
 #load "packages/SourceLink.Fake/tools/SourceLink.Tfs.fsx"
+#endif
+
 open System
 open System.IO
 open Fake 
 open Fake.AssemblyInfoFile
 open Fake.Git
 open Fake.ReleaseNotesHelper
-open SourceLink
 
 // --------------------------------------------------------------------------------------
 // Provide project-specific details below
@@ -88,22 +92,30 @@ Target "CleanDocs" (fun _ ->
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
-Target "BuildNumber" (fun _ ->
-    use tb = getTfsBuild()
-    tb.Build.BuildNumber <- sprintf "Frank.%s.%s" release.AssemblyVersion tb.Build.BuildNumber
-    tb.Build.Save()
-)
-
 Target "Build" (fun _ ->
     !! ("*/**/" + projectFile + "*.*proj")
     |> MSBuildRelease "bin" "Rebuild"
     |> ignore
 )
 
+#if MONO
+
+Target "BuildNumber" <| id
+Target "SourceLink" <| id
+
+let isTfsBuild = false
+
+#else
+
+open SourceLink
+
+Target "BuildNumber" (fun _ ->
+    use tb = getTfsBuild()
+    tb.Build.BuildNumber <- sprintf "Frank.%s.%s" release.AssemblyVersion tb.Build.BuildNumber
+    tb.Build.Save()
+)
+
 Target "SourceLink" (fun _ ->
-    #if MONO
-    ()
-    #else
     use repo = new GitRepo(__SOURCE_DIRECTORY__)
     !! ("*/**/" + projectFile + "*.*proj")
     |> Seq.iter (fun f ->
@@ -115,8 +127,8 @@ Target "SourceLink" (fun _ ->
         proj.CreateSrcSrv "https://raw.github.com/frank-fs/frank/{0}/%var2%" repo.Revision (repo.Paths files)
         Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
     )
-    #endif
 )
+#endif
 
 Target "CopyLicense" (fun _ ->
     [ "LICENSE.txt" ] |> CopyTo "bin"
@@ -197,7 +209,7 @@ Target "All" DoNothing
   =?> ("SourceLink", not isMono && not (hasBuildParam "skipSourceLink"))
   ==> "CopyLicense"
   ==> "RunTests"
-  ==> ("NuGet", not isMono)
+  =?> ("NuGet", not isMono)
   ==> "All"
 
 "All" 
