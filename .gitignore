@@ -32,3 +32,5 @@ packages/
 docs/output/
 temp/
 gh-pages/
+Backup/
+UpgradeLog*.htm

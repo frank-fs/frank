@@ -17,6 +17,9 @@ open Fake.AssemblyInfoFile
 open Fake.Git
 open Fake.ReleaseNotesHelper
 
+Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
+let (!!) includes = (!! includes).SetBaseDirectory __SOURCE_DIRECTORY__
+
 // --------------------------------------------------------------------------------------
 // Provide project-specific details below
 // --------------------------------------------------------------------------------------
@@ -57,14 +60,18 @@ let testAssemblies = "bin/Frank*Tests*exe"
 let gitHome = "git@github.com:frank-fs"
 // The name of the project on GitHub
 let gitName = "frank"
+let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/frank-fs"
 
 // --------------------------------------------------------------------------------------
 // The rest of the file includes standard build steps 
 // --------------------------------------------------------------------------------------
 
 // Read additional information from the release notes document
-Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 let release = parseReleaseNotes (IO.File.ReadAllLines "RELEASE_NOTES.md")
+let isAppVeyorBuild = environVar "APPVEYOR" <> null
+let nugetVersion = 
+    if isAppVeyorBuild then sprintf "%s-a%s" release.NugetVersion (DateTime.UtcNow.ToString "yyMMddHHmm")
+    else release.NugetVersion
 
 // Generate assembly info files with the right version & up-to-date information
 Target "AssemblyInfo" (fun _ ->
@@ -75,6 +82,10 @@ Target "AssemblyInfo" (fun _ ->
         Attribute.Description summary
         Attribute.Version release.AssemblyVersion
         Attribute.FileVersion release.AssemblyVersion ] )
+
+Target "BuildVersion" (fun _ ->
+    Shell.Exec("appveyor", sprintf "UpdateBuild -Version \"%s\"" nugetVersion) |> ignore
+)
 
 // --------------------------------------------------------------------------------------
 // Clean build results & restore NuGet packages
@@ -124,7 +135,7 @@ Target "SourceLink" (fun _ ->
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
         repo.VerifyChecksums files
         proj.VerifyPdbChecksums files
-        proj.CreateSrcSrv "https://raw.github.com/frank-fs/frank/{0}/%var2%" repo.Revision (repo.Paths files)
+        proj.CreateSrcSrv (sprintf "%s/%s/{0}/%%var2%%" gitRaw gitName) repo.Revision (repo.Paths files)
         Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
     )
 )
@@ -162,7 +173,7 @@ Target "NuGet" (fun _ ->
             Project = project
             Summary = summary
             Description = description
-            Version = release.NugetVersion
+            Version = nugetVersion
             ReleaseNotes = String.Join(Environment.NewLine, release.Notes)
             Tags = tags
             OutputPath = bin
@@ -202,8 +213,9 @@ Target "Release" DoNothing
 Target "All" DoNothing
 
 "Clean"
-  ==> "RestorePackages"
+  =?> ("BuildVersion", isAppVeyorBuild)
   =?> ("BuildNumber", isTfsBuild)
+  ==> "RestorePackages"
   ==> "AssemblyInfo"
   ==> "Build"
   =?> ("SourceLink", not isMono && not (hasBuildParam "skipSourceLink"))
@@ -219,4 +231,3 @@ Target "All" DoNothing
   ==> "Release"
 
 RunTargetOrDefault "All"
-
