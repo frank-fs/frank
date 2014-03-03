@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30110.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "project", "project", "{B8E01199-E214-4775-A731-6923932BE7B1}"
 	ProjectSection(SolutionItems) = preProject
 		build.fsx = build.fsx
@@ -11,9 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "project", "project", "{B8E0
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0E4239AC-B601-4FF1-A703-AC0E3A7E9AC6}"
 	ProjectSection(SolutionItems) = preProject
-		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
-		.nuget\NuGet.targets = .nuget\NuGet.targets
 		.nuget\packages.config = .nuget\packages.config
 	EndProjectSection
 EndProject
@@ -33,13 +33,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{FE1776D3
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{2E3D20FF-0044-400D-9ECB-2BF048AFE478}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank", "src\Frank\Frank.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests\Frank.Tests.fsproj", "{D48605F7-9B14-4AD6-91B7-6AA15609820E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2} = {06DBE12F-D4BE-40C4-86D8-81F0202DACC2}
-	EndProjectSection
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "files", "files", "{DB5615DC-AA78-4A96-859B-D957B6581A1E}"
 	ProjectSection(SolutionItems) = preProject
 		docs\files\CNAME = docs\files\CNAME
@@ -53,6 +46,13 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "templates", "templates", "{1EE713FC-6F76-4B54-A72F-200B5FFDB192}"
 	ProjectSection(SolutionItems) = preProject
 		docs\tools\templates\template.cshtml = docs\tools\templates\template.cshtml
+	EndProjectSection
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank", "src\Frank\Frank.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests\Frank.Tests.fsproj", "{D48605F7-9B14-4AD6-91B7-6AA15609820E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2} = {06DBE12F-D4BE-40C4-86D8-81F0202DACC2}
 	EndProjectSection
 EndProject
 Global
