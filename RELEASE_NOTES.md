@@ -1,3 +1,6 @@
+### New in 3.0.0 - (Released 2014/05/24)
+* Updated dependencies to Web API 2.1 and .NET 4.5
+
 ### New in 2.0.3 - (Released 2014/02/07)
 * Add SourceLink to link to GitHub sources (courtesy Cameron Taggart).
 
