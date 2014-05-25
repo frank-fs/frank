@@ -18,8 +18,8 @@
     @dependencies@
   </metadata>
   <files>
-    <file src="..\bin\Frank.dll" target="lib/net40" />
-    <file src="..\bin\Frank.xml" target="lib/net40" />
-    <file src="..\bin\Frank.pdb" target="lib/net40" />
+    <file src="..\bin\Frank.dll" target="lib/net45" />
+    <file src="..\bin\Frank.xml" target="lib/net45" />
+    <file src="..\bin\Frank.pdb" target="lib/net45" />
   </files>
 </package>
