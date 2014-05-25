@@ -179,7 +179,7 @@ Target "NuGet" (fun _ ->
             OutputPath = bin
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
-            Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"] })
+            Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"; "Newtonsoft.Json"] })
         ("nuget/" + project + ".nuspec")
 )
 
