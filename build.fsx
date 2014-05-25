@@ -70,7 +70,7 @@ let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/frank-fs"
 let release = parseReleaseNotes (IO.File.ReadAllLines "RELEASE_NOTES.md")
 let isAppVeyorBuild = environVar "APPVEYOR" <> null
 let nugetVersion = 
-    if isAppVeyorBuild then sprintf "%s-%s" release.NugetVersion buildVersion
+    if isAppVeyorBuild then sprintf "%s.%s" release.NugetVersion buildVersion
     else release.NugetVersion
 
 // Generate assembly info files with the right version & up-to-date information
