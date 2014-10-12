@@ -1,6 +1,10 @@
 source http://nuget.org/api/v2
 
-nuget FSharp.Formatting 2.2.11-beta
+nuget FAKE
+nuget SourceLink.Fake
+nuget Nuget.CommandLine
+nuget FSharp.Formatting 2.4.25
+nuget FSharp.Compiler.Service 0.0.62
 nuget FSharpx.Core 1.8.41
 nuget Microsoft.AspNet.Razor 2.0.30506.0
 nuget Microsoft.AspNet.WebApi.Client 5.1.2
@@ -10,4 +14,3 @@ nuget NUnit 2.6.3
 nuget NUnit.Runners 2.6.3
 nuget RazorEngine 3.3.0
 nuget Unquote 2.2.2
-nuget Nuget.CommandLine
