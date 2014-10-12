@@ -34,3 +34,4 @@ temp/
 gh-pages/
 Backup/
 UpgradeLog*.htm
+AssemblyInfo.fs
