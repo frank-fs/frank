@@ -113,7 +113,7 @@ Target "Build" (fun _ ->
 
 Target "CopyFiles" (fun _ ->
     [ "LICENSE.txt" ] |> CopyTo "bin"
-    !! ("src/" + project + "/bin/Release/Dyfrig*.*")
+    !! ("src/" + project + "/bin/Release/Frank*.*")
     |> CopyTo "bin"
 )
 
