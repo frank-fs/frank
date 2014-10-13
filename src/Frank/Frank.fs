@@ -19,8 +19,6 @@ open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
 open System.Threading.Tasks
-open FSharpx
-open FSharpx.Reader
 
 // ## Define the web application interface
 
@@ -64,10 +62,11 @@ module Core =
 
     // ## HTTP Response Header Combinators
 
-    // Headers are added using the `Reader` monad. If F# allows mutation, why do we need the monad?
+    // Headers are added using the `Reader` computation expression from F#x: `HttpResponseMessage -> unit`
+    // If F# allows mutation, why do we need the monad?
     // First of all, it allows for the explicit declaration of side effects. Second, a number
     // of combinators are already defined that allows you to more easily compose headers.
-    type HttpResponseHeadersBuilder = Reader<HttpResponseMessage, unit>
+
     let respond statusCode headers content (request: HttpRequestMessage) =
         let response =
             match content with
@@ -77,97 +76,96 @@ module Core =
         response
 
     // ### General Headers
-    let Date x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Date <- Nullable.create x
+    let Date x (response: HttpResponseMessage) =
+        response.Headers.Date <- Nullable<_> x
 
-    let Connection x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Connection.ParseAdd x
+    let Connection x (response: HttpResponseMessage) =
+        response.Headers.Connection.ParseAdd x
 
-    let Trailer x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Trailer.ParseAdd x
+    let Trailer x (response: HttpResponseMessage) =
+        response.Headers.Trailer.ParseAdd x
 
-    let ``Transfer-Encoding`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.TransferEncoding.ParseAdd x
+    let ``Transfer-Encoding`` x (response: HttpResponseMessage) =
+        response.Headers.TransferEncoding.ParseAdd x
 
-    let Upgrade x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Upgrade.ParseAdd x
+    let Upgrade x (response: HttpResponseMessage) =
+        response.Headers.Upgrade.ParseAdd x
 
-    let Via x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Via.ParseAdd x
+    let Via x (response: HttpResponseMessage) =
+        response.Headers.Via.ParseAdd x
 
-    let ``Cache-Control`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.CacheControl <- CacheControlHeaderValue.Parse x
+    let ``Cache-Control`` x (response: HttpResponseMessage) =
+        response.Headers.CacheControl <- CacheControlHeaderValue.Parse x
 
-    let Pragma x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Pragma.ParseAdd x
+    let Pragma x (response: HttpResponseMessage) =
+        response.Headers.Pragma.ParseAdd x
 
     // ### Response Headers
-    let Age x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Age <- Nullable.create x
+    let Age x (response: HttpResponseMessage) =
+        response.Headers.Age <- Nullable<_> x
 
-    let ``Retry-After`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.RetryAfter <- RetryConditionHeaderValue.Parse x
+    let ``Retry-After`` x (response: HttpResponseMessage) =
+        response.Headers.RetryAfter <- RetryConditionHeaderValue.Parse x
 
-    let Server x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Server.ParseAdd x
+    let Server x (response: HttpResponseMessage) =
+        response.Headers.Server.ParseAdd x
 
-    let Warning x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Warning.ParseAdd x
+    let Warning x (response: HttpResponseMessage) =
+        response.Headers.Warning.ParseAdd x
 
-    let ``Accept-Ranges`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.AcceptRanges.ParseAdd x
+    let ``Accept-Ranges`` x (response: HttpResponseMessage) =
+        response.Headers.AcceptRanges.ParseAdd x
 
-    let Vary x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Vary.ParseAdd x
+    let Vary x (response: HttpResponseMessage) =
+        response.Headers.Vary.ParseAdd x
 
-    let ``Proxy-Authenticate`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.ProxyAuthenticate.ParseAdd x
+    let ``Proxy-Authenticate`` x (response: HttpResponseMessage) =
+        response.Headers.ProxyAuthenticate.ParseAdd x
 
-    let ``WWW-Authenticate`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.WwwAuthenticate.ParseAdd x
+    let ``WWW-Authenticate`` x (response: HttpResponseMessage) =
+        response.Headers.WwwAuthenticate.ParseAdd x
 
     // ### Entity Headers
-    let Allow (allowedMethods: #seq<HttpMethod>) : HttpResponseHeadersBuilder =
-        fun response ->
-            allowedMethods
-            |> Seq.map (fun (m: HttpMethod) -> m.Method)
-            |> Seq.iter response.Content.Headers.Allow.Add
+    let Allow (allowedMethods: #seq<HttpMethod>) (response: HttpResponseMessage) =
+        allowedMethods
+        |> Seq.map (fun (m: HttpMethod) -> m.Method)
+        |> Seq.iter response.Content.Headers.Allow.Add
 
-    let Location x : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.Location <- x
+    let Location x (response: HttpResponseMessage) =
+        response.Headers.Location <- x
 
-    let ``Content-Disposition`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentDisposition <- ContentDispositionHeaderValue x
+    let ``Content-Disposition`` x (response: HttpResponseMessage) =
+        response.Content.Headers.ContentDisposition <- ContentDispositionHeaderValue x
 
-    let ``Content-Encoding`` x : HttpResponseHeadersBuilder =
-        fun response -> Seq.iter response.Content.Headers.ContentEncoding.Add x
+    let ``Content-Encoding`` x (response: HttpResponseMessage) =
+        Seq.iter response.Content.Headers.ContentEncoding.Add x
 
-    let ``Content-Language`` x : HttpResponseHeadersBuilder =
-        fun response -> Seq.iter response.Content.Headers.ContentLanguage.Add x 
+    let ``Content-Language`` x (response: HttpResponseMessage) =
+        Seq.iter response.Content.Headers.ContentLanguage.Add x 
 
-    let ``Content-Length`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentLength <- Nullable.create x
+    let ``Content-Length`` x (response: HttpResponseMessage) =
+        response.Content.Headers.ContentLength <- Nullable<_> x
 
-    let ``Content-Location`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentLocation <- x
+    let ``Content-Location`` x (response: HttpResponseMessage) =
+        response.Content.Headers.ContentLocation <- x
 
-    let ``Content-MD5`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentMD5 <- x
+    let ``Content-MD5`` x (response: HttpResponseMessage) =
+        response.Content.Headers.ContentMD5 <- x
 
-    let ``Content-Range`` from _to length : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentRange <- ContentRangeHeaderValue(from, _to, length)
+    let ``Content-Range`` from _to length (response: HttpResponseMessage) =
+        response.Content.Headers.ContentRange <- ContentRangeHeaderValue(from, _to, length)
 
-    let ``Content-Type`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.ContentType <- MediaTypeHeaderValue x
+    let ``Content-Type`` x (response: HttpResponseMessage) =
+        response.Content.Headers.ContentType <- MediaTypeHeaderValue x
 
-    let ETag tag isWeak : HttpResponseHeadersBuilder =
-        fun response -> response.Headers.ETag <- EntityTagHeaderValue(tag, isWeak)
+    let ETag tag isWeak (response: HttpResponseMessage) =
+        response.Headers.ETag <- EntityTagHeaderValue(tag, isWeak)
 
-    let Expires x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.Expires <- Nullable.create x
+    let Expires x (response: HttpResponseMessage) =
+        response.Content.Headers.Expires <- Nullable<_> x
 
-    let ``Last Modified`` x : HttpResponseHeadersBuilder =
-        fun response -> response.Content.Headers.LastModified <- Nullable.create x
+    let ``Last Modified`` x (response: HttpResponseMessage) =
+        response.Content.Headers.LastModified <- Nullable<_> x
 
     // Response helpers - shortcuts for common responses.
     let OK headers content = respond HttpStatusCode.OK headers content
@@ -251,7 +249,10 @@ module Core =
                     async {
                         let! responseBody = f request
                         let formattedBody = responseBody |> formatWith mediaType formatter
-                        return respond HttpStatusCode.OK <| ``Content-Type`` mediaType *> ``Vary`` "Accept" <| Some formattedBody <| request
+                        let applyHeaders response =
+                            ``Content-Type`` mediaType response
+                            ``Vary`` "Accept" response
+                        return respond HttpStatusCode.OK applyHeaders (Some formattedBody) request
                     }
             | _ -> ``406 Not Acceptable`` request
 

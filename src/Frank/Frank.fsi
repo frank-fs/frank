@@ -36,50 +36,48 @@ module Core =
         /// Returns an `EmptyContent`.
         member Empty : HttpContent
 
-    type HttpResponseHeadersBuilder = FSharpx.Reader.Reader<HttpResponseMessage, unit>
-
-    val respond : statusCode: HttpStatusCode -> headers: HttpResponseHeadersBuilder -> content: #HttpContent option -> request: HttpRequestMessage -> HttpResponseMessage
+    val respond : statusCode: HttpStatusCode -> headers: (HttpResponseMessage -> unit) -> content: #HttpContent option -> request: HttpRequestMessage -> HttpResponseMessage
 
     (* General Headers *)
 
-    val Date : x: DateTimeOffset -> HttpResponseHeadersBuilder
-    val Connection : x: string -> HttpResponseHeadersBuilder
-    val Trailer : x: string -> HttpResponseHeadersBuilder
-    val ``Transfer-Encoding`` : x: string -> HttpResponseHeadersBuilder
-    val Upgrade : x: string -> HttpResponseHeadersBuilder
-    val Via : x: string -> HttpResponseHeadersBuilder
-    val ``Cache-Control`` : x: string -> HttpResponseHeadersBuilder
-    val Pragma : x: string -> HttpResponseHeadersBuilder
+    val Date : x: DateTimeOffset -> response: HttpResponseMessage -> unit
+    val Connection : x: string -> response: HttpResponseMessage -> unit
+    val Trailer : x: string -> response: HttpResponseMessage -> unit
+    val ``Transfer-Encoding`` : x: string -> response: HttpResponseMessage -> unit
+    val Upgrade : x: string -> response: HttpResponseMessage -> unit
+    val Via : x: string -> response: HttpResponseMessage -> unit
+    val ``Cache-Control`` : x: string -> response: HttpResponseMessage -> unit
+    val Pragma : x: string -> response: HttpResponseMessage -> unit
 
     (* Response Headers *)
 
-    val Age : x: TimeSpan -> HttpResponseHeadersBuilder
-    val ``Retry-After`` : x: string -> HttpResponseHeadersBuilder
-    val Server : x: string -> HttpResponseHeadersBuilder
-    val Warning : x: string -> HttpResponseHeadersBuilder
-    val ``Accept-Ranges`` : x: string -> HttpResponseHeadersBuilder
-    val Vary : x: string -> HttpResponseHeadersBuilder
-    val ``Proxy-Authenticate`` : x: string -> HttpResponseHeadersBuilder
-    val ``WWW-Authenticate`` : x: string -> HttpResponseHeadersBuilder
+    val Age : x: TimeSpan -> response: HttpResponseMessage -> unit
+    val ``Retry-After`` : x: string -> response: HttpResponseMessage -> unit
+    val Server : x: string -> response: HttpResponseMessage -> unit
+    val Warning : x: string -> response: HttpResponseMessage -> unit
+    val ``Accept-Ranges`` : x: string -> response: HttpResponseMessage -> unit
+    val Vary : x: string -> response: HttpResponseMessage -> unit
+    val ``Proxy-Authenticate`` : x: string -> response: HttpResponseMessage -> unit
+    val ``WWW-Authenticate`` : x: string -> response: HttpResponseMessage -> unit
 
     (* Entity Headers *)
 
-    val Allow : allowedMethods: #seq<HttpMethod> -> HttpResponseHeadersBuilder
-    val Location : x: Uri -> HttpResponseHeadersBuilder
-    val ``Content-Disposition`` : x: string -> HttpResponseHeadersBuilder
-    val ``Content-Encoding`` : x: seq<string> -> HttpResponseHeadersBuilder
-    val ``Content-Language`` : x: seq<string> -> HttpResponseHeadersBuilder
-    val ``Content-Length`` : x: int64 -> HttpResponseHeadersBuilder
-    val ``Content-Location`` : x: Uri -> HttpResponseHeadersBuilder
-    val ``Content-MD5`` : x: byte[] -> HttpResponseHeadersBuilder
-    val ``Content-Range`` : from: int64 -> _to: int64 -> length: int64 -> HttpResponseHeadersBuilder
-    val ``Content-Type`` : x: string -> HttpResponseHeadersBuilder
-    val ETag : tag: string -> isWeak: bool -> HttpResponseHeadersBuilder
-    val Expires : x: DateTimeOffset -> HttpResponseHeadersBuilder
-    val ``Last Modified`` : x: DateTimeOffset -> HttpResponseHeadersBuilder
+    val Allow : allowedMethods: #seq<HttpMethod> -> response: HttpResponseMessage -> unit
+    val Location : x: Uri -> response: HttpResponseMessage -> unit
+    val ``Content-Disposition`` : x: string -> response: HttpResponseMessage -> unit
+    val ``Content-Encoding`` : x: seq<string> -> response: HttpResponseMessage -> unit
+    val ``Content-Language`` : x: seq<string> -> response: HttpResponseMessage -> unit
+    val ``Content-Length`` : x: int64 -> response: HttpResponseMessage -> unit
+    val ``Content-Location`` : x: Uri -> response: HttpResponseMessage -> unit
+    val ``Content-MD5`` : x: byte[] -> response: HttpResponseMessage -> unit
+    val ``Content-Range`` : from: int64 -> _to: int64 -> length: int64 -> response: HttpResponseMessage -> unit
+    val ``Content-Type`` : x: string -> response: HttpResponseMessage -> unit
+    val ETag : tag: string -> isWeak: bool -> response: HttpResponseMessage -> unit
+    val Expires : x: DateTimeOffset -> response: HttpResponseMessage -> unit
+    val ``Last Modified`` : x: DateTimeOffset -> response: HttpResponseMessage -> unit
 
     /// Returns a response message with status code `200 OK`
-    val OK : headers: HttpResponseHeadersBuilder -> content: #HttpContent option -> (HttpRequestMessage -> HttpResponseMessage)
+    val OK : headers: (HttpResponseMessage -> unit) -> content: #HttpContent option -> (HttpRequestMessage -> HttpResponseMessage)
 
     (* Allow Header Helpers *)
 

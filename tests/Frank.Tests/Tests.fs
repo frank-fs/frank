@@ -9,8 +9,6 @@ open System.Net.Http.Formatting
 open System.Net.Http.Headers
 open System.Text
 open Frank
-open FSharpx
-open FSharpx.Reader
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json.Serialization
 open NUnit.Framework 

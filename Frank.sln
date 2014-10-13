@@ -49,9 +49,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank", "src\Frank\Frank.fsproj", "{06DBE12F-D4BE-40C4-86D8-81F0202DACC2}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Tests", "tests\Frank.Tests\Frank.Tests.fsproj", "{D48605F7-9B14-4AD6-91B7-6AA15609820E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{06DBE12F-D4BE-40C4-86D8-81F0202DACC2} = {06DBE12F-D4BE-40C4-86D8-81F0202DACC2}
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

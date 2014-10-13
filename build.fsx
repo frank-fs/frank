@@ -168,7 +168,7 @@ Target "NuGet" (fun _ ->
             OutputPath = "bin"
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
-            Dependencies = referenceDependencies ["FSharpx.Core"; "Microsoft.AspNet.WebApi.Core"; "Newtonsoft.Json"]
+            Dependencies = referenceDependencies ["Microsoft.AspNet.WebApi.Core"; "Newtonsoft.Json"]
             Files = [ (@"..\bin\Frank.dll", Some "lib/net45", None)
                       (@"..\bin\Frank.xml", Some "lib/net45", None)
                       (@"..\bin\Frank.pdb", Some "lib/net45", None) ] })

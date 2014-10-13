@@ -1,3 +1,7 @@
+### New in 3.1.0 - (Released 2014/10/13)
+* Remove dependency on F#x
+* Signatures remain equivalent, but some type aliases have been removed.
+
 ### New in 3.0.19 - (Released 2014/10/13)
 * Merge all implementations into one file and add .fsi signature
 
