@@ -1,6 +1,7 @@
-### New in 3.0.1 - (Released 2014/10/12)
+### New in 3.0.18 - (Released 2014/10/12)
 * Use Paket for package management
 * FSharp.Core 4.3.1.0
+* NOTE: Jumped to 3.0.18 due to bad build script configuration
 
 ### New in 3.0.0 - (Released 2014/05/24)
 * Updated dependencies to Web API 2.1 and .NET 4.5
