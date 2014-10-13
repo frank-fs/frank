@@ -10,7 +10,6 @@
     <RootNamespace>Frank</RootNamespace>
     <AssemblyName>Frank</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
     <Name>Frank</Name>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
     <TargetFrameworkProfile />
@@ -40,18 +39,19 @@
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
       <PropertyGroup>
         <FSharpTargetsPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets</FSharpTargetsPath>
+        <TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
         <FSharpTargetsPath>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets</FSharpTargetsPath>
+        <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
       </PropertyGroup>
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="paket.references" />
     <Compile Include="Frank.fsi" />
     <Compile Include="Frank.fs" />
