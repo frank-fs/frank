@@ -1,3 +1,6 @@
+### New in 3.0.19 - (Released 2014/10/13)
+* Merge all implementations into one file and add .fsi signature
+
 ### New in 3.0.18 - (Released 2014/10/12)
 * Use Paket for package management
 * FSharp.Core 4.3.1.0

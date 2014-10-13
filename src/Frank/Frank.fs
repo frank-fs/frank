@@ -201,8 +201,9 @@ module Core =
             |> respond HttpStatusCode.NotAcceptable ignore (Some(new StringContent("406 Not Acceptable")))
             |> async.Return
 
-    let findFormatterFor mediaType =
-        Seq.find (fun (formatter: MediaTypeFormatter) ->
+    let findFormatterFor mediaType formatters =
+        formatters
+        |> Seq.find (fun (formatter: MediaTypeFormatter) ->
             formatter.SupportedMediaTypes
             |> Seq.map (fun value -> value.MediaType)
             |> Seq.exists ((=) mediaType))
@@ -275,3 +276,90 @@ type AsyncHandler =
     new (f) = { inherit DelegatingHandler(); AsyncSend = f }
     override x.SendAsync(request, cancellationToken) =
         Async.StartAsTask(x.AsyncSend request, cancellationToken = cancellationToken)
+
+
+(**
+ * # F# Extensions to System.Web.Http
+ *)
+
+namespace System.Web.Http
+
+open System.Net
+open System.Net.Http
+open System.Web.Http
+open Frank
+
+// HTTP resources expose an resource handler function at a given uri.
+// In the common MVC-style frameworks, this would roughly correspond
+// to a `Controller`. Resources should represent a single entity type,
+// and it is important to note that a `Foo` is not the same entity
+// type as a `Foo list`, which is where most MVC approaches go wrong. 
+// The optional `uriMatcher` parameter allows the consumer to provide
+// a more advanced uri matching algorithm, such as one using regular
+// expressions.
+// 
+// Additional notes:
+//   Should this type subclass HttpServer? If it did it could get
+//   it's own configration and have its own route table. I'm not
+//   convinced System.Web.Routing is worth it, but it's an option.
+type HttpResource(template: string, methods, handler) =
+    inherit System.Web.Http.Routing.HttpRoute(routeTemplate = template.TrimStart([|'/'|]),
+                                              defaults = null,
+                                              constraints = null,
+                                              dataTokens = null,
+                                              handler = new AsyncHandler(resourceHandlerOrDefault methods handler))
+    with
+    member x.Name = template
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpResource =
+    let makeHandler(httpMethod, handler) = function
+        | (request: HttpRequestMessage) when request.Method = httpMethod -> Some(handler request)
+        | _ -> None
+
+    // Helpers to more easily map `HttpApplication` functions to methods to be composed into `HttpResource`s.
+    let mapResourceHandler(httpMethod: HttpMethod, handler) = [httpMethod], makeHandler(httpMethod, handler)
+    let get handler = mapResourceHandler(HttpMethod.Get, handler)
+    let post handler = mapResourceHandler(HttpMethod.Post, handler)
+    let put handler = mapResourceHandler(HttpMethod.Put, handler)
+    let delete handler = mapResourceHandler(HttpMethod.Delete, handler)
+    let options handler = mapResourceHandler(HttpMethod.Options, handler)
+    let trace handler = mapResourceHandler(HttpMethod.Trace, handler)
+    let patch handler = mapResourceHandler(HttpMethod("PATCH"), handler)
+
+    // Helper to more easily access URL params
+    let getParam<'T> (request:HttpRequestMessage) key =
+        let values = request.GetRouteData().Values
+        if values.ContainsKey(key) then
+            Some(values.[key] :?> 'T)
+        else None
+
+    // We can use several methods to merge multiple handlers together into a single resource.
+    // Our chosen mechanism here is merging functions into a larger function of the same signature.
+    // This allows us to create resources as follows:
+    // 
+    //     let resource = get app1 <|> post app2 <|> put app3 <|> delete app4
+    //
+    // The intent here is to build a resource, with at most one handler per HTTP method. This goes
+    // against a lot of the "RESTful" approaches that just merge a bunch of method handlers at
+    // different URI addresses.
+    let orElse left right =
+        fst left @ fst right,
+        fun request ->
+            match snd left request with
+            | None -> snd right request
+            | result -> result
+
+    let inline (<|>) left right = orElse left right
+
+    let route uri handler = HttpResource(uri, fst handler, snd handler)
+
+    let routeResource uri handlers = route uri <| Seq.reduce orElse handlers
+
+    let ``404 Not Found`` (request: HttpRequestMessage) = async {
+        return request.CreateResponse(HttpStatusCode.NotFound)
+    }
+
+    let register (resources: seq<HttpResource>) (config: HttpConfiguration) =
+        for resource in resources do
+            config.Routes.Add(resource.Name, resource)

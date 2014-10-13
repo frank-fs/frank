@@ -53,8 +53,8 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="paket.references" />
+    <Compile Include="Frank.fsi" />
     <Compile Include="Frank.fs" />
-    <Compile Include="System.Web.Http.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
