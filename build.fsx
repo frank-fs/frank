@@ -1,6 +1,6 @@
 // -------------------------------------------------------------------------------------- // FAKE build script // -------------------------------------------------------------------------------------- #I "packages/FAKE/tools/"
 #I "packages/FAKE/tools"
-#r "Nuget.Core.dll"
+#r "NuGet.Core.dll"
 #r "FakeLib.dll"
 open System
 open System.IO
