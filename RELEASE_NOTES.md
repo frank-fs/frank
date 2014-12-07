@@ -1,3 +1,6 @@
+### New in 3.1.1 - (Released 2014/12/07)
+* Use FSharp.Core from NuGet
+
 ### New in 3.1.0 - (Released 2014/10/13)
 * Remove dependency on F#x
 * Signatures remain equivalent, but some type aliases have been removed.
