@@ -12,6 +12,7 @@ NUGET
     Microsoft.AspNet.WebApi.Client (5.1.2)
       Microsoft.Net.Http (>= 2.2.13)
       Newtonsoft.Json (>= 4.5.11)
+      Newtonsoft.Json (>= 4.5.11) - net45
     Microsoft.AspNet.WebApi.Core (5.1.2)
       Microsoft.AspNet.WebApi.Client (>= 5.1.2)
     Microsoft.Bcl (1.1.9)
@@ -20,7 +21,6 @@ NUGET
     Microsoft.Net.Http (2.2.28)
       Microsoft.Bcl (>= 1.1.9)
       Microsoft.Bcl.Build (>= 1.0.14)
-    MSBuild.Extension.Pack (1.3.0)
     Newtonsoft.Json (6.0.3)
     NuGet.CommandLine (2.8.3)
     NUnit (2.6.3)
