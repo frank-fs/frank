@@ -53,6 +53,8 @@
     <None Include="paket.references" />
     <Compile Include="Frank.fsi" />
     <Compile Include="Frank.fs" />
+    <Compile Include="Frank.Web.Http.fs" />
+    <None Include="HelloWorld.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
