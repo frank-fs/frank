@@ -11,6 +11,7 @@ See LICENSE.txt for details.
 namespace Frank.Web.Http
 
 open System
+open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Collections.ObjectModel
 open System.Diagnostics.Contracts
@@ -81,32 +82,20 @@ type AsyncApiActionInvoker() =
             downcast specialized.Invoke(null, [| actionContext; cancellationToken |])
         | _ -> base.InvokeActionAsync(actionContext, cancellationToken)
 
+
 [<Sealed>]
-type FlexControllerTypeResolver(?suffix: string) =
-    inherit DefaultHttpControllerTypeResolver(Predicate<_>(fun t -> FlexControllerTypeResolver.IsControllerTypePredicate(t, ?suffix = suffix)))
+type FlexControllerTypeResolver() =
+    inherit DefaultHttpControllerTypeResolver(Predicate<_>(FlexControllerTypeResolver.IsControllerTypePredicate))
 
     static let httpControllerType = typeof<IHttpController>
     static let routeAttrType = typeof<RouteAttribute>
     static let actionMethodProviderType = typeof<IActionHttpMethodProvider>
 
-    /// Verifies that a type is an IHttpController and optionally matches a provided suffix.
-    static member internal IsIHttpController (t: Type, ?suffix: string) =
+    /// Verifies that a type is an IHttpController.
+    static member internal IsIHttpController (t: Type) =
         t.IsClass
         && not t.IsAbstract
         && httpControllerType.IsAssignableFrom t
-        && match suffix with
-            | None -> true
-            | Some s -> t.Name.Length > s.Length && t.Name.EndsWith(s, StringComparison.OrdinalIgnoreCase)
-
-    /// Verifies a module to be used as an HTTP resource matches an optional suffix.
-    static member internal HasApiModuleSuffix(t: Type, ?suffix) =
-        let moduleSuffix = "Module"
-        match suffix with 
-        | None -> true
-        | Some (s: string) ->
-            // If a suffix is provided use that as the only method by which to verify a Web Api module.
-            ((t.Name.Length > s.Length && t.Name.EndsWith(s, StringComparison.OrdinalIgnoreCase))
-            || t.Name.Length > s.Length + moduleSuffix.Length && t.Name.EndsWith(s + moduleSuffix, StringComparison.OrdinalIgnoreCase))
 
     /// Checks for a RouteAttribute or RoutePrefixAttribute on the module to indicate the module is an HTTP resource.
     static member internal HasRouteAttribute(t: Type) =
@@ -134,18 +123,16 @@ type FlexControllerTypeResolver(?suffix: string) =
             && typeof<HttpRequestMessage>.IsAssignableFrom(parameters.[0].ParameterType))
 
     /// Matches a static class or F# module as an HTTP resource.
-    static member internal IsApiModule (t: Type, ?suffix) =
+    static member internal IsApiModule(t: Type) =
         ((t.IsClass && t.IsAbstract && t.IsSealed) || FSharpType.IsModule t)
         && (FlexControllerTypeResolver.HasRouteAttribute t || FlexControllerTypeResolver.HasHttpActionMethod t)
-        && FlexControllerTypeResolver.HasApiModuleSuffix(t, ?suffix = suffix)
 
     /// Identifies a Type as either usable as a "controller" or not.
-    static member IsControllerTypePredicate (t: Type, ?suffix) =
+    static member IsControllerTypePredicate(t: Type) =
         Contract.Assert(t <> null)
         t <> null
         && t.IsVisible
-        && (FlexControllerTypeResolver.IsIHttpController(t, ?suffix = suffix)
-            || FlexControllerTypeResolver.IsApiModule(t, ?suffix = suffix))
+        && (FlexControllerTypeResolver.IsIHttpController t || FlexControllerTypeResolver.IsApiModule t)
 
 
 (******************************************************************

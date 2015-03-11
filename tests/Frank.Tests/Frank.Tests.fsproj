@@ -53,6 +53,7 @@
     <Content Include="App.config" />
     <None Include="paket.references" />
     <Compile Include="Tests.fs" />
+    <Compile Include="Frank.Web.Http.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
