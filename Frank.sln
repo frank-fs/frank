@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30723.0
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{0307AB2D-9DD3-4B00-BC6F-578E1712F01F}"
 	ProjectSection(SolutionItems) = preProject
@@ -28,8 +28,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{FE1776D3
 	ProjectSection(SolutionItems) = preProject
 		docs\tools\generate.fsx = docs\tools\generate.fsx
 	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{2E3D20FF-0044-400D-9ECB-2BF048AFE478}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "files", "files", "{DB5615DC-AA78-4A96-859B-D957B6581A1E}"
 	ProjectSection(SolutionItems) = preProject
@@ -80,6 +78,5 @@ Global
 		{DB5615DC-AA78-4A96-859B-D957B6581A1E} = {1B6F8BCF-6048-42D1-A991-373200D57143}
 		{CC272FB5-0983-4C02-91F2-4D07352E4E52} = {DB5615DC-AA78-4A96-859B-D957B6581A1E}
 		{1EE713FC-6F76-4B54-A72F-200B5FFDB192} = {FE1776D3-EB9A-4816-B7E6-D26A57313097}
-		{D48605F7-9B14-4AD6-91B7-6AA15609820E} = {2E3D20FF-0044-400D-9ECB-2BF048AFE478}
 	EndGlobalSection
 EndGlobal
