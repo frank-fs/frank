@@ -135,6 +135,124 @@ type BetterDefaultHttpControllerTypeResolver() =
         && (BetterDefaultHttpControllerTypeResolver.IsIHttpController t || BetterDefaultHttpControllerTypeResolver.IsApiModule t)
 
 
+[<Sealed>]
+type BetterDefaultHttpControllerSelector(configuration: HttpConfiguration) =
+    static let controllerKey = "controller"
+    static let controllerSuffix = "Controller"
+    static let moduleSuffix = "Module"
+
+    static let resourceNotFound (request: HttpRequestMessage) =
+        HttpResponseException(request.CreateErrorResponse(HttpStatusCode.NotFound, request.RequestUri.AbsoluteUri))
+
+    static let getControllerName (request: HttpRequestMessage) =
+        if request = null then
+            raise <| ArgumentNullException("request")
+
+        let routeData = request.GetRouteData()
+        if routeData = null then Unchecked.defaultof<_> else
+        let _, controllerName = routeData.Values.TryGetValue(controllerKey)
+        unbox controllerName
+
+    static let canonicalControllerName (ty: Type) =
+        let name =
+            if ty.Name.Length > controllerSuffix.Length && ty.Name.EndsWith(controllerSuffix, StringComparison.OrdinalIgnoreCase) then
+                ty.Name.Substring(0, ty.Name.Length - controllerSuffix.Length)
+            else ty.Name
+        let name' =
+            if name.Length > moduleSuffix.Length && name.EndsWith(moduleSuffix, StringComparison.OrdinalIgnoreCase) then
+                name.Substring(0, name.Length - moduleSuffix.Length)
+            else name
+        name'
+
+    let controllerTypeCache = lazy (
+        let assembliesResolver = configuration.Services.GetAssembliesResolver()
+        let typeResolver = configuration.Services.GetHttpControllerTypeResolver()
+        let controllerTypes = typeResolver.GetControllerTypes(assembliesResolver)
+        query {
+            for ty in controllerTypes do
+            groupBy (canonicalControllerName ty) into g
+            select (g.Key, g.ToLookup((fun t -> if t.Namespace = null then "" else t.Namespace), StringComparer.OrdinalIgnoreCase))
+        } |> dict )
+
+    let getControllerTypes controllerName =
+        if String.IsNullOrEmpty controllerName then
+            raise <| ArgumentNullException("controllerName")
+
+        let matchingTypes = HashSet<_>()
+        let success, namespaceLookup = controllerTypeCache.Value.TryGetValue(controllerName)
+        if success then
+            for group in namespaceLookup do matchingTypes.UnionWith(group)
+        matchingTypes :> ICollection<_>
+
+    let tryAddControllerTypes controllerName (duplicateControllers: HashSet<_>) (result: ConcurrentDictionary<_,_>) typesGroupedByNs =
+        let rec loop = function
+            | [] -> ()
+            | ty::tys ->
+                if result.Keys.Contains controllerName then
+                    duplicateControllers.Add controllerName |> ignore
+                    ()
+                else
+                    result.TryAdd(controllerName, HttpControllerDescriptor(configuration, controllerName, ty)) |> ignore
+                    loop tys
+        loop (typesGroupedByNs |> List.ofSeq)
+
+    let controllerInfoCache =
+        lazy (
+            let result = ConcurrentDictionary<_,_>(StringComparer.OrdinalIgnoreCase)
+            let duplicateControllers = HashSet<_>()
+            for group in controllerTypeCache.Value do
+                for typesGroupedByNs in group.Value do
+                    typesGroupedByNs
+                    |> tryAddControllerTypes group.Key duplicateControllers result
+            for duplicateDescriptor in duplicateControllers do
+                result.TryRemove duplicateDescriptor |> ignore
+            result :> IDictionary<_,_>)
+
+// NOTE: The rabbit trail runs deeper: IHttpRoute.GetDirectRouteCandidates is also internal. :'(
+//    let rec getDirectRouteCandidates (routeData: IHttpRouteData): CandidateAction[] =
+//        Contract.Assert(routeData <> null)
+//        let subRoutes = routeData.GetSubRoutes()
+//        if subRoutes = null then
+//            if routeData.Route = null then null
+//            else routeData.Route.GetDirectRouteCandidates()
+//        else
+//        [| for subData in subRoutes do
+//            let candidates = subData.Route.GetDirectRouteCandidates()
+//            if candidates <> null then
+//                yield! candidates |]
+
+
+//    let getDirectRouteController (routeData: IHttpRouteData) =
+//        routeData. // More internal-only shenanigans
+
+    member this.GetControllerMapping() = controllerInfoCache.Value
+
+    member this.SelectController(request) =
+        if request = null then
+            raise <| ArgumentNullException("request")
+
+        let controllerName = getControllerName request
+        if String.IsNullOrEmpty controllerName then
+            raise <| resourceNotFound request
+
+        let success, controllerDescriptor = controllerInfoCache.Value.TryGetValue(controllerName)
+        if success then controllerDescriptor else
+        let matchingTypes = getControllerTypes controllerName
+        Contract.Assert(matchingTypes.Count <> 1)
+
+        if matchingTypes.Count = 0 then
+            raise <| resourceNotFound request
+        else 
+            let sb = Text.StringBuilder()
+            for ty in matchingTypes do
+                sb.AppendLine ty.Name |> ignore
+            failwithf "Ambiguous controller %s matched:\r\n%s" controllerName (sb.ToString())
+
+    interface IHttpControllerSelector with
+        member this.GetControllerMapping() = this.GetControllerMapping()
+        member this.SelectController(request) = this.SelectController(request)
+
+
 (******************************************************************
  * Completely replace the Web API model with a new runtime model.
  ******************************************************************)
