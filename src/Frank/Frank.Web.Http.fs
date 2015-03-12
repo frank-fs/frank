@@ -84,8 +84,8 @@ type AsyncApiActionInvoker() =
 
 
 [<Sealed>]
-type FlexControllerTypeResolver() =
-    inherit DefaultHttpControllerTypeResolver(Predicate<_>(FlexControllerTypeResolver.IsControllerTypePredicate))
+type BetterDefaultHttpControllerTypeResolver() =
+    inherit DefaultHttpControllerTypeResolver(Predicate<_>(BetterDefaultHttpControllerTypeResolver.IsControllerTypePredicate))
 
     static let httpControllerType = typeof<IHttpController>
     static let routeAttrType = typeof<RouteAttribute>
@@ -117,7 +117,7 @@ type FlexControllerTypeResolver() =
         t.GetMethods(BindingFlags.Public ||| BindingFlags.Static)
         |> Seq.exists (fun mi ->
             let parameters = mi.GetParameters()
-            FlexControllerTypeResolver.HasHttpMethodAttribute mi
+            BetterDefaultHttpControllerTypeResolver.HasHttpMethodAttribute mi
             // Require that the first parameter be bound to the HttpRequestMessage. There is otherwise no way to bind the HttpRequestMessage.
             && parameters.Length > 0
             && typeof<HttpRequestMessage>.IsAssignableFrom(parameters.[0].ParameterType))
@@ -125,14 +125,14 @@ type FlexControllerTypeResolver() =
     /// Matches a static class or F# module as an HTTP resource.
     static member internal IsApiModule(t: Type) =
         ((t.IsClass && t.IsAbstract && t.IsSealed) || FSharpType.IsModule t)
-        && (FlexControllerTypeResolver.HasRouteAttribute t || FlexControllerTypeResolver.HasHttpActionMethod t)
+        && (BetterDefaultHttpControllerTypeResolver.HasRouteAttribute t || BetterDefaultHttpControllerTypeResolver.HasHttpActionMethod t)
 
     /// Identifies a Type as either usable as a "controller" or not.
     static member IsControllerTypePredicate(t: Type) =
         Contract.Assert(t <> null)
         t <> null
         && t.IsVisible
-        && (FlexControllerTypeResolver.IsIHttpController t || FlexControllerTypeResolver.IsApiModule t)
+        && (BetterDefaultHttpControllerTypeResolver.IsIHttpController t || BetterDefaultHttpControllerTypeResolver.IsApiModule t)
 
 
 (******************************************************************
