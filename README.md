@@ -160,8 +160,8 @@ adds a `DelegatingHandler` instance to the route's `HttpConfiguration.MessageHan
 
 ## TODO
 
-* Loads of documentation
-* Integrate with [Dyfrig](https://github.com/fsprojects/dyfrig)
+* [Convert to .NET Core](https://github.com/frank-fs/frank/issues/47)
+* Update documentation, especially use with [Azure Functions](https://azure.microsoft.com/en-us/documentation/articles/functions-reference-fsharp/)
 
 ## Team
 
