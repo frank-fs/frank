@@ -1,5 +1,5 @@
 // -------------------------------------------------------------------------------------- // FAKE build script // -------------------------------------------------------------------------------------- #I "packages/FAKE/tools/"
-#I "packages/FAKE/tools"
+#I "packages/build/FAKE/tools"
 #r "FakeLib.dll"
 open System
 open System.IO
@@ -10,7 +10,7 @@ open Fake.ReleaseNotesHelper
 open Fake.Testing
 #if MONO
 #else
-#load "packages/SourceLink.Fake/tools/SourceLink.fsx"
+#load "packages/build/SourceLink.Fake/tools/SourceLink.fsx"
 open SourceLink
 #endif
 
