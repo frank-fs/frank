@@ -303,7 +303,7 @@ open Frank
 //   Should this type subclass HttpServer? If it did it could get
 //   it's own configration and have its own route table. I'm not
 //   convinced System.Web.Routing is worth it, but it's an option.
-type HttpResource(template: string, methods, handler) =
+type HttpResource(template: string, methods:seq<HttpMethod>, handler) =
     inherit System.Web.Http.Routing.HttpRoute(routeTemplate = template.TrimStart([|'/'|]),
                                               defaults = null,
                                               constraints = null,

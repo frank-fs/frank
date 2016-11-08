@@ -1,0 +1,17 @@
+type project
+description
+    Library of helpers for working with Azure Functions from F#
+authors Ryan Riley
+owners panesofglass
+language en-US
+iconUrl https://raw.github.com/fsharp/FSharp.ProjectScaffold/master/nuget/logo.png
+licenseUrl https://github.com/frank-fs/frank/raw/master/LICENSE.txt
+projectUrl https://github.com/frank-fs/frank
+copyright Copyright 2010-2016
+tags
+    fsharp
+    F#
+    Azure
+    AzureFunctions
+    http
+    web

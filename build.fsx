@@ -1,6 +1,5 @@
 // -------------------------------------------------------------------------------------- // FAKE build script // -------------------------------------------------------------------------------------- #I "packages/FAKE/tools/"
 #I "packages/FAKE/tools"
-#r "NuGet.Core.dll"
 #r "FakeLib.dll"
 open System
 open System.IO
@@ -8,6 +7,7 @@ open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
 open Fake.ReleaseNotesHelper
+open Fake.Testing
 #if MONO
 #else
 #load "packages/SourceLink.Fake/tools/SourceLink.fsx"
@@ -65,13 +65,17 @@ let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/frank-fs"
 Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 let (!!) includes = (!! includes).SetBaseDirectory __SOURCE_DIRECTORY__
 let release = parseReleaseNotes (IO.File.ReadAllLines "RELEASE_NOTES.md")
-let isAppVeyorBuild = environVar "APPVEYOR" <> null
+let isAppVeyorBuild = environVar "APPVEYOR" |> isNull |> not
 let nugetVersion = 
     if isAppVeyorBuild then
-        // If `release.NugetVersion` includes a pre-release suffix, just append the `buildVersion`.
-        if release.NugetVersion.Contains("-") then
-            sprintf "%s%s" release.NugetVersion buildVersion
-        else sprintf "%s.%s" release.NugetVersion buildVersion
+        let nugetVersion =
+            let isTagged = Boolean.Parse(environVar "APPVEYOR_REPO_TAG")
+            if isTagged then
+                environVar "APPVEYOR_REPO_TAG_NAME"
+            else
+                sprintf "%s-b%03i" release.NugetVersion (int buildVersion)
+        Shell.Exec("appveyor", sprintf "UpdateBuild -Version \"%s\"" nugetVersion) |> ignore
+        nugetVersion
     else release.NugetVersion
 
 // Generate assembly info files with the right version & up-to-date information
@@ -108,22 +112,12 @@ Target "Build" (fun _ ->
     |> ignore
 )
 
-Target "CopyFiles" (fun _ ->
-    [ "LICENSE.txt" ] |> CopyTo "bin"
-    !! ("src/" + project + "/bin/Release/Frank*.*")
-    |> CopyTo "bin"
-)
-
 // --------------------------------------------------------------------------------------
 // Run the unit tests using test runner
 
 Target "RunTests" (fun _ ->
     !! testAssemblies
-    |> NUnit (fun p ->
-        { p with
-            DisableShadowCopy = true
-            TimeOut = TimeSpan.FromMinutes 20.
-            OutputFile = "TestResults.xml" })
+    |> NUnit3 (fun p -> { p with TimeOut = TimeSpan.FromMinutes 20. })
 )
 
 #if MONO
@@ -134,16 +128,12 @@ Target "RunTests" (fun _ ->
 
 Target "SourceLink" (fun _ ->
     let baseUrl = sprintf "%s/%s/{0}/%%var2%%" gitRaw (project.ToLower())
-    use repo = new GitRepo(__SOURCE_DIRECTORY__)
+
     !! "src/**/*.fsproj"
-    |> Seq.iter (fun f ->
-        let proj = VsProj.LoadRelease f
-        logfn "source linking %s" proj.OutputFilePdb
+    |> Seq.iter (fun project ->
+        let proj = VsProj.LoadRelease project
         let files = proj.Compiles -- "**/AssemblyInfo.fs"
-        repo.VerifyChecksums files
-        proj.VerifyPdbChecksums files
-        proj.CreateSrcSrv baseUrl repo.Revision (repo.Paths files)
-        Pdbstr.exec proj.OutputFilePdb proj.OutputFilePdbSrcSrv
+        SourceLink.Index files proj.OutputFilePdb __SOURCE_DIRECTORY__ baseUrl
     )
 )
 #endif
@@ -151,28 +141,17 @@ Target "SourceLink" (fun _ ->
 // --------------------------------------------------------------------------------------
 // Build a NuGet package
 
-let referenceDependencies dependencies =
-    let packagesDir = __SOURCE_DIRECTORY__  @@ "packages"
-    [ for dependency in dependencies -> dependency, GetPackageVersion packagesDir dependency ]
-
-Target "NuGet" (fun _ ->
-    NuGet (fun p -> 
-        { p with   
-            Authors = authors
-            Project = project
-            Summary = summary
-            Description = description
-            Version = release.NugetVersion
-            ReleaseNotes = String.Join(Environment.NewLine, release.Notes)
-            Tags = tags
+Target "Pack" (fun _ ->
+    Paket.Pack (fun p ->
+        { p with
+            Version = nugetVersion
             OutputPath = "bin"
-            AccessKey = getBuildParamOrDefault "nugetkey" ""
-            Publish = hasBuildParam "nugetkey"
-            Dependencies = referenceDependencies ["Microsoft.AspNet.WebApi.Core"; "Newtonsoft.Json"]
-            Files = [ (@"..\bin\Frank.dll", Some "lib/net45", None)
-                      (@"..\bin\Frank.xml", Some "lib/net45", None)
-                      (@"..\bin\Frank.pdb", Some "lib/net45", None) ] })
-        ("nuget/" + project + ".nuspec")
+            ToolPath = "./.paket/paket.exe"
+        })
+)
+
+Target "Push" (fun _ ->
+    Paket.Push (fun p -> { p with WorkingDir = "bin" })
 )
 
 // --------------------------------------------------------------------------------------
@@ -225,7 +204,6 @@ Target "All" DoNothing
   ==> "AssemblyInfo"
   ==> "Build"
   ==> "RunTests"
-  ==> "CopyFiles"
   ==> "All"
   =?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
   =?> ("GenerateDocs",isLocalBuild && not isMono)
@@ -236,7 +214,7 @@ Target "All" DoNothing
 #else
   =?> ("SourceLink", Pdbstr.tryFind().IsSome )
 #endif
-  ==> "NuGet"
+  ==> "Pack"
   ==> "BuildPackage"
 
 "CleanDocs"
@@ -248,6 +226,7 @@ Target "All" DoNothing
   ==> "Release"
 
 "BuildPackage"
+  ==> "Push"
   ==> "Release"
 
 RunTargetOrDefault "All"
