@@ -9,6 +9,7 @@ nuget Newtonsoft.Json
 group Build
     source http://nuget.org/api/v2
     framework: >= net461
+    redirects: on
 
     nuget FAKE
     nuget SourceLink.Fake
@@ -18,6 +19,7 @@ group Build
 group Test
     source http://nuget.org/api/v2
     framework: >= net461
+    redirects: on
 
     nuget Unquote
     nuget NUnit

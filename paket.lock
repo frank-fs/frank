@@ -8,6 +8,7 @@ NUGET
     Newtonsoft.Json (9.0.1)
 
 GROUP Build
+REDIRECTS: ON
 FRAMEWORK: >= NET461
 NUGET
   remote: http://www.nuget.org/api/v2
@@ -24,6 +25,7 @@ NUGET
     SourceLink.Fake (1.1)
 
 GROUP Test
+REDIRECTS: ON
 FRAMEWORK: >= NET461
 NUGET
   remote: http://www.nuget.org/api/v2
