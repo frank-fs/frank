@@ -51,8 +51,8 @@
   <Import Project="..\..\.paket\paket.targets" />
   <ItemGroup>
     <None Include="paket.references" />
-    <Compile Include="Frank.fsi" />
-    <Compile Include="Frank.fs" />
+    <Compile Include="Http.fsi" />
+    <Compile Include="Http.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
