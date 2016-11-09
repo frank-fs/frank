@@ -6,14 +6,11 @@
 #r "System.Net.Http.dll"
 #r "System.Net.Http.Formatting.dll"
 #r "System.Net.Http.WebRequest.dll"
-#r "System.Web.Http.dll"
 #r "FSharpx.Core.dll"
 #r "Frank.dll"
 open System
 open System.Net
 open System.Net.Http
-open System.Web.Http
-open System.Web.Http.HttpResource
 open FSharp.Control
 open Frank
 
@@ -145,21 +142,6 @@ let echo2 request = async {
 }
 
 (**
-Create a `HttpResource` instance at the root of the site that responds to `POST`.
-*)
-
-let resource = route "/" <| post echo2
-
-(**
-Other combinators are available to handle other scenarios, such as:
-
-1. Content Negotiation
-2. Building Responses
-3. Combining applications into resources
-4. Combining resources into applications
-
-Check the samples for more examples of these combinators.
-
 ### Define a Middleware
 
 Middlewares follow a Russian-doll model for wrapping resource handlers with additional functionality. Frank middlewares take an `HttpApplication` and return an `HttpApplication`.
@@ -179,17 +161,4 @@ let log app = fun (request : HttpRequestMessage) -> async {
 
 (**
 The most likely place to insert middlewares is the outer edge of your application. However, since middlewares are themselves just `HttpApplication`s, you can compose them into a Frank application at any level. Want to support logging only on one troublesome resource? No problem. Expose the resource as an application, wrap it in the log middleware, and insert it into the larger application as you did before.
-
-## Hosting
-
-Frank will run on any hosting platform that supports the
-[Web API](http://asp.net/web-api/) library. To hook up your Frank application,
-use the `register` function, passing in the resources and the instance of `HttpConfiguration`.
-*)
-
-register [resource] config
-
-(**
-This extension adds a default route to your `HttpConfiguration` instance and
-adds a `DelegatingHandler` instance to the route's `HttpConfiguration.MessageHandlers` collection.
 *)

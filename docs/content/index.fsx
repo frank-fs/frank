@@ -6,7 +6,6 @@
 #r "System.Net.Http.dll"
 #r "System.Net.Http.Formatting.dll"
 #r "System.Net.Http.WebRequest.dll"
-#r "System.Web.Http.dll"
 #r "FSharpx.Core.dll"
 #r "Frank.dll"
 open System.Net

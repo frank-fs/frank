@@ -1,16 +1,24 @@
 source http://nuget.org/api/v2
+framework: >= net461
+redirects: on
 
-nuget FAKE
-nuget SourceLink.Fake
-nuget Nuget.CommandLine
-nuget FSharp.Core ~> 3.1.2
-nuget Microsoft.AspNet.Razor 2.0.30506.0
-nuget Microsoft.AspNet.WebApi.Client 5.1.2
-nuget Microsoft.AspNet.WebApi.Core 5.1.2
-nuget Newtonsoft.Json 6.0.3
-nuget RazorEngine ~> 3.3.0
-nuget Unquote ~> 2.2.2
-nuget NUnit
-nuget NUnit.Runners
-nuget FSharp.Formatting
-nuget FSharp.Compiler.Service
+nuget FSharp.Core
+nuget Microsoft.AspNet.WebApi.Client
+nuget Newtonsoft.Json
+
+group Build
+    source http://nuget.org/api/v2
+    framework: >= net461
+
+    nuget FAKE
+    nuget SourceLink.Fake
+    nuget FSharp.Formatting
+    nuget RazorEngine
+
+group Test
+    source http://nuget.org/api/v2
+    framework: >= net461
+
+    nuget Unquote
+    nuget NUnit
+    nuget NUnit.Runners
