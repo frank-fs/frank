@@ -104,3 +104,12 @@ module Tests =
         test <@ content.Headers.ContentType.MediaType = "application/xml" @>
         let result = content.ReadAsAsync<TestType>() |> Async.AwaitTask |> Async.RunSynchronously
         test <@ result.FirstName = body.FirstName && result.LastName = body.LastName @>
+    
+    [<Test>]
+    let ``test readFormUrlEncoded produces a Map<string, string> of the same values``() =
+        let pairs = [ "a","b"; "c","d" ]
+        use body = Form pairs
+        use request = new HttpRequestMessage(HttpMethod.Post, "http://example.org/", Content = body)
+        let result = readFormUrlEncoded request.Content |> Async.RunSynchronously
+        let expected = Map.ofList pairs
+        test <@ result = expected @>

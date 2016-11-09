@@ -3,7 +3,7 @@
 ## License
 
 Author: Ryan Riley <ryan.riley@panesofglass.org>
-Copyright (c) 2011-2012, Ryan Riley.
+Copyright (c) 2011-2016, Ryan Riley.
 
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
@@ -89,6 +89,9 @@ module Core =
     /// HTTP methods.
     val ``405 Method Not Allowed`` : allowedMethods: seq<HttpMethod> -> HttpApplication
 
+    /// Helper function to read FormUrlEncoded content as a Map<string, string>
+    val readFormUrlEncoded<'T> : content:HttpContent -> Async<Map<string, string>>
+
     (* Content Negotiation Helpers *)
 
     val ``406 Not Acceptable`` : HttpApplication
@@ -119,49 +122,3 @@ module Core =
 type AsyncHandler =
     inherit DelegatingHandler
     val AsyncSend : HttpRequestMessage -> Async<HttpResponseMessage>
-
-
-(**
- * # F# Extensions to System.Web.Http
- *)
-
-namespace System.Web.Http
-
-open System.Net
-open System.Net.Http
-open System.Web.Http
-open Frank
-
-/// HTTP resources expose an resource handler function at a given uri.
-/// In the common MVC-style frameworks, this would roughly correspond
-/// to a `Controller`. Resources should represent a single entity type,
-/// and it is important to note that a `Foo` is not the same entity
-/// type as a `Foo list`, which is where most MVC approaches go wrong. 
-/// The optional `uriMatcher` parameter allows the consumer to provide
-/// a more advanced uri matching algorithm, such as one using regular
-/// expressions.
-type HttpResource =
-    inherit System.Web.Http.Routing.HttpRoute
-    new : template: string * methods: seq<HttpMethod> * handler: (HttpRequestMessage -> Async<HttpResponseMessage> option) -> HttpResource
-    member Name : string
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module HttpResource =
-
-    val mapResourceHandler : httpMethod: HttpMethod * handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val get : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val post : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val put : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val delete : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val options : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val trace : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-    val patch : handler: (HttpRequestMessage -> 'b) -> HttpMethod list * (#HttpRequestMessage -> 'b option)
-
-    /// Helper to more easily access URL params
-    val getParam<'a> : request: HttpRequestMessage -> key: string -> 'a option
-    val orElse : left: 'a list * ('b -> 'c option) -> right: 'a list * ('b -> 'c option) -> 'a list * ('b -> 'c option)
-    val inline (<|>) : left: 'a list * ('b -> 'c option) -> right: 'a list * ('b -> 'c option) -> 'a list * ('b -> 'c option)
-    val route : uri: string -> handler: seq<HttpMethod> * (HttpRequestMessage -> Async<HttpResponseMessage> option) -> HttpResource
-    val routeResource : uri: string -> handlers: seq<HttpMethod list * (HttpRequestMessage -> Async<HttpResponseMessage> option)> -> HttpResource
-    val ``404 Not Found`` : HttpApplication
-    val register : resources: seq<HttpResource> -> config: HttpConfiguration -> unit

@@ -4,7 +4,6 @@ redirects: on
 
 nuget FSharp.Core
 nuget Microsoft.AspNet.WebApi.Client
-nuget Microsoft.AspNet.WebApi.Core
 nuget Newtonsoft.Json
 
 group Build
