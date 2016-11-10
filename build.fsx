@@ -147,6 +147,7 @@ Target "Pack" (fun _ ->
             Version = nugetVersion
             OutputPath = "bin"
             ToolPath = "./.paket/paket.exe"
+            MinimumFromLockFile = true
         })
 )
 
