@@ -1,5 +1,5 @@
 REDIRECTS: ON
-FRAMEWORK: >= NET461
+RESTRICTION: >= net461
 NUGET
   remote: http://www.nuget.org/api/v2
     FSharp.Core (4.0.0.1)
@@ -9,7 +9,7 @@ NUGET
 
 GROUP Build
 REDIRECTS: ON
-FRAMEWORK: >= NET461
+RESTRICTION: >= net461
 NUGET
   remote: http://www.nuget.org/api/v2
     FAKE (4.45.1)
@@ -26,7 +26,7 @@ NUGET
 
 GROUP Test
 REDIRECTS: ON
-FRAMEWORK: >= NET461
+RESTRICTION: >= net461
 NUGET
   remote: http://www.nuget.org/api/v2
     NUnit (3.5)
