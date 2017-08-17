@@ -1,5 +1,4 @@
 # Frank
-[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/frank-fs/frank?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/pt3i73qxyxgjax5d?svg=true)](https://ci.appveyor.com/project/frank-fs/frank)
 [![Build Status](https://travis-ci.org/frank-fs/frank.png?branch=master)](https://travis-ci.org/frank-fs/frank)
