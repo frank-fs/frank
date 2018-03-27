@@ -40,3 +40,4 @@ tools/
 AssemblyInfo.fs
 *.userprefs
 .fake/
+paket-files/
