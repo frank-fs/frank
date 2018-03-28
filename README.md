@@ -159,7 +159,7 @@ adds a `DelegatingHandler` instance to the route's `HttpConfiguration.MessageHan
 
 ## TODO
 
-* [Convert to .NET Core](https://github.com/frank-fs/frank/issues/47)
+* <s>[Convert to .NET Core](https://github.com/frank-fs/frank/issues/47)</s>
 * Update documentation, especially use with [Azure Functions](https://azure.microsoft.com/en-us/documentation/articles/functions-reference-fsharp/)
 
 ## Team
