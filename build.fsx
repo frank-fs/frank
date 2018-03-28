@@ -105,7 +105,7 @@ Target "Pack" (fun _ ->
 )
 
 Target "Push" (fun _ ->
-    DotNetCli.Publish (fun p ->
+    Paket.Push (fun p ->
         { p with WorkingDir = buildDir })
 )
 
