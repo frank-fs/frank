@@ -18,8 +18,10 @@ group Test
     source http://nuget.org/api/v2
     framework: auto-detect
 
+    nuget AppVeyor.TestLogger
     nuget Microsoft.NET.Test.Sdk
     nuget NUnit
     nuget NUnit.Runners
     nuget NUnit3TestAdapter
+    nuget NUnitXml.TestLogger
     nuget Unquote

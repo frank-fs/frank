@@ -23,6 +23,8 @@ let gitHome = "git@github.com:frank-fs"
 let gitName = "frank"
 let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/frank-fs"
 
+let buildDir = IO.Path.Combine(Environment.CurrentDirectory, "bin")
+
 // --------------------------------------------------------------------------------------
 // The rest of the file includes standard build steps 
 // --------------------------------------------------------------------------------------
@@ -73,13 +75,17 @@ Target "Build" (fun _ ->
 // Run the unit tests using test runner
 
 Target "RunTests" (fun _ ->
-    try
-        DotNetCli.Test (fun p ->
-            { p with
-                Project = "tests/Frank.Tests"
-                Configuration = "Release" })
-    finally
-        AppVeyor.UploadTestResultsXml AppVeyor.TestResultsType.NUnit "bin"
+    DotNetCli.Test (fun p ->
+        { p with
+            Project = "tests/Frank.Tests"
+            Configuration = "Release"
+            AdditionalArgs =
+              [ yield "--test-adapter-path:."
+                yield if isAppVeyorBuild then
+                        sprintf "--logger:Appveyor"
+                      else
+                        sprintf "--logger:nunit;LogFileName=%s" (IO.Path.Combine(buildDir, "TestResults.xml")) ]
+        })
 )
 
 // --------------------------------------------------------------------------------------
@@ -89,7 +95,7 @@ Target "Pack" (fun _ ->
     DotNetCli.Pack (fun p ->
         { p with
             Project = "src/Frank"
-            OutputPath = "bin"
+            OutputPath = buildDir
             AdditionalArgs =
               [ "--no-build"
                 sprintf "/p:Version=%s" nugetVersion
@@ -100,7 +106,7 @@ Target "Pack" (fun _ ->
 
 Target "Push" (fun _ ->
     DotNetCli.Publish (fun p ->
-        { p with WorkingDir = "bin" })
+        { p with WorkingDir = buildDir })
 )
 
 // --------------------------------------------------------------------------------------
@@ -152,14 +158,12 @@ Target "All" DoNothing
   =?> ("BuildVersion", isAppVeyorBuild)
   ==> "Build"
   ==> "RunTests"
+  ==> "Pack"
+  ==> "BuildPackage"
   ==> "All"
   =?> ("GenerateReferenceDocs",isLocalBuild && not isMono)
   =?> ("GenerateDocs",isLocalBuild && not isMono)
   =?> ("ReleaseDocs",isLocalBuild && not isMono)
-
-"All" 
-  ==> "Pack"
-  ==> "BuildPackage"
 
 "CleanDocs"
   ==> "GenerateHelp"
@@ -169,7 +173,7 @@ Target "All" DoNothing
 "ReleaseDocs"
   ==> "Release"
 
-"BuildPackage"
+"All"
   ==> "Push"
   ==> "Release"
 
