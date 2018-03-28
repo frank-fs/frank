@@ -1,6 +1,6 @@
-### New in 4.0.0 - (TBD)
-* Update to .NET 4.6.1
-* Re-purpose for use with Azure Functions
+### New in 4.0.0 - (Released 2018/03/27)
+* Update to .NETStandard 2.0 and .NET 4.6.1
+* Now more easily used with Azure Functions or ASP.NET Core
 
 ### New in 3.1.1 - (Released 2014/12/07)
 * Use FSharp.Core from NuGet
