@@ -1,40 +1,16 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <ProjectGuid>d48605f7-9b14-4ad6-91b7-6aa15609820e</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Frank.Tests</RootNamespace>
-    <AssemblyName>Frank.Tests</AssemblyName>
-    <TargetFrameworks>net461</TargetFrameworks>
-    <WarningLevel>3</WarningLevel>
-    <Name>Frank.Tests</Name>
+    <TargetFrameworks>netcoreapp2.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <Tailcalls>false</Tailcalls>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <Tailcalls>true</Tailcalls>
-    <DefineConstants>TRACE</DefineConstants>
-  </PropertyGroup>
   <ItemGroup>
-    <Content Include="App.config" />
     <None Include="paket.references" />
     <Compile Include="HttpTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Frank\Frank.fsproj">
-      <Name>Frank</Name>
-      <Project>{06dbe12f-d4be-40c4-86d8-81f0202dacc2}</Project>
-      <Private>True</Private>
-    </ProjectReference>
+    <ProjectReference Include="..\..\src\Frank\Frank.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

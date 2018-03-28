@@ -1,7 +1,6 @@
-FSharp.Core
-Microsoft.AspNet.WebApi.Client
-Newtonsoft.Json
-
 group Test
-    NUnit
-    Unquote
+Microsoft.NET.Test.Sdk
+NUnit
+NUnit.Runners
+NUnit3TestAdapter
+Unquote

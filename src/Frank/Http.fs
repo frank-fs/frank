@@ -3,7 +3,7 @@
 ## License
 
 Author: Ryan Riley <ryan.riley@panesofglass.org>
-Copyright (c) 2011-2016, Ryan Riley.
+Copyright (c) 2011-2018, Ryan Riley.
 
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
@@ -12,12 +12,10 @@ module Frank.Http
 
 open System
 open System.Collections.Generic
-open System.IO
 open System.Net
 open System.Net.Http
 open System.Net.Http.Formatting
 open System.Net.Http.Headers
-open System.Text
 open System.Threading.Tasks
 
 // ## Define the web application interface
@@ -69,7 +67,7 @@ let respond statusCode headers content (request: HttpRequestMessage) =
     let response =
         match content with
         | Some c -> new HttpResponseMessage(statusCode, Content = c, RequestMessage = request)
-        | None     -> request.CreateResponse(statusCode)
+        | None   -> new HttpResponseMessage(statusCode, RequestMessage = request)
     headers response
     response
 

@@ -1,2 +1,5 @@
-﻿[<EntryPoint>]
-let main args = 0
+module Program
+
+[<EntryPoint>]
+let main args =
+    0

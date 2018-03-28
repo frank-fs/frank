@@ -3,7 +3,7 @@
 ## License
 
 Author: Ryan Riley <ryan.riley@panesofglass.org>
-Copyright (c) 2011-2016, Ryan Riley.
+Copyright (c) 2011-2018, Ryan Riley.
 
 Licensed under the Apache License, Version 2.0.
 See LICENSE.txt for details.
@@ -11,14 +11,10 @@ See LICENSE.txt for details.
 module Frank.Http
 
 open System
-open System.Collections.Generic
 open System.IO
 open System.Net
 open System.Net.Http
 open System.Net.Http.Formatting
-open System.Net.Http.Headers
-open System.Text
-open System.Threading.Tasks
 
 /// `HttpApplication` defines the contract for processing any request.
 /// An application takes an `HttpRequestMessage` and returns an `HttpRequestHandler` asynchronously.

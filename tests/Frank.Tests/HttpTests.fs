@@ -1,15 +1,9 @@
 ﻿module Frank.Tests.Http
 
-open System
-open System.Collections.Generic
-open System.IO
 open System.Net
 open System.Net.Http
 open System.Net.Http.Formatting
-open System.Net.Http.Headers
-open System.Text
 open Frank.Http
-open Newtonsoft.Json.Linq
 open Newtonsoft.Json.Serialization
 open NUnit.Framework 
 open Swensen.Unquote.Assertions

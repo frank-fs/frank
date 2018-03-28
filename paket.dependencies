@@ -1,7 +1,7 @@
 source http://nuget.org/api/v2
-redirects: on
+framework: auto-detect
 
-nuget FSharp.Core
+nuget FSharp.Core 4.2.3
 nuget Microsoft.AspNet.WebApi.Client
 nuget Newtonsoft.Json
 
@@ -11,15 +11,15 @@ group Build
     redirects: on
 
     nuget FAKE
-    nuget SourceLink.Fake
     nuget FSharp.Formatting
     nuget RazorEngine
 
 group Test
     source http://nuget.org/api/v2
-    framework: >= net461
-    redirects: on
+    framework: auto-detect
 
-    nuget Unquote
+    nuget Microsoft.NET.Test.Sdk
     nuget NUnit
     nuget NUnit.Runners
+    nuget NUnit3TestAdapter
+    nuget Unquote

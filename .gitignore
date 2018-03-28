@@ -36,7 +36,6 @@ temp/
 test/
 tools/
 *.nupkg
-.paket/paket.exe
 AssemblyInfo.fs
 *.userprefs
 .fake/
