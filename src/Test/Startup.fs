@@ -34,8 +34,7 @@ type Startup private () =
     member this.Configure(app: IApplicationBuilder, env: IHostingEnvironment) =
 
         let helloName =
-            resource {
-                applicationBuilder app
+            resource app {
                 name "Hello Name"
                 template "hello/{name}"
 
@@ -49,8 +48,7 @@ type Startup private () =
             }
 
         let hello =
-            resource {
-                applicationBuilder app
+            resource app {
                 name "Hello"
                 template "hello"
 

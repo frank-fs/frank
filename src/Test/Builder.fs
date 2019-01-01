@@ -54,32 +54,26 @@ module Builder =
 
     [<Struct>]
     type ResourceSpec =
-        { ApplicationBuilder : IApplicationBuilder
-          Name : string
+        { Name : string
           Template : string
           Handlers : (string * RequestDelegate) list }
         static member Empty =
-            { ApplicationBuilder = Unchecked.defaultof<_>
-              Name = Unchecked.defaultof<_>
+            { Name = Unchecked.defaultof<_>
               Template = Unchecked.defaultof<_>
               Handlers = [] }
-        member spec.Build() =
-            let routeBuilder = RouteBuilder(spec.ApplicationBuilder, methodNotAllowed)
+        member spec.Build(applicationBuilder) =
+            let routeBuilder = RouteBuilder(applicationBuilder, methodNotAllowed)
             for httpMethod, handler in spec.Handlers do
                 routeBuilder.MapVerb(httpMethod, spec.Template, handler) |> ignore
             routeBuilder.MapRoute(name=spec.Name, template=spec.Template) |> ignore
             routeBuilder.Build()
 
-    type ResourceBuilder () =
+    type ResourceBuilder (applicationBuilder:IApplicationBuilder) =
 
         member __.Run(spec:ResourceSpec) =
-            spec.Build()
+            spec.Build(applicationBuilder)
         
         member __.Yield(_) = ResourceSpec.Empty
-
-        [<CustomOperation("applicationBuilder")>]
-        member __.ApplicationBuilder(spec:ResourceSpec, applicationBuilder) =
-            { spec with ApplicationBuilder = applicationBuilder }
 
         [<CustomOperation("name")>]
         member __.Name(spec, name) = { spec with Name = name }
@@ -210,4 +204,4 @@ module Builder =
         member this.Trace(spec, handler:HttpContext -> unit) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
 
-    let resource = ResourceBuilder()
+    let resource applicationBuilder = ResourceBuilder(applicationBuilder)
