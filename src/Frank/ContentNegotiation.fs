@@ -1,4 +1,4 @@
-namespace Test
+namespace Frank
 
 module ContentNegotiation =
 

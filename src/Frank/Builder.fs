@@ -1,4 +1,4 @@
-namespace Test
+namespace Frank
 
 module Builder =
 
@@ -11,45 +11,6 @@ module Builder =
     open Microsoft.AspNetCore.Routing.Constraints
     open Microsoft.Extensions.DependencyInjection
 
-    type RouterSpec =
-        { Middleware : (IApplicationBuilder -> IApplicationBuilder)
-          Routes : RouteCollection }
-        static member Empty = { Middleware = id; Routes = RouteCollection() }
-
-    type RouterBuilder (applicationBuilder:IApplicationBuilder) =
-
-        member __.Run(spec:RouterSpec) =
-            spec.Middleware applicationBuilder |> ignore
-            applicationBuilder.UseRouter(spec.Routes) |> ignore
-
-        member __.Yield(_) = RouterSpec.Empty
-
-        [<CustomOperation("route")>]
-        member __.Route(spec, router:IRouter) =
-            let routes = spec.Routes
-            routes.Add(router)
-            { spec with Routes = routes }
-
-        // TODO: replace `Startup` with ability to hook up both services and app builder configuration
-
-        [<CustomOperation("plug")>]
-        member __.Plug(spec, f) =
-            { spec with Middleware = fun app -> f app }
-
-        [<CustomOperation("plugWhen")>]
-        member __.PlugWhen(spec, cond, f) =
-            if cond then
-                { spec with Middleware = fun app -> f app }
-            else spec
-
-        [<CustomOperation("plugWhenNot")>]
-        member __.PlugWhenNot(spec, cond, f) =
-            if not cond then
-                { spec with Middleware = fun app -> f app }
-            else spec
-
-    let router applicationBuilder = RouterBuilder(applicationBuilder)
-
     let private methodNotAllowed =
         RequestDelegate(fun ctx ->
             ctx.Response.StatusCode <- 405
@@ -58,14 +19,9 @@ module Builder =
 
     [<Struct>]
     type ResourceSpec =
-        { Name : string
-          Template : string
-          Handlers : (string * RequestDelegate) list }
-        static member Empty =
-            { Name = Unchecked.defaultof<_>
-              Template = Unchecked.defaultof<_>
-              Handlers = [] }
-        member spec.Build(serviceProvider:IServiceProvider) =
+        { Name : string; Handlers : (string * RequestDelegate) list }
+        static member Empty = { Name = Unchecked.defaultof<_>; Handlers = [] }
+        member spec.Build(serviceProvider:IServiceProvider, routeTemplate) =
             let inlineConstraintResolver = serviceProvider.GetRequiredService<IInlineConstraintResolver>()
             // Create routes for current resource, similar to approach used by RouteBuilder.
             let routes = RouteCollection()
@@ -73,7 +29,7 @@ module Builder =
                 let route =
                     Route(
                         target=RouteHandler handler,
-                        routeTemplate=spec.Template,
+                        routeTemplate=routeTemplate,
                         defaults=null,
                         constraints=dict [|"httpMethod", box(HttpMethodRouteConstraint([|httpMethod|]))|],
                         dataTokens=null,
@@ -82,8 +38,8 @@ module Builder =
             let defaultRoute =
                 Route(
                     target=methodNotAllowed,
-                    routeName=spec.Name,
-                    routeTemplate=spec.Template,
+                    routeName=(if String.IsNullOrEmpty spec.Name then routeTemplate else spec.Name),
+                    routeTemplate=routeTemplate,
                     defaults=RouteValueDictionary(null),
                     constraints=(RouteValueDictionary(null) :> IDictionary<string, obj>),
                     dataTokens=RouteValueDictionary(null),
@@ -91,18 +47,15 @@ module Builder =
             routes.Add(defaultRoute)
             routes :> IRouter
 
-    type ResourceBuilder (serviceProvider) =
+    type ResourceBuilder (serviceProvider, routeTemplate) =
 
         member __.Run(spec:ResourceSpec) =
-            spec.Build(serviceProvider)
+            spec.Build(serviceProvider, routeTemplate)
         
         member __.Yield(_) = ResourceSpec.Empty
 
         [<CustomOperation("name")>]
         member __.Name(spec, name) = { spec with Name = name }
-
-        [<CustomOperation("template")>]
-        member __.Template(spec, template) = { spec with Template = template }
 
         member __.AddHandler(httpMethod, spec, handler) =
             { spec with Handlers=(httpMethod, handler)::spec.Handlers}
@@ -227,4 +180,43 @@ module Builder =
         member this.Trace(spec, handler:HttpContext -> unit) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
 
-    let resource serviceProvider = ResourceBuilder(serviceProvider)
+    let resource serviceProvider routeTemplate = ResourceBuilder(serviceProvider, routeTemplate)
+
+    type RouterSpec =
+        { Middleware : (IApplicationBuilder -> IApplicationBuilder)
+          Routes : RouteCollection }
+        static member Empty = { Middleware = id; Routes = RouteCollection() }
+
+    type RouterBuilder (applicationBuilder:IApplicationBuilder) =
+
+        member __.Run(spec:RouterSpec) =
+            spec.Middleware applicationBuilder |> ignore
+            applicationBuilder.UseRouter(spec.Routes) |> ignore
+
+        member __.Yield(_) = RouterSpec.Empty
+
+        [<CustomOperation("route")>]
+        member __.Route(spec, router:IRouter) =
+            let routes = spec.Routes
+            routes.Add(router)
+            { spec with Routes = routes }
+
+        // TODO: replace `Startup` with ability to hook up both services and app builder configuration
+
+        [<CustomOperation("plug")>]
+        member __.Plug(spec, f) =
+            { spec with Middleware = fun app -> f app }
+
+        [<CustomOperation("plugWhen")>]
+        member __.PlugWhen(spec, cond, f) =
+            if cond then
+                { spec with Middleware = fun app -> f app }
+            else spec
+
+        [<CustomOperation("plugWhenNot")>]
+        member __.PlugWhenNot(spec, cond, f) =
+            if not cond then
+                { spec with Middleware = fun app -> f app }
+            else spec
+
+    let router applicationBuilder = RouterBuilder(applicationBuilder)
