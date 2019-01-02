@@ -7,14 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="ContentNegotiation.fs" />
-    <Compile Include="Builder.fs" />
     <Compile Include="Startup.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../ResourceBuilder/ResourceBuilder.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.All" />
     <PackageReference Include="TaskBuilder.fs" Version="2.1.0" />
   </ItemGroup>
 

@@ -44,7 +44,7 @@ type Startup private () =
 
                 put (fun ctx ->
                     let name = ctx.GetRouteValue("name") |> string
-                    ctx.Negotiate(201, name))
+                    ContentNegotiation.negotiate 201 name ctx)
             }
 
         let hello =
@@ -52,9 +52,13 @@ type Startup private () =
                 name "Hello"
                 template "hello"
 
+                // Using HttpContext -> () overload
                 get (fun ctx ->
-                    ctx.Response.WriteAsync("Hello, world!"))
+                    use writer = new System.IO.StreamWriter(ctx.Response.Body)
+                    writer.Write("Hello, world!")
+                    writer.Flush())
 
+                // Using HttpContext -> Task<'a> overload
                 post (fun ctx ->
                     task {
                         ctx.Request.EnableBuffering()
