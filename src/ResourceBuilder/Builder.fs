@@ -2,10 +2,14 @@ namespace Test
 
 module Builder =
 
+    open System
+    open System.Collections.Generic
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Http
     open Microsoft.AspNetCore.Routing
+    open Microsoft.AspNetCore.Routing.Constraints
+    open Microsoft.Extensions.DependencyInjection
 
     type RouterSpec =
         { Middleware : (IApplicationBuilder -> IApplicationBuilder)
@@ -61,17 +65,36 @@ module Builder =
             { Name = Unchecked.defaultof<_>
               Template = Unchecked.defaultof<_>
               Handlers = [] }
-        member spec.Build(applicationBuilder) =
-            let routeBuilder = RouteBuilder(applicationBuilder, methodNotAllowed)
+        member spec.Build(serviceProvider:IServiceProvider) =
+            let inlineConstraintResolver = serviceProvider.GetRequiredService<IInlineConstraintResolver>()
+            // Create routes for current resource, similar to approach used by RouteBuilder.
+            let routes = RouteCollection()
             for httpMethod, handler in spec.Handlers do
-                routeBuilder.MapVerb(httpMethod, spec.Template, handler) |> ignore
-            routeBuilder.MapRoute(name=spec.Name, template=spec.Template) |> ignore
-            routeBuilder.Build()
+                let route =
+                    Route(
+                        target=RouteHandler handler,
+                        routeTemplate=spec.Template,
+                        defaults=null,
+                        constraints=dict [|"httpMethod", box(HttpMethodRouteConstraint([|httpMethod|]))|],
+                        dataTokens=null,
+                        inlineConstraintResolver=inlineConstraintResolver)
+                routes.Add(route)
+            let defaultRoute =
+                Route(
+                    target=methodNotAllowed,
+                    routeName=spec.Name,
+                    routeTemplate=spec.Template,
+                    defaults=RouteValueDictionary(null),
+                    constraints=(RouteValueDictionary(null) :> IDictionary<string, obj>),
+                    dataTokens=RouteValueDictionary(null),
+                    inlineConstraintResolver=inlineConstraintResolver)
+            routes.Add(defaultRoute)
+            routes :> IRouter
 
-    type ResourceBuilder (applicationBuilder:IApplicationBuilder) =
+    type ResourceBuilder (serviceProvider) =
 
         member __.Run(spec:ResourceSpec) =
-            spec.Build(applicationBuilder)
+            spec.Build(serviceProvider)
         
         member __.Yield(_) = ResourceSpec.Empty
 
@@ -204,4 +227,4 @@ module Builder =
         member this.Trace(spec, handler:HttpContext -> unit) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
 
-    let resource applicationBuilder = ResourceBuilder(applicationBuilder)
+    let resource serviceProvider = ResourceBuilder(serviceProvider)
