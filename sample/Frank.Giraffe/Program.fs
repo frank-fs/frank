@@ -110,7 +110,7 @@ let main _ =
             .UseIISIntegration()
             .UseWebRoot(webRoot)
 
-    let hostBuilder : IWebHostBuilder =
+    let hostBuilder =
         webHost initBuilder {
             logging configureLogging
 

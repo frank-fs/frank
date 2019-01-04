@@ -62,7 +62,7 @@ let hello app =
 
 [<EntryPoint>]
 let main args =
-    let builder : IWebHostBuilder =
+    let builder =
         webHost (WebHost.CreateDefaultBuilder(args)) {
             logging (fun options->
                 options.AddConsole()
