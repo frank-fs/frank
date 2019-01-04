@@ -1,16 +1,16 @@
-module Test.Extensions
+module Sample.Extensions
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
 /// Helper function to determine whether the application
 /// is running in a development environment.
 let isDevelopment (app:IApplicationBuilder) =
     app.ApplicationServices
-       .GetService<IHostingEnvironment>()
+       .GetService<IWebHostEnvironment>()
        .IsDevelopment()
 
 type Frank.Builder.WebHostBuilder with
@@ -31,8 +31,6 @@ type Frank.Builder.WebHostBuilder with
             Services = fun services ->
                 spec.Services(services)
                     .AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
-                    .SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
                     .AddXmlDataContractSerializerFormatters()
-                    .AddJsonFormatters()
                     |> ignore
                 services }

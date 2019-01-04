@@ -42,4 +42,9 @@ Thumbs.db
 *~
 
 .idea/
-*.DotSettings.user
+.fake/
+.ionide/
+.vs/
+.vscode/
+*.user
+launchSettings.json

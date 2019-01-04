@@ -5,10 +5,8 @@ open System.IO
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Logging
-open FSharp.Control.Tasks.V2.ContextInsensitive
 open Giraffe
 open Frank.Builder
 open Frank.Giraffe.Extensions
@@ -59,14 +57,14 @@ let indexHandler (name : string) =
     let view      = Views.index model
     htmlView view
 
-let helloWorld app =
-    resource "/" app {
+let helloWorld =
+    resource "/" {
         name "Hello World"
         get (indexHandler "world")
     }
 
-let helloName app =
-    resource "/hello/{name}" app {
+let helloName =
+    resource "/hello/{name}" {
         name "Hello Name"
         get (fun next ctx ->
             let name = ctx.GetRouteValue("name") |> string
@@ -101,7 +99,7 @@ let main _ =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
 
-    let hostBuilder =
+    let hostBuilder : IWebHostBuilder =
         webHost (Microsoft.AspNetCore.Hosting.WebHostBuilder()) {
             configure (fun builder ->
                 builder.UseKestrel()
@@ -119,8 +117,8 @@ let main _ =
             plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
             plug StaticFileExtensions.UseStaticFiles
 
-            route helloWorld
-            route helloName
+            resource helloWorld
+            resource helloName
         }
 
     let host = hostBuilder.Build()

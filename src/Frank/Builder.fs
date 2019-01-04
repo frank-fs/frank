@@ -3,58 +3,43 @@ namespace Frank
 module Builder =
 
     open System
-    open System.Collections.Generic
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
     open Microsoft.AspNetCore.Http
     open Microsoft.AspNetCore.Routing
-    open Microsoft.AspNetCore.Routing.Constraints
     open Microsoft.Extensions.DependencyInjection
+    open Microsoft.Extensions.FileProviders
 
-    let private methodNotAllowedHandler =
-        RequestDelegate(fun ctx ->
-            ctx.Response.StatusCode <- 405
-            upcast Task.FromResult())
-        |> RouteHandler
+    [<Struct>]
+    type Resource = { Endpoints : Endpoint[] }
 
     type ResourceSpec =
         { Name : string; Handlers : (string * RequestDelegate) list }
         static member Empty = { Name = Unchecked.defaultof<_>; Handlers = [] }
-        member spec.Build(serviceProvider:IServiceProvider, routeTemplate) =
-            let inlineConstraintResolver = serviceProvider.GetRequiredService<IInlineConstraintResolver>()
-            // Create routes for current resource, similar to approach used by RouteBuilder.
-            let routes = RouteCollection()
-            for httpMethod, handler in spec.Handlers do
-                let route =
-                    Route(
-                        target=RouteHandler handler,
-                        routeTemplate=routeTemplate,
-                        defaults=null,
-                        constraints=dict [|"httpMethod", box(HttpMethodRouteConstraint([|httpMethod|]))|],
-                        dataTokens=null,
-                        inlineConstraintResolver=inlineConstraintResolver)
-                routes.Add(route)
-            let defaultRoute =
-                Route(
-                    target=methodNotAllowedHandler,
-                    routeName=(if String.IsNullOrEmpty spec.Name then routeTemplate else spec.Name),
-                    routeTemplate=routeTemplate,
-                    defaults=RouteValueDictionary(null),
-                    constraints=(RouteValueDictionary(null) :> IDictionary<string, obj>),
-                    dataTokens=RouteValueDictionary(null),
-                    inlineConstraintResolver=inlineConstraintResolver)
-            routes.Add(defaultRoute)
-            routes :> IRouter
+        member spec.Build(routeTemplate) =
+            let {Name=name; Handlers=handlers} = spec
+            let routePattern = Patterns.RoutePatternFactory.Parse routeTemplate
+            let endpoints =
+                [| for httpMethod, handler in handlers ->
+                    let displayName = httpMethod+" "+(if String.IsNullOrEmpty name then routeTemplate else name)
+                    let metadata = EndpointMetadataCollection(HttpMethodMetadata [|httpMethod|])
+                    RouteEndpoint(
+                        requestDelegate=handler,
+                        routePattern=routePattern,
+                        order=0,
+                        metadata=metadata,
+                        displayName=displayName) :> Endpoint |]
+            { Endpoints = endpoints }
 
     [<Sealed>]
-    type ResourceBuilder (routeTemplate, applicationBuilder:IApplicationBuilder) =
+    type ResourceBuilder (routeTemplate) =
         static let methodNotAllowed (ctx:HttpContext) =
             ctx.Response.StatusCode <- 405
             Task.FromResult(Some ctx)
 
-        member __.Run(spec:ResourceSpec) =
-            spec.Build(applicationBuilder.ApplicationServices, routeTemplate)
+        member __.Run(spec:ResourceSpec) : Resource =
+            spec.Build(routeTemplate)
         
         member __.Yield(_) = ResourceSpec.Empty
 
@@ -220,18 +205,28 @@ module Builder =
         member __.Trace(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
-    let resource routeTemplate applicationBuilder = ResourceBuilder(routeTemplate, applicationBuilder)
+    let resource routeTemplate = ResourceBuilder(routeTemplate)
+
+    [<Sealed>]
+    type internal ResourceEndpointDataSource(endpoints:Endpoint[]) =
+        inherit EndpointDataSource()
+
+        override __.Endpoints = endpoints :> _
+        override __.GetChangeToken() = NullChangeToken.Singleton :> _
 
     type WebHostSpec =
         { Host : (IWebHostBuilder -> IWebHostBuilder)
           Middleware : (IApplicationBuilder -> IApplicationBuilder)
-          Routes : (IApplicationBuilder -> IRouter) list
+          Endpoints : Endpoint[]
           Services : (IServiceCollection -> IServiceCollection) }
         static member Empty =
             { Host = id
               Middleware = id
-              Routes = []
-              Services = (fun services -> services.AddRouting()) }
+              Endpoints = [||]
+              Services = (fun services ->
+                services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true) |> ignore
+                services)
+              }
 
     [<Sealed>]
     type WebHostBuilder (hostBuilder:IWebHostBuilder) =
@@ -240,10 +235,10 @@ module Builder =
             spec.Host(hostBuilder)
                 .ConfigureServices(spec.Services >> ignore)
                 .Configure(fun app ->
-                    let routes = RouteCollection()
-                    for router in List.rev spec.Routes do
-                        routes.Add(router app)
-                    app.UseRouter(routes)
+                    app.UseRouting()
+                       .UseEndpoints(fun endpoints ->
+                           let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+                           endpoints.DataSources.Add(dataSource))
                     |> spec.Middleware
                     |> ignore)
 
@@ -273,9 +268,9 @@ module Builder =
                         f(spec.Middleware(app))
                     else spec.Middleware(app) }
 
-        [<CustomOperation("route")>]
-        member __.Route(spec, router:IApplicationBuilder -> IRouter) =
-            { spec with Routes = router::spec.Routes }
+        [<CustomOperation("resource")>]
+        member __.Resource(spec, resource:Resource) : WebHostSpec =
+            { spec with Endpoints = Array.append spec.Endpoints resource.Endpoints }
 
         [<CustomOperation("service")>]
         member __.Service(spec, f) =

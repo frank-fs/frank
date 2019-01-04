@@ -1,4 +1,4 @@
-﻿module Test.Program
+﻿module Sample.Program
 
 open Microsoft.AspNetCore
 open Microsoft.AspNetCore.Builder
@@ -8,12 +8,13 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
+open Frank
 open Frank.Builder
 open Newtonsoft.Json.Linq
-open Test.Extensions
+open Sample.Extensions
 
-let helloName app =
-    resource "hello/{name}" app {
+let helloName =
+    resource "hello/{name}" {
         name "Hello Name"
 
         get (fun (ctx:HttpContext) ->
@@ -25,15 +26,17 @@ let helloName app =
             ContentNegotiation.negotiate 201 name ctx)
     }
 
-let hello app =
-    resource "hello" app {
+let hello =
+    resource "hello" {
         name "Hello"
 
         // Using HttpContext -> () overload
         get (fun (ctx:HttpContext) ->
-            use writer = new System.IO.StreamWriter(ctx.Response.Body)
-            writer.Write("Hello, world!")
-            writer.Flush())
+            task {
+                use writer = new System.IO.StreamWriter(ctx.Response.Body)
+                do! writer.WriteAsync("Hello, world!")
+                do! writer.FlushAsync()
+            })
 
         // Using HttpContext -> Task<'a> overload
         post (fun (ctx:HttpContext) ->
@@ -78,11 +81,10 @@ let main args =
             plug ResponseCompressionBuilderExtensions.UseResponseCompression
             plug StaticFileExtensions.UseStaticFiles
 
-            route helloName
-            route hello
+            resource helloName
+            resource hello
         }
 
     let host = builder.Build()
     host.Run()
-
     0
