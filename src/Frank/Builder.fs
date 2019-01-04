@@ -6,7 +6,9 @@ module Builder =
     open System.Collections.Generic
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
+    open Microsoft.AspNetCore.Hosting
     open Microsoft.AspNetCore.Http
+    open Microsoft.AspNetCore.Mvc
     open Microsoft.AspNetCore.Routing
     open Microsoft.AspNetCore.Routing.Constraints
     open Microsoft.Extensions.DependencyInjection
@@ -17,7 +19,6 @@ module Builder =
             upcast Task.FromResult())
         |> RouteHandler
 
-    [<Struct>]
     type ResourceSpec =
         { Name : string; Handlers : (string * RequestDelegate) list }
         static member Empty = { Name = Unchecked.defaultof<_>; Handlers = [] }
@@ -47,10 +48,11 @@ module Builder =
             routes.Add(defaultRoute)
             routes :> IRouter
 
-    type ResourceBuilder (serviceProvider, routeTemplate) =
+    [<Sealed>]
+    type ResourceBuilder (routeTemplate, applicationBuilder:IApplicationBuilder) =
 
         member __.Run(spec:ResourceSpec) =
-            spec.Build(serviceProvider, routeTemplate)
+            spec.Build(applicationBuilder.ApplicationServices, routeTemplate)
         
         member __.Yield(_) = ResourceSpec.Empty
 
@@ -180,43 +182,63 @@ module Builder =
         member this.Trace(spec, handler:HttpContext -> unit) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
 
-    let resource serviceProvider routeTemplate = ResourceBuilder(serviceProvider, routeTemplate)
+    let resource routeTemplate applicationBuilder = ResourceBuilder(routeTemplate, applicationBuilder)
 
-    type RouterSpec =
+    type WebHostSpec =
         { Middleware : (IApplicationBuilder -> IApplicationBuilder)
-          Routes : RouteCollection }
-        static member Empty = { Middleware = id; Routes = RouteCollection() }
+          Routes : (IApplicationBuilder -> IRouter) list
+          Services : (IServiceCollection -> IServiceCollection) }
+        static member Empty =
+            { Middleware = id
+              Routes = []
+              Services = (fun services ->
+                services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
+                        .SetCompatibilityVersion(CompatibilityVersion.Version_2_2) |> ignore
+                services.AddRouting())
+              }
 
-    type RouterBuilder (applicationBuilder:IApplicationBuilder) =
+    [<Sealed>]
+    type WebHostBuilder (hostBuilder:IWebHostBuilder) =
 
-        member __.Run(spec:RouterSpec) =
-            spec.Middleware applicationBuilder |> ignore
-            applicationBuilder.UseRouter(spec.Routes) |> ignore
+        member __.Run(spec:WebHostSpec) =
+            hostBuilder
+                .ConfigureServices(spec.Services >> ignore)
+                .Configure(fun app ->
+                    let routes = RouteCollection()
+                    for router in List.rev spec.Routes do
+                        routes.Add(router app)
+                    app.UseRouter(routes)
+                    |> spec.Middleware
+                    |> ignore)
 
-        member __.Yield(_) = RouterSpec.Empty
-
-        [<CustomOperation("route")>]
-        member __.Route(spec, router:IRouter) =
-            let routes = spec.Routes
-            routes.Add(router)
-            { spec with Routes = routes }
-
-        // TODO: replace `Startup` with ability to hook up both services and app builder configuration
+        member __.Yield(_) = WebHostSpec.Empty
 
         [<CustomOperation("plug")>]
         member __.Plug(spec, f) =
-            { spec with Middleware = fun app -> f app }
+            { spec with Middleware = spec.Middleware >> f }
 
         [<CustomOperation("plugWhen")>]
         member __.PlugWhen(spec, cond, f) =
-            if cond then
-                { spec with Middleware = fun app -> f app }
-            else spec
+            { spec with
+                Middleware = fun app ->
+                    if cond app then
+                        f(spec.Middleware(app))
+                    else spec.Middleware(app) }
 
         [<CustomOperation("plugWhenNot")>]
         member __.PlugWhenNot(spec, cond, f) =
-            if not cond then
-                { spec with Middleware = fun app -> f app }
-            else spec
+            { spec with
+                Middleware = fun app ->
+                    if not(cond app) then
+                        f(spec.Middleware(app))
+                    else spec.Middleware(app) }
 
-    let router applicationBuilder = RouterBuilder(applicationBuilder)
+        [<CustomOperation("route")>]
+        member __.Route(spec, router:IApplicationBuilder -> IRouter) =
+            { spec with Routes = router::spec.Routes }
+
+        [<CustomOperation("service")>]
+        member __.Service(spec, f) =
+            { spec with Services = spec.Services >> f }
+
+    let webHost hostBuilder = WebHostBuilder(hostBuilder)
