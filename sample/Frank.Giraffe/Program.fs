@@ -54,18 +54,12 @@ module Views =
 // ---------------------------------
 // Web app
 // ---------------------------------
-let notFound (ctx:HttpContext) =
-    task {
-        ctx.SetStatusCode 404
-        do! ctx.Response.WriteAsync("Not Found")
-        return Some ctx
-    }
 
 let indexHandler (name : string) =
     let greetings = sprintf "Hello %s, from Giraffe!" name
     let model     = { Text = greetings }
     let view      = Views.index model
-    htmlView view notFound
+    htmlView view
 
 let helloWorld app =
     resource "/" app {
@@ -76,9 +70,9 @@ let helloWorld app =
 let helloName app =
     resource "/hello/{name}" app {
         name "Hello Name"
-        get (fun ctx ->
+        get (fun next ctx ->
             let name = ctx.GetRouteValue("name") |> string
-            indexHandler name ctx)
+            indexHandler name next ctx)
     }
 
 // ---------------------------------

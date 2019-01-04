@@ -17,11 +17,11 @@ let helloName app =
     resource "hello/{name}" app {
         name "Hello Name"
 
-        get (fun ctx ->
+        get (fun (ctx:HttpContext) ->
             let name = ctx.GetRouteValue("name") |> string
             ctx.Response.WriteAsync(sprintf "Hi, %s!" name))
 
-        put (fun ctx ->
+        put (fun (ctx:HttpContext) ->
             let name = ctx.GetRouteValue("name") |> string
             ContentNegotiation.negotiate 201 name ctx)
     }
@@ -31,13 +31,13 @@ let hello app =
         name "Hello"
 
         // Using HttpContext -> () overload
-        get (fun ctx ->
+        get (fun (ctx:HttpContext) ->
             use writer = new System.IO.StreamWriter(ctx.Response.Body)
             writer.Write("Hello, world!")
             writer.Flush())
 
         // Using HttpContext -> Task<'a> overload
-        post (fun ctx ->
+        post (fun (ctx:HttpContext) ->
             task {
                 ctx.Request.EnableBuffering()
                 if ctx.Request.HasFormContentType then
