@@ -1,0 +1,7 @@
+image: Visual Studio 2017
+build_script:
+- ps: |
+      .\build.ps1
+      if ($lastexitcode -ne 0){ exit $lastexitcode }
+artifacts:
+- path: bin\*.nupkg
