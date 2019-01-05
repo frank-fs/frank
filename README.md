@@ -10,11 +10,14 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 MacOS/Linux | Windows
 --- | ---
-TODO | TODO
+[![Build Status](https://travis-ci.org/frank-fs/frank.png?branch=master)](https://travis-ci.org/frank-fs/frank) | [![Build status](https://ci.appveyor.com/api/projects/status/pt3i73qxyxgjax5d?svg=true)](https://ci.appveyor.com/project/frank-fs/frank)
+[![Build History](https://buildstats.info/travisci/chart/frank-fs/frank)](https://travis-ci.org/frank-fs/frank/builds) | [![Build History](https://buildstats.info/appveyor/chart/frank-fs/frank)](https://ci.appveyor.com/project/frank-fs/frank)
 
 ## Nuget 
 
-TODO
+Stable | Prerelease
+--- | ---
+[![NuGet Badge](https://buildstats.info/nuget/Frank)](https://www.nuget.org/packages/Frank/) | [![NuGet Badge](https://buildstats.info/nuget/Frank?includePreReleases=true)](https://www.nuget.org/packages/Frank/)
 
 ---
 
