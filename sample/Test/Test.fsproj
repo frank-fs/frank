@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
-    <MvcRazorCompileOnPublish>true</MvcRazorCompileOnPublish>
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ContentNegotiation.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

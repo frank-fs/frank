@@ -7,11 +7,9 @@ open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
-open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open Giraffe
-open Frank
 open Frank.Builder
 open Frank.Giraffe.Extensions
 
@@ -113,15 +111,13 @@ let main _ =
     let hostBuilder =
         webHost initBuilder {
             logging configureLogging
-
-            service (fun services -> services.AddCors())
+            useCors configureCors
 
             plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
             plugWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
 
             plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
             plug StaticFileExtensions.UseStaticFiles
-            plug (fun app -> app.UseCors(configureCors))
 
             route helloWorld
             route helloName

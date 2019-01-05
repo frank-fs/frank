@@ -2,6 +2,7 @@ module Test.Extensions
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 
@@ -16,3 +17,15 @@ type Frank.Builder.WebHostBuilder with
         { spec with
             Services = fun services ->
                 spec.Services(services).AddLogging(fun builder -> f builder |> ignore) }
+
+    [<CustomOperation("useContentNegotiation")>]
+    member __.UseContentNegotiation(spec:Frank.Builder.WebHostSpec) =
+        { spec with
+            Services = fun services ->
+                spec.Services(services)
+                    .AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
+                    .SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
+                    .AddXmlDataContractSerializerFormatters()
+                    .AddJsonFormatters()
+                    |> ignore
+                services }

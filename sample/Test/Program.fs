@@ -8,7 +8,6 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
-open Frank
 open Frank.Builder
 open Newtonsoft.Json.Linq
 open Test.Extensions
@@ -64,13 +63,11 @@ let hello app =
 let main args =
     let builder =
         webHost (WebHost.CreateDefaultBuilder(args)) {
-            logging (fun options->
-                options.AddConsole()
-                       .AddDebug())
+            logging (fun options-> options.AddConsole().AddDebug())
 
-            service (fun services ->
-                services.AddResponseCompression()
-                        .AddResponseCaching())
+            service (fun services -> services.AddResponseCompression().AddResponseCaching())
+
+            useContentNegotiation
 
             plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
             // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.

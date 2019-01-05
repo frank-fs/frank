@@ -8,7 +8,6 @@ module Builder =
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
     open Microsoft.AspNetCore.Http
-    open Microsoft.AspNetCore.Mvc
     open Microsoft.AspNetCore.Routing
     open Microsoft.AspNetCore.Routing.Constraints
     open Microsoft.Extensions.DependencyInjection
@@ -223,11 +222,7 @@ module Builder =
         static member Empty =
             { Middleware = id
               Routes = []
-              Services = (fun services ->
-                services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
-                        .SetCompatibilityVersion(CompatibilityVersion.Version_2_2) |> ignore
-                services.AddRouting())
-              }
+              Services = (fun services -> services.AddRouting()) }
 
     [<Sealed>]
     type WebHostBuilder (hostBuilder:IWebHostBuilder) =
