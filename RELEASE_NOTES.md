@@ -1,3 +1,11 @@
+### New in 5.0.0-alpha1 (Released 2019-01-05)
+* Starting over based on ASP.NET Core Routing and Hosting
+* New MIT license
+* Computation expression for configuring IWebHostBuilder
+* Computation expression for specifying HTTP resources
+* Sample using simple ASP.NET Core web application
+* Sample using standard Giraffe template web application
+
 ### New in 4.0.0 - (Released 2018/03/27)
 * Update to .NETStandard 2.0 and .NET 4.6.1
 * Now more easily used with Azure Functions or ASP.NET Core

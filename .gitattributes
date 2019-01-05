@@ -1,10 +1,52 @@
-# Autodetect text or binary. Do not leave merge conflict markers in the files.
-* text=auto merge=union
+*.doc  diff=astextplain
+*.DOC	diff=astextplain
+*.docx	diff=astextplain
+*.DOCX	diff=astextplain
+*.dot	diff=astextplain
+*.DOT	diff=astextplain
+*.pdf	diff=astextplain
+*.PDF	diff=astextplain
+*.rtf	diff=astextplain
+*.RTF	diff=astextplain
 
-# Use LF in the working directory by default. Override with core.autocrlf=true.
-*.fs eol=lf
-*.fsi eol=lf
-*.fsx eol=lf
+*.jpg  	binary
+*.png 	binary
+*.gif 	binary
 
-# Visual Studio can read LF sln files, but it always writes them as CRLF.
-*.sln eol=crlf
+*.cs text=auto diff=csharp 
+*.vb text=auto
+*.resx text=auto
+*.c text=auto
+*.cpp text=auto
+*.cxx text=auto
+*.h text=auto
+*.hxx text=auto
+*.py text=auto
+*.rb text=auto
+*.java text=auto
+*.html text=auto
+*.htm text=auto
+*.css text=auto
+*.scss text=auto
+*.sass text=auto
+*.less text=auto
+*.js text=auto
+*.lisp text=auto
+*.clj text=auto
+*.sql text=auto
+*.php text=auto
+*.lua text=auto
+*.m text=auto
+*.asm text=auto
+*.erl text=auto
+*.fs text=auto
+*.fsx text=auto
+*.hs text=auto
+
+*.csproj text=auto
+*.vbproj text=auto
+*.fsproj text=auto
+*.dbproj text=auto
+*.sln text=auto eol=crlf
+
+*.sh eol=lf

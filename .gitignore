@@ -1,42 +1,43 @@
-
-#ignore thumbnails created by windows
-Thumbs.db
-#Ignore files build by Visual Studio
-*.obj
-*.pdb
-*.user
-*.aps
-*.pch
-*.vspscc
-*_i.c
-*_p.c
-*.ncb
-*.suo
-*.tlb
-*.tlh
-*.bak
-*.cache
-*.ilk
-*.log
-*_Spliced.*proj
-[Bb]in
-[Dd]ebug*/
-*.lib
-*.sbr
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+bin/
 obj/
-[Rr]elease*/
-_ReSharper*/
-[Tt]est[Rr]esult*
-build/
-deploy/
-docs/
-nuget/
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+node_modules/
 packages/
-temp/
-test/
-tools/
-*.nupkg
-AssemblyInfo.fs
-*.userprefs
-.fake/
-paket-files/
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
