@@ -1,4 +1,4 @@
-### New in 5.0.0-alpha1 (Released 2019-01-05)
+### New in 5.0.0 (Released 2019-01-05)
 * Starting over based on ASP.NET Core Routing and Hosting
 * New MIT license
 * Computation expression for configuring IWebHostBuilder
