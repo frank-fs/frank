@@ -112,6 +112,8 @@ let main _ =
         webHost initBuilder {
             logging configureLogging
             useCors configureCors
+            // enable Giraffe content negotiation
+            service (fun services -> services.AddGiraffe())
 
             plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
             plugWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
