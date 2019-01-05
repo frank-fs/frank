@@ -101,15 +101,13 @@ let main _ =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
 
-    let initBuilder =
-        Microsoft.AspNetCore.Hosting.WebHostBuilder()
-            .UseKestrel()
-            .UseContentRoot(contentRoot)
-            .UseIISIntegration()
-            .UseWebRoot(webRoot)
-
     let hostBuilder =
-        webHost initBuilder {
+        webHost (Microsoft.AspNetCore.Hosting.WebHostBuilder()) {
+            configure (fun builder ->
+                builder.UseKestrel()
+                       .UseContentRoot(contentRoot)
+                       .UseIISIntegration()
+                       .UseWebRoot(webRoot))
             logging configureLogging
             useCors configureCors
             // enable Giraffe content negotiation

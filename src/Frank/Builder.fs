@@ -212,11 +212,13 @@ module Builder =
     let resource routeTemplate applicationBuilder = ResourceBuilder(routeTemplate, applicationBuilder)
 
     type WebHostSpec =
-        { Middleware : (IApplicationBuilder -> IApplicationBuilder)
+        { Host : (IWebHostBuilder -> IWebHostBuilder)
+          Middleware : (IApplicationBuilder -> IApplicationBuilder)
           Routes : (IApplicationBuilder -> IRouter) list
           Services : (IServiceCollection -> IServiceCollection) }
         static member Empty =
-            { Middleware = id
+            { Host = id
+              Middleware = id
               Routes = []
               Services = (fun services -> services.AddRouting()) }
 
@@ -224,7 +226,7 @@ module Builder =
     type WebHostBuilder (hostBuilder:IWebHostBuilder) =
 
         member __.Run(spec:WebHostSpec) =
-            hostBuilder
+            spec.Host(hostBuilder)
                 .ConfigureServices(spec.Services >> ignore)
                 .Configure(fun app ->
                     let routes = RouteCollection()
@@ -235,6 +237,10 @@ module Builder =
                     |> ignore)
 
         member __.Yield(_) = WebHostSpec.Empty
+
+        [<CustomOperation("configure")>]
+        member __.Configure(spec, f) =
+            { spec with Host = spec.Host >> f }
 
         [<CustomOperation("plug")>]
         member __.Plug(spec, f) =
