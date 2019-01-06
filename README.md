@@ -26,7 +26,7 @@ Stable | Prerelease
 
 Make sure the following **requirements** are installed in your system:
 
-* [dotnet SDK](https://www.microsoft.com/net/download/core) 2.0 or higher
+* [dotnet SDK](https://www.microsoft.com/net/download/core) 2.2 or higher
 
 ```
 dotnet build
