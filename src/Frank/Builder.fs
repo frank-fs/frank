@@ -12,7 +12,7 @@ module Builder =
     open Microsoft.AspNetCore.Routing.Constraints
     open Microsoft.Extensions.DependencyInjection
 
-    let private methodNotAllowed =
+    let private methodNotAllowedHandler =
         RequestDelegate(fun ctx ->
             ctx.Response.StatusCode <- 405
             upcast Task.FromResult())
@@ -37,7 +37,7 @@ module Builder =
                 routes.Add(route)
             let defaultRoute =
                 Route(
-                    target=methodNotAllowed,
+                    target=methodNotAllowedHandler,
                     routeName=(if String.IsNullOrEmpty spec.Name then routeTemplate else spec.Name),
                     routeTemplate=routeTemplate,
                     defaults=RouteValueDictionary(null),
@@ -49,7 +49,6 @@ module Builder =
 
     [<Sealed>]
     type ResourceBuilder (routeTemplate, applicationBuilder:IApplicationBuilder) =
-        static let passThrough (ctx:HttpContext) = Task.FromResult(Some ctx)
 
         member __.Run(spec:ResourceSpec) =
             spec.Build(applicationBuilder.ApplicationServices, routeTemplate)
@@ -72,9 +71,6 @@ module Builder =
         member this.Connect(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
 
-        member this.Connect(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
-
         member this.Connect(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
 
@@ -87,9 +83,6 @@ module Builder =
 
         member this.Delete(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Delete, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
-
-        member this.Delete(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
 
         member this.Delete(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Delete, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
@@ -104,9 +97,6 @@ module Builder =
         member this.Get(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Get, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
 
-        member this.Get(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
-
         member this.Get(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Get, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
 
@@ -119,9 +109,6 @@ module Builder =
 
         member this.Head(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Head, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
-
-        member this.Head(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
 
         member this.Head(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Head, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
@@ -136,9 +123,6 @@ module Builder =
         member this.Options(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Options, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
 
-        member this.Options(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
-
         member this.Options(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Options, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
 
@@ -151,9 +135,6 @@ module Builder =
 
         member this.Patch(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Patch, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
-
-        member this.Patch(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
 
         member this.Patch(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Patch, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
@@ -168,9 +149,6 @@ module Builder =
         member this.Post(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Post, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
 
-        member this.Post(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
-
         member this.Post(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Post, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
 
@@ -184,9 +162,6 @@ module Builder =
         member this.Put(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Put, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
 
-        member this.Put(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
-
         member this.Put(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Put, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
 
@@ -199,9 +174,6 @@ module Builder =
 
         member this.Trace(spec, handler:HttpContext -> Task<'a>) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
-
-        member this.Trace(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler passThrough ctx :> Task))
 
         member this.Trace(spec, handler:HttpContext -> Async<'a>) =
             this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
