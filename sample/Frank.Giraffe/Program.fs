@@ -10,7 +10,6 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open Giraffe
-open Frank
 open Frank.Builder
 open Frank.Giraffe.Extensions
 
@@ -58,7 +57,7 @@ let indexHandler (name : string) =
     let greetings = sprintf "Hello %s, from Giraffe!" name
     let model     = { Text = greetings }
     let view      = Views.index model
-    htmlView view |> HttpHandler.toHttpFunc
+    htmlView view
 
 let helloWorld app =
     resource "/" app {
@@ -69,9 +68,9 @@ let helloWorld app =
 let helloName app =
     resource "/hello/{name}" app {
         name "Hello Name"
-        get (fun ctx ->
+        get (fun next ctx ->
             let name = ctx.GetRouteValue("name") |> string
-            indexHandler name ctx)
+            indexHandler name next ctx)
     }
 
 // ---------------------------------

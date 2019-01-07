@@ -49,6 +49,9 @@ module Builder =
 
     [<Sealed>]
     type ResourceBuilder (routeTemplate, applicationBuilder:IApplicationBuilder) =
+        static let methodNotAllowed (ctx:HttpContext) =
+            ctx.Response.StatusCode <- 405
+            Task.FromResult(Some ctx)
 
         member __.Run(spec:ResourceSpec) =
             spec.Build(applicationBuilder.ApplicationServices, routeTemplate)
@@ -58,128 +61,164 @@ module Builder =
         [<CustomOperation("name")>]
         member __.Name(spec, name) = { spec with Name = name }
 
-        member __.AddHandler(httpMethod, spec, handler) =
-            { spec with Handlers=(httpMethod, handler)::spec.Handlers}
+        static member AddHandler(httpMethod, spec, handler) =
+            { spec with Handlers=(httpMethod, handler)::spec.Handlers }
+
+        static member AddHandler(httpMethod, spec, handler:HttpContext -> Task<'a>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler ctx :> Task))::spec.Handlers }
+
+        static member AddHandler(httpMethod, spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler methodNotAllowed ctx :> Task))::spec.Handlers }
+
+        static member AddHandler(httpMethod, spec, handler:HttpContext -> Async<'a>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))::spec.Handlers }
+
+        static member AddHandler(httpMethod, spec, handler:HttpContext -> unit) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))::spec.Handlers }
 
         [<CustomOperation("connect")>]
-        member this.Connect(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Connect, spec, handler)
+        member __.Connect(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
-        member this.Connect(spec, handler:HttpContext -> Task) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate handler)
+        member __.Connect(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
-        member this.Connect(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Connect(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
-        member this.Connect(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Connect(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
-        member this.Connect(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Connect, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Connect(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
         [<CustomOperation("delete")>]
-        member this.Delete(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Delete, spec, handler)
+        member __.Delete(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
-        member this.Delete(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Delete, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Delete(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
-        member this.Delete(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Delete, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Delete(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
-        member this.Delete(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Delete, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Delete(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
+
+        member __.Delete(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
         [<CustomOperation("get")>]
-        member this.Get(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Get, spec, handler)
+        member __.Get(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
 
-        member this.Get(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Get, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Get(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
 
-        member this.Get(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Get, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Get(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
 
-        member this.Get(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Get, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Get(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
+
+        member __.Get(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
 
         [<CustomOperation("head")>]
-        member this.Head(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Head, spec, handler)
+        member __.Head(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
-        member this.Head(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Head, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Head(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
-        member this.Head(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Head, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Head(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
-        member this.Head(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Head, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Head(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
+
+        member __.Head(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
         [<CustomOperation("options")>]
-        member this.Options(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Options, spec, handler)
+        member __.Options(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
 
-        member this.Options(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Options, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Options(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
 
-        member this.Options(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Options, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Options(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
 
-        member this.Options(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Options, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Options(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
+
+        member __.Options(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
 
         [<CustomOperation("patch")>]
-        member this.Patch(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Patch, spec, handler)
+        member __.Patch(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
-        member this.Patch(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Patch, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Patch(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
-        member this.Patch(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Patch, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Patch(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
-        member this.Patch(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Patch, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Patch(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
+
+        member __.Patch(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
         [<CustomOperation("post")>]
-        member this.Post(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Post, spec, handler)
+        member __.Post(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
-        member this.Post(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Post, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Post(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
-        member this.Post(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Post, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Post(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
-        member this.Post(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Post, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Post(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
+
+        member __.Post(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
         [<CustomOperation("put")>]
-        member this.Put(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Put, spec, handler)
+        member __.Put(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
 
-        member this.Put(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Put, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Put(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
 
-        member this.Put(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Put, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Put(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
 
-        member this.Put(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Put, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Put(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
+
+        member __.Put(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
 
         [<CustomOperation("trace")>]
-        member this.Trace(spec, handler:RequestDelegate) =
-            this.AddHandler(HttpMethods.Trace, spec, handler)
+        member __.Trace(spec, handler:RequestDelegate) =
+            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
-        member this.Trace(spec, handler:HttpContext -> Task<'a>) =
-            this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> handler ctx :> Task))
+        member __.Trace(spec, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
-        member this.Trace(spec, handler:HttpContext -> Async<'a>) =
-            this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task))
+        member __.Trace(spec, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
-        member this.Trace(spec, handler:HttpContext -> unit) =
-            this.AddHandler(HttpMethods.Trace, spec, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task))
+        member __.Trace(spec, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
+
+        member __.Trace(spec, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
     let resource routeTemplate applicationBuilder = ResourceBuilder(routeTemplate, applicationBuilder)
 

@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <Compile Include="Builder.fs" />
-    <Compile Include="HttpHandler.fs" />
   </ItemGroup>
 
   <ItemGroup>
