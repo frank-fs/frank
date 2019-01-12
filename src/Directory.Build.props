@@ -7,17 +7,7 @@
     <Copyright>© Ryan Riley. All rights reserved.</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
 
-    <PackageLicenseUrl>https://github.com/panesofglass/frank/blob/aspnetcore/LICENSE</PackageLicenseUrl>
-    <!-- The SPDX name for the source license. See https://spdx.org/licenses/. -->
-    <PackageLicenseType>MIT</PackageLicenseType>
-    <!--
-      Suppress a warning about upcoming deprecation of PackageLicenseUrl. When embedding licenses are supported,
-      replace PackageLicenseUrl with PackageLicenseExpression.
-    -->
-    <NoWarn>$(NoWarn);NU5125</NoWarn>
-    <!-- Suppress warnings about using SemVer 2.0. -->
-    <NoWarn>$(NoWarn);NU5105</NoWarn>
-
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/panesofglass/frank/tree/aspnetcore</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/panesofglass/frank/tree/aspnetcore</RepositoryUrl>
