@@ -119,8 +119,8 @@ let main _ =
             plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
             plug StaticFileExtensions.UseStaticFiles
 
-            route helloWorld
-            route helloName
+            resource helloWorld
+            resource helloName
         }
 
     let host = hostBuilder.Build()

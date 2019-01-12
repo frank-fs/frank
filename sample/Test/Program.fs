@@ -13,7 +13,7 @@ open Newtonsoft.Json.Linq
 open Test.Extensions
 
 let helloName app =
-    resource "hello/{name}" app {
+    resource "/hello/{name}" app {
         name "Hello Name"
 
         get (fun (ctx:HttpContext) ->
@@ -26,7 +26,7 @@ let helloName app =
     }
 
 let hello app =
-    resource "hello" app {
+    resource "/hello" app {
         name "Hello"
 
         // Using HttpContext -> () overload
@@ -78,8 +78,8 @@ let main args =
             plug ResponseCompressionBuilderExtensions.UseResponseCompression
             plug StaticFileExtensions.UseStaticFiles
 
-            route helloName
-            route hello
+            resource helloName
+            resource hello
         }
 
     let host = builder.Build()

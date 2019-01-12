@@ -12,6 +12,7 @@
     <PackageReference Update="FSharp.Core" Version="4.3.4" />
     <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.*" />
     <PackageReference Include="Microsoft.AspNetCore.Routing" Version="2.2.*" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.1.2" />
   </ItemGroup>
 
 </Project>
