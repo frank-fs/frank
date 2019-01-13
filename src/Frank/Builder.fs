@@ -449,18 +449,24 @@ module Builder =
 
     /// Specification for configuring a WebHost.
     type WebHostSpec =
-        { Description : string option
-          Title : string option
+        { Title : string
           Version : string
+          Description : string option
+          Contact : OpenApiContact option
+          License : OpenApiLicense option
+          TermsOfService : Uri option
           Host : (IWebHostBuilder -> IWebHostBuilder)
           Middleware : (IApplicationBuilder -> IApplicationBuilder)
           Endpoints : Endpoint[]
           Services : (IServiceCollection -> IServiceCollection) }
 
         static member Empty =
-            { Description = None
-              Title = None
+            { Title = "Frank-generated Open API"
               Version = "1.0.0"
+              Description = None
+              Contact = None
+              License = None
+              TermsOfService = None
               Host = id
               Middleware = id
               Endpoints = [||]
@@ -476,9 +482,11 @@ module Builder =
             spec.Host(hostBuilder)
                 .ConfigureServices(spec.Services >> ignore)
                 .Configure(fun app ->
-                    let apiDescription = OpenApi.emptyDocument spec.Version
+                    let apiDescription = OpenApi.emptyDocument (spec.Title, spec.Version)
                     spec.Description |> Option.iter (fun desc -> apiDescription.Info.Description <- desc)
-                    spec.Title |> Option.iter (fun title -> apiDescription.Info.Title <- title)
+                    spec.Contact |> Option.iter (fun cont -> apiDescription.Info.Contact <- cont)
+                    spec.License |> Option.iter (fun lic -> apiDescription.Info.License <- lic)
+                    spec.TermsOfService |> Option.iter (fun tos -> apiDescription.Info.TermsOfService <- tos)
 
                     spec.Endpoints
                     |> Array.groupBy (fun e -> e.Metadata.GetMetadata<Patterns.RoutePattern>())
@@ -500,21 +508,33 @@ module Builder =
                     |> ignore)
 
         member __.Yield(_) = WebHostSpec.Empty
-        
-        [<CustomOperation("description")>]
-        member __.Description(spec:WebHostSpec, description) =
-            if String.IsNullOrEmpty description then spec
-            else { spec with Description = Some description }
 
         [<CustomOperation("title")>]
         member __.Title(spec, title) =
             if String.IsNullOrEmpty title then spec
-            else { spec with Title = Some title }
+            else { spec with Title = title }
 
         [<CustomOperation("version")>]
         member __.Version(spec, version) =
             if String.IsNullOrEmpty version then spec
             else { spec with Version = version }
+
+        [<CustomOperation("description")>]
+        member __.Description(spec:WebHostSpec, description) =
+            if String.IsNullOrEmpty description then spec
+            else { spec with Description = Some description }
+
+        [<CustomOperation("contact")>]
+        member __.Contact(spec:WebHostSpec, contact) =
+            { spec with Contact = Some contact }
+
+        [<CustomOperation("license")>]
+        member __.License(spec:WebHostSpec, license) =
+            { spec with License = Some license }
+
+        [<CustomOperation("termsOfService")>]
+        member __.TermsOfService(spec:WebHostSpec, termsOfService) =
+            { spec with TermsOfService = Some termsOfService }
 
         [<CustomOperation("configure")>]
         member __.Configure(spec, f) =

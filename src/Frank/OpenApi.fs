@@ -86,9 +86,9 @@ module OpenApiParameter =
             else
                 yield OpenApiParameter(Name=part.Name, Required=not part.IsOptional)|]
 
-let emptyDocument version =
+let emptyDocument (title, version) =
     OpenApiDocument(
-        Info = OpenApiInfo(Version = version),
+        Info = OpenApiInfo(Title=title, Version=version),
         Servers = ResizeArray<OpenApiServer>(),
         Paths = OpenApiPaths())
 
