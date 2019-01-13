@@ -11,9 +11,8 @@ module Builder =
     open Microsoft.AspNetCore.Routing
     open Microsoft.Extensions.DependencyInjection
     open Microsoft.Extensions.FileProviders
-    open Microsoft.OpenApi
-    open Microsoft.OpenApi.Extensions
     open Microsoft.OpenApi.Models
+    open Frank.OpenApi
 
     /// Defines an HTTP resource with optional Open API documentation.
     [<Struct>]
@@ -34,18 +33,6 @@ module Builder =
         static member Empty =
             { Description = None; Tag = None; Body = None; Responses = [||] }
     
-    module OperationType =
-        let ofHttpMethod httpMethod =
-            if HttpMethods.IsGet httpMethod then OperationType.Get
-            elif HttpMethods.IsPut httpMethod then OperationType.Put
-            elif HttpMethods.IsPost httpMethod then OperationType.Post
-            elif HttpMethods.IsDelete httpMethod then OperationType.Delete
-            elif HttpMethods.IsOptions httpMethod then OperationType.Options
-            elif HttpMethods.IsHead httpMethod then OperationType.Head
-            elif HttpMethods.IsPatch httpMethod then OperationType.Patch
-            elif HttpMethods.IsTrace httpMethod then OperationType.Trace
-            else failwithf "Unrecognized Open API HTTP method %s." httpMethod
-
     // Design Notes:
     // -------------
     // Ultimate goal is to be able to specify OperationMetadata as:
@@ -88,6 +75,9 @@ module Builder =
                         | Some s, None -> OpenApiOperation(Summary=s, OperationId=operationId)
                         | None, Some d -> OpenApiOperation(Summary=name, Description=d, OperationId=operationId)
                         | None, None -> OpenApiOperation(OperationId=operationId)
+                    if routePattern.Parameters.Count > 0 then
+                        let parameters = OpenApiParameter.ofRouteParameters routePattern.Parameters
+                        parameters |> Array.iter op.Parameters.Add
                     // TODO: collect metadata into OpenApiOperation
                     let metadata =
                         EndpointMetadataCollection(
@@ -132,9 +122,6 @@ module Builder =
         static member AddHandler(httpMethod, spec, handler) =
             { spec with Handlers=(httpMethod, handler, None)::spec.Handlers }
 
-        static member AddHandler(httpMethod, spec, operation, handler) =
-            { spec with Handlers=(httpMethod, operation, handler)::spec.Handlers }
-
         static member AddHandler(httpMethod, spec, handler:HttpContext -> Task<'a>) =
             { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler ctx :> Task), None)::spec.Handlers }
 
@@ -146,6 +133,21 @@ module Builder =
 
         static member AddHandler(httpMethod, spec, handler:HttpContext -> unit) =
             { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task), None)::spec.Handlers }
+
+        static member AddHandlerWithDescription(httpMethod, spec, meta, handler) =
+            { spec with Handlers=(httpMethod, handler, Some meta)::spec.Handlers }
+
+        static member AddHandlerWithDescription(httpMethod, spec, meta, handler:HttpContext -> Task<'a>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler ctx :> Task), Some meta)::spec.Handlers }
+
+        static member AddHandlerWithDescription(httpMethod, spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler methodNotAllowed ctx :> Task), Some meta)::spec.Handlers }
+
+        static member AddHandlerWithDescription(httpMethod, spec, meta, handler:HttpContext -> Async<'a>) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> handler ctx |> Async.StartAsTask :> Task), Some meta)::spec.Handlers }
+
+        static member AddHandlerWithDescription(httpMethod, spec, meta, handler:HttpContext -> unit) =
+            { spec with Handlers=(httpMethod, RequestDelegate(fun ctx -> Task.FromResult(handler ctx) :> Task), Some meta)::spec.Handlers }
 
         [<CustomOperation("connect")>]
         member __.Connect(spec, handler:RequestDelegate) =
@@ -163,20 +165,21 @@ module Builder =
         member __.Connect(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Connect, spec, handler)
 
-        member __.Connect(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, operation, handler)
+        [<CustomOperation("connectWithDesc")>]
+        member __.ConnectWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Connect, spec, meta, handler)
 
-        member __.Connect(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, operation, handler)
+        member __.ConnectWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Connect, spec, meta, handler)
 
-        member __.Connect(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, operation, handler)
+        member __.ConnectWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Connect, spec, meta, handler)
 
-        member __.Connect(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, operation, handler)
+        member __.ConnectWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Connect, spec, meta, handler)
 
-        member __.Connect(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Connect, spec, operation, handler)
+        member __.ConnectWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Connect, spec, meta, handler)
 
         [<CustomOperation("delete")>]
         member __.Delete(spec, handler:RequestDelegate) =
@@ -194,20 +197,21 @@ module Builder =
         member __.Delete(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
-        member __.Delete(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, operation, handler)
+        [<CustomOperation("deleteWithDesc")>]
+        member __.DeleteWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Delete, spec, meta, handler)
 
-        member __.Delete(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, operation, handler)
+        member __.DeleteWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Delete, spec, meta, handler)
 
-        member __.Delete(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, operation, handler)
+        member __.DeleteWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Delete, spec, meta, handler)
 
-        member __.Delete(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, operation, handler)
+        member __.DeleteWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Delete, spec, meta, handler)
 
-        member __.Delete(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Delete, spec, operation, handler)
+        member __.DeleteWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Delete, spec, meta, handler)
 
         [<CustomOperation("get")>]
         member __.Get(spec, handler:RequestDelegate) =
@@ -225,20 +229,21 @@ module Builder =
         member __.Get(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
 
-        member __.Get(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Get, spec, operation, handler)
+        [<CustomOperation("getWithDesc")>]
+        member __.GetWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Get, spec, meta, handler)
 
-        member __.Get(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Get, spec, operation, handler)
+        member __.GetWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Get, spec, meta, handler)
 
-        member __.Get(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Get, spec, operation, handler)
+        member __.GetWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Get, spec, meta, handler)
 
-        member __.Get(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Get, spec, operation, handler)
+        member __.GetWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Get, spec, meta, handler)
 
-        member __.Get(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Get, spec, operation, handler)
+        member __.GetWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Get, spec, meta, handler)
 
         [<CustomOperation("head")>]
         member __.Head(spec, handler:RequestDelegate) =
@@ -256,20 +261,21 @@ module Builder =
         member __.Head(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
-        member __.Head(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Head, spec, operation, handler)
+        [<CustomOperation("headWithDesc")>]
+        member __.HeadWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Head, spec, meta, handler)
 
-        member __.Head(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Head, spec, operation, handler)
+        member __.HeadWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Head, spec, meta, handler)
 
-        member __.Head(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Head, spec, operation, handler)
+        member __.HeadWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Head, spec, meta, handler)
 
-        member __.Head(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Head, spec, operation, handler)
+        member __.HeadWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Head, spec, meta, handler)
 
-        member __.Head(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Head, spec, operation, handler)
+        member __.HeadWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Head, spec, meta, handler)
 
         [<CustomOperation("options")>]
         member __.Options(spec, handler:RequestDelegate) =
@@ -287,20 +293,21 @@ module Builder =
         member __.Options(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
 
-        member __.Options(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Options, spec, operation, handler)
+        [<CustomOperation("optionsWithDesc")>]
+        member __.OptionsWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Options, spec, meta, handler)
 
-        member __.Options(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Options, spec, operation, handler)
+        member __.OptionsWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Options, spec, meta, handler)
 
-        member __.Options(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Options, spec, operation, handler)
+        member __.OptionsWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Options, spec, meta, handler)
 
-        member __.Options(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Options, spec, operation, handler)
+        member __.OptionsWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Options, spec, meta, handler)
 
-        member __.Options(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Options, spec, operation, handler)
+        member __.OptionsWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Options, spec, meta, handler)
 
         [<CustomOperation("patch")>]
         member __.Patch(spec, handler:RequestDelegate) =
@@ -318,20 +325,21 @@ module Builder =
         member __.Patch(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
-        member __.Patch(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, operation, handler)
+        [<CustomOperation("patchWithDesc")>]
+        member __.PatchWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Patch, spec, meta, handler)
 
-        member __.Patch(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, operation, handler)
+        member __.PatchWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Patch, spec, meta, handler)
 
-        member __.Patch(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, operation, handler)
+        member __.PatchWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Patch, spec, meta, handler)
 
-        member __.Patch(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, operation, handler)
+        member __.PatchWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Patch, spec, meta, handler)
 
-        member __.Patch(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Patch, spec, operation, handler)
+        member __.PatchWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Patch, spec, meta, handler)
 
         [<CustomOperation("post")>]
         member __.Post(spec, handler:RequestDelegate) =
@@ -349,20 +357,21 @@ module Builder =
         member __.Post(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
-        member __.Post(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Post, spec, operation, handler)
+        [<CustomOperation("postWithDesc")>]
+        member __.PostWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Post, spec, meta, handler)
 
-        member __.Post(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Post, spec, operation, handler)
+        member __.PostWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Post, spec, meta, handler)
 
-        member __.Post(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Post, spec, operation, handler)
+        member __.PostWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Post, spec, meta, handler)
 
-        member __.Post(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Post, spec, operation, handler)
+        member __.PostWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Post, spec, meta, handler)
 
-        member __.Post(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Post, spec, operation, handler)
+        member __.PostWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Post, spec, meta, handler)
 
         [<CustomOperation("put")>]
         member __.Put(spec, handler:RequestDelegate) =
@@ -380,20 +389,21 @@ module Builder =
         member __.Put(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
 
-        member __.Put(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Put, spec, operation, handler)
+        [<CustomOperation("putWithDesc")>]
+        member __.PutWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Put, spec, meta, handler)
 
-        member __.Put(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Put, spec, operation, handler)
+        member __.PutWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Put, spec, meta, handler)
 
-        member __.Put(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Put, spec, operation, handler)
+        member __.PutWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Put, spec, meta, handler)
 
-        member __.Put(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Put, spec, operation, handler)
+        member __.PutWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Put, spec, meta, handler)
 
-        member __.Put(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Put, spec, operation, handler)
+        member __.PutWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Put, spec, meta, handler)
 
         [<CustomOperation("trace")>]
         member __.Trace(spec, handler:RequestDelegate) =
@@ -411,20 +421,21 @@ module Builder =
         member __.Trace(spec, handler:HttpContext -> unit) =
             ResourceBuilder.AddHandler(HttpMethods.Trace, spec, handler)
 
-        member __.Trace(spec, operation, handler:RequestDelegate) =
-            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, operation, handler)
+        [<CustomOperation("traceWithTrace")>]
+        member __.TraceWithDescription(spec, meta, handler:RequestDelegate) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Trace, spec, meta, handler)
 
-        member __.Trace(spec, operation, handler:HttpContext -> Task<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, operation, handler)
+        member __.TraceWithDescription(spec, meta, handler:HttpContext -> Task<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Trace, spec, meta, handler)
 
-        member __.Trace(spec, operation, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
-            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, operation, handler)
+        member __.TraceWithDescription(spec, meta, handler:(HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Trace, spec, meta, handler)
 
-        member __.Trace(spec, operation, handler:HttpContext -> Async<'a>) =
-            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, operation, handler)
+        member __.TraceWithDescription(spec, meta, handler:HttpContext -> Async<'a>) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Trace, spec, meta, handler)
 
-        member __.Trace(spec, operation, handler:HttpContext -> unit) =
-            ResourceBuilder.AddHandler(HttpMethods.Trace, spec, operation, handler)
+        member __.TraceWithDescription(spec, meta, handler:HttpContext -> unit) =
+            ResourceBuilder.AddHandlerWithDescription(HttpMethods.Trace, spec, meta, handler)
 
     /// Resource-oriented routing computation expression.
     let resource routeTemplate = ResourceBuilder(routeTemplate)
@@ -455,8 +466,7 @@ module Builder =
               Endpoints = [||]
               Services = (fun services ->
                 services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true) |> ignore
-                services)
-              }
+                services) }
 
     /// Computation expression builder for configuring a WebHost.
     [<Sealed>]
@@ -466,42 +476,25 @@ module Builder =
             spec.Host(hostBuilder)
                 .ConfigureServices(spec.Services >> ignore)
                 .Configure(fun app ->
-                    let apiDescription =
-                        OpenApiDocument(
-                            Info = OpenApiInfo(Version = spec.Version),
-                            Servers = ResizeArray<OpenApiServer>(),
-                            Paths = OpenApiPaths())
+                    let apiDescription = OpenApi.emptyDocument spec.Version
                     spec.Description |> Option.iter (fun desc -> apiDescription.Info.Description <- desc)
                     spec.Title |> Option.iter (fun title -> apiDescription.Info.Title <- title)
 
                     spec.Endpoints
                     |> Array.groupBy (fun e -> e.Metadata.GetMetadata<Patterns.RoutePattern>())
+                    |> Array.rev
                     |> Array.iter (fun (route, endpoints) ->
                         let routeTemplate = route.RawText
                         let item = OpenApiPathItem()
-                        for endpoint in endpoints do
+                        for endpoint in Array.rev endpoints do
                             let httpMethod = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()
                             let op = endpoint.Metadata.GetMetadata<OpenApiOperation>()
                             item.AddOperation(OperationType.ofHttpMethod httpMethod.HttpMethods.[0], op)
                         apiDescription.Paths.Add(routeTemplate, item))
                         
-                    let openApiHandler = RequestDelegate(fun ctx ->
-                        // TODO: check Accept header and negotiate json or yaml.
-                        ctx.Response.ContentType <- "application/json; charset=utf-8"
-                        apiDescription.SerializeAsJson(ctx.Response.Body, OpenApiSpecVersion.OpenApi3_0)
-                        Task.CompletedTask)
-
-                    let openApiEndpoint =
-                        RouteEndpoint(
-                            requestDelegate=openApiHandler,
-                            routePattern=Patterns.RoutePatternFactory.Parse "openapi",
-                            order=0,
-                            metadata=EndpointMetadataCollection(HttpMethodMetadata [|HttpMethods.Get|]),
-                            displayName="OpenAPI") :> Endpoint
-
                     app.UseRouting()
                        .UseEndpoints(fun endpoints ->
-                           let dataSource = ResourceEndpointDataSource([|yield openApiEndpoint; yield! spec.Endpoints|])
+                           let dataSource = ResourceEndpointDataSource([|yield OpenApi.endpoint apiDescription; yield! spec.Endpoints|])
                            endpoints.DataSources.Add(dataSource))
                     |> spec.Middleware
                     |> ignore)
