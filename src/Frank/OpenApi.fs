@@ -3,12 +3,17 @@ module Frank.OpenApi
 open System
 open System.Collections.Generic
 open System.IO
+open System.Text.RegularExpressions
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.OpenApi
 open Microsoft.OpenApi.Extensions
 open Microsoft.OpenApi.Models
 open FSharp.Control.Tasks.V2.ContextInsensitive
+
+module OperationId =
+    let format (httpMethod:string) (name:string) =
+        httpMethod.ToLower() + Regex.Replace(name, "[-\s()\[\]{}\$]", "")
 
 module OperationType =
 

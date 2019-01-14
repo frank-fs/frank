@@ -1,9 +1,29 @@
 namespace Frank
 
+module RouteTemplate =
+    open System
+    open System.Threading
+    open Microsoft.AspNetCore.Routing.Template
+
+    let toTitle (routeTemplate:RouteTemplate) =
+        let segments =
+            [| for segment in routeTemplate.Segments do
+               for part in segment.Parts do
+                   let text =
+                       if part.IsParameter && not (String.IsNullOrEmpty part.Name) then
+                           part.Name
+                       else part.Text
+                   yield Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase text |]
+        match String.Join(" ", segments) with
+        | null | "" -> "Root"
+        | name -> name
+
 module Builder =
 
     open System
+    open System.Collections.Generic
     open System.Text.RegularExpressions
+    open System.Threading
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
@@ -18,21 +38,6 @@ module Builder =
     [<Struct>]
     type Resource = { Endpoints : Endpoint[] }
 
-    /// Defines the Open API operation response documentation.
-    type OperationResponseMetadata =
-        { StatusCode : int 
-          Description : string
-          Body : Type }
-        
-    /// Defines the Open API operation documentation for a given request handler.
-    type OperationMetadata =
-        { Description : string option
-          Tag : string option
-          Body : Type option
-          Responses : OperationResponseMetadata[] }
-        static member Empty =
-            { Description = None; Tag = None; Body = None; Responses = [||] }
-    
     // Design Notes:
     // -------------
     // Ultimate goal is to be able to specify OperationMetadata as:
@@ -50,31 +55,41 @@ module Builder =
 
     /// Resource specification type for registering routes and corresponding handlers.
     type ResourceSpec =
-        { Name : string
+        { Name : string option
           Summary : string option
           Description : string option
-          Handlers : (string * RequestDelegate * OperationMetadata option) list }
+          Handlers : (string * RequestDelegate * OpenApiOperation option) list }
 
         static member Empty =
-            { Name = Unchecked.defaultof<_>
+            { Name = None
               Summary = None
               Description = None
               Handlers = [] }
 
         member spec.Build(routeTemplate) =
             let {Name=name; Summary=summary; Description=description; Handlers=handlers} = spec
-            let name = if String.IsNullOrEmpty name then routeTemplate else name
+            let name = defaultArg name routeTemplate
             let routePattern = Patterns.RoutePatternFactory.Parse routeTemplate
             let endpoints =
                 [| for httpMethod, handler, metadata in handlers ->
                     let displayName = httpMethod+" "+name
-                    let operationId = Regex.Replace(displayName, @"[^A-Za-z0-9_-]", "-").ToLower()
                     let op =
-                        match summary, description with
-                        | Some s, Some d -> OpenApiOperation(Summary=s, Description=d, OperationId=operationId)
-                        | Some s, None -> OpenApiOperation(Summary=s, OperationId=operationId)
-                        | None, Some d -> OpenApiOperation(Summary=name, Description=d, OperationId=operationId)
-                        | None, None -> OpenApiOperation(OperationId=operationId)
+                        match metadata with
+                        | Some op ->
+                            if String.IsNullOrEmpty op.OperationId then
+                                op.OperationId <- OpenApi.OperationId.format httpMethod name
+                            if String.IsNullOrEmpty op.Summary then
+                                summary |> Option.iter (fun s -> op.Summary <- s)
+                            if String.IsNullOrEmpty op.Description then
+                                description |> Option.iter (fun d -> op.Description <- d)
+                            op
+                        | None ->
+                            let operationId = OpenApi.OperationId.format httpMethod name
+                            match summary, description with
+                            | Some s, Some d -> OpenApiOperation(Summary=s, Description=d, OperationId=operationId)
+                            | Some s, None -> OpenApiOperation(Summary=s, OperationId=operationId)
+                            | None, Some d -> OpenApiOperation(Summary=name, Description=d, OperationId=operationId)
+                            | None, None -> OpenApiOperation(OperationId=operationId)
                     if routePattern.Parameters.Count > 0 then
                         let parameters = OpenApiParameter.ofRouteParameters routePattern.Parameters
                         parameters |> Array.iter op.Parameters.Add
@@ -109,15 +124,18 @@ module Builder =
 
         [<CustomOperation("name")>]
         member __.Name(spec, name) =
-            { spec with Name = name }
+            if String.IsNullOrEmpty name then spec else
+            { spec with Name = Some name }
 
         [<CustomOperation("summary")>]
         member __.Summary(spec, summary) =
-            { spec with Summary = summary }
+            if String.IsNullOrEmpty summary then spec else
+            { spec with Summary = Some summary }
 
         [<CustomOperation("description")>]
         member __.Description(spec:ResourceSpec, description) =
-            { spec with Description = description }
+            if String.IsNullOrEmpty description then spec else
+            { spec with Description = Some description }
 
         static member AddHandler(httpMethod, spec, handler) =
             { spec with Handlers=(httpMethod, handler, None)::spec.Handlers }
