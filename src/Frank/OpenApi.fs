@@ -87,15 +87,22 @@ module OpenApiParameter =
                 let schema = OpenApiSchema()
                 let policies = part.ParameterPolicies |> Seq.map (fun p -> p.ParameterPolicy)
                 applyParameterPolicies(part.Name, policies, schema)
-                yield OpenApiParameter(Name=part.Name, Required=not part.IsOptional, Schema=schema)
+                yield OpenApiParameter(Name=part.Name, In=Nullable(ParameterLocation.Path), Required=not part.IsOptional, Schema=schema)
             else
-                yield OpenApiParameter(Name=part.Name, Required=not part.IsOptional)|]
+                yield OpenApiParameter(Name=part.Name, In=Nullable(ParameterLocation.Path), Required=not part.IsOptional)|]
 
 let emptyDocument (title, version) =
     OpenApiDocument(
         Info = OpenApiInfo(Title=title, Version=version),
         Servers = ResizeArray<OpenApiServer>(),
         Paths = OpenApiPaths())
+
+let defaultResponse = "200", OpenApiResponse(Description="OK")
+
+let emptyOperation (httpMethod, name) =
+    let op = OpenApiOperation(OperationId=OperationId.format httpMethod name)
+    op.Responses.Add(defaultResponse)
+    op
 
 let handler (document:OpenApiDocument) =
     RequestDelegate(fun ctx ->
