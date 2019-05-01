@@ -19,10 +19,13 @@ Stable | Prerelease
 --- | ---
 [![NuGet Badge](https://buildstats.info/nuget/Frank)](https://www.nuget.org/packages/Frank/) | [![NuGet Badge](https://buildstats.info/nuget/Frank?includePreReleases=true)](https://www.nuget.org/packages/Frank/)
 
+## CodeScene
+
+[![](https://codescene.io/projects/4775/status.svg) Get more details at **codescene.io**.](https://codescene.io/projects/4775/jobs/latest-successful/results)
+
 ---
 
-### Building
-
+## Building
 
 Make sure the following **requirements** are installed in your system:
 
