@@ -1,3 +1,8 @@
+### New in 6.0.0 (Released 2020-06-02)
+* Update to .NET Core 3.1
+* Use Endpoint Routing
+* Pave the way for built-in generation of Open API spec
+
 ### New in 5.0.0 (Released 2019-01-05)
 * Starting over based on ASP.NET Core Routing and Hosting
 * New MIT license
