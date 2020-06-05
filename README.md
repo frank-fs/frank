@@ -38,7 +38,7 @@ dotnet build
 ## Performance
 
 Benchmarks should never be taken at face value. The following are taken from the [web-frameworks](https://github.com/the-benchmarker/web-frameworks) application, which simply returns an `""` with a `200 OK` response.
-These benchmarks compare Frank, Falco, Giraffe, and Suave under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombarider](https://github.com/codesenberg/bombardier).
+These benchmarks compare Frank, [Falco](https://github.com/pimbrouwers/Falco), [Giraffe](https://github.com/giraffe-fsharp/Giraffe), and [Suave](https://suave.io/) under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombarider](https://github.com/codesenberg/bombardier).
 
 ![Test machine stats](img/computer-info.png)
 
@@ -68,7 +68,7 @@ Statistics        Avg      Stdev        Max
   Throughput:    10.06MB/s
 ```
 
-Falco
+[Falco](https://github.com/pimbrouwers/Falco)
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
@@ -94,7 +94,7 @@ Statistics        Avg      Stdev        Max
   Throughput:    11.50MB/s
 ```
 
-Giraffe
+[Giraffe](https://github.com/giraffe-fsharp/Giraffe)
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
@@ -120,7 +120,7 @@ Statistics        Avg      Stdev        Max
   Throughput:    11.29MB/s
 ```
 
-Suave
+[Suave](https://suave.io/)
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:3000 -c 2000
 Bombarding http://127.0.0.1:3000 for 10s using 2000 connection(s)
