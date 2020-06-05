@@ -38,7 +38,9 @@ dotnet build
 ## Performance
 
 Benchmarks should never be taken at face value. The following are taken from the [web-frameworks](https://github.com/the-benchmarker/web-frameworks) application, which simply returns an `""` with a `200 OK` response.
-These benchmarks compare Frank, [Falco](https://github.com/pimbrouwers/Falco), [Giraffe](https://github.com/giraffe-fsharp/Giraffe), and [Suave](https://suave.io/) under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombarider](https://github.com/codesenberg/bombardier).
+These benchmarks compare Frank, [Falco](https://github.com/pimbrouwers/Falco), [Giraffe](https://github.com/giraffe-fsharp/Giraffe), [Suave](https://suave.io/), and [WebSharper](https://websharper.com/)
+under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombarider](https://github.com/codesenberg/bombardier). Frank, Falco, and Giraffe are all pretty well aligned, with each edging out
+the others in different runs. WebSharper is quite close behind and had surprising bursts of Max values on each run.
 
 ![Test machine stats](img/computer-info.png)
 
@@ -146,4 +148,30 @@ Statistics        Avg      Stdev        Max
   Errors:
     dial tcp 127.0.0.1:3000: connectex: No connection could be made because the target machine actively refused it. - 8568
   Throughput:     6.88MB/s
+```
+
+[WebSharper](https://websharper.com/)
+```
+C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
+Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
+[===========================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     58768.49   41779.96  254730.90
+  Latency       37.97ms    12.10ms   642.00ms
+  HTTP codes:
+    1xx - 0, 2xx - 525470, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:    10.08MB/s
+C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 10000
+Bombarding http://127.0.0.1:5000 for 10s using 10000 connection(s)
+[===========================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     53442.13   50090.03  290941.81
+  Latency      224.47ms   129.43ms      3.25s
+  HTTP codes:
+    1xx - 0, 2xx - 438677, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:     8.33MB/s
 ```
