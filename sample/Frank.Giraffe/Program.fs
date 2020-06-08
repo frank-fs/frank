@@ -101,6 +101,10 @@ let main _ =
 
     let hostBuilder : IWebHostBuilder =
         webHost (Microsoft.AspNetCore.Hosting.WebHostBuilder()) {
+            version "1.0.1"
+            title "Giraffe Sample"
+            description "Sample application showing use of Frank routing with Giraffe"
+
             configure (fun builder ->
                 builder.UseKestrel()
                        .UseContentRoot(contentRoot)

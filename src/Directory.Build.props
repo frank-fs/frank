@@ -8,6 +8,9 @@
     <NeutralLanguage>en-US</NeutralLanguage>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- Suppress warnings about using SemVer 2.0. -->
+    <NoWarn>$(NoWarn);NU5105</NoWarn>
+
     <PackageProjectUrl>https://github.com/panesofglass/frank/tree/aspnetcore</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/panesofglass/frank/tree/aspnetcore</RepositoryUrl>

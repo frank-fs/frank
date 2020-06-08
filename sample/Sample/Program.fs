@@ -31,12 +31,7 @@ let hello =
         name "Hello"
 
         // Using HttpContext -> () overload
-        get (fun (ctx:HttpContext) ->
-            task {
-                use writer = new System.IO.StreamWriter(ctx.Response.Body)
-                do! writer.WriteAsync("Hello, world!")
-                do! writer.FlushAsync()
-            })
+        get (fun (ctx:HttpContext) -> ctx.Response.WriteAsync("Hello, world!"))
 
         // Using HttpContext -> Task<'a> overload
         post (fun (ctx:HttpContext) ->
@@ -66,6 +61,9 @@ let hello =
 let main args =
     let builder =
         webHost (WebHost.CreateDefaultBuilder(args)) {
+            title "Sample API"
+            description "This is a sample Frank API"
+
             logging (fun options-> options.AddConsole().AddDebug())
 
             service (fun services -> services.AddResponseCompression().AddResponseCaching())
