@@ -10,6 +10,7 @@ module Builder =
     open Microsoft.AspNetCore.Routing
     open Microsoft.Extensions.DependencyInjection
     open Microsoft.Extensions.FileProviders
+    open Microsoft.Extensions.Hosting
 
     [<Struct>]
     type Resource = { Endpoints : Endpoint[] }
@@ -215,32 +216,42 @@ module Builder =
         override __.GetChangeToken() = NullChangeToken.Singleton :> _
 
     type WebHostSpec =
-        { Host : (IWebHostBuilder -> IWebHostBuilder)
-          Middleware : (IApplicationBuilder -> IApplicationBuilder)
-          Endpoints : Endpoint[]
-          Services : (IServiceCollection -> IServiceCollection) }
+        { Host: (IWebHostBuilder -> IWebHostBuilder)
+          Middleware: (IApplicationBuilder -> IApplicationBuilder)
+          Endpoints: Endpoint[]
+          Services: (IServiceCollection -> IServiceCollection)
+          UseDefaults: bool }
         static member Empty =
-            { Host = id
-              Middleware = id
-              Endpoints = [||]
-              Services = (fun services ->
+            { Host=id
+              Middleware=id
+              Endpoints=[||]
+              Services=(fun services ->
                 services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true) |> ignore
                 services)
-              }
+              UseDefaults=false }
 
     [<Sealed>]
-    type WebHostBuilder (hostBuilder:IWebHostBuilder) =
+    type WebHostBuilder (args) =
 
         member __.Run(spec:WebHostSpec) =
-            spec.Host(hostBuilder)
-                .ConfigureServices(spec.Services >> ignore)
-                .Configure(fun app ->
-                    app.UseRouting()
-                       .UseEndpoints(fun endpoints ->
-                           let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-                           endpoints.DataSources.Add(dataSource))
-                    |> spec.Middleware
+            let builder = Host.CreateDefaultBuilder(args)
+            let config = Action<_>(fun webBuilder ->
+                spec.Host(webBuilder)
+                    .ConfigureServices(spec.Services >> ignore)
+                    .Configure(fun app ->
+                        app.UseRouting()
+                           .UseEndpoints(fun endpoints ->
+                               let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+                               endpoints.DataSources.Add(dataSource))
+                        |> spec.Middleware
+                        |> ignore)
                     |> ignore)
+            let configured =
+                if spec.UseDefaults then
+                    builder.ConfigureWebHostDefaults(config)
+                else
+                    builder.ConfigureWebHost(config)
+            configured.Build().Run()
 
         member __.Yield(_) = WebHostSpec.Empty
 
@@ -262,11 +273,7 @@ module Builder =
 
         [<CustomOperation("plugWhenNot")>]
         member __.PlugWhenNot(spec, cond, f) =
-            { spec with
-                Middleware = fun app ->
-                    if not(cond app) then
-                        f(spec.Middleware(app))
-                    else spec.Middleware(app) }
+            __.PlugWhen(spec, not << cond, f)
 
         [<CustomOperation("resource")>]
         member __.Resource(spec, resource:Resource) : WebHostSpec =
@@ -275,5 +282,9 @@ module Builder =
         [<CustomOperation("service")>]
         member __.Service(spec, f) =
             { spec with Services = spec.Services >> f }
+        
+        [<CustomOperation("useDefaults")>]
+        member __.UseDefaults(spec) =
+            { spec with UseDefaults = true }
 
-    let webHost hostBuilder = WebHostBuilder(hostBuilder)
+    let webHost args = WebHostBuilder(args)
