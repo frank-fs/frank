@@ -1,8 +1,7 @@
 ﻿module Sample.Program
 
-open Microsoft.AspNetCore
+open System.Text
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
@@ -12,6 +11,14 @@ open Frank
 open Frank.Builder
 open Newtonsoft.Json.Linq
 open Sample.Extensions
+
+let home =
+    resource "/" {
+        name "Home"
+
+        get (fun (ctx:HttpContext) ->
+            ctx.Response.WriteAsync("Welcome!"))
+    }
 
 let helloName =
     resource "hello/{name}" {
@@ -32,11 +39,7 @@ let hello =
 
         // Using HttpContext -> () overload
         get (fun (ctx:HttpContext) ->
-            task {
-                use writer = new System.IO.StreamWriter(ctx.Response.Body)
-                do! writer.WriteAsync("Hello, world!")
-                do! writer.FlushAsync()
-            })
+            ctx.Response.WriteAsync("Hello, world!"))
 
         // Using HttpContext -> Task<'a> overload
         post (fun (ctx:HttpContext) ->
@@ -45,7 +48,7 @@ let hello =
                 if ctx.Request.HasFormContentType then
                     let! form = ctx.Request.ReadFormAsync()
                     ctx.Response.StatusCode <- 201
-                    use writer = new System.IO.StreamWriter(ctx.Response.Body)
+                    use writer = new System.IO.StreamWriter(ctx.Response.Body, encoding=Encoding.UTF8, leaveOpen=true)
                     do! writer.WriteLineAsync("Received form data:")
                     for KeyValue(key, value) in form do
                         do! writer.WriteLineAsync(sprintf "%s: %A" key (value.ToArray()))
@@ -64,27 +67,27 @@ let hello =
 
 [<EntryPoint>]
 let main args =
-    let builder =
-        webHost (WebHost.CreateDefaultBuilder(args)) {
-            logging (fun options-> options.AddConsole().AddDebug())
+    webHost args {
+        useDefaults
 
-            service (fun services -> services.AddResponseCompression().AddResponseCaching())
+        logging (fun options-> options.AddConsole().AddDebug())
 
-            useContentNegotiation
+        service (fun services -> services.AddResponseCompression().AddResponseCaching())
 
-            plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-            plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
+        useContentNegotiation
 
-            plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-            plug ResponseCachingExtensions.UseResponseCaching
-            plug ResponseCompressionBuilderExtensions.UseResponseCompression
-            plug StaticFileExtensions.UseStaticFiles
+        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+        plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
 
-            resource helloName
-            resource hello
-        }
+        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plug ResponseCachingExtensions.UseResponseCaching
+        plug ResponseCompressionBuilderExtensions.UseResponseCompression
+        plug StaticFileExtensions.UseStaticFiles
 
-    let host = builder.Build()
-    host.Run()
+        resource home
+        resource helloName
+        resource hello
+    }
+
     0

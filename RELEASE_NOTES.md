@@ -1,3 +1,7 @@
+### New in 6.1.0 (Released 2020-06-11)
+* Encapsulate `IHostBuilder` and expose option to use web builder defaults with `useDefaults`.
+* Server application can now be simply a standard console application. See [samples](https://github.com/frank-fs/frank/tree/master/sample).
+
 ### New in 6.0.0 (Released 2020-06-02)
 * Update to .NET Core 3.1
 * Use Endpoint Routing

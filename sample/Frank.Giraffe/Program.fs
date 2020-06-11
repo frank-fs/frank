@@ -95,33 +95,29 @@ let configureLogging (builder:ILoggingBuilder) =
            .AddDebug()
 
 [<EntryPoint>]
-let main _ =
+let main args =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
 
-    let hostBuilder : IWebHostBuilder =
-        webHost (Microsoft.AspNetCore.Hosting.WebHostBuilder()) {
-            configure (fun builder ->
-                builder.UseKestrel()
-                       .UseContentRoot(contentRoot)
-                       .UseIISIntegration()
-                       .UseWebRoot(webRoot))
-            logging configureLogging
-            useCors configureCors
-            // enable Giraffe content negotiation
-            service (fun services -> services.AddGiraffe())
+    webHost args {
+        configure (fun bldr ->
+            bldr.UseKestrel()
+                .UseContentRoot(contentRoot)
+                .UseIISIntegration()
+                .UseWebRoot(webRoot))
+        logging configureLogging
+        useCors configureCors
+        // enable Giraffe content negotiation
+        service (fun services -> services.AddGiraffe())
 
-            plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-            plugWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
+        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        plugWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
 
-            plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-            plug StaticFileExtensions.UseStaticFiles
+        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plug StaticFileExtensions.UseStaticFiles
 
-            resource helloWorld
-            resource helloName
-        }
-
-    let host = hostBuilder.Build()
-    host.Run()
+        resource helloWorld
+        resource helloName
+    }
 
     0
