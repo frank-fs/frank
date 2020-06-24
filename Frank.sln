@@ -4,9 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E7FEC957-359E-4B20-B0C1-F93552F6701F}"
-ProjectSection(SolutionItems) = preProject
-	src\Directory.Build.props = src\Directory.Build.props
-EndProjectSection
+	ProjectSection(SolutionItems) = preProject
+		src\Directory.Build.props = src\Directory.Build.props
+	EndProjectSection
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Frank", "src\Frank\Frank.fsproj", "{6B884F96-1AC1-4D94-B124-4E45802BC9CA}"
 EndProject
@@ -15,6 +15,8 @@ EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Sample", "sample\Sample\Sample.fsproj", "{B00F5976-D710-493F-90DB-CEB8703DF924}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Giraffe", "sample\Frank.Giraffe\Frank.Giraffe.fsproj", "{288DD553-E875-48CC-BE7A-F17D6CC248A2}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Falco", "sample\Frank.Falco\Frank.Falco.fsproj", "{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -62,6 +64,18 @@ Global
 		{288DD553-E875-48CC-BE7A-F17D6CC248A2}.Release|x64.Build.0 = Release|Any CPU
 		{288DD553-E875-48CC-BE7A-F17D6CC248A2}.Release|x86.ActiveCfg = Release|Any CPU
 		{288DD553-E875-48CC-BE7A-F17D6CC248A2}.Release|x86.Build.0 = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|x64.Build.0 = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Debug|x86.Build.0 = Debug|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|x64.ActiveCfg = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|x64.Build.0 = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|x86.ActiveCfg = Release|Any CPU
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -70,6 +84,7 @@ Global
 		{6B884F96-1AC1-4D94-B124-4E45802BC9CA} = {E7FEC957-359E-4B20-B0C1-F93552F6701F}
 		{B00F5976-D710-493F-90DB-CEB8703DF924} = {D44D293C-2E08-4249-8274-1B5BB8EA273D}
 		{288DD553-E875-48CC-BE7A-F17D6CC248A2} = {D44D293C-2E08-4249-8274-1B5BB8EA273D}
+		{ED5FD678-C822-4C2A-ABC3-E75C4B9B0CE7} = {D44D293C-2E08-4249-8274-1B5BB8EA273D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {69BCA08B-4B88-4702-91B2-B5E891A078D9}
