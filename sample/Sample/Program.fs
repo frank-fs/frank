@@ -1,9 +1,11 @@
 ﻿module Sample.Program
 
+open System.IO
 open System.Text
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Internal
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
@@ -64,6 +66,18 @@ let hello =
                     do! ctx.Response.WriteAsync("Could not seek")
             })
     }
+    
+let graph =
+    resource "graph" {
+        name "Graph"
+        
+        get (fun(ctx:HttpContext) ->
+                let graphWriter = ctx.RequestServices.GetRequiredService<DfaGraphWriter>()
+                let endpointDataSource = ctx.RequestServices.GetRequiredService<EndpointDataSource>()
+                use sw = new StringWriter();
+                graphWriter.Write(endpointDataSource, sw);
+                ctx.Response.WriteAsync(sw.ToString()))
+    }
 
 [<EntryPoint>]
 let main args =
@@ -88,6 +102,7 @@ let main args =
         resource home
         resource helloName
         resource hello
+        resource graph
     }
 
     0
