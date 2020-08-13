@@ -39,7 +39,7 @@ dotnet build
 
 Benchmarks should never be taken at face value. The following are taken from the [web-frameworks](https://github.com/the-benchmarker/web-frameworks) application, which simply returns an `""` with a `200 OK` response.
 These benchmarks compare Frank, [Falco](https://github.com/pimbrouwers/Falco), [Giraffe](https://github.com/giraffe-fsharp/Giraffe), [Suave](https://suave.io/), and [WebSharper](https://websharper.com/)
-under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombarider](https://github.com/codesenberg/bombardier). Frank, Falco, and Giraffe are all pretty well aligned, with each edging out
+under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombardier](https://github.com/codesenberg/bombardier). Frank, Falco, and Giraffe are all pretty well aligned, with each edging out
 the others in different runs. WebSharper is quite close behind and had surprising bursts of Max values on each run.
 
 ![Test machine stats](img/computer-info.png)
