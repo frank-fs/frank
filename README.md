@@ -8,8 +8,6 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 ## Builds
 
-MacOS/Linux | Windows
---- | ---
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
 
 [![Build History](https://buildstats.info/github/chart/frank-fs/frank?branch=master)](https://github.com/frank-fs/frank/actions?query=workflow%3ACI)
