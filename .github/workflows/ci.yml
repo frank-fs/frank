@@ -23,11 +23,9 @@ jobs:
     - name: Build
       run: |
         dotnet restore
-        dotnet build -c Release --no-restore
-    - name: Test
-      run: dotnet test -c Release --no-restore --no-build --framework net5.0 --logger "GitHubActions;report-warnings=false"
+        dotnet build Frank.sln -c Release --no-restore
     - name: Pack
-      run: dotnet pack -c Release --no-restore --no-build --include-symbols -o out
+      run: dotnet pack src/Frank -c Release --no-restore --no-build --include-symbols -o out
     - name: Upload artifact
       uses: actions/upload-artifact@v1
       with:
