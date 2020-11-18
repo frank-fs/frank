@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <VersionPrefix>6.1.0</VersionPrefix>
+    <VersionPrefix>6.2.0</VersionPrefix>
     <Authors>Ryan Riley</Authors>
     <Description>F# computation expressions for configuring the Microsoft.AspNetCore.Hosting.IWebHostBuilder and defining routes for HTTP resources using Microsoft.AspNetCore.Routing.</Description>
     <Copyright>© Ryan Riley. All rights reserved.</Copyright>
@@ -13,7 +13,6 @@
     <RepositoryUrl>https://github.com/panesofglass/frank/tree/aspnetcore</RepositoryUrl>
     <PackageTags>$(PackageTags);functional;web;frank;f#;fsharp</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <IncludeSymbols>true</IncludeSymbols>
 
     <!-- Optional: Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -23,7 +22,7 @@
   
     <!-- Optional: Build symbol package (.snupkg) to distribute the PDB containing Source Link -->
     <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>symbols.nupkg</SymbolPackageFormat>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
