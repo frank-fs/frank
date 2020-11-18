@@ -10,8 +10,9 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 MacOS/Linux | Windows
 --- | ---
-[![Build Status](https://travis-ci.org/frank-fs/frank.png?branch=master)](https://travis-ci.org/frank-fs/frank) | [![Build status](https://ci.appveyor.com/api/projects/status/pt3i73qxyxgjax5d?svg=true)](https://ci.appveyor.com/project/panesofglass/frank)
-[![Build History](https://buildstats.info/travisci/chart/frank-fs/frank)](https://travis-ci.org/frank-fs/frank/builds) | [![Build History](https://buildstats.info/appveyor/chart/panesofglass/frank)](https://ci.appveyor.com/project/panesofglass/frank)
+![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
+
+[![Build History](https://buildstats.info/github/chart/frank-fs/frank?branch=master)](https://github.com/frank-fs/frank/actions?query=workflow%3ACI)
 
 ## Nuget 
 
