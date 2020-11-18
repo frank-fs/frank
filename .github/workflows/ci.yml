@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    name: Build, test, and pack
+    name: Build and pack
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
