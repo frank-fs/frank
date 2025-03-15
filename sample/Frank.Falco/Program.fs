@@ -79,11 +79,10 @@ let serverException: HttpHandler =
 // ---------------------------------
 
 let configureCors (builder: CorsPolicyBuilder) =
-    builder.WithOrigins("http://localhost:8080").AllowAnyMethod().AllowAnyHeader()
+    builder.WithOrigins("http://localhost:5000").AllowAnyMethod().AllowAnyHeader()
     |> ignore
 
-let configureLogging (builder: ILoggingBuilder) =
-    builder.AddFilter(fun l -> l.Equals LogLevel.Error).AddConsole().AddDebug()
+let configureLogging (builder: ILoggingBuilder) = builder.AddConsole().AddDebug()
 
 [<EntryPoint>]
 let main args =

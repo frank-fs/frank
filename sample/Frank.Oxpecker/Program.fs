@@ -1,13 +1,12 @@
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging
 open Oxpecker
-open Oxpecker.Htmx
 open Oxpecker.ViewEngine
 open Oxpecker.ViewEngine.Aria
+open Oxpecker.Htmx
 open FSharp.Control
 open Frank.Builder
 open Frank.Oxpecker.Extensions
@@ -37,7 +36,7 @@ let streamingHtml1: EndpointHandler =
         let html =
             html () {
                 head () {
-                    script (src = "https://unkpg.com/htmx.org@1.9.12")
+                    script (src = "https://unpkg.com/htmx.org@1.9.12")
                     script (src = "https://unpkg.com/htmx.ext...chunked-transfer@1.0.4/dist/index.js") // workaround, see https://github.com/bigskysoftware/htmx/issues/1911
                 }
 
@@ -60,10 +59,9 @@ let streamingHtml2: EndpointHandler =
 
         htmlChunked values ctx
 
-
 let home =
     resource "/" {
-        name "Home"
+        name "streamHtml1"
 
         get streamingHtml1
     }
@@ -131,16 +129,15 @@ let errorHandler (ctx: HttpContext) (next: RequestDelegate) =
 // ---------------------------------
 
 let configureCors (builder: CorsPolicyBuilder) =
-    builder.WithOrigins("http://localhost:8080").AllowAnyMethod().AllowAnyHeader()
+    builder.WithOrigins([| "http://localhost:5017"; "https://unpkg.com" |]).AllowAnyMethod().AllowAnyHeader()
     |> ignore
 
-let configureLogging (builder: ILoggingBuilder) =
-    builder.AddFilter(fun l -> l.Equals LogLevel.Error).AddConsole().AddDebug()
+let configureLogging (builder: ILoggingBuilder) = builder.AddConsole().AddDebug()
 
 [<EntryPoint>]
 let main args =
     webHost args {
-        configure (fun bldr -> bldr.UseKestrel())
+        useDefaults
 
         logging configureLogging
         service (fun services -> services.AddOxpecker())
