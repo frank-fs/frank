@@ -14,7 +14,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 Make sure the following **requirements** are installed in your system:
 
-- [dotnet SDK](https://www.microsoft.com/net/download/core) 2.2 or higher
+- [dotnet SDK](https://dotnet.microsoft.com/en-us/download) 8.0 or higher
 
 ```
 dotnet build
