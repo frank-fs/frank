@@ -2,15 +2,16 @@
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <VersionPrefix>7.0.0</VersionPrefix>
-    <Authors>Ryan Riley</Authors>
+    <Authors>panesofglass</Authors>
     <Description>F# computation expressions for configuring the Microsoft.AspNetCore.Hosting.IWebHostBuilder and defining routes for HTTP resources using Microsoft.AspNetCore.Routing.</Description>
     <Copyright>© Ryan Riley. All rights reserved.</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/panesofglass/frank/tree/aspnetcore</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/frank-fs/frank</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/panesofglass/frank/tree/aspnetcore</RepositoryUrl>
+    <RepositoryUrl>https://github.com/frank-fs/frank</RepositoryUrl>
     <PackageTags>$(PackageTags);functional;web;frank;f#;fsharp</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 

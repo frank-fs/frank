@@ -1,7 +1,11 @@
-### New in 7.0.0 (Released 2025-03-14)
+### New in 6.3.0 (Released 2025-03-14)
 
 - Updated to target net8.0 and net9.0
 - Updated examples
+
+### New in 6.2.0 (Released 2020-11-18)
+
+- Updated samples
 
 ### New in 6.1.0 (Released 2020-06-11)
 
