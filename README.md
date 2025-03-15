@@ -10,6 +10,57 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 ---
 
+## Features
+
+- `WebHostBuilder` - computation expression for configuring `WebHost`
+- `ResourceBuilder` - computation expression for configuring resources (routing)
+- **No** pre-defined view engine - use your preferred view engine implementation,
+  e.g. [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup)
+  or [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/)
+- Easy extensibility - just extend the `Builder` with your own methods!
+
+```fsharp
+module Program
+
+open System.IO
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Internal
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
+open Frank
+open Frank.Builder
+
+let home =
+    resource "/" {
+        name "Home"
+
+        get (fun (ctx:HttpContext) ->
+            ctx.Response.WriteAsync("Welcome!"))
+    }
+
+[<EntryPoint>]
+let main args =
+    webHost args {
+        useDefaults
+
+        logging (fun options-> options.AddConsole().AddDebug())
+
+        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
+
+        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plug StaticFileExtensions.UseStaticFiles
+
+        resource home
+    }
+
+    0
+```
+
+---
+
 ## Building
 
 Make sure the following **requirements** are installed in your system:
