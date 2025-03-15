@@ -6,17 +6,9 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 ---
 
-## Builds
-
+[![NuGet Version](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/)
+![GitHub Release Date](https://img.shields.io/github/release-date/frank-fs/frank)
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
-
-[![Build History](https://buildstats.info/github/chart/frank-fs/frank?branch=master)](https://github.com/frank-fs/frank/actions?query=workflow%3ACI)
-
-## Nuget
-
-| Stable                                                                                       | Prerelease                                                                                                           |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [![NuGet Badge](https://buildstats.info/nuget/Frank)](https://www.nuget.org/packages/Frank/) | [![NuGet Badge](https://buildstats.info/nuget/Frank?includePreReleases=true)](https://www.nuget.org/packages/Frank/) |
 
 ---
 
