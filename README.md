@@ -12,15 +12,11 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 [![Build History](https://buildstats.info/github/chart/frank-fs/frank?branch=master)](https://github.com/frank-fs/frank/actions?query=workflow%3ACI)
 
-## Nuget 
+## Nuget
 
-Stable | Prerelease
---- | ---
-[![NuGet Badge](https://buildstats.info/nuget/Frank)](https://www.nuget.org/packages/Frank/) | [![NuGet Badge](https://buildstats.info/nuget/Frank?includePreReleases=true)](https://www.nuget.org/packages/Frank/)
-
-## CodeScene
-
-[![](https://codescene.io/projects/4775/status.svg) Get more details at **codescene.io**.](https://codescene.io/projects/4775/jobs/latest-successful/results)
+| Stable                                                                                       | Prerelease                                                                                                           |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [![NuGet Badge](https://buildstats.info/nuget/Frank)](https://www.nuget.org/packages/Frank/) | [![NuGet Badge](https://buildstats.info/nuget/Frank?includePreReleases=true)](https://www.nuget.org/packages/Frank/) |
 
 ---
 
@@ -28,7 +24,7 @@ Stable | Prerelease
 
 Make sure the following **requirements** are installed in your system:
 
-* [dotnet SDK](https://www.microsoft.com/net/download/core) 2.2 or higher
+- [dotnet SDK](https://www.microsoft.com/net/download/core) 2.2 or higher
 
 ```
 dotnet build
@@ -44,6 +40,7 @@ the others in different runs. WebSharper is quite close behind and had surprisin
 ![Test machine stats](img/computer-info.png)
 
 Frank
+
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
@@ -70,6 +67,7 @@ Statistics        Avg      Stdev        Max
 ```
 
 [Falco](https://github.com/pimbrouwers/Falco)
+
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
@@ -96,6 +94,7 @@ Statistics        Avg      Stdev        Max
 ```
 
 [Giraffe](https://github.com/giraffe-fsharp/Giraffe)
+
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
@@ -122,6 +121,7 @@ Statistics        Avg      Stdev        Max
 ```
 
 [Suave](https://suave.io/)
+
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:3000 -c 2000
 Bombarding http://127.0.0.1:3000 for 10s using 2000 connection(s)
@@ -150,6 +150,7 @@ Statistics        Avg      Stdev        Max
 ```
 
 [WebSharper](https://websharper.com/)
+
 ```
 C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
 Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)

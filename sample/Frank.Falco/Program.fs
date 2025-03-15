@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.Diagnostics
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Logging
 open Falco
+open Falco.Markup
 open Frank.Builder
 open Frank.Falco.Extensions
 
@@ -21,8 +22,6 @@ type Message = { Text : string }
 // ---------------------------------
 
 module Views =
-    open Falco.Markup
-    
     let layout (content: XmlNode list) =
         Elem.html [] [
             Elem.head [] [
@@ -58,8 +57,8 @@ let helloWorld =
     }
 
 let indexRouteHandler : HttpHandler =
-    let routeBinder (r : RouteCollectionReader) =
-        r.GetString "name" "world"
+    let routeBinder (r : RequestData) =
+        r.GetString("name", "world")
 
     Request.mapRoute routeBinder indexHandler
 
@@ -73,16 +72,13 @@ let helloName =
 // Error handler
 // ---------------------------------
 
-let errorHandler : HttpHandler =
-    fun ctx ->
-        let exceptionHandlerFeature = ctx.Features.Get<IExceptionHandlerPathFeature>();
-        let ex = exceptionHandlerFeature.Error
+let notFound : HttpHandler =
+    Response.withStatusCode 404 >>
+    Response.ofHtml (Views.layout [ Text.h1 "Not Found" ])
 
-        let logger = ctx.GetLogger "exception handler"
-        logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
-
-        Response.withStatusCode 500 ctx
-        |> Response.ofPlainText ex.Message
+let serverException : HttpHandler =
+    Response.withStatusCode 500 >>
+    Response.ofHtml (Views.layout [ Text.h1 "Server Error" ])
 
 // ---------------------------------
 // Config and Main
@@ -104,11 +100,9 @@ let main args =
         configure (fun bldr -> bldr.UseKestrel().UseContentRoot(contentRoot).UseIISIntegration().UseWebRoot(webRoot))
         logging configureLogging
         useCors configureCors
-        
-        service (fun services -> services.AddFalco())
 
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-        plugWhenNot isDevelopment (FalcoExtensions.UseFalcoExceptionHandler errorHandler)
+        plugWhenNot isDevelopment (FalcoExtensions.UseFalcoExceptionHandler serverException)
 
         plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
         plug StaticFileExtensions.UseStaticFiles

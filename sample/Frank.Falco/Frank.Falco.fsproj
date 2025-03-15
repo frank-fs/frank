@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
     <DebugType>portable</DebugType>
-    <AssemblyName>Frank.Falco</AssemblyName>
     <OutputType>Exe</OutputType>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
@@ -24,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="5.0.0" />
-    <PackageReference Include="Falco" Version="3.1.0-beta7" />
+    <PackageReference Include="Falco" Version="5.0.0" />
+    <PackageReference Include="Falco.Markup" Version="1.1.1" />
   </ItemGroup>
 
 </Project>

@@ -2,16 +2,15 @@
 
 open System.IO
 open System.Text
+open System.Text.Json
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Internal
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
-open FSharp.Control.Tasks.V2.ContextInsensitive
 open Frank
 open Frank.Builder
-open Newtonsoft.Json.Linq
 open Sample.Extensions
 
 let home =
@@ -59,7 +58,7 @@ let hello =
                     ctx.Request.Body.Seek(0L, System.IO.SeekOrigin.Begin) |> ignore
                     use reader = new System.IO.StreamReader(ctx.Request.Body)
                     let! input = reader.ReadToEndAsync()
-                    let json = JObject.Parse input
+                    let json = JsonSerializer.Deserialize input
                     do! ContentNegotiation.negotiate 201 json ctx
                 else
                     ctx.Response.StatusCode <- 500
