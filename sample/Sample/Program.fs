@@ -17,19 +17,18 @@ let home =
     resource "/" {
         name "Home"
 
-        get (fun (ctx:HttpContext) ->
-            ctx.Response.WriteAsync("Welcome!"))
+        get (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("Welcome!"))
     }
 
 let helloName =
     resource "hello/{name}" {
         name "Hello Name"
 
-        get (fun (ctx:HttpContext) ->
+        get (fun (ctx: HttpContext) ->
             let name = ctx.GetRouteValue("name") |> string
             ctx.Response.WriteAsync(sprintf "Hi, %s!" name))
 
-        put (fun (ctx:HttpContext) ->
+        put (fun (ctx: HttpContext) ->
             let name = ctx.GetRouteValue("name") |> string
             ContentNegotiation.negotiate 201 name ctx)
     }
@@ -39,20 +38,25 @@ let hello =
         name "Hello"
 
         // Using HttpContext -> () overload
-        get (fun (ctx:HttpContext) ->
-            ctx.Response.WriteAsync("Hello, world!"))
+        get (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("Hello, world!"))
 
         // Using HttpContext -> Task<'a> overload
-        post (fun (ctx:HttpContext) ->
+        post (fun (ctx: HttpContext) ->
             task {
                 ctx.Request.EnableBuffering()
+
                 if ctx.Request.HasFormContentType then
                     let! form = ctx.Request.ReadFormAsync()
                     ctx.Response.StatusCode <- 201
-                    use writer = new System.IO.StreamWriter(ctx.Response.Body, encoding=Encoding.UTF8, leaveOpen=true)
+
+                    use writer =
+                        new System.IO.StreamWriter(ctx.Response.Body, encoding = Encoding.UTF8, leaveOpen = true)
+
                     do! writer.WriteLineAsync("Received form data:")
+
                     for KeyValue(key, value) in form do
                         do! writer.WriteLineAsync(sprintf "%s: %A" key (value.ToArray()))
+
                     do! writer.FlushAsync()
                 elif ctx.Request.ContentType = "application/json" then
                     ctx.Request.Body.Seek(0L, System.IO.SeekOrigin.Begin) |> ignore
@@ -65,17 +69,20 @@ let hello =
                     do! ctx.Response.WriteAsync("Could not seek")
             })
     }
-    
+
 let graph =
     resource "graph" {
         name "Graph"
-        
-        get (fun(ctx:HttpContext) ->
-                let graphWriter = ctx.RequestServices.GetRequiredService<DfaGraphWriter>()
-                let endpointDataSource = ctx.RequestServices.GetRequiredService<EndpointDataSource>()
-                use sw = new StringWriter();
-                graphWriter.Write(endpointDataSource, sw);
-                ctx.Response.WriteAsync(sw.ToString()))
+
+        get (fun (ctx: HttpContext) ->
+            let graphWriter = ctx.RequestServices.GetRequiredService<DfaGraphWriter>()
+
+            let endpointDataSource =
+                ctx.RequestServices.GetRequiredService<EndpointDataSource>()
+
+            use sw = new StringWriter()
+            graphWriter.Write(endpointDataSource, sw)
+            ctx.Response.WriteAsync(sw.ToString()))
     }
 
 [<EntryPoint>]
@@ -83,7 +90,7 @@ let main args =
     webHost args {
         useDefaults
 
-        logging (fun options-> options.AddConsole().AddDebug())
+        logging (fun options -> options.AddConsole().AddDebug())
 
         service (fun services -> services.AddResponseCompression().AddResponseCaching())
 
