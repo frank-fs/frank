@@ -3,7 +3,6 @@
 open System.IO
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
-open Microsoft.AspNetCore.Diagnostics
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Logging
 open Falco
@@ -15,7 +14,7 @@ open Frank.Falco.Extensions
 // Models
 // ---------------------------------
 
-type Message = { Text : string }
+type Message = { Text: string }
 
 // ---------------------------------
 // Views
@@ -23,31 +22,27 @@ type Message = { Text : string }
 
 module Views =
     let layout (content: XmlNode list) =
-        Elem.html [] [
-            Elem.head [] [
-                Elem.title []  [ Text.raw "Frank.Falco" ]
-                Elem.link [ Attr.rel  "stylesheet"; Attr.type' "text/css"; Attr.href "/main.css" ]
-            ]
-            Elem.body [] content
-        ]
+        Elem.html
+            []
+            [ Elem.head
+                  []
+                  [ Elem.title [] [ Text.raw "Frank.Falco" ]
+                    Elem.link [ Attr.rel "stylesheet"; Attr.type' "text/css"; Attr.href "/main.css" ] ]
+              Elem.body [] content ]
 
-    let partial () =
-        Elem.h1 [] [ Text.raw "Frank.Falco" ]
+    let partial () = Elem.h1 [] [ Text.raw "Frank.Falco" ]
 
-    let index (model : Message) =
-        [
-            partial()
-            Elem.p [] [ Text.raw model.Text ]
-        ] |> layout
+    let index (model: Message) =
+        [ partial (); Elem.p [] [ Text.raw model.Text ] ] |> layout
 
 // ---------------------------------
 // Web app
 // ---------------------------------
 
-let indexHandler (name : string) : HttpHandler =    
+let indexHandler (name: string) : HttpHandler =
     let greetings = sprintf "Hello %s, from Falco!" name
-    let model     = { Text = greetings }
-    let view      = Views.index model
+    let model = { Text = greetings }
+    let view = Views.index model
     Response.ofHtml view
 
 let helloWorld =
@@ -56,9 +51,8 @@ let helloWorld =
         get (indexHandler "world")
     }
 
-let indexRouteHandler : HttpHandler =
-    let routeBinder (r : RequestData) =
-        r.GetString("name", "world")
+let indexRouteHandler: HttpHandler =
+    let routeBinder (r: RequestData) = r.GetString("name", "world")
 
     Request.mapRoute routeBinder indexHandler
 
@@ -72,13 +66,13 @@ let helloName =
 // Error handler
 // ---------------------------------
 
-let notFound : HttpHandler =
-    Response.withStatusCode 404 >>
-    Response.ofHtml (Views.layout [ Text.h1 "Not Found" ])
+let notFound: HttpHandler =
+    Response.withStatusCode 404
+    >> Response.ofHtml (Views.layout [ Text.h1 "Not Found" ])
 
-let serverException : HttpHandler =
-    Response.withStatusCode 500 >>
-    Response.ofHtml (Views.layout [ Text.h1 "Server Error" ])
+let serverException: HttpHandler =
+    Response.withStatusCode 500
+    >> Response.ofHtml (Views.layout [ Text.h1 "Server Error" ])
 
 // ---------------------------------
 // Config and Main
