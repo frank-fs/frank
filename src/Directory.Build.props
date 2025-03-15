@@ -4,7 +4,7 @@
     <VersionPrefix>7.0.0</VersionPrefix>
     <Authors>panesofglass</Authors>
     <Description>F# computation expressions for configuring the Microsoft.AspNetCore.Hosting.IWebHostBuilder and defining routes for HTTP resources using Microsoft.AspNetCore.Routing.</Description>
-    <Copyright>© Ryan Riley. All rights reserved.</Copyright>
+    <Copyright>Copyright © 2011-2025 Ryan Riley. All rights reserved.</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
