@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frank.Datastar + Hox Examples</title>
+    
+    <!-- Datastar -->
+    <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>
+    
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .section { padding: 2rem 1.5rem; }
+        .example-box {
+            border: 2px solid #dbdbdb;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .example-title {
+            color: #363636;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <section class="hero is-primary">
+        <div class="hero-body">
+            <div class="container">
+                <h1 class="title is-1">Frank.Datastar + Hox</h1>
+                <h2 class="subtitle is-3">Server-Side Rendering with Async HTML Fragments</h2>
+            </div>
+        </div>
+    </section>
+
+    <div class="container mt-5">
+        
+        <!-- Example 1: Load User Cards -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 1: Load User Cards</h2>
+            <p class="content">Demonstrates loading user cards with async data fetching and Hox rendering.</p>
+            
+            <div class="buttons">
+                <button class="button is-primary" data-on:click="@get('/load-users/3')">
+                    Load 3 Users
+                </button>
+                <button class="button is-info" data-on:click="@get('/load-users/6')">
+                    Load 6 Users
+                </button>
+                <button class="button is-link" data-on:click="@get('/load-users/9')">
+                    Load 9 Users
+                </button>
+            </div>
+            
+            <div id="user-list" class="mt-4"></div>
+        </div>
+
+        <!-- Example 2: Product Filtering -->
+        <div class="example-box" 
+             data-signals="{'searchTerm': '', 'category': '', 'inStockOnly': false}">
+            <h2 class="title is-3 example-title">Example 2: Product Filtering with Signals</h2>
+            <p class="content">Filter products dynamically using Datastar signals and Hox rendering.</p>
+            
+            <button class="button is-primary is-fullwidth mb-4" 
+                    data-on:click="@get('/load-catalog')">
+                Load Product Catalog
+            </button>
+            
+            <div class="columns">
+                <div class="column is-one-quarter" id="filter-form"></div>
+                <div class="column is-three-quarters" id="product-grid"></div>
+            </div>
+        </div>
+
+        <!-- Example 3: Dashboard Statistics -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 3: Dashboard with Async Data</h2>
+            <p class="content">Load dashboard statistics with async aggregated data.</p>
+            
+            <button class="button is-primary" data-on:click="@get('/load-dashboard')">
+                Load Dashboard
+            </button>
+            
+            <div id="dashboard" class="mt-4"></div>
+        </div>
+
+        <!-- Example 4: Multiple Fragment Updates -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 4: Multi-Fragment Refresh</h2>
+            <p class="content">Update multiple page sections simultaneously.</p>
+            
+            <button class="button is-primary is-large is-fullwidth" 
+                    data-on:click="@get('/refresh-all')">
+                <span class="icon">
+                    <i class="fas fa-sync-alt"></i>
+                </span>
+                <span>Refresh Everything</span>
+            </button>
+            
+            <div class="mt-5">
+                <div id="dashboard"></div>
+                <hr>
+                <div id="user-list"></div>
+                <hr>
+                <div id="product-grid"></div>
+            </div>
+        </div>
+
+        <!-- Example 5: Notifications -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 5: Dynamic Notifications</h2>
+            <p class="content">Show notifications that auto-dismiss after 5 seconds.</p>
+            
+            <div class="buttons">
+                <button class="button is-success" 
+                        data-on:click="@post('/notify?message=Operation successful!&type=success')">
+                    Success Notification
+                </button>
+                <button class="button is-warning" 
+                        data-on:click="@post('/notify?message=Warning: Check your settings&type=warning')">
+                    Warning Notification
+                </button>
+                <button class="button is-danger" 
+                        data-on:click="@post('/notify?message=Error occurred!&type=error')">
+                    Error Notification
+                </button>
+                <button class="button is-info" 
+                        data-on:click="@post('/notify?message=Information message&type=info')">
+                    Info Notification
+                </button>
+            </div>
+            
+            <div id="notification" class="mt-4"></div>
+        </div>
+
+        <!-- Example 6: Data Table -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 6: Dynamic Data Table</h2>
+            <p class="content">Render a data table with Hox's fragment composition.</p>
+            
+            <button class="button is-primary" data-on:click="@get('/load-table')">
+                Load Data Table
+            </button>
+            
+            <div id="data-table" class="mt-4"></div>
+        </div>
+
+        <!-- Example 7: Complex Layout Streaming -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 7: Streamed Complex Layout</h2>
+            <p class="content">Load a multi-section layout with async streaming rendering.</p>
+            
+            <button class="button is-primary is-large is-fullwidth" 
+                    data-on:click="@get('/stream-content')">
+                <span class="icon">
+                    <i class="fas fa-stream"></i>
+                </span>
+                <span>Stream Complex Layout</span>
+            </button>
+            
+            <div id="complex-layout" class="mt-5"></div>
+        </div>
+
+        <!-- Example 8: Progressive Enhancement -->
+        <div class="example-box" 
+             data-signals="{'searchTerm': '', 'category': '', 'inStockOnly': false}">
+            <h2 class="title is-3 example-title">Example 8: Progressive Loading</h2>
+            <p class="content">Load form first, then products progressively.</p>
+            
+            <button class="button is-primary" data-on:click="@get('/load-catalog')">
+                Load Catalog Progressively
+            </button>
+            
+            <div class="columns mt-4">
+                <div class="column is-one-quarter" id="filter-form"></div>
+                <div class="column is-three-quarters" id="product-grid"></div>
+            </div>
+        </div>
+
+        <!-- Example 9: Conditional Rendering -->
+        <div class="example-box" 
+             data-signals="{'viewMode': 'grid', 'userId': 0}">
+            <h2 class="title is-3 example-title">Example 9: View Mode Toggle</h2>
+            <p class="content">Switch between grid and table views.</p>
+            
+            <div class="field is-grouped">
+                <p class="control">
+                    <button class="button is-primary" 
+                            data-on:click="$viewMode = 'grid'; @post('/update-user-view')">
+                        <span class="icon">
+                            <i class="fas fa-th"></i>
+                        </span>
+                        <span>Grid View</span>
+                    </button>
+                </p>
+                <p class="control">
+                    <button class="button is-info" 
+                            data-on:click="$viewMode = 'table'; @post('/update-user-view')">
+                        <span class="icon">
+                            <i class="fas fa-table"></i>
+                        </span>
+                        <span>Table View</span>
+                    </button>
+                </p>
+            </div>
+            
+            <div id="user-list" class="mt-4"></div>
+        </div>
+
+        <!-- Example 10: Real-time Updates -->
+        <div class="example-box">
+            <h2 class="title is-3 example-title">Example 10: Real-time Updates</h2>
+            <p class="content">Simulate real-time updates with notifications and dashboard refresh.</p>
+            
+            <button class="button is-primary" 
+                    data-on:click="@get('/realtime-update'); setInterval(() => fetch('/realtime-update'), 5000)">
+                <span class="icon">
+                    <i class="fas fa-broadcast-tower"></i>
+                </span>
+                <span>Start Real-time Updates</span>
+            </button>
+            
+            <div class="mt-4">
+                <div id="notification"></div>
+                <div id="dashboard" class="mt-4"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer class="footer">
+        <div class="content has-text-centered">
+            <p>
+                <strong>Frank.Datastar + Hox Examples</strong>
+            </p>
+            <p>
+                Demonstrating server-side HTML rendering with async capabilities,
+                seamless SSE integration, and reactive updates.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>
