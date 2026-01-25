@@ -48,11 +48,10 @@ type DashboardStats = {
     Revenue: decimal
 }
 
-// Simulated data sources (replace with actual DB calls)
+// Simulated data sources
 let fetchUsersAsync count =
     task {
-        do! Task.Delay(100) // Simulate async I/O
-
+        do! Task.Delay(100)
         return
             [ for i in 1..count do
                   { Id = i
@@ -64,414 +63,334 @@ let fetchUsersAsync count =
 let fetchProductsAsync category =
     task {
         do! Task.Delay(100)
-
         let allProducts =
-            [ { Id = 1
-                Name = "Laptop"
-                Price = 999M
-                Category = "electronics"
-                InStock = true }
-              { Id = 2
-                Name = "Phone"
-                Price = 699M
-                Category = "electronics"
-                InStock = true }
-              { Id = 3
-                Name = "Desk"
-                Price = 299M
-                Category = "furniture"
-                InStock = false }
-              { Id = 4
-                Name = "Chair"
-                Price = 199M
-                Category = "furniture"
-                InStock = true }
-              { Id = 5
-                Name = "Monitor"
-                Price = 349M
-                Category = "electronics"
-                InStock = true } ]
+            [ { Id = 1; Name = "Laptop"; Price = 999M; Category = "electronics"; InStock = true }
+              { Id = 2; Name = "Phone"; Price = 699M; Category = "electronics"; InStock = true }
+              { Id = 3; Name = "Desk"; Price = 299M; Category = "furniture"; InStock = false }
+              { Id = 4; Name = "Chair"; Price = 199M; Category = "furniture"; InStock = true }
+              { Id = 5; Name = "Monitor"; Price = 349M; Category = "electronics"; InStock = true } ]
 
         return
-            if String.IsNullOrWhiteSpace(category) then
-                allProducts
-            else
-                allProducts |> List.filter (fun p -> p.Category = category)
+            if String.IsNullOrWhiteSpace(category) then allProducts
+            else allProducts |> List.filter (fun p -> p.Category = category)
     }
 
 let fetchDashboardStatsAsync () =
     task {
         do! Task.Delay(100)
-
-        return
-            { TotalUsers = 1234
-              ActiveOrders = 567
-              Revenue = 89012.50M }
+        return { TotalUsers = Random.Shared.Next(1000, 2000)
+                 ActiveOrders = Random.Shared.Next(100, 500)
+                 Revenue = decimal (Random.Shared.Next(50000, 100000)) }
     }
 
 // ===========================
-// HOX COMPONENTS (Async HTML Rendering)
+// HOX COMPONENTS (Bulma-styled)
 // ===========================
-// Hox uses CSS selector notation for attributes: [attr=value]
 
-// User card component - using Hox CSS selector syntax for attributes
 let userCard (user: User) =
-    h(
-        "div.user-card",
-        [ h($"img.avatar [src={user.Avatar}] [alt={user.Name}]", [])
-          h(
-              "div.user-info",
-              [ h("h3", [ Text user.Name ])
-                h("p", [ Text user.Email ])
-                h($"button [data-on-click=@get('/user/{user.Id}/details')]", [ Text "View Details" ]) ]
-          ) ]
-    )
+    h("div.card",
+        [ h("div.card-image",
+              [ h("figure.image.is-4by3",
+                    [ h($"img [src={user.Avatar}] [alt={user.Name}]", []) ]) ])
+          h("div.card-content",
+              [ h("p.title.is-4", [ Text user.Name ])
+                h("p.subtitle.is-6", [ Text user.Email ]) ]) ])
 
-// User list fragment (async)
-let userListFragment count =
-    task {
-        let! users = fetchUsersAsync count
-        return h("div#user-list.grid", fragment [ for user in users do userCard user ])
-    }
-
-// Product card component
 let productCard (product: Product) =
-    let stockClass = if product.InStock then "in-stock" else "out-of-stock"
+    let stockClass = if product.InStock then "has-text-success" else "has-text-danger"
     let stockText = if product.InStock then "In Stock" else "Out of Stock"
 
-    h(
-        $"div.product-card.{stockClass}",
-        [ h("h3", [ Text product.Name ])
-          h("p.category", [ Text $"Category: {product.Category}" ])
-          h("p.price", [ Text $"${product.Price}" ])
-          h($"span.stock-status.{stockClass}", [ Text stockText ])
-          if product.InStock then
-              h($"button.add-to-cart [data-on-click=@post('/cart/add?id={product.Id}')]", [ Text "Add to Cart" ]) ]
-    )
+    h("div.card",
+        [ h("div.card-content",
+              [ h("p.title.is-5", [ Text product.Name ])
+                h("p.subtitle.is-6", [ Text $"${product.Price}" ])
+                h("p", [ Text $"Category: {product.Category}" ])
+                h($"p.{stockClass}", [ Text stockText ])
+                if product.InStock then
+                    h($"button.button.is-primary.is-small [data-on-click=@post('/cart/add?id={product.Id}')]",
+                        [ Text "Add to Cart" ]) ]) ])
 
-// Product grid fragment (async)
-let productGridFragment category =
-    task {
-        let! products = fetchProductsAsync category
-        return h("div#product-grid.grid", fragment [ for product in products do productCard product ])
-    }
+let dashboardStatsComponent (stats: DashboardStats) =
+    h("div.columns.is-multiline",
+        [ h("div.column.is-4",
+              [ h("div.notification.is-primary",
+                    [ h("p.heading", [ Text "Total Users" ])
+                      h("p.title", [ Text (string stats.TotalUsers) ]) ]) ])
+          h("div.column.is-4",
+              [ h("div.notification.is-info",
+                    [ h("p.heading", [ Text "Active Orders" ])
+                      h("p.title", [ Text (string stats.ActiveOrders) ]) ]) ])
+          h("div.column.is-4",
+              [ h("div.notification.is-success",
+                    [ h("p.heading", [ Text "Revenue" ])
+                      h("p.title", [ Text $"${stats.Revenue:N0}" ]) ]) ]) ])
 
-// Dashboard stats component
-let dashboardStatsFragment () =
-    task {
-        let! stats = fetchDashboardStatsAsync ()
-        let revenue = stats.Revenue.ToString("N2")
+let notificationComponent (message: string) (notifType: string) =
+    let bulmaClass =
+        match notifType with
+        | "success" -> "is-success"
+        | "warning" -> "is-warning"
+        | "error" | "danger" -> "is-danger"
+        | _ -> "is-info"
 
-        return
-            h(
-                "div#dashboard-stats",
-                [ h(
-                      "div.stat-card",
-                      [ h("h4", [ Text "Total Users" ])
-                        h("p.stat-value", [ Text(string stats.TotalUsers) ]) ]
-                  )
-                  h(
-                      "div.stat-card",
-                      [ h("h4", [ Text "Active Orders" ])
-                        h("p.stat-value", [ Text(string stats.ActiveOrders) ]) ]
-                  )
-                  h(
-                      "div.stat-card",
-                      [ h("h4", [ Text "Revenue" ])
-                        h("p.stat-value", [ Text $"${revenue}" ]) ]
-                  ) ]
-            )
-    }
+    h($"div#notification.notification.{bulmaClass}",
+        [ h("button.delete", [])
+          Text message ])
 
-// Table row component
-let tableRow (data: string list) =
-    h("tr", fragment [ for cell in data do h("td", [ Text cell ]) ])
-
-// Data table fragment (async)
-let dataTableFragment () =
-    task {
-        do! Task.Delay(200) // Simulate data loading
-
-        let data =
-            [ [ "Order #1001"; "2024-01-15"; "$299.99"; "Shipped" ]
-              [ "Order #1002"; "2024-01-15"; "$149.50"; "Processing" ]
-              [ "Order #1003"; "2024-01-14"; "$599.00"; "Delivered" ]
-              [ "Order #1004"; "2024-01-14"; "$89.99"; "Pending" ] ]
-
-        return
-            h(
-                "table#orders-table",
-                [ h(
-                      "thead",
-                      [ h(
-                            "tr",
-                            [ h("th", [ Text "Order ID" ])
-                              h("th", [ Text "Date" ])
-                              h("th", [ Text "Amount" ])
-                              h("th", [ Text "Status" ]) ]
-                        ) ]
-                  )
-                  h("tbody", fragment [ for row in data do tableRow row ]) ]
-            )
-    }
+let dataTableComponent (headers: string list) (rows: string list list) =
+    h("table.table.is-fullwidth.is-striped.is-hoverable",
+        [ h("thead",
+              [ h("tr", fragment [ for header in headers do h("th", [ Text header ]) ]) ])
+          h("tbody",
+              fragment [ for row in rows do
+                           h("tr", fragment [ for cell in row do h("td", [ Text cell ]) ]) ]) ])
 
 // ===========================
-// DATASTAR ENDPOINTS WITH HOX
+// DATASTAR ENDPOINTS
 // ===========================
 
-// Example 1: Load user list (PRIMARY PATTERN: patchElements)
-let loadUsers =
-    resource "/users/load" {
-        name "LoadUsers"
+// Example 1: Load user cards (with count in path)
+let loadUsersWithCount =
+    resource "/load-users/{count}" {
+        name "LoadUsersWithCount"
         datastar (fun ctx ->
             task {
                 let count =
-                    match ctx.Request.Query.TryGetValue("count") with
-                    | true, values -> int values.[0]
-                    | false, _ -> 6
+                    match ctx.Request.RouteValues.TryGetValue("count") with
+                    | true, v -> int (string v)
+                    | _ -> 6
 
-                let! node = userListFragment count
+                let! users = fetchUsersAsync count
+                let node = h("div#user-list.columns.is-multiline",
+                    fragment [ for user in users do
+                                 h("div.column.is-4", [ userCard user ]) ])
                 let! html = Render.asString node
                 do! Datastar.patchElements html ctx
             })
     }
 
-// Example 2: Load products by category (PRIMARY PATTERN: patchElements)
-let loadProductsByCategory =
-    resource "/products/load" {
-        name "LoadProductsByCategory"
+// Example 2: Load product catalog with filter form
+let loadCatalog =
+    resource "/load-catalog" {
+        name "LoadCatalog"
         datastar (fun ctx ->
             task {
-                let category = ctx.Request.Query.["category"].ToString()
-                let! node = productGridFragment category
+                // First send the filter form
+                let filterForm = h("div#filter-form",
+                    [ h("div.field",
+                          [ h("label.label", [ Text "Category" ])
+                            h("div.select.is-fullwidth",
+                                [ h("select [data-bind-category]",
+                                      [ h("option [value=]", [ Text "All" ])
+                                        h("option [value=electronics]", [ Text "Electronics" ])
+                                        h("option [value=furniture]", [ Text "Furniture" ]) ]) ]) ])
+                      h("div.field",
+                          [ h("label.checkbox",
+                                [ h("input [type=checkbox] [data-bind-inStockOnly]", [])
+                                  Text " In Stock Only" ]) ])
+                      h("button.button.is-primary.is-fullwidth [data-on-click=@get('/products/load')]",
+                          [ Text "Apply Filters" ]) ])
+
+                let! filterHtml = Render.asString filterForm
+                do! Datastar.patchElements filterHtml ctx
+
+                do! Task.Delay(100)
+
+                // Then send the products
+                let! products = fetchProductsAsync ""
+                let productGrid = h("div#product-grid.columns.is-multiline",
+                    fragment [ for product in products do
+                                 h("div.column.is-6", [ productCard product ]) ])
+                let! productHtml = Render.asString productGrid
+                do! Datastar.patchElements productHtml ctx
+            })
+    }
+
+// Example 3: Load dashboard
+let loadDashboard =
+    resource "/load-dashboard" {
+        name "LoadDashboard"
+        datastar (fun ctx ->
+            task {
+                let! stats = fetchDashboardStatsAsync()
+                let node = h("div#dashboard", [ dashboardStatsComponent stats ])
                 let! html = Render.asString node
                 do! Datastar.patchElements html ctx
             })
     }
 
-// Example 3: Load dashboard stats (PRIMARY PATTERN: patchElements)
-let loadDashboardStats =
-    resource "/dashboard/stats" {
-        name "LoadDashboardStats"
+// Example 4: Refresh all sections
+let refreshAll =
+    resource "/refresh-all" {
+        name "RefreshAll"
         datastar (fun ctx ->
             task {
-                let! node = dashboardStatsFragment ()
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
+                // Dashboard
+                let! stats = fetchDashboardStatsAsync()
+                let dashNode = h("div#dashboard", [ dashboardStatsComponent stats ])
+                let! dashHtml = Render.asString dashNode
+                do! Datastar.patchElements dashHtml ctx
 
-// Example 4: Load data table (PRIMARY PATTERN: patchElements)
-let loadOrdersTable =
-    resource "/orders/load" {
-        name "LoadOrdersTable"
-        datastar (fun ctx ->
-            task {
-                let! node = dataTableFragment ()
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
+                do! Task.Delay(100)
 
-// Example 5: Progressive dashboard loading (multiple fragments)
-// This demonstrates the PRIMARY USE CASE: streaming multiple HTML updates
-let loadFullDashboard =
-    resource "/dashboard/load" {
-        name "LoadFullDashboard"
-        datastar (fun ctx ->
-            task {
-                // 1. Load stats first
-                let! statsNode = dashboardStatsFragment ()
-                let! statsHtml = Render.asString statsNode
-                do! Datastar.patchElements statsHtml ctx
-
-                // 2. Load user list
-                let! usersNode = userListFragment 4
+                // Users
+                let! users = fetchUsersAsync 3
+                let usersNode = h("div#user-list.columns.is-multiline",
+                    fragment [ for user in users do h("div.column.is-4", [ userCard user ]) ])
                 let! usersHtml = Render.asString usersNode
                 do! Datastar.patchElements usersHtml ctx
 
-                // 3. Load product grid
-                let! productsNode = productGridFragment ""
+                do! Task.Delay(100)
+
+                // Products
+                let! products = fetchProductsAsync ""
+                let productsNode = h("div#product-grid.columns.is-multiline",
+                    fragment [ for product in products do h("div.column.is-6", [ productCard product ]) ])
                 let! productsHtml = Render.asString productsNode
                 do! Datastar.patchElements productsHtml ctx
             })
     }
 
-// Example 6: User details modal (async data + render)
-let loadUserDetails =
-    resource "/user/{id}/details" {
-        name "LoadUserDetails"
-        datastar (fun ctx ->
+// Example 5: Notifications
+let notify =
+    resource "/notify" {
+        name "Notify"
+        datastar HttpMethods.Post (fun ctx ->
             task {
-                let userId = ctx.Request.RouteValues.["id"] |> string |> int
+                let message = ctx.Request.Query.["message"].ToString()
+                let notifType = ctx.Request.Query.["type"].ToString()
 
-                // Simulate fetching user details
-                do! Task.Delay(150)
-
-                let user =
-                    { Id = userId
-                      Name = $"User {userId}"
-                      Email = $"user{userId}@example.com"
-                      Avatar = $"https://i.pravatar.cc/150?img={userId}" }
-
-                let modal =
-                    h(
-                        "div#user-modal.modal",
-                        [ h(
-                              "div.modal-content",
-                              [ h(
-                                    "div.modal-header",
-                                    [ h("h2", [ Text "User Details" ])
-                                      h("button.close [data-on-click=@get('/modal/close')]", [ Text "×" ]) ]
-                                )
-                                h(
-                                    "div.modal-body",
-                                    [ h($"img [src={user.Avatar}] [alt={user.Name}]", [])
-                                      h("h3", [ Text user.Name ])
-                                      h("p", [ Text $"Email: {user.Email}" ])
-                                      h("p", [ Text $"User ID: {user.Id}" ]) ]
-                                ) ]
-                          ) ]
-                    )
-
-                let! html = Render.asString modal
+                let node = notificationComponent message notifType
+                let! html = Render.asString node
                 do! Datastar.patchElements html ctx
             })
     }
 
-// Example 7: Search results with Hox rendering
-let searchWithHox =
-    resource "/search/hox" {
-        name "SearchWithHox"
+// Example 6: Data table
+let loadTable =
+    resource "/load-table" {
+        name "LoadTable"
         datastar (fun ctx ->
             task {
-                let query = ctx.Request.Query.["q"].ToString()
+                do! Task.Delay(200)
 
-                // Simulate search
+                let headers = [ "Order ID"; "Date"; "Customer"; "Amount"; "Status" ]
+                let rows = [
+                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd"); "John Doe"; "$299.99"; "Shipped" ]
+                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-2).ToString("yyyy-MM-dd"); "Jane Smith"; "$149.50"; "Processing" ]
+                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-3).ToString("yyyy-MM-dd"); "Bob Wilson"; "$599.00"; "Delivered" ]
+                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-4).ToString("yyyy-MM-dd"); "Alice Brown"; "$89.99"; "Pending" ]
+                ]
+
+                let node = h("div#data-table", [ dataTableComponent headers rows ])
+                let! html = Render.asString node
+                do! Datastar.patchElements html ctx
+            })
+    }
+
+// Example 7: Stream complex content
+let streamContent =
+    resource "/stream-content" {
+        name "StreamContent"
+        datastar (fun ctx ->
+            task {
+                // Header section
+                let timestamp = DateTime.Now.ToString("HH:mm:ss")
+                let header = h("div.hero.is-primary.is-small",
+                    [ h("div.hero-body",
+                          [ h("p.title", [ Text "Complex Layout" ])
+                            h("p.subtitle", [ Text $"Generated at {timestamp}" ]) ]) ])
+                let! headerHtml = Render.asString header
+                do! Datastar.patchElements $"""<div id="complex-layout">{headerHtml}</div>""" ctx
+
+                do! Task.Delay(300)
+
+                // Stats section
+                let! stats = fetchDashboardStatsAsync()
+                let statsNode = dashboardStatsComponent stats
+                let! statsHtml = Render.asString statsNode
+                do! Datastar.patchElements $"""<div id="complex-layout">{statsHtml}</div>""" ctx
+
+                do! Task.Delay(300)
+
+                // Users section
+                let! users = fetchUsersAsync 4
+                let usersNode = h("div.columns.is-multiline",
+                    fragment [ for user in users do h("div.column.is-3", [ userCard user ]) ])
+                let! usersHtml = Render.asString usersNode
+                do! Datastar.patchElements $"""<div id="complex-layout">{usersHtml}</div>""" ctx
+            })
+    }
+
+// Example 8: Products load endpoint
+let loadProductsEndpoint =
+    resource "/products/load" {
+        name "LoadProducts"
+        datastar (fun ctx ->
+            task {
+                let category = ctx.Request.Query.["category"].ToString()
+                let! products = fetchProductsAsync category
+
+                let node = h("div#product-grid.columns.is-multiline",
+                    fragment [ for product in products do
+                                 h("div.column.is-6", [ productCard product ]) ])
+                let! html = Render.asString node
+                do! Datastar.patchElements html ctx
+            })
+    }
+
+// Example 9: Update user view
+[<CLIMutable>]
+type ViewModeSignals = { viewMode: string }
+
+let updateUserView =
+    resource "/update-user-view" {
+        name "UpdateUserView"
+        datastar HttpMethods.Post (fun ctx ->
+            task {
+                let! signals = Datastar.tryReadSignals<ViewModeSignals> ctx
+                let! users = fetchUsersAsync 6
+
+                let node =
+                    match signals with
+                    | ValueSome s when s.viewMode = "table" ->
+                        let headers = [ "ID"; "Name"; "Email" ]
+                        let rows = users |> List.map (fun u -> [ string u.Id; u.Name; u.Email ])
+                        h("div#user-list", [ dataTableComponent headers rows ])
+                    | _ ->
+                        h("div#user-list.columns.is-multiline",
+                            fragment [ for user in users do h("div.column.is-4", [ userCard user ]) ])
+
+                let! html = Render.asString node
+                do! Datastar.patchElements html ctx
+            })
+    }
+
+// Example 10: Real-time updates
+let realtimeUpdate =
+    resource "/realtime-update" {
+        name "RealtimeUpdate"
+        datastar (fun ctx ->
+            task {
+                // Send notification
+                let messages = [
+                    ("New order received!", "success")
+                    ("User signed up", "info")
+                    ("Payment processed", "success")
+                    ("Stock running low", "warning")
+                ]
+                let (msg, typ) = messages.[Random.Shared.Next(messages.Length)]
+                let notifNode = notificationComponent msg typ
+                let! notifHtml = Render.asString notifNode
+                do! Datastar.patchElements notifHtml ctx
+
                 do! Task.Delay(100)
 
-                let results =
-                    [ "Apple"; "Banana"; "Cherry"; "Date"; "Elderberry" ]
-                    |> List.filter (fun item -> item.Contains(query, StringComparison.OrdinalIgnoreCase))
-
-                let resultsNode =
-                    if results.IsEmpty then
-                        h("div#search-results.empty", [ h("p", [ Text "No results found" ]) ])
-                    else
-                        h(
-                            "div#search-results",
-                            [ h("h3", [ Text $"Found {results.Length} results" ])
-                              h(
-                                  "ul",
-                                  fragment
-                                      [ for result in results do
-                                            h(
-                                                "li.search-result",
-                                                [ Text result
-                                                  h($"button.select [data-on-click=@get('/item/select?name={result}')]", [ Text "Select" ]) ]
-                                            ) ]
-                              ) ]
-                        )
-
-                let! html = Render.asString resultsNode
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 8: Form submission with server-side rendering
-let submitContactForm =
-    resource "/contact/submit" {
-        name "SubmitContactForm"
-        datastar (fun ctx ->
-            task {
-                let name = ctx.Request.Query.["name"].ToString()
-                let email = ctx.Request.Query.["email"].ToString()
-                let message = ctx.Request.Query.["message"].ToString()
-
-                // Server-side validation
-                let isValid =
-                    not (String.IsNullOrWhiteSpace(name)) && email.Contains("@") && message.Length >= 10
-
-                let responseNode =
-                    if isValid then
-                        h(
-                            "div#form-response.success",
-                            [ h("h3", [ Text "Message Sent!" ])
-                              h("p", [ Text $"Thank you, {name}. We'll respond to {email} soon." ]) ]
-                        )
-                    else
-                        h(
-                            "div#form-response.error",
-                            [ h("h3", [ Text "Validation Error" ])
-                              h(
-                                  "ul",
-                                  fragment
-                                      [ if String.IsNullOrWhiteSpace(name) then
-                                            h("li", [ Text "Name is required" ])
-                                        if not (email.Contains("@")) then
-                                            h("li", [ Text "Invalid email address" ])
-                                        if message.Length < 10 then
-                                            h("li", [ Text "Message must be at least 10 characters" ]) ]
-                              ) ]
-                        )
-
-                let! html = Render.asString responseNode
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 9: Streaming updates (simulate real-time data)
-// Demonstrates PRIMARY USE CASE: multiple progressive HTML updates
-let streamUpdates =
-    resource "/stream/updates" {
-        name "StreamUpdates"
-        datastar (fun ctx ->
-            task {
-                // Simulate streaming multiple updates
-                for i in 1..5 do
-                    do! Task.Delay(500)
-
-                    let timestamp = DateTime.Now.ToString("HH:mm:ss")
-
-                    let updateNode =
-                        h(
-                            "div.update-item",
-                            [ h("span.timestamp", [ Text timestamp ])
-                              h("span.message", [ Text $"Update #{i}: System running normally" ]) ]
-                        )
-
-                    let! html = Render.asString updateNode
-                    let fullHtml = $"""<div id="updates-container">{html}</div>"""
-                    do! Datastar.patchElements fullHtml ctx
-            })
-    }
-
-// Example 10: Complex nested components
-let loadNestedComponents =
-    resource "/components/nested" {
-        name "LoadNestedComponents"
-        datastar (fun ctx ->
-            task {
-                let! users = fetchUsersAsync 3
-                let! products = fetchProductsAsync "electronics"
-
-                let page =
-                    h(
-                        "div#nested-demo",
-                        [ h(
-                              "section.users-section",
-                              [ h("h2", [ Text "Recent Users" ])
-                                h("div.user-grid", fragment [ for user in users do userCard user ]) ]
-                          )
-                          h(
-                              "section.products-section",
-                              [ h("h2", [ Text "Featured Products" ])
-                                h("div.product-grid", fragment [ for product in products do productCard product ]) ]
-                          ) ]
-                    )
-
-                let! html = Render.asString page
-                do! Datastar.patchElements html ctx
+                // Update dashboard
+                let! stats = fetchDashboardStatsAsync()
+                let dashNode = h("div#dashboard", [ dashboardStatsComponent stats ])
+                let! dashHtml = Render.asString dashNode
+                do! Datastar.patchElements dashHtml ctx
             })
     }
 
@@ -483,23 +402,37 @@ let loadNestedComponents =
 let main args =
     webHost args {
         useDefaults
+        // UseDefaultFiles must come before UseStaticFiles to serve index.html at "/"
+        plug DefaultFilesExtensions.UseDefaultFiles
         plug StaticFileExtensions.UseStaticFiles
 
-        // Single element loads (PRIMARY PATTERN: patchElements)
-        resource loadUsers
-        resource loadProductsByCategory
-        resource loadDashboardStats
-        resource loadOrdersTable
+        // User endpoints
+        resource loadUsersWithCount
 
-        // Progressive streaming (PRIMARY USE CASE)
-        resource loadFullDashboard
-        resource streamUpdates
+        // Product endpoints
+        resource loadCatalog
+        resource loadProductsEndpoint
 
-        // Interactive components
-        resource loadUserDetails
-        resource searchWithHox
-        resource submitContactForm
-        resource loadNestedComponents
+        // Dashboard
+        resource loadDashboard
+
+        // Multi-section refresh
+        resource refreshAll
+
+        // Notifications
+        resource notify
+
+        // Data table
+        resource loadTable
+
+        // Streaming content
+        resource streamContent
+
+        // View mode toggle
+        resource updateUserView
+
+        // Real-time updates
+        resource realtimeUpdate
     }
 
     0

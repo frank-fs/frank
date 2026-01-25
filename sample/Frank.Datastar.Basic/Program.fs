@@ -26,7 +26,7 @@ open Frank.Datastar
 type CounterSignals = { count: int }
 
 [<CLIMutable>]
-type SearchSignals = { query: string }
+type FormSignals = { email: string; password: string }
 
 // ===========================
 // PRIMARY PATTERN: Patch Elements (Hypermedia-First)
@@ -48,7 +48,7 @@ let removeDate =
     resource "/removeDate" {
         name "RemoveDate"
         datastar (fun ctx ->
-            task { do! Datastar.removeElement "#date" ctx })
+            task { do! Datastar.removeElement "#target" ctx })
     }
 
 // Example 3: Server-driven search (no signals needed - uses query string)
@@ -123,7 +123,25 @@ let loadItemsPage =
             })
     }
 
-// Example 5: Product catalog with filtering (server-side logic)
+// Example 5: User greeting (server decides HTML based on input)
+let greetUser =
+    resource "/greet" {
+        name "GreetUser"
+        datastar (fun ctx ->
+            task {
+                let name = ctx.Request.Query.["name"].ToString()
+
+                let html =
+                    if String.IsNullOrWhiteSpace(name) then
+                        """<div id='greeting'>Please enter your name!</div>"""
+                    else
+                        $"""<div id='greeting'>Hello, <strong>{name}</strong>! Welcome to Frank.Datastar.</div>"""
+
+                do! Datastar.patchElements html ctx
+            })
+    }
+
+// Example 6: Product catalog with filtering (server-side logic)
 let loadProducts =
     resource "/products" {
         name "LoadProducts"
@@ -154,176 +172,167 @@ let loadProducts =
                         </div>""")
                     |> String.concat ""
 
-                do! Datastar.patchElements $"""<div id='product-list'>{productHtml}</div>""" ctx
+                do! Datastar.patchElements $"""<div id='product-grid'>{productHtml}</div>""" ctx
             })
     }
 
-// Example 6: Dashboard with multiple sections (multiple patches - primary use case)
-// This demonstrates the core streaming capability: sending multiple progressive updates
-let loadDashboard =
-    resource "/dashboard" {
-        name "LoadDashboard"
+// Example 7: Form validation with signals (POST method)
+let validateForm =
+    resource "/validate" {
+        name "ValidateForm"
+        datastar HttpMethods.Post (fun ctx ->
+            task {
+                let! signals = Datastar.tryReadSignals<FormSignals> ctx
+
+                match signals with
+                | ValueSome form ->
+                    let errors = ResizeArray<string>()
+
+                    if String.IsNullOrWhiteSpace(form.email) then
+                        errors.Add("Email is required")
+                    elif not (form.email.Contains("@")) then
+                        errors.Add("Email must be valid")
+
+                    if String.IsNullOrWhiteSpace(form.password) then
+                        errors.Add("Password is required")
+                    elif form.password.Length < 6 then
+                        errors.Add("Password must be at least 6 characters")
+
+                    let html =
+                        if errors.Count = 0 then
+                            """<div id='validation-result' class='success'>
+                                ✓ Form is valid! Ready to submit.
+                            </div>"""
+                        else
+                            let errorList = errors |> Seq.map (fun e -> $"<li>{e}</li>") |> String.concat ""
+                            $"""<div id='validation-result' class='error'>
+                                <ul>{errorList}</ul>
+                            </div>"""
+
+                    do! Datastar.patchElements html ctx
+                | ValueNone ->
+                    do! Datastar.patchElements """<div id='validation-result' class='error'>Invalid form data</div>""" ctx
+            })
+    }
+
+// Example 8: Real-time clock (server sends updated HTML)
+let clock =
+    resource "/clock" {
+        name "Clock"
         datastar (fun ctx ->
             task {
-                // Patch header
                 let time = DateTime.Now.ToString("HH:mm:ss")
-
-                do!
-                    Datastar.patchElements $"""<div id='header'><h2>Dashboard - {time}</h2></div>""" ctx
-
-                do! Task.Delay(100) // Simulate async data fetch
-
-                // Patch stats
-                do!
-                    Datastar.patchElements
-                        """
-                    <div id='stats'>
-                        <div class='stat'>Users: 1,234</div>
-                        <div class='stat'>Orders: 567</div>
-                        <div class='stat'>Revenue: $89,012</div>
-                    </div>
-                    """
-                        ctx
-
-                do! Task.Delay(100)
-
-                // Patch recent activity
-                do!
-                    Datastar.patchElements
-                        """
-                    <div id='activity'>
-                        <h3>Recent Activity</h3>
-                        <ul>
-                            <li>Order #123 completed</li>
-                            <li>New user registered</li>
-                            <li>Product updated</li>
-                        </ul>
-                    </div>
-                    """
-                        ctx
+                do! Datastar.patchElements $"""<div id='clock'>{time}</div>""" ctx
             })
     }
 
-// Example 7: User profile editor (server validates and returns updated HTML)
-let updateProfile =
-    resource "/profile/update" {
-        name "UpdateProfile"
+// Example 9: Dashboard refresh with multiple sections (multiple patches - primary use case)
+let dashboardRefresh =
+    resource "/dashboard/refresh" {
+        name "DashboardRefresh"
         datastar (fun ctx ->
             task {
-                let name = ctx.Request.Query.["name"].ToString()
-                let email = ctx.Request.Query.["email"].ToString()
+                // Patch stats section
+                let users = Random.Shared.Next(1000, 2000)
+                let orders = Random.Shared.Next(100, 500)
+                let revenue = Random.Shared.Next(50000, 100000)
+                let statsHtml = $"""<div id='stats'>
+                    <div class='stat'>Users: {users}</div>
+                    <div class='stat'>Orders: {orders}</div>
+                    <div class='stat'>Revenue: ${revenue}</div>
+                </div>"""
+                do! Datastar.patchElements statsHtml ctx
 
-                // Server-side validation
-                let isValid = not (String.IsNullOrWhiteSpace(name)) && email.Contains("@")
+                do! Task.Delay(200) // Simulate async data fetch
+
+                // Patch activity section
+                let order1 = Random.Shared.Next(1000, 9999)
+                let product1 = Random.Shared.Next(100, 999)
+                let activities = [
+                    $"Order #{order1} completed"
+                    "New user registered"
+                    $"Product #{product1} updated"
+                ]
+                let activityHtml = activities |> List.map (fun a -> $"<li>{a}</li>") |> String.concat ""
+
+                do! Datastar.patchElements $"""<div id='activity'>
+                    <h4>Recent Activity</h4>
+                    <ul>{activityHtml}</ul>
+                </div>""" ctx
+            })
+    }
+
+// Example 10: Profile view (server decides UI based on user ID)
+let viewProfile =
+    resource "/profile/{id}" {
+        name "ViewProfile"
+        datastar (fun ctx ->
+            task {
+                let userId = ctx.Request.RouteValues.["id"] |> string |> int
+
+                // Simulate different permissions based on user ID
+                let canEdit = userId = 123
 
                 let html =
-                    if isValid then
-                        $"""
-                        <div id='profile' class='success'>
-                            <h3>Profile Updated</h3>
-                            <p>Name: {name}</p>
-                            <p>Email: {email}</p>
-                        </div>
-                        """
+                    if canEdit then
+                        $"""<div id='profile'>
+                            <h3>User Profile (ID: {userId})</h3>
+                            <p>Name: John Doe</p>
+                            <p>Email: john@example.com</p>
+                            <button data-on-click="@get('/profile/{userId}/edit')">Edit Profile</button>
+                        </div>"""
                     else
-                        """
-                        <div id='profile' class='error'>
-                            <h3>Validation Error</h3>
-                            <p>Please provide valid name and email</p>
-                        </div>
-                        """
+                        $"""<div id='profile'>
+                            <h3>User Profile (ID: {userId})</h3>
+                            <p>Name: Jane Smith</p>
+                            <p>Email: jane@example.com</p>
+                            <p><em>View only - no edit permission</em></p>
+                        </div>"""
 
                 do! Datastar.patchElements html ctx
             })
     }
 
 // ===========================
-// POST-based streaming example (demonstrates HTTP method flexibility)
+// MINIMAL SIGNAL USAGE: Counter (Ephemeral UI State)
 // ===========================
 
-// Example 8: Form submission with streaming response (POST method)
-let submitForm =
-    resource "/form/submit" {
-        name "SubmitForm"
+let increment =
+    resource "/increment" {
+        name "Increment"
         datastar HttpMethods.Post (fun ctx ->
             task {
-                // Read signals from POST body
-                let! signals = Datastar.tryReadSignals<SearchSignals> ctx
-
-                match signals with
-                | ValueSome s ->
-                    // Show processing feedback
-                    do!
-                        Datastar.patchElements
-                            $"""<div id='form-status'>Processing query: {s.query}...</div>"""
-                            ctx
-
-                    do! Task.Delay(500) // Simulate processing
-
-                    // Show success
-                    do!
-                        Datastar.patchElements
-                            $"""<div id='form-status' class='success'>Query "{s.query}" submitted successfully!</div>"""
-                            ctx
-                | ValueNone ->
-                    do!
-                        Datastar.patchElements
-                            """<div id='form-status' class='error'>Invalid form data</div>"""
-                            ctx
-            })
-    }
-
-// ===========================
-// MINIMAL SIGNAL USAGE: For Ephemeral UI State Only
-// ===========================
-
-// Example 9: Simple counter (ephemeral state) - demonstrates signal reading
-// Note: patchSignals is secondary to patchElements
-let incrementCounter =
-    resource "/counter/increment" {
-        name "IncrementCounter"
-        datastar (fun ctx ->
-            task {
                 let! signals = Datastar.tryReadSignals<CounterSignals> ctx
-
                 match signals with
                 | ValueSome s ->
                     let newCount = s.count + 1
-                    let signalsJson = JsonSerializer.Serialize({| count = newCount |})
-                    // Update signal (secondary pattern)
-                    do! Datastar.patchSignals signalsJson ctx
-                    // Also send HTML with the count (primary pattern - preferred)
-                    do! Datastar.patchElements $"""<div id='counter-display'>Count: {newCount}</div>""" ctx
+                    do! Datastar.patchSignals (JsonSerializer.Serialize({| count = newCount |})) ctx
                 | ValueNone ->
-                    do! Datastar.patchElements """<div id='error'>Invalid counter state</div>""" ctx
+                    do! Datastar.patchSignals """{"count": 1}""" ctx
             })
     }
 
-// Example 10: Form validation feedback (signals for input state only)
-let validateForm =
-    resource "/validate-form" {
-        name "ValidateForm"
-        datastar (fun ctx ->
+let decrement =
+    resource "/decrement" {
+        name "Decrement"
+        datastar HttpMethods.Post (fun ctx ->
             task {
-                let! signals = Datastar.tryReadSignals<SearchSignals> ctx
-
+                let! signals = Datastar.tryReadSignals<CounterSignals> ctx
                 match signals with
                 | ValueSome s ->
-                    // Validate and send back HTML feedback (not signal manipulation)
-                    let feedbackHtml =
-                        if String.IsNullOrWhiteSpace(s.query) then
-                            """<div id='validation' class='error'>Query cannot be empty</div>"""
-                        elif s.query.Length < 3 then
-                            """<div id='validation' class='warning'>Query too short (min 3 chars)</div>"""
-                        else
-                            """<div id='validation' class='success'>Valid query</div>"""
-
-                    do! Datastar.patchElements feedbackHtml ctx
+                    let newCount = max 0 (s.count - 1)
+                    do! Datastar.patchSignals (JsonSerializer.Serialize({| count = newCount |})) ctx
                 | ValueNone ->
-                    do!
-                        Datastar.patchElements
-                            """<div id='validation' class='error'>Invalid data</div>"""
-                            ctx
+                    do! Datastar.patchSignals """{"count": 0}""" ctx
+            })
+    }
+
+let reset =
+    resource "/reset" {
+        name "Reset"
+        datastar HttpMethods.Post (fun ctx ->
+            task {
+                do! Datastar.patchSignals """{"count": 0}""" ctx
             })
     }
 
@@ -335,6 +344,8 @@ let validateForm =
 let main args =
     webHost args {
         useDefaults
+        // UseDefaultFiles must come before UseStaticFiles to serve index.html at "/"
+        plug DefaultFilesExtensions.UseDefaultFiles
         plug StaticFileExtensions.UseStaticFiles
 
         // Primary pattern examples (patchElements - hypermedia-first)
@@ -342,16 +353,19 @@ let main args =
         resource removeDate
         resource searchItems
         resource loadItemsPage
+        resource greetUser
         resource loadProducts
-        resource loadDashboard
-        resource updateProfile
+        resource clock
+        resource dashboardRefresh
+        resource viewProfile
 
-        // POST-based streaming example
-        resource submitForm
-
-        // Secondary pattern examples (signal reading - use sparingly)
-        resource incrementCounter
+        // Form validation (POST with signal reading)
         resource validateForm
+
+        // Counter examples (minimal signal usage)
+        resource increment
+        resource decrement
+        resource reset
     }
 
     0
