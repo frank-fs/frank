@@ -90,7 +90,7 @@ module Datastar =
 
 - [x] T018 [US1] Add unit test for multi-event streaming (10 progressive updates with ~100ms delays) verifying progressive arrival in test/Frank.Datastar.Tests/DatastarTests.fs
 - [x] T019 [US1] Add unit test for single stream start per request (SC-002) in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T020 [US1] Add unit test for client disconnection detection via cancellation token in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T020 [US1] Add unit test for client disconnection detection via cancellation token in test/Frank.Datastar.Tests/DatastarTests.fs
 
 ### Implementation for User Story 1
 

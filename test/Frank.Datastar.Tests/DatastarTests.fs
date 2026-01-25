@@ -91,6 +91,40 @@ let datastarTests =
             Expect.stringContains responseBody "10%" "Should contain first update"
             Expect.stringContains responseBody "100%" "Should contain last update"
 
+        testCase "US1: Client disconnection detected via cancellation token" <| fun () ->
+            // Arrange (T020)
+            let context = createMockContext()
+            let cts = new CancellationTokenSource()
+            // Set the RequestAborted token on the context
+            context.RequestAborted <- cts.Token
+
+            let mutable loopIterations = 0
+            let mutable cancellationDetected = false
+
+            let resource =
+                ResourceBuilder("/stream") {
+                    datastar (fun ctx -> task {
+                        // Simulate a streaming loop that checks for cancellation
+                        while not ctx.RequestAborted.IsCancellationRequested && loopIterations < 100 do
+                            do! Datastar.patchElements $"<div>Update {loopIterations}</div>" ctx
+                            loopIterations <- loopIterations + 1
+
+                            // Cancel after 3 iterations to simulate client disconnect
+                            if loopIterations = 3 then
+                                cts.Cancel()
+
+                        cancellationDetected <- ctx.RequestAborted.IsCancellationRequested
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            Expect.equal loopIterations 3 "Should stop after 3 iterations when cancelled"
+            Expect.isTrue cancellationDetected "Should detect cancellation via RequestAborted"
+
         testCase "US1: Single stream start per request (SC-002)" <| fun () ->
             // Arrange (T019)
             let context = createMockContext()
