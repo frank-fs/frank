@@ -143,11 +143,10 @@ module Datastar =
 
 **Goal**: Complete Hox sample compilation and demonstrate type-safe HTML rendering with Datastar
 
-- [ ] T032 [P] Fix all Hox API calls to use `Render.asString` throughout sample/Frank.Datastar.Hox/Program.fs
-- [ ] T033 [P] Fix Hox attributes - change `Attr("name", "value")` to `.extension` syntax throughout sample/Frank.Datastar.Hox/Program.fs
-- [ ] T034 Refactor Hox sample to use `webHost` builder with `datastar` operation in sample/Frank.Datastar.Hox/Program.fs
+- [ ] T034 Refactor Hox sample to use `webHost` builder with `datastar` operation in sample/Frank.Datastar.Hox/Program.fs (Note: Hox API fixes from T017 must be applied first)
 - [ ] T035 Test Hox sample compiles and runs with `dotnet run --project sample/Frank.Datastar.Hox`
 - [ ] T036 Manually test Hox sample SSE streaming works in browser
+- [ ] T036a Review both samples to verify patch-elements is emphasized as primary pattern with comments indicating patch-signals is secondary (per spec Validation Criteria)
 
 **Checkpoint**: Both samples compile without warnings (SC-007)
 
@@ -160,6 +159,7 @@ module Datastar =
 - [ ] T037 Run all unit tests with `dotnet test test/Frank.Datastar.Tests`
 - [ ] T038 [P] Update README.md in src/Frank.Datastar/ to reflect correct API (only `datastar` operation + helper module)
 - [ ] T039 [P] Verify library uses latest StarFederation.Datastar.FSharp package version (SC-004)
+- [ ] T039a [P] Add performance benchmark comparing Frank.Datastar streaming vs direct StarFederation.Datastar.FSharp usage (Constitution Principle V)
 - [ ] T040 Update quickstart.md to show correct usage pattern
 - [ ] T041 Update contracts/frank-datastar-api.md to reflect correct API
 - [ ] T042 Validate success criteria checklist:
