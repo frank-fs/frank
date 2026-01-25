@@ -97,13 +97,13 @@ let loadItemsPage =
 
                 let prevButton =
                     if page > 1 then
-                        $"""<button data-on-click="@get('/load-items/{prevPage}')">Previous</button>"""
+                        $"""<button data-on:click="@get('/load-items/{prevPage}')">Previous</button>"""
                     else
                         ""
 
                 let nextButton =
                     if page * itemsPerPage < allItems.Length then
-                        $"""<button data-on-click="@get('/load-items/{nextPage}')">Next</button>"""
+                        $"""<button data-on:click="@get('/load-items/{nextPage}')">Next</button>"""
                     else
                         ""
 
