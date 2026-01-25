@@ -47,7 +47,7 @@ type ResourceBuilder with
 - [ ] T012 Verify `Datastar.tryReadSignals` helper exists in src/Frank.Datastar/Frank.Datastar.fs
 - [ ] T013 Remove `Datastar.stream` if it exists - unnecessary since users can use ServerSentEventGenerator directly
 
-**Datastar module should provide:**
+**Datastar module should provide (for use inside `datastar` handler OR standalone with manual stream init):**
 ```fsharp
 module Datastar =
     let patchElements (html: string) (ctx: HttpContext) = ...
@@ -64,6 +64,7 @@ module Datastar =
 **Purpose**: Add HTTP method flexibility to the `datastar` custom operation
 
 - [ ] T014 Add HTTP method parameter support to `datastar` custom operation in src/Frank.Datastar/Frank.Datastar.fs - currently hardcodes GET only
+- [ ] T014a [US1] Add unit test verifying `datastar` operation works with POST method (not just GET) in test/Frank.Datastar.Tests/DatastarTests.fs
 - [ ] T015 Verify solution builds with `dotnet build Frank.Datastar.sln --configuration Release`
 
 **Checkpoint**: Library API is FR-005 compliant and supports any HTTP method
@@ -93,7 +94,7 @@ module Datastar =
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Refactor Basic sample to use `webHost` builder pattern with `datastar` operation and `Datastar.*` helpers in sample/Frank.Datastar.Basic/Program.fs
+- [ ] T021 [US1] Refactor Basic sample to use `webHost` builder pattern with `datastar` operation and `Datastar.*` helpers in sample/Frank.Datastar.Basic/Program.fs. Include at least one POST-based streaming endpoint to demonstrate HTTP method flexibility.
 - [ ] T022 [US1] Test Basic sample compiles and runs with `dotnet run --project sample/Frank.Datastar.Basic`
 - [ ] T023 [US1] Manually test Basic sample SSE streaming works in browser with Datastar client
 

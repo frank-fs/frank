@@ -82,7 +82,7 @@ A developer wants to use Datastar streaming outside of Frank's `resource` comput
 
 - **FR-006**: The library MUST integrate with Frank's `resource` computation expression as a custom operation.
 
-- **FR-007**: The library MUST also expose standalone functions for use outside the computation expression.
+- **FR-007**: The library MUST expose a `Datastar` helper module with functions (`patchElements`, `patchSignals`, `removeElement`, `executeScript`, `tryReadSignals`) that can be called from within the `datastar` streaming handler. These same functions enable standalone usage outside Frank when paired with manual SSE stream initialization via `ServerSentEventGenerator`.
 
 - **FR-008**: The library MUST use the latest stable version of the `StarFederation.Datastar` package.
 

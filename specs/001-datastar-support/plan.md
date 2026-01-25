@@ -90,16 +90,18 @@ sample/
 
 ### Implemented (on branch)
 
+> **⚠️ FR-005 Compliance Required**: The custom operations listed below (except `datastar`) violate FR-005 and are scheduled for removal in tasks.md Phase 1 (T001-T007). After Phase 1 completion, only the `datastar` custom operation will remain on ResourceBuilder.
+
 1. **Frank.Datastar library** (`src/Frank.Datastar/Frank.Datastar.fs`)
    - `DatastarExtensions` module with `ResourceBuilder` extensions
-   - `datastar` custom operation for multi-event streaming
-   - `patchElements` (3 overloads: string, sync function, async function)
-   - `removeElement` for DOM removal
-   - `patchSignals` (2 overloads: string, function)
-   - `executeScript` for client-side JS
-   - `readSignals` for typed signal deserialization
-   - `transformSignals` for bidirectional signal processing
-   - `Datastar` standalone module with curried functions
+   - `datastar` custom operation for multi-event streaming ✅ (KEEP)
+   - `patchElements` (3 overloads) ❌ (REMOVE per FR-005)
+   - `removeElement` ❌ (REMOVE per FR-005)
+   - `patchSignals` (2 overloads) ❌ (REMOVE per FR-005)
+   - `executeScript` ❌ (REMOVE per FR-005)
+   - `readSignals` ❌ (REMOVE per FR-005)
+   - `transformSignals` ❌ (REMOVE per FR-005)
+   - `Datastar` standalone module with curried functions ✅ (KEEP - these are helper functions, not custom operations)
 
 2. **Test suite** (`test/Frank.Datastar.Tests/DatastarTests.fs`)
    - 9 unit tests covering core operations
