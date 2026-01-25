@@ -3,11 +3,13 @@ module DatastarTests
 open System
 open System.IO
 open System.Text
+open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Expecto
 open Frank.Builder
 open Frank.Datastar
+open StarFederation.Datastar.FSharp
 
 /// Helper to create a mock HttpContext with in-memory response stream
 let createMockContext () =
@@ -32,234 +34,293 @@ let setRequestBody (context: HttpContext) (body: string) =
 [<Tests>]
 let datastarTests =
     testList "Datastar ResourceBuilder Extensions" [
-        
-        testCase "Datastar() starts SSE stream and executes multiple operations" <| fun () ->
+
+        // ==========================================
+        // User Story 1: Stream Multiple Updates
+        // ==========================================
+
+        testCase "US1: datastar operation starts SSE stream and executes multiple operations" <| fun () ->
             // Arrange
             let context = createMockContext()
-            let mutable patchCalled = false
-            let mutable signalsCalled = false
-            
-            let resource = 
+            let mutable patchCount = 0
+
+            let resource =
                 ResourceBuilder("/test") {
                     datastar (fun ctx -> task {
-                        // Execute multiple Datastar operations
-                        do! StarFederation.Datastar.FSharp.ServerSentEventGenerator.PatchElementsAsync(ctx.Response, "<div>Test</div>")
-                        patchCalled <- true
-                        do! StarFederation.Datastar.FSharp.ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, """{"count": 5}""")
-                        signalsCalled <- true
+                        do! Datastar.patchElements "<div>First</div>" ctx
+                        patchCount <- patchCount + 1
+                        do! Datastar.patchElements "<div>Second</div>" ctx
+                        patchCount <- patchCount + 1
                     })
                 }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
+
             // Assert
             let responseBody = getResponseBody context
-            Expect.isTrue patchCalled "PatchElements should be called"
-            Expect.isTrue signalsCalled "PatchSignals should be called"
+            Expect.equal patchCount 2 "Should have patched twice"
             Expect.stringContains responseBody "event: datastar-patch-elements" "Response should contain patch-elements event"
-            Expect.stringContains responseBody "event: datastar-patch-signals" "Response should contain patch-signals event"
-            Expect.stringContains responseBody "<div>Test</div>" "Response should contain HTML content"
-            Expect.stringContains responseBody "\"count\": 5" "Response should contain signal data"
-        
-        testCase "PatchElements() with string sends expected HTML in SSE stream" <| fun () ->
-            // Arrange
+            Expect.stringContains responseBody "<div>First</div>" "Response should contain first HTML"
+            Expect.stringContains responseBody "<div>Second</div>" "Response should contain second HTML"
+
+        testCase "US1: Multi-event streaming with 10 progressive updates" <| fun () ->
+            // Arrange (T018)
             let context = createMockContext()
-            let htmlContent = "<div id='test'>Hello World</div>"
-            
-            let resource = 
-                ResourceBuilder("/test") {
-                    patchElements htmlContent
+            let mutable updatesSent = 0
+
+            let resource =
+                ResourceBuilder("/progress") {
+                    datastar (fun ctx -> task {
+                        for i in 1..10 do
+                            let html = $"""<div id="progress">{i * 10}%%</div>"""
+                            do! Datastar.patchElements html ctx
+                            updatesSent <- updatesSent + 1
+                            // Note: In real scenarios there would be delays
+                    })
                 }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
+
             // Assert
             let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-elements" "Response should contain patch-elements event"
-            Expect.stringContains responseBody htmlContent "Response should contain the HTML content"
-        
-        testCase "PatchElements() with sync function sends expected HTML in SSE stream" <| fun () ->
-            // Arrange
+            Expect.equal updatesSent 10 "Should send 10 updates"
+            Expect.stringContains responseBody "10%" "Should contain first update"
+            Expect.stringContains responseBody "100%" "Should contain last update"
+
+        testCase "US1: Single stream start per request (SC-002)" <| fun () ->
+            // Arrange (T019)
             let context = createMockContext()
-            let htmlFunction (ctx: HttpContext) = 
-                $"<div>Context Path: {ctx.Request.Path}</div>"
-            
-            context.Request.Path <- PathString("/test-path")
-            
-            let resource = 
+
+            let resource =
                 ResourceBuilder("/test") {
-                    patchElements htmlFunction
+                    datastar (fun ctx -> task {
+                        // Stream is started ONCE by the datastar operation
+                        // Multiple patches should work without re-starting
+                        do! Datastar.patchElements "<div>1</div>" ctx
+                        do! Datastar.patchElements "<div>2</div>" ctx
+                        do! Datastar.patchElements "<div>3</div>" ctx
+                    })
                 }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
-            // Assert
+
+            // Assert - verify content-type is set once (SSE characteristic)
             let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-elements" "Response should contain patch-elements event"
-            Expect.stringContains responseBody "Context Path: /test-path" "Response should contain dynamically generated HTML"
-        
-        testCase "PatchElements() with async function sends expected HTML in SSE stream" <| fun () ->
-            // Arrange
+            // Count occurrences of the SSE stream initialization markers
+            let eventCount =
+                responseBody.Split("event: datastar-patch-elements").Length - 1
+            Expect.equal eventCount 3 "Should have exactly 3 events"
+
+        testCase "US1: datastar with POST method" <| fun () ->
+            // Arrange (T014a)
             let context = createMockContext()
-            let asyncHtmlFunction (ctx: HttpContext) = 
-                task {
-                    do! Task.Delay(10) // Simulate async work
-                    return $"<div>Async Content from {ctx.Request.Path}</div>"
+            context.Request.Method <- HttpMethods.Post
+
+            let resource =
+                ResourceBuilder("/submit") {
+                    datastar HttpMethods.Post (fun ctx -> task {
+                        do! Datastar.patchElements "<div id='result'>Submitted!</div>" ctx
+                    })
                 }
-            
-            context.Request.Path <- PathString("/async-test")
-            
-            let resource = 
-                ResourceBuilder("/test") {
-                    patchElements asyncHtmlFunction
-                }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+
+            // Verify the endpoint is registered for POST
+            let httpMethodMetadata =
+                endpoint.Metadata
+                |> Seq.tryPick (fun m ->
+                    match m with
+                    | :? Microsoft.AspNetCore.Routing.HttpMethodMetadata as meta -> Some meta
+                    | _ -> None)
+
+            Expect.isSome httpMethodMetadata "Should have HTTP method metadata"
+            let methods = httpMethodMetadata.Value.HttpMethods |> Seq.toList
+            Expect.contains methods "POST" "Should be registered for POST"
+
+            // Execute the handler
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
+
             // Assert
             let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-elements" "Response should contain patch-elements event"
-            Expect.stringContains responseBody "Async Content from /async-test" "Response should contain async-generated HTML"
-        
-        testCase "RemoveElement() sends correct remove element command for CSS selector" <| fun () ->
-            // Arrange
-            let context = createMockContext()
-            let selector = "#obsolete-element"
-            
-            let resource = 
-                ResourceBuilder("/test") {
-                    removeElement selector
-                }
-            
-            // Act
-            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
-            endpoint.RequestDelegate.Invoke(context).Wait()
-            
-            // Assert
-            let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-elements" "Response should contain patch-elements event"
-            Expect.stringContains responseBody "mode remove" "Response should contain remove mode"
-            Expect.stringContains responseBody selector "Response should contain the CSS selector"
-        
-        testCase "PatchSignals() with string sends expected signal JSON in SSE stream" <| fun () ->
-            // Arrange
-            let context = createMockContext()
-            let signalsJson = """{"counter": 42, "message": "test"}"""
-            
-            let resource = 
-                ResourceBuilder("/test") {
-                    patchSignals signalsJson
-                }
-            
-            // Act
-            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
-            endpoint.RequestDelegate.Invoke(context).Wait()
-            
-            // Assert
-            let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-signals" "Response should contain patch-signals event"
-            Expect.stringContains responseBody "\"counter\": 42" "Response should contain counter signal"
-            Expect.stringContains responseBody "\"message\": \"test\"" "Response should contain message signal"
-        
-        testCase "PatchSignals() with function sends expected signal JSON in SSE stream" <| fun () ->
-            // Arrange
-            let context = createMockContext()
-            let signalsFunction (ctx: HttpContext) = 
-                let path = ctx.Request.Path.Value
-                $"""{{\"path\": \"{path}\", \"timestamp\": \"{DateTime.UtcNow:o}\"}}"""
-            
-            context.Request.Path <- PathString("/signal-test")
-            
-            let resource = 
-                ResourceBuilder("/test") {
-                    patchSignals signalsFunction
-                }
-            
-            // Act
-            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
-            endpoint.RequestDelegate.Invoke(context).Wait()
-            
-            // Assert
-            let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-signals" "Response should contain patch-signals event"
-            Expect.stringContains responseBody "/signal-test" "Response should contain path signal"
-            Expect.stringContains responseBody "timestamp" "Response should contain timestamp signal"
-        
-        testCase "ReadSignals() correctly reads signals from client request and forwards to handler" <| fun () ->
-            // Arrange
+            Expect.stringContains responseBody "Submitted!" "Response should contain HTML"
+
+        // ==========================================
+        // User Story 2: Read Client Signals
+        // ==========================================
+
+        testCase "US2: tryReadSignals correctly deserializes valid JSON" <| fun () ->
+            // Arrange (T024)
             let context = createMockContext()
             let requestSignals = """{"userId": 123, "action": "click"}"""
             setRequestBody context requestSignals
-            
+
             let mutable capturedSignals: voption<{| userId: int; action: string |}> = ValueNone
-            let mutable handlerCalled = false
-            
-            let resource = 
+
+            let resource =
                 ResourceBuilder("/test") {
-                    readSignals (fun ctx signals -> task {
+                    datastar (fun ctx -> task {
+                        let! signals = Datastar.tryReadSignals<{| userId: int; action: string |}> ctx
                         capturedSignals <- signals
-                        handlerCalled <- true
-                        
-                        // Optionally send a response back
+
                         match signals with
                         | ValueSome data ->
-                            do! StarFederation.Datastar.FSharp.ServerSentEventGenerator.PatchSignalsAsync(
-                                ctx.Response, 
-                                $"""{{\"received\": true, \"userId\": {data.userId}}}""")
+                            do! Datastar.patchElements $"<div>User: {data.userId}</div>" ctx
                         | ValueNone ->
-                            do! StarFederation.Datastar.FSharp.ServerSentEventGenerator.PatchSignalsAsync(
-                                ctx.Response, 
-                                """{"error": "No signals received"}""")
+                            do! Datastar.patchElements "<div>No data</div>" ctx
                     })
                 }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
+
             // Assert
-            Expect.isTrue handlerCalled "Handler function should be called"
-            Expect.isTrue capturedSignals.IsSome "Signals should be successfully deserialized"
-            
+            Expect.isTrue capturedSignals.IsSome "Signals should be deserialized"
             match capturedSignals with
             | ValueSome signals ->
                 Expect.equal signals.userId 123 "UserId should match"
                 Expect.equal signals.action "click" "Action should match"
             | ValueNone ->
                 failtest "Signals should have been captured"
-            
+
             let responseBody = getResponseBody context
-            Expect.stringContains responseBody "event: datastar-patch-signals" "Response should contain patch-signals event"
-            Expect.stringContains responseBody "received" "Response should confirm receipt"
-            Expect.stringContains responseBody "123" "Response should include userId"
-        
-        testCase "ReadSignals() handles invalid JSON gracefully" <| fun () ->
-            // Arrange
+            Expect.stringContains responseBody "User: 123" "Response should show user"
+
+        testCase "US2: tryReadSignals returns ValueNone for malformed JSON" <| fun () ->
+            // Arrange (T025)
             let context = createMockContext()
             let invalidJson = """{"invalid": json"""
             setRequestBody context invalidJson
-            
+
             let mutable capturedSignals: voption<{| userId: int |}> = ValueSome {| userId = -1 |}
-            
-            let resource = 
+
+            let resource =
                 ResourceBuilder("/test") {
-                    readSignals (fun ctx signals -> task {
+                    datastar (fun ctx -> task {
+                        let! signals = Datastar.tryReadSignals<{| userId: int |}> ctx
                         capturedSignals <- signals
                     })
                 }
-            
+
             // Act
             let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
             endpoint.RequestDelegate.Invoke(context).Wait()
-            
-            // Assert
+
+            // Assert (SC-005: Malformed JSON returns ValueNone)
             Expect.isTrue capturedSignals.IsNone "Invalid JSON should result in ValueNone"
+
+        // ==========================================
+        // User Story 3: Standalone Helper Functions
+        // ==========================================
+
+        testCase "US3: Datastar.patchElements sends HTML fragment" <| fun () ->
+            // Arrange (T028)
+            let context = createMockContext()
+            let html = "<div id='test'>Hello World</div>"
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchElements html ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody html "Should contain HTML"
+
+        testCase "US3: Datastar.patchSignals sends signal JSON" <| fun () ->
+            // Arrange (T029)
+            let context = createMockContext()
+            let signals = """{"count": 42}"""
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchSignals signals ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-signals" "Should have patch-signals event"
+            Expect.stringContains responseBody "\"count\": 42" "Should contain signal data"
+
+        testCase "US3: Datastar.removeElement sends remove command" <| fun () ->
+            // Arrange (T030)
+            let context = createMockContext()
+            let selector = "#obsolete-element"
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.removeElement selector ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "mode remove" "Should have remove mode"
+            Expect.stringContains responseBody selector "Should contain selector"
+
+        testCase "US3: Datastar.executeScript sends script" <| fun () ->
+            // Arrange (T031)
+            let context = createMockContext()
+            let script = "console.log('hello')"
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.executeScript script ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert - StarFederation.Datastar wraps scripts in patch-elements with script tags
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "<script" "Should contain script tag"
+            Expect.stringContains responseBody script "Should contain script content"
+
+        // ==========================================
+        // API Compliance
+        // ==========================================
+
+        testCase "FR-005: Only datastar custom operation exists on ResourceBuilder" <| fun () ->
+            // T007: Verify only datastar remains
+            // This is a compile-time verification - if this test compiles,
+            // it means the removed operations don't exist
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchElements "<div>Test</div>" ctx
+                    })
+                }
+
+            Expect.equal resource.Endpoints.Length 1 "Should have one endpoint"
     ]

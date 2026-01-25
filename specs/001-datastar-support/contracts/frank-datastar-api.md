@@ -7,16 +7,25 @@
 
 Auto-opened module providing a single extension to `Frank.Builder.ResourceBuilder`.
 
-### Custom Operation
+### Custom Operations
 
-#### datastar
+#### datastar (GET default)
 
 ```fsharp
 [<CustomOperation("datastar")>]
 member Datastar: spec:ResourceSpec * operation:(HttpContext -> Task<unit>) -> ResourceSpec
 ```
 
-Execute Datastar operations with automatic SSE stream management. The stream is started once, then the user's operation executes. Use `Datastar.*` helper functions within the operation to send events.
+Execute Datastar operations with automatic SSE stream management using GET method (default). The stream is started once, then the user's operation executes. Use `Datastar.*` helper functions within the operation to send events.
+
+#### datastar (with HTTP method)
+
+```fsharp
+[<CustomOperation("datastar")>]
+member Datastar: spec:ResourceSpec * method:string * operation:(HttpContext -> Task<unit>) -> ResourceSpec
+```
+
+Execute Datastar operations with automatic SSE stream management using the specified HTTP method. Useful for POST-based streaming (e.g., reading signals from request body).
 
 **Example:**
 ```fsharp
