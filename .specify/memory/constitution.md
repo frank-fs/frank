@@ -1,50 +1,131 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: N/A → 1.0.0 (initial)
+Modified principles: N/A (initial constitution)
+Added sections:
+  - Core Principles (5 principles)
+  - Technical Standards
+  - Development Workflow
+  - Governance
+Removed sections: N/A
+Templates requiring updates:
+  - .specify/templates/plan-template.md ✅ (Constitution Check section compatible)
+  - .specify/templates/spec-template.md ✅ (no changes needed)
+  - .specify/templates/tasks-template.md ✅ (no changes needed)
+Follow-up TODOs: None
+-->
+
+# Frank Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Resource-Oriented Design
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+HTTP resources are the primary abstraction in Frank. The API MUST make it natural to
+think in terms of resources with uniform interface semantics (GET, POST, PUT, DELETE),
+not URL patterns with handlers attached.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+- The `resource` computation expression is the central API concept
+- Resource definitions MUST support all standard HTTP methods as first-class operations
+- Hypermedia enables evolvability; static specifications (OpenAPI) create coupling
+- New features MUST NOT push users toward route-centric thinking
+- Link relations and content negotiation SHOULD be easy to express
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale**: REST as defined in Fielding's dissertation treats resources as the key
+abstraction. Hypermedia as the engine of application state (HATEOAS) provides
+evolvability that static API specifications cannot. Frank's design follows HTTP's
+design.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Idiomatic F#
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+All public APIs MUST use F# idioms. Frank is an F# library for F# developers.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Computation expressions for configuration and resource definition
+- Discriminated unions for modeling choices
+- Option types instead of nulls
+- Pipeline-friendly function signatures
+- Declarative style over imperative configuration
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Rationale**: F# developers choose Frank because it feels like F#, not because it
+wraps a C# library with F# syntax. The API should be discoverable through F#
+conventions.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Library, Not Framework
+
+Frank provides routing and resource definition. Nothing more.
+
+- No view engine (use Falco.Markup, Oxpecker.ViewEngine, or any other)
+- No ORM or data access
+- No authentication system (use ASP.NET Core's)
+- No opinions beyond HTTP resource modeling
+- Easy to adopt incrementally; easy to remove
+
+**Rationale**: Frameworks impose structure and create lock-in. Libraries compose.
+Users MUST be able to use Frank for one resource in an existing ASP.NET Core app
+without adopting a "Frank way" of doing everything else.
+
+### IV. ASP.NET Core Native
+
+Frank builds on ASP.NET Core, not around it.
+
+- Expose `HttpContext` directly in handlers
+- Use `IWebHostBuilder` and standard hosting patterns
+- Integrate with ASP.NET Core middleware pipeline
+- MUST NOT create abstractions that hide the underlying platform
+- Users' ASP.NET Core knowledge transfers directly
+
+**Rationale**: ASP.NET Core is well-designed and well-documented. Frank adds F#
+ergonomics for resource definition; it does not replace the platform. When users
+need to do something Frank doesn't directly support, they use ASP.NET Core APIs.
+
+### V. Performance Parity
+
+Frank MUST perform as well as comparable F# web libraries.
+
+- Benchmark against Giraffe, Falco, and raw ASP.NET Core routing
+- Performance regressions in PRs MUST be justified and documented
+- Avoid allocations in hot paths
+- Prefer struct types where appropriate
+
+**Rationale**: Developers should not have to choose between ergonomics and
+performance. Frank's computation expression syntax MUST NOT impose runtime overhead
+compared to direct ASP.NET Core routing.
+
+## Technical Standards
+
+- **Target Framework**: .NET 8.0+ (current LTS)
+- **F# Version**: F# 8.0+
+- **Dependencies**: Minimize external dependencies; prefer ASP.NET Core built-ins
+- **Nullability**: Treat warnings as errors; use Option types in F# APIs
+- **Testing**: All public APIs MUST have tests; examples in README MUST compile
+
+## Development Workflow
+
+- **Branches**: Feature branches from `master`; PRs required for all changes
+- **Tests**: All tests MUST pass before merge
+- **Benchmarks**: Performance-sensitive changes MUST include benchmark results
+- **Breaking Changes**: MAJOR version bump required; document migration path
+- **Examples**: The `samples/` directory contains working applications that serve
+  as integration tests
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution defines non-negotiable principles for Frank development. All PRs
+and code reviews MUST verify compliance with these principles.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Amendment Process**:
+1. Propose change via GitHub issue with rationale
+2. Discussion period (minimum 7 days for principle changes)
+3. Update constitution with new version number
+4. Document migration impact if principles change
+
+**Version Policy**:
+- MAJOR: Principle removal or backward-incompatible redefinition
+- MINOR: New principle added or existing principle materially expanded
+- PATCH: Clarifications, typo fixes, non-semantic refinements
+
+**Compliance**: When in doubt, refer to this constitution. Complexity MUST be
+justified against these principles. "It would be nice to have" is not justification.
+
+**Version**: 1.0.0 | **Ratified**: 2025-01-25 | **Last Amended**: 2025-01-25
