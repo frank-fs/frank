@@ -160,7 +160,7 @@ let loadDashboard =
             // Multiple element patches - stream starts once automatically
             
             // Patch header
-            let headerHtml = $"""<div id='header'><h2>Dashboard - {DateTime.Now:HH:mm:ss}</h2></div>"""
+            let headerHtml = $"""<div id='header'><h2>Dashboard - {DateTime.Now.ToString("HH:mm:ss")}</h2></div>"""
             do! ServerSentEventGenerator.PatchElementsAsync(ctx.Response, headerHtml)
             
             // Patch stats

@@ -377,7 +377,7 @@ let streamUpdates =
                 do! Task.Delay(500)
                 
                 let updateNode = h("div.update-item", [
-                    h("span.timestamp", [Text $"{DateTime.Now:HH:mm:ss}"])
+                    h("span.timestamp", [Text (DateTime.Now.ToString("HH:mm:ss"))])
                     h("span.message", [Text $"Update #{i}: System running normally"])
                 ])
                 
