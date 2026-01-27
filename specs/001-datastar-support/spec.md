@@ -49,13 +49,15 @@ A developer wants to use Datastar streaming outside of Frank's `resource` comput
 
 **Why this priority**: Flexibility for advanced use cases. Not all developers will use the computation expression syntax; standalone functions enable composition with other patterns.
 
-**Independent Test**: Can be tested by using the streaming functions directly with an HttpContext, verifying SSE output without the resource builder.
+**Independent Test**: Can be tested by invoking `Datastar.*` helper functions directly with a mock HttpContext, verifying they produce correct SSE output independent of Frank's `resource` computation expression.
 
 **Acceptance Scenarios**:
 
-1. **Given** an HttpContext and standalone Datastar functions, **When** the developer manually starts a stream and sends patches, **Then** the output is valid SSE format.
+1. **Given** a mock HttpContext and standalone `Datastar.*` functions, **When** the developer calls helpers directly (e.g., `Datastar.patchElements html ctx`), **Then** the output is valid SSE format written to the response stream.
 
-2. **Given** the standalone module, **When** composing multiple operations, **Then** each operation can be called independently after stream initialization.
+2. **Given** the standalone `Datastar` module, **When** composing multiple helper calls on the same HttpContext, **Then** each helper executes independently and writes to the response in sequence.
+
+**Note**: "Standalone" means the helper functions can be used with any HttpContext, including those from raw ASP.NET Core endpoints. Unit tests with mock HttpContext validate this contract.
 
 ---
 
@@ -65,6 +67,8 @@ A developer wants to use Datastar streaming outside of Frank's `resource` comput
 - What happens when an exception occurs mid-stream? The stream terminates; error handling is the developer's responsibility within the handler.
 - What happens with very large HTML fragments? They are sent as-is; chunking is handled by SSE protocol.
 - What happens when the client sends signals but the handler doesn't read them? The signals are ignored; no error occurs.
+
+**Testing Scope**: Edge cases #1 (empty stream) and #4 (unused signals) are validated via unit tests. Edge cases #2-3 are documented behavior only: #2 relies on standard .NET exception handling, #3 relies on SSE protocol/ASP.NET Core response buffering.
 
 ## Requirements *(mandatory)*
 
@@ -116,51 +120,38 @@ A developer wants to use Datastar streaming outside of Frank's `resource` comput
 
 ## Validation
 
-The library MUST be validated through two sample applications that demonstrate the streaming API works correctly with different HTML generation approaches:
+The library MUST be validated through unit tests covering all public API functions. Minimum: one test per helper function, one test per user story acceptance scenario, and one test per success criterion that specifies "(Validated via unit test)".
 
-### Sample 1: Basic (F# String Templates)
+### Unit Test Coverage
 
-Location: `sample/Frank.Datastar.Basic`
-
-Demonstrates:
-- Streaming handler with simple F# string interpolation for HTML
-- Multiple progressive DOM updates over SSE
-- Reading client signals within a streaming context
-- Server-driven UI patterns (hypermedia-first)
-
-### Sample 2: Hox Integration
-
-Location: `sample/Frank.Datastar.Hox`
-
-Demonstrates:
-- Streaming handler with Hox library for type-safe HTML rendering
-- Async HTML fragment composition with `Render.AsStringAsync`
-- Progressive loading of multiple components (dashboard pattern)
-- Integration of Hox's `h()` function with Datastar's SSE streaming
+- Multi-event streaming (10 progressive updates with delays)
+- Single stream start per request enforcement
+- Client disconnection detection via cancellation token
+- Signal deserialization (valid JSON)
+- Malformed JSON handling (returns ValueNone)
+- Each helper function (`patchElements`, `patchSignals`, `removeElement`, `executeScript`)
+- HTTP method flexibility (GET and POST support)
 
 ### Validation Criteria
 
-- Both samples MUST compile without warnings
-- Both samples MUST run and serve SSE streams that Datastar clients can consume
-- The streaming handler (`datastar` custom operation) MUST work identically regardless of HTML generation approach
-- Samples MUST NOT use one-off convenience operations (per FR-005)—only the streaming handler pattern
-- Samples MUST emphasize patch-elements (hypermedia-first) as the primary pattern
-- Samples MUST demonstrate patch-signals only for appropriate use cases (ephemeral UI state like form inputs, counters) with clear comments indicating this is secondary to hypermedia
+- All unit tests MUST pass
+- Library MUST build without errors across all target frameworks (net8.0, net9.0, net10.0)
+- Library MUST NOT expose one-off convenience operations on ResourceBuilder (per FR-005)
+
+**Note**: Sample applications demonstrating real-world usage patterns will be added as separate feature specs.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Developers can create a streaming resource that sends 10 progressive updates with 100ms delays, and all 10 updates arrive at the client progressively.
+- **SC-001**: Developers can create a streaming resource that sends 10 progressive updates with 100ms delays, and all 10 updates arrive at the client progressively. (Validated via unit test)
 
-- **SC-002**: The streaming API requires exactly one "start stream" call per request, preventing the common mistake of starting multiple streams.
+- **SC-002**: The streaming API requires exactly one "start stream" call per request, preventing the common mistake of starting multiple streams. (Validated via unit test)
 
 - **SC-003**: 100% of public APIs use F# idioms (no C#-style method overloads, no nullable types, computation expressions where appropriate).
 
 - **SC-004**: The library compiles against and uses the latest stable `StarFederation.Datastar` NuGet package version.
 
-- **SC-005**: Signal reading handles malformed JSON without throwing exceptions, returning a "none" value instead.
+- **SC-005**: Signal reading handles malformed JSON without throwing exceptions, returning a "none" value instead. (Validated via unit test)
 
 - **SC-006**: The library integrates naturally with Frank's existing `resource` computation expression syntax.
-
-- **SC-007**: Both sample applications (Basic and Hox) compile without warnings and demonstrate working SSE streams.
