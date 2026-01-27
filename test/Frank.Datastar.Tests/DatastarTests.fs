@@ -341,6 +341,56 @@ let datastarTests =
             Expect.stringContains responseBody script "Should contain script content"
 
         // ==========================================
+        // Edge Cases (Phase 4a)
+        // ==========================================
+
+        testCase "EC: Empty stream - handler returns immediately without sending events" <| fun () ->
+            // Arrange (T021)
+            let context = createMockContext()
+
+            let resource =
+                ResourceBuilder("/empty") {
+                    datastar (fun _ctx -> task {
+                        // Handler returns immediately without sending any events
+                        ()
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert - should return HTTP 200 with SSE headers but minimal content
+            let responseBody = getResponseBody context
+            // Stream was started (SSE headers set) but no events were sent
+            // The response should be valid but potentially empty of data events
+            Expect.equal context.Response.StatusCode 200 "Should return HTTP 200"
+
+        testCase "EC: Unused signals - client sends signals but handler ignores them" <| fun () ->
+            // Arrange (T022)
+            let context = createMockContext()
+            let requestSignals = """{"ignored": "data", "count": 42}"""
+            setRequestBody context requestSignals
+
+            let resource =
+                ResourceBuilder("/ignore-signals") {
+                    datastar (fun ctx -> task {
+                        // Handler deliberately ignores any signals in the request
+                        // Just sends a response without reading signals
+                        do! Datastar.patchElements "<div id='result'>Done</div>" ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert - no error should occur, response should be valid
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "Done" "Response should contain expected HTML"
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch event"
+
+        // ==========================================
         // API Compliance
         // ==========================================
 

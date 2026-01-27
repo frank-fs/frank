@@ -66,25 +66,26 @@ module DatastarExtensions =
 
 /// Helper functions for use inside the `datastar` handler.
 /// These assume the SSE stream has already been started by the `datastar` operation.
+/// All functions are marked `inline` to ensure zero-overhead wrapper calls (Constitution Principle V).
 module Datastar =
 
     /// Patch HTML elements. Use this as the primary pattern (hypermedia-first).
-    let patchElements (html: string) (ctx: HttpContext) =
+    let inline patchElements (html: string) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchElementsAsync(ctx.Response, html)
 
     /// Patch client-side signals. Use sparingly - prefer patchElements.
-    let patchSignals (signals: string) (ctx: HttpContext) =
+    let inline patchSignals (signals: string) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, signals)
 
     /// Remove an element by CSS selector.
-    let removeElement (selector: string) (ctx: HttpContext) =
+    let inline removeElement (selector: string) (ctx: HttpContext) =
         ServerSentEventGenerator.RemoveElementAsync(ctx.Response, selector)
 
     /// Execute JavaScript on the client. Use very sparingly.
-    let executeScript (script: string) (ctx: HttpContext) =
+    let inline executeScript (script: string) (ctx: HttpContext) =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, script)
 
     /// Read and deserialize signals from the request body.
     /// Returns ValueNone for invalid/missing JSON.
-    let tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
+    let inline tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
         ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request)

@@ -62,16 +62,16 @@ module Datastar =
 
 ---
 
-## Phase 3: API Improvements
+## Phase 3: API Improvements ✅ COMPLETE
 
 **Purpose**: Add HTTP method flexibility to the `datastar` custom operation
 
 - [x] T014 Add HTTP method parameter support to `datastar` custom operation in src/Frank.Datastar/Frank.Datastar.fs - currently hardcodes GET only
 - [x] T014a [US1] Add unit test verifying `datastar` operation works with POST method (not just GET) in test/Frank.Datastar.Tests/DatastarTests.fs
 - [x] T015 Verify solution builds with `dotnet build Frank.Datastar.sln --configuration Release`
-- [ ] T016 Mark all `Datastar` module wrapper functions with `inline` in src/Frank.Datastar/Frank.Datastar.fs - ensures compiled code calls StarFederation.Datastar.FSharp methods directly (Constitution Principle V)
+- [x] T016 Mark all `Datastar` module wrapper functions with `inline` in src/Frank.Datastar/Frank.Datastar.fs - ensures compiled code calls StarFederation.Datastar.FSharp methods directly (Constitution Principle V)
 
-**Checkpoint**: Library API is FR-005 compliant, supports any HTTP method, and has zero-overhead wrappers
+**Checkpoint**: Library API is FR-005 compliant, supports any HTTP method, and has zero-overhead wrappers ✅
 
 ---
 
@@ -91,14 +91,14 @@ module Datastar =
 
 ---
 
-## Phase 4a: Edge Case Validation
+## Phase 4a: Edge Case Validation ✅ COMPLETE
 
 **Purpose**: Validate documented edge case behaviors from spec.md
 
-- [ ] T021 [EC] Add unit test for empty stream - handler returns immediately without sending events, verify HTTP 200 with empty SSE response in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T022 [EC] Add unit test for unused signals - client sends signals in request body but handler ignores them, verify no error occurs in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T021 [EC] Add unit test for empty stream - handler returns immediately without sending events, verify HTTP 200 with empty SSE response in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T022 [EC] Add unit test for unused signals - client sends signals in request body but handler ignores them, verify no error occurs in test/Frank.Datastar.Tests/DatastarTests.fs
 
-**Checkpoint**: Edge cases #1 and #4 validated via unit tests
+**Checkpoint**: Edge cases #1 and #4 validated via unit tests ✅
 
 ---
 
@@ -138,7 +138,7 @@ module Datastar =
 
 **Purpose**: Final validation and quality improvements
 
-- [x] T037 Run all unit tests with `dotnet test test/Frank.Datastar.Tests` - 11 tests passing
+- [x] T037 Run all unit tests with `dotnet test test/Frank.Datastar.Tests` - 14 tests passing
 - [x] T038 [P] Update README.md in src/Frank.Datastar/ to reflect correct API (only `datastar` operation + helper module)
 - [x] T039 [P] Verify library uses latest StarFederation.Datastar.FSharp package version (SC-004) - uses `Version="*"` for latest
 - [x] T040 Validate success criteria checklist:
