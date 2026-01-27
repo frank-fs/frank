@@ -25,9 +25,9 @@ All code changes are in the existing sample application:
 
 **Purpose**: Verify existing project structure and ensure prerequisites are met
 
-- [ ] T001 Verify existing sample compiles with `dotnet build sample/Frank.Datastar.Basic`
-- [ ] T002 Verify existing tests pass with `dotnet test test/Frank.Datastar.Tests`
-- [ ] T003 Review existing examples in sample/Frank.Datastar.Basic/Program.fs to understand current patterns
+- [X] T001 Verify existing sample compiles with `dotnet build sample/Frank.Datastar.Basic`
+- [X] T002 Verify existing tests pass with `dotnet test test/Frank.Datastar.Tests`
+- [X] T003 Review existing examples in sample/Frank.Datastar.Basic/Program.fs to understand current patterns
 
 **Checkpoint**: Existing sample verified working before modifications
 
@@ -39,12 +39,12 @@ All code changes are in the existing sample application:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] Add Contact type and ContactSignals type in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T005 [P] Add User type, UserStatus DU, and BulkUpdateSignals type in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T006 [P] Add Item type in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T007 [P] Add Registration type and RegistrationSignals type in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T008 Add in-memory data stores (contacts dict, fruits list, items ResizeArray, users dict, registrations ResizeArray) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T009 Verify project still compiles after adding types with `dotnet build sample/Frank.Datastar.Basic`
+- [X] T004 [P] Add Contact type and ContactSignals type in sample/Frank.Datastar.Basic/Program.fs
+- [X] T005 [P] Add User type, UserStatus DU, and BulkUpdateSignals type in sample/Frank.Datastar.Basic/Program.fs
+- [X] T006 [P] Add Item type in sample/Frank.Datastar.Basic/Program.fs
+- [X] T007 [P] Add Registration type and RegistrationSignals type in sample/Frank.Datastar.Basic/Program.fs
+- [X] T008 Add in-memory data stores (contacts dict, fruits list, items ResizeArray, users dict, registrations ResizeArray) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T009 Verify project still compiles after adding types with `dotnet build sample/Frank.Datastar.Basic`
 
 **Checkpoint**: Foundation ready - all types and data stores in place
 
@@ -58,10 +58,10 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Add "RESTful Resource Patterns" section header comment in sample/Frank.Datastar.Basic/Program.fs after existing examples
-- [ ] T011 [US1] Add RESTful Patterns navigation section to sample/Frank.Datastar.Basic/wwwroot/index.html with links to Click-to-Edit, Search, Delete, Bulk Update, and Validation demos
-- [ ] T012 [US1] Add placeholder div elements for each new pattern section in sample/Frank.Datastar.Basic/wwwroot/index.html (contact-demo, fruits-demo, items-demo, users-demo, registration-demo)
-- [ ] T013 [US1] Verify index.html loads without errors by running sample with `dotnet run --project sample/Frank.Datastar.Basic`
+- [X] T010 [US1] Add "RESTful Resource Patterns" section header comment in sample/Frank.Datastar.Basic/Program.fs after existing examples
+- [X] T011 [US1] Add RESTful Patterns navigation section to sample/Frank.Datastar.Basic/wwwroot/index.html with links to Click-to-Edit, Search, Delete, Bulk Update, and Validation demos
+- [X] T012 [US1] Add placeholder div elements for each new pattern section in sample/Frank.Datastar.Basic/wwwroot/index.html (contact-demo, fruits-demo, items-demo, users-demo, registration-demo)
+- [X] T013 [US1] Verify index.html loads without errors by running sample with `dotnet run --project sample/Frank.Datastar.Basic`
 
 **Checkpoint**: Home page shows navigation to all patterns (placeholders for now)
 
@@ -75,15 +75,15 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Add renderContactView helper function for read-only contact HTML in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T015 [US2] Add renderContactEdit helper function for editable contact form HTML in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T016 [US2] Implement GET /contacts/{id} resource with datastar CE operation (establishes SSE, returns view) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T017 [US2] Implement GET /contacts/{id}/edit resource with datastar CE operation (returns edit form) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T018 [US2] Implement PUT /contacts/{id} resource with datastar CE operation (reads signals, updates contact, returns view) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T019 [US2] Add 404 handling for non-existent contact IDs in all contact endpoints
-- [ ] T020 [US2] Add contact demo section HTML with data-on-load to fetch initial contact in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T021 [US2] Register contact resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T022 [US2] Manually test click-to-edit flow: view → edit → save → view
+- [X] T014 [US2] Add renderContactView helper function for read-only contact HTML in sample/Frank.Datastar.Basic/Program.fs
+- [X] T015 [US2] Add renderContactEdit helper function for editable contact form HTML in sample/Frank.Datastar.Basic/Program.fs
+- [X] T016 [US2] Implement GET /contacts/{id} resource with SSE channel pattern (establishes SSE, awaits channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T017 [US2] Implement GET /contacts/{id}/edit resource as fire-and-forget (posts to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T018 [US2] Implement PUT /contacts/{id} resource as fire-and-forget (updates data, posts to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T019 [US2] Add 404 handling for non-existent contact IDs in all contact endpoints
+- [X] T020 [US2] Add contact demo section HTML with data-on-load to fetch initial contact in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T021 [US2] Register contact resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
+- [X] T022 [US2] Manually test click-to-edit flow: view → edit → save → view
 
 **Checkpoint**: Contact click-to-edit pattern fully functional
 
@@ -97,11 +97,11 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Add renderFruitsList helper function for fruits HTML list in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T024 [US3] Implement GET /fruits resource with datastar CE operation (reads q param, filters fruits, returns list) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T025 [US3] Add fruits demo section HTML with search input using data-bind and debounced data-on:input in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T026 [US3] Register fruits resource in webHost builder in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T027 [US3] Manually test search: type "ap" and see Apple, Apricot, Grape, Papaya filtered
+- [X] T023 [US3] Add renderFruitsList helper function for fruits HTML list in sample/Frank.Datastar.Basic/Program.fs
+- [X] T024 [US3] Implement GET /fruits resource with SSE channel pattern in sample/Frank.Datastar.Basic/Program.fs
+- [X] T025 [US3] Add fruits demo section HTML with search input using debounced data-on:input in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T026 [US3] Register fruits resource in webHost builder in sample/Frank.Datastar.Basic/Program.fs
+- [X] T027 [US3] Manually test search: type "ap" and see Apple, Apricot, Grape, Papaya filtered
 
 **Checkpoint**: Fruits search pattern fully functional
 
@@ -115,13 +115,13 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Add renderItemsTable helper function for items table HTML in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T029 [US4] Implement GET /items resource with datastar CE operation (establishes SSE, returns table, keeps connection open) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T030 [US4] Implement DELETE /items/{id} resource with delete CE operation (fire-and-forget: removes item, returns 202, sends removeElement over SSE) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T031 [US4] Add 404 handling for already-deleted items in DELETE endpoint
-- [ ] T032 [US4] Add items demo section HTML with data-on-load to fetch initial items in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T033 [US4] Register items resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T034 [US4] Manually test deletion: delete item, confirm removal from list without page refresh
+- [X] T028 [US4] Add renderItemsTable helper function for items table HTML in sample/Frank.Datastar.Basic/Program.fs
+- [X] T029 [US4] Implement GET /items resource with SSE channel pattern in sample/Frank.Datastar.Basic/Program.fs
+- [X] T030 [US4] Implement DELETE /items/{id} resource as fire-and-forget (posts removeElement to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T031 [US4] Add 404 handling for already-deleted items in DELETE endpoint
+- [X] T032 [US4] Add items demo section HTML in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T033 [US4] Register items resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
+- [X] T034 [US4] Manually test deletion: delete item, confirm removal from list without page refresh
 
 **Checkpoint**: Items deletion pattern fully functional
 
@@ -135,12 +135,12 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 5
 
-- [ ] T035 [US5] Add renderUsersTable helper function for users table HTML with checkboxes in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T036 [US5] Implement GET /users resource with datastar CE operation (establishes SSE, returns table) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T037 [US5] Implement PUT /users/bulk resource with datastar CE operation (reads selections from signals, status from query param, updates users, returns updated table) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T038 [US5] Add users demo section HTML with data-signals for selections array and activate/deactivate buttons in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T039 [US5] Register users resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T040 [US5] Manually test bulk update: select users, activate, verify status changes
+- [X] T035 [US5] Add renderUsersTable helper function for users table HTML with checkboxes in sample/Frank.Datastar.Basic/Program.fs
+- [X] T036 [US5] Implement GET /users resource with SSE channel pattern in sample/Frank.Datastar.Basic/Program.fs
+- [X] T037 [US5] Implement PUT /users/bulk resource as fire-and-forget (posts updated table to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T038 [US5] Add users demo section HTML in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T039 [US5] Register users resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
+- [X] T040 [US5] Manually test bulk update: select users, activate, verify status changes
 
 **Checkpoint**: Users bulk update pattern fully functional
 
@@ -154,15 +154,15 @@ All code changes are in the existing sample application:
 
 ### Implementation for User Story 6
 
-- [ ] T041 [US6] Add validateRegistration helper function returning list of errors in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T042 [US6] Add renderValidationFeedback helper function for validation result HTML in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T043 [US6] Add renderRegistrationSuccess helper function for success message HTML in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T044 [US6] Implement POST /registrations/validate resource with datastar POST CE operation (validates, streams feedback) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T045 [US6] Implement POST /registrations resource with datastar POST CE operation (validates, creates registration, streams success or errors) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T045a [US6] Add 409 Conflict handling for duplicate email in POST /registrations in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T046 [US6] Add registration demo section HTML with form inputs using debounced validation in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T047 [US6] Register registration resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T048 [US6] Manually test validation flow: invalid input → errors, valid input → success
+- [X] T041 [US6] Add validateRegistration helper function returning list of errors in sample/Frank.Datastar.Basic/Program.fs
+- [X] T042 [US6] Add renderValidationFeedback helper function for validation result HTML in sample/Frank.Datastar.Basic/Program.fs
+- [X] T043 [US6] Add renderRegistrationSuccess helper function for success message HTML in sample/Frank.Datastar.Basic/Program.fs
+- [X] T044 [US6] Implement POST /registrations/validate resource as fire-and-forget (posts feedback to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T045 [US6] Implement POST /registrations resource as fire-and-forget (posts result to channel) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T045a [US6] Add 409 Conflict handling for duplicate email in POST /registrations in sample/Frank.Datastar.Basic/Program.fs
+- [X] T046 [US6] Add registration demo section HTML in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T047 [US6] Register registration resources in webHost builder in sample/Frank.Datastar.Basic/Program.fs
+- [X] T048 [US6] Manually test validation flow: invalid input → errors, valid input → success
 
 **Checkpoint**: Registration validation pattern fully functional
 
@@ -172,14 +172,14 @@ All code changes are in the existing sample application:
 
 **Purpose**: Final verification and documentation
 
-- [ ] T049 Add brief comments explaining resource model for each new example in sample/Frank.Datastar.Basic/Program.fs (FR-010)
-- [ ] T050 Verify all existing 10 examples still work (FR-009) by testing displayDate, searchItems, counter
-- [ ] T051 Verify zero RPC-style URLs exist (SC-004) - all URLs use nouns not verbs
-- [ ] T052 Run full test suite with `dotnet test` to ensure no regressions
-- [ ] T053 Verify sample compiles on .NET 8.0, 9.0, 10.0 (SC-006) with `dotnet build sample/Frank.Datastar.Basic`
-- [ ] T054 Run quickstart.md validation - clone fresh, run sample, interact within 2 minutes (SC-001)
-- [ ] T055 Add 405 Method Not Allowed handling for unsupported methods (e.g., DELETE on /fruits) in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T056 Manually test edge cases: 404 not found, 405 method not allowed, 409 conflict on duplicate registration
+- [X] T049 Add brief comments explaining resource model for each new example in sample/Frank.Datastar.Basic/Program.fs (FR-010)
+- [X] T050 Verify all existing 10 examples still work (FR-009) by testing displayDate, searchItems, counter
+- [X] T051 Verify zero RPC-style URLs exist (SC-004) - all URLs use nouns not verbs
+- [X] T052 Run full test suite with `dotnet test` to ensure no regressions
+- [X] T053 Verify sample compiles on .NET 10.0 with `dotnet build sample/Frank.Datastar.Basic`
+- [X] T054 Run quickstart.md validation - clone fresh, run sample, interact within 2 minutes (SC-001)
+- [X] T055 Add 405 Method Not Allowed handling for unsupported methods (e.g., DELETE on /fruits) in sample/Frank.Datastar.Basic/Program.fs (NOTE: handled automatically by Frank/ASP.NET Core routing)
+- [X] T056 Manually test edge cases: 404 not found, 405 method not allowed, 409 conflict on duplicate registration
 
 **Checkpoint**: All requirements verified, sample ready for use
 

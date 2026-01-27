@@ -84,6 +84,15 @@
         }
         .primary { background: #3498db; color: white; }
         .minimal { background: #95a5a6; color: white; }
+        .success { color: #27ae60; padding: 0.5rem; background: #d5f4e6; border-radius: 4px; }
+        .error { color: #e74c3c; padding: 0.5rem; background: #fadbd8; border-radius: 4px; }
+        .error ul { margin: 0; padding-left: 1.5rem; }
+        .status-active { color: #27ae60; font-weight: bold; }
+        .status-inactive { color: #95a5a6; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #ecf0f1; }
+        label { display: block; margin: 0.5rem 0; }
     </style>
 </head>
 <body>
@@ -208,5 +217,100 @@
             <li><strong>Avoid Client State:</strong> Don't store application data in signals</li>
         </ul>
     </div>
+
+    <!-- ===========================
+         RESTFUL RESOURCE PATTERNS
+         These examples demonstrate proper HTTP resource semantics combined
+         with Datastar's hypermedia-first approach.
+         =========================== -->
+
+    <h2 style="margin-top: 3rem; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem;">
+        RESTful Resource Patterns
+    </h2>
+    <p style="color: #7f8c8d;">
+        The following examples demonstrate proper HTTP resource semantics:
+        resource URLs (nouns), appropriate HTTP methods (GET/PUT/DELETE/POST),
+        and query parameters for filtering.
+    </p>
+
+    <!-- Navigation to RESTful Patterns -->
+    <div style="margin: 1rem 0; padding: 1rem; background: #ecf0f1; border-radius: 8px;">
+        <strong>Jump to:</strong>
+        <a href="#contact-demo" style="margin: 0 0.5rem;">Click-to-Edit</a> |
+        <a href="#fruits-demo" style="margin: 0 0.5rem;">Search</a> |
+        <a href="#items-demo" style="margin: 0 0.5rem;">Delete</a> |
+        <a href="#users-demo" style="margin: 0 0.5rem;">Bulk Update</a> |
+        <a href="#registration-demo" style="margin: 0 0.5rem;">Form Validation</a>
+    </div>
+
+    <!-- Click-to-Edit Contact Demo -->
+    <div class="section" id="contact-demo">
+        <h2>Click-to-Edit <span class="badge primary">GET/PUT Resource</span></h2>
+        <p>Edit a contact inline using proper REST: GET establishes SSE, edit/save are fire-and-forget.</p>
+        <p><em>Click "Load Contact" to establish SSE connection. Then Edit/Save use that channel.</em></p>
+        <div id="contact-container">
+            <button data-on:click="@get('/contacts/1')">Load Contact</button>
+            <div id="contact-view">
+                <!-- Contact will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Fruits Demo -->
+    <div class="section" id="fruits-demo">
+        <h2>Search with Filtering <span class="badge primary">GET + Query Params</span></h2>
+        <p>Filter a collection using GET with query parameters. GET /fruits establishes SSE, subsequent searches are fire-and-forget.</p>
+        <p><em>Click "Load Fruits" first to establish SSE, then type to search.</em></p>
+        <div id="fruits-container">
+            <button data-on:click="@get('/fruits')">Load Fruits</button>
+            <div style="margin-top: 1rem;">
+                <input type="text" id="fruits-search" placeholder="Search fruits..."
+                       data-on:input__debounce.300ms="@get('/fruits?q=' + $el.value)" />
+            </div>
+            <div id="fruits-list">
+                <!-- Fruits list will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Items Demo -->
+    <div class="section" id="items-demo">
+        <h2>Row Deletion <span class="badge primary">DELETE Resource</span></h2>
+        <p>Delete items using HTTP DELETE. GET /items establishes SSE, DELETE is fire-and-forget.</p>
+        <p><em>Click "Load Items" to establish SSE. Delete buttons use that channel.</em></p>
+        <div id="items-container-restful">
+            <button data-on:click="@get('/items')">Load Items</button>
+            <div id="items-table">
+                <!-- Items table will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Update Users Demo -->
+    <div class="section" id="users-demo">
+        <h2>Bulk Update <span class="badge primary">PUT Collection</span></h2>
+        <p>Update multiple resources using PUT. GET /users establishes SSE, bulk updates are fire-and-forget.</p>
+        <p><em>Click "Load Users" to establish SSE. Select users and click Activate/Deactivate.</em></p>
+        <div id="users-container">
+            <button data-on:click="@get('/users')">Load Users</button>
+            <div id="users-table-container">
+                <!-- Users table will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Validation Registration Demo -->
+    <div class="section" id="registration-demo">
+        <h2>Form Validation <span class="badge primary">POST with Validation</span></h2>
+        <p>Real-time validation. GET /registrations/form establishes SSE, validation and submit are fire-and-forget.</p>
+        <p><em>Click "Show Form" to establish SSE. Validation happens as you type.</em></p>
+        <div id="registration-container">
+            <button data-on:click="@get('/registrations/form')">Show Registration Form</button>
+            <div id="registration-form">
+                <!-- Registration form will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
