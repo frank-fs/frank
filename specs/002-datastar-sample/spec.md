@@ -93,7 +93,7 @@ A developer wants to implement bulk updates on a collection. They reference the 
 
 1. **Given** a collection of users at `/users`, **When** I view the list, **Then** each row has a checkbox for selection.
 
-2. **Given** multiple users selected, **When** I click "Activate Selected", **Then** a PUT to `/users` with the selected IDs updates their status.
+2. **Given** multiple users selected, **When** I click "Activate Selected", **Then** a PUT to `/users/bulk` with the selected IDs updates their status.
 
 3. **Given** a successful bulk update, **When** the server responds, **Then** the table reflects the updated status for all affected users.
 
@@ -122,6 +122,9 @@ A developer wants to implement real-time form validation. They reference the sam
 - **Not Found**: GET/PUT/DELETE on non-existent ID returns HTTP 404 with a simple HTML error message (e.g., "Contact not found").
 - **Already Deleted**: DELETE on already-deleted resource returns HTTP 404 (resource no longer exists).
 - **Validation Errors**: Empty or malformed input returns HTTP 400 with HTML listing specific validation errors.
+- **Conflict**: POST to create a resource that already exists (e.g., duplicate email in registration) returns HTTP 409 with an HTML error message explaining the conflict.
+- **Method Not Allowed**: Unsupported HTTP method on a resource (e.g., DELETE on `/fruits`) returns HTTP 405 with an HTML error message listing allowed methods.
+- **Not Acceptable**: Request with unsupported Accept header returns HTTP 406 (optional - sample primarily returns HTML via SSE).
 - **Concurrent Edits**: Out of scope for sample app (last-write-wins is acceptable for demo purposes).
 
 ## Requirements *(mandatory)*
@@ -190,4 +193,4 @@ A developer wants to implement real-time form validation. They reference the sam
 
 ### Session 2026-01-27
 
-- Q: How should edge cases (not found, already deleted, etc.) be handled? → A: Return appropriate HTTP status codes (404, 409, etc.) with simple HTML error messages.
+- Q: How should edge cases (not found, already deleted, etc.) be handled? → A: Return appropriate HTTP status codes (400, 404, 405, 409) with simple HTML error messages. See Edge Cases section for details.
