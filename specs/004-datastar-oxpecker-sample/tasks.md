@@ -29,9 +29,9 @@ sample/Frank.Datastar.Oxpecker/
 
 **Purpose**: Create project directory and configuration
 
-- [ ] T001 Create project directory at sample/Frank.Datastar.Oxpecker/
-- [ ] T002 Create Frank.Datastar.Oxpecker.fsproj with net10.0, Frank 6.x, Oxpecker.ViewEngine 2.x, and Frank.Datastar ProjectReference
-- [ ] T003 Copy test.sh from sample/Frank.Datastar.Basic/test.sh to sample/Frank.Datastar.Oxpecker/test.sh
+- [X] T001 Create project directory at sample/Frank.Datastar.Oxpecker/
+- [X] T002 Create Frank.Datastar.Oxpecker.fsproj with net10.0, Frank 6.x, Oxpecker.ViewEngine 2.x, and Frank.Datastar ProjectReference
+- [X] T003 Copy test.sh from sample/Frank.Datastar.Basic/test.sh to sample/Frank.Datastar.Oxpecker/test.sh
 
 ---
 
@@ -41,12 +41,12 @@ sample/Frank.Datastar.Oxpecker/
 
 **File**: sample/Frank.Datastar.Oxpecker/Program.fs
 
-- [ ] T004 Create Program.fs with module declaration, open statements for System, Microsoft.AspNetCore, Frank, Frank.Datastar, Oxpecker.ViewEngine, Oxpecker.ViewEngine.Render
-- [ ] T005 Define all entity types (Contact, ContactSignals, UserStatus, User, BulkUpdateSignals, Item, Registration, RegistrationSignals) per data-model.md
-- [ ] T006 Define SSE event types (SseEvent, SseChannelMsg) and createSseChannel MailboxProcessor factory
-- [ ] T007 Create all SSE channels (contactChannel, fruitsChannel, itemsChannel, usersChannel, registrationChannel)
-- [ ] T008 Create in-memory data stores (contacts Dictionary, fruits list, items ResizeArray, users Dictionary, registrations ResizeArray)
-- [ ] T009 Implement writeSseEvent helper function for SSE response handling
+- [X] T004 Create Program.fs with module declaration, open statements for System, Microsoft.AspNetCore, Frank, Frank.Datastar, Oxpecker.ViewEngine, Oxpecker.ViewEngine.Render
+- [X] T005 Define all entity types (Contact, ContactSignals, UserStatus, User, BulkUpdateSignals, Item, Registration, RegistrationSignals) per data-model.md
+- [X] T006 Define SSE event types (SseEvent, SseChannelMsg) and createSseChannel MailboxProcessor factory
+- [X] T007 Create all SSE channels (contactChannel, fruitsChannel, itemsChannel, usersChannel, registrationChannel)
+- [X] T008 Create in-memory data stores (contacts Dictionary, fruits list, items ResizeArray, users Dictionary, registrations ResizeArray)
+- [X] T009 Implement writeSseEvent helper function for SSE response handling
 
 **Checkpoint**: Foundation ready - all types and infrastructure defined
 
@@ -62,43 +62,43 @@ sample/Frank.Datastar.Oxpecker/
 
 ### Contact Resources (Click-to-Edit Pattern)
 
-- [ ] T010 [US1] Implement renderContactView function using Oxpecker.ViewEngine computation expressions with toString
-- [ ] T011 [US1] Implement renderContactEdit function with data-signals and data-bind attributes via .attr()
-- [ ] T012 [US1] Implement contactResource (GET /contacts/{id} SSE, PUT /contacts/{id} update)
-- [ ] T013 [US1] Implement contactEditResource (GET /contacts/{id}/edit fire-and-forget)
+- [X] T010 [US1] Implement renderContactView function using Oxpecker.ViewEngine computation expressions with toString
+- [X] T011 [US1] Implement renderContactEdit function with data-signals and data-bind attributes via .attr()
+- [X] T012 [US1] Implement contactResource (GET /contacts/{id} SSE, PUT /contacts/{id} update)
+- [X] T013 [US1] Implement contactEditResource (GET /contacts/{id}/edit fire-and-forget)
 
 ### Fruits Resource (Search Pattern)
 
-- [ ] T014 [US1] Implement renderFruitsList function using Oxpecker.ViewEngine for ul/li list
-- [ ] T015 [US1] Implement fruitsResource (GET /fruits SSE with optional ?q= search)
+- [X] T014 [US1] Implement renderFruitsList function using Oxpecker.ViewEngine for ul/li list
+- [X] T015 [US1] Implement fruitsResource (GET /fruits SSE with optional ?q= search)
 
 ### Items Resources (Delete Pattern)
 
-- [ ] T016 [US1] Implement renderItemsTable function using Oxpecker.ViewEngine for table with delete buttons
-- [ ] T017 [US1] Implement itemsCollectionResource (GET /items SSE)
-- [ ] T018 [US1] Implement itemResource (DELETE /items/{id} fire-and-forget)
+- [X] T016 [US1] Implement renderItemsTable function using Oxpecker.ViewEngine for table with delete buttons
+- [X] T017 [US1] Implement itemsCollectionResource (GET /items SSE)
+- [X] T018 [US1] Implement itemResource (DELETE /items/{id} fire-and-forget)
 
 ### Users Resources (Bulk Update Pattern)
 
-- [ ] T019 [US1] Implement renderUsersTable function using Oxpecker.ViewEngine with checkbox bindings
-- [ ] T020 [US1] Implement usersCollectionResource (GET /users SSE)
-- [ ] T021 [US1] Implement usersBulkResource (PUT /users/bulk?status= fire-and-forget)
+- [X] T019 [US1] Implement renderUsersTable function using Oxpecker.ViewEngine with checkbox bindings
+- [X] T020 [US1] Implement usersCollectionResource (GET /users SSE)
+- [X] T021 [US1] Implement usersBulkResource (PUT /users/bulk?status= fire-and-forget)
 
 ### Registration Resources (Form Validation Pattern)
 
-- [ ] T022 [US1] Implement validateRegistration function
-- [ ] T023 [US1] Implement renderValidationFeedback function using Oxpecker.ViewEngine
-- [ ] T024 [US1] Implement renderRegistrationSuccess function using Oxpecker.ViewEngine
-- [ ] T025 [US1] Implement renderRegistrationForm function using Oxpecker.ViewEngine with data-on:input attributes
-- [ ] T026 [US1] Implement registrationFormResource (GET /registrations/form SSE)
-- [ ] T027 [US1] Implement registrationValidateResource (POST /registrations/validate fire-and-forget)
-- [ ] T028 [US1] Implement registrationsResource (POST /registrations create)
+- [X] T022 [US1] Implement validateRegistration function
+- [X] T023 [US1] Implement renderValidationFeedback function using Oxpecker.ViewEngine
+- [X] T024 [US1] Implement renderRegistrationSuccess function using Oxpecker.ViewEngine
+- [X] T025 [US1] Implement renderRegistrationForm function using Oxpecker.ViewEngine with data-on:input attributes
+- [X] T026 [US1] Implement registrationFormResource (GET /registrations/form SSE)
+- [X] T027 [US1] Implement registrationValidateResource (POST /registrations/validate fire-and-forget)
+- [X] T028 [US1] Implement registrationsResource (POST /registrations create)
 
 ### Application Entry Point
 
-- [ ] T029 [US1] Implement main function with webHost builder registering all resources
-- [ ] T030 [US1] Build and verify compilation with `dotnet build`
-- [ ] T031 [US1] Run test.sh and verify all 18 tests pass (tests 11-28)
+- [X] T029 [US1] Implement main function with webHost builder registering all resources
+- [X] T030 [US1] Build and verify compilation with `dotnet build`
+- [X] T031 [US1] Run test.sh and verify all 18 tests pass (tests 11-28)
 
 **Checkpoint**: User Story 1 complete - sample fully functional and tested
 
@@ -110,9 +110,9 @@ sample/Frank.Datastar.Oxpecker/
 
 **Independent Test**: Compare Program.fs files - same structure, only render functions differ
 
-- [ ] T032 [US2] Review Program.fs structure matches Frank.Datastar.Basic and Frank.Datastar.Hox organization
-- [ ] T033 [US2] Verify all render functions use Oxpecker.ViewEngine patterns from VIEW_ENGINE_COMPARISON.md
-- [ ] T034 [US2] Add header comment explaining Oxpecker.ViewEngine syntax patterns
+- [X] T032 [US2] Review Program.fs structure matches Frank.Datastar.Basic and Frank.Datastar.Hox organization
+- [X] T033 [US2] Verify all render functions use Oxpecker.ViewEngine patterns from VIEW_ENGINE_COMPARISON.md
+- [X] T034 [US2] Add header comment explaining Oxpecker.ViewEngine syntax patterns
 
 **Checkpoint**: User Story 2 complete - code is comparison-ready
 
@@ -124,13 +124,13 @@ sample/Frank.Datastar.Oxpecker/
 
 **Independent Test**: Run test.sh - all tests 11-28 show PASS
 
-- [ ] T035 [US3] Verify test 11 (GET /contacts/1 SSE view) returns HTML with "First Name"
-- [ ] T036 [US3] Verify test 12-14 (contact edit/update/404) return correct HTTP status codes
-- [ ] T037 [US3] Verify test 15-16 (fruits SSE/search) work correctly
-- [ ] T038 [US3] Verify test 17-18 (items table/delete 404) work correctly
-- [ ] T039 [US3] Verify test 19-20 (users table/bulk update) work correctly
-- [ ] T040 [US3] Verify test 21-25 (registration form/validate/create/duplicate) work correctly
-- [ ] T041 [US3] Verify test 26-28 (405 method not allowed) work correctly
+- [X] T035 [US3] Verify test 11 (GET /contacts/1 SSE view) returns HTML with "First Name"
+- [X] T036 [US3] Verify test 12-14 (contact edit/update/404) return correct HTTP status codes
+- [X] T037 [US3] Verify test 15-16 (fruits SSE/search) work correctly
+- [X] T038 [US3] Verify test 17-18 (items table/delete 404) work correctly
+- [X] T039 [US3] Verify test 19-20 (users table/bulk update) work correctly
+- [X] T040 [US3] Verify test 21-25 (registration form/validate/create/duplicate) work correctly
+- [X] T041 [US3] Verify test 26-28 (405 method not allowed) work correctly
 
 **Checkpoint**: User Story 3 complete - all automated tests pass
 
@@ -140,11 +140,11 @@ sample/Frank.Datastar.Oxpecker/
 
 **Purpose**: Final validation and cleanup
 
-- [ ] T042 Ensure no Hox imports or raw HTML string templates remain
-- [ ] T043 Verify Oxpecker.ViewEngine computation expression syntax is consistent throughout
-- [ ] T044 Run final `dotnet build` - no warnings
-- [ ] T045 Run final `./test.sh` - all 18 tests pass
-- [ ] T046 Validate quickstart.md instructions work end-to-end
+- [X] T042 Ensure no Hox imports or raw HTML string templates remain
+- [X] T043 Verify Oxpecker.ViewEngine computation expression syntax is consistent throughout
+- [X] T044 Run final `dotnet build` - no warnings
+- [X] T045 Run final `./test.sh` - all 18 tests pass
+- [X] T046 Validate quickstart.md instructions work end-to-end
 
 ---
 

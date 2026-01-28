@@ -15,8 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="Frank" Version="6.*" />
-    <PackageReference Include="Hox" Version="3.*" />
-    <PackageReference Update="FSharp.Core" Version="10.0.*" />
+    <PackageReference Include="Oxpecker.ViewEngine" Version="2.*" />
   </ItemGroup>
 
 </Project>
