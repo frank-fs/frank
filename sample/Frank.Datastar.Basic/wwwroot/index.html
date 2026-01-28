@@ -53,27 +53,6 @@
             width: 300px;
             margin: 0.25rem;
         }
-        #target, #greeting, #data, #search-results, #items-container, 
-        #product-grid, #validation-result, #profile, #stats, #activity {
-            margin-top: 1rem;
-            padding: 0.5rem;
-            min-height: 2rem;
-        }
-        .result, .product-card {
-            padding: 1rem;
-            margin: 0.5rem 0;
-            background: #ecf0f1;
-            border-radius: 4px;
-        }
-        #clock {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #2c3e50;
-            text-align: center;
-            padding: 1rem;
-            background: #ecf0f1;
-            border-radius: 8px;
-        }
         .badge {
             display: inline-block;
             padding: 0.25rem 0.5rem;
@@ -97,141 +76,18 @@
 </head>
 <body>
     <h1>Frank.Datastar Examples</h1>
-    <p class="subtitle">Demonstrating Hypermedia-First Reactive Updates</p>
-    
-    <!-- Example 1: Display Date/Time (Primary Pattern) -->
-    <div class="section">
-        <h2>Example 1: Display Date/Time <span class="badge primary">Patch Elements</span></h2>
-        <p>The primary Datastar pattern: server sends HTML to update the page.</p>
-        <button data-on:click="@get('/displayDate')">Display Current Date</button>
-        <button data-on:click="@get('/removeDate')">Remove Date</button>
-        <div id="target"></div>
-    </div>
+    <p class="subtitle">RESTful Resource Patterns with Hypermedia-First Updates</p>
 
-    <!-- Example 2: Search Results (Hypermedia) -->
-    <div class="section">
-        <h2>Example 2: Search Results <span class="badge primary">Server Filters</span></h2>
-        <p>Server filters data and sends back HTML results. No client-side data management.</p>
-        <input type="text" 
-               id="searchBox"
-               placeholder="Type to search products..." 
-               data-on:input.debounce_300ms="@get('/search?q=' + $el.value)">
-        <div id="search-results"></div>
-    </div>
-
-    <!-- Example 3: Pagination (HTML Updates) -->
-    <div class="section">
-        <h2>Example 3: Paginated List <span class="badge primary">HTML Navigation</span></h2>
-        <p>Server sends complete page HTML with navigation buttons included.</p>
-        <button data-on:click="@get('/load-items/1')">Load Page 1</button>
-        <div id="items-container"></div>
-    </div>
-
-    <!-- Example 4: User Greeting (Server Decides) -->
-    <div class="section">
-        <h2>Example 4: User Greeting <span class="badge primary">Server-Driven</span></h2>
-        <p>Server decides what HTML to show based on input. No signals needed.</p>
-        <input type="text" 
-               id="nameInput"
-               placeholder="Enter your name...">
-        <button data-on:click="@get('/greet?name=' + nameInput.value)">Greet Me</button>
-        <div id="greeting"></div>
-    </div>
-
-    <!-- Example 5: Product Catalog (HTML Rendering) -->
-    <div class="section">
-        <h2>Example 5: Product Catalog <span class="badge primary">Server Renders</span></h2>
-        <p>Server fetches from database and renders products as complete HTML.</p>
-        <button data-on:click="@get('/products?category=electronics')">Electronics</button>
-        <button data-on:click="@get('/products?category=furniture')">Furniture</button>
-        <button data-on:click="@get('/products')">All Products</button>
-        <div id="product-grid"></div>
-    </div>
-
-    <!-- Example 6: Form with Validation (Minimal Signals) -->
-    <div class="section" data-signals="{'email': '', 'password': ''}">
-        <h2>Example 6: Form Validation <span class="badge minimal">Minimal Signals</span></h2>
-        <p>Signals only for form inputs; server validates and sends back HTML feedback.</p>
-        <div>
-            <input type="email" 
-                   placeholder="Email" 
-                   data-bind:email>
-        </div>
-        <div>
-            <input type="password" 
-                   placeholder="Password" 
-                   data-bind:password>
-        </div>
-        <button data-on:click="@post('/validate')">Validate</button>
-        <div id="validation-result"></div>
-    </div>
-
-    <!-- Example 7: Real-Time Clock (HTML Updates) -->
-    <div class="section">
-        <h2>Example 7: Real-Time Clock <span class="badge primary">Continuous HTML</span></h2>
-        <p>Server sends updated HTML every second. Pure hypermedia updates.</p>
-        <div id="clock">--:--:--</div>
-        <button data-on:click="@get('/clock'); setInterval(() => fetch('/clock'), 1000)">
-            Start Clock
-        </button>
-    </div>
-
-    <!-- Example 8: Dashboard Refresh (Multiple Elements) -->
-    <div class="section">
-        <h2>Example 8: Dashboard Multi-Element <span class="badge primary">Multiple Patches</span></h2>
-        <p>Update multiple page sections independently with separate HTML patches.</p>
-        <button data-on:click="@get('/dashboard/refresh')">Refresh Dashboard</button>
-        <div id="stats" style="background: #ecf0f1; padding: 1rem; margin-top: 0.5rem; border-radius: 4px;">
-            <p>Statistics will load here...</p>
-        </div>
-        <div id="activity" style="background: #ecf0f1; padding: 1rem; margin-top: 0.5rem; border-radius: 4px;">
-            <p>Recent activity will load here...</p>
-        </div>
-    </div>
-
-    <!-- Example 9: Profile View (Server-Controlled UI) -->
-    <div class="section">
-        <h2>Example 9: Profile View <span class="badge primary">Server Decides UI</span></h2>
-        <p>Server determines what HTML to show based on permissions and user state.</p>
-        <button data-on:click="@get('/profile/123')">Load Profile (Can Edit)</button>
-        <button data-on:click="@get('/profile/456')">Load Profile (View Only)</button>
-        <div id="profile"></div>
-    </div>
-
-    <!-- Example 10: Counter (Rare Signal Example) -->
-    <div class="section" data-signals="{'count': 0}">
-        <h2>Example 10: Counter <span class="badge minimal">Rare: Ephemeral State</span></h2>
-        <p>A rare case where signals make sense: ephemeral counter state. Most UIs don't need this.</p>
-        <p>Count: <span data-text="$count"></span></p>
-        <button data-on:click="@post('/increment')">Increment</button>
-        <button data-on:click="@post('/decrement')">Decrement</button>
-        <button data-on:click="@post('/reset')">Reset</button>
-    </div>
-
-    <div style="margin-top: 3rem; padding: 1.5rem; background: #e8f4f8; border-radius: 8px;">
-        <h3 style="margin-top: 0; color: #2c3e50;">💡 Key Principles</h3>
-        <ul style="color: #34495e;">
-            <li><strong>Hypermedia First:</strong> Send HTML from the server (Examples 1-5, 7-9)</li>
-            <li><strong>Server as Source of Truth:</strong> Let the server decide what to show</li>
-            <li><strong>Minimal Signals:</strong> Only for form inputs and ephemeral state (Examples 6, 10)</li>
-            <li><strong>Avoid Client State:</strong> Don't store application data in signals</li>
+    <!-- Key Principles -->
+    <div style="margin: 1rem 0; padding: 1.5rem; background: #e8f4f8; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #2c3e50;">Key Principles</h3>
+        <ul style="color: #34495e; margin-bottom: 0;">
+            <li><strong>Resource URLs:</strong> Use nouns, not verbs (/contacts/1, not /getContact)</li>
+            <li><strong>HTTP Methods:</strong> GET=retrieve, PUT=update, DELETE=remove, POST=create</li>
+            <li><strong>Query Params:</strong> Use for filtering (/fruits?q=apple)</li>
+            <li><strong>Hypermedia First:</strong> Server sends HTML, client renders it</li>
         </ul>
     </div>
-
-    <!-- ===========================
-         RESTFUL RESOURCE PATTERNS
-         These examples demonstrate proper HTTP resource semantics combined
-         with Datastar's hypermedia-first approach.
-         =========================== -->
-
-    <h2 style="margin-top: 3rem; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem;">
-        RESTful Resource Patterns
-    </h2>
-    <p style="color: #7f8c8d;">
-        The following examples demonstrate proper HTTP resource semantics:
-        resource URLs (nouns), appropriate HTTP methods (GET/PUT/DELETE/POST),
-        and query parameters for filtering.
-    </p>
 
     <!-- Navigation to RESTful Patterns -->
     <div style="margin: 1rem 0; padding: 1rem; background: #ecf0f1; border-radius: 8px;">
