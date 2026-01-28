@@ -1,3 +1,19 @@
+// ===========================
+// FRANK.DATASTAR.HOX SAMPLE
+// ===========================
+// This sample demonstrates the same RESTful Datastar patterns as Frank.Datastar.Basic,
+// but uses Hox for HTML generation instead of F# string templates.
+//
+// KEY PATTERNS:
+// - Resource URLs (nouns): /contacts/{id}, /fruits, /items/{id}
+// - HTTP method semantics: GET=retrieve, PUT=update, DELETE=remove, POST=create
+// - Query parameters for filtering: /fruits?q=term
+// - Hypermedia first: Server sends HTML via SSE
+//
+// HOX ATTRIBUTE SYNTAX:
+// Uses CSS selector notation: h("tag#id.class [attr=value]", children)
+// ===========================
+
 module HoxExample
 
 open System
@@ -12,385 +28,647 @@ open Hox.Core
 open Hox.Rendering
 
 // ===========================
-// DATASTAR + HOX INTEGRATION
-// ===========================
-// Hox provides async-first HTML rendering with a clean F# API.
-// Combined with Datastar's SSE, this enables reactive server-driven UIs
-// with composable, type-safe HTML components.
-//
-// KEY PATTERNS:
-// - patchElements is PRIMARY (hypermedia-first)
-// - patchSignals is SECONDARY (only for ephemeral UI state)
-//
-// HOX ATTRIBUTE SYNTAX:
-// Uses CSS selector notation: h("tag#id.class [attr=value]", children)
+// RESTFUL RESOURCE TYPES
 // ===========================
 
-// Domain models
-type User = {
-    Id: int
-    Name: string
-    Email: string
-    Avatar: string
-}
+// Contact for click-to-edit pattern
+type Contact =
+    { Id: int
+      FirstName: string
+      LastName: string
+      Email: string }
 
-type Product = {
-    Id: int
-    Name: string
-    Price: decimal
-    Category: string
-    InStock: bool
-}
-
-type DashboardStats = {
-    TotalUsers: int
-    ActiveOrders: int
-    Revenue: decimal
-}
-
-// Simulated data sources
-let fetchUsersAsync count =
-    task {
-        do! Task.Delay(100)
-        return
-            [ for i in 1..count do
-                  { Id = i
-                    Name = $"User {i}"
-                    Email = $"user{i}@example.com"
-                    Avatar = $"https://i.pravatar.cc/150?img={i}" } ]
-    }
-
-let fetchProductsAsync category =
-    task {
-        do! Task.Delay(100)
-        let allProducts =
-            [ { Id = 1; Name = "Laptop"; Price = 999M; Category = "electronics"; InStock = true }
-              { Id = 2; Name = "Phone"; Price = 699M; Category = "electronics"; InStock = true }
-              { Id = 3; Name = "Desk"; Price = 299M; Category = "furniture"; InStock = false }
-              { Id = 4; Name = "Chair"; Price = 199M; Category = "furniture"; InStock = true }
-              { Id = 5; Name = "Monitor"; Price = 349M; Category = "electronics"; InStock = true } ]
-
-        return
-            if String.IsNullOrWhiteSpace(category) then allProducts
-            else allProducts |> List.filter (fun p -> p.Category = category)
-    }
-
-let fetchDashboardStatsAsync () =
-    task {
-        do! Task.Delay(100)
-        return { TotalUsers = Random.Shared.Next(1000, 2000)
-                 ActiveOrders = Random.Shared.Next(100, 500)
-                 Revenue = decimal (Random.Shared.Next(50000, 100000)) }
-    }
-
-// ===========================
-// HOX COMPONENTS (Bulma-styled)
-// ===========================
-
-let userCard (user: User) =
-    h("div.card",
-        [ h("div.card-image",
-              [ h("figure.image.is-4by3",
-                    [ h($"img [src={user.Avatar}] [alt={user.Name}]", []) ]) ])
-          h("div.card-content",
-              [ h("p.title.is-4", [ Text user.Name ])
-                h("p.subtitle.is-6", [ Text user.Email ]) ]) ])
-
-let productCard (product: Product) =
-    let stockClass = if product.InStock then "has-text-success" else "has-text-danger"
-    let stockText = if product.InStock then "In Stock" else "Out of Stock"
-
-    h("div.card",
-        [ h("div.card-content",
-              [ h("p.title.is-5", [ Text product.Name ])
-                h("p.subtitle.is-6", [ Text $"${product.Price}" ])
-                h("p", [ Text $"Category: {product.Category}" ])
-                h($"p.{stockClass}", [ Text stockText ])
-                if product.InStock then
-                    h($"button.button.is-primary.is-small [data-on-click=@post('/cart/add?id={product.Id}')]",
-                        [ Text "Add to Cart" ]) ]) ])
-
-let dashboardStatsComponent (stats: DashboardStats) =
-    h("div.columns.is-multiline",
-        [ h("div.column.is-4",
-              [ h("div.notification.is-primary",
-                    [ h("p.heading", [ Text "Total Users" ])
-                      h("p.title", [ Text (string stats.TotalUsers) ]) ]) ])
-          h("div.column.is-4",
-              [ h("div.notification.is-info",
-                    [ h("p.heading", [ Text "Active Orders" ])
-                      h("p.title", [ Text (string stats.ActiveOrders) ]) ]) ])
-          h("div.column.is-4",
-              [ h("div.notification.is-success",
-                    [ h("p.heading", [ Text "Revenue" ])
-                      h("p.title", [ Text $"${stats.Revenue:N0}" ]) ]) ]) ])
-
-let notificationComponent (message: string) (notifType: string) =
-    let bulmaClass =
-        match notifType with
-        | "success" -> "is-success"
-        | "warning" -> "is-warning"
-        | "error" | "danger" -> "is-danger"
-        | _ -> "is-info"
-
-    h($"div#notification.notification.{bulmaClass}",
-        [ h("button.delete", [])
-          Text message ])
-
-let dataTableComponent (headers: string list) (rows: string list list) =
-    h("table.table.is-fullwidth.is-striped.is-hoverable",
-        [ h("thead",
-              [ h("tr", fragment [ for header in headers do h("th", [ Text header ]) ]) ])
-          h("tbody",
-              fragment [ for row in rows do
-                           h("tr", fragment [ for cell in row do h("td", [ Text cell ]) ]) ]) ])
-
-// ===========================
-// DATASTAR ENDPOINTS
-// ===========================
-
-// Example 1: Load user cards (with count in path)
-let loadUsersWithCount =
-    resource "/load-users/{count}" {
-        name "LoadUsersWithCount"
-        datastar (fun ctx ->
-            task {
-                let count =
-                    match ctx.Request.RouteValues.TryGetValue("count") with
-                    | true, v -> int (string v)
-                    | _ -> 6
-
-                let! users = fetchUsersAsync count
-                let node = h("div#user-list.columns.is-multiline",
-                    fragment [ for user in users do
-                                 h("div.column.is-4", [ userCard user ]) ])
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 2: Load product catalog with filter form
-let loadCatalog =
-    resource "/load-catalog" {
-        name "LoadCatalog"
-        datastar (fun ctx ->
-            task {
-                // First send the filter form
-                let filterForm = h("div#filter-form",
-                    [ h("div.field",
-                          [ h("label.label", [ Text "Category" ])
-                            h("div.select.is-fullwidth",
-                                [ h("select [data-bind-category]",
-                                      [ h("option [value=]", [ Text "All" ])
-                                        h("option [value=electronics]", [ Text "Electronics" ])
-                                        h("option [value=furniture]", [ Text "Furniture" ]) ]) ]) ])
-                      h("div.field",
-                          [ h("label.checkbox",
-                                [ h("input [type=checkbox] [data-bind-inStockOnly]", [])
-                                  Text " In Stock Only" ]) ])
-                      h("button.button.is-primary.is-fullwidth [data-on-click=@get('/products/load')]",
-                          [ Text "Apply Filters" ]) ])
-
-                let! filterHtml = Render.asString filterForm
-                do! Datastar.patchElements filterHtml ctx
-
-                do! Task.Delay(100)
-
-                // Then send the products
-                let! products = fetchProductsAsync ""
-                let productGrid = h("div#product-grid.columns.is-multiline",
-                    fragment [ for product in products do
-                                 h("div.column.is-6", [ productCard product ]) ])
-                let! productHtml = Render.asString productGrid
-                do! Datastar.patchElements productHtml ctx
-            })
-    }
-
-// Example 3: Load dashboard
-let loadDashboard =
-    resource "/load-dashboard" {
-        name "LoadDashboard"
-        datastar (fun ctx ->
-            task {
-                let! stats = fetchDashboardStatsAsync()
-                let node = h("div#dashboard", [ dashboardStatsComponent stats ])
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 4: Refresh all sections
-let refreshAll =
-    resource "/refresh-all" {
-        name "RefreshAll"
-        datastar (fun ctx ->
-            task {
-                // Dashboard
-                let! stats = fetchDashboardStatsAsync()
-                let dashNode = h("div#dashboard", [ dashboardStatsComponent stats ])
-                let! dashHtml = Render.asString dashNode
-                do! Datastar.patchElements dashHtml ctx
-
-                do! Task.Delay(100)
-
-                // Users
-                let! users = fetchUsersAsync 3
-                let usersNode = h("div#user-list.columns.is-multiline",
-                    fragment [ for user in users do h("div.column.is-4", [ userCard user ]) ])
-                let! usersHtml = Render.asString usersNode
-                do! Datastar.patchElements usersHtml ctx
-
-                do! Task.Delay(100)
-
-                // Products
-                let! products = fetchProductsAsync ""
-                let productsNode = h("div#product-grid.columns.is-multiline",
-                    fragment [ for product in products do h("div.column.is-6", [ productCard product ]) ])
-                let! productsHtml = Render.asString productsNode
-                do! Datastar.patchElements productsHtml ctx
-            })
-    }
-
-// Example 5: Notifications
-let notify =
-    resource "/notify" {
-        name "Notify"
-        datastar HttpMethods.Post (fun ctx ->
-            task {
-                let message = ctx.Request.Query.["message"].ToString()
-                let notifType = ctx.Request.Query.["type"].ToString()
-
-                let node = notificationComponent message notifType
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 6: Data table
-let loadTable =
-    resource "/load-table" {
-        name "LoadTable"
-        datastar (fun ctx ->
-            task {
-                do! Task.Delay(200)
-
-                let headers = [ "Order ID"; "Date"; "Customer"; "Amount"; "Status" ]
-                let rows = [
-                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd"); "John Doe"; "$299.99"; "Shipped" ]
-                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-2).ToString("yyyy-MM-dd"); "Jane Smith"; "$149.50"; "Processing" ]
-                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-3).ToString("yyyy-MM-dd"); "Bob Wilson"; "$599.00"; "Delivered" ]
-                    [ $"#ORD-{Random.Shared.Next(1000, 9999)}"; DateTime.Now.AddDays(-4).ToString("yyyy-MM-dd"); "Alice Brown"; "$89.99"; "Pending" ]
-                ]
-
-                let node = h("div#data-table", [ dataTableComponent headers rows ])
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 7: Stream complex content
-let streamContent =
-    resource "/stream-content" {
-        name "StreamContent"
-        datastar (fun ctx ->
-            task {
-                // Header section
-                let timestamp = DateTime.Now.ToString("HH:mm:ss")
-                let header = h("div.hero.is-primary.is-small",
-                    [ h("div.hero-body",
-                          [ h("p.title", [ Text "Complex Layout" ])
-                            h("p.subtitle", [ Text $"Generated at {timestamp}" ]) ]) ])
-                let! headerHtml = Render.asString header
-                do! Datastar.patchElements $"""<div id="complex-layout">{headerHtml}</div>""" ctx
-
-                do! Task.Delay(300)
-
-                // Stats section
-                let! stats = fetchDashboardStatsAsync()
-                let statsNode = dashboardStatsComponent stats
-                let! statsHtml = Render.asString statsNode
-                do! Datastar.patchElements $"""<div id="complex-layout">{statsHtml}</div>""" ctx
-
-                do! Task.Delay(300)
-
-                // Users section
-                let! users = fetchUsersAsync 4
-                let usersNode = h("div.columns.is-multiline",
-                    fragment [ for user in users do h("div.column.is-3", [ userCard user ]) ])
-                let! usersHtml = Render.asString usersNode
-                do! Datastar.patchElements $"""<div id="complex-layout">{usersHtml}</div>""" ctx
-            })
-    }
-
-// Example 8: Products load endpoint
-let loadProductsEndpoint =
-    resource "/products/load" {
-        name "LoadProducts"
-        datastar (fun ctx ->
-            task {
-                let category = ctx.Request.Query.["category"].ToString()
-                let! products = fetchProductsAsync category
-
-                let node = h("div#product-grid.columns.is-multiline",
-                    fragment [ for product in products do
-                                 h("div.column.is-6", [ productCard product ]) ])
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
-            })
-    }
-
-// Example 9: Update user view
 [<CLIMutable>]
-type ViewModeSignals = { viewMode: string }
+type ContactSignals =
+    { firstName: string
+      lastName: string
+      email: string }
 
-let updateUserView =
-    resource "/update-user-view" {
-        name "UpdateUserView"
-        datastar HttpMethods.Post (fun ctx ->
+// User for bulk update pattern
+type UserStatus =
+    | Active
+    | Inactive
+
+type User =
+    { Id: int
+      Name: string
+      Email: string
+      Status: UserStatus }
+
+[<CLIMutable>]
+type BulkUpdateSignals = { selections: bool[] }
+
+// Item for row deletion pattern
+type Item = { Id: int; Name: string }
+
+// Registration for form validation pattern
+type Registration =
+    { Id: int
+      Email: string
+      FirstName: string
+      LastName: string }
+
+[<CLIMutable>]
+type RegistrationSignals =
+    { email: string
+      firstName: string
+      lastName: string }
+
+// ===========================
+// SSE CHANNELS (MailboxProcessor per section)
+// ===========================
+// Each demo section has its own SSE channel. The initial GET establishes
+// the SSE connection and awaits on the MailboxProcessor. Fire-and-forget
+// endpoints post updates to the MailboxProcessor.
+
+type SseEvent =
+    | PatchElements of html: string
+    | RemoveElement of selector: string
+    | PatchSignals of json: string
+    | Close
+
+type SseChannelMsg =
+    | Subscribe of replyChannel: AsyncReplyChannel<SseEvent>
+    | Broadcast of SseEvent
+
+/// Creates a new SSE channel (MailboxProcessor) for a demo section
+let createSseChannel () =
+    MailboxProcessor.Start(fun inbox ->
+        let subscribers = ResizeArray<AsyncReplyChannel<SseEvent>>()
+        let pendingEvents = System.Collections.Generic.Queue<SseEvent>()
+
+        let rec loop () =
+            async {
+                let! msg = inbox.Receive()
+
+                match msg with
+                | Subscribe replyChannel ->
+                    if pendingEvents.Count > 0 then
+                        replyChannel.Reply(pendingEvents.Dequeue())
+                    else
+                        subscribers.Add(replyChannel)
+                | Broadcast event ->
+                    if subscribers.Count > 0 then
+                        let subscriber = subscribers.[0]
+                        subscribers.RemoveAt(0)
+                        subscriber.Reply(event)
+                    else
+                        pendingEvents.Enqueue(event)
+
+                return! loop ()
+            }
+
+        loop ())
+
+// SSE channels for each RESTful demo section
+let contactChannel = createSseChannel ()
+let fruitsChannel = createSseChannel ()
+let itemsChannel = createSseChannel ()
+let usersChannel = createSseChannel ()
+let registrationChannel = createSseChannel ()
+
+// ===========================
+// IN-MEMORY DATA STORES
+// ===========================
+
+let mutable contacts: System.Collections.Generic.Dictionary<int, Contact> =
+    dict
+        [ 1,
+          { Contact.Id = 1
+            FirstName = "Joe"
+            LastName = "Smith"
+            Email = "joe@smith.org" } ]
+    |> System.Collections.Generic.Dictionary
+
+let fruits =
+    [ "Apple"
+      "Apricot"
+      "Banana"
+      "Blueberry"
+      "Cherry"
+      "Coconut"
+      "Date"
+      "Fig"
+      "Grape"
+      "Kiwi"
+      "Lemon"
+      "Lime"
+      "Mango"
+      "Orange"
+      "Papaya"
+      "Peach"
+      "Pear"
+      "Pineapple"
+      "Plum"
+      "Raspberry"
+      "Strawberry"
+      "Watermelon" ]
+
+let items =
+    ResizeArray
+        [ { Id = 1; Name = "Item 1" }
+          { Id = 2; Name = "Item 2" }
+          { Id = 3; Name = "Item 3" }
+          { Id = 4; Name = "Item 4" } ]
+
+let mutable users =
+    dict
+        [ 1,
+          { Id = 1
+            Name = "Joe Smith"
+            Email = "joe@smith.org"
+            Status = Active }
+          2,
+          { Id = 2
+            Name = "Jane Doe"
+            Email = "jane@doe.com"
+            Status = Inactive }
+          3,
+          { Id = 3
+            Name = "Bob Wilson"
+            Email = "bob@wilson.net"
+            Status = Active }
+          4,
+          { Id = 4
+            Name = "Alice Brown"
+            Email = "alice@brown.io"
+            Status = Inactive } ]
+    |> System.Collections.Generic.Dictionary
+
+let registrations = ResizeArray<Registration>()
+let mutable nextRegistrationId = 1
+
+// ===========================
+// SSE HELPER
+// ===========================
+
+let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
+    task {
+        match event with
+        | PatchElements html -> do! Datastar.patchElements html ctx
+        | RemoveElement selector -> do! Datastar.removeElement selector ctx
+        | PatchSignals json -> do! Datastar.patchSignals json ctx
+        | Close -> ()
+    }
+
+// ===========================
+// CONTACT RESOURCES (Click-to-Edit Pattern)
+// ===========================
+
+let renderContactView (contact: Contact) : ValueTask<string> =
+    let node =
+        h("div#contact-view", [
+            h("p", [ h("strong", [ Text "First Name:" ]); Text $" {contact.FirstName}" ])
+            h("p", [ h("strong", [ Text "Last Name:" ]); Text $" {contact.LastName}" ])
+            h("p", [ h("strong", [ Text "Email:" ]); Text $" {contact.Email}" ])
+            h($"button [data-on:click=@get('/contacts/{contact.Id}/edit')]", [ Text "Edit" ])
+        ])
+    Render.asString node
+
+let renderContactEdit (contact: Contact) : ValueTask<string> =
+    let node =
+        h($"div#contact-view [data-signals={{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}]", [
+            h("label", [ Text "First Name "; h("input [type=text] [data-bind:firstName]", []) ])
+            h("label", [ Text "Last Name "; h("input [type=text] [data-bind:lastName]", []) ])
+            h("label", [ Text "Email "; h("input [type=email] [data-bind:email]", []) ])
+            h($"button [data-on:click=@put('/contacts/{contact.Id}')]", [ Text "Save" ])
+            h($"button [data-on:click=@get('/contacts/{contact.Id}')]", [ Text "Cancel" ])
+        ])
+    Render.asString node
+
+// GET /contacts/{id} - Establishes SSE, sends initial view, awaits channel for updates
+let contactResource =
+    resource "/contacts/{id}" {
+        name "Contact"
+
+        get (fun (ctx: HttpContext) ->
             task {
-                let! signals = Datastar.tryReadSignals<ViewModeSignals> ctx
-                let! users = fetchUsersAsync 6
+                let id = ctx.Request.RouteValues["id"] |> string |> int
 
-                let node =
+                // Set up SSE response
+                ctx.Response.Headers.ContentType <- "text/event-stream"
+                ctx.Response.Headers.CacheControl <- "no-cache"
+
+                match contacts.TryGetValue(id) with
+                | true, (contact: Contact) ->
+                    // Send initial view
+                    let! html = renderContactView contact
+                    do! Datastar.patchElements html ctx
+
+                    // Keep connection open, await updates from channel
+                    let mutable keepOpen = true
+
+                    while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
+                        let! event = contactChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
+
+                        match event with
+                        | Close -> keepOpen <- false
+                        | _ -> do! writeSseEvent ctx event
+                | false, _ ->
+                    ctx.Response.StatusCode <- 404
+                    let errorNode = h("div#contact-view.error", [ Text "Contact not found." ])
+                    let! html = Render.asString errorNode
+                    do! Datastar.patchElements html ctx
+            })
+
+        // PUT /contacts/{id} - Fire-and-forget, updates data, posts to channel
+        put (fun (ctx: HttpContext) ->
+            task {
+                let id = ctx.Request.RouteValues["id"] |> string |> int
+
+                match contacts.TryGetValue(id) with
+                | true, _ ->
+                    let! signals = Datastar.tryReadSignals<ContactSignals> ctx
+
                     match signals with
-                    | ValueSome s when s.viewMode = "table" ->
-                        let headers = [ "ID"; "Name"; "Email" ]
-                        let rows = users |> List.map (fun u -> [ string u.Id; u.Name; u.Email ])
-                        h("div#user-list", [ dataTableComponent headers rows ])
-                    | _ ->
-                        h("div#user-list.columns.is-multiline",
-                            fragment [ for user in users do h("div.column.is-4", [ userCard user ]) ])
+                    | ValueSome s ->
+                        let updated: Contact =
+                            { Id = id
+                              FirstName = s.firstName
+                              LastName = s.lastName
+                              Email = s.email }
 
-                let! html = Render.asString node
-                do! Datastar.patchElements html ctx
+                        contacts[id] <- updated
+                        let! html = renderContactView updated
+                        contactChannel.Post(Broadcast(PatchElements html))
+                        ctx.Response.StatusCode <- 202
+                    | ValueNone -> ctx.Response.StatusCode <- 400
+                | false, _ -> ctx.Response.StatusCode <- 404
             })
     }
 
-// Example 10: Real-time updates
-let realtimeUpdate =
-    resource "/realtime-update" {
-        name "RealtimeUpdate"
-        datastar (fun ctx ->
+// GET /contacts/{id}/edit - Fire-and-forget, posts edit form to channel
+let contactEditResource =
+    resource "/contacts/{id}/edit" {
+        name "ContactEdit"
+
+        get (fun (ctx: HttpContext) ->
             task {
-                // Send notification
-                let messages = [
-                    ("New order received!", "success")
-                    ("User signed up", "info")
-                    ("Payment processed", "success")
-                    ("Stock running low", "warning")
-                ]
-                let (msg, typ) = messages.[Random.Shared.Next(messages.Length)]
-                let notifNode = notificationComponent msg typ
-                let! notifHtml = Render.asString notifNode
-                do! Datastar.patchElements notifHtml ctx
+                let id = ctx.Request.RouteValues["id"] |> string |> int
 
-                do! Task.Delay(100)
+                match contacts.TryGetValue(id) with
+                | true, (contact: Contact) ->
+                    let! html = renderContactEdit contact
+                    contactChannel.Post(Broadcast(PatchElements html))
+                    ctx.Response.StatusCode <- 202
+                | false, _ -> ctx.Response.StatusCode <- 404
+            })
+    }
 
-                // Update dashboard
-                let! stats = fetchDashboardStatsAsync()
-                let dashNode = h("div#dashboard", [ dashboardStatsComponent stats ])
-                let! dashHtml = Render.asString dashNode
-                do! Datastar.patchElements dashHtml ctx
+// ===========================
+// FRUITS RESOURCE (Search Pattern)
+// ===========================
+
+let renderFruitsList (filteredFruits: string list) : ValueTask<string> =
+    let node =
+        h("ul#fruits-list",
+            fragment [ for f in filteredFruits do h("li", [ Text f ]) ])
+    Render.asString node
+
+// GET /fruits - Establishes SSE or handles search query
+let fruitsResource =
+    resource "/fruits" {
+        name "Fruits"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                let query = ctx.Request.Query["q"].ToString()
+
+                // If this is a search query (has q param), post to channel (fire-and-forget)
+                if not (String.IsNullOrEmpty(query)) then
+                    let filtered =
+                        fruits
+                        |> List.filter (fun f -> f.Contains(query, StringComparison.OrdinalIgnoreCase))
+
+                    let! html = renderFruitsList filtered
+                    fruitsChannel.Post(Broadcast(PatchElements html))
+                    ctx.Response.StatusCode <- 202
+                else
+                    // Initial load - establish SSE, send full list, keep open
+                    ctx.Response.Headers.ContentType <- "text/event-stream"
+                    ctx.Response.Headers.CacheControl <- "no-cache"
+
+                    // Send initial full list
+                    let! html = renderFruitsList fruits
+                    do! Datastar.patchElements html ctx
+
+                    // Keep connection open for search updates
+                    let mutable keepOpen = true
+
+                    while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
+                        let! event = fruitsChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
+
+                        match event with
+                        | Close -> keepOpen <- false
+                        | _ -> do! writeSseEvent ctx event
+            })
+    }
+
+// ===========================
+// ITEMS RESOURCES (Delete Pattern)
+// ===========================
+
+let renderItemsTable (itemsList: ResizeArray<Item>) : ValueTask<string> =
+    let node =
+        h("table#items-table", [
+            h("thead", [
+                h("tr", [
+                    h("th", [ Text "Name" ])
+                    h("th", [ Text "Actions" ])
+                ])
+            ])
+            h("tbody#items-list",
+                fragment [
+                    for item in itemsList do
+                        h($"tr#item-{item.Id}", [
+                            h("td", [ Text item.Name ])
+                            h("td", [
+                                h($"button [data-on:click=confirm('Delete this item?') && @delete('/items/{item.Id}')]", [ Text "Delete" ])
+                            ])
+                        ])
+                ])
+        ])
+    Render.asString node
+
+// GET /items - Establishes SSE, sends table, keeps open for delete updates
+let itemsCollectionResource =
+    resource "/items" {
+        name "Items"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                ctx.Response.Headers.ContentType <- "text/event-stream"
+                ctx.Response.Headers.CacheControl <- "no-cache"
+
+                // Send initial table
+                let! html = renderItemsTable items
+                do! Datastar.patchElements html ctx
+
+                // Keep connection open for delete updates
+                let mutable keepOpen = true
+
+                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
+                    let! event = itemsChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
+
+                    match event with
+                    | Close -> keepOpen <- false
+                    | _ -> do! writeSseEvent ctx event
+            })
+    }
+
+// DELETE /items/{id} - Fire-and-forget, removes item, posts removeElement to channel
+let itemResource =
+    resource "/items/{id}" {
+        name "Item"
+
+        delete (fun (ctx: HttpContext) ->
+            task {
+                let id = ctx.Request.RouteValues["id"] |> string |> int
+
+                match items |> Seq.tryFindIndex (fun i -> i.Id = id) with
+                | Some idx ->
+                    items.RemoveAt(idx)
+                    itemsChannel.Post(Broadcast(RemoveElement $"#item-{id}"))
+                    ctx.Response.StatusCode <- 202
+                | None -> ctx.Response.StatusCode <- 404
+            })
+    }
+
+// ===========================
+// USERS RESOURCES (Bulk Update Pattern)
+// ===========================
+
+let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : ValueTask<string> =
+    let node =
+        h("div#users-table-container [data-signals={'selections': [false, false, false, false]}]", [
+            h("table", [
+                h("thead", [
+                    h("tr", [
+                        h("th", [
+                            h($"input [type=checkbox] [data-on:change=$selections = Array({usersList.Count}).fill($el.checked)]", [])
+                        ])
+                        h("th", [ Text "Name" ])
+                        h("th", [ Text "Email" ])
+                        h("th", [ Text "Status" ])
+                    ])
+                ])
+                h("tbody#users-list",
+                    fragment [
+                        for idx, user in usersList.Values |> Seq.indexed do
+                            let statusClass = if user.Status = Active then "status-active" else "status-inactive"
+                            let statusText = if user.Status = Active then "Active" else "Inactive"
+                            h("tr", [
+                                h("td", [
+                                    h($"input [type=checkbox] [data-bind:selections[{idx}]]", [])
+                                ])
+                                h("td", [ Text user.Name ])
+                                h("td", [ Text user.Email ])
+                                h($"td.{statusClass}", [ Text statusText ])
+                            ])
+                    ])
+            ])
+            h("button [data-on:click=@put('/users/bulk?status=active')]", [ Text "Activate Selected" ])
+            h("button [data-on:click=@put('/users/bulk?status=inactive')]", [ Text "Deactivate Selected" ])
+        ])
+    Render.asString node
+
+// GET /users - Establishes SSE, sends table, keeps open
+let usersCollectionResource =
+    resource "/users" {
+        name "Users"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                ctx.Response.Headers.ContentType <- "text/event-stream"
+                ctx.Response.Headers.CacheControl <- "no-cache"
+
+                let! html = renderUsersTable users
+                do! Datastar.patchElements html ctx
+
+                let mutable keepOpen = true
+
+                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
+                    let! event = usersChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
+
+                    match event with
+                    | Close -> keepOpen <- false
+                    | _ -> do! writeSseEvent ctx event
+            })
+    }
+
+// PUT /users/bulk - Fire-and-forget, updates selected users, posts new table to channel
+let usersBulkResource =
+    resource "/users/bulk" {
+        name "UsersBulk"
+
+        put (fun (ctx: HttpContext) ->
+            task {
+                let status = ctx.Request.Query["status"].ToString()
+                let! signals = Datastar.tryReadSignals<BulkUpdateSignals> ctx
+
+                match signals with
+                | ValueSome s ->
+                    let newStatus = if status = "active" then Active else Inactive
+                    let userIds = users.Keys |> Seq.toArray
+
+                    for i, selected in s.selections |> Array.indexed do
+                        if selected && i < userIds.Length then
+                            let userId = userIds[i]
+
+                            users[userId] <-
+                                { users[userId] with
+                                    Status = newStatus }
+
+                    let! html = renderUsersTable users
+                    usersChannel.Post(Broadcast(PatchElements html))
+                    ctx.Response.StatusCode <- 202
+                | ValueNone -> ctx.Response.StatusCode <- 400
+            })
+    }
+
+// ===========================
+// REGISTRATION RESOURCES (Form Validation Pattern)
+// ===========================
+
+let validateRegistration (signals: RegistrationSignals) : string list =
+    let errors = ResizeArray<string>()
+
+    if String.IsNullOrWhiteSpace(signals.email) then
+        errors.Add("Email is required")
+    elif not (signals.email.Contains("@")) then
+        errors.Add("Email must be valid")
+
+    if String.IsNullOrWhiteSpace(signals.firstName) then
+        errors.Add("First name is required")
+
+    if String.IsNullOrWhiteSpace(signals.lastName) then
+        errors.Add("Last name is required")
+
+    errors |> Seq.toList
+
+let renderValidationFeedback (errors: string list) : ValueTask<string> =
+    let node =
+        if errors.IsEmpty then
+            h("div#validation-feedback.success", [ Text "All fields valid!" ])
+        else
+            h("div#validation-feedback.error", [
+                h("ul", fragment [ for e in errors do h("li", [ Text e ]) ])
+            ])
+    Render.asString node
+
+let renderRegistrationSuccess (firstName: string) : ValueTask<string> =
+    let node = h("div#registration-result.success", [ Text $"Registration successful! Welcome, {firstName}." ])
+    Render.asString node
+
+let renderRegistrationForm () : ValueTask<string> =
+    let node =
+        h("div#registration-form [data-signals={'email': '', 'firstName': '', 'lastName': ''}]", [
+            h("div", [
+                h("label", [
+                    Text "Email "
+                    h("input [type=email] [data-bind:email] [data-on:input__debounce.500ms=@post('/registrations/validate')]", [])
+                ])
+            ])
+            h("div", [
+                h("label", [
+                    Text "First Name "
+                    h("input [type=text] [data-bind:firstName] [data-on:input__debounce.500ms=@post('/registrations/validate')]", [])
+                ])
+            ])
+            h("div", [
+                h("label", [
+                    Text "Last Name "
+                    h("input [type=text] [data-bind:lastName] [data-on:input__debounce.500ms=@post('/registrations/validate')]", [])
+                ])
+            ])
+            h("div#validation-feedback", [])
+            h("button [data-on:click=@post('/registrations')]", [ Text "Register" ])
+            h("div#registration-result", [])
+        ])
+    Render.asString node
+
+// GET /registrations/form - Returns the registration form and establishes SSE
+let registrationFormResource =
+    resource "/registrations/form" {
+        name "RegistrationForm"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                ctx.Response.Headers.ContentType <- "text/event-stream"
+                ctx.Response.Headers.CacheControl <- "no-cache"
+
+                let! html = renderRegistrationForm ()
+                do! Datastar.patchElements html ctx
+
+                let mutable keepOpen = true
+
+                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
+                    let! event = registrationChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
+
+                    match event with
+                    | Close -> keepOpen <- false
+                    | _ -> do! writeSseEvent ctx event
+            })
+    }
+
+// POST /registrations/validate - Fire-and-forget, validates and posts feedback to channel
+let registrationValidateResource =
+    resource "/registrations/validate" {
+        name "RegistrationValidate"
+
+        post (fun (ctx: HttpContext) ->
+            task {
+                let! signals = Datastar.tryReadSignals<RegistrationSignals> ctx
+
+                match signals with
+                | ValueSome s ->
+                    let errors = validateRegistration s
+                    let! html = renderValidationFeedback errors
+                    registrationChannel.Post(Broadcast(PatchElements html))
+                    ctx.Response.StatusCode <- 202
+                | ValueNone -> ctx.Response.StatusCode <- 400
+            })
+    }
+
+// POST /registrations - Fire-and-forget, creates registration, posts result to channel
+let registrationsResource =
+    resource "/registrations" {
+        name "Registrations"
+
+        post (fun (ctx: HttpContext) ->
+            task {
+                let! signals = Datastar.tryReadSignals<RegistrationSignals> ctx
+
+                match signals with
+                | ValueSome s ->
+                    let errors = validateRegistration s
+
+                    if errors.IsEmpty then
+                        // Check for duplicate email
+                        let isDuplicate = registrations |> Seq.exists (fun r -> r.Email = s.email)
+
+                        if isDuplicate then
+                            let errorNode = h("div#registration-result.error", [ Text "Email already registered." ])
+                            let! html = Render.asString errorNode
+                            registrationChannel.Post(Broadcast(PatchElements html))
+                            ctx.Response.StatusCode <- 409
+                        else
+                            let newReg: Registration =
+                                { Id = nextRegistrationId
+                                  Email = s.email
+                                  FirstName = s.firstName
+                                  LastName = s.lastName }
+
+                            registrations.Add(newReg)
+                            nextRegistrationId <- nextRegistrationId + 1
+                            let! html = renderRegistrationSuccess s.firstName
+                            registrationChannel.Post(Broadcast(PatchElements html))
+                            ctx.Response.StatusCode <- 201
+                    else
+                        let! html = renderValidationFeedback errors
+                        registrationChannel.Post(Broadcast(PatchElements html))
+                        ctx.Response.StatusCode <- 400
+                | ValueNone -> ctx.Response.StatusCode <- 400
             })
     }
 
@@ -406,33 +684,26 @@ let main args =
         plug DefaultFilesExtensions.UseDefaultFiles
         plug StaticFileExtensions.UseStaticFiles
 
-        // User endpoints
-        resource loadUsersWithCount
+        // RESTful Resource Patterns
+        // Click-to-Edit (Contact)
+        resource contactResource
+        resource contactEditResource
 
-        // Product endpoints
-        resource loadCatalog
-        resource loadProductsEndpoint
+        // Search (Fruits)
+        resource fruitsResource
 
-        // Dashboard
-        resource loadDashboard
+        // Delete (Items)
+        resource itemsCollectionResource
+        resource itemResource
 
-        // Multi-section refresh
-        resource refreshAll
+        // Bulk Update (Users)
+        resource usersCollectionResource
+        resource usersBulkResource
 
-        // Notifications
-        resource notify
-
-        // Data table
-        resource loadTable
-
-        // Streaming content
-        resource streamContent
-
-        // View mode toggle
-        resource updateUserView
-
-        // Real-time updates
-        resource realtimeUpdate
+        // Form Validation (Registration)
+        resource registrationFormResource
+        resource registrationValidateResource
+        resource registrationsResource
     }
 
     0
