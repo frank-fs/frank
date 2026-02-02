@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <!-- Required: Sample name to test (e.g., Frank.Datastar.Basic, Frank.Datastar.Hox, Frank.Datastar.Oxpecker) -->
+      <DATASTAR_SAMPLE></DATASTAR_SAMPLE>
+      <!-- Optional: Base URL of the running sample (default: http://localhost:5000) -->
+      <DATASTAR_BASE_URL>http://localhost:5000</DATASTAR_BASE_URL>
+      <!-- Optional: Timeout in milliseconds for SSE updates (default: 5000) -->
+      <DATASTAR_TIMEOUT_MS>5000</DATASTAR_TIMEOUT_MS>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

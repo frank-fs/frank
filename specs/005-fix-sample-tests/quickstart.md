@@ -1,208 +1,164 @@
-# Quickstart: Enhanced Sample Test Validation
-
-**Feature**: 005-fix-sample-tests
-**Date**: 2026-01-27
-
-## Overview
-
-This guide explains how to run and extend the enhanced test scripts for Frank.Datastar sample applications.
+# Quickstart: Frank.Datastar Browser Automation Tests
 
 ## Prerequisites
 
-- Bash shell (macOS, Linux, or WSL)
-- curl installed
-- .NET SDK (to run sample applications)
+- .NET 10.0 SDK
+- PowerShell (for Playwright browser installation)
 
-## Running Tests
+## Setup
 
-### 1. Start a Sample Application
+### 1. Install Playwright Browsers
+
+After building the test project for the first time:
 
 ```bash
-# Choose one sample to test
+cd sample/Frank.Datastar.Tests
+dotnet build
+pwsh bin/Debug/net10.0/playwright.ps1 install
+```
+
+This installs Chromium, Firefox, and WebKit browsers used by Playwright.
+
+### 2. Start a Sample Application
+
+In a separate terminal, start the sample you want to test:
+
+```bash
+# Option 1: Basic sample
 dotnet run --project sample/Frank.Datastar.Basic
-# OR
+
+# Option 2: Hox sample
 dotnet run --project sample/Frank.Datastar.Hox
-# OR
+
+# Option 3: Oxpecker sample
 dotnet run --project sample/Frank.Datastar.Oxpecker
 ```
 
-The server starts on port 5000 by default.
+The application will start on http://localhost:5000.
 
-### 2. Run the Test Script
+## Running Tests
 
-In a separate terminal:
-
-```bash
-# Run tests for the running sample
-./sample/Frank.Datastar.Basic/test.sh
-
-# Or specify a custom port
-./sample/Frank.Datastar.Basic/test.sh 5001
-```
-
-### 3. Interpret Results
-
-```
-========================================
-Frank.Datastar.Basic Test Results
-========================================
-
-=== Click-to-Edit Tests ===
-  [PASS] View contact shows current values
-  [PASS] Edit form displays current values
-  [FAIL] Save updates persist: Expected "Updated" but got "Joe"
-
-=== Search Tests ===
-  [PASS] Search "ap" returns Apple and Apricot
-  [FAIL] Search does not clear list: List was empty
-
-========================================
-SUMMARY: 8 passed, 2 failed
-========================================
-```
-
-- `[PASS]`: Test passed
-- `[FAIL]`: Test failed with explanation
-- Exit code: 0 if all pass, non-zero if any fail
-
-## Test Structure
-
-Each test script follows this structure:
+### Basic Usage
 
 ```bash
-#!/bin/bash
-# Test script for Frank.Datastar.{Sample}
-
-PORT=${1:-5000}
-BASE_URL="http://localhost:$PORT"
-SAMPLE_NAME="Frank.Datastar.{Sample}"
-
-PASS_COUNT=0
-FAIL_COUNT=0
-
-# Test helper function
-assert() {
-  local name="$1"
-  local condition="$2"
-  local message="$3"
-
-  if eval "$condition"; then
-    echo "  [PASS] $name"
-    PASS_COUNT=$((PASS_COUNT + 1))
-  else
-    echo "  [FAIL] $name: $message"
-    FAIL_COUNT=$((FAIL_COUNT + 1))
-  fi
-}
-
-# Server availability check
-check_server() {
-  if ! curl -s -o /dev/null "$BASE_URL/"; then
-    echo "ERROR: Server not running at $BASE_URL"
-    exit 1
-  fi
-}
-
-# Test sections...
-
-# Summary
-echo "========================================"
-echo "SUMMARY: $PASS_COUNT passed, $FAIL_COUNT failed"
-echo "========================================"
-exit $FAIL_COUNT
+# Specify which sample you're testing
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/
 ```
 
-## Adding New Tests
+**Note**: Some tests may fail - this is expected behavior. The test suite is designed to detect bugs in the sample applications. Test failures indicate bugs in the samples that need to be fixed, not issues with the test suite itself.
 
-### Basic Content Assertion
+### Windows (PowerShell)
 
-```bash
-echo "=== My New Tests ==="
-
-# Test that response contains expected content
-RESULT=$(curl -s -m 2 "$BASE_URL/endpoint")
-assert "Endpoint returns expected content" \
-  'echo "$RESULT" | grep -q "expected text"' \
-  "Content not found"
+```powershell
+$env:DATASTAR_SAMPLE="Frank.Datastar.Basic"
+dotnet test sample/Frank.Datastar.Tests/
 ```
 
-### State Change Verification
+### Windows (Command Prompt)
 
-```bash
-# Read initial state
-BEFORE=$(curl -s -m 2 "$BASE_URL/resource" | grep -c "pattern")
-
-# Perform operation
-curl -s -X PUT "$BASE_URL/resource" -d '{"data":"value"}'
-sleep 0.5  # Brief delay for processing
-
-# Verify state changed
-AFTER=$(curl -s -m 2 "$BASE_URL/resource" | grep -c "pattern")
-assert "Operation changed state" \
-  '[ "$AFTER" -ne "$BEFORE" ]' \
-  "State unchanged: before=$BEFORE, after=$AFTER"
+```cmd
+set DATASTAR_SAMPLE=Frank.Datastar.Basic
+dotnet test sample/Frank.Datastar.Tests/
 ```
 
-### Fire-and-Forget with Verification
+## Configuration Options
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DATASTAR_SAMPLE` | (required) | Sample name, e.g., `Frank.Datastar.Basic` |
+| `DATASTAR_BASE_URL` | `http://localhost:5000` | Base URL of running sample |
+| `DATASTAR_TIMEOUT_MS` | `5000` | Timeout for SSE updates in milliseconds |
+
+### Custom Timeout
+
+If tests are flaky due to slow updates:
 
 ```bash
-# Send fire-and-forget request
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/action")
-assert "Action accepted" '[ "$STATUS" = "202" ]' "HTTP $STATUS"
-
-# Verify effect via subsequent read
-sleep 0.5
-RESULT=$(curl -s -m 2 "$BASE_URL/resource")
-assert "Action had expected effect" \
-  'echo "$RESULT" | grep -q "expected change"' \
-  "Change not observed"
+DATASTAR_SAMPLE=Frank.Datastar.Hox DATASTAR_TIMEOUT_MS=10000 dotnet test sample/Frank.Datastar.Tests/
 ```
 
 ## Common Issues
 
-### SSE Timeout
+### "DATASTAR_SAMPLE environment variable required"
 
-SSE endpoints keep connections open. Use `-m 2` (2-second timeout) to capture initial response:
-
-```bash
-# Correct: with timeout
-RESULT=$(curl -s -m 2 "$BASE_URL/sse-endpoint")
-
-# Wrong: will hang forever
-RESULT=$(curl -s "$BASE_URL/sse-endpoint")
-```
-
-### Timing Issues
-
-If tests fail intermittently, add a brief delay before verification:
+You forgot to specify which sample to test. Set the environment variable:
 
 ```bash
-curl -s -X PUT "$BASE_URL/update"
-sleep 0.5  # Allow server to process
-RESULT=$(curl -s -m 2 "$BASE_URL/read")
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/
 ```
 
-### Checking for Absence
+### "Sample 'Frank.Datastar.Foo' not found"
 
-To verify something is NOT in the response:
+The specified sample doesn't exist. Check available samples:
 
 ```bash
-assert "Item removed" \
-  '! echo "$RESULT" | grep -q "deleted item"' \
-  "Item still present"
+ls sample/ | grep Frank.Datastar
 ```
 
-## Test Coverage Checklist
+### "Connection refused" or timeout on page load
 
-Each sample's test script should cover:
+The sample server isn't running. Start it in a separate terminal:
 
-- [ ] Server availability check
-- [ ] Click-to-edit: view shows values, edit shows values, save persists
-- [ ] Search: returns matches, doesn't return non-matches, handles empty
-- [ ] Bulk update: changes selected users, doesn't change unselected
-- [ ] Item deletion: removes item, returns 404 for non-existent
-- [ ] Registration: validation errors, validation success, create, duplicate
-- [ ] State isolation: registration doesn't affect contacts
-- [ ] 405 responses: incorrect methods rejected
-- [ ] Summary with pass/fail counts
-- [ ] Non-zero exit on failure
+```bash
+dotnet run --project sample/Frank.Datastar.Basic
+```
+
+### Tests pass locally but fail in CI
+
+Ensure Playwright browsers are installed in CI:
+
+```yaml
+# GitHub Actions example
+- name: Install Playwright
+  run: pwsh sample/Frank.Datastar.Tests/bin/Debug/net10.0/playwright.ps1 install
+```
+
+## Test Categories
+
+Run specific test categories:
+
+```bash
+# Click-to-edit tests only
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/ --filter "FullyQualifiedName~ClickToEdit"
+
+# Search filter tests only
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/ --filter "FullyQualifiedName~SearchFilter"
+
+# Bulk update tests only
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/ --filter "FullyQualifiedName~BulkUpdate"
+```
+
+## Test All Samples
+
+To test all samples sequentially:
+
+```bash
+#!/bin/bash
+for sample in Frank.Datastar.Basic Frank.Datastar.Hox Frank.Datastar.Oxpecker; do
+    echo "=== Testing $sample ==="
+    # Note: You need to restart the server for each sample
+    DATASTAR_SAMPLE=$sample dotnet test sample/Frank.Datastar.Tests/
+done
+```
+
+## Debugging Failed Tests
+
+### Run in headed mode (visible browser)
+
+Set the `HEADED` environment variable:
+
+```bash
+DATASTAR_SAMPLE=Frank.Datastar.Basic HEADED=1 dotnet test sample/Frank.Datastar.Tests/
+```
+
+### Verbose output
+
+```bash
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/ -v detailed
+```
+
+### Single test
+
+```bash
+DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/ --filter "TestName=EditFormShowsCurrentValues"
+```

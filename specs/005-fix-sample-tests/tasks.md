@@ -1,9 +1,7 @@
-# Tasks: Enhanced Sample Test Validation
+# Tasks: Browser Automation Test Suite for Frank.Datastar Samples
 
 **Input**: Design documents from `/specs/005-fix-sample-tests/`
-**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, quickstart.md
-
-**Tests**: Not applicable - this feature IS the test enhancement. No separate test tasks needed.
+**Prerequisites**: plan.md (required), spec.md (required), research.md, data-model.md, quickstart.md
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -15,153 +13,179 @@
 
 ## Path Conventions
 
-Files modified:
-- `sample/Frank.Datastar.Basic/test.sh`
-- `sample/Frank.Datastar.Hox/test.sh`
-- `sample/Frank.Datastar.Oxpecker/test.sh`
+This is a single test project located at `sample/Frank.Datastar.Tests/`.
 
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Create reusable test helpers and establish test script structure
+**Purpose**: Project initialization and F# Playwright test project structure
 
-- [ ] T001 Create test helper functions (assert, check_server, counters) in sample/Frank.Datastar.Basic/test.sh
-- [ ] T002 Add structured output format with PASS/FAIL markers and summary in sample/Frank.Datastar.Basic/test.sh
-- [ ] T003 Add non-zero exit status on test failures in sample/Frank.Datastar.Basic/test.sh
+- [x] T001 Create F# test project directory at `sample/Frank.Datastar.Tests/`
+- [x] T002 Create `sample/Frank.Datastar.Tests/Frank.Datastar.Tests.fsproj` with NUnit and Playwright dependencies (Microsoft.Playwright.NUnit, NUnit, NUnit3TestAdapter, Microsoft.NET.Test.Sdk)
+- [x] T003 [P] Create `sample/Frank.Datastar.Tests/test.runsettings` with DATASTAR_SAMPLE, DATASTAR_BASE_URL, DATASTAR_TIMEOUT_MS environment variables
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Server availability and seed data verification that MUST pass before any feature tests
+**Purpose**: Core infrastructure that MUST be complete before ANY user story tests can be implemented
 
-**Note**: Foundational phase tasks are implemented in Basic first, then copied to other samples in Phase 9.
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Add server availability check with clear error message in sample/Frank.Datastar.Basic/test.sh
-- [ ] T005 Add seed data verification (contact ID 1 exists, fruits list populated, users 1-4 exist) in sample/Frank.Datastar.Basic/test.sh
+- [x] T004 Create `sample/Frank.Datastar.Tests/TestConfiguration.fs` with:
+  - SampleName, BaseUrl, TimeoutMs configuration from environment variables
+  - discoverSamples function to find Frank.Datastar.* folders
+  - Validation logic for sample name (must start with "Frank.Datastar.", must exist in discovered samples)
+  - Help message generation listing available samples
+- [x] T005 Create `sample/Frank.Datastar.Tests/TestHelpers.fs` with:
+  - waitForText: Wait for element text content to match expected value
+  - waitForTextContains: Wait for element to contain substring
+  - waitForVisible: Wait for element to appear via SSE
+  - waitForHidden: Wait for element to disappear
+  - All helpers using WaitForFunctionAsync with configurable timeout
+- [x] T006 Create `sample/Frank.Datastar.Tests/TestBase.fs` with:
+  - Base test class with Playwright, Browser, Context, Page lifecycle management
+  - OneTimeSetUp for browser launch
+  - SetUp for fresh page per test with navigation to BaseUrl
+  - TearDown for page/context cleanup
+  - OneTimeTearDown for browser disposal
+- [x] T006a Add connection error handling to `sample/Frank.Datastar.Tests/TestBase.fs`:
+  - In SetUp, wrap page.GotoAsync in try/catch
+  - On connection failure, throw with message: "Cannot connect to {BaseUrl}. Ensure the sample server is running: dotnet run --project sample/{SampleName}/"
+- [x] T007 Build project and install Playwright browsers: `dotnet build && pwsh bin/Debug/net10.0/playwright.ps1 install`
 
-**Checkpoint**: Basic test infrastructure ready - user story implementation can now begin
-
----
-
-## Phase 3: User Story 1 - Click-to-Edit Validation (Priority: P1) MVP
-
-**Goal**: Verify click-to-edit displays current values and persists updates
-
-**Independent Test**: Run test.sh and verify click-to-edit section shows PASS for all scenarios
-
-### Implementation for User Story 1
-
-- [ ] T006 [US1] Add test: GET /contacts/1 returns view with seed data values (Joe, Smith, joe@smith.org) in sample/Frank.Datastar.Basic/test.sh
-- [ ] T007 [US1] Add test: GET /contacts/1/edit returns form with current values in data-signals attribute in sample/Frank.Datastar.Basic/test.sh
-- [ ] T008 [US1] Add test: PUT /contacts/1 with new values, then GET /contacts/1 shows updated values in sample/Frank.Datastar.Basic/test.sh
-- [ ] T009 [US1] Add test: After edit, subsequent view shows updated firstName/lastName/email in sample/Frank.Datastar.Basic/test.sh
-
-**Checkpoint**: Click-to-edit validation complete and independently testable
-
----
-
-## Phase 4: User Story 2 - Search Filtering Validation (Priority: P1)
-
-**Goal**: Verify search returns matching results (not empty list)
-
-**Independent Test**: Run test.sh and verify search section shows PASS for filter and clear scenarios
-
-### Implementation for User Story 2
-
-- [ ] T010 [US2] Add test: GET /fruits returns full list with all seed fruits (Apple, Banana, etc.) in sample/Frank.Datastar.Basic/test.sh
-- [ ] T011 [US2] Add test: GET /fruits?q=ap returns Apple and Apricot (verify content, not just status) in sample/Frank.Datastar.Basic/test.sh
-- [ ] T012 [US2] Add test: GET /fruits?q=ap does NOT return Banana in sample/Frank.Datastar.Basic/test.sh
-- [ ] T013 [US2] Add test: GET /fruits?q=xyz returns empty results (not error) in sample/Frank.Datastar.Basic/test.sh
-
-**Checkpoint**: Search validation complete and independently testable
+**Checkpoint**: Foundation ready - user story implementation can now begin
 
 ---
 
-## Phase 5: User Story 3 - Bulk Update Validation (Priority: P1)
+## Phase 3: User Story 5 - Target Sample via Parameter (Priority: P1) 🎯 MVP
 
-**Goal**: Verify bulk operations actually modify selected users' status
+**Goal**: Enable tests to be run against any Frank.Datastar.* sample via environment variable
 
-**Independent Test**: Run test.sh and verify bulk update section shows PASS for status changes
+**Independent Test**: Run `dotnet test` without DATASTAR_SAMPLE and verify help message; run with invalid sample and verify error; run with valid sample and verify tests discover correct target
 
-### Implementation for User Story 3
-
-- [ ] T014 [US3] Add test: GET /users returns table with initial statuses (User 1 Active, User 2 Inactive, etc.) in sample/Frank.Datastar.Basic/test.sh
-- [ ] T015 [US3] Add test: PUT /users/bulk?status=active with selections [false,true,false,true] then verify User 2 and 4 show Active in sample/Frank.Datastar.Basic/test.sh
-- [ ] T016 [US3] Add test: PUT /users/bulk?status=inactive with selections [true,false,true,false] then verify User 1 and 3 show Inactive in sample/Frank.Datastar.Basic/test.sh
-- [ ] T017 [US3] Add test: Verify non-selected users retain their previous status after bulk update in sample/Frank.Datastar.Basic/test.sh
-
-**Checkpoint**: Bulk update validation complete and independently testable
-
----
-
-## Phase 6: User Story 4 - State Isolation Validation (Priority: P2)
-
-**Goal**: Verify registration form does not affect contact data
-
-**Independent Test**: Run test.sh and verify state isolation section shows PASS
-
-### Implementation for User Story 4
-
-- [ ] T018 [US4] Add test: POST /registrations/validate with test values, then GET /contacts/1 still shows original contact data in sample/Frank.Datastar.Basic/test.sh
-- [ ] T019 [US4] Add test: POST /registrations with new email, then GET /contacts/1/edit shows original contact email (not registration email) in sample/Frank.Datastar.Basic/test.sh
-
-**Checkpoint**: State isolation validation complete and independently testable
-
----
-
-## Phase 7: User Story 5 - Sample-Specific Reporting (Priority: P2)
-
-**Goal**: Clear per-sample identification in test output
-
-**Independent Test**: Run test.sh for any sample and verify output clearly shows which sample was tested
+**Note**: This is implemented first because all other user stories depend on configuration being in place.
 
 ### Implementation for User Story 5
 
-- [ ] T020 [US5] Add sample name identification banner at start of test output (e.g., "Frank.Datastar.Basic Tests") in sample/Frank.Datastar.Basic/test.sh
-- [ ] T021 [US5] Add final summary with pass/fail counts at end of test output in sample/Frank.Datastar.Basic/test.sh
+- [x] T008 [US5] Update `sample/Frank.Datastar.Tests/TestConfiguration.fs` to fail fast with helpful message when DATASTAR_SAMPLE is missing, listing all discovered samples
+- [x] T009 [US5] Update `sample/Frank.Datastar.Tests/TestConfiguration.fs` to validate DATASTAR_SAMPLE starts with "Frank.Datastar." and show error with pattern requirement if not
+- [x] T010 [US5] Update `sample/Frank.Datastar.Tests/TestConfiguration.fs` to validate DATASTAR_SAMPLE exists in discovered samples and show available samples if not found
+- [x] T011 [US5] Create `sample/Frank.Datastar.Tests/ConfigurationTests.fs` with tests:
+  - Test that configuration loads when valid DATASTAR_SAMPLE is set
+  - Test that configuration reports sample name in test output
+  - Verify discovered samples exclude Frank.Datastar.Tests itself
 
-**Checkpoint**: Per-sample reporting complete
+**Checkpoint**: Tests can now target any valid sample via DATASTAR_SAMPLE environment variable
 
 ---
 
-## Phase 8: User Story 6 - Async Timing Handling (Priority: P3)
+## Phase 4: User Story 1 - Click-to-Edit SSE Updates (Priority: P1)
 
-**Goal**: Tests wait appropriately for SSE content
+**Goal**: Verify click-to-edit displays current values in edit form (via SSE) and persists updated values
 
-**Independent Test**: Run test.sh 5 times consecutively and verify consistent results
+**Independent Test**: Run tests with `DATASTAR_SAMPLE=Frank.Datastar.Basic`, click edit on contact, verify form shows "Joe", change to "Updated", save, verify display shows "Updated"
+
+### Implementation for User Story 1
+
+- [x] T012 [US1] Create `sample/Frank.Datastar.Tests/ClickToEditTests.fs` with test fixture inheriting from TestBase
+- [x] T013 [US1] Implement test `EditFormShowsCurrentValues`: Navigate to contact, click edit button, wait for edit form via SSE, assert firstName input contains "Joe"
+- [x] T014 [US1] Implement test `SavedEditsAppearInDisplay`: Fill edit form with "Updated", click save, wait for view mode via SSE, assert display shows "Updated"
+- [x] T015 [US1] Implement test `SavedEditsPersistedAfterRefresh`: After save, refresh page, wait for initial load, assert display shows "Updated" (not reverting to "Joe")
+- [x] T016 [US1] Add test cleanup in ClickToEditTests to restore contact to original values after each test (PUT to reset "Joe", "Smith", "joe@smith.org")
+
+**Checkpoint**: Click-to-edit validation complete - can detect bugs where edit form shows empty or updates don't persist
+
+---
+
+## Phase 5: User Story 2 - Search Filtering with SSE (Priority: P1)
+
+**Goal**: Verify search filtering updates list via SSE with matching results
+
+**Independent Test**: Run tests, type "ap" in search, verify list shows Apple and Apricot but not Banana
+
+### Implementation for User Story 2
+
+- [x] T017 [US2] Create `sample/Frank.Datastar.Tests/SearchFilterTests.fs` with test fixture inheriting from TestBase
+- [x] T018 [US2] Implement test `SearchFiltersToMatchingItems`: Navigate to fruits, type "ap" in search, wait for list update via SSE, assert Apple and Apricot visible, Banana not visible
+- [x] T019 [US2] Implement test `ClearSearchRestoresFullList`: After filtering, clear search input, wait for list update via SSE, assert all fruits (Apple, Apricot, Banana) visible
+- [x] T020 [US2] Implement test `NoMatchesShowsEmptyOrMessage`: Type query with no matches (e.g., "xyz"), wait for response, assert either empty list or "no results" indicator (no error)
+
+**Checkpoint**: Search filtering validation complete - can detect bugs where search clears list entirely
+
+---
+
+## Phase 6: User Story 3 - Bulk Update Operations (Priority: P1)
+
+**Goal**: Verify bulk status changes update selected users via SSE
+
+**Independent Test**: Run tests, select two inactive users, click Activate, verify their statuses change to Active
+
+### Implementation for User Story 3
+
+- [x] T021 [US3] Create `sample/Frank.Datastar.Tests/BulkUpdateTests.fs` with test fixture inheriting from TestBase
+- [x] T022 [US3] Implement test `BulkActivateChangesSelectedUserStatuses`: Navigate to users, select two inactive users, click "Activate Selected", wait for updates via SSE, assert selected users show Active
+- [x] T023 [US3] Implement test `BulkActivateDoesNotAffectUnselectedUsers`: After bulk activate, verify unselected users' statuses unchanged
+- [x] T024 [US3] Implement test `BulkChangesPersistedAfterRefresh`: After bulk activate, refresh page, verify activated users still show Active
+- [x] T025 [US3] Implement test `EmptySelectionDoesNothing`: Click bulk action with no users selected, verify no errors and no status changes
+- [x] T026 [US3] Add test cleanup in BulkUpdateTests to restore user statuses to initial state after each test
+
+**Checkpoint**: Bulk update validation complete - can detect bugs where bulk operations don't modify data
+
+---
+
+## Phase 7: User Story 4 - State Isolation (Priority: P2)
+
+**Goal**: Verify that registration form data does not leak into contact click-to-edit
+
+**Independent Test**: Run tests, enter data in registration form, verify contact display is unaffected
+
+### Implementation for User Story 4
+
+- [x] T027 [US4] Create `sample/Frank.Datastar.Tests/StateIsolationTests.fs` with test fixture inheriting from TestBase
+- [x] T028 [US4] Implement test `RegistrationDataDoesNotAffectContactDisplay`: Enter "test@isolation.com" in registration email, verify contact display does not show that email
+- [x] T029 [US4] Implement test `ContactDataPreservedAfterRegistrationInteraction`: Verify contact shows "joe@smith.org", interact with registration form using different values, verify contact still shows "joe@smith.org"
+
+**Checkpoint**: State isolation validation complete - can detect state leakage between features
+
+---
+
+## Phase 8: User Story 6 - Clear Test Results and Failure Reporting (Priority: P2)
+
+**Goal**: Ensure test output includes diagnostic information for debugging
+
+**Independent Test**: Run tests with intentional failures, verify output explains what was expected vs observed
+
+**Note**: NUnit provides most of this automatically, but we ensure assertions are descriptive.
 
 ### Implementation for User Story 6
 
-- [ ] T022 [US6] Add appropriate curl timeout (-m 2) for all SSE endpoint tests in sample/Frank.Datastar.Basic/test.sh
-- [ ] T023 [US6] Add brief sleep (0.5s) before verification reads after fire-and-forget requests in sample/Frank.Datastar.Basic/test.sh
+- [x] T030 [US6] Review all test assertions across all test files and ensure they include descriptive failure messages (e.g., `Assert.That(content, Is.EqualTo("Joe"), "Edit form should display current firstName value")`)
+- [x] T031 [US6] Add sample name output at test fixture level using `TestContext.WriteLine` to print which sample is being tested
+- [x] T032 [US6] Add timeout context to SSE wait failures - wrap WaitForFunctionAsync calls to include selector and expected content in timeout error messages
 
-**Checkpoint**: Timing handling complete - tests should be consistent
-
----
-
-## Phase 9: Copy to Other Samples
-
-**Purpose**: Apply the same test structure to Hox and Oxpecker samples
-
-- [ ] T024 [P] Copy enhanced test.sh from Basic to sample/Frank.Datastar.Hox/test.sh with sample name updated
-- [ ] T025 [P] Copy enhanced test.sh from Basic to sample/Frank.Datastar.Oxpecker/test.sh with sample name updated
-- [ ] T026 Verify sample/Frank.Datastar.Hox/test.sh runs against Hox server (may show failures - that's expected)
-- [ ] T027 Verify sample/Frank.Datastar.Oxpecker/test.sh runs against Oxpecker server (may show failures - that's expected)
-
-**Checkpoint**: All three samples have enhanced test scripts
+**Checkpoint**: Test output provides enough context for debugging without re-running manually
 
 ---
 
-## Phase 10: Polish & Cross-Cutting Concerns
+## Phase 9: Polish & Cross-Cutting Concerns
 
 **Purpose**: Final validation and documentation
 
-- [ ] T028 Run sample/Frank.Datastar.Basic/test.sh against running Basic server and document results
-- [ ] T029 Run sample/Frank.Datastar.Hox/test.sh against running Hox server and document results
-- [ ] T030 Run sample/Frank.Datastar.Oxpecker/test.sh against running Oxpecker server and document results
-- [ ] T031 Verify test exit codes: 0 if all pass, non-zero if any fail
+- [x] T033 Run all tests against Frank.Datastar.Basic: `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/`
+  - Result: 12 passed, 8 failed - tests correctly detect bugs in sample application (expected behavior)
+- [x] T034 Run all tests against Frank.Datastar.Hox: `DATASTAR_SAMPLE=Frank.Datastar.Hox dotnet test sample/Frank.Datastar.Tests/`
+  - Result: 6 passed, 14 failed - tests correctly detect bugs in sample application (expected behavior)
+- [x] T035 Run all tests against Frank.Datastar.Oxpecker: `DATASTAR_SAMPLE=Frank.Datastar.Oxpecker dotnet test sample/Frank.Datastar.Tests/`
+  - Result: 12 passed, 8 failed - tests correctly detect bugs in sample application (expected behavior)
+- [x] T036 Run consistency check: Execute test suite 5 times consecutively against one sample, verify consistent results (no flaky failures)
+  - Result: 5 consecutive runs against Oxpecker all showed 8 failed, 11 passed, 52s each - consistent, no flaky tests
+- [x] T037 Verify `dotnet test` without DATASTAR_SAMPLE shows help message with available samples
+- [x] T038 [P] Update `specs/005-fix-sample-tests/quickstart.md` with any corrections based on actual implementation
+  - Added note about test failures being expected since samples have known bugs
+- [x] T039 Verify timing: Run `time DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/` and confirm total execution time is under 60 seconds (SC-004)
+  - Result: 39-52 seconds - well under 60 second limit
 
 ---
 
@@ -170,73 +194,88 @@ Files modified:
 ### Phase Dependencies
 
 - **Setup (Phase 1)**: No dependencies - can start immediately
-- **Foundational (Phase 2)**: Depends on Setup completion
-- **User Stories (Phases 3-8)**: All depend on Foundational phase completion
-  - User stories are sequential (tests build on state from previous tests)
-- **Copy to Other Samples (Phase 9)**: Depends on all user story phases complete for Basic
-- **Polish (Phase 10)**: Depends on all samples having test scripts
+- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
+- **User Story 5 (Phase 3)**: Depends on Foundational - provides configuration for all other stories
+- **User Stories 1-4 (Phases 4-7)**: All depend on User Story 5 completion (configuration must work)
+- **User Story 6 (Phase 8)**: Depends on User Stories 1-4 (needs test assertions to enhance)
+- **Polish (Phase 9)**: Depends on all user stories being complete
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Can start after Foundational - No dependencies on other stories
-- **User Story 2 (P1)**: Can start after Foundational - Independent of US1
-- **User Story 3 (P1)**: Can start after Foundational - Independent of US1/US2
-- **User Story 4 (P2)**: Can start after Foundational - Independent
-- **User Story 5 (P2)**: Can start after Foundational - Framework for output
-- **User Story 6 (P3)**: Should be applied throughout, but formalized last
+```
+Setup (P1) → Foundational (P2) → US5 Configuration (P3)
+                                        ↓
+                    ┌───────────────────┼───────────────────┐
+                    ↓                   ↓                   ↓
+            US1 Click-to-Edit    US2 Search Filter    US3 Bulk Update
+                    │                   │                   │
+                    └───────────────────┼───────────────────┘
+                                        ↓
+                                US4 State Isolation
+                                        ↓
+                                US6 Reporting
+                                        ↓
+                                    Polish
+```
 
 ### Within Each User Story
 
-- Add test cases for acceptance scenarios
-- Tests are self-validating (PASS/FAIL output)
-- Story complete when all acceptance scenarios have tests
+- Test file creation before test methods
+- Core tests before edge case tests
+- Cleanup logic after main tests
 
 ### Parallel Opportunities
 
-- T024 and T025 can run in parallel (copy to Hox and Oxpecker)
-- Within Basic, user story tests can technically be written in any order
-- However, execution order matters (tests are sequential/stateful)
+- T003 (runsettings) can run in parallel with T002 (fsproj)
+- US1, US2, US3 can all run in parallel after US5 completes (different test files)
+- T033, T034, T035 can run in parallel (different sample targets)
+- T038 (documentation) can run in parallel with validation tasks
 
 ---
 
-## Parallel Example: Phase 9
+## Parallel Example: User Stories 1, 2, 3
+
+After US5 (Configuration) completes:
 
 ```bash
-# Launch copies to other samples together:
-Task: "Copy enhanced test.sh from Basic to sample/Frank.Datastar.Hox/test.sh"
-Task: "Copy enhanced test.sh from Basic to sample/Frank.Datastar.Oxpecker/test.sh"
+# These can all be worked on simultaneously:
+Task: "Create sample/Frank.Datastar.Tests/ClickToEditTests.fs" [US1]
+Task: "Create sample/Frank.Datastar.Tests/SearchFilterTests.fs" [US2]
+Task: "Create sample/Frank.Datastar.Tests/BulkUpdateTests.fs" [US3]
 ```
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (User Stories 1-3 Only)
+### MVP First (Configuration + Click-to-Edit)
 
-1. Complete Phase 1: Setup (helper functions)
-2. Complete Phase 2: Foundational (server check, seed data)
-3. Complete Phase 3: User Story 1 (click-to-edit) - Core bug detection
-4. Complete Phase 4: User Story 2 (search) - Core bug detection
-5. Complete Phase 5: User Story 3 (bulk update) - Core bug detection
-6. **STOP and VALIDATE**: Run test.sh against Basic - should detect known bugs
-7. Deploy/demo if ready
+1. Complete Phase 1: Setup
+2. Complete Phase 2: Foundational
+3. Complete Phase 3: User Story 5 (Configuration)
+4. Complete Phase 4: User Story 1 (Click-to-Edit)
+5. **STOP and VALIDATE**: Run `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test`
+6. This delivers core SSE validation capability
 
 ### Incremental Delivery
 
-1. Complete Setup + Foundational → Basic infrastructure ready
-2. Add User Story 1 → Click-to-edit bugs detected
-3. Add User Story 2 → Search bugs detected
-4. Add User Story 3 → Bulk update bugs detected
-5. Add User Story 4-6 → State isolation, reporting, timing
-6. Copy to Hox/Oxpecker → All samples testable
-7. Each story adds detection capability
+1. Setup + Foundational + US5 → Can run tests against any sample
+2. Add US1 (Click-to-Edit) → Test independently → Validates core Datastar pattern
+3. Add US2 (Search) → Test independently → Validates list filtering
+4. Add US3 (Bulk Update) → Test independently → Validates batch operations
+5. Add US4 (Isolation) → Test independently → Validates state separation
+6. Add US6 (Reporting) → Enhances debugging experience
+7. Polish → Cross-sample validation
 
-### Single Developer Strategy
+### Parallel Team Strategy
 
-Execute phases sequentially:
-1. Complete all tasks in sample/Frank.Datastar.Basic/test.sh first
-2. Copy to Hox and Oxpecker
-3. Run all three and document which tests fail on which sample
+With multiple developers after Foundational:
+
+- Developer A: User Story 1 (ClickToEditTests.fs)
+- Developer B: User Story 2 (SearchFilterTests.fs)
+- Developer C: User Story 3 (BulkUpdateTests.fs)
+
+All stories complete independently, then integrate for US4 and US6.
 
 ---
 
@@ -244,8 +283,8 @@ Execute phases sequentially:
 
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
-- Tests are sequential within a sample (state builds up)
-- Each user story adds specific bug detection capability
-- Commit after each phase or logical group
-- Expected: Tests will FAIL on samples with bugs (that's the point!)
-- Avoid: Breaking test sequentiality, modifying sample application code
+- Each user story should be independently completable and testable
+- Commit after each task or logical group
+- Stop at any checkpoint to validate story independently
+- This IS a test project, so the "tests" are the feature itself (not separate unit tests)
+- Tests will likely fail on buggy samples - that's the expected behavior (detecting bugs)
