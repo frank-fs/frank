@@ -50,8 +50,7 @@ type User =
       Status: UserStatus }
 
 [<CLIMutable>]
-type BulkUpdateSignals =
-    { selections: bool array }
+type BulkUpdateSignals = { selections: bool array }
 
 // Item for row deletion pattern
 type Item = { Id: int; Name: string }
@@ -93,36 +92,37 @@ type SseEvent =
     | RemoveElement of selector: string
     | PatchSignals of json: string
 
-/// Thread-safe collection of subscriber channels
-let private subscribersLock = obj()
-let private subscribers = ResizeArray<Channel<SseEvent>>()
+module SseEvent =
 
-/// Create a new subscriber channel for an SSE connection
-let subscribe () : Channel<SseEvent> =
-    let channel = Channel.CreateUnbounded<SseEvent>()
-    lock subscribersLock (fun () -> subscribers.Add(channel))
-    channel
+    /// Thread-safe collection of subscriber channels
+    let private subscribersLock = obj ()
+    let private subscribers = ResizeArray<Channel<SseEvent>>()
 
-/// Remove a subscriber channel when SSE connection closes
-let unsubscribe (channel: Channel<SseEvent>) =
-    lock subscribersLock (fun () -> subscribers.Remove(channel) |> ignore)
-    channel.Writer.Complete()
+    /// Create a new subscriber channel for an SSE connection
+    let subscribe () : Channel<SseEvent> =
+        let channel = Channel.CreateUnbounded<SseEvent>()
+        lock subscribersLock (fun () -> subscribers.Add(channel))
+        channel
 
-/// Broadcast an event to ALL active SSE connections
-let broadcast (event: SseEvent) =
-    lock subscribersLock (fun () ->
-        for ch in subscribers do
-            ch.Writer.TryWrite(event) |> ignore
-    )
+    /// Remove a subscriber channel when SSE connection closes
+    let unsubscribe (channel: Channel<SseEvent>) =
+        lock subscribersLock (fun () -> subscribers.Remove(channel) |> ignore)
+        channel.Writer.Complete()
 
-/// Helper to write SSE events to response
-let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
-    task {
-        match event with
-        | PatchElements html -> do! Datastar.patchElements html ctx
-        | RemoveElement selector -> do! Datastar.removeElement selector ctx
-        | PatchSignals json -> do! Datastar.patchSignals json ctx
-    }
+    /// Broadcast an event to ALL active SSE connections
+    let broadcast (event: SseEvent) =
+        lock subscribersLock (fun () ->
+            for ch in subscribers do
+                ch.Writer.TryWrite(event) |> ignore)
+
+    /// Helper to write SSE events to response
+    let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
+        task {
+            match event with
+            | PatchElements html -> do! Datastar.patchElements html ctx
+            | RemoveElement selector -> do! Datastar.removeElement selector ctx
+            | PatchSignals json -> do! Datastar.patchSignals json ctx
+        }
 
 // ===========================
 // STATIC DATA
@@ -220,7 +220,7 @@ let contactResource =
 
                 match contacts.TryGetValue(id) with
                 | true, (contact: Contact) ->
-                    broadcast (PatchElements(renderContactView contact))
+                    SseEvent.broadcast (PatchElements(renderContactView contact))
                     ctx.Response.StatusCode <- 202
                 | false, _ -> ctx.Response.StatusCode <- 404
             })
@@ -242,7 +242,7 @@ let contactResource =
                               Email = s.email }
 
                         contacts[id] <- updated
-                        broadcast (PatchElements(renderContactView updated))
+                        SseEvent.broadcast (PatchElements(renderContactView updated))
                         ctx.Response.StatusCode <- 202
                     | ValueNone -> ctx.Response.StatusCode <- 400
                 | false, _ -> ctx.Response.StatusCode <- 404
@@ -260,7 +260,7 @@ let contactEditResource =
 
                 match contacts.TryGetValue(id) with
                 | true, (contact: Contact) ->
-                    broadcast (PatchElements(renderContactEdit contact))
+                    SseEvent.broadcast (PatchElements(renderContactEdit contact))
                     ctx.Response.StatusCode <- 202
                 | false, _ -> ctx.Response.StatusCode <- 404
             })
@@ -287,9 +287,10 @@ let fruitsResource =
                     if String.IsNullOrEmpty(query) then
                         fruits
                     else
-                        fruits |> List.filter (fun f -> f.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        fruits
+                        |> List.filter (fun f -> f.Contains(query, StringComparison.OrdinalIgnoreCase))
 
-                broadcast (PatchElements(renderFruitsList filtered))
+                SseEvent.broadcast (PatchElements(renderFruitsList filtered))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -330,7 +331,7 @@ let itemsResource =
 
         get (fun (ctx: HttpContext) ->
             task {
-                broadcast (PatchElements(renderItemsTable items))
+                SseEvent.broadcast (PatchElements(renderItemsTable items))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -347,7 +348,7 @@ let itemResource =
                 match items |> Seq.tryFindIndex (fun i -> i.Id = id) with
                 | Some idx ->
                     items.RemoveAt(idx)
-                    broadcast (RemoveElement $"#item-{id}")
+                    SseEvent.broadcast (RemoveElement $"#item-{id}")
                     ctx.Response.StatusCode <- 202
                 | None -> ctx.Response.StatusCode <- 404
             })
@@ -400,7 +401,7 @@ let usersResource =
 
         get (fun (ctx: HttpContext) ->
             task {
-                broadcast (PatchElements(renderUsersTable users))
+                SseEvent.broadcast (PatchElements(renderUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -433,7 +434,7 @@ let usersBulkResource =
                             { users[userId] with
                                 Status = newStatus }
 
-                broadcast (PatchElements(renderUsersTable users))
+                SseEvent.broadcast (PatchElements(renderUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -489,7 +490,7 @@ let registrationFormResource =
 
         get (fun (ctx: HttpContext) ->
             task {
-                broadcast (PatchElements(renderRegistrationForm ()))
+                SseEvent.broadcast (PatchElements(renderRegistrationForm ()))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -506,7 +507,7 @@ let registrationValidateResource =
                 match signals with
                 | ValueSome s ->
                     let errors = validateRegistration s
-                    broadcast (PatchElements(renderValidationFeedback errors))
+                    SseEvent.broadcast (PatchElements(renderValidationFeedback errors))
                     ctx.Response.StatusCode <- 202
                 | ValueNone -> ctx.Response.StatusCode <- 400
             })
@@ -530,11 +531,12 @@ let registrationsResource =
                         let isDuplicate = registrations |> Seq.exists (fun r -> r.Email = s.email)
 
                         if isDuplicate then
-                            broadcast (
+                            SseEvent.broadcast (
                                 PatchElements(
                                     """<div id="registration-result" class="error">Email already registered.</div>"""
                                 )
                             )
+
                             ctx.Response.StatusCode <- 409
                         else
                             let newReg: Registration =
@@ -545,10 +547,10 @@ let registrationsResource =
 
                             registrations.Add(newReg)
                             nextRegistrationId <- nextRegistrationId + 1
-                            broadcast (PatchElements(renderRegistrationSuccess s.firstName))
+                            SseEvent.broadcast (PatchElements(renderRegistrationSuccess s.firstName))
                             ctx.Response.StatusCode <- 201
                     else
-                        broadcast (PatchElements(renderValidationFeedback errors))
+                        SseEvent.broadcast (PatchElements(renderValidationFeedback errors))
                         ctx.Response.StatusCode <- 400
                 | ValueNone -> ctx.Response.StatusCode <- 400
             })
@@ -566,21 +568,21 @@ let sseResource =
         datastar (fun (ctx: HttpContext) ->
             task {
                 // Subscribe to broadcasts for this connection
-                let myChannel = subscribe ()
+                let myChannel = SseEvent.subscribe ()
 
                 try
                     // No initial data push - "Load X" buttons trigger data loads
                     // Keep connection open, forwarding events from our channel
                     while not ctx.RequestAborted.IsCancellationRequested do
                         let! event = myChannel.Reader.ReadAsync(ctx.RequestAborted).AsTask()
-                        do! writeSseEvent ctx event
+                        do! SseEvent.writeSseEvent ctx event
                 with
                 | :? OperationCanceledException -> ()
                 | :? ChannelClosedException -> ()
                 | _ -> ()
 
                 // Clean up subscription when connection closes
-                unsubscribe myChannel
+                SseEvent.unsubscribe myChannel
             })
     }
 
