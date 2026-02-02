@@ -46,4 +46,4 @@ jobs:
           API_KEY: ${{ secrets.NUGET_API_KEY }}
           SOURCE: "https://api.nuget.org/v3/index.json"
         run: |
-          dotnet nuget push out/*.*nupkg --source $SOURCE --api-key $API_KEY
+          dotnet nuget push out/*.*nupkg --source $SOURCE --api-key $API_KEY --skip-duplicate
