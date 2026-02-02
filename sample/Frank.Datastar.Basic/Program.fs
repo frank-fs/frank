@@ -2,6 +2,8 @@ module Example
 
 open System
 open System.Text.Json
+open System.Threading
+open System.Threading.Channels
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
@@ -32,8 +34,8 @@ type Contact =
 
 [<CLIMutable>]
 type ContactSignals =
-    { firstName: string
-      lastName: string
+    { firstname: string
+      lastname: string
       email: string }
 
 // User for bulk update pattern
@@ -48,7 +50,8 @@ type User =
       Status: UserStatus }
 
 [<CLIMutable>]
-type BulkUpdateSignals = { selections: bool[] }
+type BulkUpdateSignals =
+    { selections: bool array }
 
 // Item for row deletion pattern
 type Item = { Id: int; Name: string }
@@ -80,57 +83,50 @@ let mutable contacts: System.Collections.Generic.Dictionary<int, Contact> =
     |> System.Collections.Generic.Dictionary
 
 // ===========================
-// SSE CHANNELS (MailboxProcessor per section)
+// SSE BROADCAST INFRASTRUCTURE
 // ===========================
-// Each demo section has its own SSE channel. The initial GET establishes
-// the SSE connection and awaits on the MailboxProcessor. Fire-and-forget
-// endpoints post updates to the MailboxProcessor.
+// Multiple SSE connections can exist (e.g., multiple browser tabs, parallel tests).
+// Each connection subscribes to receive ALL broadcasts.
 
 type SseEvent =
     | PatchElements of html: string
     | RemoveElement of selector: string
     | PatchSignals of json: string
-    | Close
 
-type SseChannelMsg =
-    | Subscribe of replyChannel: AsyncReplyChannel<SseEvent>
-    | Broadcast of SseEvent
+/// Thread-safe collection of subscriber channels
+let private subscribersLock = obj()
+let private subscribers = ResizeArray<Channel<SseEvent>>()
 
-/// Creates a new SSE channel (MailboxProcessor) for a demo section
-let createSseChannel () =
-    MailboxProcessor.Start(fun inbox ->
-        let subscribers = ResizeArray<AsyncReplyChannel<SseEvent>>()
-        let pendingEvents = System.Collections.Generic.Queue<SseEvent>()
+/// Create a new subscriber channel for an SSE connection
+let subscribe () : Channel<SseEvent> =
+    let channel = Channel.CreateUnbounded<SseEvent>()
+    lock subscribersLock (fun () -> subscribers.Add(channel))
+    channel
 
-        let rec loop () =
-            async {
-                let! msg = inbox.Receive()
+/// Remove a subscriber channel when SSE connection closes
+let unsubscribe (channel: Channel<SseEvent>) =
+    lock subscribersLock (fun () -> subscribers.Remove(channel) |> ignore)
+    channel.Writer.Complete()
 
-                match msg with
-                | Subscribe replyChannel ->
-                    if pendingEvents.Count > 0 then
-                        replyChannel.Reply(pendingEvents.Dequeue())
-                    else
-                        subscribers.Add(replyChannel)
-                | Broadcast event ->
-                    if subscribers.Count > 0 then
-                        let subscriber = subscribers.[0]
-                        subscribers.RemoveAt(0)
-                        subscriber.Reply(event)
-                    else
-                        pendingEvents.Enqueue(event)
+/// Broadcast an event to ALL active SSE connections
+let broadcast (event: SseEvent) =
+    lock subscribersLock (fun () ->
+        for ch in subscribers do
+            ch.Writer.TryWrite(event) |> ignore
+    )
 
-                return! loop ()
-            }
+/// Helper to write SSE events to response
+let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
+    task {
+        match event with
+        | PatchElements html -> do! Datastar.patchElements html ctx
+        | RemoveElement selector -> do! Datastar.removeElement selector ctx
+        | PatchSignals json -> do! Datastar.patchSignals json ctx
+    }
 
-        loop ())
-
-// SSE channels for each RESTful demo section
-let contactChannel = createSseChannel ()
-let fruitsChannel = createSseChannel ()
-let itemsChannel = createSseChannel ()
-let usersChannel = createSseChannel ()
-let registrationChannel = createSseChannel ()
+// ===========================
+// STATIC DATA
+// ===========================
 
 let fruits =
     [ "Apple"
@@ -193,15 +189,8 @@ let mutable nextRegistrationId = 1
 // ===========================
 // RESTFUL RESOURCE PATTERNS
 // ===========================
-// These examples demonstrate proper HTTP resource semantics:
-// - Resource URLs (nouns, not verbs): /contacts/{id}, /fruits, /items/{id}
-// - HTTP methods match semantics: GET=retrieve, PUT=update, DELETE=remove, POST=create
-// - Query parameters for filtering: /fruits?q=term
-// - Sub-resources for representations: /contacts/{id}/edit
-// ===========================
 
 // --- Click-to-Edit Pattern (Contact Resource) ---
-// Demonstrates: GET establishes SSE, edit/save are fire-and-forget via channel
 
 let inline renderContactView (contact: Contact) : string =
     $"""<div id="contact-view">
@@ -212,25 +201,15 @@ let inline renderContactView (contact: Contact) : string =
     </div>"""
 
 let inline renderContactEdit (contact: Contact) : string =
-    $"""<div id="contact-view" data-signals="{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}">
-        <label>First Name <input type="text" data-bind:firstName /></label>
-        <label>Last Name <input type="text" data-bind:lastName /></label>
+    $"""<div id="contact-view" data-signals="{{'firstname': '{contact.FirstName}', 'lastname': '{contact.LastName}', 'email': '{contact.Email}'}}">
+        <label>First Name <input type="text" data-bind:firstname /></label>
+        <label>Last Name <input type="text" data-bind:lastname /></label>
         <label>Email <input type="email" data-bind:email /></label>
         <button data-on:click="@put('/contacts/{contact.Id}')">Save</button>
         <button data-on:click="@get('/contacts/{contact.Id}')">Cancel</button>
     </div>"""
 
-// Helper to write SSE events to response
-let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
-    task {
-        match event with
-        | PatchElements html -> do! Datastar.patchElements html ctx
-        | RemoveElement selector -> do! Datastar.removeElement selector ctx
-        | PatchSignals json -> do! Datastar.patchSignals json ctx
-        | Close -> ()
-    }
-
-// GET /contacts/{id} - Establishes SSE, sends initial view, awaits channel for updates
+// Contact resource - GET retrieves data, PUT updates data, broadcasts to channel
 let contactResource =
     resource "/contacts/{id}" {
         name "Contact"
@@ -239,30 +218,13 @@ let contactResource =
             task {
                 let id = ctx.Request.RouteValues["id"] |> string |> int
 
-                // Set up SSE response
-                ctx.Response.Headers.ContentType <- "text/event-stream"
-                ctx.Response.Headers.CacheControl <- "no-cache"
-
                 match contacts.TryGetValue(id) with
                 | true, (contact: Contact) ->
-                    // Send initial view
-                    do! Datastar.patchElements (renderContactView contact) ctx
-
-                    // Keep connection open, await updates from channel
-                    let mutable keepOpen = true
-
-                    while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
-                        let! event = contactChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
-
-                        match event with
-                        | Close -> keepOpen <- false
-                        | _ -> do! writeSseEvent ctx event
-                | false, _ ->
-                    ctx.Response.StatusCode <- 404
-                    do! Datastar.patchElements """<div id="contact-view" class="error">Contact not found.</div>""" ctx
+                    broadcast (PatchElements(renderContactView contact))
+                    ctx.Response.StatusCode <- 202
+                | false, _ -> ctx.Response.StatusCode <- 404
             })
 
-        // PUT /contacts/{id} - Fire-and-forget, updates data, posts to channel
         put (fun (ctx: HttpContext) ->
             task {
                 let id = ctx.Request.RouteValues["id"] |> string |> int
@@ -275,19 +237,19 @@ let contactResource =
                     | ValueSome s ->
                         let updated: Contact =
                             { Id = id
-                              FirstName = s.firstName
-                              LastName = s.lastName
+                              FirstName = s.firstname
+                              LastName = s.lastname
                               Email = s.email }
 
                         contacts[id] <- updated
-                        contactChannel.Post(Broadcast(PatchElements(renderContactView updated)))
+                        broadcast (PatchElements(renderContactView updated))
                         ctx.Response.StatusCode <- 202
                     | ValueNone -> ctx.Response.StatusCode <- 400
                 | false, _ -> ctx.Response.StatusCode <- 404
             })
     }
 
-// GET /contacts/{id}/edit - Fire-and-forget, posts edit form to channel
+// Contact edit - broadcasts edit form to channel
 let contactEditResource =
     resource "/contacts/{id}/edit" {
         name "ContactEdit"
@@ -298,22 +260,21 @@ let contactEditResource =
 
                 match contacts.TryGetValue(id) with
                 | true, (contact: Contact) ->
-                    contactChannel.Post(Broadcast(PatchElements(renderContactEdit contact)))
+                    broadcast (PatchElements(renderContactEdit contact))
                     ctx.Response.StatusCode <- 202
                 | false, _ -> ctx.Response.StatusCode <- 404
             })
     }
 
 // --- Search Pattern (Fruits Collection) ---
-// Demonstrates: GET establishes SSE with initial list, search queries post filtered results
 
 let inline renderFruitsList (filteredFruits: string list) : string =
     let items =
         filteredFruits |> List.map (fun f -> $"<li>{f}</li>") |> String.concat ""
+    // Use min-height to ensure empty list remains visible for Playwright
+    $"""<ul id="fruits-list" style="min-height: 1em;">{items}</ul>"""
 
-    $"""<ul id="fruits-list">{items}</ul>"""
-
-// GET /fruits - Establishes SSE or handles search query
+// Fruits search - broadcasts filtered or full fruit list
 let fruitsResource =
     resource "/fruits" {
         name "Fruits"
@@ -322,36 +283,18 @@ let fruitsResource =
             task {
                 let query = ctx.Request.Query["q"].ToString()
 
-                // If this is a search query (has q param), post to channel (fire-and-forget)
-                if not (String.IsNullOrEmpty(query)) then
-                    let filtered =
+                let filtered =
+                    if String.IsNullOrEmpty(query) then
                         fruits
-                        |> List.filter (fun f -> f.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    else
+                        fruits |> List.filter (fun f -> f.Contains(query, StringComparison.OrdinalIgnoreCase))
 
-                    fruitsChannel.Post(Broadcast(PatchElements(renderFruitsList filtered)))
-                    ctx.Response.StatusCode <- 202
-                else
-                    // Initial load - establish SSE, send full list, keep open
-                    ctx.Response.Headers.ContentType <- "text/event-stream"
-                    ctx.Response.Headers.CacheControl <- "no-cache"
-
-                    // Send initial full list
-                    do! Datastar.patchElements (renderFruitsList fruits) ctx
-
-                    // Keep connection open for search updates
-                    let mutable keepOpen = true
-
-                    while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
-                        let! event = fruitsChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
-
-                        match event with
-                        | Close -> keepOpen <- false
-                        | _ -> do! writeSseEvent ctx event
+                broadcast (PatchElements(renderFruitsList filtered))
+                ctx.Response.StatusCode <- 202
             })
     }
 
 // --- Delete Pattern (Items Collection) ---
-// Demonstrates: GET establishes SSE with list, DELETE is fire-and-forget
 
 let inline renderItemsTable (itemsList: ResizeArray<Item>) : string =
     let rows =
@@ -368,32 +311,31 @@ let inline renderItemsTable (itemsList: ResizeArray<Item>) : string =
         <tbody id="items-list">{rows}</tbody>
     </table>"""
 
-// GET /items - Establishes SSE, sends table, keeps open for delete updates
-let itemsCollectionResource =
+// Debug endpoint to test if input events fire
+let debugPingResource =
+    resource "/debug/ping" {
+        name "DebugPing"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                printfn "DEBUG: Input event received!"
+                ctx.Response.StatusCode <- 200
+            })
+    }
+
+// GET /items - Fire-and-forget: broadcasts items table to SSE channel
+let itemsResource =
     resource "/items" {
         name "Items"
 
         get (fun (ctx: HttpContext) ->
             task {
-                ctx.Response.Headers.ContentType <- "text/event-stream"
-                ctx.Response.Headers.CacheControl <- "no-cache"
-
-                // Send initial table
-                do! Datastar.patchElements (renderItemsTable items) ctx
-
-                // Keep connection open for delete updates
-                let mutable keepOpen = true
-
-                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
-                    let! event = itemsChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
-
-                    match event with
-                    | Close -> keepOpen <- false
-                    | _ -> do! writeSseEvent ctx event
+                broadcast (PatchElements(renderItemsTable items))
+                ctx.Response.StatusCode <- 202
             })
     }
 
-// DELETE /items/{id} - Fire-and-forget, removes item, posts removeElement to channel
+// DELETE /items/{id} - Fire-and-forget: removes item, broadcasts to channel
 let itemResource =
     resource "/items/{id}" {
         name "Item"
@@ -405,19 +347,18 @@ let itemResource =
                 match items |> Seq.tryFindIndex (fun i -> i.Id = id) with
                 | Some idx ->
                     items.RemoveAt(idx)
-                    itemsChannel.Post(Broadcast(RemoveElement $"#item-{id}"))
+                    broadcast (RemoveElement $"#item-{id}")
                     ctx.Response.StatusCode <- 202
                 | None -> ctx.Response.StatusCode <- 404
             })
     }
 
 // --- Bulk Update Pattern (Users Collection) ---
-// Demonstrates: GET establishes SSE with table, PUT bulk is fire-and-forget
 
 let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : string =
     let rows =
         usersList.Values
-        |> Seq.mapi (fun idx user ->
+        |> Seq.map (fun user ->
             let statusClass =
                 if user.Status = Active then
                     "status-active"
@@ -427,18 +368,20 @@ let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<in
             let statusText = if user.Status = Active then "Active" else "Inactive"
 
             $"""<tr>
-                <td><input type="checkbox" data-bind:selections[{idx}] /></td>
+                <td><input type="checkbox" data-bind:selections /></td>
                 <td>{user.Name}</td>
                 <td>{user.Email}</td>
                 <td class="{statusClass}">{statusText}</td>
             </tr>""")
         |> String.concat ""
 
-    $"""<div id="users-table-container" data-signals="{{'selections': [false, false, false, false]}}">
+    // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
+    // data-bind:selections on checkboxes automatically manages the boolean array
+    $"""<div id="users-table-container" data-signals__ifmissing="{{selections: Array(4).fill(false)}}">
         <table>
             <thead>
                 <tr>
-                    <th><input type="checkbox" data-on:change="$selections = Array({usersList.Count}).fill($el.checked)" /></th>
+                    <th><input type="checkbox" data-bind:_all data-on:change="$selections = Array(4).fill($_all)" data-effect="$selections; $_all = $selections.every(Boolean)" /></th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Status</th>
@@ -450,30 +393,19 @@ let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<in
         <button data-on:click="@put('/users/bulk?status=inactive')">Deactivate Selected</button>
     </div>"""
 
-// GET /users - Establishes SSE, sends table, keeps open
-let usersCollectionResource =
+// GET /users - Fire-and-forget: broadcasts users table to SSE channel
+let usersResource =
     resource "/users" {
         name "Users"
 
         get (fun (ctx: HttpContext) ->
             task {
-                ctx.Response.Headers.ContentType <- "text/event-stream"
-                ctx.Response.Headers.CacheControl <- "no-cache"
-
-                do! Datastar.patchElements (renderUsersTable users) ctx
-
-                let mutable keepOpen = true
-
-                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
-                    let! event = usersChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
-
-                    match event with
-                    | Close -> keepOpen <- false
-                    | _ -> do! writeSseEvent ctx event
+                broadcast (PatchElements(renderUsersTable users))
+                ctx.Response.StatusCode <- 202
             })
     }
 
-// PUT /users/bulk - Fire-and-forget, updates selected users, posts new table to channel
+// PUT /users/bulk - Fire-and-forget: updates selected users, broadcasts to channel
 let usersBulkResource =
     resource "/users/bulk" {
         name "UsersBulk"
@@ -481,29 +413,32 @@ let usersBulkResource =
         put (fun (ctx: HttpContext) ->
             task {
                 let status = ctx.Request.Query["status"].ToString()
+
+                // Read selections array from signals using Datastar's standard pattern
                 let! signals = Datastar.tryReadSignals<BulkUpdateSignals> ctx
 
-                match signals with
-                | ValueSome s ->
-                    let newStatus = if status = "active" then Active else Inactive
-                    let userIds = users.Keys |> Seq.toArray
+                let selections =
+                    match signals with
+                    | ValueSome s -> s.selections
+                    | ValueNone -> [||]
 
-                    for i, selected in s.selections |> Array.indexed do
-                        if selected && i < userIds.Length then
-                            let userId = userIds[i]
+                let newStatus = if status = "active" then Active else Inactive
+                let userIds = users.Keys |> Seq.toArray
 
-                            users[userId] <-
-                                { users[userId] with
-                                    Status = newStatus }
+                for i, selected in selections |> Array.indexed do
+                    if selected && i < userIds.Length then
+                        let userId = userIds[i]
 
-                    usersChannel.Post(Broadcast(PatchElements(renderUsersTable users)))
-                    ctx.Response.StatusCode <- 202
-                | ValueNone -> ctx.Response.StatusCode <- 400
+                        users[userId] <-
+                            { users[userId] with
+                                Status = newStatus }
+
+                broadcast (PatchElements(renderUsersTable users))
+                ctx.Response.StatusCode <- 202
             })
     }
 
 // --- Form Validation Pattern (Registration) ---
-// Demonstrates: POST /validate streams feedback, POST /registrations creates with validation
 
 let validateRegistration (signals: RegistrationSignals) : string list =
     let errors = ResizeArray<string>()
@@ -547,30 +482,19 @@ let inline renderRegistrationForm () : string =
         <div id="registration-result"></div>
     </div>"""
 
-// GET /registrations/form - Returns the registration form and establishes SSE
+// GET /registrations/form - Fire-and-forget: broadcasts registration form to channel
 let registrationFormResource =
     resource "/registrations/form" {
         name "RegistrationForm"
 
         get (fun (ctx: HttpContext) ->
             task {
-                ctx.Response.Headers.ContentType <- "text/event-stream"
-                ctx.Response.Headers.CacheControl <- "no-cache"
-
-                do! Datastar.patchElements (renderRegistrationForm ()) ctx
-
-                let mutable keepOpen = true
-
-                while keepOpen && not ctx.RequestAborted.IsCancellationRequested do
-                    let! event = registrationChannel.PostAndAsyncReply(Subscribe) |> Async.StartAsTask
-
-                    match event with
-                    | Close -> keepOpen <- false
-                    | _ -> do! writeSseEvent ctx event
+                broadcast (PatchElements(renderRegistrationForm ()))
+                ctx.Response.StatusCode <- 202
             })
     }
 
-// POST /registrations/validate - Fire-and-forget, validates and posts feedback to channel
+// POST /registrations/validate - Fire-and-forget: validates and broadcasts to channel
 let registrationValidateResource =
     resource "/registrations/validate" {
         name "RegistrationValidate"
@@ -582,13 +506,13 @@ let registrationValidateResource =
                 match signals with
                 | ValueSome s ->
                     let errors = validateRegistration s
-                    registrationChannel.Post(Broadcast(PatchElements(renderValidationFeedback errors)))
+                    broadcast (PatchElements(renderValidationFeedback errors))
                     ctx.Response.StatusCode <- 202
                 | ValueNone -> ctx.Response.StatusCode <- 400
             })
     }
 
-// POST /registrations - Fire-and-forget, creates registration, posts result to channel
+// POST /registrations - Fire-and-forget: creates registration, broadcasts to channel
 let registrationsResource =
     resource "/registrations" {
         name "Registrations"
@@ -606,14 +530,11 @@ let registrationsResource =
                         let isDuplicate = registrations |> Seq.exists (fun r -> r.Email = s.email)
 
                         if isDuplicate then
-                            registrationChannel.Post(
-                                Broadcast(
-                                    PatchElements(
-                                        """<div id="registration-result" class="error">Email already registered.</div>"""
-                                    )
+                            broadcast (
+                                PatchElements(
+                                    """<div id="registration-result" class="error">Email already registered.</div>"""
                                 )
                             )
-
                             ctx.Response.StatusCode <- 409
                         else
                             let newReg: Registration =
@@ -624,12 +545,42 @@ let registrationsResource =
 
                             registrations.Add(newReg)
                             nextRegistrationId <- nextRegistrationId + 1
-                            registrationChannel.Post(Broadcast(PatchElements(renderRegistrationSuccess s.firstName)))
+                            broadcast (PatchElements(renderRegistrationSuccess s.firstName))
                             ctx.Response.StatusCode <- 201
                     else
-                        registrationChannel.Post(Broadcast(PatchElements(renderValidationFeedback errors)))
+                        broadcast (PatchElements(renderValidationFeedback errors))
                         ctx.Response.StatusCode <- 400
                 | ValueNone -> ctx.Response.StatusCode <- 400
+            })
+    }
+
+// ===========================
+// SINGLE SSE ENDPOINT
+// ===========================
+// One SSE connection per page. All fire-and-forget handlers broadcast to this channel.
+
+let sseResource =
+    resource "/sse" {
+        name "SSE"
+
+        datastar (fun (ctx: HttpContext) ->
+            task {
+                // Subscribe to broadcasts for this connection
+                let myChannel = subscribe ()
+
+                try
+                    // No initial data push - "Load X" buttons trigger data loads
+                    // Keep connection open, forwarding events from our channel
+                    while not ctx.RequestAborted.IsCancellationRequested do
+                        let! event = myChannel.Reader.ReadAsync(ctx.RequestAborted).AsTask()
+                        do! writeSseEvent ctx event
+                with
+                | :? OperationCanceledException -> ()
+                | :? ChannelClosedException -> ()
+                | _ -> ()
+
+                // Clean up subscription when connection closes
+                unsubscribe myChannel
             })
     }
 
@@ -645,20 +596,26 @@ let main args =
         plug DefaultFilesExtensions.UseDefaultFiles
         plug StaticFileExtensions.UseStaticFiles
 
-        // RESTful Resource Patterns
+        // Single SSE endpoint for the whole page
+        resource sseResource
+
+        // RESTful Resource Patterns (fire-and-forget updates via SSE channel)
         // Click-to-Edit (Contact)
         resource contactResource
         resource contactEditResource
+
+        // Debug
+        resource debugPingResource
 
         // Search (Fruits)
         resource fruitsResource
 
         // Delete (Items)
-        resource itemsCollectionResource
+        resource itemsResource
         resource itemResource
 
         // Bulk Update (Users)
-        resource usersCollectionResource
+        resource usersResource
         resource usersBulkResource
 
         // Form Validation (Registration)

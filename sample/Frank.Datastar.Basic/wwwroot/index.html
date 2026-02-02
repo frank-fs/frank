@@ -74,7 +74,7 @@
         label { display: block; margin: 0.5rem 0; }
     </style>
 </head>
-<body>
+<body data-init="@get('/sse')">
     <h1>Frank.Datastar Examples</h1>
     <p class="subtitle">RESTful Resource Patterns with Hypermedia-First Updates</p>
 
@@ -101,13 +101,12 @@
 
     <!-- Click-to-Edit Contact Demo -->
     <div class="section" id="contact-demo">
-        <h2>Click-to-Edit <span class="badge primary">GET/PUT Resource</span></h2>
-        <p>Edit a contact inline using proper REST: GET establishes SSE, edit/save are fire-and-forget.</p>
-        <p><em>Click "Load Contact" to establish SSE connection. Then Edit/Save use that channel.</em></p>
+        <h2>Click-to-Edit <span class="badge primary">PUT Resource</span></h2>
+        <p>Edit a contact inline. Click Edit, modify fields, then Save.</p>
         <div id="contact-container">
             <button data-on:click="@get('/contacts/1')">Load Contact</button>
             <div id="contact-view">
-                <!-- Contact will be loaded here via SSE -->
+                <!-- Contact loaded via SSE -->
             </div>
         </div>
     </div>
@@ -115,29 +114,28 @@
     <!-- Search Fruits Demo -->
     <div class="section" id="fruits-demo">
         <h2>Search with Filtering <span class="badge primary">GET + Query Params</span></h2>
-        <p>Filter a collection using GET with query parameters. GET /fruits establishes SSE, subsequent searches are fire-and-forget.</p>
-        <p><em>Click "Load Fruits" first to establish SSE, then type to search.</em></p>
-        <div id="fruits-container">
+        <p>Filter a collection using GET with query parameters. Type to search.</p>
+        <div id="fruits-container" data-signals="{'searchquery': ''}">
             <button data-on:click="@get('/fruits')">Load Fruits</button>
-            <div style="margin-top: 1rem;">
+            <div style="margin-bottom: 1rem;">
                 <input type="text" id="fruits-search" placeholder="Search fruits..."
-                       data-on:input__debounce.300ms="@get('/fruits?q=' + $el.value)" />
+                       data-bind:searchquery
+                       data-on:input__debounce.300ms="@get('/fruits?q=' + $searchquery)" />
             </div>
-            <div id="fruits-list">
-                <!-- Fruits list will be loaded here via SSE -->
-            </div>
+            <ul id="fruits-list">
+                <!-- Fruits list loaded via SSE -->
+            </ul>
         </div>
     </div>
 
     <!-- Delete Items Demo -->
     <div class="section" id="items-demo">
         <h2>Row Deletion <span class="badge primary">DELETE Resource</span></h2>
-        <p>Delete items using HTTP DELETE. GET /items establishes SSE, DELETE is fire-and-forget.</p>
-        <p><em>Click "Load Items" to establish SSE. Delete buttons use that channel.</em></p>
+        <p>Delete items using HTTP DELETE. Click the delete button on any row.</p>
         <div id="items-container-restful">
             <button data-on:click="@get('/items')">Load Items</button>
             <div id="items-table">
-                <!-- Items table will be loaded here via SSE -->
+                <!-- Items table loaded via SSE -->
             </div>
         </div>
     </div>
@@ -145,8 +143,7 @@
     <!-- Bulk Update Users Demo -->
     <div class="section" id="users-demo">
         <h2>Bulk Update <span class="badge primary">PUT Collection</span></h2>
-        <p>Update multiple resources using PUT. GET /users establishes SSE, bulk updates are fire-and-forget.</p>
-        <p><em>Click "Load Users" to establish SSE. Select users and click Activate/Deactivate.</em></p>
+        <p>Update multiple resources using PUT. Select users and click Activate/Deactivate.</p>
         <div id="users-container">
             <button data-on:click="@get('/users')">Load Users</button>
             <div id="users-table-container">
@@ -158,12 +155,11 @@
     <!-- Form Validation Registration Demo -->
     <div class="section" id="registration-demo">
         <h2>Form Validation <span class="badge primary">POST with Validation</span></h2>
-        <p>Real-time validation. GET /registrations/form establishes SSE, validation and submit are fire-and-forget.</p>
-        <p><em>Click "Show Form" to establish SSE. Validation happens as you type.</em></p>
+        <p>Real-time validation. Validation happens as you type.</p>
         <div id="registration-container">
             <button data-on:click="@get('/registrations/form')">Show Registration Form</button>
             <div id="registration-form">
-                <!-- Registration form will be loaded here via SSE -->
+                <!-- Registration form loaded via SSE -->
             </div>
         </div>
     </div>

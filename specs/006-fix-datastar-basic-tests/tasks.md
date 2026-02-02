@@ -24,9 +24,9 @@
 
 **Purpose**: Verify current state and establish baseline
 
-- [ ] T001 Build sample project in sample/Frank.Datastar.Basic/
-- [ ] T002 Build test project in sample/Frank.Datastar.Tests/
-- [ ] T003 Run tests to confirm current state (12 pass, 8 fail) with `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/`
+- [X] T001 Build sample project in sample/Frank.Datastar.Basic/
+- [X] T002 Build test project in sample/Frank.Datastar.Tests/
+- [X] T003 Run tests to confirm current state (12 pass, 8 fail) with `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/`
 
 ---
 
@@ -38,39 +38,39 @@
 
 ### Channel Consolidation
 
-- [ ] T004 Replace 5 individual channel declarations with 1 global channel in sample/Frank.Datastar.Basic/Program.fs (delete `contactChannel`, `fruitsChannel`, `itemsChannel`, `usersChannel`, `registrationChannel`; add `globalChannel`)
-- [ ] T005 Create single SSE endpoint `GET /sse` that establishes the page-wide SSE connection in sample/Frank.Datastar.Basic/Program.fs
+- [X] T004 Replace 5 individual channel declarations with 1 global channel in sample/Frank.Datastar.Basic/Program.fs (delete `contactChannel`, `fruitsChannel`, `itemsChannel`, `usersChannel`, `registrationChannel`; add `globalChannel`)
+- [X] T005 Create single SSE endpoint `GET /sse` that establishes the page-wide SSE connection in sample/Frank.Datastar.Basic/Program.fs
 
 ### Endpoint Updates - Contact Resource
 
-- [ ] T006 [P] Update `GET /contacts/{id}` to broadcast initial view through globalChannel instead of establishing SSE in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T007 [P] Update `GET /contacts/{id}/edit` to broadcast edit form through globalChannel in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T008 [P] Update `PUT /contacts/{id}` to broadcast updated view through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T006 [P] Update `GET /contacts/{id}` to broadcast initial view through globalChannel instead of establishing SSE in sample/Frank.Datastar.Basic/Program.fs
+- [X] T007 [P] Update `GET /contacts/{id}/edit` to broadcast edit form through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T008 [P] Update `PUT /contacts/{id}` to broadcast updated view through globalChannel in sample/Frank.Datastar.Basic/Program.fs
 
 ### Endpoint Updates - Fruits Resource
 
-- [ ] T009 [P] Update `GET /fruits` to broadcast fruit list through globalChannel (both initial load and search results) in sample/Frank.Datastar.Basic/Program.fs
+- [X] T009 [P] Update `GET /fruits` to broadcast fruit list through globalChannel (both initial load and search results) in sample/Frank.Datastar.Basic/Program.fs
 
 ### Endpoint Updates - Items Resource
 
-- [ ] T010 [P] Update `GET /items` to broadcast items table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T011 [P] Update `DELETE /items/{id}` to broadcast removeElement through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T010 [P] Update `GET /items` to broadcast items table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T011 [P] Update `DELETE /items/{id}` to broadcast removeElement through globalChannel in sample/Frank.Datastar.Basic/Program.fs
 
 ### Endpoint Updates - Users Resource
 
-- [ ] T012 [P] Update `GET /users` to broadcast users table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T013 [P] Update `PUT /users/bulk` to broadcast updated table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T012 [P] Update `GET /users` to broadcast users table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T013 [P] Update `PUT /users/bulk` to broadcast updated table through globalChannel in sample/Frank.Datastar.Basic/Program.fs
 
 ### Endpoint Updates - Registration Resource
 
-- [ ] T014 [P] Update `GET /registrations/form` to broadcast registration form through globalChannel in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T015 [P] Update `POST /registrations/validate` to broadcast validation feedback through globalChannel in sample/Frank.Datastar.Basic/Program.fs
-- [ ] T016 [P] Update `POST /registrations` to broadcast result through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T014 [P] Update `GET /registrations/form` to broadcast registration form through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T015 [P] Update `POST /registrations/validate` to broadcast validation feedback through globalChannel in sample/Frank.Datastar.Basic/Program.fs
+- [X] T016 [P] Update `POST /registrations` to broadcast result through globalChannel in sample/Frank.Datastar.Basic/Program.fs
 
 ### HTML Updates
 
-- [ ] T017 Update index.html to establish single SSE connection on page load in sample/Frank.Datastar.Basic/wwwroot/index.html
-- [ ] T018 Update "Load X" buttons in index.html to trigger fire-and-forget GET requests instead of establishing SSE connections in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T017 Update index.html to establish single SSE connection on page load in sample/Frank.Datastar.Basic/wwwroot/index.html
+- [X] T018 Update "Load X" buttons in index.html to trigger fire-and-forget GET requests instead of establishing SSE connections in sample/Frank.Datastar.Basic/wwwroot/index.html
 
 **Checkpoint**: Foundation ready - SSE channel consolidated, all endpoints use globalChannel
 
@@ -84,7 +84,7 @@
 
 ### Verification for User Story 1
 
-- [ ] T019 [US1] Verify bulk update tests pass (4 tests: activate, deactivate, persist, empty selection, unselected unchanged) by running BulkUpdateTests
+- [X] T019 [US1] Verify bulk update tests pass (4 tests: activate, deactivate, persist, empty selection, unselected unchanged) by running BulkUpdateTests
 
 **Checkpoint**: User Story 1 complete - 4 previously failing bulk update tests now pass
 
@@ -98,7 +98,7 @@
 
 ### Verification for User Story 2
 
-- [ ] T020 [US2] Verify search filter tests pass (2 failing + 2 passing = 4 tests) by running SearchFilterTests
+- [X] T020 [US2] Verify search filter tests pass (2 failing + 2 passing = 4 tests) by running SearchFilterTests
 
 **Checkpoint**: User Story 2 complete - 2 previously failing search tests now pass
 
@@ -112,7 +112,7 @@
 
 ### Verification for User Stories 3 & 4
 
-- [ ] T021 [US3] [US4] Verify click-to-edit tests pass (2 failing + 2 passing = 4 tests) by running ClickToEditTests
+- [X] T021 [US3] [US4] Verify click-to-edit tests pass (2 failing + 2 passing = 4 tests) by running ClickToEditTests
 
 **Checkpoint**: User Stories 3 & 4 complete - 2 previously failing contact tests now pass
 
@@ -122,9 +122,9 @@
 
 **Purpose**: Final validation and cleanup
 
-- [ ] T022 Run full test suite to verify all 20 tests pass with `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/`
-- [ ] T023 Verify no regressions in StateIsolationTests (3 tests) and ConfigurationTests (6 tests)
-- [ ] T024 Clean up any dead code (unused channel declarations, commented code)
+- [X] T022 Run full test suite to verify all 20 tests pass with `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test sample/Frank.Datastar.Tests/`
+- [X] T023 Verify no regressions in StateIsolationTests (3 tests) and ConfigurationTests (6 tests)
+- [X] T024 Clean up any dead code (unused channel declarations, commented code)
 - [ ] T025 Verify sample runs correctly in browser with headed mode: `DATASTAR_SAMPLE=Frank.Datastar.Basic HEADED=1 dotnet test sample/Frank.Datastar.Tests/`
 
 ---
