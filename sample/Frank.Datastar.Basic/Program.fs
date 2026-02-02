@@ -34,8 +34,8 @@ type Contact =
 
 [<CLIMutable>]
 type ContactSignals =
-    { firstname: string
-      lastname: string
+    { firstName: string
+      lastName: string
       email: string }
 
 // User for bulk update pattern
@@ -197,16 +197,16 @@ let inline renderContactView (contact: Contact) : string =
         <p><strong>First Name:</strong> {contact.FirstName}</p>
         <p><strong>Last Name:</strong> {contact.LastName}</p>
         <p><strong>Email:</strong> {contact.Email}</p>
-        <button data-on:click="@get('/contacts/{contact.Id}/edit')">Edit</button>
+        <button data-on:click="@get('/contacts/{contact.Id}/edit')" data-indicator:_fetching data-attr:disabled="$_fetching">Edit</button>
     </div>"""
 
 let inline renderContactEdit (contact: Contact) : string =
-    $"""<div id="contact-view" data-signals="{{'firstname': '{contact.FirstName}', 'lastname': '{contact.LastName}', 'email': '{contact.Email}'}}">
-        <label>First Name <input type="text" data-bind:firstname /></label>
-        <label>Last Name <input type="text" data-bind:lastname /></label>
-        <label>Email <input type="email" data-bind:email /></label>
-        <button data-on:click="@put('/contacts/{contact.Id}')">Save</button>
-        <button data-on:click="@get('/contacts/{contact.Id}')">Cancel</button>
+    $"""<div id="contact-view" data-signals="{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}">
+        <label>First Name <input type="text" data-bind:first-name data-attr:disabled="$_fetching" /></label>
+        <label>Last Name <input type="text" data-bind:last-name data-attr:disabled="$_fetching" /></label>
+        <label>Email <input type="email" data-bind:email data-attr:disabled="$_fetching" /></label>
+        <button data-on:click="@put('/contacts/{contact.Id}')" data-indicator:_fetching data-attr:disabled="$_fetching">Save</button>
+        <button data-on:click="@get('/contacts/{contact.Id}')" data-indicator:_fetching data-attr:disabled="$_fetching">Cancel</button>
     </div>"""
 
 // Contact resource - GET retrieves data, PUT updates data, broadcasts to channel
@@ -237,8 +237,8 @@ let contactResource =
                     | ValueSome s ->
                         let updated: Contact =
                             { Id = id
-                              FirstName = s.firstname
-                              LastName = s.lastname
+                              FirstName = s.firstName
+                              LastName = s.lastName
                               Email = s.email }
 
                         contacts[id] <- updated
@@ -302,7 +302,7 @@ let inline renderItemsTable (itemsList: ResizeArray<Item>) : string =
         |> Seq.map (fun item ->
             $"""<tr id="item-{item.Id}">
                 <td>{item.Name}</td>
-                <td><button data-on:click="confirm('Delete this item?') && @delete('/items/{item.Id}')">Delete</button></td>
+                <td><button data-on:click="confirm('Are you sure?') && @delete('/items/{item.Id}')" data-indicator:_fetching data-attr:disabled="$_fetching">Delete</button></td>
             </tr>""")
         |> String.concat ""
 
@@ -368,7 +368,7 @@ let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<in
             let statusText = if user.Status = Active then "Active" else "Inactive"
 
             $"""<tr>
-                <td><input type="checkbox" data-bind:selections /></td>
+                <td><input type="checkbox" data-bind:selections data-attr:disabled="$_fetching" /></td>
                 <td>{user.Name}</td>
                 <td>{user.Email}</td>
                 <td class="{statusClass}">{statusText}</td>
@@ -377,11 +377,11 @@ let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<in
 
     // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
     // data-bind:selections on checkboxes automatically manages the boolean array
-    $"""<div id="users-table-container" data-signals__ifmissing="{{selections: Array(4).fill(false)}}">
+    $"""<div id="users-table-container" data-signals__ifmissing="{{_fetching: false, selections: Array(4).fill(false)}}">
         <table>
             <thead>
                 <tr>
-                    <th><input type="checkbox" data-bind:_all data-on:change="$selections = Array(4).fill($_all)" data-effect="$selections; $_all = $selections.every(Boolean)" /></th>
+                    <th><input type="checkbox" data-bind:_all data-on:change="$selections = Array(4).fill($_all)" data-effect="$selections; $_all = $selections.every(Boolean)" data-attr:disabled="$_fetching" /></th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Status</th>
@@ -389,8 +389,8 @@ let inline renderUsersTable (usersList: System.Collections.Generic.Dictionary<in
             </thead>
             <tbody id="users-list">{rows}</tbody>
         </table>
-        <button data-on:click="@put('/users/bulk?status=active')">Activate Selected</button>
-        <button data-on:click="@put('/users/bulk?status=inactive')">Deactivate Selected</button>
+        <button data-on:click="@put('/users/bulk?status=active')" data-indicator:_fetching data-attr:disabled="$_fetching">Activate Selected</button>
+        <button data-on:click="@put('/users/bulk?status=inactive')" data-indicator:_fetching data-attr:disabled="$_fetching">Deactivate Selected</button>
     </div>"""
 
 // GET /users - Fire-and-forget: broadcasts users table to SSE channel
@@ -469,16 +469,16 @@ let inline renderRegistrationSuccess (firstName: string) : string =
 let inline renderRegistrationForm () : string =
     """<div id="registration-form" data-signals="{'email': '', 'firstName': '', 'lastName': ''}">
         <div>
-            <label>Email <input type="email" data-bind:email data-on:input__debounce.500ms="@post('/registrations/validate')" /></label>
+            <label>Email <input type="email" data-bind:email data-on:keydown__debounce.500ms="@post('/registrations/validate')" data-attr:disabled="$_fetching" /></label>
         </div>
         <div>
-            <label>First Name <input type="text" data-bind:firstName data-on:input__debounce.500ms="@post('/registrations/validate')" /></label>
+            <label>First Name <input type="text" data-bind:first-name data-on:keydown__debounce.500ms="@post('/registrations/validate')" data-attr:disabled="$_fetching" /></label>
         </div>
         <div>
-            <label>Last Name <input type="text" data-bind:lastName data-on:input__debounce.500ms="@post('/registrations/validate')" /></label>
+            <label>Last Name <input type="text" data-bind:last-name data-on:keydown__debounce.500ms="@post('/registrations/validate')" data-attr:disabled="$_fetching" /></label>
         </div>
         <div id="validation-feedback"></div>
-        <button data-on:click="@post('/registrations')">Register</button>
+        <button data-on:click="@post('/registrations')" data-indicator:_fetching data-attr:disabled="$_fetching">Register</button>
         <div id="registration-result"></div>
     </div>"""
 
