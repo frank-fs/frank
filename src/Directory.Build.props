@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <VersionPrefix>6.3.0</VersionPrefix>
+    <VersionPrefix>6.4.0</VersionPrefix>
     <Authors>panesofglass</Authors>
     <Description>F# computation expressions for configuring the Microsoft.AspNetCore.Hosting.IWebHostBuilder and defining routes for HTTP resources using Microsoft.AspNetCore.Routing.</Description>
-    <Copyright>Copyright © 2011-2025 Ryan Riley. All rights reserved.</Copyright>
+    <Copyright>Copyright © 2011-2026 Ryan Riley. All rights reserved.</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -13,6 +13,11 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/frank-fs/frank</RepositoryUrl>
     <PackageTags>$(PackageTags);functional;web;frank;f#;fsharp</PackageTags>
+
+    <DebugType>portable</DebugType>
+    <OutputType>Library</OutputType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <!-- Optional: Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->

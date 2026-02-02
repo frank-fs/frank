@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frank.Datastar - Hypermedia First</title>
+    <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f5f5f5;
+        }
+        h1 { color: #2c3e50; }
+        .subtitle { color: #7f8c8d; margin-top: -1rem; margin-bottom: 2rem; }
+        .section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+        }
+        .section h2 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        .section p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            margin: 0.25rem;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            width: 300px;
+            margin: 0.25rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+        }
+        .primary { background: #3498db; color: white; }
+        .minimal { background: #95a5a6; color: white; }
+        .success { color: #27ae60; padding: 0.5rem; background: #d5f4e6; border-radius: 4px; }
+        .error { color: #e74c3c; padding: 0.5rem; background: #fadbd8; border-radius: 4px; }
+        .error ul { margin: 0; padding-left: 1.5rem; }
+        .status-active { color: #27ae60; font-weight: bold; }
+        .status-inactive { color: #95a5a6; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #ecf0f1; }
+        label { display: block; margin: 0.5rem 0; }
+    </style>
+</head>
+<body data-init="@get('/sse')">
+    <h1>Frank.Datastar Examples</h1>
+    <p class="subtitle">RESTful Resource Patterns with Hypermedia-First Updates</p>
+
+    <!-- Key Principles -->
+    <div style="margin: 1rem 0; padding: 1.5rem; background: #e8f4f8; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #2c3e50;">Key Principles</h3>
+        <ul style="color: #34495e; margin-bottom: 0;">
+            <li><strong>Resource URLs:</strong> Use nouns, not verbs (/contacts/1, not /getContact)</li>
+            <li><strong>HTTP Methods:</strong> GET=retrieve, PUT=update, DELETE=remove, POST=create</li>
+            <li><strong>Query Params:</strong> Use for filtering (/fruits?q=apple)</li>
+            <li><strong>Hypermedia First:</strong> Server sends HTML, client renders it</li>
+        </ul>
+    </div>
+
+    <!-- Navigation to RESTful Patterns -->
+    <div style="margin: 1rem 0; padding: 1rem; background: #ecf0f1; border-radius: 8px;">
+        <strong>Jump to:</strong>
+        <a href="#contact-demo" style="margin: 0 0.5rem;">Click-to-Edit</a> |
+        <a href="#fruits-demo" style="margin: 0 0.5rem;">Search</a> |
+        <a href="#items-demo" style="margin: 0 0.5rem;">Delete</a> |
+        <a href="#users-demo" style="margin: 0 0.5rem;">Bulk Update</a> |
+        <a href="#registration-demo" style="margin: 0 0.5rem;">Form Validation</a>
+    </div>
+
+    <!-- Click-to-Edit Contact Demo -->
+    <div class="section" id="contact-demo">
+        <h2>Click-to-Edit <span class="badge primary">PUT Resource</span></h2>
+        <p>Edit a contact inline. Click Edit, modify fields, then Save.</p>
+        <div id="contact-container">
+            <button data-on:click="@get('/contacts/1')" data-indicator:_fetching data-attr:disabled="$_fetching">Load Contact</button>
+            <div id="contact-view">
+                <!-- Contact loaded via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Fruits Demo -->
+    <div class="section" id="fruits-demo">
+        <h2>Search with Filtering <span class="badge primary">GET + Query Params</span></h2>
+        <p>Filter a collection using GET with query parameters. Type to search.</p>
+        <div id="fruits-container" data-signals="{'search': ''}">
+            <button data-on:click="@get('/fruits')" data-indicator:_fetching data-attr:disabled="$_fetching">Load Fruits</button>
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="fruits-search" placeholder="Search fruits..."
+                       data-bind:search
+                       data-on:input__debounce.200ms="@get('/fruits?q=' + $search)" />
+            </div>
+            <ul id="fruits-list">
+                <!-- Fruits list loaded via SSE -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Delete Items Demo -->
+    <div class="section" id="items-demo">
+        <h2>Row Deletion <span class="badge primary">DELETE Resource</span></h2>
+        <p>Delete items using HTTP DELETE. Click the delete button on any row.</p>
+        <div id="items-container-restful">
+            <button data-on:click="@get('/items')" data-indicator:_fetching data-attr:disabled="$_fetching">Load Items</button>
+            <div id="items-table">
+                <!-- Items table loaded via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Update Users Demo -->
+    <div class="section" id="users-demo">
+        <h2>Bulk Update <span class="badge primary">PUT Collection</span></h2>
+        <p>Update multiple resources using PUT. Select users and click Activate/Deactivate.</p>
+        <div id="users-container">
+            <button data-on:click="@get('/users')" data-indicator:_fetching data-attr:disabled="$_fetching">Load Users</button>
+            <div id="users-table-container">
+                <!-- Users table will be loaded here via SSE -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Validation Registration Demo -->
+    <div class="section" id="registration-demo">
+        <h2>Form Validation <span class="badge primary">POST with Validation</span></h2>
+        <p>Real-time validation. Validation happens as you type.</p>
+        <div id="registration-container">
+            <button data-on:click="@get('/registrations/form')" data-indicator:_fetching data-attr:disabled="$_fetching">Show Registration Form</button>
+            <div id="registration-form">
+                <!-- Registration form loaded via SSE -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
