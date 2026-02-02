@@ -1,195 +1,189 @@
-# Research: Enhanced Sample Test Validation
+# Research: Browser Automation Test Suite for Frank.Datastar Samples
 
+**Date**: 2026-01-28
 **Feature**: 005-fix-sample-tests
-**Date**: 2026-01-27
 
-## Research Topics
+## Research Questions
 
-### 1. SSE Response Parsing with curl
+### 1. Playwright NuGet Package for F#/.NET
 
-**Context**: Sample applications use Server-Sent Events (SSE) for real-time updates. Tests need to capture and validate SSE content.
-
-**Decision**: Use `curl -s -m <timeout>` with timeout to capture SSE response, then parse with grep/sed.
+**Decision**: Use `Microsoft.Playwright.NUnit` package
 
 **Rationale**:
-- SSE connections stay open indefinitely; timeout forces curl to close after receiving initial content
-- The `-m 2` (2-second timeout) is sufficient to receive the initial HTML patch
-- curl returns the full response body including SSE event formatting
+- Official Microsoft package with NUnit integration
+- Current version: 1.57.0
+- Supports .NET Standard 2.0 (works with .NET 8.0+, .NET 10.0)
+- Provides `PageTest` base class and test lifecycle management
 
-**Alternatives Considered**:
-- `nc` (netcat): More complex, not installed by default on all systems
-- Custom SSE client: Overkill for test scripts
-- `--max-time` vs `-m`: Same behavior, `-m` is shorter
+**Alternatives considered**:
+- `Microsoft.Playwright` (core only) - Requires manual browser lifecycle management
+- `Microsoft.Playwright.MSTest` - MSTest is less idiomatic for F# projects
+- `Microsoft.Playwright.Xunit` - xUnit lacks `TestContext.Parameters` for runsettings integration
 
-**Pattern**:
-```bash
-# Capture SSE response with timeout
-RESULT=$(curl -s -m 2 "$BASE_URL/endpoint" 2>/dev/null || true)
-# Parse for expected content
-if echo "$RESULT" | grep -q "expected content"; then
-  echo "PASS"
-else
-  echo "FAIL - Expected 'expected content', got: $RESULT"
-fi
-```
+### 2. F# Integration Pattern for Playwright
 
-### 2. Content Validation vs. Status Code Validation
-
-**Context**: Current tests only check HTTP status codes (e.g., 202 Accepted). This misses behavioral bugs where the status is correct but content is wrong.
-
-**Decision**: Validate both status code AND response content for all meaningful operations.
+**Decision**: Use F# `task { }` computation expressions
 
 **Rationale**:
-- Status codes confirm the request was handled
-- Content validation confirms the correct data was returned/updated
-- Both are necessary for complete test coverage
+- Playwright APIs return `Task<T>` and `ValueTask<T>`
+- F# task expressions provide natural interop without `|> Async.AwaitTask` overhead
+- Pattern: `let!` for awaiting, `do!` for side effects, `use!` for disposables
 
-**Pattern**:
-```bash
-# Get both status and body
-STATUS=$(curl -s -o /tmp/response.txt -w "%{http_code}" "$URL")
-BODY=$(cat /tmp/response.txt)
-
-# Validate status
-if [ "$STATUS" != "202" ]; then
-  echo "FAIL (HTTP $STATUS)"
-  return
-fi
-
-# Validate content
-if ! echo "$BODY" | grep -q "expected"; then
-  echo "FAIL - Content mismatch"
-  return
-fi
-
-echo "PASS"
-```
-
-### 3. State Verification Pattern
-
-**Context**: Tests need to verify that operations actually change state (e.g., bulk update modifies user status).
-
-**Decision**: Use read-modify-verify pattern: read initial state, perform operation, verify state changed.
-
-**Rationale**:
-- Sequential tests can rely on known initial state from seed data
-- Verification read confirms persistence, not just response
-
-**Pattern**:
-```bash
-# 1. Read initial state
-BEFORE=$(curl -s -m 2 "$BASE_URL/users" | grep -c "status-active")
-
-# 2. Perform update
-curl -s -X PUT "$BASE_URL/users/bulk?status=active" ...
-
-# 3. Verify state changed
-AFTER=$(curl -s -m 2 "$BASE_URL/users" | grep -c "status-active")
-
-if [ "$AFTER" -gt "$BEFORE" ]; then
-  echo "PASS"
-else
-  echo "FAIL - Status unchanged"
-fi
-```
-
-### 4. Handling Fire-and-Forget Endpoints
-
-**Context**: Some endpoints (edit, search, bulk) return 202 and post updates to SSE channel. The update appears in the SSE stream, not the HTTP response.
-
-**Decision**: For fire-and-forget endpoints, the verification comes from a subsequent read operation, not from the 202 response.
-
-**Rationale**:
-- 202 Accepted means "request received" not "operation complete"
-- The SSE channel receives the actual update
-- Since tests are sequential single-user, the next read will reflect the change
-
-**Pattern**:
-```bash
-# Fire-and-forget edit request
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/contacts/1/edit")
-[ "$STATUS" = "202" ] || echo "FAIL: edit request"
-
-# Verify edit form appeared (read via SSE with short timeout for pending event)
-sleep 0.5  # Brief delay for channel to process
-RESULT=$(curl -s -m 2 "$BASE_URL/contacts/1" 2>/dev/null || true)
-if echo "$RESULT" | grep -q "data-bind:firstName"; then
-  echo "PASS - Edit form displayed"
-fi
-```
-
-### 5. Known Seed Data for Assertions
-
-**Context**: Tests need to assert against expected values. Each sample has seed data.
-
-**Decision**: Document and rely on known seed data from `Program.fs`:
-
-| Entity | ID | Key Values |
-|--------|-----|-----------|
-| Contact | 1 | firstName="Joe", lastName="Smith", email="joe@smith.org" |
-| Users | 1-4 | User 1: Active, User 2: Inactive, User 3: Active, User 4: Inactive |
-| Fruits | - | "Apple", "Apricot", "Banana", ... (22 items) |
-| Items | 1-4 | "Item 1" through "Item 4" |
-
-**Rationale**:
-- Tests are stateful and sequential
-- Known seed data allows precise assertions
-- Each test builds on previous state
-
-### 6. Test Output Format
-
-**Context**: Tests should clearly report which sample, which test, and pass/fail with details.
-
-**Decision**: Use structured output with counters and summary.
-
-**Pattern**:
-```bash
-PASS_COUNT=0
-FAIL_COUNT=0
-SAMPLE_NAME="Frank.Datastar.Basic"
-
-test_case() {
-  local name="$1"
-  local result="$2"
-  if [ "$result" = "PASS" ]; then
-    echo "  [PASS] $name"
-    PASS_COUNT=$((PASS_COUNT + 1))
-  else
-    echo "  [FAIL] $name: $result"
-    FAIL_COUNT=$((FAIL_COUNT + 1))
-  fi
+**Code pattern**:
+```fsharp
+[<Test>]
+member this.TestExample() = task {
+    use! page = context.NewPageAsync()
+    do! page.GotoAsync("http://localhost:5000")
+    let! content = page.Locator(".data").TextContentAsync()
+    Assert.That(content, Is.EqualTo("Expected"))
 }
-
-# At end
-echo "========================================"
-echo "$SAMPLE_NAME: $PASS_COUNT passed, $FAIL_COUNT failed"
-echo "========================================"
-exit $FAIL_COUNT  # Non-zero if any failures
 ```
 
-### 7. Async Timing Considerations
+**Alternatives considered**:
+- `async { }` with `|> Async.AwaitTask` - More verbose, unnecessary conversion overhead
+- Direct `.Result` blocking - Defeats async purpose, can cause deadlocks
 
-**Context**: Hox sample may have different rendering timing. Tests should be resilient to minor timing variations.
+### 3. Waiting for SSE-Pushed DOM Updates
 
-**Decision**: Use reasonable timeouts (2-3 seconds) and optional brief delays before verification reads.
+**Decision**: Use `WaitForFunctionAsync` with DOM query predicates
 
 **Rationale**:
-- Longer timeouts increase test reliability without significantly slowing tests
-- Brief `sleep 0.5` before verification reads gives channel time to process
-- If tests still flaky, indicates a real bug, not a timing issue
+- `WaitForLoadStateAsync(NetworkIdle)` hangs indefinitely with SSE (persistent connection)
+- `WaitForFunctionAsync` allows custom JavaScript predicates
+- Can check for specific content, element visibility, or DOM mutations
+- Supports configurable timeout (default 5 seconds per spec)
 
-**Alternatives Rejected**:
-- Polling with retries: Adds complexity; prefer failing fast to identify real issues
-- Very long timeouts: Masks actual bugs; 2-3 seconds is sufficient for functioning code
+**Code pattern**:
+```fsharp
+// Wait for specific content to appear via SSE
+do! page.WaitForFunctionAsync(
+    "() => document.querySelector('.contact-name')?.textContent === 'Updated'",
+    PageWaitForFunctionOptions(Timeout = 5000.0)
+)
+
+// Wait for element to exist
+do! page.WaitForFunctionAsync(
+    "selector => !!document.querySelector(selector)",
+    "#edit-form"
+)
+```
+
+**Alternatives considered**:
+- `WaitForLoadStateAsync(NetworkIdle)` - Hangs with SSE
+- Fixed `Task.Delay` sleeps - Flaky, either too slow or too fast
+- `WaitForSelectorAsync` - Works for element existence but not content changes
+
+### 4. Passing Sample Name Parameter to Tests
+
+**Decision**: Use `DATASTAR_SAMPLE` environment variable
+
+**Rationale**:
+- Simple to set via command line: `DATASTAR_SAMPLE=Frank.Datastar.Basic dotnet test`
+- Works across all platforms (Windows, macOS, Linux)
+- Can also be set via `.runsettings` file for IDE integration
+- Allows fail-fast validation in test setup
+
+**Code pattern**:
+```fsharp
+let sampleName =
+    Environment.GetEnvironmentVariable("DATASTAR_SAMPLE")
+    |> Option.ofObj
+    |> Option.defaultWith (fun () ->
+        failwith "DATASTAR_SAMPLE environment variable required. Available samples: ...")
+```
+
+**Alternatives considered**:
+- Command-line filter expression (`--filter`) - Can't pass arbitrary data
+- `.runsettings` only - Less convenient for quick command-line runs
+- Test constructor parameters - NUnit doesn't support this pattern well
+
+### 5. Test Project Structure
+
+**Decision**: Single test project with feature-based file organization
+
+**Rationale**:
+- Matches user story organization from spec
+- Easy to run all tests or filter by feature
+- Shared configuration and helpers in separate files
+- Follows existing sample project naming convention
+
+**File structure**:
+```
+Frank.Datastar.Tests/
+├── Frank.Datastar.Tests.fsproj
+├── TestConfiguration.fs     # Runs first (F# compilation order)
+├── TestHelpers.fs           # Common utilities
+├── ClickToEditTests.fs      # US1
+├── SearchFilterTests.fs     # US2
+├── BulkUpdateTests.fs       # US3
+├── StateIsolationTests.fs   # US4
+└── test.runsettings
+```
+
+**Alternatives considered**:
+- Separate test projects per sample - Unnecessary complexity, same tests for all
+- Single file with all tests - Hard to navigate, doesn't scale
+- Tests in existing sample projects - Violates separation of concerns
+
+### 6. Browser Lifecycle Management
+
+**Decision**: Use NUnit's `[<OneTimeSetUp>]` and `[<SetUp>]` for browser/page lifecycle
+
+**Rationale**:
+- Browser launch is expensive (~1 second), do once per test class
+- Each test gets fresh page for isolation
+- Context shared within test class for efficiency
+- Proper cleanup via `[<TearDown>]` and `[<OneTimeTearDown>]`
+
+**Code pattern**:
+```fsharp
+[<TestFixture>]
+type ClickToEditTests() =
+    let mutable playwright: IPlaywright = null
+    let mutable browser: IBrowser = null
+    let mutable context: IBrowserContext = null
+    let mutable page: IPage = null
+
+    [<OneTimeSetUp>]
+    member this.SetupBrowser() = task {
+        playwright <- Playwright.CreateAsync() |> Async.AwaitTask |> Async.RunSynchronously
+        let! b = playwright.Chromium.LaunchAsync()
+        browser <- b
+    }
+
+    [<SetUp>]
+    member this.SetupPage() = task {
+        let! ctx = browser.NewContextAsync()
+        context <- ctx
+        let! p = ctx.NewPageAsync()
+        page <- p
+        do! page.GotoAsync(baseUrl)
+    }
+
+    [<TearDown>]
+    member this.TeardownPage() = task {
+        do! page.CloseAsync()
+        do! context.CloseAsync()
+    }
+
+    [<OneTimeTearDown>]
+    member this.TeardownBrowser() =
+        browser.CloseAsync() |> Async.AwaitTask |> Async.RunSynchronously
+        playwright.Dispose()
+```
+
+**Alternatives considered**:
+- New browser per test - Too slow
+- Single page for all tests - State bleeds between tests
+- Playwright's `PageTest` base class - C#-centric, less idiomatic for F#
 
 ## Summary
 
-No unresolved technical questions. All patterns are well-understood:
-
-1. SSE testing: `curl -s -m 2` with timeout
-2. Content validation: Parse response body with grep
-3. State verification: Read-modify-verify pattern
-4. Fire-and-forget: Verify via subsequent read
-5. Seed data: Documented known values for assertions
-6. Output format: Structured pass/fail with summary
-7. Timing: Reasonable timeouts, brief delays before verification
+All research questions resolved. Key findings:
+1. Use `Microsoft.Playwright.NUnit` package
+2. Use F# `task { }` expressions for async operations
+3. Use `WaitForFunctionAsync` for SSE content verification (not NetworkIdle)
+4. Use `DATASTAR_SAMPLE` environment variable for sample selection
+5. Feature-based file organization matching user stories
+6. Browser shared per test class, fresh page per test

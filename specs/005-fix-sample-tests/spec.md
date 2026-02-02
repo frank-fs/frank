@@ -1,7 +1,8 @@
-# Feature Specification: Enhanced Sample Test Validation
+# Feature Specification: Browser Automation Test Suite for Frank.Datastar Samples
 
 **Feature Branch**: `005-fix-sample-tests`
 **Created**: 2026-01-27
+**Updated**: 2026-01-28
 **Status**: Draft
 
 ## Clarifications
@@ -11,156 +12,200 @@
 - Q: Should test scripts only detect bugs or also fix the underlying sample bugs? → A: Only detect and report bugs (tests fail when bugs are present); fixing sample bugs is out of scope
 - Q: How should tests handle data state between test runs? → A: Tests are sequential and stateful, representing a single user; each test builds on state from previous tests. Samples intentionally don't support concurrent users (single SSE channel). Tests verify known behavior, not complex scenarios.
 
-**Input**: User description: "Enhance the sample/Frank.Datastar.*/test.sh script to more accurately validate the behaviors. When testing manually, I noticed: 1) click-to-edit does not present the current values nor save the updated values, 2) search filtering clears the list entirely, 3) bulk updates doesn't appear to do anything, etc. Different samples break in different ways. Hox appears the most broken, which could be related to incorrectly not awaiting renders. Basic seems the most correct, but it also shares field values across click-to-edit and registration form validation."
+### Session 2026-01-28
+
+- Q: Why replace bash scripts with browser automation? → A: Bash scripts using curl cannot properly evaluate streaming updates through SSE channels while other interactions occur. A real browser can maintain SSE connections and verify that UI updates arrive correctly in response to user actions, which is the core behavior Datastar applications need to demonstrate.
+- Q: What technology should the test project use? → A: F# with Playwright, structured as a .NET test project that can be run with `dotnet test`
+- Q: Where should the test project be located? → A: In the `sample/` directory alongside the other sample projects
+- Q: How should the target sample be specified? → A: Via a required parameter matching `Frank.Datastar.*` pattern, validated against existing folder paths in `sample/`
+- Q: How should the test project determine the target URL for a sample? → A: Default to localhost:5000 for all samples; tests run one sample at a time, and samples use port 5000 via launchSettings.json
+- Q: What should the default timeout be for waiting on SSE updates? → A: 5 seconds
+
+**Input**: User description: "Update the specification to not update the test.sh script(s) but instead create a browser automation app that can target any of the Frank.Datastar sample applications. The bash script is not set up to properly evaluate the streaming updates through the SSE channel as other interactions take place."
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Validate Click-to-Edit Behavior (Priority: P1)
+### User Story 1 - Validate Click-to-Edit SSE Updates in Browser (Priority: P1)
 
-As a developer running the test scripts, I want the tests to verify that the click-to-edit feature correctly displays current values when entering edit mode and persists updated values after saving, so that I can catch regressions where the edit form shows empty or stale data.
+As a developer running the automated tests, I want the browser automation to verify that clicking edit on a contact triggers an SSE update that renders the edit form with current values, and that saving triggers another SSE update showing the persisted values, so that I can validate the core Datastar SSE-driven UI update pattern.
 
-**Why this priority**: Click-to-edit is a core interactive feature. If it doesn't show current values or save updates, the feature is fundamentally broken. This is the most critical user-facing behavior to validate.
+**Why this priority**: Click-to-edit demonstrates the fundamental Datastar pattern: user action → server response → SSE push → UI update. If this doesn't work, the entire Datastar integration is broken.
 
-**Independent Test**: Can be fully tested by requesting the edit form for a known contact, verifying the form contains the expected current field values, submitting updated values, and then verifying a subsequent read returns the updated values.
+**Independent Test**: Can be fully tested by launching a browser, navigating to the sample app, observing the contact display, clicking edit, verifying the form appears with current values via SSE, modifying values, saving, and verifying the updated display arrives via SSE.
 
 **Acceptance Scenarios**:
 
-1. **Given** a contact exists with known first name, last name, and email, **When** the edit form is requested, **Then** the response contains input fields pre-populated with the contact's current values
-2. **Given** a contact exists with known values, **When** updated values are submitted, **Then** a subsequent read of that contact shows the updated values (not the original values)
-3. **Given** a contact exists, **When** the edit form is requested and cancelled without saving, **Then** a subsequent read shows the original unchanged values
+1. **Given** a contact exists with first name "Joe", **When** the user clicks the edit button, **Then** an edit form appears (via SSE update) containing the value "Joe" in the first name field
+2. **Given** the edit form is displayed with current values, **When** the user changes first name to "Updated" and clicks save, **Then** the display updates (via SSE) to show "Updated" as the first name
+3. **Given** a contact was edited and saved, **When** the page is refreshed, **Then** the persisted value "Updated" is displayed (proving data was saved, not just displayed)
 
 ---
 
-### User Story 2 - Validate Search Filtering Results (Priority: P1)
+### User Story 2 - Validate Search Filtering with Concurrent SSE Stream (Priority: P1)
 
-As a developer running the test scripts, I want the tests to verify that search filtering actually returns matching results (not an empty list), so that I can catch regressions where the search feature incorrectly clears or fails to populate results.
+As a developer running the automated tests, I want the browser automation to verify that typing a search query triggers SSE updates that filter the displayed list to matching items, while maintaining the SSE connection throughout, so that I can validate that search filtering works with Datastar's reactive update model.
 
-**Why this priority**: Search is a fundamental feature for users to find data. If searching clears the list entirely instead of filtering, users cannot use the application effectively.
+**Why this priority**: Search filtering is a common pattern that requires the SSE connection to remain active while processing user input and pushing filtered results. This validates that the SSE stream handles multiple updates correctly.
 
-**Independent Test**: Can be fully tested by searching for a known term that should match existing items and verifying the response contains the expected matching items.
+**Independent Test**: Can be fully tested by navigating to the fruits list, verifying all fruits are displayed, typing a search query, and verifying the list updates via SSE to show only matching items.
 
 **Acceptance Scenarios**:
 
-1. **Given** a list contains items including "Apple", "Apricot", and "Banana", **When** searching with query "ap" (case-insensitive), **Then** the response contains "Apple" and "Apricot" but not "Banana"
-2. **Given** a list contains items, **When** searching with a query that matches nothing, **Then** the response indicates no results (empty list or "no results" message) rather than an error
-3. **Given** a list contains items, **When** the search query is cleared, **Then** the full unfiltered list is displayed
+1. **Given** a fruits list contains "Apple", "Apricot", and "Banana", **When** the user types "ap" in the search field, **Then** the list updates (via SSE) to show "Apple" and "Apricot" but not "Banana"
+2. **Given** a filtered list is displayed, **When** the user clears the search field, **Then** the full unfiltered list is restored (via SSE)
+3. **Given** a fruits list is displayed, **When** the user searches for a term with no matches, **Then** an empty list or "no results" indicator is displayed (not an error)
 
 ---
 
-### User Story 3 - Validate Bulk Update Operations (Priority: P1)
+### User Story 3 - Validate Bulk Update Operations with SSE Feedback (Priority: P1)
 
-As a developer running the test scripts, I want the tests to verify that bulk update operations actually modify the selected items' data, so that I can catch regressions where bulk operations appear to succeed but don't change anything.
+As a developer running the automated tests, I want the browser automation to verify that selecting multiple users and triggering a bulk status change results in SSE updates showing the changed statuses, so that I can validate bulk operations work correctly with Datastar.
 
-**Why this priority**: Bulk operations are efficiency features. If they don't actually update data, users waste time believing operations completed when they did not.
+**Why this priority**: Bulk operations demonstrate that the server correctly processes multi-item updates and pushes the results to the client via SSE. This is critical for validating data integrity in batch operations.
 
-**Independent Test**: Can be fully tested by reading initial state of multiple items, performing a bulk update on selected items, and verifying that only the selected items show the updated state.
+**Independent Test**: Can be fully tested by navigating to the users list, selecting multiple users via checkboxes, clicking a bulk action button, and verifying each selected user's status updates via SSE.
 
 **Acceptance Scenarios**:
 
-1. **Given** users with statuses "inactive", "active", "inactive", "active", **When** a bulk activate is performed selecting users 2 and 4, **Then** a subsequent read shows users 2 and 4 as "active" (note: user 2 and 4 were already active, so also test users that change)
-2. **Given** users with statuses "inactive", "active", "inactive", "active", **When** a bulk activate is performed selecting users 1 and 3, **Then** a subsequent read shows users 1 and 3 changed from "inactive" to "active"
-3. **Given** users in various states, **When** a bulk update is performed with no items selected, **Then** no data changes occur
+1. **Given** users exist with mixed active/inactive statuses, **When** the user selects two inactive users and clicks "Activate Selected", **Then** those users' statuses update to "Active" (via SSE) while unselected users remain unchanged
+2. **Given** users have been bulk-activated, **When** the page is refreshed, **Then** the activated users still show as "Active" (proving changes were persisted)
+3. **Given** no users are selected, **When** the user clicks a bulk action button, **Then** no changes occur (graceful handling of empty selection)
 
 ---
 
 ### User Story 4 - Validate State Isolation Between Features (Priority: P2)
 
-As a developer running the test scripts, I want the tests to verify that different features maintain separate state, so that I can catch regressions where form fields or data stores are incorrectly shared.
+As a developer running the automated tests, I want the browser automation to verify that entering data in one form (registration) does not affect data displayed in another feature (click-to-edit), so that I can catch state leakage bugs between independent UI components.
 
-**Why this priority**: State isolation prevents confusing user experiences where entering data in one form unexpectedly affects another. This is important for correctness but less critical than individual features working.
+**Why this priority**: State isolation ensures independent features don't accidentally share data. This is less critical than core features working, but important for overall application correctness.
 
-**Independent Test**: Can be fully tested by entering data in one form (e.g., registration), then checking that another form (e.g., click-to-edit) does not show that data.
+**Independent Test**: Can be fully tested by entering values in the registration form, then navigating to click-to-edit and verifying those values don't appear in the contact form.
 
 **Acceptance Scenarios**:
 
-1. **Given** the registration form and click-to-edit form exist, **When** the user enters "test@example.com" in the registration email field, **Then** the click-to-edit form does not show "test@example.com" in any field
-2. **Given** a contact has email "original@example.com", **When** the registration form is used with "different@example.com", **Then** the contact's email remains "original@example.com"
+1. **Given** the registration form and contact display are both accessible, **When** the user enters "test@isolation.com" in the registration email field, **Then** the contact display does not show "test@isolation.com"
+2. **Given** a contact has email "joe@smith.org", **When** the user interacts with the registration form using different values, **Then** the contact's email remains "joe@smith.org"
 
 ---
 
-### User Story 5 - Detect Sample-Specific Failures (Priority: P2)
+### User Story 5 - Target Any Frank.Datastar Sample via Parameter (Priority: P1)
 
-As a developer running the test scripts, I want the tests to report which specific sample (Basic, Hox, Oxpecker) fails which tests, so that I can identify rendering or implementation differences between view engines.
+As a developer, I want to specify which Frank.Datastar sample to test by providing a parameter like `Frank.Datastar.Basic`, and have the test project validate this against existing sample folders, so that I can run tests against any current or future Datastar sample without modifying the test code.
 
-**Why this priority**: Different samples may have different failure modes. Knowing which sample fails which test accelerates debugging and prevents incorrect assumptions about shared behavior.
+**Why this priority**: This is the primary interface for running tests. Without proper parameter handling, tests cannot be executed at all.
 
-**Independent Test**: Can be fully tested by running the same test suite against each sample and comparing results.
+**Independent Test**: Can be fully tested by running the test project with various valid and invalid sample names and observing the behavior.
 
 **Acceptance Scenarios**:
 
-1. **Given** the test script runs against a sample, **When** tests complete, **Then** the output clearly identifies which sample was tested and provides a summary of pass/fail counts
-2. **Given** multiple samples exist, **When** a test fails on one sample but passes on another, **Then** the test output distinguishes the per-sample results
+1. **Given** the test project is run with parameter `Frank.Datastar.Basic`, **When** the folder `sample/Frank.Datastar.Basic` exists, **Then** tests execute against that sample
+2. **Given** the test project is run with parameter `Frank.Datastar.Hox`, **When** the folder `sample/Frank.Datastar.Hox` exists, **Then** tests execute against that sample
+3. **Given** the test project is run with parameter `Frank.Datastar.NewSample`, **When** the folder `sample/Frank.Datastar.NewSample` does not exist, **Then** an error message lists all available `Frank.Datastar.*` samples and exits with non-zero status
+4. **Given** the test project is run without any parameter, **When** no sample name is provided, **Then** a help message explains the required parameter format and lists available samples
+5. **Given** the test project is run with parameter `Frank.Giraffe` (not matching `Frank.Datastar.*`), **When** the parameter doesn't start with `Frank.Datastar`, **Then** an error message explains the parameter must match the `Frank.Datastar.*` pattern
 
 ---
 
-### User Story 6 - Validate Async Rendering Completion (Priority: P3)
+### User Story 6 - Clear Test Results and Failure Reporting (Priority: P2)
 
-As a developer running the test scripts, I want the tests to wait appropriately for async rendering to complete before asserting content, so that I can catch timing-related failures especially in samples like Hox that may have different rendering timing.
+As a developer, I want the browser automation to produce clear, detailed test results showing which tests passed and failed, with diagnostic information for failures, so that I can quickly identify and investigate broken behavior.
 
-**Why this priority**: Flaky tests due to timing reduce confidence in test results. However, this is lower priority than validating correctness because timing issues may not indicate actual bugs.
+**Why this priority**: Good test output accelerates debugging. Without clear failure messages, developers waste time investigating what went wrong.
 
-**Independent Test**: Can be fully tested by introducing appropriate waits or retries for content checks and verifying tests pass consistently across multiple runs.
+**Independent Test**: Can be fully tested by running tests that include intentional failures and verifying the output explains what failed and why.
 
 **Acceptance Scenarios**:
 
-1. **Given** an SSE endpoint returns content asynchronously, **When** the test checks for expected content, **Then** the test waits for the content to appear or times out with a clear message
-2. **Given** a test that previously failed intermittently, **When** run 5 times consecutively, **Then** the test produces consistent results (all pass or all fail, not a mix)
+1. **Given** all tests pass, **When** the test run completes, **Then** a summary shows all tests passed with a count
+2. **Given** a test fails, **When** the test run completes, **Then** the failure message explains what was expected vs. what was observed
+3. **Given** multiple tests fail, **When** the test run completes, **Then** all failures are listed with individual diagnostics, and the application exits with a non-zero status code
 
 ---
 
 ### Edge Cases
 
-- What happens when the server returns unexpected content type? → Test reports failure with actual content received
-- How does the test handle network timeouts vs. application errors? → Both are reported as failures with descriptive messages
-- What if expected seed data is missing or corrupted? → Early test failures indicate missing prerequisites; tests do not attempt recovery
+- What happens when the target application server is not running? → Test reports a clear connection error indicating the sample server needs to be started first
+- What happens when an SSE connection is interrupted? → Test detects the disconnection and reports it as a failure with timeout information
+- What happens when the UI takes longer than expected to update? → Tests use reasonable timeouts (configurable) and report timeout failures with the expected vs. actual state
+- What happens when running tests against an application with no seed data? → Tests detect missing prerequisites and fail with descriptive messages indicating what seed data is required
+- What happens when the `sample/` directory structure changes? → Tests dynamically discover available `Frank.Datastar.*` folders at runtime, adapting to new samples automatically
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: Test scripts MUST verify that edit forms display current entity values (not empty fields)
-- **FR-002**: Test scripts MUST verify that saved edits persist to subsequent reads
-- **FR-003**: Test scripts MUST verify that search returns matching results (not empty lists when matches exist)
-- **FR-004**: Test scripts MUST verify that bulk operations actually modify selected items' data
-- **FR-005**: Test scripts MUST verify state isolation between independent features (e.g., registration form does not affect click-to-edit values)
-- **FR-006**: Test scripts MUST clearly report which sample is being tested in output
-- **FR-007**: Test scripts MUST provide a summary of pass/fail counts at completion
-- **FR-008**: Test scripts MUST handle async content appropriately (wait for content rather than fail on timing)
-- **FR-009**: Test scripts MUST exit with non-zero status if any test fails
-- **FR-010**: Test scripts MUST be runnable independently for each sample (Basic, Hox, Oxpecker)
+#### Project Structure
+
+- **FR-001**: Test project MUST be an F# .NET test project using Playwright for browser automation
+- **FR-002**: Test project MUST be located in `sample/Frank.Datastar.Tests/` alongside other sample projects
+- **FR-003**: Test project MUST be runnable via standard `dotnet test` command
+
+#### Parameter Handling
+
+- **FR-004**: Test project MUST require a sample name parameter to specify which sample to test
+- **FR-005**: Test project MUST validate that the parameter starts with `Frank.Datastar`
+- **FR-006**: Test project MUST validate that a matching folder exists in `sample/` for the specified sample name
+- **FR-007**: Test project MUST display a help message listing available `Frank.Datastar.*` samples when no parameter is provided
+- **FR-008**: Test project MUST display an error with available samples when an invalid sample name is provided
+
+#### Test Execution
+
+- **FR-009**: Test project MUST target `http://localhost:5000` as the default base URL for all sample applications
+- **FR-010**: Test project MUST maintain an active SSE connection while performing user interactions to verify SSE-pushed updates
+- **FR-011**: Test project MUST verify that click-to-edit displays current values in the edit form (received via SSE)
+- **FR-012**: Test project MUST verify that saving edits results in updated values appearing in the display (via SSE)
+- **FR-013**: Test project MUST verify that search filtering updates the list with matching results (via SSE)
+- **FR-014**: Test project MUST verify that bulk operations update selected items' statuses (via SSE)
+- **FR-015**: Test project MUST verify that different forms maintain state isolation
+- **FR-016**: Test project MUST wait for SSE updates with a default timeout of 5 seconds (configurable)
+
+#### Output and Reporting
+
+- **FR-017**: Test project MUST produce clear pass/fail output with diagnostic information for failures
+- **FR-018**: Test project MUST exit with non-zero status code if any test fails
+- **FR-019**: Test project MUST report which sample was tested in the output
 
 ### Key Entities
 
-- **Sample Application**: A self-contained demo application (Basic, Hox, or Oxpecker) that implements standard features using different view engines
-- **Test Script**: A bash script that validates sample application behavior through HTTP requests
-- **Contact**: An entity with first name, last name, and email that supports view and click-to-edit operations
-- **Fruit List**: A searchable list of fruit names used for search filtering validation
-- **User**: An entity with an active/inactive status used for bulk update validation
-- **Registration Form**: A form for creating new users, should be isolated from other forms
+- **Test Project**: An F# Playwright test project (`sample/Frank.Datastar.Tests/`) that runs browser automation tests
+- **Sample Name Parameter**: A required string parameter matching pattern `Frank.Datastar.*` that identifies which sample to test
+- **Target Sample**: One of the Frank.Datastar sample applications (Basic, Hox, Oxpecker, or future additions) located in `sample/`
+- **SSE Connection**: A persistent connection that receives server-pushed UI updates; tests must verify updates arrive through this channel
+- **Test Result**: The outcome of a single test case including pass/fail status and diagnostic information
+- **Contact**: An entity with first name, last name, and email that supports click-to-edit operations
+- **Fruit List**: A searchable list used for search filtering validation
+- **User**: An entity with active/inactive status used for bulk update validation
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of known behavioral issues (click-to-edit values, search clearing, bulk updates) are detected by the enhanced tests when the bugs are present
-- **SC-002**: Tests run to completion in under 30 seconds per sample application
-- **SC-003**: Test scripts produce consistent results across 5 consecutive runs (no flaky failures due to timing)
-- **SC-004**: All three samples (Basic, Hox, Oxpecker) can be tested with the same test structure, with clear per-sample reporting
-- **SC-005**: A developer can identify from the test output alone which specific feature is broken in which sample
+- **SC-001**: Tests correctly identify when SSE updates do not arrive (detecting the curl-based test limitation that prompted this change)
+- **SC-002**: Tests detect all previously-identified bugs: click-to-edit not showing current values, search clearing the list, bulk updates not modifying data
+- **SC-003**: The same test suite runs successfully against all three sample applications (Basic, Hox, Oxpecker) by changing only the sample name parameter
+- **SC-004**: Test suite completes in under 60 seconds per sample application
+- **SC-005**: Test failures include enough diagnostic information for a developer to understand what went wrong without re-running manually
+- **SC-006**: Running the test suite 5 times consecutively produces consistent results (no flaky failures due to timing)
+- **SC-007**: Running `dotnet test` without parameters displays a helpful message listing all available `Frank.Datastar.*` samples
+- **SC-008**: Adding a new `Frank.Datastar.NewEngine` sample folder makes it immediately available as a test target without code changes
 
 ## Assumptions
 
-- Sample applications have seed data pre-loaded (at least one contact with known values, fruits list with known items, users with known statuses)
-- The server is running before tests are executed (tests may fail-fast if server is unavailable)
-- HTTP status codes alone are not sufficient for validation; response content must also be verified
-- The test scripts will use curl or similar tools available in standard bash environments
-- SSE (Server-Sent Events) endpoints may require special handling for timeouts as the connection stays open
-- Tests are sequential and stateful: each test may depend on state changes from previous tests
-- Single-user model: samples use a single SSE channel and don't support concurrent users
-- Tests verify known, expected behavior - not complex concurrent or edge-case scenarios
+- Playwright supports F# through its .NET bindings
+- Sample applications have seed data pre-loaded (at least one contact with known values, fruits list, users with known statuses)
+- The target sample application server is started separately before running tests
+- SSE connections can be observed through Playwright's browser automation capabilities
+- Tests run sequentially (not in parallel) to avoid SSE channel conflicts since samples are single-user
+- The test project will reference sample folder paths relative to its location in `sample/`
+- All sample applications run on port 5000 (configured via launchSettings.json); only one sample runs at a time
+- Tests always target `http://localhost:5000` - the user ensures the correct sample is running before executing tests
 
 ## Out of Scope
 
 - Fixing bugs in the sample applications (Basic, Hox, Oxpecker) - tests only detect and report issues
 - Modifying the sample application source code
 - Adding new features to the sample applications
+- Testing concurrent user scenarios (samples are explicitly single-user)
+- Performance/load testing beyond basic timeout verification
+- Maintaining the existing bash test.sh scripts (these will be superseded by the browser automation approach)
+- Automatic server startup (the sample server must be running before tests execute)

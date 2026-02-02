@@ -1,139 +1,171 @@
-# Data Model: Enhanced Sample Test Validation
+# Data Model: Browser Automation Test Suite
 
+**Date**: 2026-01-28
 **Feature**: 005-fix-sample-tests
-**Date**: 2026-01-27
 
 ## Overview
 
-This document defines the test data model - the entities, expected values, and state transitions that tests validate. Tests do not create new data structures; they verify the existing sample application data.
+This test project doesn't create or persist data. It validates data displayed by sample applications through browser automation. The data model describes the test infrastructure entities and the domain entities being validated.
 
-## Test Entities
+## Test Infrastructure Entities
 
-### Contact (Click-to-Edit)
+### TestConfiguration
 
-**Seed Data**:
-| ID | First Name | Last Name | Email |
-|----|------------|-----------|-------|
-| 1 | Joe | Smith | joe@smith.org |
+Runtime configuration for test execution.
 
-**States**:
-- View mode: Displays contact info with "Edit" button
-- Edit mode: Shows form with `data-bind` inputs pre-populated with current values
-
-**State Transitions**:
-```
-View → (GET /contacts/1/edit) → Edit
-Edit → (PUT /contacts/1) → View (with updated values)
-Edit → (GET /contacts/1) → View (cancel, original values)
-```
-
-**Validation Points**:
-- Edit form shows current values in `data-signals` attribute
-- After PUT, view shows updated values
-- After cancel, view shows original values
-
-### Fruits (Search Filtering)
-
-**Seed Data**: 22 fruits alphabetically ordered
-- Apple, Apricot, Banana, Blueberry, Cherry, Coconut, Date, Fig, Grape, Kiwi, Lemon, Lime, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Raspberry, Strawberry, Watermelon
-
-**Search Behavior**:
-| Query | Expected Results | Not Included |
-|-------|------------------|--------------|
-| "ap" | Apple, Apricot, Grape, Papaya | Banana, Cherry, etc. |
-| "berry" | Blueberry, Raspberry, Strawberry | Apple, etc. |
-| "xyz" | (empty) | All items |
-| "" | All 22 fruits | None |
-
-**Validation Points**:
-- Search returns matching items (case-insensitive contains)
-- Search does not return non-matching items
-- Empty/cleared search returns full list
-
-### Users (Bulk Update)
-
-**Seed Data**:
-| ID | Name | Email | Initial Status |
-|----|------|-------|----------------|
-| 1 | Joe Smith | joe@smith.org | Active |
-| 2 | Jane Doe | jane@doe.com | Inactive |
-| 3 | Bob Wilson | bob@wilson.net | Active |
-| 4 | Alice Brown | alice@brown.io | Inactive |
-
-**Bulk Update Behavior**:
-- `PUT /users/bulk?status=active` with `selections: [true, false, true, false]` activates users 1 and 3
-- `PUT /users/bulk?status=inactive` with `selections: [false, true, false, true]` deactivates users 2 and 4
-
-**Validation Points**:
-- After bulk activate, selected users show "Active" status
-- After bulk deactivate, selected users show "Inactive" status
-- Non-selected users retain their original status
-
-### Items (Row Deletion)
-
-**Seed Data**:
-| ID | Name |
-|----|------|
-| 1 | Item 1 |
-| 2 | Item 2 |
-| 3 | Item 3 |
-| 4 | Item 4 |
-
-**Deletion Behavior**:
-- `DELETE /items/{id}` removes item from list
-- Subsequent GET does not include deleted item
-
-**Validation Points**:
-- After DELETE, item no longer appears in table
-- DELETE of non-existent ID returns 404
-
-### Registration (Form Validation)
-
-**Seed Data**: Empty (no pre-existing registrations)
+| Field | Type | Source | Description |
+|-------|------|--------|-------------|
+| SampleName | string | `DATASTAR_SAMPLE` env var | Required sample to test (e.g., "Frank.Datastar.Basic") |
+| BaseUrl | string | `DATASTAR_BASE_URL` env var | Default: "http://localhost:5000" |
+| TimeoutMs | int | `DATASTAR_TIMEOUT_MS` env var | Default: 5000 |
+| AvailableSamples | string list | Filesystem discovery | Discovered `Frank.Datastar.*` folders |
 
 **Validation Rules**:
-| Field | Rule |
-|-------|------|
-| email | Required, must contain "@" |
-| firstName | Required |
-| lastName | Required |
+- `SampleName` must start with "Frank.Datastar."
+- `SampleName` must exist in `AvailableSamples`
+- `TimeoutMs` must be positive integer
 
-**State Transitions**:
+### TestResult
+
+Represents outcome of a single test case.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| TestName | string | Full test name (e.g., "ClickToEditTests.EditFormShowsCurrentValues") |
+| Status | Pass \| Fail \| Skip | Test outcome |
+| Duration | TimeSpan | Execution time |
+| ErrorMessage | string option | Present when Status = Fail |
+| Screenshot | string option | Path to failure screenshot (optional) |
+
+## Domain Entities (Under Test)
+
+These entities exist in the sample applications. Tests verify their behavior through the UI.
+
+### Contact
+
+Displayed in click-to-edit feature.
+
+| Field | Type | Seed Value | Description |
+|-------|------|------------|-------------|
+| Id | int | 1 | Contact identifier |
+| FirstName | string | "Joe" | First name (editable) |
+| LastName | string | "Smith" | Last name (editable) |
+| Email | string | "joe@smith.org" | Email address (editable) |
+
+**UI Selectors** (expected in samples):
+- View mode: `#contact-view`, `.contact-firstname`, `.contact-lastname`, `.contact-email`
+- Edit button: `[data-action="edit"]` or similar
+- Edit form: `#contact-edit`, `input[name="firstName"]`, `input[name="lastName"]`, `input[name="email"]`
+- Save button: `[data-action="save"]` or `button[type="submit"]`
+
+### Fruit
+
+Displayed in searchable list.
+
+| Field | Type | Seed Values | Description |
+|-------|------|-------------|-------------|
+| Name | string | "Apple", "Apricot", "Banana", "Cherry", "Date" | Fruit name |
+
+**UI Selectors** (expected in samples):
+- List container: `#fruits-list` or `[data-list="fruits"]`
+- List items: `.fruit-item` or `li`
+- Search input: `input[name="search"]` or `#fruit-search`
+
+### User
+
+Displayed in bulk update feature.
+
+| Field | Type | Seed Values | Description |
+|-------|------|-------------|-------------|
+| Id | int | 1, 2, 3, 4 | User identifier |
+| Name | string | Various | User display name |
+| Status | Active \| Inactive | Mixed | Current status |
+
+**UI Selectors** (expected in samples):
+- Table: `#users-table`
+- Row checkbox: `input[type="checkbox"][data-user-id]`
+- Status indicator: `.user-status` or `[data-status]`
+- Bulk activate button: `[data-action="bulk-activate"]`
+- Bulk deactivate button: `[data-action="bulk-deactivate"]`
+
+### Registration Form
+
+Separate form for state isolation testing.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| FirstName | string | Registration first name input |
+| LastName | string | Registration last name input |
+| Email | string | Registration email input |
+
+**UI Selectors** (expected in samples):
+- Form: `#registration-form`
+- Inputs: `input[name="regFirstName"]`, `input[name="regLastName"]`, `input[name="regEmail"]`
+
+## Element Wait Patterns
+
+### SSE Update Detection
+
+Since SSE pushes HTML fragments that replace DOM content, tests must wait for content changes:
+
+```fsharp
+// Pattern: Wait for text content to match expected value
+let waitForText (page: IPage) (selector: string) (expected: string) (timeoutMs: int) = task {
+    do! page.WaitForFunctionAsync(
+        sprintf "() => document.querySelector('%s')?.textContent?.trim() === '%s'" selector expected,
+        PageWaitForFunctionOptions(Timeout = float timeoutMs)
+    )
+}
+
+// Pattern: Wait for element to contain text (partial match)
+let waitForTextContains (page: IPage) (selector: string) (substring: string) (timeoutMs: int) = task {
+    do! page.WaitForFunctionAsync(
+        sprintf "() => document.querySelector('%s')?.textContent?.includes('%s')" selector substring,
+        PageWaitForFunctionOptions(Timeout = float timeoutMs)
+    )
+}
+
+// Pattern: Wait for element to appear
+let waitForVisible (page: IPage) (selector: string) (timeoutMs: int) = task {
+    do! page.Locator(selector).WaitForAsync(
+        LocatorWaitForOptions(State = WaitForSelectorState.Visible, Timeout = float timeoutMs)
+    )
+}
+
+// Pattern: Wait for element to disappear
+let waitForHidden (page: IPage) (selector: string) (timeoutMs: int) = task {
+    do! page.Locator(selector).WaitForAsync(
+        LocatorWaitForOptions(State = WaitForSelectorState.Hidden, Timeout = float timeoutMs)
+    )
+}
 ```
-Empty form → (POST /registrations/validate with empty) → Error feedback
-Empty form → (POST /registrations/validate with valid) → Success feedback
-Valid form → (POST /registrations) → 201 Created, success message
-Duplicate email → (POST /registrations) → 409 Conflict
+
+## State Transitions
+
+### Click-to-Edit Flow
+
+```
+View Mode → [Click Edit] → Edit Mode → [Click Save] → View Mode (updated)
+                              ↓
+                        [Click Cancel]
+                              ↓
+                        View Mode (unchanged)
 ```
 
-**Validation Points**:
-- Empty fields produce error messages
-- Valid fields produce success message
-- Successful registration returns 201
-- Duplicate email returns 409
+### Search Filter Flow
 
-## State Isolation Requirements
+```
+Full List → [Type Query] → Filtered List → [Clear Query] → Full List
+```
 
-Tests must verify that these entities maintain separate state:
+### Bulk Update Flow
 
-| Entity A | Entity B | Isolation Requirement |
-|----------|----------|----------------------|
-| Registration form | Contact edit form | email field in registration does not affect contact email |
-| Contact signals | Registration signals | firstName/lastName are independent |
+```
+Initial State → [Select Items] → Items Selected → [Click Action] → Updated State
+```
 
-**Validation Points**:
-- Submitting registration form does not change contact data
-- Editing contact does not affect registration form values
+## Notes
 
-## Test Sequence
-
-Tests are sequential and stateful. Recommended order:
-
-1. **Prerequisite checks**: Server running, seed data present
-2. **Click-to-edit tests**: View → Edit → Save → Verify
-3. **Search tests**: Full list → Filter → Clear → Verify
-4. **Bulk update tests**: Initial state → Bulk activate → Verify → Bulk deactivate → Verify
-5. **Item deletion tests**: Initial count → Delete → Verify count decreased
-6. **Registration tests**: Validate empty → Validate valid → Create → Duplicate
-7. **State isolation tests**: Cross-feature verification
-8. **405 tests**: Method not allowed responses
+- Actual UI selectors may vary between samples (Basic, Hox, Oxpecker)
+- Tests should use resilient locators that work across implementations
+- If selectors differ significantly, consider data-testid attributes in samples
