@@ -18,3 +18,7 @@ if ($env:appveyor){
 
 dotnet build -c Release Frank.sln /p:Version=$version$versionSuffix
 dotnet pack --no-build -c Release src/Frank /p:Version=$version$versionSuffix -o $psscriptroot/bin
+
+dotnet build -c Release Frank.Datastar.sln /p:Version=$version$versionSuffix
+dotnet test test/Frank.Datastar.Tests
+dotnet pack --no-build -c Release src/Frank.Datastar /p:Version=$version$versionSuffix -o $psscriptroot/bin

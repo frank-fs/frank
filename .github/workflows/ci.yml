@@ -22,12 +22,19 @@ jobs:
           dotnet-version: |
             8.0.x
             9.0.x
+            10.0.x
       - name: Build
         run: |
-          dotnet restore
+          dotnet restore Frank.sln
           dotnet build Frank.sln -c Release --no-restore
+          dotnet restore Frank.Datastar.sln
+          dotnet build Frank.Datastar.sln -c Release --no-restore
+      - name: Test
+        run: dotnet test test/Frank.Datastar.Tests
       - name: Pack
-        run: dotnet pack src/Frank -c Release --no-restore --no-build --include-symbols -o out
+        run: |
+          dotnet pack src/Frank -c Release --no-restore --no-build --include-symbols -o out
+          dotnet pack src/Frank.Datastar -c Release --no-restore --no-build --include-symbols -o out
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

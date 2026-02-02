@@ -1,3 +1,9 @@
+### New in 6.4.0 (Released 2026-02-02)
+
+- Updated to target net8.0, net9.0, and net10.0
+- Add Frank.Datastar
+- Updated samples and added samples for Frank.Datastar
+
 ### New in 6.3.0 (Released 2025-03-14)
 
 - Updated to target net8.0 and net9.0
