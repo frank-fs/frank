@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Description>F# Analyzers for Frank web framework - detects common issues at compile-time</Description>
+    <PackageTags>fsharp;analyzer;frank;web</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="DuplicateHandlerAnalyzer.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="10.0.101" />
+    <PackageReference Include="FSharp.Analyzers.SDK" Version="0.35.*" />
+  </ItemGroup>
+
+</Project>

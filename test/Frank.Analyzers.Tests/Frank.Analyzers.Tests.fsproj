@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="fixtures/DuplicateGet.fs" />
+    <Compile Include="fixtures/ValidSingleHandlers.fs" />
+    <Compile Include="fixtures/MultipleResources.fs" />
+    <Compile Include="fixtures/DuplicatePost.fs" />
+    <Compile Include="fixtures/DuplicatePut.fs" />
+    <Compile Include="fixtures/DuplicateDelete.fs" />
+    <Compile Include="fixtures/DuplicatePatch.fs" />
+    <Compile Include="fixtures/DuplicateHead.fs" />
+    <Compile Include="fixtures/DuplicateOptions.fs" />
+    <Compile Include="fixtures/DuplicateConnect.fs" />
+    <Compile Include="fixtures/DuplicateTrace.fs" />
+    <Compile Include="fixtures/AllMethodsOnce.fs" />
+    <Compile Include="fixtures/DatastarConflict.fs" />
+    <Compile Include="fixtures/DatastarWithPost.fs" />
+    <Compile Include="fixtures/DatastarNoConflict.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="10.0.102" />
+  </ItemGroup>
+
+</Project>

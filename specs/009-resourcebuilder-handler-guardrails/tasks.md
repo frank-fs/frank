@@ -19,10 +19,10 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create src/Frank.Analyzers/ directory structure
-- [ ] T002 Create src/Frank.Analyzers/Frank.Analyzers.fsproj with FSharp.Analyzers.SDK 0.35.* reference and multi-target net8.0;net9.0;net10.0
-- [ ] T003 Create test/Frank.Analyzers.Tests/ directory structure with fixtures/ subdirectory
-- [ ] T004 Create test/Frank.Analyzers.Tests/Frank.Analyzers.Tests.fsproj as minimal project to compile fixtures (reference Frank package)
+- [X] T001 Create src/Frank.Analyzers/ directory structure
+- [X] T002 Create src/Frank.Analyzers/Frank.Analyzers.fsproj with FSharp.Analyzers.SDK 0.35.* reference and multi-target net8.0;net9.0;net10.0
+- [X] T003 Create test/Frank.Analyzers.Tests/ directory structure with fixtures/ subdirectory
+- [X] T004 Create test/Frank.Analyzers.Tests/Frank.Analyzers.Tests.fsproj as minimal project to compile fixtures (reference Frank package)
 
 ---
 
@@ -32,17 +32,17 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement HttpMethod type in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs (DU with GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE)
-- [ ] T006 Implement httpMethodOperations set containing all 9 method identifier names in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T007 Implement tryGetHttpMethodName function to extract method name from SynExpr.Ident in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T008 Implement DuplicateHandlerWalker type inheriting SyntaxCollectorBase in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T009 Implement WalkExpr override for SynExpr.ComputationExpr (context push/pop) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T010 Implement WalkExpr override for SynExpr.App (HTTP method detection) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T011 Implement createDuplicateDiagnostic function with FRANK001 code and warning severity in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T012 Implement analyzeFile function that creates walker and runs ASTCollecting.walkAst in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T013 [P] Add [<EditorAnalyzer>] attributed function wrapping analyzeFile in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T014 [P] Add [<CliAnalyzer>] attributed function wrapping analyzeFile in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T015 Build and verify src/Frank.Analyzers compiles without errors
+- [X] T005 Implement HttpMethod type in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs (DU with GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE)
+- [X] T006 Implement httpMethodOperations set containing all 9 method identifier names in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T007 Implement tryGetHttpMethodName function to extract method name from SynExpr.Ident in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T008 Implement DuplicateHandlerWalker type inheriting SyntaxCollectorBase in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T009 Implement WalkExpr override for SynExpr.ComputationExpr (context push/pop) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T010 Implement WalkExpr override for SynExpr.App (HTTP method detection) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T011 Implement createDuplicateDiagnostic function with FRANK001 code and warning severity in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T012 Implement analyzeFile function that creates walker and runs ASTCollecting.walkAst in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T013 [P] Add [<EditorAnalyzer>] attributed function wrapping analyzeFile in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T014 [P] Add [<CliAnalyzer>] attributed function wrapping analyzeFile in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T015 Build and verify src/Frank.Analyzers compiles without errors
 
 **Checkpoint**: Analyzer infrastructure ready - user story fixtures can now be created
 
@@ -56,17 +56,17 @@
 
 ### Test Fixtures for User Story 1
 
-- [ ] T016 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/DuplicateGet.fs with resource containing two get handlers
-- [ ] T017 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/ValidSingleHandlers.fs with resource containing one get and one post handler (no warnings expected)
-- [ ] T018 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/MultipleResources.fs with two separate resources each with one get handler (no warnings expected)
+- [X] T016 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/DuplicateGet.fs with resource containing two get handlers
+- [X] T017 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/ValidSingleHandlers.fs with resource containing one get and one post handler (no warnings expected)
+- [X] T018 [P] [US1] Create test/Frank.Analyzers.Tests/fixtures/MultipleResources.fs with two separate resources each with one get handler (no warnings expected)
 
 ### Test Script for User Story 1
 
-- [ ] T019 [US1] Create test/Frank.Analyzers.Tests/run-analyzer-tests.sh with build and test execution logic
-- [ ] T020 [US1] Add test case in run-analyzer-tests.sh for DuplicateGet.fs expecting FRANK001 warning with GET
-- [ ] T021 [US1] Add test case in run-analyzer-tests.sh for ValidSingleHandlers.fs expecting no warnings
-- [ ] T022 [US1] Add test case in run-analyzer-tests.sh for MultipleResources.fs expecting no warnings
-- [ ] T023 [US1] Run run-analyzer-tests.sh and verify all User Story 1 tests pass
+- [X] T019 [US1] Create test/Frank.Analyzers.Tests/run-analyzer-tests.sh with build and test execution logic
+- [X] T020 [US1] Add test case in run-analyzer-tests.sh for DuplicateGet.fs expecting FRANK001 warning with GET
+- [X] T021 [US1] Add test case in run-analyzer-tests.sh for ValidSingleHandlers.fs expecting no warnings
+- [X] T022 [US1] Add test case in run-analyzer-tests.sh for MultipleResources.fs expecting no warnings
+- [X] T023 [US1] Run run-analyzer-tests.sh and verify all User Story 1 tests pass
 
 **Checkpoint**: Core duplicate detection works for GET method - MVP functional
 
@@ -80,9 +80,9 @@
 
 ### Verification for User Story 2
 
-- [ ] T024 [US2] Update test/Frank.Analyzers.Tests/run-analyzer-tests.sh to verify diagnostic message format includes method name
-- [ ] T025 [US2] Update test/Frank.Analyzers.Tests/run-analyzer-tests.sh to verify diagnostic message includes line number reference
-- [ ] T026 [US2] Run run-analyzer-tests.sh and verify message format tests pass
+- [X] T024 [US2] Update test/Frank.Analyzers.Tests/run-analyzer-tests.sh to verify diagnostic message format includes method name
+- [X] T025 [US2] Update test/Frank.Analyzers.Tests/run-analyzer-tests.sh to verify diagnostic message includes line number reference
+- [X] T026 [US2] Run run-analyzer-tests.sh and verify message format tests pass
 
 **Checkpoint**: Diagnostic messages are clear and actionable
 
@@ -96,21 +96,21 @@
 
 ### Test Fixtures for User Story 3
 
-- [ ] T027 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePost.fs with resource containing two post handlers
-- [ ] T028 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePut.fs with resource containing two put handlers
-- [ ] T029 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateDelete.fs with resource containing two delete handlers
-- [ ] T030 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePatch.fs with resource containing two patch handlers
-- [ ] T031 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateHead.fs with resource containing two head handlers
-- [ ] T032 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateOptions.fs with resource containing two options handlers
-- [ ] T033 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateConnect.fs with resource containing two connect handlers
-- [ ] T034 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateTrace.fs with resource containing two trace handlers
-- [ ] T035 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/AllMethodsOnce.fs with resource containing one of each of the 9 methods (no warnings expected)
+- [X] T027 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePost.fs with resource containing two post handlers
+- [X] T028 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePut.fs with resource containing two put handlers
+- [X] T029 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateDelete.fs with resource containing two delete handlers
+- [X] T030 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicatePatch.fs with resource containing two patch handlers
+- [X] T031 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateHead.fs with resource containing two head handlers
+- [X] T032 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateOptions.fs with resource containing two options handlers
+- [X] T033 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateConnect.fs with resource containing two connect handlers
+- [X] T034 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/DuplicateTrace.fs with resource containing two trace handlers
+- [X] T035 [P] [US3] Create test/Frank.Analyzers.Tests/fixtures/AllMethodsOnce.fs with resource containing one of each of the 9 methods (no warnings expected)
 
 ### Test Script Updates for User Story 3
 
-- [ ] T036 [US3] Add test cases in run-analyzer-tests.sh for all DuplicateXxx.fs fixtures expecting FRANK001 with respective method
-- [ ] T037 [US3] Add test case in run-analyzer-tests.sh for AllMethodsOnce.fs expecting no warnings
-- [ ] T038 [US3] Run run-analyzer-tests.sh and verify all User Story 3 tests pass
+- [X] T036 [US3] Add test cases in run-analyzer-tests.sh for all DuplicateXxx.fs fixtures expecting FRANK001 with respective method
+- [X] T037 [US3] Add test case in run-analyzer-tests.sh for AllMethodsOnce.fs expecting no warnings
+- [X] T038 [US3] Run run-analyzer-tests.sh and verify all User Story 3 tests pass
 
 **Checkpoint**: All 9 HTTP methods are covered with 100% consistency
 
@@ -124,21 +124,21 @@
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Add "datastar" to operation detection in tryGetHttpMethodName in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T040 [US4] Implement datastar HTTP method resolution (default GET, or explicit method from first argument) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T039 [US4] Add "datastar" to operation detection in tryGetHttpMethodName in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T040 [US4] Implement datastar HTTP method resolution (default GET, or explicit method from first argument) in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
 
 ### Test Fixtures for User Story 4
 
-- [ ] T041 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarConflict.fs with resource containing datastar and get handler (should warn)
-- [ ] T042 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarWithPost.fs with resource containing datastar HttpMethods.Post and post handler (should warn)
-- [ ] T043 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarNoConflict.fs with resource containing datastar and post handler (no warning - different methods)
+- [X] T041 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarConflict.fs with resource containing datastar and get handler (should warn)
+- [X] T042 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarWithPost.fs with resource containing datastar HttpMethods.Post and post handler (should warn)
+- [X] T043 [P] [US4] Create test/Frank.Analyzers.Tests/fixtures/DatastarNoConflict.fs with resource containing datastar and post handler (no warning - different methods)
 
 ### Test Script Updates for User Story 4
 
-- [ ] T044 [US4] Add test case in run-analyzer-tests.sh for DatastarConflict.fs expecting FRANK001 with GET
-- [ ] T045 [US4] Add test case in run-analyzer-tests.sh for DatastarWithPost.fs expecting FRANK001 with POST
-- [ ] T046 [US4] Add test case in run-analyzer-tests.sh for DatastarNoConflict.fs expecting no warnings
-- [ ] T047 [US4] Run run-analyzer-tests.sh and verify all User Story 4 tests pass
+- [X] T044 [US4] Add test case in run-analyzer-tests.sh for DatastarConflict.fs expecting FRANK001 with GET
+- [X] T045 [US4] Add test case in run-analyzer-tests.sh for DatastarWithPost.fs expecting FRANK001 with POST
+- [X] T046 [US4] Add test case in run-analyzer-tests.sh for DatastarNoConflict.fs expecting no warnings
+- [X] T047 [US4] Run run-analyzer-tests.sh and verify all User Story 4 tests pass
 
 **Checkpoint**: Datastar extension compatibility complete
 
@@ -152,14 +152,14 @@
 
 ### Implementation for User Story 5
 
-- [ ] T048 [US5] Verify [<CliAnalyzer>] registration works with fsharp-analyzers tool by running against test fixtures
-- [ ] T049 [US5] Document CLI usage in specs/009-resourcebuilder-handler-guardrails/quickstart.md (verify existing content is accurate)
-- [ ] T050 [US5] Verify exit codes from fsharp-analyzers tool (non-zero when warnings present, if supported)
+- [X] T048 [US5] Verify [<CliAnalyzer>] registration works with fsharp-analyzers tool by running against test fixtures
+- [X] T049 [US5] Document CLI usage in specs/009-resourcebuilder-handler-guardrails/quickstart.md (verify existing content is accurate)
+- [X] T050 [US5] Verify exit codes from fsharp-analyzers tool (non-zero when warnings present, if supported)
 
 ### CI Integration for User Story 5
 
-- [ ] T051 [US5] Ensure run-analyzer-tests.sh returns non-zero exit code on test failure
-- [ ] T052 [US5] Run full test suite via run-analyzer-tests.sh to validate CI readiness
+- [X] T051 [US5] Ensure run-analyzer-tests.sh returns non-zero exit code on test failure
+- [X] T052 [US5] Run full test suite via run-analyzer-tests.sh to validate CI readiness
 
 **Checkpoint**: CLI and CI/CD support verified and documented
 
@@ -169,10 +169,10 @@
 
 **Purpose**: Final cleanup and validation
 
-- [ ] T053 [P] Add XML documentation comments to public analyzer functions in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
-- [ ] T054 [P] Update specs/009-resourcebuilder-handler-guardrails/quickstart.md with final usage examples
-- [ ] T055 Run complete test suite and verify all fixtures pass
-- [ ] T056 Build analyzer in Release mode and verify NuGet package metadata
+- [X] T053 [P] Add XML documentation comments to public analyzer functions in src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs
+- [X] T054 [P] Update specs/009-resourcebuilder-handler-guardrails/quickstart.md with final usage examples
+- [X] T055 Run complete test suite and verify all fixtures pass
+- [X] T056 Build analyzer in Release mode and verify NuGet package metadata
 - [ ] T057 Manual verification: Load analyzer in IDE (Ionide/VS/Rider) and confirm warnings display correctly
 
 ---
