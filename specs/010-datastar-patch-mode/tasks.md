@@ -24,8 +24,8 @@
 
 **Purpose**: Verify build environment and existing tests pass before changes
 
-- [ ] T001 Verify project builds: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj`
-- [ ] T002 Verify existing tests pass: `dotnet test test/Frank.Datastar.Tests/`
+- [x] T001 Verify project builds: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj`
+- [x] T002 Verify existing tests pass: `dotnet test test/Frank.Datastar.Tests/`
 
 **Checkpoint**: Existing codebase verified working
 
@@ -41,21 +41,21 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T003 [P] [US1] Add test `patchElementsWithOptions sends custom mode` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T004 [P] [US1] Add test `patchSignalsWithOptions sends onlyIfMissing option` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T005 [P] [US1] Add test `removeElementWithOptions sends useViewTransition option` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T006 [P] [US1] Add test `executeScriptWithOptions respects autoRemove false` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T007 [P] [US1] Add test `tryReadSignalsWithOptions uses custom JsonSerializerOptions` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T003 [P] [US1] Add test `patchElementsWithOptions sends custom mode` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T004 [P] [US1] Add test `patchSignalsWithOptions sends onlyIfMissing option` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T005 [P] [US1] Add test `removeElementWithOptions sends useViewTransition option` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T006 [P] [US1] Add test `executeScriptWithOptions respects autoRemove false` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T007 [P] [US1] Add test `tryReadSignalsWithOptions uses custom JsonSerializerOptions` in test/Frank.Datastar.Tests/DatastarTests.fs
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Add `System.Text.Json` open statement if needed in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T009 [P] [US1] Implement `patchElementsWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T010 [P] [US1] Implement `patchSignalsWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T011 [P] [US1] Implement `removeElementWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T012 [P] [US1] Implement `executeScriptWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T013 [P] [US1] Implement `tryReadSignalsWithOptions<'T>` inline function in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T014 [US1] Verify all US1 tests pass: `dotnet test test/Frank.Datastar.Tests/`
+- [x] T008 [US1] Add `System.Text.Json` open statement if needed in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T009 [P] [US1] Implement `patchElementsWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T010 [P] [US1] Implement `patchSignalsWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T011 [P] [US1] Implement `removeElementWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T012 [P] [US1] Implement `executeScriptWithOptions` inline function in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T013 [P] [US1] Implement `tryReadSignalsWithOptions<'T>` inline function in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T014 [US1] Verify all US1 tests pass: `dotnet test test/Frank.Datastar.Tests/`
 
 **Checkpoint**: All 5 `WithOptions` functions implemented and tested with non-default options
 
@@ -69,15 +69,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T015 [P] [US2] Add test `patchElementsWithOptions with Defaults equals patchElements output` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T016 [P] [US2] Add test `patchSignalsWithOptions with Defaults equals patchSignals output` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T017 [P] [US2] Add test `removeElementWithOptions with Defaults equals removeElement output` in test/Frank.Datastar.Tests/DatastarTests.fs
-- [ ] T018 [P] [US2] Add test `executeScriptWithOptions with Defaults equals executeScript output` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T015 [P] [US2] Add test `patchElementsWithOptions with Defaults equals patchElements output` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T016 [P] [US2] Add test `patchSignalsWithOptions with Defaults equals patchSignals output` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T017 [P] [US2] Add test `removeElementWithOptions with Defaults equals removeElement output` in test/Frank.Datastar.Tests/DatastarTests.fs
+- [x] T018 [P] [US2] Add test `executeScriptWithOptions with Defaults equals executeScript output` in test/Frank.Datastar.Tests/DatastarTests.fs
 
 ### Verification for User Story 2
 
-- [ ] T019 [US2] Run full test suite including existing tests: `dotnet test test/Frank.Datastar.Tests/`
-- [ ] T020 [US2] Verify existing simple helpers are unchanged (no modifications to existing function bodies)
+- [x] T019 [US2] Run full test suite including existing tests: `dotnet test test/Frank.Datastar.Tests/`
+- [x] T020 [US2] Verify existing simple helpers are unchanged (no modifications to existing function bodies)
 
 **Checkpoint**: Backward compatibility verified; existing API unchanged
 
@@ -87,11 +87,11 @@
 
 **Purpose**: Multi-target verification and documentation
 
-- [ ] T021 [P] Verify build succeeds for net8.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net8.0`
-- [ ] T022 [P] Verify build succeeds for net9.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net9.0`
-- [ ] T023 [P] Verify build succeeds for net10.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net10.0`
-- [ ] T024 Add XML doc comments to all 5 new functions in src/Frank.Datastar/Frank.Datastar.fs
-- [ ] T025 Final test run: `dotnet test test/Frank.Datastar.Tests/`
+- [x] T021 [P] Verify build succeeds for net8.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net8.0`
+- [x] T022 [P] Verify build succeeds for net9.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net9.0`
+- [x] T023 [P] Verify build succeeds for net10.0: `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj -f net10.0`
+- [x] T024 Add XML doc comments to all 5 new functions in src/Frank.Datastar/Frank.Datastar.fs
+- [x] T025 Final test run: `dotnet test test/Frank.Datastar.Tests/`
 
 ---
 
