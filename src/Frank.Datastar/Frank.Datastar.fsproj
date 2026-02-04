@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>1.0.0</Version>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageTags>datastar;sse;hypermedia;reactive</PackageTags>
     <Description>Datastar SSE integration for Frank web framework with F# computation expression support</Description>
@@ -12,7 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Frank" Version="6.*" />
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="StarFederation.Datastar.FSharp" Version="*" />
   </ItemGroup>
 

@@ -10,11 +10,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Frank.Datastar\Frank.Datastar.fsproj" />
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Frank" Version="6.*" />
     <PackageReference Include="Oxpecker.ViewEngine" Version="2.*" />
   </ItemGroup>
 
