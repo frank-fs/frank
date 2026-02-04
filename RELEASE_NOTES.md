@@ -1,3 +1,8 @@
+### New in 6.4.1 (Released 2026-02-04)
+
+- Add Frank.Analyzers to assist with validating resource definitions
+- Added additional Frank.Datastar helpers to use more StarFederation.Datastar options
+
 ### New in 6.4.0 (Released 2026-02-02)
 
 - Updated to target net8.0, net9.0, and net10.0
