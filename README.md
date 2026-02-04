@@ -10,14 +10,27 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 
 ---
 
+## Packages
+
+| Package | Description | NuGet |
+|---------|-------------|-------|
+| **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/) |
+| **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
+| **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
+
+---
+
 ## Features
 
 - `WebHostBuilder` - computation expression for configuring `WebHost`
 - `ResourceBuilder` - computation expression for configuring resources (routing)
 - **No** pre-defined view engine - use your preferred view engine implementation,
-  e.g. [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup)
-  or [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/)
+  e.g. [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup),
+  [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/),
+  or [Hox](https://github.com/AngelMunoz/Hox)
 - Easy extensibility - just extend the `Builder` with your own methods!
+
+### Basic Example
 
 ```fsharp
 module Program
@@ -61,6 +74,98 @@ let main args =
 
 ---
 
+## Frank.Datastar
+
+Frank.Datastar provides seamless integration with [Datastar](https://data-star.dev/), enabling reactive hypermedia applications using Server-Sent Events (SSE).
+
+### Installation
+
+```bash
+dotnet add package Frank.Datastar
+```
+
+### Example
+
+```fsharp
+open Frank.Builder
+open Frank.Datastar
+
+let updates =
+    resource "/updates" {
+        name "Updates"
+
+        datastar (fun ctx -> task {
+            // SSE stream starts automatically
+            do! Datastar.patchElements "<div id='status'>Loading...</div>" ctx
+            do! Task.Delay(500)
+            do! Datastar.patchElements "<div id='status'>Complete!</div>" ctx
+        })
+    }
+
+// With explicit HTTP method
+let submit =
+    resource "/submit" {
+        name "Submit"
+
+        datastar HttpMethods.Post (fun ctx -> task {
+            let! signals = Datastar.tryReadSignals<FormData> ctx
+            match signals with
+            | ValueSome data ->
+                do! Datastar.patchElements $"<div id='result'>Received: {data.Name}</div>" ctx
+            | ValueNone ->
+                do! Datastar.patchElements "<div id='error'>Invalid data</div>" ctx
+        })
+    }
+```
+
+### Available Operations
+
+- `Datastar.patchElements` - Update HTML elements in the DOM
+- `Datastar.patchSignals` - Update client-side signals
+- `Datastar.removeElement` - Remove elements by CSS selector
+- `Datastar.executeScript` - Execute JavaScript on the client
+- `Datastar.tryReadSignals<'T>` - Read and deserialize signals from request
+
+Each operation also has a `WithOptions` variant for advanced customization.
+
+---
+
+## Frank.Analyzers
+
+Frank.Analyzers provides compile-time static analysis to catch common mistakes in Frank applications.
+
+### Installation
+
+```bash
+dotnet add package Frank.Analyzers
+```
+
+### Available Analyzers
+
+#### FRANK001: Duplicate HTTP Handler Detection
+
+Detects when multiple handlers for the same HTTP method are defined on a single resource. Only the last handler would be used at runtime, so this is almost always a mistake.
+
+```fsharp
+// This will produce a warning:
+resource "/example" {
+    name "Example"
+    get (fun ctx -> ctx.Response.WriteAsync("First"))   // Warning: FRANK001
+    get (fun ctx -> ctx.Response.WriteAsync("Second"))  // This one takes effect
+}
+```
+
+### IDE Integration
+
+Frank.Analyzers works with:
+- **Ionide** (VS Code)
+- **Visual Studio** with F# support
+- **JetBrains Rider**
+
+Warnings appear inline as you type, helping catch issues before you even compile.
+
+---
+
 ## Building
 
 Make sure the following **requirements** are installed in your system:
@@ -71,148 +176,24 @@ Make sure the following **requirements** are installed in your system:
 dotnet build
 ```
 
-## Performance
+---
 
-Benchmarks should never be taken at face value. The following are taken from the [web-frameworks](https://github.com/the-benchmarker/web-frameworks) application, which simply returns an `""` with a `200 OK` response.
-These benchmarks compare Frank, [Falco](https://github.com/pimbrouwers/Falco), [Giraffe](https://github.com/giraffe-fsharp/Giraffe), [Suave](https://suave.io/), and [WebSharper](https://websharper.com/)
-under a load of 2000 and 10000 concurrent requests for a duration of 10 seconds using [bombardier](https://github.com/codesenberg/bombardier). Frank, Falco, and Giraffe are all pretty well aligned, with each edging out
-the others in different runs. WebSharper is quite close behind and had surprising bursts of Max values on each run.
+## Sample Applications
 
-![Test machine stats](img/computer-info.png)
+The `sample/` directory contains several example applications:
 
-Frank
+| Sample | Description |
+|--------|-------------|
+| `Sample` | Basic Frank application |
+| `Frank.Datastar.Basic` | Datastar integration with minimal HTML |
+| `Frank.Datastar.Hox` | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine |
+| `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
+| `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
+| `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
+| `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
 
-```
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
-Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     74771.81   16274.70  213042.61
-  Latency       27.06ms    14.99ms      1.17s
-  HTTP codes:
-    1xx - 0, 2xx - 735729, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    11.76MB/s
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 10000
-Bombarding http://127.0.0.1:5000 for 10s using 10000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     66859.74   21516.50  135402.71
-  Latency      154.69ms    70.68ms      2.31s
-  HTTP codes:
-    1xx - 0, 2xx - 636305, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    10.06MB/s
-```
+---
 
-[Falco](https://github.com/pimbrouwers/Falco)
+## License
 
-```
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
-Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     68816.05   19014.03  260693.85
-  Latency       29.49ms    16.89ms      1.14s
-  HTTP codes:
-    1xx - 0, 2xx - 675620, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    13.43MB/s
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 10000
-Bombarding http://127.0.0.1:5000 for 10s using 10000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     61873.98   18588.41  144228.63
-  Latency      167.55ms    80.43ms      2.63s
-  HTTP codes:
-    1xx - 0, 2xx - 585628, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    11.50MB/s
-```
-
-[Giraffe](https://github.com/giraffe-fsharp/Giraffe)
-
-```
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
-Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     70654.17   20454.63  161930.16
-  Latency       28.69ms    27.63ms      1.68s
-  HTTP codes:
-    1xx - 0, 2xx - 695363, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    12.89MB/s
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 10000
-Bombarding http://127.0.0.1:5000 for 10s using 10000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     64535.14   19824.63  191980.80
-  Latency      159.96ms    92.95ms      2.67s
-  HTTP codes:
-    1xx - 0, 2xx - 615054, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    11.29MB/s
-```
-
-[Suave](https://suave.io/)
-
-```
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:3000 -c 2000
-Bombarding http://127.0.0.1:3000 for 10s using 2000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     47804.68   33925.73  251817.76
-  Latency       42.40ms    47.92ms      2.30s
-  HTTP codes:
-    1xx - 0, 2xx - 475110, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:     8.77MB/s
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:3000 -c 10000
-Bombarding http://127.0.0.1:3000 for 10s using 10000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     38277.80   39849.83  225515.79
-  Latency      244.58ms   223.99ms      4.42s
-  HTTP codes:
-    1xx - 0, 2xx - 396062, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 8568
-  Errors:
-    dial tcp 127.0.0.1:3000: connectex: No connection could be made because the target machine actively refused it. - 8568
-  Throughput:     6.88MB/s
-```
-
-[WebSharper](https://websharper.com/)
-
-```
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 2000
-Bombarding http://127.0.0.1:5000 for 10s using 2000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     58768.49   41779.96  254730.90
-  Latency       37.97ms    12.10ms   642.00ms
-  HTTP codes:
-    1xx - 0, 2xx - 525470, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:    10.08MB/s
-C:\Users\ryanr\Code> .\bombardier-windows-amd64.exe http://127.0.0.1:5000 -c 10000
-Bombarding http://127.0.0.1:5000 for 10s using 10000 connection(s)
-[===========================================================================================================] 10s
-Done!
-Statistics        Avg      Stdev        Max
-  Reqs/sec     53442.13   50090.03  290941.81
-  Latency      224.47ms   129.43ms      3.25s
-  HTTP codes:
-    1xx - 0, 2xx - 438677, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:     8.33MB/s
-```
+[Apache 2.0](LICENSE)
