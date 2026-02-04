@@ -1,5 +1,6 @@
 namespace Frank.Datastar
 
+open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Frank.Builder
@@ -89,3 +90,63 @@ module Datastar =
     /// Returns ValueNone for invalid/missing JSON.
     let inline tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
         ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request)
+
+    // --- WithOptions variants ---
+    // These allow specifying full options records from StarFederation.Datastar.FSharp.
+    // Use { SomeOptions.Defaults with Property = value } syntax to customize.
+
+    /// <summary>Patch HTML elements with custom options.</summary>
+    /// <param name="options">Options controlling patch mode, selector, and view transitions.</param>
+    /// <param name="html">The HTML content to patch into the DOM.</param>
+    /// <param name="ctx">The HttpContext for the current request.</param>
+    /// <example>
+    /// let opts = { PatchElementsOptions.Defaults with PatchMode = ElementPatchMode.Inner }
+    /// do! Datastar.patchElementsWithOptions opts "&lt;div&gt;Content&lt;/div&gt;" ctx
+    /// </example>
+    let inline patchElementsWithOptions (options: PatchElementsOptions) (html: string) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchElementsAsync(ctx.Response, html, options)
+
+    /// <summary>Patch client-side signals with custom options.</summary>
+    /// <param name="options">Options controlling whether to only set missing signals.</param>
+    /// <param name="signals">JSON string containing signal values to patch.</param>
+    /// <param name="ctx">The HttpContext for the current request.</param>
+    /// <example>
+    /// let opts = { PatchSignalsOptions.Defaults with OnlyIfMissing = true }
+    /// do! Datastar.patchSignalsWithOptions opts """{"count": 0}""" ctx
+    /// </example>
+    let inline patchSignalsWithOptions (options: PatchSignalsOptions) (signals: string) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, signals, options)
+
+    /// <summary>Remove an element by CSS selector with custom options.</summary>
+    /// <param name="options">Options controlling view transitions during removal.</param>
+    /// <param name="selector">CSS selector for the element(s) to remove.</param>
+    /// <param name="ctx">The HttpContext for the current request.</param>
+    /// <example>
+    /// let opts = { RemoveElementOptions.Defaults with UseViewTransition = true }
+    /// do! Datastar.removeElementWithOptions opts "#old-element" ctx
+    /// </example>
+    let inline removeElementWithOptions (options: RemoveElementOptions) (selector: string) (ctx: HttpContext) =
+        ServerSentEventGenerator.RemoveElementAsync(ctx.Response, selector, options)
+
+    /// <summary>Execute JavaScript on the client with custom options.</summary>
+    /// <param name="options">Options controlling auto-removal and attributes.</param>
+    /// <param name="script">The JavaScript code to execute.</param>
+    /// <param name="ctx">The HttpContext for the current request.</param>
+    /// <example>
+    /// let opts = { ExecuteScriptOptions.Defaults with AutoRemove = false }
+    /// do! Datastar.executeScriptWithOptions opts "console.log('persistent')" ctx
+    /// </example>
+    let inline executeScriptWithOptions (options: ExecuteScriptOptions) (script: string) (ctx: HttpContext) =
+        ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, script, options)
+
+    /// <summary>Read and deserialize signals with custom JSON serializer options.</summary>
+    /// <typeparam name="T">The type to deserialize signals into.</typeparam>
+    /// <param name="jsonOptions">Custom JsonSerializerOptions for deserialization.</param>
+    /// <param name="ctx">The HttpContext for the current request.</param>
+    /// <returns>ValueSome with deserialized signals, or ValueNone if parsing fails.</returns>
+    /// <example>
+    /// let jsonOpts = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+    /// let! signals = Datastar.tryReadSignalsWithOptions&lt;MySignals&gt; jsonOpts ctx
+    /// </example>
+    let inline tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
+        ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)

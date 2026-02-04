@@ -7,6 +7,7 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Expecto
+open System.Text.Json
 open Frank.Builder
 open Frank.Datastar
 open StarFederation.Datastar.FSharp
@@ -407,4 +408,257 @@ let datastarTests =
                 }
 
             Expect.equal resource.Endpoints.Length 1 "Should have one endpoint"
+
+        // ==========================================
+        // WithOptions Variants (Feature 010)
+        // ==========================================
+
+        testCase "T003: patchElementsWithOptions sends custom mode" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let html = "<div id='test'>Inner content</div>"
+            let opts = { PatchElementsOptions.Defaults with PatchMode = ElementPatchMode.Inner }
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchElementsWithOptions opts html ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "mode inner" "Should have inner mode"
+            Expect.stringContains responseBody html "Should contain HTML"
+
+        testCase "T004: patchSignalsWithOptions sends onlyIfMissing option" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let signals = """{"count": 0}"""
+            let opts = { PatchSignalsOptions.Defaults with OnlyIfMissing = true }
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchSignalsWithOptions opts signals ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-signals" "Should have patch-signals event"
+            Expect.stringContains responseBody "onlyIfMissing true" "Should have onlyIfMissing option"
+
+        testCase "T005: removeElementWithOptions sends useViewTransition option" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let selector = "#old-element"
+            let opts = { RemoveElementOptions.Defaults with UseViewTransition = true }
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.removeElementWithOptions opts selector ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "useViewTransition true" "Should have useViewTransition option"
+
+        testCase "T006: executeScriptWithOptions respects autoRemove false" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let script = "console.log('persistent')"
+            let opts = { ExecuteScriptOptions.Defaults with AutoRemove = false }
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.executeScriptWithOptions opts script ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "<script>" "Should have script tag without auto-remove attribute"
+            // When AutoRemove is false, the script tag should NOT have data-effect="el.remove()"
+            Expect.isFalse (responseBody.Contains("data-effect")) "Should NOT have auto-remove data-effect"
+
+        testCase "T007: tryReadSignalsWithOptions uses custom JsonSerializerOptions" <| fun () ->
+            // Arrange - Test that tryReadSignalsWithOptions accepts JsonSerializerOptions
+            // The goal is to verify the function signature works and options are passed through
+            let context = createMockContext()
+            let requestSignals = """{"count": 42}"""
+            setRequestBody context requestSignals
+
+            // Create custom options (case-insensitive is already the behavior we want for this test)
+            let jsonOptions = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+
+            let mutable capturedSignals: voption<{| count: int |}> = ValueNone
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        let! signals = Datastar.tryReadSignalsWithOptions<{| count: int |}> jsonOptions ctx
+                        capturedSignals <- signals
+                        do! Datastar.patchElements "<div>Done</div>" ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert - verify the function works with custom options
+            Expect.isTrue capturedSignals.IsSome "Should successfully deserialize signals with custom options"
+            let signals = capturedSignals.Value
+            Expect.equal signals.count 42 "Should deserialize count value correctly"
+
+        // ==========================================
+        // Backward Compatibility Tests (Feature 010 - US2)
+        // ==========================================
+
+        testCase "T015: patchElementsWithOptions with Defaults equals patchElements output" <| fun () ->
+            // Arrange
+            let context1 = createMockContext()
+            let context2 = createMockContext()
+            let html = "<div id='test'>Test content</div>"
+
+            // Act - call simple version
+            let resource1 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchElements html ctx
+                    })
+                }
+            let endpoint1 = resource1.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint1.RequestDelegate.Invoke(context1).Wait()
+
+            // Act - call WithOptions version with Defaults
+            let resource2 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchElementsWithOptions PatchElementsOptions.Defaults html ctx
+                    })
+                }
+            let endpoint2 = resource2.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint2.RequestDelegate.Invoke(context2).Wait()
+
+            // Assert - outputs should be equivalent
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response1 response2 "patchElementsWithOptions with Defaults should produce same output as patchElements"
+
+        testCase "T016: patchSignalsWithOptions with Defaults equals patchSignals output" <| fun () ->
+            // Arrange
+            let context1 = createMockContext()
+            let context2 = createMockContext()
+            let signals = """{"count": 0}"""
+
+            // Act - call simple version
+            let resource1 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchSignals signals ctx
+                    })
+                }
+            let endpoint1 = resource1.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint1.RequestDelegate.Invoke(context1).Wait()
+
+            // Act - call WithOptions version with Defaults
+            let resource2 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.patchSignalsWithOptions PatchSignalsOptions.Defaults signals ctx
+                    })
+                }
+            let endpoint2 = resource2.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint2.RequestDelegate.Invoke(context2).Wait()
+
+            // Assert - outputs should be equivalent
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response1 response2 "patchSignalsWithOptions with Defaults should produce same output as patchSignals"
+
+        testCase "T017: removeElementWithOptions with Defaults equals removeElement output" <| fun () ->
+            // Arrange
+            let context1 = createMockContext()
+            let context2 = createMockContext()
+            let selector = "#element-to-remove"
+
+            // Act - call simple version
+            let resource1 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.removeElement selector ctx
+                    })
+                }
+            let endpoint1 = resource1.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint1.RequestDelegate.Invoke(context1).Wait()
+
+            // Act - call WithOptions version with Defaults
+            let resource2 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.removeElementWithOptions RemoveElementOptions.Defaults selector ctx
+                    })
+                }
+            let endpoint2 = resource2.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint2.RequestDelegate.Invoke(context2).Wait()
+
+            // Assert - outputs should be equivalent
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response1 response2 "removeElementWithOptions with Defaults should produce same output as removeElement"
+
+        testCase "T018: executeScriptWithOptions with Defaults equals executeScript output" <| fun () ->
+            // Arrange
+            let context1 = createMockContext()
+            let context2 = createMockContext()
+            let script = "console.log('test')"
+
+            // Act - call simple version
+            let resource1 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.executeScript script ctx
+                    })
+                }
+            let endpoint1 = resource1.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint1.RequestDelegate.Invoke(context1).Wait()
+
+            // Act - call WithOptions version with Defaults
+            let resource2 =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.executeScriptWithOptions ExecuteScriptOptions.Defaults script ctx
+                    })
+                }
+            let endpoint2 = resource2.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint2.RequestDelegate.Invoke(context2).Wait()
+
+            // Assert - outputs should be equivalent
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response1 response2 "executeScriptWithOptions with Defaults should produce same output as executeScript"
     ]
