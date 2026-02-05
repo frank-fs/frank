@@ -148,4 +148,146 @@ let middlewareOrderingTests =
             let! (response : HttpResponseMessage) = client.GetAsync("/test")
             Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK with no middleware"
         }
+
+        // Tests for plugBeforeRoutingWhen (User Story 1)
+        testTask "plugBeforeRoutingWhen executes middleware when condition is true" {
+            let alwaysTrue (_: IApplicationBuilder) = true
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysTrue, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "conditional" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isTrue (markers.Contains("conditional,")) "Middleware should execute when condition is true"
+        }
+
+        testTask "plugBeforeRoutingWhen skips middleware when condition is false" {
+            let alwaysFalse (_: IApplicationBuilder) = false
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysFalse, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "conditional" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isFalse (markers.Contains("conditional,")) "Middleware should NOT execute when condition is false"
+        }
+
+        // Tests for plugBeforeRoutingWhenNot (User Story 2)
+        testTask "plugBeforeRoutingWhenNot executes middleware when condition is false" {
+            let alwaysFalse (_: IApplicationBuilder) = false
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRoutingWhenNot(s, alwaysFalse, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "conditional" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isTrue (markers.Contains("conditional,")) "Middleware should execute when condition is false (WhenNot)"
+        }
+
+        testTask "plugBeforeRoutingWhenNot skips middleware when condition is true" {
+            let alwaysTrue (_: IApplicationBuilder) = true
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRoutingWhenNot(s, alwaysTrue, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "conditional" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isFalse (markers.Contains("conditional,")) "Middleware should NOT execute when condition is true (WhenNot)"
+        }
+
+        // Tests for composition (User Story 3)
+        testTask "Multiple conditional before-routing middleware compose correctly" {
+            let alwaysTrue (_: IApplicationBuilder) = true
+            let alwaysFalse (_: IApplicationBuilder) = false
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysTrue, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "first" next ctx)))
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysFalse, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "skipped" next ctx)))
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysTrue, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "second" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isTrue (markers.Contains("first,")) "First middleware should execute"
+            Expect.isFalse (markers.Contains("skipped,")) "Skipped middleware should NOT execute"
+            Expect.isTrue (markers.Contains("second,")) "Second middleware should execute"
+        }
+
+        testTask "Conditional before-routing middleware works with regular plugBeforeRouting" {
+            let alwaysTrue (_: IApplicationBuilder) = true
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.PlugBeforeRouting(s, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "unconditional" next ctx)))
+                |> fun s -> builder.PlugBeforeRoutingWhen(s, alwaysTrue, fun app ->
+                    app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+                        markerMiddleware "conditional" next ctx)))
+
+            let client = createTestServer (fun _ -> spec)
+            let! (response : HttpResponseMessage) = client.GetAsync("/test")
+            let markers =
+                if response.Headers.Contains("X-Markers") then
+                    response.Headers.GetValues("X-Markers") |> Seq.head
+                else
+                    ""
+
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 OK"
+            Expect.isTrue (markers.Contains("unconditional,")) "Unconditional middleware should execute"
+            Expect.isTrue (markers.Contains("conditional,")) "Conditional middleware should execute"
+        }
     ]

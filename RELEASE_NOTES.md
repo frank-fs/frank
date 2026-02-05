@@ -1,3 +1,8 @@
+### New in 6.6.0 (Unreleased)
+
+- Added `plugBeforeRoutingWhen` for conditional middleware before routing when condition is true
+- Added `plugBeforeRoutingWhenNot` for conditional middleware before routing when condition is false
+
 ### New in 6.5.0 (Released 2026-02-04)
 
 - Fixed middleware pipeline ordering: `plug` middleware now runs after `UseRouting` and before `UseEndpoints`

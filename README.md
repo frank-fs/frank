@@ -127,6 +127,27 @@ webHost args {
 }
 ```
 
+### Conditional Before-Routing Middleware
+
+Both `plugBeforeRoutingWhen` and `plugBeforeRoutingWhenNot` run in the `plugBeforeRouting` position (before routing):
+
+```fsharp
+let isDevelopment (app: IApplicationBuilder) =
+    app.ApplicationServices
+        .GetService<IWebHostEnvironment>()
+        .IsDevelopment()
+
+webHost args {
+    // Only redirect to HTTPS in production
+    plugBeforeRoutingWhenNot isDevelopment HttpsPolicyBuilderExtensions.UseHttpsRedirection
+
+    // Only serve static files locally in development (CDN in production)
+    plugBeforeRoutingWhen isDevelopment StaticFileExtensions.UseStaticFiles
+
+    resource myResource
+}
+```
+
 ---
 
 ## Frank.Datastar

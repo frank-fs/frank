@@ -35,10 +35,10 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 012-conditional-routing: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + ASP.NET Core (Microsoft.AspNetCore.*)
 - 011-middleware-before-endpoints: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + ASP.NET Core (Microsoft.AspNetCore.*)
 
 - 010-datastar-patch-mode: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp, ASP.NET Core
-- 009-resourcebuilder-handler-guardrails: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank) + FSharp.Analyzers.SDK (0.35.0+), FSharp.Compiler.Service (bundled with SDK)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
