@@ -268,6 +268,18 @@ module Builder =
         member __.PlugBeforeRouting(spec, f) =
             { spec with BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> f }
 
+        [<CustomOperation("plugBeforeRoutingWhen")>]
+        member __.PlugBeforeRoutingWhen(spec, cond, f) =
+            { spec with
+                BeforeRoutingMiddleware = fun app ->
+                    if cond app then
+                        f(spec.BeforeRoutingMiddleware(app))
+                    else spec.BeforeRoutingMiddleware(app) }
+
+        [<CustomOperation("plugBeforeRoutingWhenNot")>]
+        member __.PlugBeforeRoutingWhenNot(spec, cond, f) =
+            __.PlugBeforeRoutingWhen(spec, not << cond, f)
+
         [<CustomOperation("plug")>]
         member __.Plug(spec, f) =
             { spec with Middleware = spec.Middleware >> f }
