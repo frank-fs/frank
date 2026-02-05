@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-01-25
 
 ## Active Technologies
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + ASP.NET Core (Microsoft.AspNetCore.*) (011-middleware-before-endpoints)
 
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp (latest), ASP.NET Core (002-datastar-sample)
 - In-memory (Dictionary, ResizeArray) - demo purposes only (002-datastar-sample)
@@ -34,11 +35,10 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 011-middleware-before-endpoints: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + ASP.NET Core (Microsoft.AspNetCore.*)
 
 - 010-datastar-patch-mode: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp, ASP.NET Core
 - 009-resourcebuilder-handler-guardrails: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank) + FSharp.Analyzers.SDK (0.35.0+), FSharp.Compiler.Service (bundled with SDK)
-- 008-update-hox-sample: Added F# 8.0+ targeting .NET 10.0 + Frank 6.x, Hox 3.x, StarFederation.Datastar.FSharp (via Frank.Datastar project reference)
-- 007-update-oxpecker-sample: Added F# 8.0+ targeting .NET 10.0 + Frank 6.x, Oxpecker.ViewEngine 2.x, StarFederation.Datastar.FSharp (via Frank.Datastar project reference)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

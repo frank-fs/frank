@@ -14,8 +14,4 @@
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="9.*" />
-  </ItemGroup>
-
 </Project>
