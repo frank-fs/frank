@@ -63,13 +63,68 @@ let main args =
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
         plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
 
-        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         resource home
     }
 
     0
+```
+
+---
+
+## Middleware Pipeline
+
+Frank provides two middleware operations with different positions in the ASP.NET Core pipeline:
+
+```
+Request → plugBeforeRouting → UseRouting → plug → Endpoints → Response
+```
+
+### `plugBeforeRouting`
+
+Use for middleware that must run **before** routing decisions are made:
+
+- **HttpsRedirection** - redirect before routing
+- **StaticFiles** - serve static files without routing overhead
+- **ResponseCompression** - compress all responses
+- **ResponseCaching** - cache before routing
+
+```fsharp
+webHost args {
+    plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
+    plugBeforeRouting StaticFileExtensions.UseStaticFiles
+    resource myResource
+}
+```
+
+### `plug`
+
+Use for middleware that needs routing information (e.g., the matched endpoint):
+
+- **Authentication** - may need endpoint metadata
+- **Authorization** - requires endpoint to check policies
+- **CORS** - may use endpoint-specific policies
+
+```fsharp
+webHost args {
+    plug AuthenticationBuilderExtensions.UseAuthentication
+    plug AuthorizationAppBuilderExtensions.UseAuthorization
+    resource protectedResource
+}
+```
+
+### Conditional Middleware
+
+Both `plugWhen` and `plugWhenNot` run in the `plug` position (after routing):
+
+```fsharp
+webHost args {
+    plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+    plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
+    resource myResource
+}
 ```
 
 ---

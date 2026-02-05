@@ -217,12 +217,14 @@ module Builder =
 
     type WebHostSpec =
         { Host: (IWebHostBuilder -> IWebHostBuilder)
+          BeforeRoutingMiddleware: (IApplicationBuilder -> IApplicationBuilder)
           Middleware: (IApplicationBuilder -> IApplicationBuilder)
           Endpoints: Endpoint[]
           Services: (IServiceCollection -> IServiceCollection)
           UseDefaults: bool }
         static member Empty =
             { Host=id
+              BeforeRoutingMiddleware=id
               Middleware=id
               Endpoints=[||]
               Services=(fun services ->
@@ -239,11 +241,14 @@ module Builder =
                 spec.Host(webBuilder)
                     .ConfigureServices(spec.Services >> ignore)
                     .Configure(fun app ->
-                        app.UseRouting()
-                           .UseEndpoints(fun endpoints ->
-                               let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-                               endpoints.DataSources.Add(dataSource))
+                        app
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
                         |> spec.Middleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+                                endpoints.DataSources.Add(dataSource))
                         |> ignore)
                     |> ignore)
             let configured =
@@ -258,6 +263,10 @@ module Builder =
         [<CustomOperation("configure")>]
         member __.Configure(spec, f) =
             { spec with Host = spec.Host >> f }
+
+        [<CustomOperation("plugBeforeRouting")>]
+        member __.PlugBeforeRouting(spec, f) =
+            { spec with BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> f }
 
         [<CustomOperation("plug")>]
         member __.Plug(spec, f) =

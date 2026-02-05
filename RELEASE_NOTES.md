@@ -1,3 +1,9 @@
+### New in 6.5.0 (Released 2026-02-04)
+
+- Fixed middleware pipeline ordering: `plug` middleware now runs after `UseRouting` and before `UseEndpoints`
+- Added `plugBeforeRouting` for middleware that must run before routing (e.g., StaticFiles, HttpsRedirection)
+- Added middleware ordering tests
+
 ### New in 6.4.1 (Released 2026-02-04)
 
 - Add Frank.Analyzers to assist with validating resource definitions
