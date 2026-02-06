@@ -1,7 +1,15 @@
-### New in 6.6.0 (Unreleased)
+### New in 7.0.0 (Released 2026-02-05)
 
+- **Breaking:** Added `Metadata` field to `ResourceSpec` and `AddMetadata` to `ResourceBuilder` for composable endpoint metadata conventions
 - Added `plugBeforeRoutingWhen` for conditional middleware before routing when condition is true
 - Added `plugBeforeRoutingWhenNot` for conditional middleware before routing when condition is false
+- Added **Frank.Auth** library for resource-level authorization:
+  - `requireAuth` — require authenticated user
+  - `requireClaim` — require a specific claim type and value(s)
+  - `requireRole` — require a specific role
+  - `requirePolicy` — require a named authorization policy
+  - `useAuthentication` / `useAuthorization` — configure auth services and middleware on the web host
+  - `authorizationPolicy` — define named authorization policies on the web host
 
 ### New in 6.5.0 (Released 2026-02-04)
 
