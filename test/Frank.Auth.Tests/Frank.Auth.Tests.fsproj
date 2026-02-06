@@ -9,8 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="MiddlewareOrderingTests.fs" />
-    <Compile Include="MetadataTests.fs" />
+    <Compile Include="AuthorizationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -22,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Auth/Frank.Auth.fsproj" />
   </ItemGroup>
 
 </Project>

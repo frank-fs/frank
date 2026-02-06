@@ -15,6 +15,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | Package | Description | NuGet |
 |---------|-------------|-------|
 | **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/) |
+| **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
@@ -147,6 +148,107 @@ webHost args {
     resource myResource
 }
 ```
+
+---
+
+## Frank.Auth
+
+Frank.Auth provides resource-level authorization for Frank applications, integrating with ASP.NET Core's built-in authorization infrastructure.
+
+### Installation
+
+```bash
+dotnet add package Frank.Auth
+```
+
+### Protecting Resources
+
+Add authorization requirements directly to resource definitions:
+
+```fsharp
+open Frank.Builder
+open Frank.Auth
+
+// Require any authenticated user
+let dashboard =
+    resource "/dashboard" {
+        name "Dashboard"
+        requireAuth
+        get (fun ctx -> ctx.Response.WriteAsync("Welcome to Dashboard"))
+    }
+
+// Require a specific claim
+let adminPanel =
+    resource "/admin" {
+        name "Admin"
+        requireClaim "role" "admin"
+        get (fun ctx -> ctx.Response.WriteAsync("Admin Panel"))
+    }
+
+// Require a role
+let engineering =
+    resource "/engineering" {
+        name "Engineering"
+        requireRole "Engineering"
+        get (fun ctx -> ctx.Response.WriteAsync("Engineering Portal"))
+    }
+
+// Reference a named policy
+let reports =
+    resource "/reports" {
+        name "Reports"
+        requirePolicy "CanViewReports"
+        get (fun ctx -> ctx.Response.WriteAsync("Reports"))
+    }
+
+// Compose requirements (AND semantics — all must pass)
+let sensitive =
+    resource "/api/sensitive" {
+        name "Sensitive"
+        requireAuth
+        requireClaim "scope" "admin"
+        requireRole "Engineering"
+        get (fun ctx -> ctx.Response.WriteAsync("Sensitive data"))
+    }
+```
+
+### Application Wiring
+
+Configure authentication and authorization services using Frank's builder syntax:
+
+```fsharp
+[<EntryPoint>]
+let main args =
+    webHost args {
+        useDefaults
+
+        useAuthentication (fun auth ->
+            // Configure your authentication scheme here
+            auth)
+
+        useAuthorization
+
+        authorizationPolicy "CanViewReports" (fun policy ->
+            policy.RequireClaim("scope", "reports:read") |> ignore)
+
+        resource dashboard
+        resource adminPanel
+        resource reports
+    }
+    0
+```
+
+### Authorization Patterns
+
+| Pattern | Operation | Behavior |
+|---------|-----------|----------|
+| Authenticated user | `requireAuth` | 401 if unauthenticated, 200 if authenticated |
+| Claim (single value) | `requireClaim "type" "value"` | 403 if claim missing or wrong value |
+| Claim (multiple values) | `requireClaim "type" ["a"; "b"]` | 200 if user has any listed value (OR) |
+| Role | `requireRole "Admin"` | 403 if user not in role |
+| Named policy | `requirePolicy "PolicyName"` | Delegates to registered policy |
+| Multiple requirements | Stack multiple `require*` | AND semantics — all must pass |
+| No requirements | (default) | Publicly accessible, zero overhead |
 
 ---
 

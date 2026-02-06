@@ -16,21 +16,22 @@ module Builder =
     type Resource = { Endpoints : Endpoint[] }
 
     type ResourceSpec =
-        { Name : string; Handlers : (string * RequestDelegate) list }
-        static member Empty = { Name = Unchecked.defaultof<_>; Handlers = [] }
+        { Name : string
+          Handlers : (string * RequestDelegate) list
+          Metadata : (EndpointBuilder -> unit) list }
+        static member Empty = { Name = Unchecked.defaultof<_>; Handlers = []; Metadata = [] }
         member spec.Build(routeTemplate) =
-            let {Name=name; Handlers=handlers} = spec
+            let {Name=name; Handlers=handlers; Metadata=metadata} = spec
             let routePattern = Patterns.RoutePatternFactory.Parse routeTemplate
             let endpoints =
                 [| for httpMethod, handler in handlers ->
                     let displayName = httpMethod+" "+(if String.IsNullOrEmpty name then routeTemplate else name)
-                    let metadata = EndpointMetadataCollection(HttpMethodMetadata [|httpMethod|])
-                    RouteEndpoint(
-                        requestDelegate=handler,
-                        routePattern=routePattern,
-                        order=0,
-                        metadata=metadata,
-                        displayName=displayName) :> Endpoint |]
+                    let builder = RouteEndpointBuilder(handler, routePattern, 0)
+                    builder.DisplayName <- displayName
+                    builder.Metadata.Add(HttpMethodMetadata [|httpMethod|])
+                    for convention in metadata do
+                        convention builder
+                    builder.Build() |]
             { Endpoints = endpoints }
 
     [<Sealed>]
@@ -46,6 +47,9 @@ module Builder =
 
         [<CustomOperation("name")>]
         member __.Name(spec, name) = { spec with Name = name }
+
+        static member AddMetadata(spec: ResourceSpec, convention: EndpointBuilder -> unit) : ResourceSpec =
+            { spec with Metadata = spec.Metadata @ [ convention ] }
 
         static member AddHandler(httpMethod, spec, handler) =
             { spec with Handlers=(httpMethod, handler)::spec.Handlers }
