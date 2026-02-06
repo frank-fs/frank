@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>authorization;auth;security</PackageTags>
+    <Description>Resource-level authorization extensions for Frank web framework</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="AuthRequirement.fs" />
+    <Compile Include="AuthConfig.fs" />
+    <Compile Include="EndpointAuth.fs" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="WebHostBuilderExtensions.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank/Frank.fsproj" />
+  </ItemGroup>
+
+</Project>
