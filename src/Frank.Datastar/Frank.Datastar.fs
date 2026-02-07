@@ -1,5 +1,6 @@
 namespace Frank.Datastar
 
+open System.IO
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
@@ -149,3 +150,59 @@ module Datastar =
     /// </example>
     let inline tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
         ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)
+
+    // --- Stream-based variants ---
+    // These accept a TextWriter -> Task callback for direct-to-buffer output.
+    // Use when generating large HTML or for view engine streaming integration.
+
+    let inline streamPatchElements (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer)
+
+    let inline streamPatchElementsWithOptions (options: PatchElementsOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer, options)
+
+    let inline streamRemoveElement (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer)
+
+    let inline streamRemoveElementWithOptions (options: RemoveElementOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer, options)
+
+    let inline streamPatchSignals (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer)
+
+    let inline streamPatchSignalsWithOptions (options: PatchSignalsOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer, options)
+
+    let inline streamExecuteScript (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer)
+
+    let inline streamExecuteScriptWithOptions (options: ExecuteScriptOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer, options)
+
+    // --- Stream-based variants (Stream -> Task) ---
+    // These accept a Stream -> Task callback for byte-level streaming.
+    // Use with view engines that render to Stream (e.g., Hox Render.toStream).
+
+    let inline streamPatchElementsToStream (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer)
+
+    let inline streamPatchElementsToStreamWithOptions (options: PatchElementsOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer, options)
+
+    let inline streamRemoveElementToStream (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer)
+
+    let inline streamRemoveElementToStreamWithOptions (options: RemoveElementOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer, options)
+
+    let inline streamPatchSignalsToStream (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer)
+
+    let inline streamPatchSignalsToStreamWithOptions (options: PatchSignalsOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer, options)
+
+    let inline streamExecuteScriptToStream (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer)
+
+    let inline streamExecuteScriptToStreamWithOptions (options: ExecuteScriptOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+        ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer, options)

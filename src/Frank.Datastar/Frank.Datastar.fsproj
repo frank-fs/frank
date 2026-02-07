@@ -11,6 +11,8 @@
     <Compile Include="Consts.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="ServerSentEvent.fs" />
+    <Compile Include="SseDataLineWriter.fs" />
+    <Compile Include="SseDataLineStream.fs" />
     <Compile Include="ServerSentEventGenerator.fs" />
     <Compile Include="Frank.Datastar.fs" />
   </ItemGroup>

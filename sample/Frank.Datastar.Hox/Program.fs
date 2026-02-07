@@ -18,6 +18,7 @@
 module HoxExample
 
 open System
+open System.IO
 open System.Threading
 open System.Threading.Channels
 open System.Threading.Tasks
@@ -156,6 +157,7 @@ let mutable nextRegistrationId = 1
 
 type SseEvent =
     | PatchElements of html: string
+    | StreamPatchElements of writer: (Stream -> Task)
     | RemoveElement of selector: string
     | PatchSignals of json: string
 
@@ -187,6 +189,7 @@ module SseEvent =
         task {
             match event with
             | PatchElements html -> do! Datastar.patchElements html ctx
+            | StreamPatchElements writer -> do! Datastar.streamPatchElementsToStream writer ctx
             | RemoveElement selector -> do! Datastar.removeElement selector ctx
             | PatchSignals json -> do! Datastar.patchSignals json ctx
         }
@@ -409,53 +412,59 @@ let itemResource =
 // USERS RESOURCES (Bulk Update Pattern)
 // ===========================
 
-let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : ValueTask<string> =
-    let node =
-        // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
-        // data-bind:selections on checkboxes automatically manages the boolean array
-        h("div#users-table-container", [
-            h("table", [
-                h("thead", [
-                    h("tr", [
-                        h("th", [
-                            h("input[type=checkbox]", [])
-                                .attr("data-bind:_all", "")
-                                .attr("data-on:change", "$selections = Array(4).fill($_all)")
-                                .attr("data-effect", "$selections; $_all = $selections.every(Boolean)")
-                                .attr("data-attr:disabled", "$_fetching")
-                        ])
-                        h("th", [ Text "Name" ])
-                        h("th", [ Text "Email" ])
-                        h("th", [ Text "Status" ])
+let usersTableNode (usersList: System.Collections.Generic.Dictionary<int, User>) =
+    // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
+    // data-bind:selections on checkboxes automatically manages the boolean array
+    h("div#users-table-container", [
+        h("table", [
+            h("thead", [
+                h("tr", [
+                    h("th", [
+                        h("input[type=checkbox]", [])
+                            .attr("data-bind:_all", "")
+                            .attr("data-on:change", "$selections = Array(4).fill($_all)")
+                            .attr("data-effect", "$selections; $_all = $selections.every(Boolean)")
+                            .attr("data-attr:disabled", "$_fetching")
                     ])
+                    h("th", [ Text "Name" ])
+                    h("th", [ Text "Email" ])
+                    h("th", [ Text "Status" ])
                 ])
-                h("tbody#users-list",
-                    fragment [
-                        for user in usersList.Values do
-                            let statusClass = if user.Status = Active then "status-active" else "status-inactive"
-                            let statusText = if user.Status = Active then "Active" else "Inactive"
-                            h("tr", [
-                                h("td", [
-                                    h("input[type=checkbox]", [])
-                                        .attr("data-bind:selections", "")
-                                        .attr("data-attr:disabled", "$_fetching")
-                                ])
-                                h("td", [ Text user.Name ])
-                                h("td", [ Text user.Email ])
-                                h($"td.{statusClass}", [ Text statusText ])
-                            ])
-                    ])
             ])
-            h("button", [ Text "Activate Selected" ])
-                .attr("data-on:click", "@put('/users/bulk?status=active')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-            h("button", [ Text "Deactivate Selected" ])
-                .attr("data-on:click", "@put('/users/bulk?status=inactive')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-        ]).attr("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}")
-    Render.asString node
+            h("tbody#users-list",
+                fragment [
+                    for user in usersList.Values do
+                        let statusClass = if user.Status = Active then "status-active" else "status-inactive"
+                        let statusText = if user.Status = Active then "Active" else "Inactive"
+                        h("tr", [
+                            h("td", [
+                                h("input[type=checkbox]", [])
+                                    .attr("data-bind:selections", "")
+                                    .attr("data-attr:disabled", "$_fetching")
+                            ])
+                            h("td", [ Text user.Name ])
+                            h("td", [ Text user.Email ])
+                            h($"td.{statusClass}", [ Text statusText ])
+                        ])
+                ])
+        ])
+        h("button", [ Text "Activate Selected" ])
+            .attr("data-on:click", "@put('/users/bulk?status=active')")
+            .attr("data-indicator:_fetching", "")
+            .attr("data-attr:disabled", "$_fetching")
+        h("button", [ Text "Deactivate Selected" ])
+            .attr("data-on:click", "@put('/users/bulk?status=inactive')")
+            .attr("data-indicator:_fetching", "")
+            .attr("data-attr:disabled", "$_fetching")
+    ]).attr("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}")
+
+let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : ValueTask<string> =
+    Render.asString (usersTableNode usersList)
+
+/// Stream users table directly to SSE using Hox's Render.toStream (zero-string-materialization).
+let streamUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : Stream -> Task =
+    let node = usersTableNode usersList
+    fun stream -> Render.toStream(node, stream)
 
 // GET /users - Fire-and-forget: broadcasts users table to SSE channel
 let usersResource =
@@ -464,8 +473,7 @@ let usersResource =
 
         get (fun (ctx: HttpContext) ->
             task {
-                let! html = renderUsersTable users
-                SseEvent.broadcast (PatchElements html)
+                SseEvent.broadcast (StreamPatchElements(streamUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -498,8 +506,7 @@ let usersBulkResource =
                             { users[userId] with
                                 Status = newStatus }
 
-                let! html = renderUsersTable users
-                SseEvent.broadcast (PatchElements html)
+                SseEvent.broadcast (StreamPatchElements(streamUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }

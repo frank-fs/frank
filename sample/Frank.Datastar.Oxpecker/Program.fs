@@ -1,8 +1,10 @@
 module Example
 
 open System
+open System.IO
 open System.Threading
 open System.Threading.Channels
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Frank
@@ -88,6 +90,7 @@ let mutable contacts: System.Collections.Generic.Dictionary<int, Contact> =
 
 type SseEvent =
     | PatchElements of html: string
+    | StreamPatchElements of writer: (TextWriter -> Task)
     | RemoveElement of selector: string
     | PatchSignals of json: string
 
@@ -119,6 +122,7 @@ module SseEvent =
         task {
             match event with
             | PatchElements html -> do! Datastar.patchElements html ctx
+            | StreamPatchElements writer -> do! Datastar.streamPatchElements writer ctx
             | RemoveElement selector -> do! Datastar.removeElement selector ctx
             | PatchSignals json -> do! Datastar.patchSignals json ctx
         }
@@ -401,7 +405,7 @@ let itemResource =
 
 // --- Bulk Update Pattern (Users Collection) ---
 
-let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : string =
+let usersTableElement (usersList: System.Collections.Generic.Dictionary<int, User>) =
     // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
     // data-bind:selections on checkboxes automatically manages the boolean array
     div(id = "users-table-container")
@@ -446,7 +450,13 @@ let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User
             .attr("data-indicator:_fetching", "")
             .attr("data-attr:disabled", "$_fetching") { "Deactivate Selected" }
     }
-    |> Render.toString
+
+// Stream-based: Oxpecker renders directly to TextWriter (zero intermediate string).
+// The TextWriter is Frank.Datastar's SseDataLineWriter, which encodes to UTF-8
+// directly into the response buffer — no HTML string materialization.
+let streamUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : TextWriter -> Task =
+    let element = usersTableElement usersList
+    fun tw -> Render.toTextWriterAsync tw element
 
 // GET /users - Fire-and-forget: broadcasts users table to SSE channel
 let usersResource =
@@ -455,7 +465,7 @@ let usersResource =
 
         get (fun (ctx: HttpContext) ->
             task {
-                SseEvent.broadcast (PatchElements(renderUsersTable users))
+                SseEvent.broadcast (StreamPatchElements(streamUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }
@@ -488,7 +498,7 @@ let usersBulkResource =
                             { users[userId] with
                                 Status = newStatus }
 
-                SseEvent.broadcast (PatchElements(renderUsersTable users))
+                SseEvent.broadcast (StreamPatchElements(streamUsersTable users))
                 ctx.Response.StatusCode <- 202
             })
     }
