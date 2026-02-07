@@ -186,11 +186,13 @@ type ExecuteScriptOptions = {
 
 ---
 
-## Breaking Changes from 7.x
+## Changes from Previous Implementation
+
+**Note**: This version restores multi-targeting after an unreleased 8.0.0 that briefly targeted net10.0 only. Version 7.1.0 continues the 7.x line with enhanced implementation.
 
 | Change | Impact | Migration |
 |--------|--------|-----------|
-| Target framework: `net8.0;net9.0;net10.0` → `net10.0` | Consumers on .NET 8/9 cannot use this version | Use Frank core + StarFederation.Datastar.FSharp directly on older targets |
-| `ExecuteScriptOptions.Attributes`: `KeyValuePair<string,string> list` → `string[]` | Binary-breaking for anyone using Attributes directly | Change `[KeyValuePair("key","val")]` to `[|"key=\"val\""|]` |
-| Removed transitive dependency on StarFederation.Datastar.FSharp | Tests importing `StarFederation.Datastar.FSharp` must change imports | Remove `open StarFederation.Datastar.FSharp`; types now in `Frank.Datastar` |
-| `ServerSentEventGenerator` now public | Additive change, not breaking | No migration needed |
+| Target framework: `net10.0` → `net8.0;net9.0;net10.0` (multi-targeting restored) | Broader compatibility - consumers on .NET 8/9/10 can now use this version | No migration needed - multi-targeting is additive |
+| Dependency removed: StarFederation.Datastar.FSharp → native implementation | Zero external dependencies beyond framework references | Remove `open StarFederation.Datastar.FSharp` from test files; types now in `Frank.Datastar` namespace |
+| `ExecuteScriptOptions.Attributes` added: `string[]` field for custom script attributes | Additive change - new field with default empty array | No migration needed - existing code using ExecuteScriptOptions.Defaults continues to work |
+| `ServerSentEventGenerator` now public (was internal) | Advanced users can now construct custom SSE events | No migration needed - additive API exposure |

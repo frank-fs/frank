@@ -3,204 +3,282 @@
 **Input**: Design documents from `/specs/014-datastar-native-sse/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Tests are included for new public APIs (Attributes field, public ServerSentEventGenerator) per constitution requirement "All public APIs MUST have tests." Existing 18 tests validate the replacement implementation.
+**Tests**: Existing 18+ tests validate the replacement implementation. No new tests required unless TDD is explicitly requested.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-## Format: `[ID] [P?] [Story] Description`
+## Format: `- [ ] [ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3, US4)
 - Include exact file paths in descriptions
 
 ## Path Conventions
 
 - **Library source**: `src/Frank.Datastar/`
 - **Tests**: `test/Frank.Datastar.Tests/`
-- **Samples**: `sample/Frank.Datastar.Basic/`, `sample/Frank.Datastar.Hox/`, `sample/Frank.Datastar.Oxpecker/`
+- **Samples**: `samples/Frank.Datastar.Basic/`, `samples/Frank.Datastar.Hox/`, `samples/Frank.Datastar.Oxpecker/`
 
 ---
 
 ## Phase 1: Setup
 
-**Purpose**: Modify project file to target net10.0 only and remove the StarFederation.Datastar.FSharp dependency
+**Purpose**: Update project configuration for multi-targeting and dependency removal
 
-- [X] T001 Update `src/Frank.Datastar/Frank.Datastar.fsproj`: change `<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>` to `<TargetFramework>net10.0</TargetFramework>`, remove `<PackageReference Include="StarFederation.Datastar.FSharp" ... />`, and add `<Compile Include>` entries for the four new source files in dependency order: `Consts.fs`, `Types.fs`, `ServerSentEvent.fs`, `ServerSentEventGenerator.fs` (all before `Frank.Datastar.fs`)
+**Tasks**:
+
+- [ ] T001 Update `src/Frank.Datastar/Frank.Datastar.fsproj` to change `<TargetFramework>net10.0</TargetFramework>` to `<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>` and update `<VersionPrefix>8.0.0</VersionPrefix>` to `<VersionPrefix>7.1.0</VersionPrefix>` and update `<Description>` to remove ".NET 10 only" and emphasize native multi-target SSE implementation
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Implement the internal SSE infrastructure that all user stories depend on — constants, types, low-level write functions, and string utilities
+**Purpose**: Verify existing internal SSE infrastructure is correct and uses only net8.0+ compatible APIs
 
-**CRITICAL**: No user story work can begin until this phase is complete
+**CRITICAL**: This infrastructure is already implemented but must be validated for multi-framework compatibility
 
-- [X] T002 [P] Create `src/Frank.Datastar/Consts.fs`: Define `ElementPatchMode` DU (Outer, Inner, Remove, Replace, Prepend, Append, Before, After), `PatchElementNamespace` DU (Html, Svg, MathMl), public constants (`DatastarKey = "datastar"`, `DefaultSseRetryDuration = TimeSpan.FromSeconds(1.0)`, `DefaultElementPatchMode = Outer`, `DefaultPatchElementNamespace = Html`, `DefaultElementsUseViewTransitions = false`, `DefaultPatchSignalsOnlyIfMissing = false`), internal `ScriptDataEffectRemove` literal, and internal `Bytes` module with all pre-allocated byte arrays: event types (`"datastar-patch-elements"B`, `"datastar-patch-signals"B`), data line keys (`"selector"B`, `"mode"B`, `"elements"B`, `"signals"B`, `"useViewTransition"B`, `"namespace"B`, `"onlyIfMissing"B`), boolean values (`"true"B`, `"false"B`), script tags (`"<script>"B`, `"</script>"B`, `"<script data-effect=""el.remove()"">"B`, `"body"B`), ElementPatchMode `toBytes` function, PatchElementNamespace `toBytes` function. Reference: data-model.md Pre-allocated Byte Arrays section and `../datastar-dotnet/src/fsharp/Consts.fs`
-- [X] T003 [P] Create `src/Frank.Datastar/Types.fs`: Define all four `[<Struct>]` option record types with exact fields and `static member Defaults` per data-model.md: `PatchElementsOptions` (Selector: string voption, PatchMode: ElementPatchMode, UseViewTransition: bool, Namespace: PatchElementNamespace, EventId: string voption, Retry: TimeSpan), `PatchSignalsOptions` (OnlyIfMissing: bool, EventId: string voption, Retry: TimeSpan), `RemoveElementOptions` (UseViewTransition: bool, EventId: string voption, Retry: TimeSpan), `ExecuteScriptOptions` (AutoRemove: bool, Attributes: string[], EventId: string voption, Retry: TimeSpan). Also define type aliases `Signals = string` and `Selector = string`. Reference: `../datastar-dotnet/src/fsharp/Types.fs`
-- [X] T004 Create `src/Frank.Datastar/ServerSentEvent.fs`: Implement internal low-level `IBufferWriter<byte>` write functions as an internal module. Must include: `writeUtf8String` (string to buffer via `Encoding.UTF8.GetBytes` into `GetSpan`), `writeUtf8Literal` (byte[] to buffer via `AsSpan().CopyTo`), `writeUtf8Segment` (StringSegment to buffer), `writeSpace`, `writeNewline`, `sendEventType` (writes `event: <type>\n`), `sendEventId` (writes `id: <id>\n`), `sendRetry` (writes `retry: <ms>\n`), `sendDataBytesLine` (writes `data: <prefix> <bytes>\n`), `sendDataStringLine` (writes `data: <prefix> <string>\n`), `sendDataSegmentLine` (writes `data: <prefix> <segment>\n`), `sendDataStringSeqLine` (writes `data: <prefix> <seq of strings>\n`). All functions must be `inline` and return the writer for chaining. Also include internal `String.splitLinesToSegments` using `StringTokenizer` from `Microsoft.Extensions.Primitives` for zero-allocation newline splitting. Reference: `../datastar-dotnet/src/fsharp/ServerSentEvent.fs` and `../datastar-dotnet/src/fsharp/Utility.fs`
+**Tasks**:
 
-**Checkpoint**: Foundation ready — all internal types, constants, and write primitives available for ServerSentEventGenerator
+- [ ] T002 [P] Verify `src/Frank.Datastar/Consts.fs` uses only APIs available across net8.0/net9.0/net10.0 (no .NET 10-specific features)
+- [ ] T003 [P] Verify `src/Frank.Datastar/Types.fs` uses only APIs available across net8.0/net9.0/net10.0 (struct records, voption, TimeSpan are all net8.0+ compatible)
+- [ ] T004 [P] Verify `src/Frank.Datastar/ServerSentEvent.fs` uses only APIs available across net8.0/net9.0/net10.0 (IBufferWriter<byte>, StringTokenizer from Microsoft.Extensions.Primitives, Encoding.UTF8 are all net8.0+ compatible)
+- [ ] T005 [P] Verify `src/Frank.Datastar/ServerSentEventGenerator.fs` uses only APIs available across net8.0/net9.0/net10.0 (HttpResponse.BodyWriter, backgroundTask, all framework APIs are net8.0+ compatible)
+- [ ] T006 [P] Verify `src/Frank.Datastar/Frank.Datastar.fs` uses only APIs available across net8.0/net9.0/net10.0 (Task, JsonSerializerOptions are net8.0+ compatible)
+
+**Checkpoint**: Foundation verified — all implementation uses net8.0+ APIs only
 
 ---
 
 ## Phase 3: User Story 1 — Send Datastar SSE Events Without External Dependencies (Priority: P1) MVP
 
-**Goal**: Implement the public `ServerSentEventGenerator` with all ADR-compliant operations (PatchElements, PatchSignals, RemoveElement, ExecuteScript, ReadSignals) and rewire `Frank.Datastar.fs` to use it instead of StarFederation.Datastar.FSharp
+**Goal**: Core SSE event implementation already complete — this story validates the implementation conforms to ADR and works across all target frameworks
 
 **Independent Test**: Send each event type through the implementation and verify SSE output conforms to the Datastar SDK ADR specification
 
-### Implementation for User Story 1
+**Acceptance Criteria**:
+- [ ] US1-AC1: patchElements generates well-formed `event: datastar-patch-elements` SSE message with multi-line data
+- [ ] US1-AC2: patchSignals generates well-formed `event: datastar-patch-signals` SSE message
+- [ ] US1-AC3: removeElement generates SSE message with `mode: remove`
+- [ ] US1-AC4: executeScript generates SSE message with script tag wrapped in datastar-patch-elements
+- [ ] US1-AC5: tryReadSignals (GET) deserializes JSON from `datastar` query parameter
+- [ ] US1-AC6: tryReadSignals (POST) deserializes JSON from request body
 
-- [X] T005 [US1] Create `src/Frank.Datastar/ServerSentEventGenerator.fs`: Implement `ServerSentEventGenerator` type with static methods per contracts/api-surface.md. Must include: (1) `StartServerEventStreamAsync(httpResponse, ?cancellationToken)` — set `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive` (HTTP/1.1 only), call `httpResponse.StartAsync()` then flush `BodyWriter`. MUST use a lock-protected guard (e.g., `lock` + mutable flag) to ensure headers are set and flushed exactly once per request, even if called multiple times (FR-010/SC-006); (2) `PatchElementsAsync(httpResponse, elements, ?options, ?cancellationToken)` — write `event: datastar-patch-elements`, optional id/retry, conditional data lines for selector/mode/useViewTransition/namespace (only non-defaults), split elements on newlines via `String.splitLinesToSegments` and write each as `data: elements <segment>`, write blank line, flush; (3) `RemoveElementAsync(httpResponse, selector, ?options, ?cancellationToken)` — write `event: datastar-patch-elements` with `data: mode remove` and `data: selector <selector>`, optional useViewTransition; (4) `PatchSignalsAsync(httpResponse, signals, ?options, ?cancellationToken)` — write `event: datastar-patch-signals`, optional onlyIfMissing, split signals on newlines and write each as `data: signals <segment>`; (5) `ExecuteScriptAsync(httpResponse, script, ?options, ?cancellationToken)` — write `event: datastar-patch-elements` with `data: selector body`, `data: mode append`, build `<script>` tag with optional `data-effect="el.remove()"` and verbatim `Attributes`, split script on newlines for body, close with `</script>`; (6) `ReadSignalsAsync(httpRequest, ?cancellationToken)` — GET: read from query param `datastar`, others: read body; (7) `ReadSignalsAsync<'T>(httpRequest, ?jsonSerializerOptions, ?cancellationToken)` — deserialize via `System.Text.Json`, return `ValueSome`/`ValueNone`. All write methods MUST accept and propagate `CancellationToken` (defaulting to `httpResponse.HttpContext.RequestAborted`) and must not throw unhandled exceptions when the token is cancelled mid-write (FR-011). All write methods must use `httpResponse.BodyWriter` as `IBufferWriter<byte>` and flush after each event (FR-013). Reference: `../datastar-dotnet/src/fsharp/ServerSentEventGenerator.fs`, data-model.md SSE Event Format section, and Datastar SDK ADR at `../datastar/sdk/ADR.md`
-- [X] T006 [US1] Rewrite `src/Frank.Datastar/Frank.Datastar.fs`: Remove `open StarFederation.Datastar.FSharp`. Update `DatastarExtensions` module to call `ServerSentEventGenerator.StartServerEventStreamAsync(ctx.Response)` (now the local type). Update all `Datastar` module functions to delegate to the local `ServerSentEventGenerator` static methods instead of the external ones. Preserve all function signatures, XML doc comments, and `inline` markers exactly as they are. The only changes should be removing the StarFederation import and updating the internal call targets.
+**Implementation Tasks** (verification only, code already exists):
 
-**Checkpoint**: Frank.Datastar builds with zero external dependencies; all SSE event types emit ADR-compliant output
+- [ ] T007 [US1] Verify `ServerSentEventGenerator.PatchElementsAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs` writes correct SSE format per data-model.md (event type, optional id/retry, data lines for selector/mode/useViewTransition/namespace/elements, blank line terminator)
+- [ ] T008 [US1] Verify `ServerSentEventGenerator.PatchSignalsAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs` writes correct SSE format per data-model.md (event type, optional id/retry, data line for onlyIfMissing, data lines for signals, blank line terminator)
+- [ ] T009 [US1] Verify `ServerSentEventGenerator.RemoveElementAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs` writes correct SSE format per data-model.md (event type datastar-patch-elements, mode remove, selector, optional useViewTransition, blank line terminator)
+- [ ] T010 [US1] Verify `ServerSentEventGenerator.ExecuteScriptAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs` writes correct SSE format per data-model.md (event type datastar-patch-elements, selector body, mode append, script tag with optional attributes and autoRemove, blank line terminator)
+- [ ] T011 [US1] Verify `ServerSentEventGenerator.ReadSignalsAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs` reads from `datastar` query parameter on GET and request body on other methods, returns empty string on failure
+- [ ] T012 [US1] Verify `ServerSentEventGenerator.ReadSignalsAsync<'T>` in `src/Frank.Datastar/ServerSentEventGenerator.fs` deserializes JSON correctly and returns `ValueNone` on parse failure
 
----
+**Validation Tasks**:
 
-## Phase 4: User Story 2 — Preserve Existing Public API (Priority: P1)
+- [ ] T013 [US1] Run existing tests in `test/Frank.Datastar.Tests/DatastarTests.fs` against the new implementation — all tests must pass (SC-001)
+- [ ] T014 [US1] Build `src/Frank.Datastar/Frank.Datastar.fsproj` for all three target frameworks (net8.0, net9.0, net10.0) and verify no compilation errors
+- [ ] T015 [US1] Verify `src/Frank.Datastar/Frank.Datastar.fsproj` has zero external NuGet dependencies (only framework references and Frank core project reference) (SC-003)
 
-**Goal**: Verify that all existing consumers (samples and tests) compile and work correctly without source changes (except the test import fix), and add tests for new public APIs
-
-**Independent Test**: Build all sample projects and run the full test suite against the new implementation
-
-### Implementation for User Story 2
-
-- [X] T007 [US2] Update `test/Frank.Datastar.Tests/DatastarTests.fs`: Remove `open StarFederation.Datastar.FSharp` (line 13). The types `PatchElementsOptions`, `ElementPatchMode`, `PatchSignalsOptions`, `RemoveElementOptions`, `ExecuteScriptOptions` are now available via the existing `open Frank.Datastar` import. No other changes should be needed — verify all 18 existing tests compile.
-- [X] T008 [US2] Build all sample projects without changes: Run `dotnet build` on `sample/Frank.Datastar.Basic/Frank.Datastar.Basic.fsproj`, `sample/Frank.Datastar.Hox/Frank.Datastar.Hox.fsproj`, and `sample/Frank.Datastar.Oxpecker/Frank.Datastar.Oxpecker.fsproj`. All must compile successfully with zero source changes. If any fail, investigate — the samples do NOT import StarFederation.Datastar.FSharp directly, so no changes should be needed.
-- [X] T009 [US2] Run the full test suite: Execute `dotnet test test/Frank.Datastar.Tests/Frank.Datastar.Tests.fsproj`. All 18 existing tests must pass. Failures indicate either (a) SSE output format differences from the prior implementation, (b) type signature mismatches in the new option types, or (c) ReadSignals behavior differences. Fix any failures by aligning the new implementation with the expected output format.
-- [X] T010 [US2] Add test for `ExecuteScriptOptions.Attributes` in `test/Frank.Datastar.Tests/DatastarTests.fs`: Add a test that calls `Datastar.executeScriptWithOptions` with `{ ExecuteScriptOptions.Defaults with Attributes = [| "type=\"module\"" |] }` and verifies the response body contains `<script type="module"` (attribute written verbatim). Follows the existing WithOptions test pattern (e.g., T483 executeScriptWithOptions).
-- [X] T011 [US2] Add test for public `ServerSentEventGenerator` API in `test/Frank.Datastar.Tests/DatastarTests.fs`: Add a test that calls `ServerSentEventGenerator.PatchElementsAsync(ctx.Response, html)` directly (not via the `Datastar` module) and verifies well-formed SSE output containing `event: datastar-patch-elements` and the expected HTML content. Confirms FR-014 public accessibility. Uses the existing `createMockContext()` test infrastructure.
-
-**Checkpoint**: All existing consumers verified — zero-change upgrade path confirmed for samples; test import is the only required change; new public APIs have test coverage
-
----
-
-## Phase 5: User Story 3 — Efficient Resource Usage (Priority: P2)
-
-**Goal**: Verify that the implementation uses zero-copy techniques and matches or exceeds the allocation profile of StarFederation.Datastar.FSharp
-
-**Independent Test**: Code review of hot paths confirms pre-allocated byte arrays, inline functions, IBufferWriter pattern, and StringTokenizer usage; allocation profiling produces measurable evidence
-
-### Implementation for User Story 3
-
-- [X] T012 [P] [US3] Audit `src/Frank.Datastar/ServerSentEvent.fs` for allocation-free write paths: Verify all write functions use `writer.GetSpan()` + `writer.Advance()` pattern (not `writer.Write(new byte[])` or similar allocating patterns). Verify `String.splitLinesToSegments` uses `StringTokenizer` (not `String.Split` which allocates arrays). Verify all SSE prefix writes use pre-allocated byte literals from `Consts.Bytes` module. Fix any allocating patterns found.
-- [X] T013 [P] [US3] Audit `src/Frank.Datastar/ServerSentEventGenerator.fs` for allocation-free event composition: Verify PatchElements/PatchSignals iterate `splitLinesToSegments` results without collecting to list/array. Verify ExecuteScript builds the `<script>` tag using byte literals and `sendDataStringSeqLine`/`sendDataBytesLine` (not string concatenation). Verify all functions marked `inline` where appropriate. Fix any allocating patterns found.
-- [X] T014 [US3] Run allocation profiling for SC-005 evidence: Create a simple console benchmark (in the scratchpad directory, not committed) that sends 10,000 PatchElements events to a mock `IBufferWriter<byte>` and measures allocations using `GC.GetAllocatedBytesForCurrentThread()` before/after. Compare against the same workload using StarFederation.Datastar.FSharp (reference the existing project at `../datastar-dotnet`). Document results in a comment on the PR. The new implementation must allocate no more than the baseline.
-
-**Checkpoint**: Performance audit complete — all hot paths confirmed allocation-free; allocation profiling evidence produced
+**Story 1 Complete**: ✅ Core SSE implementation validated and conforming to ADR specification
 
 ---
 
-## Phase 6: User Story 4 — .NET 10 Only Target (Priority: P2)
+## Phase 4: User Story 2 — Preserve Existing Frank.Datastar Public API (Priority: P1)
 
-**Goal**: Confirm the project targets net10.0 only and the dependency graph is clean
+**Goal**: Ensure complete API compatibility — no breaking changes to existing consumers
 
-**Independent Test**: Inspect the project file and verify the built package has no StarFederation.Datastar.FSharp dependency
+**Independent Test**: Compile existing Frank.Datastar sample projects and test suite against new implementation without any source code changes
 
-### Implementation for User Story 4
+**Acceptance Criteria**:
+- [ ] US2-AC1: Frank.Datastar.Basic sample compiles without source changes
+- [ ] US2-AC2: Frank.Datastar.Hox sample compiles without source changes
+- [ ] US2-AC3: Frank.Datastar.Oxpecker sample compiles without source changes
+- [ ] US2-AC4: Frank.Datastar.Tests test project runs all tests successfully without modification to test logic
 
-- [X] T015 [US4] Verify `src/Frank.Datastar/Frank.Datastar.fsproj` targets `<TargetFramework>net10.0</TargetFramework>` (singular, not plural), has no `PackageReference` to `StarFederation.Datastar.FSharp`, and retains only the `ProjectReference` to Frank core and the `PackageReference` to `Microsoft.SourceLink.GitHub`. Run `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj` to confirm clean build.
+**Implementation Tasks** (verification only, API is preserved):
 
-**Checkpoint**: Framework target and dependency graph verified
+- [ ] T016 [US2] Verify `ResourceBuilder.datastar` custom operation in `src/Frank.Datastar/Frank.Datastar.fs` matches existing signature: `spec:ResourceSpec * operation:(HttpContext -> Task<unit>) -> ResourceSpec`
+- [ ] T017 [US2] Verify `ResourceBuilder.datastar` custom operation overload in `src/Frank.Datastar/Frank.Datastar.fs` matches existing signature: `spec:ResourceSpec * method:string * operation:(HttpContext -> Task<unit>) -> ResourceSpec`
+- [ ] T018 [US2] Verify all `Datastar` module functions in `src/Frank.Datastar/Frank.Datastar.fs` match existing signatures per contracts/api-surface.md (patchElements, patchElementsWithOptions, patchSignals, patchSignalsWithOptions, tryReadSignals, tryReadSignalsWithOptions, removeElement, removeElementWithOptions, executeScript, executeScriptWithOptions)
+- [ ] T019 [US2] Verify all option types in `src/Frank.Datastar/Types.fs` match existing field names and types per contracts/api-surface.md (PatchElementsOptions, PatchSignalsOptions, RemoveElementOptions, ExecuteScriptOptions with Attributes as string[])
+- [ ] T020 [US2] Verify all enums in `src/Frank.Datastar/Consts.fs` match existing variants per contracts/api-surface.md (ElementPatchMode, PatchElementNamespace)
+
+**Validation Tasks**:
+
+- [ ] T021 [US2] Build `samples/Frank.Datastar.Basic/` without any source changes — compilation must succeed (SC-002)
+- [ ] T022 [US2] Build `samples/Frank.Datastar.Hox/` without any source changes — compilation must succeed (SC-002)
+- [ ] T023 [US2] Build `samples/Frank.Datastar.Oxpecker/` without any source changes — compilation must succeed (SC-002)
+- [ ] T024 [US2] Run all tests in `test/Frank.Datastar.Tests/DatastarTests.fs` without modifying test logic (only namespace imports if needed) — all tests must pass (SC-001)
+
+**Story 2 Complete**: ✅ API compatibility validated — seamless upgrade experience
+
+---
+
+## Phase 5: User Story 3 — Efficient Resource Usage via Direct Buffer Writing (Priority: P2)
+
+**Goal**: Validate performance characteristics match or exceed StarFederation.Datastar.FSharp baseline
+
+**Independent Test**: Benchmark the new implementation against the existing one using a standardized workload and compare allocation counts and throughput
+
+**Acceptance Criteria**:
+- [ ] US3-AC1: Pre-allocated byte arrays used for SSE prefixes (no runtime string-to-byte conversions)
+- [ ] US3-AC2: Zero-allocation string segmentation for multi-line payloads (via StringTokenizer)
+- [ ] US3-AC3: Direct buffer writing without intermediate string/byte copies (IBufferWriter<byte>)
+
+**Implementation Tasks** (verification only, performance optimizations already implemented):
+
+- [ ] T025 [US3] Verify `src/Frank.Datastar/Consts.fs` Bytes module pre-allocates all SSE field prefixes and enum values as byte arrays using `"..."B` syntax
+- [ ] T026 [US3] Verify `src/Frank.Datastar/ServerSentEvent.fs` String.splitLinesToSegments uses StringTokenizer from Microsoft.Extensions.Primitives for zero-allocation line splitting
+- [ ] T027 [US3] Verify all `ServerSentEventGenerator` methods in `src/Frank.Datastar/ServerSentEventGenerator.fs` write directly to `HttpResponse.BodyWriter` (IBufferWriter<byte>) without intermediate allocations
+- [ ] T028 [US3] Verify all `Datastar` module functions in `src/Frank.Datastar/Frank.Datastar.fs` are marked `inline` to ensure zero-overhead wrapper calls
+
+**Validation Tasks**:
+
+- [ ] T029 [US3] Create a simple benchmark workload (10,000 patchElements events with multi-line HTML payload sent to a mock response stream) and measure allocation count
+- [ ] T030 [US3] Compare allocation profile against baseline — new implementation must allocate no more memory per event than StarFederation.Datastar.FSharp (SC-005)
+
+**Story 3 Complete**: ✅ Performance parity validated — zero-allocation buffer writing confirmed
+
+---
+
+## Phase 6: User Story 4 — Maintain Multi-Target Support for Frank.Datastar (Priority: P2)
+
+**Goal**: Verify the library builds and passes all tests on net8.0, net9.0, and net10.0
+
+**Independent Test**: Verify project file targets net8.0, net9.0, and net10.0, and that the library builds and passes all tests on each target framework
+
+**Acceptance Criteria**:
+- [ ] US4-AC1: Frank.Datastar.fsproj targets `net8.0;net9.0;net10.0`
+- [ ] US4-AC2: Consumer project targeting .NET 8.0 can reference Frank.Datastar 7.1.0 and run successfully
+- [ ] US4-AC3: Consumer project targeting .NET 9.0 can reference Frank.Datastar 7.1.0 and run successfully
+- [ ] US4-AC4: Consumer project targeting .NET 10.0 can reference Frank.Datastar 7.1.0 and run successfully
+
+**Implementation Tasks** (verification only, multi-targeting already configured in T001):
+
+- [ ] T031 [US4] Verify `src/Frank.Datastar/Frank.Datastar.fsproj` contains `<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>` (updated in T001)
+- [ ] T032 [US4] Verify `src/Frank.Datastar/Frank.Datastar.fsproj` version is `7.1.0` (updated in T001)
+- [ ] T033 [US4] Verify no conditional compilation directives (`#if`, `#else`, `#endif`) are needed — all code uses APIs available across net8.0/net9.0/net10.0
+
+**Validation Tasks**:
+
+- [ ] T034 [US4] Build `src/Frank.Datastar/Frank.Datastar.fsproj` specifically for net8.0 target and verify no compilation errors
+- [ ] T035 [US4] Build `src/Frank.Datastar/Frank.Datastar.fsproj` specifically for net9.0 target and verify no compilation errors
+- [ ] T036 [US4] Build `src/Frank.Datastar/Frank.Datastar.fsproj` specifically for net10.0 target and verify no compilation errors
+- [ ] T037 [US4] Run all tests in `test/Frank.Datastar.Tests/` targeting net8.0 and verify all tests pass
+- [ ] T038 [US4] Run all tests in `test/Frank.Datastar.Tests/` targeting net9.0 and verify all tests pass
+- [ ] T039 [US4] Run all tests in `test/Frank.Datastar.Tests/` targeting net10.0 and verify all tests pass
+
+**Story 4 Complete**: ✅ Multi-framework compatibility validated — broad framework support confirmed
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-**Purpose**: Version bump, documentation, and final validation
+**Purpose**: Final validation, edge case handling, and release preparation
 
-- [X] T016 Update version in `src/Directory.Build.props`: Change `<VersionPrefix>` from `7.0.0` to `8.0.0` to reflect the breaking changes (net10.0 only, Attributes type change)
-- [X] T017 Verify ADR compliance end-to-end: Manually compare SSE output for each event type (PatchElements minimal, PatchElements full options, PatchSignals, RemoveElement, ExecuteScript minimal, ExecuteScript with attributes) against the examples in `../datastar/sdk/ADR.md`. Ensure byte-for-byte format match including field ordering, conditional omission of defaults, and line termination.
-- [X] T018 Run full solution build and test: Execute `dotnet build Frank.sln` (Frank core) and `dotnet build src/Frank.Datastar/Frank.Datastar.fsproj` and `dotnet test test/Frank.Datastar.Tests/Frank.Datastar.Tests.fsproj` and build all three sample projects. Everything must pass.
+**Tasks**:
 
----
-
-## Dependencies & Execution Order
-
-### Phase Dependencies
-
-- **Setup (Phase 1)**: No dependencies — start immediately
-- **Foundational (Phase 2)**: Depends on Phase 1 (project file must have new Compile entries)
-- **User Story 1 (Phase 3)**: Depends on Phase 2 (needs Consts, Types, ServerSentEvent)
-- **User Story 2 (Phase 4)**: Depends on Phase 3 (needs working ServerSentEventGenerator)
-- **User Story 3 (Phase 5)**: Depends on Phase 3 (needs implementation to audit)
-- **User Story 4 (Phase 6)**: Depends on Phase 1 (project file changes)
-- **Polish (Phase 7)**: Depends on all prior phases
-
-### User Story Dependencies
-
-- **US1 (P1)**: Depends on Foundational — core implementation
-- **US2 (P1)**: Depends on US1 — cannot verify compatibility until implementation exists
-- **US3 (P2)**: Depends on US1 — cannot audit until implementation exists; can run in parallel with US2
-- **US4 (P2)**: Independent of other stories — can run in parallel with US1 after Setup
-
-### Within Each User Story
-
-- ServerSentEventGenerator (T005) before Frank.Datastar.fs rewire (T006)
-- Test import fix (T007) before sample builds (T008) before test run (T009) before new tests (T010, T011)
-- Audit tasks (T012, T013) can run in parallel; allocation profiling (T014) follows audits
-- T010 and T011 can run in parallel (adding tests to same file but independent test cases)
-
-### Parallel Opportunities
-
-- T002 and T003 can run in parallel (different files, no dependencies)
-- T010 and T011 can run in parallel (independent test additions)
-- T012 and T013 can run in parallel (auditing different files)
-- US3 and US2 can run in parallel after US1 completes
-- US4 verification (T015) can run any time after T001
+- [ ] T040 Verify edge case handling in `ServerSentEventGenerator.StartServerEventStreamAsync` in `src/Frank.Datastar/ServerSentEventGenerator.fs`: SSE stream initialization occurs exactly once per request via `HttpContext.Items` flag check (FR-010, SC-006)
+- [ ] T041 Verify edge case handling in all async methods in `src/Frank.Datastar/ServerSentEventGenerator.fs`: All methods accept and respect `CancellationToken` (HttpContext.RequestAborted) for graceful client disconnection (FR-011)
+- [ ] T042 Verify edge case handling for empty strings in `ServerSentEventGenerator.PatchElementsAsync` and `PatchSignalsAsync`: Empty payloads generate valid SSE events with no data lines (matching current behavior per Edge Cases section)
+- [ ] T043 Verify edge case handling for Windows line endings in `ServerSentEvent.fs` String.splitLinesToSegments: StringTokenizer handles both `\n` and `\r\n` correctly (per Edge Cases section)
+- [ ] T044 Verify edge case handling in `ServerSentEventGenerator.ReadSignalsAsync<'T>`: Returns `ValueNone` for empty request body or missing query parameter without throwing (per Edge Cases section)
+- [ ] T045 Run full test suite against all three target frameworks (net8.0, net9.0, net10.0) and verify all tests pass (SC-001)
+- [ ] T046 Build all three sample projects (Basic, Hox, Oxpecker) and verify they compile and run correctly without source changes (SC-002)
+- [ ] T047 Verify `src/Frank.Datastar/Frank.Datastar.fsproj` package description emphasizes native SSE implementation and multi-targeting support
+- [ ] T048 Verify version 7.1.0 is reflected in all package metadata (VersionPrefix, Description mentions minor update) (SC-007)
+- [ ] T049 Manual test: Run one sample project and verify browser Datastar client interaction works correctly (SSE events delivered, signals read, no console errors)
+- [ ] T050 Manual test: Verify SSE output format matches Datastar SDK ADR specification byte-for-byte using a reference test vector (SC-004)
+- [ ] T051 Verify per-event flushing in all event-writing methods in `src/Frank.Datastar/ServerSentEventGenerator.fs`: Each method (PatchElementsAsync, PatchSignalsAsync, RemoveElementAsync, ExecuteScriptAsync) calls `writer.FlushAsync(cancellationToken)` after writing the event to ensure immediate delivery per FR-013
 
 ---
 
-## Parallel Example: Phase 2 (Foundational)
+## Phase 8: Release Documentation & CI Updates
 
-```text
-# These can run in parallel (different files):
-T002: Create Consts.fs (enums, constants, byte arrays)
-T003: Create Types.fs (option struct records, type aliases)
+**Purpose**: Update build infrastructure, CI pipeline, and release documentation to reflect multi-targeting and version changes
 
-# This must follow T002 and T003 (depends on both):
-T004: Create ServerSentEvent.fs (write functions use Consts, Types)
-```
+**Tasks**:
 
-## Parallel Example: After User Story 1 Completes
-
-```text
-# These can run in parallel (independent validation):
-US2: T007 → T008 → T009 → T010 + T011 (compatibility + new tests)
-US3: T012 + T013 in parallel → T014 (performance audit + profiling)
-```
+- [ ] T052 Update build scripts (e.g., `build.sh`, `build.ps1`, `build.fsx`) to build Frank.Datastar for all three target frameworks (net8.0, net9.0, net10.0) and remove any net10.0-only assumptions
+- [ ] T053 Update CI pipeline configuration (e.g., `.github/workflows/`, `azure-pipelines.yml`) to build and test Frank.Datastar on all three target frameworks using build matrix strategy
+- [ ] T054 Update `README.md` in repository root to document that Frank.Datastar 7.1.0 supports net8.0/net9.0/net10.0 and uses native SSE implementation (no external Datastar dependency)
+- [ ] T055 Create or update `RELEASE_NOTES.md` (or similar) to document version 7.1.0 changes: (1) Native SSE implementation replaces StarFederation.Datastar.FSharp dependency, (2) Multi-targeting restored to net8.0/net9.0/net10.0, (3) Zero breaking API changes - seamless upgrade from 7.0.x, (4) Performance improvements via direct buffer writing
+- [ ] T056 Verify all documentation files (README, RELEASE_NOTES, package description, project homepage) use consistent version number (7.1.0) and framework targets (net8.0;net9.0;net10.0)
+- [ ] T057 Update any developer documentation (CONTRIBUTING.md, docs/) to reflect that Frank.Datastar now uses native implementation and document how to build/test across multiple frameworks
+- [ ] T058 Update NuGet package metadata in `src/Frank.Datastar/Frank.Datastar.fsproj` (Description, PackageTags, PackageReleaseNotes) to emphasize: "Native SSE implementation, no external dependencies, supports .NET 8.0/9.0/10.0"
 
 ---
 
-## Implementation Strategy
+## Summary
 
-### MVP First (User Story 1 Only)
+### Task Count by Phase
 
-1. Complete Phase 1: Setup (T001)
-2. Complete Phase 2: Foundational (T002–T004)
-3. Complete Phase 3: User Story 1 (T005–T006)
-4. **STOP and VALIDATE**: Build the project, manually test SSE output format
-5. This delivers a working Frank.Datastar with no external dependencies
+| Phase | Task Count | Purpose |
+|-------|------------|---------|
+| Phase 1: Setup | 1 | Project configuration update (multi-targeting + version) |
+| Phase 2: Foundational | 5 | Verify multi-framework API compatibility |
+| Phase 3: User Story 1 (P1) | 9 | Core SSE implementation validation |
+| Phase 4: User Story 2 (P1) | 9 | API compatibility verification |
+| Phase 5: User Story 3 (P2) | 6 | Performance validation |
+| Phase 6: User Story 4 (P2) | 9 | Multi-framework validation |
+| Phase 7: Polish | 12 | Edge cases, final validation, release prep |
+| Phase 8: Release Documentation | 7 | Build scripts, CI, README, RELEASE_NOTES updates |
+| **TOTAL** | **58** | |
 
-### Incremental Delivery
+### User Story Independence
 
-1. Setup + Foundational → Internal infrastructure ready
-2. Add US1 (T005–T006) → Core SSE implementation working (MVP!)
-3. Add US2 (T007–T011) → Backward compatibility verified + new API tests
-4. Add US3 (T012–T014) → Performance validated with profiling evidence
-5. Add US4 (T015) → Framework target confirmed
-6. Polish (T016–T018) → Version bump, full validation
+- **US1** (Core SSE Implementation): Foundation for all other stories — MUST complete first
+- **US2** (API Compatibility): Can run in parallel with US3 and US4 validation tasks
+- **US3** (Performance): Can run in parallel with US2 and US4 after US1 complete
+- **US4** (Multi-Targeting): Can run in parallel with US2 and US3 after US1 complete
 
----
+### Parallel Execution Opportunities
 
-## Notes
+**After Phase 2 (Foundational) completes:**
 
-- [P] tasks = different files, no dependencies
-- [Story] label maps task to specific user story for traceability
-- US1 and US2 are both P1 but US2 depends on US1 (can't verify compatibility without implementation)
-- US3 and US4 are both P2 and largely independent of each other
-- The existing 18 tests in DatastarTests.fs serve as the primary regression gate (SC-001)
-- T010 and T011 add tests for new public APIs per constitution requirement "All public APIs MUST have tests"
-- T014 produces allocation profiling evidence per constitution requirement "Performance-sensitive changes MUST include benchmark results"
-- Sample project builds serve as the secondary compatibility gate (SC-002)
+- Parallel Group 1 (US1 verification): T007-T015 (validate core SSE implementation)
+- Parallel Group 2 (US2 verification): T016-T024 (validate API compatibility)
+- Parallel Group 3 (US3 verification): T025-T030 (validate performance)
+- Parallel Group 4 (US4 verification): T031-T039 (validate multi-targeting)
+
+**Phase 7 (Polish) runs sequentially after all user stories complete.**
+
+### MVP Scope
+
+**Minimum Viable Product**: Phase 1 + Phase 2 + Phase 3 (User Story 1)
+
+This delivers:
+- ✅ Multi-targeting configuration (net8.0/net9.0/net10.0)
+- ✅ Dependency removal (StarFederation.Datastar.FSharp eliminated)
+- ✅ Core SSE implementation (all event types working)
+- ✅ Version 7.1.0 release ready
+
+Remaining phases add validation confidence and release readiness:
+- Phase 4 (US2): API compatibility validation (de-risks upgrade)
+- Phase 5 (US3): Performance validation (confirms optimization goals)
+- Phase 6 (US4): Multi-framework validation (ensures broad compatibility)
+- Phase 7: Polish & edge cases (production hardening)
+- Phase 8: Release documentation (build/CI/docs updates for publication)
+
+### Implementation Strategy
+
+1. **Start with T001** (Setup) — update project file for multi-targeting and version 7.1.0
+2. **Complete Phase 2** (Foundational) — verify all code uses net8.0+ APIs only
+3. **Execute User Story 1** (Phase 3) — validate core implementation works
+4. **Parallelize US2/US3/US4 validation** — run compatibility, performance, and multi-framework tests concurrently
+5. **Complete Phase 7** (Polish) — final edge case validation and per-event flush verification
+6. **Finish with Phase 8** (Release Documentation) — update build scripts, CI pipeline, README, and RELEASE_NOTES
+
+### Critical Success Criteria Mapping
+
+| Success Criterion | Tasks | Phase |
+|-------------------|-------|-------|
+| SC-001: All tests pass | T013, T024, T045 | 3, 4, 7 |
+| SC-002: Samples compile unchanged | T021-T023, T046 | 4, 7 |
+| SC-003: Zero external dependencies | T015 | 3 |
+| SC-004: SSE format matches ADR | T007-T012, T050 | 3, 7 |
+| SC-005: Performance parity | T029-T030 | 5 |
+| SC-006: Single stream initialization | T040 | 7 |
+| SC-007: Version 7.1.0 | T001, T032, T048, T056 | 1, 6, 7, 8 |
+| FR-013: Per-event flush | T051 | 7 |
+| Documentation Updated | T052-T058 | 8 |
+

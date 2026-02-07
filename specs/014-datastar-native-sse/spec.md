@@ -5,11 +5,13 @@
 **Status**: Draft
 **Input**: User description: "Frank.Datastar currently relies upon the StarFederation.Datastar dependency. .NET 10 introduced native SSE support via System.Net.ServerSentEvents. Evaluate whether Frank.Datastar should replace the external dependency with a purpose-built implementation leveraging .NET 10's native SSE APIs for improved efficiency."
 
+**Clarification**: While .NET 10 introduced `System.Net.ServerSentEvents`, this feature evaluates a custom SSE implementation using APIs available across net8.0/net9.0/net10.0 to maintain broad compatibility. The implementation provides Datastar-specific optimizations and removes the external dependency while supporting all current target frameworks.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Send Datastar SSE Events Without External Dependencies (Priority: P1)
 
-As a Frank.Datastar library consumer, I want to send Datastar SSE events (patch-elements, patch-signals, remove-element, execute-script) to the browser without requiring the StarFederation.Datastar.FSharp NuGet package, so that the library has fewer external dependencies and can leverage .NET 10's built-in SSE support for better performance.
+As a Frank.Datastar library consumer, I want to send Datastar SSE events (patch-elements, patch-signals, remove-element, execute-script) to the browser without requiring the StarFederation.Datastar.FSharp NuGet package, so that the library has fewer external dependencies and can leverage a custom SSE implementation optimized for Datastar with better performance.
 
 **Why this priority**: This is the core value proposition. Removing the external dependency eliminates a transitive dependency chain and allows Frank.Datastar to directly control how bytes are written to the response stream, enabling more efficient resource usage. This is the foundation all other stories depend on.
 
@@ -59,19 +61,20 @@ As a developer running Frank.Datastar at scale, I want the SSE implementation to
 
 ---
 
-### User Story 4 - .NET 10 Only Target for Frank.Datastar (Priority: P2)
+### User Story 4 - Maintain Multi-Target Support for Frank.Datastar (Priority: P2)
 
-As the Frank.Datastar library maintainer, I want Frank.Datastar to target only .NET 10 so that it can use modern .NET APIs without conditional compilation or polyfills, keeping the codebase simple.
+As a Frank.Datastar library consumer, I want Frank.Datastar to continue supporting .NET 8.0, 9.0, and 10.0 so that I can use the native SSE implementation without being forced to upgrade to .NET 10.
 
-**Why this priority**: Simplifying the target framework reduces maintenance burden and testing matrix. Since Frank.Datastar is a separate package from Frank core (which continues multi-targeting), consumers on older frameworks can continue using Frank core directly with StarFederation.Datastar if needed.
+**Why this priority**: Maintaining multi-target support ensures backward compatibility and broad adoption. The implementation uses only APIs available across all three target frameworks (net8.0/net9.0/net10.0), making it feasible to support all versions without conditional compilation complexity. This aligns with the repository-wide multi-targeting strategy.
 
-**Independent Test**: Can be tested by verifying the project file targets net10.0 only and builds successfully. Delivers a simpler build and dependency graph.
+**Independent Test**: Can be tested by verifying the project file targets net8.0, net9.0, and net10.0, and that the library builds and passes all tests on each target framework. Delivers broad framework compatibility.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Frank.Datastar project file, **When** the target framework is inspected, **Then** it targets only `net10.0`.
-2. **Given** a consumer project targeting .NET 10, **When** it references Frank.Datastar, **Then** it resolves all dependencies without requiring StarFederation.Datastar.FSharp.
-3. **Given** the Frank core library, **When** inspected, **Then** it continues to multi-target net8.0/net9.0/net10.0 (unchanged).
+1. **Given** the Frank.Datastar project file, **When** the target framework is inspected, **Then** it targets `net8.0;net9.0;net10.0`.
+2. **Given** a consumer project targeting .NET 8.0, **When** it references Frank.Datastar 7.1.0, **Then** it resolves all dependencies without requiring StarFederation.Datastar.FSharp and runs successfully.
+3. **Given** a consumer project targeting .NET 9.0, **When** it references Frank.Datastar 7.1.0, **Then** it resolves all dependencies without requiring StarFederation.Datastar.FSharp and runs successfully.
+4. **Given** a consumer project targeting .NET 10.0, **When** it references Frank.Datastar 7.1.0, **Then** it resolves all dependencies without requiring StarFederation.Datastar.FSharp and runs successfully.
 
 ---
 
@@ -95,7 +98,7 @@ As the Frank.Datastar library maintainer, I want Frank.Datastar to target only .
 - **FR-005**: Frank.Datastar MUST read incoming signals from the `datastar` query parameter on GET requests and from the request body on other HTTP methods.
 - **FR-006**: Frank.Datastar MUST handle multi-line payloads (HTML, JSON, script) by splitting on newline characters and emitting each non-empty line as a separate `data:` field with the appropriate prefix.
 - **FR-007**: Frank.Datastar MUST write SSE output using direct buffer writing techniques to minimize memory allocations.
-- **FR-008**: Frank.Datastar MUST target .NET 10 only (`net10.0`).
+- **FR-008**: Frank.Datastar MUST target .NET 8.0, 9.0, and 10.0 (`net8.0;net9.0;net10.0`).
 - **FR-009**: Frank.Datastar MUST NOT depend on the StarFederation.Datastar.FSharp NuGet package.
 - **FR-010**: Frank.Datastar MUST ensure that SSE stream initialization (header setting and initial flush) occurs exactly once per request, even if the handler calls multiple event-sending functions.
 - **FR-011**: Frank.Datastar MUST respect cancellation tokens (primarily `HttpContext.RequestAborted`) and gracefully stop writing when the client disconnects.
@@ -118,6 +121,7 @@ As the Frank.Datastar library maintainer, I want Frank.Datastar to target only .
 - **SC-004**: SSE output for each event type matches the Datastar SDK ADR specification format when verified against reference test vectors.
 - **SC-005**: The new implementation allocates no more memory per event than the existing StarFederation.Datastar.FSharp implementation, as measured by allocation profiling on a standardized workload.
 - **SC-006**: Response headers and initial flush occur exactly once per SSE stream, regardless of how many events are sent.
+- **SC-007**: The Frank.Datastar package version is 7.1.0, reflecting a minor version bump with no breaking API changes.
 
 ## Clarifications
 
@@ -128,10 +132,40 @@ As the Frank.Datastar library maintainer, I want Frank.Datastar to target only .
 - Q: What type should `ExecuteScriptOptions.Attributes` use? → A: `string array` (`string[]`), matching the ADR's `[]string` semantics. Contiguous, storable in struct fields, iterated once for write-only output. Default: empty array.
 - Q: Should the library HTML-encode attribute strings or write them verbatim? → A: Write verbatim. Each string is a complete, pre-formed attribute written as-is into the `<script>` tag. Caller is responsible for safe content and formatting.
 
+### Session 2026-02-07 (Revision)
+
+- Q: Should User Story 4 be removed, revised, or kept as-is given the restoration of multi-targeting? → A: Revise to "Maintain Multi-Target Support" explaining that Frank.Datastar continues to support net8.0/net9.0/net10.0 for backward compatibility.
+- Q: What version number should this release use given the restored multi-targeting and no breaking API changes? → A: 7.1.0 (minor version bump from 7.0.0) - Internal implementation change with no breaking changes.
+- Q: How should FR-008 reflect the multi-targeting requirement? → A: Frank.Datastar MUST target net8.0, net9.0, and net10.0.
+- Q: How should the Assumptions section reflect the multi-targeting strategy? → A: All libraries in the repository multi-target net8.0/net9.0/net10.0 for broad compatibility.
+- Q: Should the spec clarify which .NET APIs are being used given the multi-targeting? → A: Add a note explaining that while .NET 10 introduced System.Net.ServerSentEvents, Frank.Datastar implements its own optimized approach that works across net8.0/net9.0/net10.0.
+
 ## Assumptions
 
-- Frank core will continue to multi-target net8.0/net9.0/net10.0; only Frank.Datastar changes to net10.0-only.
-- Consumers who need .NET 8 or .NET 9 support can use Frank core directly with the StarFederation.Datastar.FSharp package as before.
+- All libraries in the repository (Frank core, Frank.Datastar, Frank.Auth, etc.) multi-target net8.0/net9.0/net10.0 for broad compatibility.
+- While .NET 10 introduced `System.Net.ServerSentEvents`, Frank.Datastar implements its own optimized SSE approach using only APIs available across net8.0/net9.0/net10.0, avoiding any .NET 10-specific dependencies. This custom implementation provides fine-grained control over buffer writing and Datastar-specific event formatting.
 - The existing `ResourceBuilder.AddHandler` mechanism in Frank core is sufficient for the `datastar` custom operation; no changes to Frank core are required.
 - The Datastar SDK ADR specification is the authoritative reference for SSE message format, and the current StarFederation.Datastar.FSharp implementation faithfully implements it.
 - The option types (PatchElementsOptions, etc.) will be re-implemented within Frank.Datastar rather than imported from the external dependency, maintaining identical field names and default values.
+- **Version History**: During initial implementation, version 8.0.0 was briefly used with net10.0-only targeting. This release corrects that approach by restoring multi-targeting and using version 7.1.0 to continue the 7.x release line. Version 7.1.0 is a minor bump that adds the native SSE implementation while maintaining full API compatibility and broad framework support (net8.0/net9.0/net10.0). No 8.0.0 release was published to NuGet—this version correction occurred during development before release.
+
+## References
+
+### Authoritative Specifications
+
+- **Datastar SDK ADR (Architectural Decision Record)**: The official specification for Datastar's Server-Sent Events format, event types, data line structure, and option semantics. This implementation conforms to the ADR's requirements for SSE message format, field ordering, and event type definitions.
+  - **Primary Source**: StarFederation.Datastar reference implementation (https://github.com/starfederation/datastar)
+  - **ADR Document**: Located at `../datastar/sdk/ADR.md` relative to datastar-dotnet repository
+  - **Key Requirements**:
+    - Two event types: `datastar-patch-elements`, `datastar-patch-signals`
+    - Field ordering: `event:`, `[id:]`, `[retry:]`, `data: <key> <value>`, blank line terminator
+    - Data line prefixes: `selector`, `mode`, `elements`, `signals`, `useViewTransition`, `namespace`, `onlyIfMissing`
+    - Multi-line payload handling: Split on `\n`, emit each non-empty line as separate `data:` line
+
+- **SSE Protocol (RFC)**: Server-Sent Events specification from WHATWG/W3C defines the underlying transport protocol (`text/event-stream`, field format, connection handling).
+
+### Related Documentation
+
+- **data-model.md**: Complete SSE event format specification with wire format examples (lines 95-148)
+- **contracts/api-surface.md**: Public API contract for all types and functions
+- **research.md**: Technical decision rationale for implementation approach
