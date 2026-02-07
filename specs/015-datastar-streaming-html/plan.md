@@ -9,11 +9,11 @@ Add stream-based overloads to Frank.Datastar's SSE event operations that accept 
 
 ## Technical Context
 
-**Language/Version**: F# 8.0+ targeting .NET 10.0 (matching Frank.Datastar 8.0.0 from spec 014)
+**Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Datastar 8.0.0 from spec 014)
 **Primary Dependencies**: ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool)
 **Storage**: N/A
 **Testing**: Expecto + DefaultHttpContext/MemoryStream mock pattern (existing Frank.Datastar.Tests)
-**Target Platform**: .NET 10.0 (Linux/Windows/macOS server)
+**Target Platform**: .NET 8.0/9.0/10.0 (multi-targeting: Linux/Windows/macOS server)
 **Project Type**: Single library (Frank.Datastar)
 **Performance Goals**: 50%+ allocation reduction per SSE event; measurable throughput improvement at 1000+ events/sec
 **Constraints**: Backward compatible — no changes to existing string-based API; byte-for-byte output equivalence (SC-004)
