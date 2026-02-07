@@ -4,7 +4,6 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Frank.Builder
-open StarFederation.Datastar.FSharp
 
 /// Extensions to Frank's ResourceBuilder for Datastar SSE operations.
 ///
