@@ -1,3 +1,20 @@
+### New in 7.1.0 (Released 2026-02-07)
+
+**Frank.Datastar - Native SSE Implementation**
+
+- **Performance:** Replaced StarFederation.Datastar.FSharp dependency with native SSE implementation using `IBufferWriter<byte>` for zero-copy buffer writing
+- **Zero External Dependencies:** Frank.Datastar now has no external NuGet dependencies beyond framework references and Frank core
+- **Multi-Targeting Restored:** Supports .NET 8.0, 9.0, and 10.0 (`net8.0;net9.0;net10.0`)
+- **API Compatibility:** Zero breaking changes — seamless upgrade from 7.0.x with identical public API surface
+- **Performance Optimizations:**
+  - Pre-allocated byte arrays for SSE field prefixes (no runtime UTF-8 encoding)
+  - Zero-allocation string segmentation via `StringTokenizer` for multi-line payloads
+  - Direct buffer writing without intermediate copies
+  - Per-event flushing for immediate delivery
+- **ADR Compliance:** Full conformance to Datastar SDK ADR specification for SSE message format
+- **Added:** `Attributes` field to `ExecuteScriptOptions` for custom script tag attributes (additive, non-breaking)
+- **Public API:** `ServerSentEventGenerator` now public for advanced SSE event construction
+
 ### New in 7.0.0 (Released 2026-02-05)
 
 - **Breaking:** Added `Metadata` field to `ResourceSpec` and `AddMetadata` to `ResourceBuilder` for composable endpoint metadata conventions
