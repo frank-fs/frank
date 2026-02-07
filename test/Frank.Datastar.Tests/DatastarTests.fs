@@ -10,7 +10,6 @@ open Expecto
 open System.Text.Json
 open Frank.Builder
 open Frank.Datastar
-open StarFederation.Datastar.FSharp
 
 /// Helper to create a mock HttpContext with in-memory response stream
 let createMockContext () =
@@ -661,4 +660,45 @@ let datastarTests =
             let response1 = getResponseBody context1
             let response2 = getResponseBody context2
             Expect.equal response1 response2 "executeScriptWithOptions with Defaults should produce same output as executeScript"
+
+        testCase "T019: executeScriptWithOptions with Attributes writes verbatim attribute strings" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let script = "console.log('hello')"
+            let opts = { ExecuteScriptOptions.Defaults with Attributes = [| "type=\"module\""; "async" |] }
+
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar (fun ctx -> task {
+                        do! Datastar.executeScriptWithOptions opts script ctx
+                    })
+                }
+
+            // Act
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "type=\"module\"" "Should contain verbatim attribute 'type=\"module\"'"
+            Expect.stringContains responseBody "async" "Should contain verbatim attribute 'async'"
+            Expect.stringContains responseBody "data-effect=\"el.remove()\"" "Should still have auto-remove effect"
+
+        testCase "T020: Public ServerSentEventGenerator.PatchElementsAsync is accessible and works correctly" <| fun () ->
+            // Arrange
+            let context = createMockContext()
+            let html = "<div id='direct'>Direct generator usage</div>"
+
+            // Act - call ServerSentEventGenerator directly (not via Datastar module)
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! ServerSentEventGenerator.PatchElementsAsync(context.Response, html)
+            } |> (fun t -> t.Wait())
+
+            // Assert
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "data: elements <div id='direct'>Direct generator usage</div>" "Should contain HTML content"
+            Expect.equal (context.Response.Headers.ContentType.ToString()) "text/event-stream" "Should have SSE content type header"
     ]

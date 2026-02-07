@@ -256,6 +256,8 @@ let main args =
 
 Frank.Datastar provides seamless integration with [Datastar](https://data-star.dev/), enabling reactive hypermedia applications using Server-Sent Events (SSE).
 
+**Version 7.1.0** features a **native SSE implementation** with zero external dependencies, delivering high-performance Server-Sent Events directly via ASP.NET Core's `IBufferWriter<byte>` API. Supports .NET 8.0, 9.0, and 10.0.
+
 ### Installation
 
 ```bash
