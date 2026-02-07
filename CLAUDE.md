@@ -10,6 +10,7 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 - N/A (no persistence) (014-datastar-native-sse)
 - F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting: `net8.0;net9.0;net10.0`) (014-datastar-native-sse)
 - N/A (stateless SSE event streaming) (014-datastar-native-sse)
+- F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool) (015-datastar-streaming-html)
 
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp (latest), ASP.NET Core (002-datastar-sample)
 - In-memory (Dictionary, ResizeArray) - demo purposes only (002-datastar-sample)
@@ -41,8 +42,8 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 015-datastar-streaming-html: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool)
 - 014-datastar-native-sse: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting: `net8.0;net9.0;net10.0`)
-- 014-datastar-native-sse: Added F# 8.0+ targeting .NET 10.0 (single target, down from multi-target) + Frank 7.0.0 (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Extensions.Primitives (for StringTokenizer, included in framework)
 - 013-frank-auth: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.5.0+ (core, modified), Microsoft.AspNetCore.Authorization (framework reference)
 
 
