@@ -701,4 +701,230 @@ let datastarTests =
             Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
             Expect.stringContains responseBody "data: elements <div id='direct'>Direct generator usage</div>" "Should contain HTML content"
             Expect.equal (context.Response.Headers.ContentType.ToString()) "text/event-stream" "Should have SSE content type header"
+
+        // ==========================================
+        // Stream-Based API Tests (Feature 015)
+        // ==========================================
+
+        testCase "Stream T009: byte-for-byte equivalence between string and stream patchElements" <| fun () ->
+            // SC-004: stream output must match string output exactly
+            let html = "<div id=\"test\">\n  <p>Hello</p>\n</div>"
+
+            // String-based
+            let context1 = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context1.Response)
+                do! Datastar.patchElements html context1
+            } |> (fun t -> t.Wait())
+
+            // Stream-based
+            let context2 = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context2.Response)
+                do! Datastar.streamPatchElements (fun tw -> tw.Write(html); Task.CompletedTask) context2
+            } |> (fun t -> t.Wait())
+
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response2 response1 "Stream output must be byte-for-byte identical to string output"
+
+        testCase "Stream T010: multi-line HTML splits into separate data lines" <| fun () ->
+            // FR-003: each line becomes a separate data: elements line
+            let context = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElements (fun tw ->
+                    tw.Write("<div>\n  <p>Line1</p>\n  <p>Line2</p>\n</div>")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: elements <div>" "Should have first line"
+            Expect.stringContains responseBody "data: elements   <p>Line1</p>" "Should have second line"
+            Expect.stringContains responseBody "data: elements   <p>Line2</p>" "Should have third line"
+            Expect.stringContains responseBody "data: elements </div>" "Should have fourth line"
+
+        testCase "Stream T010b: CRLF line endings split correctly" <| fun () ->
+            let context = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElements (fun tw ->
+                    tw.Write("<div>\r\n  <p>Hello</p>\r\n</div>")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: elements <div>" "Should have first line"
+            Expect.stringContains responseBody "data: elements   <p>Hello</p>" "Should have second line"
+            Expect.stringContains responseBody "data: elements </div>" "Should have third line"
+
+        testCase "Stream T011a: streamPatchSignals writes signals data line" <| fun () ->
+            let context = createMockContext()
+            let json = """{"count": 42}"""
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchSignals (fun tw ->
+                    tw.Write(json)
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-signals" "Should have patch-signals event"
+            Expect.stringContains responseBody "data: signals {\"count\": 42}" "Should contain signals JSON"
+
+        testCase "Stream T011b: streamRemoveElement writes selector data line" <| fun () ->
+            let context = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamRemoveElement (fun tw ->
+                    tw.Write("#obsolete-element")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "data: selector #obsolete-element" "Should contain selector"
+            Expect.stringContains responseBody "data: mode remove" "Should have remove mode"
+
+        testCase "Stream T011c: streamExecuteScript wraps body in script tags" <| fun () ->
+            let context = createMockContext()
+            let script = "console.log('hello')"
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamExecuteScript (fun tw ->
+                    tw.Write(script)
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-elements" "Should have patch-elements event"
+            Expect.stringContains responseBody "<script" "Should contain script open tag"
+            Expect.stringContains responseBody "data: elements console.log('hello')" "Should contain script body"
+            Expect.stringContains responseBody "</script>" "Should contain script close tag"
+
+        testCase "Stream T012: exception propagation from writer callback" <| fun () ->
+            // FR-005: exceptions from writer callback must propagate
+            let context = createMockContext()
+            let mutable exceptionPropagated = false
+
+            try
+                task {
+                    do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                    do! Datastar.streamPatchElements (fun _tw ->
+                        raise (InvalidOperationException("Test exception"))
+                        Task.CompletedTask) context
+                } |> (fun t -> t.Wait())
+            with
+            | :? AggregateException as ae when (ae.InnerException :? InvalidOperationException) ->
+                exceptionPropagated <- true
+
+            Expect.isTrue exceptionPropagated "Exception from writer callback should propagate to caller"
+
+        // ==========================================
+        // Stream/String Coexistence Tests (Feature 015 - US2)
+        // ==========================================
+
+        testCase "Stream T016: mixed string and stream calls in same handler" <| fun () ->
+            let context = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                // String-based call
+                do! Datastar.patchElements "<div>String-based</div>" context
+                // Stream-based call
+                do! Datastar.streamPatchElements (fun tw ->
+                    tw.Write("<div>Stream-based</div>")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            let eventCount = responseBody.Split("event: datastar-patch-elements").Length - 1
+            Expect.equal eventCount 2 "Should have 2 separate events"
+            Expect.stringContains responseBody "data: elements <div>String-based</div>" "Should contain string-based content"
+            Expect.stringContains responseBody "data: elements <div>Stream-based</div>" "Should contain stream-based content"
+
+        testCase "Stream T017a: streamPatchElementsWithOptions with Inner mode" <| fun () ->
+            let context = createMockContext()
+            let opts = { PatchElementsOptions.Defaults with PatchMode = ElementPatchMode.Inner }
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElementsWithOptions opts (fun tw ->
+                    tw.Write("<span>Updated</span>")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: mode inner" "Should contain inner mode"
+            Expect.stringContains responseBody "data: elements <span>Updated</span>" "Should contain HTML content"
+
+        testCase "Stream T017b: streamExecuteScriptWithOptions with custom Attributes" <| fun () ->
+            let context = createMockContext()
+            let opts = { ExecuteScriptOptions.Defaults with Attributes = [| "type=\"module\""; "async" |] }
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamExecuteScriptWithOptions opts (fun tw ->
+                    tw.Write("import { foo } from './bar.js'")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "type=\"module\"" "Should contain module attribute"
+            Expect.stringContains responseBody "async" "Should contain async attribute"
+            Expect.stringContains responseBody "data: elements import { foo } from './bar.js'" "Should contain script body"
+
+        // ==========================================
+        // Stream-to-Stream (Stream -> Task) Tests
+        // ==========================================
+
+        testCase "StreamToStream: byte-for-byte equivalence between string and Stream patchElements" <| fun () ->
+            let html = "<div id=\"test\">\n  <p>Hello</p>\n</div>"
+            let htmlBytes = Encoding.UTF8.GetBytes(html)
+
+            // String-based
+            let context1 = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context1.Response)
+                do! Datastar.patchElements html context1
+            } |> (fun t -> t.Wait())
+
+            // Stream-based
+            let context2 = createMockContext()
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context2.Response)
+                do! Datastar.streamPatchElementsToStream (fun stream ->
+                    stream.Write(htmlBytes, 0, htmlBytes.Length)
+                    Task.CompletedTask) context2
+            } |> (fun t -> t.Wait())
+
+            let response1 = getResponseBody context1
+            let response2 = getResponseBody context2
+            Expect.equal response2 response1 "Stream-to-Stream output must be byte-for-byte identical to string output"
+
+        testCase "StreamToStream: multi-line splitting with CRLF" <| fun () ->
+            let context = createMockContext()
+            let htmlBytes = Encoding.UTF8.GetBytes("<div>\r\n  <p>Hello</p>\r\n</div>")
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElementsToStream (fun stream ->
+                    stream.Write(htmlBytes, 0, htmlBytes.Length)
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: elements <div>" "Should have first line"
+            Expect.stringContains responseBody "data: elements   <p>Hello</p>" "Should have second line"
+            Expect.stringContains responseBody "data: elements </div>" "Should have third line"
+
+        testCase "StreamToStream: patchSignals" <| fun () ->
+            let context = createMockContext()
+            let jsonBytes = Encoding.UTF8.GetBytes("""{"count": 42}""")
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchSignalsToStream (fun stream ->
+                    stream.Write(jsonBytes, 0, jsonBytes.Length)
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "event: datastar-patch-signals" "Should have patch-signals event"
+            Expect.stringContains responseBody "data: signals {\"count\": 42}" "Should contain signals JSON"
     ]

@@ -9,7 +9,7 @@ module internal ServerSentEvent =
     let private eventPrefix = "event: "B
     let private idPrefix = "id: "B
     let private retryPrefix = "retry: "B
-    let private dataPrefix = "data: "B
+    let dataPrefix = "data: "B
 
     let inline private writeUtf8String (str:string) (writer:IBufferWriter<byte>) =
         let span = writer.GetSpan(Encoding.UTF8.GetByteCount(str))
@@ -17,7 +17,7 @@ module internal ServerSentEvent =
         writer.Advance(bytesWritten)
         writer
 
-    let inline private writeUtf8Literal (bytes:byte[]) (writer:IBufferWriter<byte>) =
+    let inline writeUtf8Literal (bytes:byte[]) (writer:IBufferWriter<byte>) =
         let span = writer.GetSpan(bytes.Length)
         bytes.AsSpan().CopyTo(span)
         writer.Advance(bytes.Length)
