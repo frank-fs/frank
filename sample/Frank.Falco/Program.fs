@@ -94,11 +94,11 @@ let main args =
         logging configureLogging
         useCors configureCors
 
-        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-        plugWhenNot isDevelopment (FalcoExtensions.UseFalcoExceptionHandler serverException)
+        plugBeforeRoutingWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        plugBeforeRoutingWhenNot isDevelopment (FalcoExtensions.UseFalcoExceptionHandler serverException)
 
-        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         resource helloWorld
         resource helloName

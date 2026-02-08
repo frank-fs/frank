@@ -145,7 +145,7 @@ let main args =
         useCors configureCors
         useErrorHandler errorHandler
 
-        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
 
         resource home
         resource helloName

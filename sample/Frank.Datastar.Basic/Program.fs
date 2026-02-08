@@ -595,8 +595,8 @@ let main args =
     webHost args {
         useDefaults
         // UseDefaultFiles must come before UseStaticFiles to serve index.html at "/"
-        plug DefaultFilesExtensions.UseDefaultFiles
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting DefaultFilesExtensions.UseDefaultFiles
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         // Single SSE endpoint for the whole page
         resource sseResource

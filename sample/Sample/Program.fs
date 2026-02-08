@@ -96,14 +96,14 @@ let main args =
 
         useContentNegotiation
 
-        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        plugBeforeRoutingWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
         // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-        plugWhenNot isDevelopment HstsBuilderExtensions.UseHsts
+        plugBeforeRoutingWhenNot isDevelopment HstsBuilderExtensions.UseHsts
 
-        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-        plug ResponseCachingExtensions.UseResponseCaching
-        plug ResponseCompressionBuilderExtensions.UseResponseCompression
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plugBeforeRouting ResponseCachingExtensions.UseResponseCaching
+        plugBeforeRouting ResponseCompressionBuilderExtensions.UseResponseCompression
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         resource home
         resource helloName

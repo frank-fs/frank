@@ -196,55 +196,65 @@ let mutable nextRegistrationId = 1
 // --- Click-to-Edit Pattern (Contact Resource) ---
 
 let renderContactView (contact: Contact) : string =
-    div(id = "contact-view") {
-        p() {
-            strong() { "First Name:" }
+    div (id = "contact-view") {
+        p () {
+            strong () { "First Name:" }
             raw $" {contact.FirstName}"
         }
-        p() {
-            strong() { "Last Name:" }
+
+        p () {
+            strong () { "Last Name:" }
             raw $" {contact.LastName}"
         }
-        p() {
-            strong() { "Email:" }
+
+        p () {
+            strong () { "Email:" }
             raw $" {contact.Email}"
         }
+
         button()
             .attr("data-on:click", $"@get('/contacts/{contact.Id}/edit')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Edit" }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Edit"
+        }
     }
     |> Render.toString
 
 let renderContactEdit (contact: Contact) : string =
     div(id = "contact-view")
-        .attr("data-signals", $"{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}") {
-        label() {
+        .attr (
+            "data-signals",
+            $"{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}"
+        ) {
+        label () {
             raw "First Name "
-            input(type' = "text")
-                .attr("data-bind:first-name", "")
-                .attr("data-attr:disabled", "$_fetching")
+            input(type' = "text").attr("data-bind:first-name", "").attr ("data-attr:disabled", "$_fetching")
         }
-        label() {
+
+        label () {
             raw "Last Name "
-            input(type' = "text")
-                .attr("data-bind:last-name", "")
-                .attr("data-attr:disabled", "$_fetching")
+            input(type' = "text").attr("data-bind:last-name", "").attr ("data-attr:disabled", "$_fetching")
         }
-        label() {
+
+        label () {
             raw "Email "
-            input(type' = "email")
-                .attr("data-bind:email", "")
-                .attr("data-attr:disabled", "$_fetching")
+            input(type' = "email").attr("data-bind:email", "").attr ("data-attr:disabled", "$_fetching")
         }
+
         button()
             .attr("data-on:click", $"@put('/contacts/{contact.Id}')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Save" }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Save"
+        }
+
         button()
             .attr("data-on:click", $"@get('/contacts/{contact.Id}')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Cancel" }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Cancel"
+        }
     }
     |> Render.toString
 
@@ -309,9 +319,9 @@ let contactEditResource =
 
 let renderFruitsList (filteredFruits: string list) : string =
     // Use min-height to ensure empty list remains visible for Playwright
-    ul(id = "fruits-list", style = "min-height: 1em;") {
+    ul (id = "fruits-list", style = "min-height: 1em;") {
         for f in filteredFruits do
-            li() { f }
+            li () { f }
     }
     |> Render.toString
 
@@ -339,22 +349,26 @@ let fruitsResource =
 // --- Delete Pattern (Items Collection) ---
 
 let renderItemsTable (itemsList: ResizeArray<Item>) : string =
-    table(id = "items-table") {
-        thead() {
-            tr() {
-                th() { "Name" }
-                th() { "Actions" }
+    table (id = "items-table") {
+        thead () {
+            tr () {
+                th () { "Name" }
+                th () { "Actions" }
             }
         }
-        tbody(id = "items-list") {
+
+        tbody (id = "items-list") {
             for item in itemsList do
-                tr(id = $"item-{item.Id}") {
-                    td() { item.Name }
-                    td() {
+                tr (id = $"item-{item.Id}") {
+                    td () { item.Name }
+
+                    td () {
                         button()
                             .attr("data-on:click", $"confirm('Are you sure?') && @delete('/items/{item.Id}')")
                             .attr("data-indicator:_fetching", "")
-                            .attr("data-attr:disabled", "$_fetching") { "Delete" }
+                            .attr ("data-attr:disabled", "$_fetching") {
+                            "Delete"
+                        }
                     }
                 }
         }
@@ -409,46 +423,61 @@ let usersTableElement (usersList: System.Collections.Generic.Dictionary<int, Use
     // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
     // data-bind:selections on checkboxes automatically manages the boolean array
     div(id = "users-table-container")
-        .attr("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}") {
-        table() {
-            thead() {
-                tr() {
-                    th() {
+        .attr ("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}") {
+        table () {
+            thead () {
+                tr () {
+                    th () {
                         input(type' = "checkbox")
                             .attr("data-bind:_all", "")
                             .attr("data-on:change", "$selections = Array(4).fill($_all)")
                             .attr("data-effect", "$selections; $_all = $selections.every(Boolean)")
-                            .attr("data-attr:disabled", "$_fetching")
+                            .attr ("data-attr:disabled", "$_fetching")
                     }
-                    th() { "Name" }
-                    th() { "Email" }
-                    th() { "Status" }
+
+                    th () { "Name" }
+                    th () { "Email" }
+                    th () { "Status" }
                 }
             }
-            tbody(id = "users-list") {
+
+            tbody (id = "users-list") {
                 for user in usersList.Values do
-                    let statusClass = if user.Status = Active then "status-active" else "status-inactive"
+                    let statusClass =
+                        if user.Status = Active then
+                            "status-active"
+                        else
+                            "status-inactive"
+
                     let statusText = if user.Status = Active then "Active" else "Inactive"
-                    tr() {
-                        td() {
+
+                    tr () {
+                        td () {
                             input(type' = "checkbox")
                                 .attr("data-bind:selections", "")
-                                .attr("data-attr:disabled", "$_fetching")
+                                .attr ("data-attr:disabled", "$_fetching")
                         }
-                        td() { user.Name }
-                        td() { user.Email }
-                        td(class' = statusClass) { statusText }
+
+                        td () { user.Name }
+                        td () { user.Email }
+                        td (class' = statusClass) { statusText }
                     }
             }
         }
+
         button()
             .attr("data-on:click", "@put('/users/bulk?status=active')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Activate Selected" }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Activate Selected"
+        }
+
         button()
             .attr("data-on:click", "@put('/users/bulk?status=inactive')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Deactivate Selected" }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Deactivate Selected"
+        }
     }
 
 // Stream-based: Oxpecker renders directly to TextWriter (zero intermediate string).
@@ -523,57 +552,66 @@ let validateRegistration (signals: RegistrationSignals) : string list =
 
 let renderValidationFeedback (errors: string list) : string =
     if errors.IsEmpty then
-        div(id = "validation-feedback", class' = "success") { "All fields valid!" }
+        div (id = "validation-feedback", class' = "success") { "All fields valid!" }
         |> Render.toString
     else
-        div(id = "validation-feedback", class' = "error") {
-            ul() {
+        div (id = "validation-feedback", class' = "error") {
+            ul () {
                 for e in errors do
-                    li() { e }
+                    li () { e }
             }
         }
         |> Render.toString
 
 let renderRegistrationSuccess (firstName: string) : string =
-    div(id = "registration-result", class' = "success") { $"Registration successful! Welcome, {firstName}." }
+    div (id = "registration-result", class' = "success") { $"Registration successful! Welcome, {firstName}." }
     |> Render.toString
 
 let renderRegistrationForm () : string =
-    div(id = "registration-form")
-        .attr("data-signals", "{'email': '', 'firstName': '', 'lastName': ''}") {
-        div() {
-            label() {
+    div(id = "registration-form").attr ("data-signals", "{'email': '', 'firstName': '', 'lastName': ''}") {
+        div () {
+            label () {
                 raw "Email "
+
                 input(type' = "email")
                     .attr("data-bind:email", "")
                     .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                    .attr("data-attr:disabled", "$_fetching")
+                    .attr ("data-attr:disabled", "$_fetching")
             }
         }
-        div() {
-            label() {
+
+        div () {
+            label () {
                 raw "First Name "
+
                 input(type' = "text")
                     .attr("data-bind:first-name", "")
                     .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                    .attr("data-attr:disabled", "$_fetching")
+                    .attr ("data-attr:disabled", "$_fetching")
             }
         }
-        div() {
-            label() {
+
+        div () {
+            label () {
                 raw "Last Name "
+
                 input(type' = "text")
                     .attr("data-bind:last-name", "")
                     .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                    .attr("data-attr:disabled", "$_fetching")
+                    .attr ("data-attr:disabled", "$_fetching")
             }
         }
-        div(id = "validation-feedback") { () }
+
+        div (id = "validation-feedback") { () }
+
         button()
             .attr("data-on:click", "@post('/registrations')")
             .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching") { "Register" }
-        div(id = "registration-result") { () }
+            .attr ("data-attr:disabled", "$_fetching") {
+            "Register"
+        }
+
+        div (id = "registration-result") { () }
     }
     |> Render.toString
 
@@ -626,8 +664,9 @@ let registrationsResource =
 
                         if isDuplicate then
                             let errorHtml =
-                                div(id = "registration-result", class' = "error") { "Email already registered." }
+                                div (id = "registration-result", class' = "error") { "Email already registered." }
                                 |> Render.toString
+
                             SseEvent.broadcast (PatchElements errorHtml)
                             ctx.Response.StatusCode <- 409
                         else
@@ -687,8 +726,8 @@ let main args =
     webHost args {
         useDefaults
         // UseDefaultFiles must come before UseStaticFiles to serve index.html at "/"
-        plug DefaultFilesExtensions.UseDefaultFiles
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting DefaultFilesExtensions.UseDefaultFiles
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         // Single SSE endpoint for the whole page
         resource sseResource

@@ -200,47 +200,52 @@ module SseEvent =
 
 let renderContactView (contact: Contact) : ValueTask<string> =
     let node =
-        h("div#contact-view", [
-            h("p", [ h("strong", [ Text "First Name:" ]); Text $" {contact.FirstName}" ])
-            h("p", [ h("strong", [ Text "Last Name:" ]); Text $" {contact.LastName}" ])
-            h("p", [ h("strong", [ Text "Email:" ]); Text $" {contact.Email}" ])
-            h("button", [ Text "Edit" ])
-                .attr("data-on:click", $"@get('/contacts/{contact.Id}/edit')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-        ])
+        h (
+            "div#contact-view",
+            [ h ("p", [ h ("strong", [ Text "First Name:" ]); Text $" {contact.FirstName}" ])
+              h ("p", [ h ("strong", [ Text "Last Name:" ]); Text $" {contact.LastName}" ])
+              h ("p", [ h ("strong", [ Text "Email:" ]); Text $" {contact.Email}" ])
+              h("button", [ Text "Edit" ])
+                  .attr("data-on:click", $"@get('/contacts/{contact.Id}/edit')")
+                  .attr("data-indicator:_fetching", "")
+                  .attr ("data-attr:disabled", "$_fetching") ]
+        )
+
     Render.asString node
 
 let renderContactEdit (contact: Contact) : ValueTask<string> =
     let node =
-        h("div#contact-view", [
-            h("label", [
-                Text "First Name "
-                h("input[type=text]", [])
-                    .attr("data-bind:first-name", "")
-                    .attr("data-attr:disabled", "$_fetching")
-            ])
-            h("label", [
-                Text "Last Name "
-                h("input[type=text]", [])
-                    .attr("data-bind:last-name", "")
-                    .attr("data-attr:disabled", "$_fetching")
-            ])
-            h("label", [
-                Text "Email "
-                h("input[type=email]", [])
-                    .attr("data-bind:email", "")
-                    .attr("data-attr:disabled", "$_fetching")
-            ])
-            h("button", [ Text "Save" ])
-                .attr("data-on:click", $"@put('/contacts/{contact.Id}')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-            h("button", [ Text "Cancel" ])
-                .attr("data-on:click", $"@get('/contacts/{contact.Id}')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-        ]).attr("data-signals", $"{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}")
+        h(
+            "div#contact-view",
+            [ h (
+                  "label",
+                  [ Text "First Name "
+                    h("input[type=text]", []).attr("data-bind:first-name", "").attr ("data-attr:disabled", "$_fetching") ]
+              )
+              h (
+                  "label",
+                  [ Text "Last Name "
+                    h("input[type=text]", []).attr("data-bind:last-name", "").attr ("data-attr:disabled", "$_fetching") ]
+              )
+              h (
+                  "label",
+                  [ Text "Email "
+                    h("input[type=email]", []).attr("data-bind:email", "").attr ("data-attr:disabled", "$_fetching") ]
+              )
+              h("button", [ Text "Save" ])
+                  .attr("data-on:click", $"@put('/contacts/{contact.Id}')")
+                  .attr("data-indicator:_fetching", "")
+                  .attr ("data-attr:disabled", "$_fetching")
+              h("button", [ Text "Cancel" ])
+                  .attr("data-on:click", $"@get('/contacts/{contact.Id}')")
+                  .attr("data-indicator:_fetching", "")
+                  .attr ("data-attr:disabled", "$_fetching") ]
+        )
+            .attr (
+                "data-signals",
+                $"{{'firstName': '{contact.FirstName}', 'lastName': '{contact.LastName}', 'email': '{contact.Email}'}}"
+            )
+
     Render.asString node
 
 // Contact resource - GET retrieves data, PUT updates data, broadcasts to channel
@@ -310,8 +315,13 @@ let contactEditResource =
 let renderFruitsList (filteredFruits: string list) : ValueTask<string> =
     let node =
         // Use min-height to ensure empty list remains visible for Playwright
-        h("ul#fruits-list[style=min-height: 1em;]",
-            fragment [ for f in filteredFruits do h("li", [ Text f ]) ])
+        h (
+            "ul#fruits-list[style=min-height: 1em;]",
+            fragment
+                [ for f in filteredFruits do
+                      h ("li", [ Text f ]) ]
+        )
+
     Render.asString node
 
 // Fruits search - broadcasts filtered or full fruit list
@@ -342,27 +352,30 @@ let fruitsResource =
 
 let renderItemsTable (itemsList: ResizeArray<Item>) : ValueTask<string> =
     let node =
-        h("table#items-table", [
-            h("thead", [
-                h("tr", [
-                    h("th", [ Text "Name" ])
-                    h("th", [ Text "Actions" ])
-                ])
-            ])
-            h("tbody#items-list",
-                fragment [
-                    for item in itemsList do
-                        h($"tr#item-{item.Id}", [
-                            h("td", [ Text item.Name ])
-                            h("td", [
-                                h("button", [ Text "Delete" ])
-                                    .attr("data-on:click", $"confirm('Are you sure?') && @delete('/items/{item.Id}')")
-                                    .attr("data-indicator:_fetching", "")
-                                    .attr("data-attr:disabled", "$_fetching")
-                            ])
-                        ])
-                ])
-        ])
+        h (
+            "table#items-table",
+            [ h ("thead", [ h ("tr", [ h ("th", [ Text "Name" ]); h ("th", [ Text "Actions" ]) ]) ])
+              h (
+                  "tbody#items-list",
+                  fragment
+                      [ for item in itemsList do
+                            h (
+                                $"tr#item-{item.Id}",
+                                [ h ("td", [ Text item.Name ])
+                                  h (
+                                      "td",
+                                      [ h("button", [ Text "Delete" ])
+                                            .attr(
+                                                "data-on:click",
+                                                $"confirm('Are you sure?') && @delete('/items/{item.Id}')"
+                                            )
+                                            .attr("data-indicator:_fetching", "")
+                                            .attr ("data-attr:disabled", "$_fetching") ]
+                                  ) ]
+                            ) ]
+              ) ]
+        )
+
     Render.asString node
 
 // Debug endpoint to test if input events fire
@@ -415,48 +428,63 @@ let itemResource =
 let usersTableNode (usersList: System.Collections.Generic.Dictionary<int, User>) =
     // Use data-signals__ifmissing to initialize selections array (Datastar pattern)
     // data-bind:selections on checkboxes automatically manages the boolean array
-    h("div#users-table-container", [
-        h("table", [
-            h("thead", [
-                h("tr", [
-                    h("th", [
-                        h("input[type=checkbox]", [])
-                            .attr("data-bind:_all", "")
-                            .attr("data-on:change", "$selections = Array(4).fill($_all)")
-                            .attr("data-effect", "$selections; $_all = $selections.every(Boolean)")
-                            .attr("data-attr:disabled", "$_fetching")
-                    ])
-                    h("th", [ Text "Name" ])
-                    h("th", [ Text "Email" ])
-                    h("th", [ Text "Status" ])
-                ])
-            ])
-            h("tbody#users-list",
-                fragment [
-                    for user in usersList.Values do
-                        let statusClass = if user.Status = Active then "status-active" else "status-inactive"
-                        let statusText = if user.Status = Active then "Active" else "Inactive"
-                        h("tr", [
-                            h("td", [
-                                h("input[type=checkbox]", [])
-                                    .attr("data-bind:selections", "")
-                                    .attr("data-attr:disabled", "$_fetching")
-                            ])
-                            h("td", [ Text user.Name ])
-                            h("td", [ Text user.Email ])
-                            h($"td.{statusClass}", [ Text statusText ])
-                        ])
-                ])
-        ])
-        h("button", [ Text "Activate Selected" ])
-            .attr("data-on:click", "@put('/users/bulk?status=active')")
-            .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching")
-        h("button", [ Text "Deactivate Selected" ])
-            .attr("data-on:click", "@put('/users/bulk?status=inactive')")
-            .attr("data-indicator:_fetching", "")
-            .attr("data-attr:disabled", "$_fetching")
-    ]).attr("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}")
+    h(
+        "div#users-table-container",
+        [ h (
+              "table",
+              [ h (
+                    "thead",
+                    [ h (
+                          "tr",
+                          [ h (
+                                "th",
+                                [ h("input[type=checkbox]", [])
+                                      .attr("data-bind:_all", "")
+                                      .attr("data-on:change", "$selections = Array(4).fill($_all)")
+                                      .attr("data-effect", "$selections; $_all = $selections.every(Boolean)")
+                                      .attr ("data-attr:disabled", "$_fetching") ]
+                            )
+                            h ("th", [ Text "Name" ])
+                            h ("th", [ Text "Email" ])
+                            h ("th", [ Text "Status" ]) ]
+                      ) ]
+                )
+                h (
+                    "tbody#users-list",
+                    fragment
+                        [ for user in usersList.Values do
+                              let statusClass =
+                                  if user.Status = Active then
+                                      "status-active"
+                                  else
+                                      "status-inactive"
+
+                              let statusText = if user.Status = Active then "Active" else "Inactive"
+
+                              h (
+                                  "tr",
+                                  [ h (
+                                        "td",
+                                        [ h("input[type=checkbox]", [])
+                                              .attr("data-bind:selections", "")
+                                              .attr ("data-attr:disabled", "$_fetching") ]
+                                    )
+                                    h ("td", [ Text user.Name ])
+                                    h ("td", [ Text user.Email ])
+                                    h ($"td.{statusClass}", [ Text statusText ]) ]
+                              ) ]
+                ) ]
+          )
+          h("button", [ Text "Activate Selected" ])
+              .attr("data-on:click", "@put('/users/bulk?status=active')")
+              .attr("data-indicator:_fetching", "")
+              .attr ("data-attr:disabled", "$_fetching")
+          h("button", [ Text "Deactivate Selected" ])
+              .attr("data-on:click", "@put('/users/bulk?status=inactive')")
+              .attr("data-indicator:_fetching", "")
+              .attr ("data-attr:disabled", "$_fetching") ]
+    )
+        .attr ("data-signals__ifmissing", "{_fetching: false, selections: Array(4).fill(false)}")
 
 let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : ValueTask<string> =
     Render.asString (usersTableNode usersList)
@@ -464,7 +492,7 @@ let renderUsersTable (usersList: System.Collections.Generic.Dictionary<int, User
 /// Stream users table directly to SSE using Hox's Render.toStream (zero-string-materialization).
 let streamUsersTable (usersList: System.Collections.Generic.Dictionary<int, User>) : Stream -> Task =
     let node = usersTableNode usersList
-    fun stream -> Render.toStream(node, stream)
+    fun stream -> Render.toStream (node, stream)
 
 // GET /users - Fire-and-forget: broadcasts users table to SSE channel
 let usersResource =
@@ -534,54 +562,72 @@ let validateRegistration (signals: RegistrationSignals) : string list =
 let renderValidationFeedback (errors: string list) : ValueTask<string> =
     let node =
         if errors.IsEmpty then
-            h("div#validation-feedback.success", [ Text "All fields valid!" ])
+            h ("div#validation-feedback.success", [ Text "All fields valid!" ])
         else
-            h("div#validation-feedback.error", [
-                h("ul", fragment [ for e in errors do h("li", [ Text e ]) ])
-            ])
+            h (
+                "div#validation-feedback.error",
+                [ h (
+                      "ul",
+                      fragment
+                          [ for e in errors do
+                                h ("li", [ Text e ]) ]
+                  ) ]
+            )
+
     Render.asString node
 
 let renderRegistrationSuccess (firstName: string) : ValueTask<string> =
-    let node = h("div#registration-result.success", [ Text $"Registration successful! Welcome, {firstName}." ])
+    let node =
+        h ("div#registration-result.success", [ Text $"Registration successful! Welcome, {firstName}." ])
+
     Render.asString node
 
 let renderRegistrationForm () : ValueTask<string> =
     let node =
-        h("div#registration-form", [
-            h("div", [
-                h("label", [
-                    Text "Email "
-                    h("input[type=email]", [])
-                        .attr("data-bind:email", "")
-                        .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                        .attr("data-attr:disabled", "$_fetching")
-                ])
-            ])
-            h("div", [
-                h("label", [
-                    Text "First Name "
-                    h("input[type=text]", [])
-                        .attr("data-bind:first-name", "")
-                        .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                        .attr("data-attr:disabled", "$_fetching")
-                ])
-            ])
-            h("div", [
-                h("label", [
-                    Text "Last Name "
-                    h("input[type=text]", [])
-                        .attr("data-bind:last-name", "")
-                        .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
-                        .attr("data-attr:disabled", "$_fetching")
-                ])
-            ])
-            h("div#validation-feedback", [])
-            h("button", [ Text "Register" ])
-                .attr("data-on:click", "@post('/registrations')")
-                .attr("data-indicator:_fetching", "")
-                .attr("data-attr:disabled", "$_fetching")
-            h("div#registration-result", [])
-        ]).attr("data-signals", "{'email': '', 'firstName': '', 'lastName': ''}")
+        h(
+            "div#registration-form",
+            [ h (
+                  "div",
+                  [ h (
+                        "label",
+                        [ Text "Email "
+                          h("input[type=email]", [])
+                              .attr("data-bind:email", "")
+                              .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
+                              .attr ("data-attr:disabled", "$_fetching") ]
+                    ) ]
+              )
+              h (
+                  "div",
+                  [ h (
+                        "label",
+                        [ Text "First Name "
+                          h("input[type=text]", [])
+                              .attr("data-bind:first-name", "")
+                              .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
+                              .attr ("data-attr:disabled", "$_fetching") ]
+                    ) ]
+              )
+              h (
+                  "div",
+                  [ h (
+                        "label",
+                        [ Text "Last Name "
+                          h("input[type=text]", [])
+                              .attr("data-bind:last-name", "")
+                              .attr("data-on:keydown__debounce.500ms", "@post('/registrations/validate')")
+                              .attr ("data-attr:disabled", "$_fetching") ]
+                    ) ]
+              )
+              h ("div#validation-feedback", [])
+              h("button", [ Text "Register" ])
+                  .attr("data-on:click", "@post('/registrations')")
+                  .attr("data-indicator:_fetching", "")
+                  .attr ("data-attr:disabled", "$_fetching")
+              h ("div#registration-result", []) ]
+        )
+            .attr ("data-signals", "{'email': '', 'firstName': '', 'lastName': ''}")
+
     Render.asString node
 
 // GET /registrations/form - Fire-and-forget: broadcasts registration form to channel
@@ -634,7 +680,9 @@ let registrationsResource =
                         let isDuplicate = registrations |> Seq.exists (fun r -> r.Email = s.email)
 
                         if isDuplicate then
-                            let errorNode = h("div#registration-result.error", [ Text "Email already registered." ])
+                            let errorNode =
+                                h ("div#registration-result.error", [ Text "Email already registered." ])
+
                             let! html = Render.asString errorNode
                             SseEvent.broadcast (PatchElements html)
                             ctx.Response.StatusCode <- 409
@@ -697,8 +745,8 @@ let main args =
     webHost args {
         useDefaults
         // UseDefaultFiles must come before UseStaticFiles to serve index.html at "/"
-        plug DefaultFilesExtensions.UseDefaultFiles
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting DefaultFilesExtensions.UseDefaultFiles
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         // Single SSE endpoint for the whole page
         resource sseResource

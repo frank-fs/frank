@@ -25,22 +25,18 @@ module Views =
     open Giraffe.ViewEngine
 
     let layout (content: XmlNode list) =
-        html [] [
-            head [] [
-                title [] [ encodedText "Frank.Giraffe" ]
-                link [ _rel "stylesheet"
-                       _type "text/css"
-                       _href "/main.css" ]
-            ]
-            body [] content
-        ]
+        html
+            []
+            [ head
+                  []
+                  [ title [] [ encodedText "Frank.Giraffe" ]
+                    link [ _rel "stylesheet"; _type "text/css"; _href "/main.css" ] ]
+              body [] content ]
 
     let partial () = h1 [] [ encodedText "Frank.Giraffe" ]
 
     let index (model: Message) =
-        [ partial ()
-          p [] [ encodedText model.Text ] ]
-        |> layout
+        [ partial (); p [] [ encodedText model.Text ] ] |> layout
 
 // ---------------------------------
 // Web app
@@ -61,9 +57,10 @@ let helloWorld =
 let helloName =
     resource "/hello/{name}" {
         name "Hello Name"
+
         get (fun next ctx ->
-                let name = ctx.GetRouteValue("name") |> string
-                indexHandler name next ctx)
+            let name = ctx.GetRouteValue("name") |> string
+            indexHandler name next ctx)
     }
 
 // ---------------------------------
@@ -72,9 +69,7 @@ let helloName =
 
 let errorHandler (ex: Exception) (logger: ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
-    clearResponse
-    >=> setStatusCode 500
-    >=> text ex.Message
+    clearResponse >=> setStatusCode 500 >=> text ex.Message
 
 // ---------------------------------
 // Config and Main
@@ -99,11 +94,11 @@ let main args =
         // enable Giraffe content negotiation
         service (fun services -> services.AddGiraffe())
 
-        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-        plugWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
+        plugBeforeRoutingWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+        plugBeforeRoutingWhenNot isDevelopment (fun app -> app.UseGiraffeErrorHandler(errorHandler))
 
-        plug HttpsPolicyBuilderExtensions.UseHttpsRedirection
-        plug StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting HttpsPolicyBuilderExtensions.UseHttpsRedirection
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
 
         resource helloWorld
         resource helloName
