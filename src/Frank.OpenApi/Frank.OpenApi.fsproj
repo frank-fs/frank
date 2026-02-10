@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageTags>openapi;swagger;api-documentation</PackageTags>
+    <Description>OpenAPI document generation extensions for Frank web framework</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="HandlerDefinition.fs" />
+    <Compile Include="HandlerBuilder.fs" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="WebHostBuilderExtensions.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank/Frank.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="10.0.102" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-preview.*" />
+    <PackageReference Include="FSharp.Data.JsonSchema.OpenApi" Version="3.0.1" />
+  </ItemGroup>
+
+</Project>
