@@ -17,7 +17,7 @@ open FSharp.Data.JsonSchema.OpenApi
 open Expecto
 open Frank.Builder
 open Frank.OpenApi
-open Frank.OpenApi
+open Scalar.AspNetCore
 
 /// Simple endpoint data source for tests (ResourceEndpointDataSource is internal)
 type TestEndpointDataSource(endpoints: Endpoint[]) =
@@ -57,7 +57,8 @@ let createOpenApiTestServer (resources: Resource list) =
                             .UseRouting()
                             .UseEndpoints(fun endpoints ->
                                 endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints))
-                                endpoints.MapOpenApi() |> ignore)
+                                endpoints.MapOpenApi() |> ignore
+                                endpoints.MapScalarApiReference() |> ignore)
                         |> ignore)
                 |> ignore)
 
