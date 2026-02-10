@@ -502,4 +502,4 @@ The `sample/` directory contains several example applications:
 
 ## License
 
-[Apache 2.0](LICENSE)
+[MIT](LICENSE)
