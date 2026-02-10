@@ -1,3 +1,40 @@
+### New in 7.2.0 (Released 2026-02-10)
+
+**Frank.OpenApi - Native OpenAPI Document Generation Support**
+
+- **New Library:** Frank.OpenApi extension library for declarative OpenAPI metadata
+- **HandlerBuilder CE:** Computation expression for defining handlers with embedded OpenAPI metadata:
+  - `name` — operationId for the endpoint
+  - `summary` / `description` — operation documentation
+  - `tags` — endpoint categorization
+  - `produces typeof<T> statusCode [contentTypes]` — response types with optional content negotiation
+  - `producesEmpty statusCode` — empty responses (204, 404, etc.)
+  - `accepts typeof<T> [contentTypes]` — request types with optional content negotiation
+  - `handle` — supports Task, Task<'a>, Async<unit>, Async<'a>
+- **ResourceBuilder Extensions:** All HTTP method operations (`get`, `post`, `put`, `delete`, `patch`, `head`, `options`) accept HandlerDefinition
+- **F# Type Schemas:** Automatic JSON Schema generation for F# types via FSharpSchemaTransformer:
+  - Records with required and optional fields
+  - Discriminated unions with anyOf/oneOf
+  - Collections (list, Set, Map)
+  - Option types as nullable
+- **WebHostBuilder Integration:** `useOpenApi` operation to enable OpenAPI document generation at `/openapi/v1.json`
+- **Content Negotiation:** Full support for multiple content types (application/json, application/xml, etc.)
+- **No Breaking Changes:** Per-handler metadata via method-specific conventions — fully backward compatible
+- **Multi-Targeting:** Supports .NET 10.0 (LTS)
+- **Core Fix:** Added MethodInfo to endpoint metadata for OpenAPI discovery (required by ASP.NET Core's EndpointMetadataApiDescriptionProvider)
+
+**Example Usage:**
+```fsharp
+handler {
+    name "createProduct"
+    summary "Create a new product"
+    tags [ "Products"; "Admin" ]
+    produces typeof<Product> 201
+    accepts typeof<CreateProductRequest>
+    handle (fun ctx -> async { return! createProduct ctx })
+}
+```
+
 ### New in 7.1.0 (Released 2026-02-07)
 
 **Frank.Datastar - Native SSE Implementation & Stream-Based HTML Generation**

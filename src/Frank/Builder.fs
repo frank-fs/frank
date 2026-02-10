@@ -29,6 +29,7 @@ module Builder =
                     let builder = RouteEndpointBuilder(handler, routePattern, 0)
                     builder.DisplayName <- displayName
                     builder.Metadata.Add(HttpMethodMetadata [|httpMethod|])
+                    builder.Metadata.Add(handler.Method)
                     for convention in metadata do
                         convention builder
                     builder.Build() |]

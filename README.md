@@ -16,6 +16,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 |---------|-------------|-------|
 | **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/) |
 | **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
+| **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/nuget/v/Frank.OpenApi)](https://www.nuget.org/packages/Frank.OpenApi/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
@@ -252,6 +253,130 @@ let main args =
 
 ---
 
+## Frank.OpenApi
+
+Frank.OpenApi provides native OpenAPI document generation for Frank applications, with first-class support for F# types and declarative metadata using computation expressions.
+
+### Installation
+
+```bash
+dotnet add package Frank.OpenApi
+```
+
+### HandlerBuilder Computation Expression
+
+Define handlers with embedded OpenAPI metadata using the `handler` computation expression:
+
+```fsharp
+open Frank.Builder
+open Frank.OpenApi
+
+type Product = { Name: string; Price: decimal }
+type CreateProductRequest = { Name: string; Price: decimal }
+
+let createProductHandler =
+    handler {
+        name "createProduct"
+        summary "Create a new product"
+        description "Creates a new product in the catalog"
+        tags [ "Products"; "Admin" ]
+        produces typeof<Product> 201
+        accepts typeof<CreateProductRequest>
+        handle (fun (ctx: HttpContext) -> task {
+            let! request = ctx.Request.ReadFromJsonAsync<CreateProductRequest>()
+            let product = { Name = request.Name; Price = request.Price }
+            ctx.Response.StatusCode <- 201
+            do! ctx.Response.WriteAsJsonAsync(product)
+        })
+    }
+
+let productsResource =
+    resource "/products" {
+        name "Products"
+        post createProductHandler
+    }
+```
+
+### HandlerBuilder Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `name "operationId"` | Sets the OpenAPI operationId |
+| `summary "text"` | Brief summary of the operation |
+| `description "text"` | Detailed description |
+| `tags [ "Tag1"; "Tag2" ]` | Categorize endpoints |
+| `produces typeof<T> statusCode` | Define response type and status code |
+| `produces typeof<T> statusCode ["content/type"]` | Response with content negotiation |
+| `producesEmpty statusCode` | Empty responses (204, 404, etc.) |
+| `accepts typeof<T>` | Define request body type |
+| `accepts typeof<T> ["content/type"]` | Request with content negotiation |
+| `handle (fun ctx -> ...)` | Handler function (supports Task, Task<'a>, Async<unit>, Async<'a>) |
+
+### F# Type Schema Generation
+
+Frank.OpenApi automatically generates JSON schemas for F# types:
+
+```fsharp
+// F# records with required and optional fields
+type User = {
+    Id: Guid
+    Name: string
+    Email: string option  // Becomes nullable in schema
+}
+
+// Discriminated unions (anyOf/oneOf)
+type Response =
+    | Success of data: string
+    | Error of code: int * message: string
+
+// Collections
+type Products = {
+    Items: Product list
+    Tags: Set<string>
+    Metadata: Map<string, string>
+}
+```
+
+### WebHostBuilder Integration
+
+Enable OpenAPI document generation in your application:
+
+```fsharp
+[<EntryPoint>]
+let main args =
+    webHost args {
+        useDefaults
+        useOpenApi  // Adds /openapi/v1.json endpoint
+
+        resource productsResource
+    }
+    0
+```
+
+The OpenAPI document will be available at `/openapi/v1.json`.
+
+### Content Negotiation
+
+Define multiple content types for requests and responses:
+
+```fsharp
+handler {
+    name "getProduct"
+    produces typeof<Product> 200 [ "application/json"; "application/xml" ]
+    accepts typeof<ProductQuery> [ "application/json"; "application/xml" ]
+    handle (fun ctx -> task { (* ... *) })
+}
+```
+
+### Backward Compatibility
+
+Frank.OpenApi is fully backward compatible with existing Frank applications. You can:
+- Mix `HandlerDefinition` and plain `RequestDelegate` handlers in the same resource
+- Add OpenAPI metadata incrementally without changing existing code
+- Use the library only where you need API documentation
+
+---
+
 ## Frank.Datastar
 
 Frank.Datastar provides seamless integration with [Datastar](https://data-star.dev/), enabling reactive hypermedia applications using Server-Sent Events (SSE).
@@ -365,6 +490,7 @@ The `sample/` directory contains several example applications:
 | Sample | Description |
 |--------|-------------|
 | `Sample` | Basic Frank application |
+| `Frank.OpenApi.Sample` | Product Catalog API demonstrating OpenAPI document generation |
 | `Frank.Datastar.Basic` | Datastar integration with minimal HTML |
 | `Frank.Datastar.Hox` | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine |
 | `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
