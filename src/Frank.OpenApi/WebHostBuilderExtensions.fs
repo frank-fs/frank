@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open FSharp.Data.JsonSchema.OpenApi
 open Frank.Builder
+open Scalar.AspNetCore
 
 [<AutoOpen>]
 module WebHostBuilderExtensions =
@@ -47,7 +48,8 @@ module WebHostBuilderExtensions =
                     services
                 Middleware = spec.Middleware >> fun app ->
                     app.UseEndpoints(fun endpoints ->
-                        endpoints.MapOpenApi() |> ignore) |> ignore
+                        endpoints.MapOpenApi() |> ignore
+                        endpoints.MapScalarApiReference() |> ignore) |> ignore
                     app }
 
         [<CustomOperation("useOpenApi")>]
@@ -60,5 +62,6 @@ module WebHostBuilderExtensions =
                     services
                 Middleware = spec.Middleware >> fun app ->
                     app.UseEndpoints(fun endpoints ->
-                        endpoints.MapOpenApi() |> ignore) |> ignore
+                        endpoints.MapOpenApi() |> ignore
+                        endpoints.MapScalarApiReference() |> ignore) |> ignore
                     app }

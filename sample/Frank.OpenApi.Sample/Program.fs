@@ -53,12 +53,13 @@ let rootHandler =
         summary "API Information"
         description "Returns information about the Product Catalog API"
         tags [ "Meta" ]
-        produces typeof<{| name: string; version: string; openApiUrl: string |}> 200
+        produces typeof<{| name: string; version: string; openApiUrl: string; scalarUrl: string |}> 200
         handle (fun (ctx: HttpContext) -> task {
             do! ctx.Response.WriteAsJsonAsync({|
                 name = "Product Catalog API"
                 version = "1.0.0"
                 openApiUrl = "/openapi/v1.json"
+                scalarUrl = "/scalar/v1"
             |})
         })
     }

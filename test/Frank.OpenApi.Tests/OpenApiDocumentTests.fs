@@ -388,3 +388,34 @@ let us3EndToEndTests =
             Expect.isTrue (hasProperty "application/xml" postContent) "POST should accept XML"
         }
     ]
+
+// ===== Scalar UI Tests =====
+
+[<Tests>]
+let scalarTests =
+    testList "Scalar UI" [
+        testTask "GET /scalar/v1 returns Scalar UI when OpenAPI is enabled" {
+            let products =
+                resource "/products" {
+                    name "Products"
+                    get simpleHandler
+                }
+            let client = createOpenApiTestServer [ products ]
+            let! (response: HttpResponseMessage) = client.GetAsync("/scalar/v1")
+            Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+            let! (body: string) = response.Content.ReadAsStringAsync()
+            Expect.stringContains body "scalar" "Should contain Scalar UI content"
+        }
+
+        testTask "App without OpenAPI does not expose /scalar/v1" {
+            let products =
+                resource "/products" {
+                    name "Products"
+                    get simpleHandler
+                }
+            let client = createPlainTestServer [ products ]
+            let! (response: HttpResponseMessage) = client.GetAsync("/scalar/v1")
+            Expect.equal response.StatusCode HttpStatusCode.NotFound "Should return 404 when OpenAPI is not configured"
+        }
+    ]

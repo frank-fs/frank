@@ -18,4 +18,8 @@
     <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Scalar.AspNetCore" Version="1.2.38" />
+  </ItemGroup>
+
 </Project>
