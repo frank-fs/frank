@@ -490,6 +490,7 @@ The `sample/` directory contains several example applications:
 | Sample | Description |
 |--------|-------------|
 | `Sample` | Basic Frank application |
+| `Frank.OpenApi.Sample` | Product Catalog API demonstrating OpenAPI document generation |
 | `Frank.Datastar.Basic` | Datastar integration with minimal HTML |
 | `Frank.Datastar.Hox` | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine |
 | `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
