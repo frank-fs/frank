@@ -111,7 +111,7 @@ Per-request projection of a resource's handler return value to RDF:
 
 ## Validation Rules
 
-- `extract` MUST fail if no compiled assembly found (FR-007a)
+- `extract` MUST fail if the .fsproj file cannot be loaded or FCS cannot parse/type-check the source files
 - `clarify`/`validate`/`diff`/`compile` MUST fail if no extraction state exists
 - `compile` SHOULD warn if `validate` has not been run
 - `linkedData` CE MUST fail at startup if embedded resources not found (FR-021)

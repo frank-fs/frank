@@ -6,7 +6,7 @@
 
 ## Summary
 
-Build the foundation layer for Frank's semantic web capabilities: a CLI tool (`frank-cli`) that extracts OWL ontology and SHACL shapes from F# source definitions, and an extension library (`Frank.LinkedData`) that serves semantic resource representations via content negotiation. Both share `dotNetRdf.Core` as the RDF runtime. The CLI uses FSharp.Compiler.Service for AST-level type extraction and System.Reflection for route/handler analysis, producing embedded assembly resources consumed by Frank.LinkedData at runtime.
+Build the foundation layer for Frank's semantic web capabilities: a CLI tool (`frank-cli`) that extracts OWL ontology and SHACL shapes from F# source definitions, and an extension library (`Frank.LinkedData`) that serves semantic resource representations via content negotiation. Both share `dotNetRdf.Core` as the RDF runtime. The CLI uses FSharp.Compiler.Service for both untyped AST walking (route/handler detection) and typed AST analysis (type structure extraction), producing embedded assembly resources consumed by Frank.LinkedData at runtime. No compiled assembly is required for extraction.
 
 ## Technical Context
 
@@ -18,6 +18,7 @@ Build the foundation layer for Frank's semantic web capabilities: a CLI tool (`f
 - `FSharp.Compiler.Service` 43.10.103 — F# AST parsing and type extraction
 - `Ionide.ProjInfo` 0.74.1 + `Ionide.ProjInfo.FCS` — .fsproj cracking and project loading
 - `System.CommandLine` — CLI argument parsing for frank-cli
+**Extraction Approach**: FCS AST-only (no compiled assembly required). Untyped AST for route/handler detection, typed AST for type analysis.
 **Storage**: Intermediate extraction state in `obj/frank-cli/` (file-based); final artifacts as embedded assembly resources
 **Testing**: Expecto 10.x + YoloDev.Expecto.TestSdk 0.14.x + Microsoft.NET.Test.Sdk 17.x (matching existing Frank test conventions)
 **Target Platform**: .NET 8.0/9.0/10.0 (cross-platform CLI tool + library)
@@ -86,9 +87,9 @@ src/
 │   │   ├── ShapeGenerator.fs       # F# constraints → SHACL shapes
 │   │   └── VocabularyAligner.fs    # Align to standard vocabularies
 │   ├── Analysis/
-│   │   ├── AstAnalyzer.fs          # FCS untyped AST walking (routes, CE structure)
+│   │   ├── AstAnalyzer.fs          # FCS untyped AST walking (routes, CE structure, HTTP methods)
 │   │   ├── TypeAnalyzer.fs         # FCS typed AST (DUs, records, fields)
-│   │   └── ReflectionAnalyzer.fs   # Assembly reflection (handler registrations)
+│   │   └── ProjectLoader.fs        # Ionide.ProjInfo project loading
 │   ├── State/
 │   │   ├── ExtractionState.fs      # Persist/load from obj/frank-cli/
 │   │   └── DiffEngine.fs           # Compare extraction states

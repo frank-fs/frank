@@ -17,24 +17,20 @@ dotnet tool install frank-cli
 dotnet add package Frank.Cli.MSBuild
 ```
 
-### 3. Build your project (required precondition)
-
-```bash
-dotnet build
-```
-
-### 4. Extract ontology from your Frank project
+### 3. Extract ontology from your Frank project
 
 ```bash
 frank-cli extract --project MyApp.fsproj
 ```
+
+No prior `dotnet build` required — extraction uses FCS to analyze source files directly.
 
 Optional parameters:
 - `--base-uri https://example.com/ontology/` — override default namespace
 - `--vocabularies schema.org,hydra` — specify standard vocabularies (default)
 - `--scope project|file|resource` — extraction scope
 
-### 5. Review and refine
+### 4. Review and refine
 
 ```bash
 # Surface ambiguities
@@ -50,21 +46,23 @@ frank-cli validate --project MyApp.fsproj
 frank-cli diff --project MyApp.fsproj
 ```
 
-### 6. Compile semantic definitions
+### 5. Compile semantic definitions
 
 ```bash
 frank-cli compile --project MyApp.fsproj
 ```
 
-This generates OWL/XML and SHACL artifacts in `obj/frank-cli/`. The MSBuild targets from `Frank.Cli.MSBuild` automatically embed them on next `dotnet build`.
+This generates OWL/XML and SHACL artifacts in `obj/frank-cli/`.
 
-### 7. Rebuild to embed
+### 6. Build to embed
 
 ```bash
 dotnet build
 ```
 
-### 8. Add LinkedData to your resource
+The MSBuild targets from `Frank.Cli.MSBuild` automatically embed the compiled artifacts as assembly resources. Only one build is needed.
+
+### 7. Add LinkedData to your resource
 
 ```fsharp
 open Frank.LinkedData
@@ -79,7 +77,7 @@ let products = resource "/products/{id}" {
 }
 ```
 
-### 9. Test semantic content negotiation
+### 8. Test semantic content negotiation
 
 ```bash
 # JSON-LD

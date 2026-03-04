@@ -84,20 +84,19 @@
 **Requirement Refs**: FR-007
 
 ### Included Subtasks
-- [ ] T013 Create `src/Frank.Cli.Core/Analysis/AstAnalyzer.fs` — untyped AST walker for route templates and CE structure detection (pattern: `SynExpr.App(Ident "resource", Const(String route))`)
+- [ ] T013 Create `src/Frank.Cli.Core/Analysis/AstAnalyzer.fs` — untyped AST walker for route templates, CE structure detection, and HTTP method handler detection (pattern: `SynExpr.App(Ident "resource", Const(String route))`)
 - [ ] T014 Create `src/Frank.Cli.Core/Analysis/TypeAnalyzer.fs` — typed AST walker for DU cases, record fields, option types, list/array types via FSharpEntity
-- [ ] T015 Create `src/Frank.Cli.Core/Analysis/ReflectionAnalyzer.fs` — assembly reflection for handler registrations, endpoint metadata, HTTP method bindings
-- [ ] T016 Create project loading module using Ionide.ProjInfo — load .fsproj, resolve source files, produce FSharpProjectOptions
-- [ ] T017 Create fixture Frank .fs files for testing (DU types, records, routes, handlers) and unit tests for all three analyzers
+- [ ] T016 Create project loading module using Ionide.ProjInfo — load .fsproj, resolve source files, produce FSharpProjectOptions (no compiled assembly required)
+- [ ] T017 Create fixture Frank .fs files for testing (DU types, records, routes, handlers) and unit tests for both analyzers
 
 ### Implementation Notes
-- AstAnalyzer follows the pattern proven in `src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs` — use SyntaxCollectorBase or manual recursive descent on ParsedInput.
+- AstAnalyzer follows the pattern proven in `src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs` — use SyntaxCollectorBase or manual recursive descent on ParsedInput. AstAnalyzer also detects HTTP method handlers (get, post, put, delete) from CE body nodes.
 - TypeAnalyzer uses `FSharpCheckProjectResults.AssemblySignature.Entities` to enumerate types.
-- ReflectionAnalyzer loads the compiled DLL and inspects endpoint metadata via reflection.
+- No compiled assembly needed — FCS type-checks source files directly via Ionide.ProjInfo project options.
 - Project loading via Ionide.ProjInfo: `WorkspaceLoader.Create(toolsPath)` → `loader.LoadProjects(["proj.fsproj"])`.
 
 ### Parallel Opportunities
-- T013 (AST), T014 (typed), T015 (reflection) can proceed in parallel as they analyze different aspects.
+- T013 (AST) and T014 (typed) can proceed in parallel as they analyze different aspects.
 
 ### Dependencies
 - Depends on WP01.
@@ -105,6 +104,7 @@
 ### Risks & Mitigations
 - FCS API surface is large and sparsely documented; reference existing DuplicateHandlerAnalyzer for patterns.
 - Ionide.ProjInfo requires MSBuild to be installed; document in prerequisites.
+- No compiled assembly required — FCS works directly from source files via project options.
 
 ---
 
@@ -151,7 +151,7 @@
 **Requirement Refs**: FR-007, FR-008, FR-013, FR-014
 
 ### Included Subtasks
-- [ ] T024 Create `src/Frank.Cli.Core/Commands/ExtractCommand.fs` — orchestrate project loading → AST analysis → type analysis → reflection → mapping → state persistence
+- [ ] T024 Create `src/Frank.Cli.Core/Commands/ExtractCommand.fs` — orchestrate project loading → AST analysis → type analysis → mapping → state persistence (no compiled assembly required)
 - [ ] T025 Create `src/Frank.Cli.Core/Commands/ClarifyCommand.fs` — load extraction state, detect ambiguities (unmapped types, ambiguous DU semantics, missing relationships), produce structured JSON questions
 - [ ] T026 Implement JSON output formatting module — shared serialization for all command outputs per contracts/cli-commands.md schemas
 - [ ] T027 Implement `--text` human-readable output mode for extract and clarify
@@ -441,7 +441,6 @@ WP01 (Scaffolding)
 | T012 | RDF foundation unit tests | WP02 | P0 | No |
 | T013 | AST analyzer (route/CE detection) | WP03 | P1 | No |
 | T014 | Type analyzer (DU/record enumeration) | WP03 | P1 | Yes |
-| T015 | Reflection analyzer (handler registration) | WP03 | P1 | Yes |
 | T016 | Project loading (Ionide.ProjInfo) | WP03 | P1 | No |
 | T017 | AST/type analysis fixture files + tests | WP03 | P1 | No |
 | T018 | TypeMapper (F# → OWL) | WP04 | P1 | Yes |

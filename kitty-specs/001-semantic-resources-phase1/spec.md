@@ -112,7 +112,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 
 - What happens when `frank-cli extract` encounters F# types it cannot map (e.g., function types, opaque external types)? It should report them in the `clarify` output as unmapped items.
 - How does the system handle partial extractions — e.g., a project with some resources having semantic definitions and others not? Only resources with `linkedData` enabled require definitions; others are unaffected.
-- What happens when semantic definitions are stale (source changed after last `compile`)? The `validate` command should detect drift between source and compiled artifacts.
+- What happens when semantic definitions are stale (source changed after last `compile`)? The `validate` command should detect drift by comparing a source file hash against the extraction state hash.
 - What happens when multiple content negotiation formatters conflict (e.g., both MVC JSON formatter and JSON-LD formatter match `application/json`)? JSON-LD is served only for `application/ld+json`; `application/json` continues to use the existing MVC formatter.
 - What happens when the embedded ontology references types from external assemblies? Phase 1 scopes extraction to the current project only; cross-assembly references are flagged as external and deferred to later phases.
 - What happens when `dotnet clean` is run? Intermediate state in `obj/frank-cli/` is removed; the next `extract` starts fresh. Compiled embedded resources are also removed, requiring a re-compile.
@@ -130,8 +130,8 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **FR-005**: The `extract` command MUST map Frank route definitions to RDF resource identities.
 - **FR-006**: The `extract` command MUST map HTTP method handlers to capability semantics in the ontology.
 - **FR-007**: The `extract` command MUST accept parameters that direct extraction scope and methods (whole project, single file, single resource).
-- **FR-007a**: The `extract` command MUST require a successfully compiled assembly as a precondition before extraction begins.
-- **FR-007b**: The `extract` command MUST use FSharp.Compiler.Service for AST-level type structure analysis and reflection on the compiled assembly for route/handler registration details.
+- **FR-007a**: *DROPPED — compiled assembly precondition removed to avoid two-pass build workflow. FCS AST provides all needed information for Phase 1 scope (static CE route definitions). See analysis session 2026-03-04.*
+- **FR-007b**: The `extract` command MUST use FSharp.Compiler.Service for both AST-level route/handler detection (untyped AST) and type structure analysis (typed AST). No compiled assembly is required.
 - **FR-007c**: The `extract` command MUST accept a `--base-uri` parameter to override the default project-specific namespace (derived from assembly name).
 - **FR-007d**: The `extract` command MUST accept a `--vocabularies` parameter (default: schema.org, hydra) to specify which standard vocabularies to use for well-known concept alignment.
 - **FR-007e**: The `extract` command MUST map HTTP method capabilities using Schema.org Actions and Hydra vocabularies by default — Schema.org for general capability semantics, Hydra for hypermedia-specific concepts (operations, parameters, link relations).
@@ -184,7 +184,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 ## Assumptions
 
 - The frank-cli tool targets the same .NET versions as Frank core (net8.0, net9.0, net10.0 multi-targeting).
-- The frank-cli tool depends on FSharp.Compiler.Service for AST parsing and uses System.Reflection for compiled assembly inspection.
+- The frank-cli tool depends on FSharp.Compiler.Service for both AST parsing (untyped) and type analysis (typed). No compiled assembly is required for extraction.
 - Intermediate extraction state is stored in `obj/frank-cli/` and is cleaned by `dotnet clean`.
 - The OWL/XML and SHACL output formats follow W3C specifications (OWL 2, SHACL 1.0).
 - RDF-star support is deferred to Phase 3 (Provenance) as noted in the tracking issue.

@@ -6,7 +6,6 @@ dependencies: [WP01]
 subtasks:
 - T013
 - T014
-- T015
 - T016
 - T017
 phase: Phase 1 - Analysis
@@ -35,7 +34,7 @@ spec-kitty implement WP03 --base WP01
 
 ## Objectives
 
-Implement FCS-based analyzers for extracting type definitions, route templates, and handler registrations from F# source files and compiled assemblies.
+Implement FCS-based analyzers for extracting type definitions, route templates, and handler registrations from F# source files using AST analysis only (no compiled assembly required).
 
 ## Context
 
@@ -156,37 +155,6 @@ F# type → `FieldKind` mapping:
 Main function:
 - `analyzeTypes : FSharpCheckProjectResults -> AnalyzedType list`
 
-### T015: ReflectionAnalyzer.fs — Assembly Reflection
-
-**Module**: `Frank.Cli.Core.Analysis.ReflectionAnalyzer`
-
-**File location**: `src/Frank.Cli.Core/Analysis/ReflectionAnalyzer.fs`
-
-Define output types:
-
-```fsharp
-type AnalyzedEndpoint = {
-    RoutePattern: string
-    HttpMethods: string list
-    HandlerTypeName: string option   // return type name if determinable
-    Metadata: string list            // raw metadata type names
-}
-```
-
-Load a compiled assembly using `System.Reflection.Assembly.LoadFrom`. Find types that implement endpoint-related patterns:
-
-- Look for ASP.NET Core `EndpointMetadataCollection` by inspecting `IEndpointConventionBuilder` metadata
-- Alternatively, use the compiled assembly path from Ionide.ProjInfo to locate the built DLL
-- Reflect over types to find `IHttpMethodMetadata` implementations for HTTP method extraction
-- Reflect over types to find `RouteNameMetadata` or `RoutePattern` attribute for route extraction
-
-Cross-reference with AST analysis results: if `AnalyzedResource.RouteTemplate` matches a reflected endpoint's `RoutePattern`, merge the handler return type information.
-
-Main function:
-- `analyzeAssembly : string -> Result<AnalyzedEndpoint list, string>` — takes assembly path, returns endpoints or error message
-
-Note: reflection-based analysis is supplementary. If the assembly is not built yet or fails to load, return `Error` gracefully — the AST analysis in T013/T014 is the primary source of truth.
-
 ### T016: ProjectLoader.fs — FCS Project Loading
 
 **Module**: `Frank.Cli.Core.Analysis.ProjectLoader`
@@ -200,7 +168,6 @@ type LoadedProject = {
     ProjectPath: string
     ParsedFiles: (string * ParsedInput) list    // (filePath, parsedAST)
     CheckResults: FSharpCheckProjectResults
-    AssemblyPath: string option                  // path to compiled DLL if present
 }
 ```
 
@@ -214,8 +181,6 @@ Implement using Ionide.ProjInfo:
 6. Extract parsed AST from `CheckResults.AssemblySignature` for typed analysis and parse each file individually for untyped AST
 
 Multi-target handling: if the .fsproj produces multiple TFMs, pick the highest available (net10.0 > net9.0 > net8.0). Inspect `ProjectOptions` for the target framework property.
-
-Assembly path: look for the built DLL in `obj/{TFM}/` relative to the project directory.
 
 Main function:
 - `loadProject : string -> Async<Result<LoadedProject, string>>` — async because FCS type checking is async
@@ -292,7 +257,7 @@ Write a file that, when parsed, produces CE body nodes for get, post, put, delet
 
 ## Review Guidance
 
-- AstAnalyzer: step through the DuplicateHandlerAnalyzer pattern carefully — the SynExpr tree can be deeply nested and ordering matters
+- AstAnalyzer: step through the DuplicateHandlerAnalyzer pattern carefully — the SynExpr tree can be deeply nested and ordering matters. AstAnalyzer now also handles HTTP method detection (previously in removed ReflectionAnalyzer)
 - TypeAnalyzer: recursion over entities must handle modules-within-modules (Frank's source uses nested modules)
-- ProjectLoader: Ionide.ProjInfo 0.74.x API may differ from older versions — read the actual Ionide.ProjInfo source or NuGet README before writing the loading code
+- ProjectLoader: Ionide.ProjInfo 0.74.x API may differ from older versions — read the actual Ionide.ProjInfo source or NuGet README before writing the loading code. No compiled assembly is needed.
 - All tests must pass with `dotnet test` — no skipped or inconclusive tests in this WP

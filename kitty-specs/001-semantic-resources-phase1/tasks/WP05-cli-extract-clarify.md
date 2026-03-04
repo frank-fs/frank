@@ -57,7 +57,7 @@ Success criteria:
 
 ## Context & Constraints
 
-- `ExtractCommand` orchestrates the full analysis pipeline: project load (Ionide.ProjInfo) → AST analysis → type analysis → reflection → mappers → state persistence
+- `ExtractCommand` orchestrates the full analysis pipeline: project load (Ionide.ProjInfo) → AST analysis → type analysis → mappers → state persistence (no compiled assembly required)
 - `ClarifyCommand` reads the persisted `ExtractionState` from `obj/frank-cli/` and analyses it for ambiguities
 - JSON output schemas are normative — output must match them exactly, including field names and envelope structure
 - References: `plan.md`, `data-model.md` (ExtractionState lifecycle), `contracts/cli-commands.md`
@@ -76,17 +76,15 @@ Accepted parameters:
 - `scope` — one of `project | file | resource` (optional, default `project`)
 
 Orchestration sequence (must execute in this exact order):
-1. Validate that the build output assembly exists; if not, emit a descriptive error and return a non-zero result
-2. Load project via `Ionide.ProjInfo` to obtain source files and compiler options
-3. Run `AstAnalyzer` (from WP03) to extract type and route declarations
-4. Run `TypeAnalyzer` (from WP03) to resolve discriminated unions, record shapes, and type hierarchy
-5. Run `ReflectionAnalyzer` (from WP03) to load actual .NET types from the assembly
-6. Run `TypeMapper` to map .NET types to OWL classes
-7. Run `RouteMapper` to map ASP.NET Core routes to Hydra operations
-8. Run `CapabilityMapper` to map Frank resource capabilities to semantic actions
-9. Run `ShapeGenerator` to produce SHACL shapes
-10. Run `VocabularyAligner` to align generated terms against selected vocabularies
-11. Persist `ExtractionState` to `obj/frank-cli/extraction-state.json`
+1. Load project via `Ionide.ProjInfo` to obtain source files and compiler options (no compiled assembly required)
+2. Run `AstAnalyzer` (from WP03) to extract route declarations and HTTP method handlers from untyped AST
+3. Run `TypeAnalyzer` (from WP03) to resolve discriminated unions, record shapes, and type hierarchy from typed AST
+4. Run `TypeMapper` to map F# types to OWL classes
+5. Run `RouteMapper` to map Frank routes to Hydra operations
+6. Run `CapabilityMapper` to map Frank resource capabilities to semantic actions
+7. Run `ShapeGenerator` to produce SHACL shapes
+8. Run `VocabularyAligner` to align generated terms against selected vocabularies
+9. Persist `ExtractionState` to `obj/frank-cli/extraction-state.json`
 
 Return type: `ExtractResult` record with:
 - `ontologySummary` — class count, property count, aligned/unaligned counts
@@ -95,7 +93,8 @@ Return type: `ExtractResult` record with:
 - `stateFilePath` — absolute path to the persisted state file
 
 Error handling:
-- Assembly not found → emit `"Assembly not found at <path>. Run 'dotnet build' first."` and return error result
+- Project file not found → emit `"Project file not found at <path>."` and return error result
+- Ionide.ProjInfo load failure → emit descriptive error about .fsproj loading; suggest verifying the project file exists and MSBuild is available
 - FCS failure → report with source file path and line number from the FCS diagnostic
 - Any analyser step failure → report step name and underlying exception message; do not silently swallow
 
@@ -157,7 +156,7 @@ Coverage required:
 - Mock all analyser and mapper dependencies via interfaces/function parameters
 - Verify orchestration calls each step exactly once and in the documented sequence
 - Verify `ExtractionState` is written to the expected path after a successful run
-- Verify that an assembly-not-found error is returned (not thrown) when the assembly path is invalid
+- Verify that a project-not-found error is returned (not thrown) when the .fsproj path is invalid
 
 **ClarifyCommand tests**:
 - Create a synthetic `ExtractionState` with a known set of unmapped types and ambiguous fields
