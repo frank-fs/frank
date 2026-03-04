@@ -92,18 +92,19 @@ A developer adds the `linkedData` custom operation to their Frank resource build
 
 ---
 
-### User Story 5 — Analyzer Enforcement of Semantic Definitions (Priority: P2)
+### User Story 5 — Build-time and Runtime Validation of Semantic Definitions (Priority: P2)
 
-A developer adds the `linkedData` operation to a resource but has not run `frank-cli compile` to generate the semantic definitions. The Frank.Analyzer reports a diagnostic warning, alerting the developer that the semantic definitions are missing.
+A developer adds the `linkedData` operation to a resource but has not run `frank-cli compile` to generate the semantic definitions. The MSBuild target from `Frank.Cli.MSBuild` emits a build warning when semantic artifacts are missing. If the developer builds and runs anyway, the runtime raises a startup error indicating that `linkedData` is enabled but no embedded definitions were found.
 
-**Why this priority**: Enforces correctness at development time — prevents runtime errors by catching missing definitions during the build.
+**Why this priority**: Two-layer validation catches missing definitions both at build time (MSBuild warning) and at runtime startup (fail-fast error), without requiring an analyzer dependency.
 
-**Independent Test**: Create a Frank project with `linkedData` enabled but no embedded semantic definitions; run the analyzer and verify the diagnostic is reported.
+**Independent Test**: Build a Frank project referencing `Frank.Cli.MSBuild` without running `frank-cli compile`; verify MSBuild warning. Then run the app with `linkedData` enabled and no embedded resources; verify startup error.
 
 **Acceptance Scenarios**:
 
-1. **Given** a Frank resource using `linkedData` without corresponding semantic definitions, **When** the Frank.Analyzer runs, **Then** it reports a diagnostic warning with a clear message and the resource location.
-2. **Given** a Frank resource using `linkedData` with valid semantic definitions present, **When** the Frank.Analyzer runs, **Then** no diagnostic is reported for that resource.
+1. **Given** a project referencing `Frank.Cli.MSBuild` without semantic artifacts in `obj/frank-cli/`, **When** `dotnet build` runs, **Then** a build warning is emitted indicating missing artifacts.
+2. **Given** a Frank resource using `linkedData` without embedded semantic definitions in the assembly, **When** the application starts, **Then** a startup error is raised with a clear message (FR-021).
+3. **Given** a Frank resource using `linkedData` with valid embedded semantic definitions, **When** the application starts, **Then** no error is raised.
 
 ---
 
@@ -154,7 +155,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **FR-020**: The library MUST load semantic definitions from embedded assembly resources at startup.
 - **FR-020a**: The library MUST automatically serialize handler return types to RDF triples via reflection, using the compiled ontology as the schema map.
 - **FR-021**: The library MUST raise an error at startup if `linkedData` is enabled but semantic definitions are not found in the assembly.
-- **FR-022**: The library MUST use a minimal custom RDF triple model — no external RDF library dependency in Phase 1.
+- **FR-022**: The library MUST use `dotNetRdf.Core` as its RDF triple model, shared with frank-cli. This is a justified dependency per constitution review — writing custom serializers for 3 formats would be more code and more bugs than the dependency itself, and Phase 4 SPARQL requires dotNetRDF regardless.
 
 **Frank.Analyzer (extension)**
 
@@ -176,7 +177,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **SC-001**: An LLM coding assistant can invoke the five frank-cli commands (extract, clarify, validate, diff, compile) in sequence to produce a complete ontology from a Frank project without human intervention beyond answering clarification prompts.
 - **SC-002**: A Frank resource with `linkedData` enabled correctly serves all three semantic media types (JSON-LD, Turtle, RDF/XML) when requested via content negotiation.
 - **SC-003**: Existing Frank applications without `linkedData` experience zero behavioral changes — all current tests continue to pass.
-- **SC-004**: The Frank.Analyzer detects 100% of cases where `linkedData` is used without semantic definitions and reports a clear diagnostic.
+- **SC-004**: The MSBuild target warns at build time when `obj/frank-cli/` is missing or empty, and the runtime raises an error at startup if `linkedData` is enabled without embedded semantic definitions (FR-021).
 - **SC-005**: The complete extract-to-serve pipeline (frank-cli extract → compile → Frank.LinkedData serving) works end-to-end on a sample Frank application.
 - **SC-006**: All frank-cli commands produce valid, parseable JSON output that can be consumed by standard tool-use protocols.
 
@@ -189,4 +190,4 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - RDF-star support is deferred to Phase 3 (Provenance) as noted in the tracking issue.
 - Cross-assembly type extraction is out of scope for Phase 1; only types defined in the target project are mapped.
 - The `linkedData` custom operation follows the same extension pattern as `Frank.Auth` and `Frank.OpenApi` (AutoOpen module with type extensions on ResourceBuilder).
-- The custom RDF triple model in Phase 1 is intentionally minimal; it may be replaced by dotNetRDF or similar in Phase 4 when SPARQL support is needed.
+- The `dotNetRdf.Core` library is adopted from Phase 1 as the shared RDF triple model for both frank-cli and Frank.LinkedData. This provides consistent serializers (JSON-LD, Turtle, RDF/XML) and a clear path to Phase 4 SPARQL support.

@@ -4,6 +4,7 @@ title: OWL/SHACL Mapping Engine
 lane: planned
 dependencies:
 - WP02
+- WP03
 subtasks:
 - T018
 - T019

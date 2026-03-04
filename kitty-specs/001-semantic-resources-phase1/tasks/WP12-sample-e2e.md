@@ -3,7 +3,9 @@ work_package_id: WP12
 title: Sample App & End-to-End Integration
 lane: planned
 dependencies:
+- WP06
 - WP08
+- WP09
 subtasks:
 - T059
 - T060
