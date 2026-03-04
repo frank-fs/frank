@@ -14,9 +14,9 @@
 ### Session 2026-03-04
 
 - Q: How should frank-cli extract read F# source? → A: Both AST (FSharp.Compiler.Service) for type structure and reflection for route/handler registration. Compiled assembly required as precondition to ensure source validity before extraction.
-- Q: How should the ontology namespace be determined? → A: Use standard vocabularies (schema.org by default) for well-known concepts. Derive project-specific namespace from assembly name with `--base-uri` CLI override. Provide `--vocabularies` parameter (default: schema.org) to allow adding domain-specific vocabularies explicitly.
+- Q: How should the ontology namespace be determined? → A: Use standard vocabularies (schema.org by default) for well-known concepts. Derive project-specific namespace from assembly name with `--base-uri` CLI override. Provide `--vocabularies` parameter (default: schema.org, hydra) to allow adding domain-specific vocabularies explicitly.
 - Q: Where does frank-cli persist intermediate extraction state between commands? → A: On disk in `obj/frank-cli/`, alongside other build artifacts. Cleaned by `dotnet clean`.
-- Q: Which RDF vocabulary for HTTP method capability semantics? → A: Schema.org Actions as default (actively maintained, broad adoption). Hydra available via `--vocabularies` parameter but not default due to stalled W3C activity.
+- Q: Which RDF vocabulary for HTTP method capability semantics? → A: Both Schema.org Actions and Hydra as defaults. Schema.org for general capability semantics, Hydra for hypermedia-specific concepts (API documentation, supported operations, link relations). Both included by default via `--vocabularies`.
 
 ---
 
@@ -130,8 +130,8 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **FR-007a**: The `extract` command MUST require a successfully compiled assembly as a precondition before extraction begins.
 - **FR-007b**: The `extract` command MUST use FSharp.Compiler.Service for AST-level type structure analysis and reflection on the compiled assembly for route/handler registration details.
 - **FR-007c**: The `extract` command MUST accept a `--base-uri` parameter to override the default project-specific namespace (derived from assembly name).
-- **FR-007d**: The `extract` command MUST accept a `--vocabularies` parameter (default: schema.org) to specify which standard vocabularies to use for well-known concept alignment.
-- **FR-007e**: The `extract` command MUST map HTTP method capabilities using Schema.org Actions vocabulary by default.
+- **FR-007d**: The `extract` command MUST accept a `--vocabularies` parameter (default: schema.org, hydra) to specify which standard vocabularies to use for well-known concept alignment.
+- **FR-007e**: The `extract` command MUST map HTTP method capabilities using Schema.org Actions and Hydra vocabularies by default — Schema.org for general capability semantics, Hydra for hypermedia-specific concepts (operations, parameters, link relations).
 - **FR-007f**: The `extract` command MUST persist intermediate extraction state in `obj/frank-cli/` for use by subsequent commands (clarify, validate, diff, compile).
 - **FR-008**: The `clarify` command MUST return structured JSON describing ambiguities with questions, context, and suggested options.
 - **FR-009**: The `validate` command MUST check completeness (unmapped types, missing relationships) and consistency of the extracted ontology.
@@ -164,7 +164,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **RDF Triple**: The atomic unit of the semantic model — subject, predicate, object. Implemented as a minimal custom type in Frank.LinkedData.
 - **Semantic Definition Artifact**: The compiled OWL/XML and SHACL files embedded as assembly resources, produced by `frank-cli compile`.
 - **Resource Identity**: The RDF URI corresponding to a Frank route definition, mapping route patterns to semantic identifiers. Project-specific namespace derived from assembly name (overridable via `--base-uri`).
-- **Standard Vocabulary**: An external RDF vocabulary (e.g., schema.org, Hydra, Dublin Core) used to align extracted concepts with well-known semantic definitions. Configurable via `--vocabularies`; schema.org is the default.
+- **Standard Vocabulary**: An external RDF vocabulary (e.g., schema.org, Hydra, Dublin Core) used to align extracted concepts with well-known semantic definitions. Configurable via `--vocabularies`; schema.org and Hydra are the defaults.
 
 ## Success Criteria
 
