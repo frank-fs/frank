@@ -158,8 +158,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 
 **Frank.Analyzer (extension)**
 
-- **FR-023**: The analyzer MUST detect when `linkedData` is used in a resource CE without corresponding semantic definitions.
-- **FR-024**: The analyzer MUST report a diagnostic with a clear message, diagnostic code, and source location when semantic definitions are missing.
+*Analyzer requirements (formerly numbered 023/024) were DROPPED during planning — replaced by MSBuild target warning + runtime startup validation. See planning clarification session.*
 
 ### Key Entities
 
