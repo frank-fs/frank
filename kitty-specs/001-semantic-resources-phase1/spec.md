@@ -9,6 +9,17 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-03-04
+
+- Q: How should frank-cli extract read F# source? → A: Both AST (FSharp.Compiler.Service) for type structure and reflection for route/handler registration. Compiled assembly required as precondition to ensure source validity before extraction.
+- Q: How should the ontology namespace be determined? → A: Use standard vocabularies (schema.org by default) for well-known concepts. Derive project-specific namespace from assembly name with `--base-uri` CLI override. Provide `--vocabularies` parameter (default: schema.org) to allow adding domain-specific vocabularies explicitly.
+- Q: Where does frank-cli persist intermediate extraction state between commands? → A: On disk in `obj/frank-cli/`, alongside other build artifacts. Cleaned by `dotnet clean`.
+- Q: Which RDF vocabulary for HTTP method capability semantics? → A: Schema.org Actions as default (actively maintained, broad adoption). Hydra available via `--vocabularies` parameter but not default due to stalled W3C activity.
+
+---
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Extract Ontology from Frank Source (Priority: P1)
@@ -101,6 +112,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - What happens when semantic definitions are stale (source changed after last `compile`)? The `validate` command should detect drift between source and compiled artifacts.
 - What happens when multiple content negotiation formatters conflict (e.g., both MVC JSON formatter and JSON-LD formatter match `application/json`)? JSON-LD is served only for `application/ld+json`; `application/json` continues to use the existing MVC formatter.
 - What happens when the embedded ontology references types from external assemblies? Phase 1 scopes extraction to the current project only; cross-assembly references are flagged as external and deferred to later phases.
+- What happens when `dotnet clean` is run? Intermediate state in `obj/frank-cli/` is removed; the next `extract` starts fresh. Compiled embedded resources are also removed, requiring a re-compile.
 
 ## Requirements
 
@@ -115,6 +127,12 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **FR-005**: The `extract` command MUST map Frank route definitions to RDF resource identities.
 - **FR-006**: The `extract` command MUST map HTTP method handlers to capability semantics in the ontology.
 - **FR-007**: The `extract` command MUST accept parameters that direct extraction scope and methods (whole project, single file, single resource).
+- **FR-007a**: The `extract` command MUST require a successfully compiled assembly as a precondition before extraction begins.
+- **FR-007b**: The `extract` command MUST use FSharp.Compiler.Service for AST-level type structure analysis and reflection on the compiled assembly for route/handler registration details.
+- **FR-007c**: The `extract` command MUST accept a `--base-uri` parameter to override the default project-specific namespace (derived from assembly name).
+- **FR-007d**: The `extract` command MUST accept a `--vocabularies` parameter (default: schema.org) to specify which standard vocabularies to use for well-known concept alignment.
+- **FR-007e**: The `extract` command MUST map HTTP method capabilities using Schema.org Actions vocabulary by default.
+- **FR-007f**: The `extract` command MUST persist intermediate extraction state in `obj/frank-cli/` for use by subsequent commands (clarify, validate, diff, compile).
 - **FR-008**: The `clarify` command MUST return structured JSON describing ambiguities with questions, context, and suggested options.
 - **FR-009**: The `validate` command MUST check completeness (unmapped types, missing relationships) and consistency of the extracted ontology.
 - **FR-010**: The `diff` command MUST compare the current extraction against the previous version and return structured changes (added, removed, modified).
@@ -145,7 +163,8 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **SHACL Shapes**: Constraint definitions describing the expected shape of RDF data — cardinality, value types, patterns. Derived from F# type constraints.
 - **RDF Triple**: The atomic unit of the semantic model — subject, predicate, object. Implemented as a minimal custom type in Frank.LinkedData.
 - **Semantic Definition Artifact**: The compiled OWL/XML and SHACL files embedded as assembly resources, produced by `frank-cli compile`.
-- **Resource Identity**: The RDF URI corresponding to a Frank route definition, mapping route patterns to semantic identifiers.
+- **Resource Identity**: The RDF URI corresponding to a Frank route definition, mapping route patterns to semantic identifiers. Project-specific namespace derived from assembly name (overridable via `--base-uri`).
+- **Standard Vocabulary**: An external RDF vocabulary (e.g., schema.org, Hydra, Dublin Core) used to align extracted concepts with well-known semantic definitions. Configurable via `--vocabularies`; schema.org is the default.
 
 ## Success Criteria
 
@@ -161,6 +180,8 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 ## Assumptions
 
 - The frank-cli tool targets the same .NET versions as Frank core (net8.0, net9.0, net10.0 multi-targeting).
+- The frank-cli tool depends on FSharp.Compiler.Service for AST parsing and uses System.Reflection for compiled assembly inspection.
+- Intermediate extraction state is stored in `obj/frank-cli/` and is cleaned by `dotnet clean`.
 - The OWL/XML and SHACL output formats follow W3C specifications (OWL 2, SHACL 1.0).
 - RDF-star support is deferred to Phase 3 (Provenance) as noted in the tracking issue.
 - Cross-assembly type extraction is out of scope for Phase 1; only types defined in the target project are mapped.
