@@ -13,7 +13,7 @@
 
 ### Session 2026-03-04
 
-- Q: How should frank-cli extract read F# source? → A: Both AST (FSharp.Compiler.Service) for type structure and reflection for route/handler registration. Compiled assembly required as precondition to ensure source validity before extraction.
+- Q: How should frank-cli extract read F# source? → A: FSharp.Compiler.Service AST-only — untyped AST for route/handler detection, typed AST for type structure analysis. No compiled assembly required (updated 2026-03-04 to eliminate two-pass build workflow).
 - Q: How should the ontology namespace be determined? → A: Use standard vocabularies (schema.org by default) for well-known concepts. Derive project-specific namespace from assembly name with `--base-uri` CLI override. Provide `--vocabularies` parameter (default: schema.org, hydra) to allow adding domain-specific vocabularies explicitly.
 - Q: Where does frank-cli persist intermediate extraction state between commands? → A: On disk in `obj/frank-cli/`, alongside other build artifacts. Cleaned by `dotnet clean`.
 - Q: Which RDF vocabulary for HTTP method capability semantics? → A: Both Schema.org Actions and Hydra as defaults. Schema.org for general capability semantics, Hydra for hypermedia-specific concepts (API documentation, supported operations, link relations). Both included by default via `--vocabularies`.
@@ -165,7 +165,7 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 
 - **OWL Ontology**: A formal description of the application's type system as OWL classes, properties, and relationships. Serialized as OWL/XML.
 - **SHACL Shapes**: Constraint definitions describing the expected shape of RDF data — cardinality, value types, patterns. Derived from F# type constraints.
-- **RDF Triple**: The atomic unit of the semantic model — subject, predicate, object. Implemented as a minimal custom type in Frank.LinkedData.
+- **RDF Triple**: The atomic unit of the semantic model — subject, predicate, object. Uses `dotNetRdf.Core` types (`Triple`, `INode`, `IGraph`) shared between frank-cli and Frank.LinkedData.
 - **Semantic Definition Artifact**: The compiled OWL/XML and SHACL files embedded as assembly resources, produced by `frank-cli compile`.
 - **Resource Identity**: The RDF URI corresponding to a Frank route definition, mapping route patterns to semantic identifiers. Project-specific namespace derived from assembly name (overridable via `--base-uri`).
 - **Standard Vocabulary**: An external RDF vocabulary (e.g., schema.org, Hydra, Dublin Core) used to align extracted concepts with well-known semantic definitions. Configurable via `--vocabularies`; schema.org and Hydra are the defaults.

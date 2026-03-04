@@ -27,7 +27,7 @@
 
 ## Decision 2: F# Source Analysis
 
-**Decision**: Use FSharp.Compiler.Service (via Ionide.ProjInfo) for AST parsing and type extraction. Use System.Reflection for compiled assembly route/handler inspection.
+**Decision**: Use FSharp.Compiler.Service (via Ionide.ProjInfo) for all source analysis — untyped AST for route/handler detection, typed AST for type structure extraction. No compiled assembly required. (Updated 2026-03-04: reflection-based analysis dropped to eliminate two-pass build workflow.)
 
 **Rationale**: FCS provides both untyped AST (fast, for route template string extraction) and typed AST (for DU/record/field enumeration). Ionide.ProjInfo handles `.fsproj` cracking and reference resolution. The existing `DuplicateHandlerAnalyzer.fs` already demonstrates the exact AST walking pattern needed for detecting `resource "..."` CE invocations.
 

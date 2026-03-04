@@ -158,7 +158,7 @@
 - [ ] T028 Unit tests for extract orchestration (mock analyzers) and clarify ambiguity detection
 
 ### Implementation Notes
-- ExtractCommand validates compiled assembly exists, then runs analyzers in sequence: project load → AST → type → reflection → mappers → persist state.
+- ExtractCommand orchestrates the pipeline: project load (Ionide.ProjInfo) → AST analysis (routes/handlers) → type analysis (DUs/records) → mappers → state persistence. No compiled assembly required.
 - ClarifyCommand analyzes the extraction state for: unmapped types, types with ambiguous semantics, missing cross-type relationships, DUs that could be open or closed enumerations.
 - JSON output must match the schemas defined in `contracts/cli-commands.md`.
 
