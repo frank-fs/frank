@@ -1,29 +1,32 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
-title: "Project Scaffolding"
-phase: "Phase 0 - Setup"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Project Scaffolding
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001"]
+base_branch: master
+base_commit: ef8ffa5d959f6fb918a4930155826d47490f826f
+created_at: '2026-03-04T22:55:37.489789+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+phase: Phase 0 - Setup
+assignee: ''
+agent: ''
+shell_pid: "18978"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-04T22:10:13Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-04T22:10:13Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001]
 ---
 
 # WP01: Project Scaffolding
