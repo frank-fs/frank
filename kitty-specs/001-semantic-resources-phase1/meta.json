@@ -2,8 +2,10 @@
   "feature_number": "001",
   "slug": "001-semantic-resources-phase1",
   "feature_slug": "001-semantic-resources-phase1",
-  "friendly_name": "semantic resources phase1",
+  "friendly_name": "Semantic Resources Phase 1",
   "mission": "software-dev",
+  "source_description": "Implement Phase 1 of milestone #2 and tracking issue #80, documented in GitHub issues. This is a parallel set of tasks to build a frank-cli and Frank.LinkedData extension library. Details are in the related issues, #79 and #75.",
   "target_branch": "master",
+  "vcs": "git",
   "created_at": "2026-03-04T18:03:24.895663+00:00"
 }
