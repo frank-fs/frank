@@ -17,6 +17,8 @@
 - Q: How should the ontology namespace be determined? → A: Use standard vocabularies (schema.org by default) for well-known concepts. Derive project-specific namespace from assembly name with `--base-uri` CLI override. Provide `--vocabularies` parameter (default: schema.org, hydra) to allow adding domain-specific vocabularies explicitly.
 - Q: Where does frank-cli persist intermediate extraction state between commands? → A: On disk in `obj/frank-cli/`, alongside other build artifacts. Cleaned by `dotnet clean`.
 - Q: Which RDF vocabulary for HTTP method capability semantics? → A: Both Schema.org Actions and Hydra as defaults. Schema.org for general capability semantics, Hydra for hypermedia-specific concepts (API documentation, supported operations, link relations). Both included by default via `--vocabularies`.
+- Q: How does LinkedData produce instance-level RDF from a resource? → A: Automatic serialization via reflection on the handler's return type, using the compiled ontology as the schema map. No developer-provided mapping function needed.
+- Q: How does frank-cli compile hook into dotnet build? → A: Generate MSBuild .props/.targets files that auto-embed resources when the tool package is referenced — zero manual .fsproj changes needed.
 
 ---
 
@@ -74,7 +76,7 @@ Once the ontology is satisfactory, the LLM assistant invokes `frank-cli compile`
 
 ### User Story 4 — Opt-in Linked Data Content Negotiation (Priority: P2)
 
-A developer adds the `linkedData` custom operation to their Frank resource builder computation expression. At runtime, when a client sends an `Accept` header requesting `application/ld+json`, `text/turtle`, or `application/rdf+xml`, the resource responds with the appropriate semantic representation derived from its embedded ontology and current state.
+A developer adds the `linkedData` custom operation to their Frank resource builder computation expression. At runtime, when a client sends an `Accept` header requesting `application/ld+json`, `text/turtle`, or `application/rdf+xml`, the resource responds with the appropriate semantic representation. The library automatically serializes the handler's return type to RDF triples via reflection, using the compiled ontology as the schema map — no developer-provided mapping function is required.
 
 **Why this priority**: This is the runtime consumer of the frank-cli output — it makes semantic representations available over HTTP. It depends on the extraction/compile pipeline (P1) being functional first.
 
@@ -138,17 +140,19 @@ A developer adds the `linkedData` operation to a resource but has not run `frank
 - **FR-010**: The `diff` command MUST compare the current extraction against the previous version and return structured changes (added, removed, modified).
 - **FR-011**: The `compile` command MUST generate OWL/XML and SHACL artifacts in the project's `obj/` directory.
 - **FR-012**: The `compile` command MUST configure the artifacts as embedded resources so they are included in the compiled assembly by `dotnet build`.
+- **FR-012a**: The tool package MUST include MSBuild `.props`/`.targets` files that automatically embed the compiled artifacts — zero manual `.fsproj` changes required.
 - **FR-013**: All commands MUST output structured JSON for machine consumption by default.
 - **FR-014**: All commands MUST support a human-readable text output mode.
 
 **Frank.LinkedData (extension library)**
 
-- **FR-015**: The library MUST provide a `linkedData` custom operation on the `ResourceBuilder` computation expression.
+- **FR-015**: The library MUST provide a `linkedData` custom operation on the `ResourceBuilder` computation expression. No developer-provided mapping function is required.
 - **FR-016**: The library MUST extend content negotiation to serve `application/ld+json` (JSON-LD) representations.
 - **FR-017**: The library MUST extend content negotiation to serve `text/turtle` (Turtle) representations.
 - **FR-018**: The library MUST extend content negotiation to serve `application/rdf+xml` (RDF/XML) representations.
 - **FR-019**: The library MUST NOT break existing content negotiation behavior for standard media types (HTML, JSON, XML).
 - **FR-020**: The library MUST load semantic definitions from embedded assembly resources at startup.
+- **FR-020a**: The library MUST automatically serialize handler return types to RDF triples via reflection, using the compiled ontology as the schema map.
 - **FR-021**: The library MUST raise an error at startup if `linkedData` is enabled but semantic definitions are not found in the assembly.
 - **FR-022**: The library MUST use a minimal custom RDF triple model — no external RDF library dependency in Phase 1.
 
