@@ -14,7 +14,7 @@ subtasks:
 - T012
 phase: Phase 0 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "80069"
 review_status: ''
 reviewed_by: ''
@@ -268,3 +268,7 @@ Register all test modules in `Program.fs` using Expecto's `testList` composition
 - `ExtractionState` save/load must be a true roundtrip: triple count in ontology graph must be identical before and after serialization
 - `DiffEngine` correctness: manually trace through a known 3-triple example to verify Added/Removed/Modified classification
 - Vocabulary constants: spot-check URIs against the actual specifications (schema.org, hydra, SHACL W3C spec)
+
+## Activity Log
+
+- 2026-03-05T15:23:56Z – claude-opus – shell_pid=80069 – lane=doing – Assigned agent via workflow command
