@@ -1,0 +1,4 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+<http://example.org/api/shapes/PersonShape> a sh:NodeShape ;
+    sh:targetClass <http://example.org/api/types/Person> .

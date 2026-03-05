@@ -9,10 +9,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="GraphLoaderTests.fs" />
+    <Compile Include="LinkedDataConfigTests.fs" />
     <Compile Include="InstanceProjectorTests.fs" />
     <Compile Include="FormatterTests.fs" />
     <Compile Include="ContentNegotiationTests.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="TestData/manifest.json" LogicalName="Frank.Semantic.manifest.json" />
+    <EmbeddedResource Include="TestData/ontology.owl.xml" LogicalName="Frank.Semantic.ontology.owl.xml" />
+    <EmbeddedResource Include="TestData/shapes.shacl.ttl" LogicalName="Frank.Semantic.shapes.shacl.ttl" />
   </ItemGroup>
 
   <ItemGroup>
