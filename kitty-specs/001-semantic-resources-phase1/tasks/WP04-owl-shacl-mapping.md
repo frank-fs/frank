@@ -17,7 +17,7 @@ subtasks:
 - T023
 phase: Phase 1 - Mapping
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "94273"
 review_status: ''
 reviewed_by: ''
@@ -311,3 +311,7 @@ Create a shared test fixture builder that produces consistent `AnalyzedType` and
 - Check that generated SHACL shape URIs do not clash with ontology class URIs (use `/shapes/` prefix vs `/types/` prefix)
 - Verify the vocabulary aligner does not add duplicate `owl:equivalentProperty` triples when called multiple times on the same graph
 - Confirm all vocabulary URI constants used in triples come from the `Vocabularies` module (no inline string literals)
+
+## Activity Log
+
+- 2026-03-05T19:31:26Z – claude-opus – shell_pid=94273 – lane=doing – Assigned agent via workflow command
