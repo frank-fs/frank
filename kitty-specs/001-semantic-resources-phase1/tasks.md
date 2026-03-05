@@ -155,7 +155,7 @@
 - [x] T025 Create `src/Frank.Cli.Core/Commands/ClarifyCommand.fs` — load extraction state, detect ambiguities (unmapped types, ambiguous DU semantics, missing relationships), produce structured JSON questions
 - [x] T026 Implement JSON output formatting module — shared serialization for all command outputs per contracts/cli-commands.md schemas
 - [x] T027 Implement `--text` human-readable output mode for extract and clarify
-- [ ] T028 Unit tests for extract orchestration (mock analyzers) and clarify ambiguity detection
+- [x] T028 Unit tests for extract orchestration (mock analyzers) and clarify ambiguity detection
 
 ### Implementation Notes
 - ExtractCommand orchestrates the pipeline: project load (Ionide.ProjInfo) → AST analysis (routes/handlers) → type analysis (DUs/records) → mappers → state persistence. No compiled assembly required.
