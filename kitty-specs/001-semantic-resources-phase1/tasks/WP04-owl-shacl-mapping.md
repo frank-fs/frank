@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: OWL/SHACL Mapping Engine
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP02
 - WP03
@@ -17,8 +17,8 @@ subtasks:
 - T023
 phase: Phase 1 - Mapping
 assignee: ''
-agent: "claude-opus"
-shell_pid: "94273"
+agent: "claude-opus-reviewer"
+shell_pid: "98582"
 review_status: ''
 reviewed_by: ''
 history:
@@ -316,3 +316,4 @@ Create a shared test fixture builder that produces consistent `AnalyzedType` and
 
 - 2026-03-05T19:31:26Z – claude-opus – shell_pid=94273 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T19:46:48Z – claude-opus – shell_pid=94273 – lane=for_review – Ready for review: 5 mapper modules + 22 tests, all passing
+- 2026-03-05T19:47:42Z – claude-opus-reviewer – shell_pid=98582 – lane=doing – Started review via workflow command
