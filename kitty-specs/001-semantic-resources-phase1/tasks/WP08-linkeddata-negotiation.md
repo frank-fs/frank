@@ -15,7 +15,7 @@ subtasks:
 - T044
 phase: Phase 2 - LinkedData
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "4859"
 review_status: ''
 reviewed_by: ''
@@ -201,3 +201,4 @@ Tests:
 | Timestamp | Lane | Agent | Action |
 |---|---|---|---|
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-05T20:16:36Z – claude-opus – shell_pid=4859 – lane=doing – Assigned agent via workflow command
