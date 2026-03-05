@@ -117,7 +117,7 @@
 **Requirement Refs**: FR-002, FR-003, FR-004, FR-005, FR-006, FR-007
 
 ### Included Subtasks
-- [ ] T018 Create `src/Frank.Cli.Core/Extraction/TypeMapper.fs` — map F# DUs to OWL class hierarchies, records to OWL classes with datatype/object properties
+- [x] T018 Create `src/Frank.Cli.Core/Extraction/TypeMapper.fs` — map F# DUs to OWL class hierarchies, records to OWL classes with datatype/object properties
 - [ ] T019 Create `src/Frank.Cli.Core/Extraction/RouteMapper.fs` — map Frank route definitions to RDF resource identities with base URI namespace
 - [ ] T020 Create `src/Frank.Cli.Core/Extraction/CapabilityMapper.fs` — map HTTP method handlers to Schema.org Actions + Hydra Operations
 - [ ] T021 Create `src/Frank.Cli.Core/Extraction/ShapeGenerator.fs` — generate SHACL NodeShapes from F# type constraints (option → minCount, list → maxCount)
