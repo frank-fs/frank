@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP11"
+work_package_id: WP11
+title: LinkedData Tests
+lane: "doing"
+dependencies: [WP08]
+base_branch: 001-semantic-resources-phase1-WP08
+base_commit: 1d04de09b9012674f85325676b509713e21ebe74
+created_at: '2026-03-05T23:39:07.857259+00:00'
 subtasks:
-  - "T055"
-  - "T056"
-  - "T057"
-  - "T058"
-title: "LinkedData Tests"
-phase: "Phase 2 - Testing"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP08"]
-requirement_refs: ["FR-015", "FR-016", "FR-017", "FR-018", "FR-019", "FR-020", "FR-021"]
+- T055
+- T056
+- T057
+- T058
+phase: Phase 2 - Testing
+assignee: ''
+agent: ''
+shell_pid: "11043"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-04T22:10:13Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-04T22:10:13Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-015, FR-016, FR-017, FR-018, FR-019, FR-020, FR-021]
 ---
 
 > **Review Feedback Status**: No review feedback yet.
