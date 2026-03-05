@@ -57,7 +57,7 @@
 - [x] T009 Create `src/Frank.Cli.Core/State/ExtractionState.fs` — extraction state record type, JSON serialization, persist/load to `obj/frank-cli/`
 - [x] T010 Create `src/Frank.Cli.Core/State/DiffEngine.fs` — compare two extraction states, produce structured diff
 - [x] T011 Create shared vocabulary constants module — Schema.org, Hydra, OWL, SHACL namespace URIs and common terms
-- [ ] T012 Unit tests for FSharpRdf helpers and ExtractionState round-trip serialization
+- [x] T012 Unit tests for FSharpRdf helpers and ExtractionState round-trip serialization
 
 ### Implementation Notes
 - The F# RDF wrapper should make dotNetRdf feel idiomatic: `createUriNode`, `createLiteral`, `assertTriple` as pipeline-friendly functions.
