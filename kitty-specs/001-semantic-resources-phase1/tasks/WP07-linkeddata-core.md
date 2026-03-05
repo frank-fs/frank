@@ -13,7 +13,7 @@ subtasks:
 - T038
 phase: Phase 2 - LinkedData
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "94850"
 review_status: ''
 reviewed_by: ''
@@ -225,3 +225,4 @@ Build a minimal `IGraph` with ontology property nodes for each field name.
 | Timestamp | Lane | Agent | Action |
 |---|---|---|---|
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-05T19:31:27Z – claude-opus – shell_pid=94850 – lane=doing – Assigned agent via workflow command
