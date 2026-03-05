@@ -1,8 +1,11 @@
 ---
 work_package_id: WP03
 title: AST & Type Analysis
-lane: planned
+lane: "doing"
 dependencies: [WP01]
+base_branch: 001-semantic-resources-phase1-WP01
+base_commit: e940579b385af16c14a3af584d68d03952856347
+created_at: '2026-03-05T15:23:57.207142+00:00'
 subtasks:
 - T013
 - T014
@@ -11,7 +14,7 @@ subtasks:
 phase: Phase 1 - Analysis
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "80270"
 review_status: ''
 reviewed_by: ''
 history:
