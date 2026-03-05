@@ -19,6 +19,30 @@ let private createTestGraph () =
     g.Assert(Triple(subject, agePred, ageObj)) |> ignore
     g
 
+/// Creates a richer graph with 3 subjects and 7 triples for round-trip testing.
+let private createRichTestGraph () =
+    let g = new Graph()
+    let rdfType = g.CreateUriNode(UriFactory.Root.Create("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))
+    let person1 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/person/1"))
+    let person2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/person/2"))
+    let org1 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/org/1"))
+    let namePred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Person/Name"))
+    let agePred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Person/Age"))
+    let memberPred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Org/member"))
+    let personType = g.CreateUriNode(UriFactory.Root.Create("http://example.org/types/Person"))
+    let orgType = g.CreateUriNode(UriFactory.Root.Create("http://example.org/types/Organization"))
+    // person1: Name, Age, rdf:type
+    g.Assert(Triple(person1, namePred, g.CreateLiteralNode("Alice"))) |> ignore
+    g.Assert(Triple(person1, agePred, g.CreateLiteralNode("30", UriFactory.Root.Create("http://www.w3.org/2001/XMLSchema#integer")))) |> ignore
+    g.Assert(Triple(person1, rdfType, personType)) |> ignore
+    // person2: Name
+    g.Assert(Triple(person2, namePred, g.CreateLiteralNode("Bob"))) |> ignore
+    g.Assert(Triple(person2, rdfType, personType)) |> ignore
+    // org1: rdf:type, member->person1, member->person2
+    g.Assert(Triple(org1, rdfType, orgType)) |> ignore
+    g.Assert(Triple(org1, memberPred, person1)) |> ignore
+    g
+
 [<Tests>]
 let tests =
     testList "Formatters" [
@@ -116,7 +140,7 @@ let tests =
             Expect.equal parsed.Triples.Count 0 "Empty graph should produce 0 triples"
 
         testCase "Turtle round-trip preserves graph isomorphism" <| fun _ ->
-            let g = createTestGraph ()
+            let g = createRichTestGraph ()
             use ms = new MemoryStream()
             TurtleFormatter.writeTurtle g ms
             ms.Seek(0L, SeekOrigin.Begin) |> ignore
@@ -125,13 +149,12 @@ let tests =
             let parser = TurtleParser()
             use reader = new StringReader(output)
             parser.Load(parsed, reader)
-            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match"
-            let originalTripleSet = g.Triples |> Seq.map (fun t -> t.Subject.ToString(), t.Predicate.ToString(), t.Object.ToString()) |> Set.ofSeq
-            let parsedTripleSet = parsed.Triples |> Seq.map (fun t -> t.Subject.ToString(), t.Predicate.ToString(), t.Object.ToString()) |> Set.ofSeq
-            Expect.equal parsedTripleSet originalTripleSet "Triple sets should be identical"
+            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match (7)"
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Round-tripped Turtle graph must be isomorphic to original"
 
         testCase "RdfXml round-trip preserves graph isomorphism" <| fun _ ->
-            let g = createTestGraph ()
+            let g = createRichTestGraph ()
             use ms = new MemoryStream()
             RdfXmlFormatter.writeRdfXml g ms
             ms.Seek(0L, SeekOrigin.Begin) |> ignore
@@ -140,10 +163,43 @@ let tests =
             let parser = RdfXmlParser()
             use reader = new StringReader(output)
             parser.Load(parsed, reader)
-            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match"
-            let originalTripleSet = g.Triples |> Seq.map (fun t -> t.Subject.ToString(), t.Predicate.ToString(), t.Object.ToString()) |> Set.ofSeq
-            let parsedTripleSet = parsed.Triples |> Seq.map (fun t -> t.Subject.ToString(), t.Predicate.ToString(), t.Object.ToString()) |> Set.ofSeq
-            Expect.equal parsedTripleSet originalTripleSet "Triple sets should be identical"
+            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match (7)"
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Round-tripped RDF/XML graph must be isomorphic to original"
+
+        testCase "Turtle round-trip with Unicode characters" <| fun _ ->
+            let g = new Graph()
+            let s = g.CreateUriNode(UriFactory.Root.Create("http://example.org/item/1"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/name"))
+            g.Assert(Triple(s, p, g.CreateLiteralNode("Ångström"))) |> ignore
+            let p2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/label"))
+            g.Assert(Triple(s, p2, g.CreateLiteralNode("日本語"))) |> ignore
+            use ms = new MemoryStream()
+            TurtleFormatter.writeTurtle g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            use reader = new StringReader(output)
+            TurtleParser().Load(parsed, reader)
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Unicode literals must survive Turtle round-trip"
+
+        testCase "RdfXml round-trip with Unicode characters" <| fun _ ->
+            let g = new Graph()
+            let s = g.CreateUriNode(UriFactory.Root.Create("http://example.org/item/2"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/name"))
+            g.Assert(Triple(s, p, g.CreateLiteralNode("Ångström"))) |> ignore
+            let p2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/label"))
+            g.Assert(Triple(s, p2, g.CreateLiteralNode("日本語"))) |> ignore
+            use ms = new MemoryStream()
+            RdfXmlFormatter.writeRdfXml g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            use reader = new StringReader(output)
+            RdfXmlParser().Load(parsed, reader)
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Unicode literals must survive RDF/XML round-trip"
 
         testCase "JsonLdFormatter renders typed literals correctly" <| fun _ ->
             let g = createTestGraph ()

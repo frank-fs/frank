@@ -225,6 +225,19 @@ let tests =
                 "Content-Type should be application/rdf+xml"
             Expect.isTrue (body.Contains("rdf:RDF") || body.Contains("<rdf:")) "Should contain RDF/XML markup"
 
+        testCase "middleware passes through when Accept is text/html" <| fun _ ->
+            let ontology = makeOntologyWithNameAndAge ()
+            let config = makeConfig ontology
+            use host = createTestHost config true
+            let server = host.GetTestServer()
+            use client = server.CreateClient()
+
+            let request = new HttpRequestMessage(HttpMethod.Get, "/person/1")
+            request.Headers.Add("Accept", "text/html")
+            let response : HttpResponseMessage = client.SendAsync(request).Result
+            let body = response.Content.ReadAsStringAsync().Result
+            Expect.stringContains body "Alice" "text/html should pass through to standard handler"
+
         testCase "middleware passes through original response when JSON projection fails" <| fun _ ->
             let ontology = makeOntologyWithNameAndAge ()
             let config = makeConfig ontology
