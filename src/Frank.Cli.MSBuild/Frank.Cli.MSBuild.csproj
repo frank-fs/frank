@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageTags>msbuild;rdf;owl;shacl;semantic-web</PackageTags>
+    <Description>MSBuild integration for frank-cli: auto-embeds OWL and SHACL artifacts as embedded resources</Description>
+    <!-- No source files to compile -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="build/**" Pack="true" PackagePath="build/" />
+    <None Include="buildTransitive/**" Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
+
+</Project>
