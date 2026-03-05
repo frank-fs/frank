@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: LinkedData Tests
-lane: "doing"
+lane: "planned"
 dependencies: [WP08]
 base_branch: 001-semantic-resources-phase1-WP08
 base_commit: 1d04de09b9012674f85325676b509713e21ebe74
@@ -15,8 +15,9 @@ phase: Phase 2 - Testing
 assignee: ''
 agent: "claude-opus"
 shell_pid: "18913"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP11.md"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -30,9 +31,38 @@ requirement_refs: [FR-015, FR-016, FR-017, FR-018, FR-019, FR-020, FR-021]
 
 ## Review Feedback
 
-_No feedback recorded._
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-05
+**Feedback file**: `/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP11.md`
 
-> **Markdown Formatting Note**: All prose in this file uses plain Markdown. Code samples use fenced code blocks with language tags. Lists use `-` bullets.
+## Review Feedback — WP11
+
+### Issue 1: Missing StartupValidationTests.fs (T058)
+The spec requires a dedicated `test/Frank.LinkedData.Tests/StartupValidationTests.fs` with three test cases:
+1. **Valid configuration**: App with `useLinkedData` + embedded resources → starts successfully via TestHost
+2. **Missing embedded resources**: App with `useLinkedData` but no embedded resources → startup throws descriptive exception (message includes assembly name, expected resource names, suggests `frank-cli compile`)
+3. **No `useLinkedData`**: App without `useLinkedData` but with embedded resources → starts normally (no false positives)
+
+Only one test was added to `LinkedDataConfigTests.fs` (shapes graph validation). This is an entire missing subtask. Create the file and add it to the .fsproj `<Compile>` list (before `Program.fs`).
+
+### Issue 2: Missing Unicode round-trip test (T056)
+The spec explicitly requires: "A graph containing a literal with non-ASCII characters (e.g., 'Ångström', '日本語') must serialize and round-trip correctly." Add a test for at least Turtle and RDF/XML formatters with Unicode literals.
+
+### Issue 3: Round-trip tests should use `IsIsomorphicWith` (T056)
+The spec provides an explicit code snippet:
+```fsharp
+let isIsomorphic (g1: IGraph) (g2: IGraph) = g1.IsIsomorphicWith(g2)
+Expect.isTrue (isIsomorphic original parsed) "Round-tripped graph must be isomorphic to original"
+```
+The current tests manually compare triple string sets. While functional, `IsIsomorphicWith` handles blank node renaming correctly and is what the spec requires. Replace the manual set comparison with `IsIsomorphicWith`.
+
+### Issue 4: Round-trip graphs are too small (T056)
+The spec says: "use a small but non-trivial graph: at least 3 subjects, 6 triples total." The current round-trip tests use `createTestGraph()` which has 1 subject and 2 triples. Create a richer test graph for round-trip tests.
+
+### Issue 5: Missing `Accept: text/html` passthrough test (T057)
+The spec requires testing that `Accept: text/html` continues to use standard Frank negotiation (FR-019). Add a test verifying text/html does NOT trigger LinkedData middleware.
+
 
 ## Objectives & Success Criteria
 
@@ -182,3 +212,4 @@ For the "missing embedded resources" case, the simplest approach is to not embed
 - 2026-03-05T23:39:08Z – claude-opus – shell_pid=11043 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T23:50:41Z – claude-opus – shell_pid=11043 – lane=for_review – Ready for review: 16 new tests added (43 total), all passing. Covers InstanceProjector typed values, formatter round-trips, content negotiation integration, config validation.
 - 2026-03-05T23:52:59Z – claude-opus – shell_pid=18913 – lane=doing – Started review via workflow command
+- 2026-03-05T23:54:04Z – claude-opus – shell_pid=18913 – lane=planned – Moved to planned
