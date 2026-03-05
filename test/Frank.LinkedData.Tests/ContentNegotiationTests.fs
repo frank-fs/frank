@@ -192,4 +192,68 @@ let tests =
             let response : HttpResponseMessage = client.SendAsync(request).Result
             let body = response.Content.ReadAsStringAsync().Result
             Expect.stringContains body "Alice" "Response should contain original JSON for non-RDF Accept"
+
+        testCase "middleware returns JSON-LD when Accept is application/ld+json" <| fun _ ->
+            let ontology = makeOntologyWithNameAndAge ()
+            let config = makeConfig ontology
+            use host = createTestHost config true
+            let server = host.GetTestServer()
+            use client = server.CreateClient()
+
+            let request = new HttpRequestMessage(HttpMethod.Get, "/person/1")
+            request.Headers.Add("Accept", "application/ld+json")
+            let response : HttpResponseMessage = client.SendAsync(request).Result
+            let body = response.Content.ReadAsStringAsync().Result
+            Expect.equal (response.Content.Headers.ContentType.MediaType) "application/ld+json"
+                "Content-Type should be application/ld+json"
+            let doc = System.Text.Json.JsonDocument.Parse(body)
+            let hasContext = doc.RootElement.TryGetProperty("@context") |> fst
+            Expect.isTrue hasContext "JSON-LD response should have @context"
+
+        testCase "middleware returns RDF/XML when Accept is application/rdf+xml" <| fun _ ->
+            let ontology = makeOntologyWithNameAndAge ()
+            let config = makeConfig ontology
+            use host = createTestHost config true
+            let server = host.GetTestServer()
+            use client = server.CreateClient()
+
+            let request = new HttpRequestMessage(HttpMethod.Get, "/person/1")
+            request.Headers.Add("Accept", "application/rdf+xml")
+            let response : HttpResponseMessage = client.SendAsync(request).Result
+            let body = response.Content.ReadAsStringAsync().Result
+            Expect.equal (response.Content.Headers.ContentType.MediaType) "application/rdf+xml"
+                "Content-Type should be application/rdf+xml"
+            Expect.isTrue (body.Contains("rdf:RDF") || body.Contains("<rdf:")) "Should contain RDF/XML markup"
+
+        testCase "middleware passes through original response when JSON projection fails" <| fun _ ->
+            let ontology = makeOntologyWithNameAndAge ()
+            let config = makeConfig ontology
+            let hostBuilder =
+                HostBuilder()
+                    .ConfigureWebHost(fun webBuilder ->
+                        webBuilder
+                            .UseTestServer()
+                            .ConfigureServices(fun services ->
+                                services.AddSingleton<LinkedDataConfig>(config) |> ignore
+                                services.AddRouting() |> ignore)
+                            .Configure(fun (app: IApplicationBuilder) ->
+                                app.UseRouting() |> ignore
+                                app.Use(Func<HttpContext, RequestDelegate, Task>(
+                                    WebHostBuilderExtensions.linkedDataMiddleware)) |> ignore
+                                app.UseEndpoints(fun endpoints ->
+                                    let ep = endpoints.MapGet("/bad", RequestDelegate(fun ctx ->
+                                        ctx.Response.ContentType <- "application/json"
+                                        ctx.Response.WriteAsync("not valid json {{")))
+                                    ep.WithMetadata(LinkedDataMarker) |> ignore) |> ignore)
+                        |> ignore)
+            use host = hostBuilder.Build()
+            host.Start()
+            let server = host.GetTestServer()
+            use client = server.CreateClient()
+
+            let request = new HttpRequestMessage(HttpMethod.Get, "/bad")
+            request.Headers.Add("Accept", "text/turtle")
+            let response : HttpResponseMessage = client.SendAsync(request).Result
+            let body = response.Content.ReadAsStringAsync().Result
+            Expect.stringContains body "not valid json" "Should pass through original response on projection failure"
     ]
