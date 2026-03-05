@@ -53,7 +53,7 @@
 **Requirement Refs**: FR-022
 
 ### Included Subtasks
-- [ ] T008 Create `src/Frank.Cli.Core/Rdf/FSharpRdf.fs` — F# wrappers for dotNetRdf (Option conversions, DU node type wrapper, graph creation helpers)
+- [x] T008 Create `src/Frank.Cli.Core/Rdf/FSharpRdf.fs` — F# wrappers for dotNetRdf (Option conversions, DU node type wrapper, graph creation helpers)
 - [ ] T009 Create `src/Frank.Cli.Core/State/ExtractionState.fs` — extraction state record type, JSON serialization, persist/load to `obj/frank-cli/`
 - [ ] T010 Create `src/Frank.Cli.Core/State/DiffEngine.fs` — compare two extraction states, produce structured diff
 - [ ] T011 Create shared vocabulary constants module — Schema.org, Hydra, OWL, SHACL namespace URIs and common terms
