@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: AST & Type Analysis
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01]
 base_branch: 001-semantic-resources-phase1-WP01
 base_commit: e940579b385af16c14a3af584d68d03952856347
@@ -14,7 +14,7 @@ subtasks:
 phase: Phase 1 - Analysis
 assignee: ''
 agent: "claude-opus"
-shell_pid: "80270"
+shell_pid: "92629"
 review_status: ''
 reviewed_by: ''
 history:
@@ -269,3 +269,4 @@ Write a file that, when parsed, produces CE body nodes for get, post, put, delet
 
 - 2026-03-05T15:23:57Z – claude-opus – shell_pid=80270 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T17:03:11Z – claude-opus – shell_pid=80270 – lane=for_review – 15 tests pass: AstAnalyzer extracts resource CEs (route, methods, name, linkedData), TypeAnalyzer maps F# types to XSD, ProjectLoader uses Ionide.ProjInfo + FCS.
+- 2026-03-05T19:25:45Z – claude-opus – shell_pid=92629 – lane=doing – Started review via workflow command
