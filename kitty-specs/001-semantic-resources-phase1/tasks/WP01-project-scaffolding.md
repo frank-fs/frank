@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffolding
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: ef8ffa5d959f6fb918a4930155826d47490f826f
@@ -151,3 +151,4 @@ Both projects need at least one passing test (e.g., a trivial `testCase "placeho
 ## Activity Log
 
 - 2026-03-04T22:55:37Z – claude-opus – shell_pid=18978 – lane=doing – Assigned agent via workflow command
+- 2026-03-05T01:07:46Z – claude-opus – shell_pid=18978 – lane=for_review – Ready for review: 7 projects scaffolded, solution builds with 0 errors, 8 placeholder tests pass, frank-cli runs. FCS requires net10.0 only for Cli.Core.
