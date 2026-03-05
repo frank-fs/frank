@@ -187,7 +187,7 @@
 - [x] T031 Create `src/Frank.Cli.Core/Commands/CompileCommand.fs` — generate OWL/XML + SHACL Turtle + manifest.json to `obj/frank-cli/`, set up embedded resource metadata
 - [x] T032 Create `src/Frank.Cli/Program.fs` — System.CommandLine dispatch for all 5 commands with common `--project` and `--text` options
 - [x] T033 Configure `src/Frank.Cli/Frank.Cli.fsproj` for dotnet tool packaging (PackAsTool, ToolCommandName)
-- [ ] T034 Unit tests for validate, diff, compile commands and integration test for full CLI workflow
+- [x] T034 Unit tests for validate, diff, compile commands and integration test for full CLI workflow
 
 ### Implementation Notes
 - ValidateCommand computes coverage metrics, runs consistency checks (dangling references, orphaned properties), and compares source hash against extraction hash for staleness.
