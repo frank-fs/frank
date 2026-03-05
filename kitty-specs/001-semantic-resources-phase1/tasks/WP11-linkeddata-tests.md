@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: LinkedData Tests
-lane: "doing"
+lane: "for_review"
 dependencies: [WP08]
 base_branch: 001-semantic-resources-phase1-WP08
 base_commit: 1d04de09b9012674f85325676b509713e21ebe74
@@ -180,3 +180,4 @@ For the "missing embedded resources" case, the simplest approach is to not embed
 |-----------|-------|--------|
 | 2026-03-04T22:10:13Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-05T23:39:08Z – claude-opus – shell_pid=11043 – lane=doing – Assigned agent via workflow command
+- 2026-03-05T23:50:41Z – claude-opus – shell_pid=11043 – lane=for_review – Ready for review: 16 new tests added (43 total), all passing. Covers InstanceProjector typed values, formatter round-trips, content negotiation integration, config validation.
