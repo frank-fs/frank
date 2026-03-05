@@ -122,7 +122,7 @@
 - [x] T020 Create `src/Frank.Cli.Core/Extraction/CapabilityMapper.fs` — map HTTP method handlers to Schema.org Actions + Hydra Operations
 - [x] T021 Create `src/Frank.Cli.Core/Extraction/ShapeGenerator.fs` — generate SHACL NodeShapes from F# type constraints (option → minCount, list → maxCount)
 - [x] T022 Create `src/Frank.Cli.Core/Extraction/VocabularyAligner.fs` — align extracted concepts to schema.org/Hydra terms where matches exist
-- [ ] T023 Unit tests for each mapper with known input types and expected OWL/SHACL output
+- [x] T023 Unit tests for each mapper with known input types and expected OWL/SHACL output
 
 ### Implementation Notes
 - TypeMapper uses dotNetRdf.Ontology's OntologyGraph for building the class hierarchy.
