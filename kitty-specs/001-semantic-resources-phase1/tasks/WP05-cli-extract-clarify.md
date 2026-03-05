@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: CLI Commands — Extract & Clarify
-lane: "doing"
+lane: "planned"
 dependencies: [WP04]
 base_branch: 001-semantic-resources-phase1-WP04
 base_commit: 4adeff1f323febb4654650c6434be04155551b8b
@@ -16,8 +16,9 @@ phase: Phase 1 - CLI
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "7121"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP05.md"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -37,9 +38,57 @@ requirement_refs:
 
 ## Review Feedback
 
-_No feedback recorded._
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-05
+**Feedback file**: `/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP05.md`
 
-> **Markdown Formatting Note**: Use ATX headings (`#`), fenced code blocks with language tags, and standard bullet lists. Do not use HTML tags or custom directives.
+## WP05 Review Feedback
+
+Build passes, all 64 tests pass. The implementation demonstrates good understanding of the domain and solid F# idioms. However, several spec requirements are not fully met.
+
+### Issue 1: Missing `missing-relationship` ambiguity category (T025 - Critical)
+
+The spec requires four ambiguity categories: `unmapped-type`, `open-or-closed`, `object-or-datatype`, and `missing-relationship`. The `ClarifyCommand` only implements the first three. The `missing-relationship` category ("types that appear to relate to each other but have no explicit property linking them") is entirely absent. Add a `missingRelationshipQuestions` function that inspects the ontology for classes that share naming patterns or appear in the same source context but have no `owl:ObjectProperty` linking them.
+
+### Issue 2: Unstable question IDs (T025 - Critical)
+
+The spec says question IDs should be stable slugs like `"unmapped-type-MyType"`. The current implementation uses index-based IDs (`"unmapped-type-0"`, `"open-or-closed-0"`) which are unstable across runs if the set of types changes. Change `unmapped-type` IDs to `$"unmapped-type-{ut.TypeName}"` (or a slugified version), `open-or-closed` IDs to `$"open-or-closed-{typeName}"`, etc.
+
+### Issue 3: Missing `scope` parameter on ExtractCommand.execute (T024)
+
+The spec requires a `scope` parameter (one of `project | file | resource`, default `project`) on `ExtractCommand.execute`. This parameter is missing from the function signature. Add it even if the initial implementation only supports `project` scope.
+
+### Issue 4: ExtractResult and JSON output schema mismatch (T026)
+
+The spec says `formatExtractResult : ExtractResult -> string` should take the `ExtractResult` type from ExtractCommand. Instead, `JsonOutput` defines its own `ExtractResultJson` type that flattens `ontologySummary` and `shapesSummary`. The spec calls for `ontologySummary` (with classCount, propertyCount, alignedCount, unalignedCount) and `shapesSummary` (with shapeCount, constraintCount) as sub-objects. The current `ExtractResultJson` is missing `alignedCount`, `unalignedCount`, and `constraintCount` fields entirely. Either use the `ExtractResult` type directly or make `ExtractResultJson` structurally match it, including the nested summary objects.
+
+### Issue 5: formatExtractResult/formatClarifyResult should accept domain types (T026/T027)
+
+Both `JsonOutput` and `TextOutput` define their own intermediate types rather than accepting `ExtractResult`/`ClarifyResult` from the command modules as specified. The spec signatures are `formatExtractResult : ExtractResult -> string` and `formatClarifyResult : ClarifyResult -> string`. Either accept the domain types and do the mapping internally, or provide explicit conversion functions. Currently there is no code that bridges `ExtractCommand.ExtractResult` to `JsonOutput.ExtractResultJson`.
+
+### Issue 6: ExtractCommand tests do not verify orchestration sequence (T028 - Critical)
+
+The spec requires: "Mock all analyser and mapper dependencies via interfaces/function parameters" and "Verify orchestration calls each step exactly once and in the documented sequence." The current `ExtractCommandTests` only test (a) error on non-existent project and (b) state save/load roundtrip. There are no mocks, no sequence verification, and no test that verifies `ExtractionState` is written to the expected path after a successful run. The ExtractCommand currently calls concrete implementations directly, making it untestable without real projects. Refactor `execute` to accept dependencies as function parameters (or an interface/record of functions) so tests can inject mocks and verify call order.
+
+### Issue 7: TextOutput summary table format (T027 - Minor)
+
+The spec says "Summary table with columns: Category | Count" but the output uses simple indented text without table formatting (no column separators or headers). Consider using a proper text table format with `|` separators and a header row, or at minimum, column-aligned output with header labels.
+
+### Issue 8: Missing `status` field on ExtractResult JSON (T026)
+
+The spec requires `formatExtractResult` to "emit a top-level `status` field (`ok` on success, `error` on failure)". The `ExtractResultJson` type has a `Status` field but it's set to `"success"` in tests rather than `"ok"` as specified. Use `"ok"` for consistency with the spec.
+
+### Summary of Required Changes (ordered by priority)
+
+1. Add `missing-relationship` ambiguity category to ClarifyCommand
+2. Fix question IDs to be stable slugs based on type names
+3. Add `scope` parameter to ExtractCommand.execute
+4. Fix JSON output schema to match spec (nested summaries, all fields, `"ok"` status)
+5. Add orchestration sequence tests with mocked dependencies (refactor execute to accept deps)
+6. Bridge or unify domain types with output types
+7. Fix summary table formatting (minor)
+
 
 ## Implementation Command
 
@@ -200,3 +249,4 @@ Coverage required:
 - 2026-03-05T20:16:35Z – claude-opus – shell_pid=4655 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T20:31:30Z – claude-opus – shell_pid=4655 – lane=for_review – Ready for review: ExtractCommand, ClarifyCommand, JsonOutput, TextOutput + 15 new tests, 64 total passing
 - 2026-03-05T20:34:04Z – claude-opus-reviewer – shell_pid=7121 – lane=doing – Started review via workflow command
+- 2026-03-05T20:36:21Z – claude-opus-reviewer – shell_pid=7121 – lane=planned – Moved to planned
