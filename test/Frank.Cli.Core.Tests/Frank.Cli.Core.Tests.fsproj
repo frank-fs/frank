@@ -12,11 +12,13 @@
     <Compile Include="Rdf/FSharpRdfTests.fs" />
     <Compile Include="State/ExtractionStateTests.fs" />
     <Compile Include="State/DiffEngineTests.fs" />
+    <Compile Include="Analysis/AstAnalyzerTests.fs" />
+    <Compile Include="Analysis/TypeAnalyzerTests.fs" />
+    <Compile Include="Analysis/ProjectLoaderTests.fs" />
     <Compile Include="TypeMapperTests.fs" />
     <Compile Include="RouteMapperTests.fs" />
     <Compile Include="CapabilityMapperTests.fs" />
     <Compile Include="ShapeGeneratorTests.fs" />
-    <Compile Include="AstAnalyzerTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
