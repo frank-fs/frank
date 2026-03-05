@@ -87,7 +87,7 @@
 - [x] T013 Create `src/Frank.Cli.Core/Analysis/AstAnalyzer.fs` — untyped AST walker for route templates, CE structure detection, and HTTP method handler detection (pattern: `SynExpr.App(Ident "resource", Const(String route))`)
 - [x] T014 Create `src/Frank.Cli.Core/Analysis/TypeAnalyzer.fs` — typed AST walker for DU cases, record fields, option types, list/array types via FSharpEntity
 - [x] T016 Create project loading module using Ionide.ProjInfo — load .fsproj, resolve source files, produce FSharpProjectOptions (no compiled assembly required)
-- [ ] T017 Create fixture Frank .fs files for testing (DU types, records, routes, handlers) and unit tests for both analyzers
+- [x] T017 Create fixture Frank .fs files for testing (DU types, records, routes, handlers) and unit tests for both analyzers
 
 ### Implementation Notes
 - AstAnalyzer follows the pattern proven in `src/Frank.Analyzers/DuplicateHandlerAnalyzer.fs` — use SyntaxCollectorBase or manual recursive descent on ParsedInput. AstAnalyzer also detects HTTP method handlers (get, post, put, delete) from CE body nodes.
