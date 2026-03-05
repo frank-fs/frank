@@ -20,7 +20,7 @@
 **Requirement Refs**: FR-001
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` with dependencies (dotNetRdf.Core, dotNetRdf.Ontology, dotNetRdf.Shacl, FSharp.Compiler.Service, Ionide.ProjInfo, Ionide.ProjInfo.FCS)
+- [x] T001 Create `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` with dependencies (dotNetRdf.Core, dotNetRdf.Ontology, dotNetRdf.Shacl, FSharp.Compiler.Service, Ionide.ProjInfo, Ionide.ProjInfo.FCS)
 - [ ] T002 [P] Create `src/Frank.Cli/Frank.Cli.fsproj` with PackAsTool=true and System.CommandLine dependency
 - [ ] T003 [P] Create `src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.csproj` as pack-only targets project
 - [ ] T004 [P] Create `src/Frank.LinkedData/Frank.LinkedData.fsproj` with dotNetRdf.Core dependency and Frank project reference
