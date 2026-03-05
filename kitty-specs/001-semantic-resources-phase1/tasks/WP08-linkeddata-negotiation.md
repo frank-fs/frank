@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP08"
+work_package_id: WP08
+title: Frank.LinkedData — Content Negotiation
+lane: "doing"
+dependencies: [WP07]
+base_branch: 001-semantic-resources-phase1-WP07
+base_commit: c5661f456e47221cad0833b44dc8bed02571f6b5
+created_at: '2026-03-05T20:16:36.473120+00:00'
 subtasks:
-  - "T039"
-  - "T040"
-  - "T041"
-  - "T042"
-  - "T043"
-  - "T044"
-title: "Frank.LinkedData — Content Negotiation"
-phase: "Phase 2 - LinkedData"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP07"]
-requirement_refs: ["FR-016", "FR-017", "FR-018", "FR-019"]
+- T039
+- T040
+- T041
+- T042
+- T043
+- T044
+phase: Phase 2 - LinkedData
+assignee: ''
+agent: ''
+shell_pid: "4859"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-04T22:10:13Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-04T22:10:13Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-016, FR-017, FR-018, FR-019]
 ---
 
 # WP08: Frank.LinkedData — Content Negotiation
