@@ -1,8 +1,11 @@
 ---
 work_package_id: WP07
 title: Frank.LinkedData — Core Runtime
-lane: planned
+lane: "doing"
 dependencies: [WP02]
+base_branch: 001-semantic-resources-phase1-WP02
+base_commit: 315030704c62f190579e2cb728841588bb44cd61
+created_at: '2026-03-05T19:31:27.107158+00:00'
 subtasks:
 - T035
 - T036
@@ -11,7 +14,7 @@ subtasks:
 phase: Phase 2 - LinkedData
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "94850"
 review_status: ''
 reviewed_by: ''
 history:
