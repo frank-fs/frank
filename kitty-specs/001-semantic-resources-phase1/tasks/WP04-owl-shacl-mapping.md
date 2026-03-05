@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: OWL/SHACL Mapping Engine
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP02
 - WP03
@@ -17,8 +17,8 @@ subtasks:
 - T023
 phase: Phase 1 - Mapping
 assignee: ''
-agent: "claude-opus-reviewer"
-shell_pid: "98582"
+agent: "claude-opus-reviewer-r2"
+shell_pid: "2004"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP04.md"
@@ -349,3 +349,4 @@ No test file performs this validation. Add a shared helper that serializes to Tu
 - 2026-03-05T19:47:42Z – claude-opus-reviewer – shell_pid=98582 – lane=doing – Started review via workflow command
 - 2026-03-05T19:53:26Z – claude-opus-reviewer – shell_pid=98582 – lane=planned – Moved to planned
 - 2026-03-05T20:04:00Z – claude-opus-reviewer – shell_pid=98582 – lane=for_review – Review fixes applied: all 3 issues addressed, 49 tests passing
+- 2026-03-05T20:05:05Z – claude-opus-reviewer-r2 – shell_pid=2004 – lane=doing – Started review via workflow command
