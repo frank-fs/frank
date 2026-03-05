@@ -251,7 +251,7 @@
 - [x] T041 [P] Create `src/Frank.LinkedData/Negotiation/RdfXmlFormatter.fs` — OutputFormatter for `application/rdf+xml` using `PrettyRdfXmlWriter`
 - [x] T042 Create `src/Frank.LinkedData/ResourceBuilderExtensions.fs` — `linkedData` custom operation on ResourceBuilder (follows Frank.Auth/Frank.OpenApi pattern)
 - [x] T043 Create `src/Frank.LinkedData/WebHostBuilderExtensions.fs` — `useLinkedData` service registration, formatter registration, startup validation
-- [ ] T044 Unit tests for formatters (verify correct RDF output) and integration tests for content negotiation (Accept header routing)
+- [x] T044 Unit tests for formatters (verify correct RDF output) and integration tests for content negotiation (Accept header routing)
 
 ### Implementation Notes
 - Each formatter extends `Microsoft.AspNetCore.Mvc.Formatters.OutputFormatter`, sets supported media types, and uses dotNetRdf writers.
