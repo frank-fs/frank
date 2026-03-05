@@ -48,3 +48,4 @@ Thumbs.db
 .vscode/
 *.user
 launchSettings.json
+.entire/
