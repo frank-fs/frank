@@ -15,7 +15,7 @@ subtasks:
 - T034
 phase: Phase 1 - CLI
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "10839"
 review_status: ''
 reviewed_by: ''
@@ -230,3 +230,4 @@ Location: `test/Frank.Cli.Core.Tests/` (unit tests) and a new `test/Frank.Cli.In
 | Timestamp | Lane | Agent | Action |
 |---|---|---|---|
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-05T23:39:06Z – claude-opus – shell_pid=10839 – lane=doing – Assigned agent via workflow command
