@@ -56,7 +56,7 @@
 - [x] T008 Create `src/Frank.Cli.Core/Rdf/FSharpRdf.fs` — F# wrappers for dotNetRdf (Option conversions, DU node type wrapper, graph creation helpers)
 - [x] T009 Create `src/Frank.Cli.Core/State/ExtractionState.fs` — extraction state record type, JSON serialization, persist/load to `obj/frank-cli/`
 - [x] T010 Create `src/Frank.Cli.Core/State/DiffEngine.fs` — compare two extraction states, produce structured diff
-- [ ] T011 Create shared vocabulary constants module — Schema.org, Hydra, OWL, SHACL namespace URIs and common terms
+- [x] T011 Create shared vocabulary constants module — Schema.org, Hydra, OWL, SHACL namespace URIs and common terms
 - [ ] T012 Unit tests for FSharpRdf helpers and ExtractionState round-trip serialization
 
 ### Implementation Notes
