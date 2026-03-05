@@ -345,7 +345,7 @@
 - [x] T055 Create InstanceProjector tests — record → RDF triples, DU → typed triples, option handling, nested types
 - [x] T056 [P] Create formatter tests — verify each formatter produces valid JSON-LD/Turtle/RDF/XML output for known input graphs
 - [x] T057 Create content negotiation integration tests — TestHost with `linkedData` resource, verify Accept header routing
-- [ ] T058 Create startup validation tests — verify error on missing embedded resources, success on present resources
+- [x] T058 Create startup validation tests — verify error on missing embedded resources, success on present resources
 
 ### Implementation Notes
 - Use ASP.NET Core TestHost (`Microsoft.AspNetCore.TestHost`) for integration tests, matching existing Frank.Tests patterns.
