@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: CLI Commands — Extract & Clarify
-lane: "for_review"
+lane: "doing"
 dependencies: [WP04]
 base_branch: 001-semantic-resources-phase1-WP04
 base_commit: 4adeff1f323febb4654650c6434be04155551b8b
@@ -14,8 +14,8 @@ subtasks:
 - T028
 phase: Phase 1 - CLI
 assignee: ''
-agent: "claude-opus-reviewer"
-shell_pid: "7121"
+agent: "claude-opus-reviewer-r2"
+shell_pid: "8180"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP05.md"
@@ -251,3 +251,4 @@ Coverage required:
 - 2026-03-05T20:34:04Z – claude-opus-reviewer – shell_pid=7121 – lane=doing – Started review via workflow command
 - 2026-03-05T20:36:21Z – claude-opus-reviewer – shell_pid=7121 – lane=planned – Moved to planned
 - 2026-03-05T20:47:13Z – claude-opus-reviewer – shell_pid=7121 – lane=for_review – R2: All 8 review issues fixed, 66 tests passing
+- 2026-03-05T20:47:35Z – claude-opus-reviewer-r2 – shell_pid=8180 – lane=doing – Started review via workflow command
