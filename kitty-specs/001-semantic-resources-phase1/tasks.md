@@ -217,7 +217,7 @@
 ### Included Subtasks
 - [x] T035 Create `src/Frank.LinkedData/Rdf/GraphLoader.fs` — load ontology.owl.xml, shapes.shacl.ttl, manifest.json from embedded assembly resources using dotNetRdf's parsers
 - [x] T036 Create `src/Frank.LinkedData/Rdf/InstanceProjector.fs` — reflect on handler return type, map fields to ontology properties, build instance IGraph
-- [ ] T037 Create `src/Frank.LinkedData/LinkedDataConfig.fs` — runtime config record, startup validation (fail if embedded resources missing per FR-021)
+- [x] T037 Create `src/Frank.LinkedData/LinkedDataConfig.fs` — runtime config record, startup validation (fail if embedded resources missing per FR-021)
 - [ ] T038 Unit tests for GraphLoader (with test embedded resources) and InstanceProjector (with known record types)
 
 ### Implementation Notes
