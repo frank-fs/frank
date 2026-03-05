@@ -85,7 +85,7 @@
 
 ### Included Subtasks
 - [x] T013 Create `src/Frank.Cli.Core/Analysis/AstAnalyzer.fs` — untyped AST walker for route templates, CE structure detection, and HTTP method handler detection (pattern: `SynExpr.App(Ident "resource", Const(String route))`)
-- [ ] T014 Create `src/Frank.Cli.Core/Analysis/TypeAnalyzer.fs` — typed AST walker for DU cases, record fields, option types, list/array types via FSharpEntity
+- [x] T014 Create `src/Frank.Cli.Core/Analysis/TypeAnalyzer.fs` — typed AST walker for DU cases, record fields, option types, list/array types via FSharpEntity
 - [ ] T016 Create project loading module using Ionide.ProjInfo — load .fsproj, resolve source files, produce FSharpProjectOptions (no compiled assembly required)
 - [ ] T017 Create fixture Frank .fs files for testing (DU types, records, routes, handlers) and unit tests for both analyzers
 
