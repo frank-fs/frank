@@ -152,7 +152,7 @@
 
 ### Included Subtasks
 - [x] T024 Create `src/Frank.Cli.Core/Commands/ExtractCommand.fs` — orchestrate project loading → AST analysis → type analysis → mapping → state persistence (no compiled assembly required)
-- [ ] T025 Create `src/Frank.Cli.Core/Commands/ClarifyCommand.fs` — load extraction state, detect ambiguities (unmapped types, ambiguous DU semantics, missing relationships), produce structured JSON questions
+- [x] T025 Create `src/Frank.Cli.Core/Commands/ClarifyCommand.fs` — load extraction state, detect ambiguities (unmapped types, ambiguous DU semantics, missing relationships), produce structured JSON questions
 - [ ] T026 Implement JSON output formatting module — shared serialization for all command outputs per contracts/cli-commands.md schemas
 - [ ] T027 Implement `--text` human-readable output mode for extract and clarify
 - [ ] T028 Unit tests for extract orchestration (mock analyzers) and clarify ambiguity detection
