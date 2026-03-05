@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="10.0.103" />
     <PackageReference Include="Scalar.AspNetCore" Version="1.2.38" />
   </ItemGroup>
 
