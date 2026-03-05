@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: Frank.LinkedData — Core Runtime
-lane: "planned"
+lane: "for_review"
 dependencies: [WP02]
 base_branch: 001-semantic-resources-phase1-WP02
 base_commit: 315030704c62f190579e2cb728841588bb44cd61
@@ -284,3 +284,4 @@ Build a minimal `IGraph` with ontology property nodes for each field name.
 - 2026-03-05T19:47:57Z – claude-opus-reviewer – shell_pid=98713 – lane=doing – Started review via workflow command
 - 2026-03-05T19:50:52Z – claude-opus-reviewer – shell_pid=98713 – lane=planned – Moved to planned
 - 2026-03-05T19:53:41Z – claude-opus-reviewer – shell_pid=98713 – lane=planned – Moved to planned
+- 2026-03-05T20:04:25Z – claude-opus-reviewer – shell_pid=98713 – lane=for_review – Review fixes applied: 3 missing tests added, 14 tests passing
