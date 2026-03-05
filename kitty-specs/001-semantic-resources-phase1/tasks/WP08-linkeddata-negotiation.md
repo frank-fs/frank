@@ -1,7 +1,7 @@
 ---
 work_package_id: WP08
 title: Frank.LinkedData — Content Negotiation
-lane: "doing"
+lane: "done"
 dependencies: [WP07]
 base_branch: 001-semantic-resources-phase1-WP07
 base_commit: c5661f456e47221cad0833b44dc8bed02571f6b5
@@ -17,8 +17,8 @@ phase: Phase 2 - LinkedData
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "7231"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -204,3 +204,4 @@ Tests:
 - 2026-03-05T20:16:36Z – claude-opus – shell_pid=4859 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T20:32:53Z – claude-opus – shell_pid=4859 – lane=for_review – Ready for review: 3 formatters, LinkedDataMarker CE, middleware, useLinkedData extension + 30 tests passing
 - 2026-03-05T20:34:17Z – claude-opus-reviewer – shell_pid=7231 – lane=doing – Started review via workflow command
+- 2026-03-05T20:35:42Z – claude-opus-reviewer – shell_pid=7231 – lane=done – Review passed: All 30 tests pass. LinkedDataMarker/ResourceBuilder/WebHostBuilder extensions follow Frank.Auth patterns correctly. Middleware-based content negotiation is a sound architectural choice over OutputFormatter for Frank's non-MVC design. dotNetRdf.Core only, multi-target net8.0/9.0/10.0. FR-019 zero behavioral change verified. Minor notes: RdfXmlWriter used instead of PrettyRdfXmlWriter (acceptable), JSON-LD hand-rolled (dotNetRdf.Core lacks JsonLdWriter). Some spec'd integration tests missing (JSON-LD/RDF-XML Accept, startup failure) but core paths well-covered.
