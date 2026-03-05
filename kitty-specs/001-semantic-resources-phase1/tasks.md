@@ -183,7 +183,7 @@
 
 ### Included Subtasks
 - [x] T029 Create `src/Frank.Cli.Core/Commands/ValidateCommand.fs` — check completeness (coverage %), consistency, vocabulary alignment, staleness detection
-- [ ] T030 Create `src/Frank.Cli.Core/Commands/DiffCommand.fs` — wrap DiffEngine, format structured changes per contract schema
+- [x] T030 Create `src/Frank.Cli.Core/Commands/DiffCommand.fs` — wrap DiffEngine, format structured changes per contract schema
 - [ ] T031 Create `src/Frank.Cli.Core/Commands/CompileCommand.fs` — generate OWL/XML + SHACL Turtle + manifest.json to `obj/frank-cli/`, set up embedded resource metadata
 - [ ] T032 Create `src/Frank.Cli/Program.fs` — System.CommandLine dispatch for all 5 commands with common `--project` and `--text` options
 - [ ] T033 Configure `src/Frank.Cli/Frank.Cli.fsproj` for dotnet tool packaging (PackAsTool, ToolCommandName)
