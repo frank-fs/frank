@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: CLI Commands — Extract & Clarify
-lane: "doing"
+lane: "for_review"
 dependencies: [WP04]
 base_branch: 001-semantic-resources-phase1-WP04
 base_commit: 4adeff1f323febb4654650c6434be04155551b8b
@@ -198,3 +198,4 @@ Coverage required:
 |---|---|---|---|
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-05T20:16:35Z – claude-opus – shell_pid=4655 – lane=doing – Assigned agent via workflow command
+- 2026-03-05T20:31:30Z – claude-opus – shell_pid=4655 – lane=for_review – Ready for review: ExtractCommand, ClarifyCommand, JsonOutput, TextOutput + 15 new tests, 64 total passing
