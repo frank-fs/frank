@@ -30,7 +30,7 @@ let private createTestState (unmappedTypes: UnmappedType list) (extraOntologySet
 [<Tests>]
 let tests =
     testList "ClarifyCommand" [
-        testCase "generates unmapped-type questions" <| fun _ ->
+        testCase "generates unmapped-type questions with stable IDs" <| fun _ ->
             let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
             Directory.CreateDirectory(tempDir) |> ignore
 
@@ -64,6 +64,9 @@ let tests =
                     Expect.stringContains unmappedQuestions.[0].QuestionText "Widget" "First question should mention Widget"
                     Expect.stringContains unmappedQuestions.[1].QuestionText "Gadget" "Second question should mention Gadget"
                     Expect.equal unmappedQuestions.[0].Options.Length 3 "Should have 3 options"
+                    // Verify stable slug-based IDs
+                    Expect.equal unmappedQuestions.[0].Id "unmapped-type-MyApp-Widget" "ID should be slug-based with type name"
+                    Expect.equal unmappedQuestions.[1].Id "unmapped-type-MyApp-Gadget" "ID should be slug-based with type name"
             finally
                 if Directory.Exists tempDir then
                     Directory.Delete(tempDir, true)
@@ -109,6 +112,49 @@ let tests =
                         |> List.filter (fun q -> q.Category = "open-or-closed")
                     Expect.isGreaterThanOrEqual openClosedQuestions.Length 1 "Should have at least 1 open-or-closed question"
                     Expect.stringContains openClosedQuestions.[0].QuestionText "Status" "Should mention Status"
+                    // Verify stable slug-based ID
+                    Expect.stringContains openClosedQuestions.[0].Id "open-or-closed-Status" "ID should contain type name"
+            finally
+                if Directory.Exists tempDir then
+                    Directory.Delete(tempDir, true)
+
+        testCase "generates missing-relationship questions" <| fun _ ->
+            let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
+            Directory.CreateDirectory(tempDir) |> ignore
+
+            try
+                let setupOntology (graph: IGraph) =
+                    let rdfType = createUriNode graph (Uri Rdf.Type)
+                    let owlClass = createUriNode graph (Uri Owl.Class)
+
+                    // Create Order and OrderItem as classes — OrderItem contains "Order" in its name
+                    // but no owl:ObjectProperty links them
+                    let orderNode = createUriNode graph (Uri "http://example.org/types/Order")
+                    assertTriple graph (orderNode, rdfType, owlClass)
+
+                    let orderItemNode = createUriNode graph (Uri "http://example.org/types/OrderItem")
+                    assertTriple graph (orderItemNode, rdfType, owlClass)
+
+                let state = createTestState [] setupOntology Map.empty
+
+                let statePath = ExtractionState.defaultStatePath tempDir
+                let saveResult = ExtractionState.save statePath state
+                Expect.isOk saveResult "Save should succeed"
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath
+
+                match result with
+                | Error e -> failtest $"Expected Ok but got Error: {e}"
+                | Ok clarifyResult ->
+                    let missingRelQuestions =
+                        clarifyResult.Questions
+                        |> List.filter (fun q -> q.Category = "missing-relationship")
+                    Expect.isGreaterThanOrEqual missingRelQuestions.Length 1 "Should detect missing relationship between Order and OrderItem"
+                    let q = missingRelQuestions.[0]
+                    Expect.stringContains q.Id "missing-relationship-" "ID should start with missing-relationship-"
+                    Expect.isTrue (q.QuestionText.Contains("Order")) "Should mention Order"
+                    Expect.equal q.Options.Length 3 "Should have 3 options"
             finally
                 if Directory.Exists tempDir then
                     Directory.Delete(tempDir, true)
@@ -124,7 +170,7 @@ let tests =
                             Reason = "no mapping"
                             Location = { File = "Foo.fs"; Line = 1; Column = 0 } } ]
                         ignore
-                        (Map.ofList [("unmapped-type-0", "ignore")])
+                        (Map.ofList [("unmapped-type-MyApp-Foo", "ignore")])
 
                 let statePath = ExtractionState.defaultStatePath tempDir
                 let saveResult = ExtractionState.save statePath state

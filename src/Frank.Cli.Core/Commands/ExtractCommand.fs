@@ -4,6 +4,8 @@ open System
 open System.Collections.Generic
 open System.IO
 open VDS.RDF
+open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.Syntax
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
@@ -30,6 +32,32 @@ module ExtractCommand =
           ShapesSummary: ShapesSummary
           UnmappedTypes: UnmappedType list
           StateFilePath: string }
+
+    /// Dependency injection record for pipeline steps, enabling testability.
+    type ExtractPipeline = {
+        LoadProject: string -> Async<Result<LoadedProject, string>>
+        AnalyzeAst: ParsedInput list -> AnalyzedResource list
+        AnalyzeTypes: FSharpCheckProjectResults -> AnalyzedType list
+        MapTypes: TypeMapper.MappingConfig -> AnalyzedType list -> IGraph
+        MapRoutes: TypeMapper.MappingConfig -> AnalyzedResource list -> AnalyzedType list -> IGraph
+        MapCapabilities: TypeMapper.MappingConfig -> AnalyzedResource list -> IGraph
+        GenerateShapes: TypeMapper.MappingConfig -> AnalyzedType list -> IGraph
+        AlignVocabularies: TypeMapper.MappingConfig -> IGraph -> IGraph
+        SaveState: string -> ExtractionState -> Result<unit, string>
+    }
+
+    /// Default pipeline using the real implementations.
+    let defaultPipeline : ExtractPipeline = {
+        LoadProject = ProjectLoader.loadProject
+        AnalyzeAst = AstAnalyzer.analyzeFiles
+        AnalyzeTypes = TypeAnalyzer.analyzeTypes
+        MapTypes = TypeMapper.mapTypes
+        MapRoutes = RouteMapper.mapRoutes
+        MapCapabilities = CapabilityMapper.mapCapabilities
+        GenerateShapes = ShapeGenerator.generateShapes
+        AlignVocabularies = VocabularyAligner.alignVocabularies
+        SaveState = ExtractionState.save
+    }
 
     let private countByType (graph: IGraph) (typeUri: Uri) : int =
         let rdfTypeNode = createUriNode graph (Uri Rdf.Type)
@@ -83,11 +111,11 @@ module ExtractCommand =
                 Some { TypeName = t.FullName; Reason = "No OWL class generated"; Location = loc }
             | Some _ -> None)
 
-    let execute (projectPath: string) (baseUri: Uri) (vocabularies: string list) : Async<Result<ExtractResult, string>> =
+    let executeWithPipeline (pipeline: ExtractPipeline) (projectPath: string) (baseUri: Uri) (vocabularies: string list) (scope: string) : Async<Result<ExtractResult, string>> =
         async {
             try
                 // Step 1: Load project
-                let! loadResult = ProjectLoader.loadProject projectPath
+                let! loadResult = pipeline.LoadProject projectPath
                 match loadResult with
                 | Error e -> return Error $"Failed to load project: {e}"
                 | Ok loaded ->
@@ -98,22 +126,22 @@ module ExtractCommand =
 
                 // Step 2: AST analysis
                 let parsedInputs = loaded.ParsedFiles |> List.map snd
-                let analyzedResources = AstAnalyzer.analyzeFiles parsedInputs
+                let analyzedResources = pipeline.AnalyzeAst parsedInputs
 
                 // Step 3: Type analysis
-                let analyzedTypes = TypeAnalyzer.analyzeTypes loaded.CheckResults
+                let analyzedTypes = pipeline.AnalyzeTypes loaded.CheckResults
 
                 // Step 4: Type mapping
-                let typeGraph = TypeMapper.mapTypes config analyzedTypes
+                let typeGraph = pipeline.MapTypes config analyzedTypes
 
                 // Step 5: Route mapping
-                let routeGraph = RouteMapper.mapRoutes config analyzedResources analyzedTypes
+                let routeGraph = pipeline.MapRoutes config analyzedResources analyzedTypes
 
                 // Step 6: Capability mapping
-                let capabilityGraph = CapabilityMapper.mapCapabilities config analyzedResources
+                let capabilityGraph = pipeline.MapCapabilities config analyzedResources
 
                 // Step 7: Shape generation
-                let shapesGraph = ShapeGenerator.generateShapes config analyzedTypes
+                let shapesGraph = pipeline.GenerateShapes config analyzedTypes
 
                 // Merge type, route, capability graphs into ontology
                 let ontologyGraph = createGraph ()
@@ -122,7 +150,7 @@ module ExtractCommand =
                 mergeGraphs ontologyGraph capabilityGraph
 
                 // Step 8: Vocabulary alignment
-                let alignedOntology = VocabularyAligner.alignVocabularies config ontologyGraph
+                let alignedOntology = pipeline.AlignVocabularies config ontologyGraph
 
                 // Compute counts
                 let classCount = countByType alignedOntology (Uri Owl.Class)
@@ -157,7 +185,7 @@ module ExtractCommand =
                           Vocabularies = vocabularies }
                       UnmappedTypes = unmappedTypes }
 
-                match ExtractionState.save statePath state with
+                match pipeline.SaveState statePath state with
                 | Error e -> return Error $"Failed to save state: {e}"
                 | Ok () ->
 
@@ -175,3 +203,6 @@ module ExtractCommand =
             with ex ->
                 return Error $"Extraction failed: {ex.Message}"
         }
+
+    let execute (projectPath: string) (baseUri: Uri) (vocabularies: string list) (scope: string) : Async<Result<ExtractResult, string>> =
+        executeWithPipeline defaultPipeline projectPath baseUri vocabularies scope

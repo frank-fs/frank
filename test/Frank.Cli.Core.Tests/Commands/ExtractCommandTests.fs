@@ -5,8 +5,12 @@ open System.Collections.Generic
 open System.IO
 open Expecto
 open VDS.RDF
+open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.Syntax
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.Vocabularies
+open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Extraction
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Commands.ExtractCommand
 
@@ -15,7 +19,7 @@ let tests =
     testList "ExtractCommand" [
         testCase "execute returns error for non-existent project" <| fun _ ->
             let result =
-                execute "/nonexistent/path/project.fsproj" (Uri "http://example.org/") ["schema.org"]
+                execute "/nonexistent/path/project.fsproj" (Uri "http://example.org/") ["schema.org"] "project"
                 |> Async.RunSynchronously
 
             match result with
@@ -87,6 +91,95 @@ let tests =
                         | _ -> false)
                     |> Seq.length
                 Expect.equal shapeCount 1 "Shapes should have 1 sh:NodeShape triple"
+            finally
+                if Directory.Exists tempDir then
+                    Directory.Delete(tempDir, true)
+
+        testCase "orchestration calls each step exactly once in order" <| fun _ ->
+            let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
+            Directory.CreateDirectory(tempDir) |> ignore
+
+            try
+                let callLog = ResizeArray<string>()
+
+                // Create minimal stubs that record call order
+                let emptyGraph () = createGraph ()
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+
+                let fakePipeline : ExtractPipeline = {
+                    LoadProject = fun _path ->
+                        async {
+                            callLog.Add("LoadProject")
+                            // We need a LoadedProject. We can't easily create FSharpCheckProjectResults
+                            // without a real compiler, so we'll use a minimal approach.
+                            // Return an error to test the first step, or create a mock.
+                            // For sequence testing, we need the pipeline to proceed through all steps.
+                            // We'll create a stub that returns a LoadedProject with empty data.
+                            return Error "mock-not-needed"
+                        }
+                    AnalyzeAst = fun _inputs ->
+                        callLog.Add("AnalyzeAst")
+                        []
+                    AnalyzeTypes = fun _checkResults ->
+                        callLog.Add("AnalyzeTypes")
+                        []
+                    MapTypes = fun _config _types ->
+                        callLog.Add("MapTypes")
+                        emptyGraph ()
+                    MapRoutes = fun _config _resources _types ->
+                        callLog.Add("MapRoutes")
+                        emptyGraph ()
+                    MapCapabilities = fun _config _resources ->
+                        callLog.Add("MapCapabilities")
+                        emptyGraph ()
+                    GenerateShapes = fun _config _types ->
+                        callLog.Add("GenerateShapes")
+                        emptyGraph ()
+                    AlignVocabularies = fun _config graph ->
+                        callLog.Add("AlignVocabularies")
+                        graph
+                    SaveState = fun _path _state ->
+                        callLog.Add("SaveState")
+                        Ok ()
+                }
+
+                // Since LoadProject returns Error, pipeline will stop after step 1.
+                // To test the full sequence, we need LoadProject to succeed.
+                // But LoadedProject requires FSharpCheckProjectResults which is hard to mock.
+                // We'll use Unchecked.defaultof for the check results since our mock AnalyzeTypes ignores them.
+                let fullPipeline = {
+                    fakePipeline with
+                        LoadProject = fun _path ->
+                            async {
+                                callLog.Add("LoadProject")
+                                return Ok {
+                                    ProjectPath = fakeProjectPath
+                                    ParsedFiles = []
+                                    CheckResults = Unchecked.defaultof<FSharpCheckProjectResults>
+                                }
+                            }
+                }
+
+                let result =
+                    executeWithPipeline fullPipeline fakeProjectPath (Uri "http://example.org/") ["schema.org"] "project"
+                    |> Async.RunSynchronously
+
+                Expect.isOk result "Pipeline should succeed with mocked steps"
+
+                let expectedOrder = [
+                    "LoadProject"
+                    "AnalyzeAst"
+                    "AnalyzeTypes"
+                    "MapTypes"
+                    "MapRoutes"
+                    "MapCapabilities"
+                    "GenerateShapes"
+                    "AlignVocabularies"
+                    "SaveState"
+                ]
+
+                Expect.equal (callLog |> Seq.toList) expectedOrder "Steps should be called exactly once in the documented order"
             finally
                 if Directory.Exists tempDir then
                     Directory.Delete(tempDir, true)

@@ -2,36 +2,53 @@ module Frank.Cli.Core.Tests.TextOutputTests
 
 open System
 open Expecto
-open Frank.Cli.Core.Output.JsonOutput
+open Frank.Cli.Core.Commands.ExtractCommand
+open Frank.Cli.Core.Commands.ClarifyCommand
+open Frank.Cli.Core.State
 open Frank.Cli.Core.Output.TextOutput
 
 [<Tests>]
 let tests =
     testList "TextOutput" [
-        testCase "formatExtractResult contains summary headers" <| fun _ ->
-            let result : ExtractResultJson =
-                { Status = "success"
-                  ClassCount = 3
-                  PropertyCount = 8
-                  ShapeCount = 3
+        testCase "formatExtractResult contains summary table with proper alignment" <| fun _ ->
+            let result : ExtractResult =
+                { OntologySummary =
+                    { ClassCount = 3
+                      PropertyCount = 8
+                      AlignedCount = 2
+                      UnalignedCount = 6 }
+                  ShapesSummary =
+                    { ShapeCount = 3
+                      ConstraintCount = 5 }
                   UnmappedTypes = []
                   StateFilePath = "/tmp/state.json" }
 
             let text = formatExtractResult result
             Expect.stringContains text "Extraction Summary" "Should contain header"
+            Expect.stringContains text "Category" "Should contain Category header"
+            Expect.stringContains text "Count" "Should contain Count header"
+            Expect.stringContains text "------------------+------" "Should contain table separator"
             Expect.stringContains text "Classes" "Should contain Classes row"
             Expect.stringContains text "Properties" "Should contain Properties row"
             Expect.stringContains text "Shapes" "Should contain Shapes row"
+            Expect.stringContains text "Aligned" "Should contain Aligned row"
+            Expect.stringContains text "Unmapped Types" "Should contain Unmapped Types row"
             Expect.stringContains text "/tmp/state.json" "Should contain state file path"
 
         testCase "formatExtractResult lists unmapped types" <| fun _ ->
-            let result : ExtractResultJson =
-                { Status = "success"
-                  ClassCount = 1
-                  PropertyCount = 2
-                  ShapeCount = 1
+            let result : ExtractResult =
+                { OntologySummary =
+                    { ClassCount = 1
+                      PropertyCount = 2
+                      AlignedCount = 0
+                      UnalignedCount = 2 }
+                  ShapesSummary =
+                    { ShapeCount = 1
+                      ConstraintCount = 2 }
                   UnmappedTypes =
-                    [ { TypeName = "Widget"; Reason = "no rule"; File = "Widget.fs"; Line = 15 } ]
+                    [ { TypeName = "Widget"
+                        Reason = "no rule"
+                        Location = { File = "Widget.fs"; Line = 15; Column = 0 } } ]
                   StateFilePath = "/tmp/state.json" }
 
             let text = formatExtractResult result
@@ -40,16 +57,15 @@ let tests =
             Expect.stringContains text "Widget.fs:15" "Should show source location"
 
         testCase "formatClarifyResult contains numbered questions" <| fun _ ->
-            let result : ClarifyResultJson =
-                { Status = "success"
-                  Questions =
-                    [ { Id = "q1"
+            let result : ClarifyResult =
+                { Questions =
+                    [ { Id = "unmapped-type-Widget"
                         Category = "unmapped-type"
                         QuestionText = "Map Widget?"
-                        Context = { SourceType = "Widget"; Location = "Widget.fs:5" }
+                        Context = {| SourceType = "Widget"; Location = Some "Widget.fs:5" |}
                         Options =
-                          [ { Label = "map it"; Impact = "adds class" }
-                            { Label = "ignore it"; Impact = "skips" } ] } ]
+                          [ {| Label = "map it"; Impact = "adds class" |}
+                            {| Label = "ignore it"; Impact = "skips" |} ] } ]
                   ResolvedCount = 0
                   TotalCount = 1 }
 
@@ -71,11 +87,15 @@ let tests =
             try
                 Environment.SetEnvironmentVariable("NO_COLOR", "1")
 
-                let result : ExtractResultJson =
-                    { Status = "success"
-                      ClassCount = 1
-                      PropertyCount = 2
-                      ShapeCount = 1
+                let result : ExtractResult =
+                    { OntologySummary =
+                        { ClassCount = 1
+                          PropertyCount = 2
+                          AlignedCount = 0
+                          UnalignedCount = 2 }
+                      ShapesSummary =
+                        { ShapeCount = 1
+                          ConstraintCount = 2 }
                       UnmappedTypes = []
                       StateFilePath = "/tmp/state.json" }
 
