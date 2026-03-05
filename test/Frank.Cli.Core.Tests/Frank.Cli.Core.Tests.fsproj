@@ -9,6 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Rdf/FSharpRdfTests.fs" />
+    <Compile Include="State/ExtractionStateTests.fs" />
+    <Compile Include="State/DiffEngineTests.fs" />
     <Compile Include="TypeMapperTests.fs" />
     <Compile Include="RouteMapperTests.fs" />
     <Compile Include="CapabilityMapperTests.fs" />
