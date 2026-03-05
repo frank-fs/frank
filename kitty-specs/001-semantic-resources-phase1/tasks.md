@@ -24,7 +24,7 @@
 - [x] T002 [P] Create `src/Frank.Cli/Frank.Cli.fsproj` with PackAsTool=true and System.CommandLine dependency
 - [x] T003 [P] Create `src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.csproj` as pack-only targets project
 - [x] T004 [P] Create `src/Frank.LinkedData/Frank.LinkedData.fsproj` with dotNetRdf.Core dependency and Frank project reference
-- [ ] T005 Create `test/Frank.Cli.Core.Tests/Frank.Cli.Core.Tests.fsproj` and `test/Frank.LinkedData.Tests/Frank.LinkedData.Tests.fsproj` with Expecto + TestSdk
+- [x] T005 Create `test/Frank.Cli.Core.Tests/Frank.Cli.Core.Tests.fsproj` and `test/Frank.LinkedData.Tests/Frank.LinkedData.Tests.fsproj` with Expecto + TestSdk
 - [ ] T006 [P] Create `sample/Frank.LinkedData.Sample/Frank.LinkedData.Sample.fsproj`
 - [ ] T007 Update `Frank.sln` to include all new projects
 
