@@ -246,7 +246,7 @@
 **Requirement Refs**: FR-016, FR-017, FR-018, FR-019
 
 ### Included Subtasks
-- [ ] T039 Create `src/Frank.LinkedData/Negotiation/JsonLdFormatter.fs` — ASP.NET Core OutputFormatter for `application/ld+json` using `JsonLdWriter`
+- [x] T039 Create `src/Frank.LinkedData/Negotiation/JsonLdFormatter.fs` — ASP.NET Core OutputFormatter for `application/ld+json` using `JsonLdWriter`
 - [ ] T040 [P] Create `src/Frank.LinkedData/Negotiation/TurtleFormatter.fs` — OutputFormatter for `text/turtle` using `CompressingTurtleWriter`
 - [ ] T041 [P] Create `src/Frank.LinkedData/Negotiation/RdfXmlFormatter.fs` — OutputFormatter for `application/rdf+xml` using `PrettyRdfXmlWriter`
 - [ ] T042 Create `src/Frank.LinkedData/ResourceBuilderExtensions.fs` — `linkedData` custom operation on ResourceBuilder (follows Frank.Auth/Frank.OpenApi pattern)
