@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffolding
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: ef8ffa5d959f6fb918a4930155826d47490f826f
@@ -18,8 +18,8 @@ phase: Phase 0 - Setup
 assignee: ''
 agent: "claude-opus"
 shell_pid: "79514"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -153,3 +153,4 @@ Both projects need at least one passing test (e.g., a trivial `testCase "placeho
 - 2026-03-04T22:55:37Z – claude-opus – shell_pid=18978 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T01:07:46Z – claude-opus – shell_pid=18978 – lane=for_review – Ready for review: 7 projects scaffolded, solution builds with 0 errors, 8 placeholder tests pass, frank-cli runs. FCS requires net10.0 only for Cli.Core.
 - 2026-03-05T15:22:12Z – claude-opus – shell_pid=79514 – lane=doing – Started review via workflow command
+- 2026-03-05T15:22:19Z – claude-opus – shell_pid=79514 – lane=done – Review passed: all 7 projects scaffolded, solution builds with 0 errors, 8 placeholder tests pass, frank-cli runs. FCS requires net10.0 only for Cli.Core.
