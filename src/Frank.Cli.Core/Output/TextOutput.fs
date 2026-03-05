@@ -18,6 +18,9 @@ module TextOutput =
     let private red text =
         if isColorEnabled () then $"\033[31m{text}\033[0m" else text
 
+    let private green text =
+        if isColorEnabled () then $"\033[32m{text}\033[0m" else text
+
     let formatExtractResult (result: ExtractCommand.ExtractResult) : string =
         let sb = System.Text.StringBuilder()
         sb.AppendLine(bold "Extraction Summary") |> ignore
@@ -59,6 +62,57 @@ module TextOutput =
                 let letter = char (int 'a' + j)
                 sb.AppendLine(sprintf "   %c) %s — %s" letter opt.Label opt.Impact) |> ignore))
 
+        sb.ToString()
+
+    let formatValidateResult (result: ValidateCommand.ValidateResult) : string =
+        let sb = System.Text.StringBuilder()
+
+        let statusText =
+            if result.IsValid then green "VALID" else red "INVALID"
+
+        sb.AppendLine(bold (sprintf "Validation: %s" statusText)) |> ignore
+        sb.AppendLine(sprintf "Coverage: %.1f%%" result.CoveragePercent) |> ignore
+        sb.AppendLine() |> ignore
+
+        if result.Issues.IsEmpty then
+            sb.AppendLine("No issues found.") |> ignore
+        else
+            sb.AppendLine(sprintf "Issues (%d):" result.Issues.Length) |> ignore
+
+            for issue in result.Issues do
+                let prefix =
+                    match issue.Severity with
+                    | "error" -> red "ERROR"
+                    | "warning" -> yellow "WARN"
+                    | _ -> issue.Severity.ToUpperInvariant()
+
+                let uriStr =
+                    issue.Uri
+                    |> Option.map (fun u -> sprintf " (%s)" u.AbsoluteUri)
+                    |> Option.defaultValue ""
+
+                sb.AppendLine(sprintf "  [%s] %s%s" prefix issue.Message uriStr) |> ignore
+
+        sb.ToString()
+
+    let formatDiffResult (result: DiffCommand.DiffCommandResult) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine(bold "Diff Summary") |> ignore
+        sb.AppendLine(sprintf "Added: %d  Removed: %d  Modified: %d"
+            result.Diff.Added.Length
+            result.Diff.Removed.Length
+            result.Diff.Modified.Length) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine(result.FormattedDiff) |> ignore
+        sb.ToString()
+
+    let formatCompileResult (result: CompileCommand.CompileResult) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine(bold "Compile Complete") |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine(sprintf "Ontology: %s" result.OntologyPath) |> ignore
+        sb.AppendLine(sprintf "Shapes:   %s" result.ShapesPath) |> ignore
+        sb.AppendLine(sprintf "Manifest: %s" result.ManifestPath) |> ignore
         sb.ToString()
 
     let formatError (message: string) : string =

@@ -95,6 +95,103 @@ module JsonOutput =
 
         Encoding.UTF8.GetString(stream.ToArray())
 
+    let formatValidateResult (result: ValidateCommand.ValidateResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+
+        writer.WriteStartObject()
+        writeString writer "status" (if result.IsValid then "ok" else "invalid")
+        writer.WriteBoolean("isValid", result.IsValid)
+        writer.WriteNumber("coveragePercent", result.CoveragePercent)
+
+        writer.WriteStartArray("issues")
+        for issue in result.Issues do
+            writer.WriteStartObject()
+            writeString writer "severity" issue.Severity
+            writeString writer "message" issue.Message
+            match issue.Uri with
+            | Some uri -> writeString writer "uri" uri.AbsoluteUri
+            | None -> writer.WriteNull("uri")
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+
+        writer.WriteEndObject()
+        writer.Flush()
+
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatDiffResult (result: DiffCommand.DiffCommandResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+
+        writer.WriteStartArray("added")
+        for entry in result.Diff.Added do
+            writer.WriteStartObject()
+            writeString writer "uri" entry.Uri.AbsoluteUri
+            match entry.Field with
+            | Some f -> writeString writer "field" f
+            | None -> writer.WriteNull("field")
+            match entry.To with
+            | Some v -> writeString writer "value" v
+            | None -> writer.WriteNull("value")
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+
+        writer.WriteStartArray("removed")
+        for entry in result.Diff.Removed do
+            writer.WriteStartObject()
+            writeString writer "uri" entry.Uri.AbsoluteUri
+            match entry.Field with
+            | Some f -> writeString writer "field" f
+            | None -> writer.WriteNull("field")
+            match entry.From with
+            | Some v -> writeString writer "value" v
+            | None -> writer.WriteNull("value")
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+
+        writer.WriteStartArray("modified")
+        for entry in result.Diff.Modified do
+            writer.WriteStartObject()
+            writeString writer "uri" entry.Uri.AbsoluteUri
+            match entry.Field with
+            | Some f -> writeString writer "field" f
+            | None -> writer.WriteNull("field")
+            match entry.From with
+            | Some v -> writeString writer "from" v
+            | None -> writer.WriteNull("from")
+            match entry.To with
+            | Some v -> writeString writer "to" v
+            | None -> writer.WriteNull("to")
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+
+        writeNumber writer "addedCount" result.Diff.Added.Length
+        writeNumber writer "removedCount" result.Diff.Removed.Length
+        writeNumber writer "modifiedCount" result.Diff.Modified.Length
+
+        writer.WriteEndObject()
+        writer.Flush()
+
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatCompileResult (result: CompileCommand.CompileResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+        writeString writer "ontologyPath" result.OntologyPath
+        writeString writer "shapesPath" result.ShapesPath
+        writeString writer "manifestPath" result.ManifestPath
+        writer.WriteEndObject()
+        writer.Flush()
+
+        Encoding.UTF8.GetString(stream.ToArray())
+
     let formatError (message: string) : string =
         let error = {| status = "error"; message = message |}
         JsonSerializer.Serialize(error, serializerOptions)
