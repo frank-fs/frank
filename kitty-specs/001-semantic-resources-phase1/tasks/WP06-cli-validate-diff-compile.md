@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: CLI Commands — Validate, Diff, Compile
-lane: "for_review"
+lane: "doing"
 dependencies: [WP05]
 base_branch: 001-semantic-resources-phase1-WP05
 base_commit: abe61520e8fdba26efb99e1078b280a99e998dc6
@@ -16,7 +16,7 @@ subtasks:
 phase: Phase 1 - CLI
 assignee: ''
 agent: "claude-opus"
-shell_pid: "10839"
+shell_pid: "21815"
 review_status: ''
 reviewed_by: ''
 history:
@@ -232,3 +232,4 @@ Location: `test/Frank.Cli.Core.Tests/` (unit tests) and a new `test/Frank.Cli.In
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-05T23:39:06Z – claude-opus – shell_pid=10839 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T23:59:45Z – claude-opus – shell_pid=10839 – lane=for_review – Ready for review: ValidateCommand, DiffCommand, CompileCommand, Program.fs with System.CommandLine, output formatters, 12 new tests. 78 total passing.
+- 2026-03-05T23:59:48Z – claude-opus – shell_pid=21815 – lane=doing – Started review via workflow command
