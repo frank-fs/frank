@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: CLI Commands — Extract & Clarify
-lane: "doing"
+lane: "done"
 dependencies: [WP04]
 base_branch: 001-semantic-resources-phase1-WP04
 base_commit: 4adeff1f323febb4654650c6434be04155551b8b
@@ -252,3 +252,4 @@ Coverage required:
 - 2026-03-05T20:36:21Z – claude-opus-reviewer – shell_pid=7121 – lane=planned – Moved to planned
 - 2026-03-05T20:47:13Z – claude-opus-reviewer – shell_pid=7121 – lane=for_review – R2: All 8 review issues fixed, 66 tests passing
 - 2026-03-05T20:47:35Z – claude-opus-reviewer-r2 – shell_pid=8180 – lane=doing – Started review via workflow command
+- 2026-03-05T20:48:07Z – claude-opus-reviewer-r2 – shell_pid=8180 – lane=done – Review passed (R2): All 8 issues fixed
