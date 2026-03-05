@@ -1,8 +1,11 @@
 ---
 work_package_id: WP05
 title: CLI Commands — Extract & Clarify
-lane: planned
+lane: "doing"
 dependencies: [WP04]
+base_branch: 001-semantic-resources-phase1-WP04
+base_commit: 4adeff1f323febb4654650c6434be04155551b8b
+created_at: '2026-03-05T20:16:35.148958+00:00'
 subtasks:
 - T024
 - T025
@@ -12,7 +15,7 @@ subtasks:
 phase: Phase 1 - CLI
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "4655"
 review_status: ''
 reviewed_by: ''
 history:
