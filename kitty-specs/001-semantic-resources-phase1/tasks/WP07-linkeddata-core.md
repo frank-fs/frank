@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: Frank.LinkedData — Core Runtime
-lane: "doing"
+lane: "planned"
 dependencies: [WP02]
 base_branch: 001-semantic-resources-phase1-WP02
 base_commit: 315030704c62f190579e2cb728841588bb44cd61
@@ -15,8 +15,9 @@ phase: Phase 2 - LinkedData
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "98713"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP07/review-feedback-WP07.md"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -35,9 +36,47 @@ requirement_refs:
 
 ## Review Feedback
 
-_No feedback recorded._
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-05
+**Feedback file**: `/Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP07/review-feedback-WP07.md`
 
-> **Markdown Formatting Note**: Use ATX headings (`#`), fenced code blocks with language tags, and standard bullet lists. Do not use HTML tags or custom directives.
+# WP07 Review Feedback
+
+## Reviewer: claude-opus-reviewer
+## Date: 2026-03-05
+
+## Overall Assessment: CHANGES REQUESTED
+
+The core implementation (GraphLoader, InstanceProjector, LinkedDataConfig) is well-written, correct, and follows the spec closely. All 11 existing tests pass. However, T038 specifies 3 additional tests that are missing.
+
+## What Passed
+
+- T035 (GraphLoader): Correct. Uses Assembly.GetManifestResourceStream, descriptive errors, RdfXmlParser/TurtleParser, RdfParseException handling. Resource names match spec.
+- T036 (InstanceProjector): Correct. All type mappings present. ConcurrentDictionary caches for both Type->PropertyInfo[] and ontology index. Returns new Graph.
+- T037 (LinkedDataConfig): Correct. Validates version non-empty, baseUri well-formed, propagates errors unchanged.
+- Project structure: Multi-target net8.0;net9.0;net10.0, only dotNetRdf.Core dependency, no Frank.Cli.Core dependency.
+- Build succeeds, all 11 tests pass on net10.0.
+
+## Issues Found
+
+### Missing Tests (T038) - 3 tests required by spec are absent:
+
+1. "GraphLoader returns descriptive error when ontology XML is malformed" (GraphLoaderTests.fs)
+   - Spec: embed syntactically invalid XML; verify Result.isError and error string contains parse error.
+   - Tests the RdfParseException catch path.
+
+2. "loadConfig rejects invalid baseUri" (LinkedDataConfigTests.fs)
+   - Spec: embed manifest with "baseUri": "not-a-uri"; verify error contains "not a valid URI".
+   - Tests the URI validation branch in loadConfig.
+
+3. "InstanceProjector caches PropertyInfo lookup" (InstanceProjectorTests.fs)
+   - Spec: call project twice for same type; verify caching works (timing or cache inspection).
+
+## Required Actions
+
+Add the 3 missing tests listed above. The implementation code itself is solid and needs no changes.
+
 
 ## Implementation Command
 
@@ -228,3 +267,4 @@ Build a minimal `IGraph` with ontology property nodes for each field name.
 - 2026-03-05T19:31:27Z – claude-opus – shell_pid=94850 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T19:46:49Z – claude-opus – shell_pid=94850 – lane=for_review – Ready for review: GraphLoader, InstanceProjector, LinkedDataConfig + 11 tests, all passing
 - 2026-03-05T19:47:57Z – claude-opus-reviewer – shell_pid=98713 – lane=doing – Started review via workflow command
+- 2026-03-05T19:50:52Z – claude-opus-reviewer – shell_pid=98713 – lane=planned – Moved to planned
