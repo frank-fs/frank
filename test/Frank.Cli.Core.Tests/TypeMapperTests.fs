@@ -8,6 +8,14 @@ open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction.TypeMapper
 
+let assertValidTurtle (graph: IGraph) =
+    let writer = VDS.RDF.Writing.CompressingTurtleWriter()
+    let turtle = VDS.RDF.Writing.StringWriter.Write(graph, writer)
+    let parser = VDS.RDF.Parsing.TurtleParser()
+    let roundTrip = new VDS.RDF.Graph()
+    use reader = new System.IO.StringReader(turtle)
+    parser.Load(roundTrip, reader)
+
 let hasTriple (graph: IGraph) (s: Uri) (p: Uri) (o: Uri) =
     graph.Triples
     |> Seq.exists (fun t ->
@@ -91,6 +99,8 @@ let tests =
                 (hasTriple graph pricePropUri (Uri Rdfs.Range) (Uri Xsd.Double))
                 "Price should have range xsd:double (unwrapped from Optional)"
 
+            assertValidTurtle graph
+
         testCase "DU maps to owl:Class with subclasses" <| fun _ ->
             let status = {
                 FullName = "MyApp.Status"
@@ -130,6 +140,8 @@ let tests =
                 (hasTriple graph inactiveUri (Uri Rdfs.SubClassOf) statusUri)
                 "Inactive should be subClassOf Status"
 
+            assertValidTurtle graph
+
         testCase "DU case with fields generates scoped properties" <| fun _ ->
             let shape = {
                 FullName = "MyApp.Shape"
@@ -156,6 +168,8 @@ let tests =
                 (hasTriple graph radiusPropUri (Uri Rdfs.Domain) (Uri "http://example.org/api/types/Circle"))
                 "Radius domain should be Circle"
 
+            assertValidTurtle graph
+
         testCase "Reference field maps to owl:ObjectProperty" <| fun _ ->
             let order = {
                 FullName = "MyApp.Order"
@@ -176,4 +190,6 @@ let tests =
             Expect.isTrue
                 (hasTriple graph customerPropUri (Uri Rdfs.Range) (Uri "http://example.org/api/types/Customer"))
                 "Customer should have range Customer class"
+
+            assertValidTurtle graph
     ]

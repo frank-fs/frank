@@ -9,6 +9,14 @@ open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction.TypeMapper
 open Frank.Cli.Core.Extraction.CapabilityMapper
 
+let assertValidTurtle (graph: IGraph) =
+    let writer = VDS.RDF.Writing.CompressingTurtleWriter()
+    let turtle = VDS.RDF.Writing.StringWriter.Write(graph, writer)
+    let parser = VDS.RDF.Parsing.TurtleParser()
+    let roundTrip = new VDS.RDF.Graph()
+    use reader = new System.IO.StringReader(turtle)
+    parser.Load(roundTrip, reader)
+
 let hasBlankSubjectTriple (graph: IGraph) (p: Uri) (o: Uri) =
     graph.Triples
     |> Seq.exists (fun t ->
@@ -85,6 +93,8 @@ let tests =
                 (hasBlankSubjectLiteralTriple graph (Uri Hydra.Method) "DELETE")
                 "Should have hydra:method DELETE"
 
+            assertValidTurtle graph
+
         testCase "operations are linked to resource via hydra:supportedOperation" <| fun _ ->
             let resource : AnalyzedResource = {
                 RouteTemplate = "/items"
@@ -110,6 +120,8 @@ let tests =
 
             Expect.equal supportedOpTriples 1 "Should have 1 supportedOperation link"
 
+            assertValidTurtle graph
+
         testCase "PATCH maps to schema:UpdateAction" <| fun _ ->
             let resource : AnalyzedResource = {
                 RouteTemplate = "/items"
@@ -124,4 +136,6 @@ let tests =
             Expect.isTrue
                 (hasBlankSubjectTriple graph (Uri Rdf.Type) (Uri SchemaOrg.UpdateAction))
                 "PATCH should map to schema:UpdateAction"
+
+            assertValidTurtle graph
     ]

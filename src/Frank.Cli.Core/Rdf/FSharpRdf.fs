@@ -39,6 +39,9 @@ module FSharpRdf =
     let triplesWithPredicate (graph: IGraph) (node: INode) : Triple seq =
         graph.GetTriplesWithPredicate(node)
 
+    let triplesWithSubjectPredicate (graph: IGraph) (s: INode) (p: INode) : Triple seq =
+        graph.GetTriplesWithSubjectPredicate(s, p)
+
     let toRdfNode (node: INode) : RdfNode =
         match node with
         | :? IUriNode as u -> UriNode u.Uri

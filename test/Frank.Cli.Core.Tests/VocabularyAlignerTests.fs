@@ -9,6 +9,14 @@ open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction.TypeMapper
 open Frank.Cli.Core.Extraction.VocabularyAligner
 
+let assertValidTurtle (graph: IGraph) =
+    let writer = VDS.RDF.Writing.CompressingTurtleWriter()
+    let turtle = VDS.RDF.Writing.StringWriter.Write(graph, writer)
+    let parser = VDS.RDF.Parsing.TurtleParser()
+    let roundTrip = new VDS.RDF.Graph()
+    use reader = new System.IO.StringReader(turtle)
+    parser.Load(roundTrip, reader)
+
 let hasTriple (graph: IGraph) (s: Uri) (p: Uri) (o: Uri) =
     graph.Triples
     |> Seq.exists (fun t ->
@@ -53,6 +61,8 @@ let tests =
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Email))
                 "email should get owl:equivalentProperty schema:email"
 
+            assertValidTurtle result
+
         testCase "name property gets owl:equivalentProperty schema:name" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Product/name"
             let graph = makeGraphWithProperty propUri "name" false
@@ -61,6 +71,8 @@ let tests =
             Expect.isTrue
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Name))
                 "name should get owl:equivalentProperty schema:name"
+
+            assertValidTurtle result
 
         testCase "description property gets owl:equivalentProperty schema:description" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Item/description"
@@ -71,6 +83,8 @@ let tests =
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Description))
                 "description should get owl:equivalentProperty schema:description"
 
+            assertValidTurtle result
+
         testCase "price property gets owl:equivalentProperty schema:price" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Product/price"
             let graph = makeGraphWithProperty propUri "price" false
@@ -79,6 +93,8 @@ let tests =
             Expect.isTrue
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Price))
                 "price should get owl:equivalentProperty schema:price"
+
+            assertValidTurtle result
 
         testCase "url property gets owl:equivalentProperty schema:url" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Link/url"
@@ -89,6 +105,8 @@ let tests =
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Url))
                 "url should get owl:equivalentProperty schema:url"
 
+            assertValidTurtle result
+
         testCase "createdAt property gets owl:equivalentProperty schema:dateCreated" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Item/createdAt"
             let graph = makeGraphWithProperty propUri "createdAt" false
@@ -98,6 +116,8 @@ let tests =
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.DateCreated))
                 "createdAt should get owl:equivalentProperty schema:dateCreated"
 
+            assertValidTurtle result
+
         testCase "no alignment when schema.org not in config" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Person/email"
             let graph = makeGraphWithProperty propUri "email" false
@@ -106,6 +126,8 @@ let tests =
             Expect.isFalse
                 (hasTriple result propUri (Uri Owl.EquivalentProperty) (Uri SchemaOrg.Email))
                 "email should NOT get alignment when schema.org not in config"
+
+            assertValidTurtle result
 
         testCase "unrecognized field name gets no alignment" <| fun _ ->
             let propUri = Uri "http://example.org/api/properties/Product/sku"
@@ -121,4 +143,6 @@ let tests =
                     | _ -> false)
 
             Expect.isFalse hasAnyEquivalent "unrecognized field should have no equivalentProperty"
+
+            assertValidTurtle result
     ]

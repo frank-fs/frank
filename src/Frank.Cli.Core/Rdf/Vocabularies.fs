@@ -60,6 +60,8 @@ module Vocabularies =
         let Price = ns + "price"
         let DateCreated = ns + "dateCreated"
         let DateModified = ns + "dateModified"
+        let Image = ns + "image"
+        let Telephone = ns + "telephone"
 
     module Xsd =
         let ns = "http://www.w3.org/2001/XMLSchema#"

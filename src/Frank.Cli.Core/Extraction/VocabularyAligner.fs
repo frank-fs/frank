@@ -23,6 +23,8 @@ module VocabularyAligner =
         (["price"; "cost"; "amount"], SchemaOrg.Price)
         (["createdat"; "datecreated"; "created"], SchemaOrg.DateCreated)
         (["updatedat"; "datemodified"; "modified"], SchemaOrg.DateModified)
+        (["image"; "imageurl"; "photo"], SchemaOrg.Image)
+        (["telephone"; "phone"], SchemaOrg.Telephone)
     ]
 
     let private tryFindAlignment (fieldName: string) : string option =
@@ -47,7 +49,7 @@ module VocabularyAligner =
 
             // Collect all property nodes (nodes that are typed as owl:DatatypeProperty or owl:ObjectProperty)
             let propertyNodes =
-                graph.GetTriplesWithPredicate(rdfTypeNode)
+                triplesWithPredicate graph rdfTypeNode
                 |> Seq.filter (fun t ->
                     match t.Object with
                     | :? IUriNode as on ->
@@ -60,7 +62,7 @@ module VocabularyAligner =
             // For each property node, find its rdfs:label and try to align
             for propNode in propertyNodes do
                 let labelTriples =
-                    graph.GetTriplesWithSubjectPredicate(propNode, labelNode)
+                    triplesWithSubjectPredicate graph propNode labelNode
                     |> Seq.toList
 
                 for labelTriple in labelTriples do
