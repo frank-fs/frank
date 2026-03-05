@@ -13,7 +13,7 @@ subtasks:
 - T017
 phase: Phase 1 - Analysis
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "80270"
 review_status: ''
 reviewed_by: ''
@@ -264,3 +264,7 @@ Write a file that, when parsed, produces CE body nodes for get, post, put, delet
 - TypeAnalyzer: recursion over entities must handle modules-within-modules (Frank's source uses nested modules)
 - ProjectLoader: Ionide.ProjInfo 0.74.x API may differ from older versions — read the actual Ionide.ProjInfo source or NuGet README before writing the loading code. No compiled assembly is needed.
 - All tests must pass with `dotnet test` — no skipped or inconclusive tests in this WP
+
+## Activity Log
+
+- 2026-03-05T15:23:57Z – claude-opus – shell_pid=80270 – lane=doing – Assigned agent via workflow command
