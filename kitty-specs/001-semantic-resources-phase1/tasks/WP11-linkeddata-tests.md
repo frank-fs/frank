@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: LinkedData Tests
-lane: "doing"
+lane: "for_review"
 dependencies: [WP08]
 base_branch: 001-semantic-resources-phase1-WP08
 base_commit: 1d04de09b9012674f85325676b509713e21ebe74
@@ -214,3 +214,4 @@ For the "missing embedded resources" case, the simplest approach is to not embed
 - 2026-03-05T23:52:59Z – claude-opus – shell_pid=18913 – lane=doing – Started review via workflow command
 - 2026-03-05T23:54:04Z – claude-opus – shell_pid=18913 – lane=planned – Moved to planned
 - 2026-03-05T23:54:11Z – claude-opus – shell_pid=19270 – lane=doing – Started implementation via workflow command
+- 2026-03-05T23:57:37Z – claude-opus – shell_pid=19270 – lane=for_review – Review fixes applied: StartupValidationTests.fs added, graph isomorphism via Difference().AreEqual, richer graphs, Unicode tests, text/html passthrough. 49 tests passing.
