@@ -19,6 +19,8 @@
     <Compile Include="Analysis/ProjectLoader.fs" />
     <Compile Include="State/ExtractionState.fs" />
     <Compile Include="State/DiffEngine.fs" />
+    <Compile Include="Output/JsonOutput.fs" />
+    <Compile Include="Output/TextOutput.fs" />
     <Compile Include="Commands/ExtractCommand.fs" />
     <Compile Include="Commands/ClarifyCommand.fs" />
     <Compile Include="Commands/ValidateCommand.fs" />

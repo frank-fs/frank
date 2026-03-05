@@ -20,6 +20,10 @@
     <Compile Include="CapabilityMapperTests.fs" />
     <Compile Include="ShapeGeneratorTests.fs" />
     <Compile Include="VocabularyAlignerTests.fs" />
+    <Compile Include="Commands/ExtractCommandTests.fs" />
+    <Compile Include="Commands/ClarifyCommandTests.fs" />
+    <Compile Include="Output/JsonOutputTests.fs" />
+    <Compile Include="Output/TextOutputTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
