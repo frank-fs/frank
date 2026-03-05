@@ -17,7 +17,7 @@ agent: "claude-opus-reviewer"
 shell_pid: "98713"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
-review_feedback_file: "/Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP07/review-feedback-WP07.md"
+review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP07.md"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -39,9 +39,24 @@ requirement_refs:
 **Reviewed by**: Ryan Riley
 **Status**: ❌ Changes Requested
 **Date**: 2026-03-05
-**Feedback file**: `/Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP07/review-feedback-WP07.md`
+**Feedback file**: `/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP07.md`
 
 # WP07 Review Feedback
+
+Implementation code is solid — only missing tests.
+
+## 3 Missing Tests (T038 violation)
+
+The spec explicitly requires these tests which are absent:
+
+1. **"GraphLoader returns descriptive error when ontology XML is malformed"** — Embed a syntactically invalid XML file as a test resource; verify `Result.isError` and error string contains the parse error. This exercises the `RdfParseException` catch path.
+
+2. **"loadConfig rejects invalid baseUri"** — Embed a manifest with `"baseUri": "not-a-uri"`; verify error contains `"not a valid URI"`. This exercises the URI validation branch.
+
+3. **"InstanceProjector caches PropertyInfo lookup"** — Call project twice for the same type; verify the cache is populated (e.g., assert the ConcurrentDictionary count, or verify performance is within a tight bound).
+
+No implementation code changes needed — just add these 3 tests.
+
 
 ## Reviewer: claude-opus-reviewer
 ## Date: 2026-03-05
@@ -268,3 +283,4 @@ Build a minimal `IGraph` with ontology property nodes for each field name.
 - 2026-03-05T19:46:49Z – claude-opus – shell_pid=94850 – lane=for_review – Ready for review: GraphLoader, InstanceProjector, LinkedDataConfig + 11 tests, all passing
 - 2026-03-05T19:47:57Z – claude-opus-reviewer – shell_pid=98713 – lane=doing – Started review via workflow command
 - 2026-03-05T19:50:52Z – claude-opus-reviewer – shell_pid=98713 – lane=planned – Moved to planned
+- 2026-03-05T19:53:41Z – claude-opus-reviewer – shell_pid=98713 – lane=planned – Moved to planned
