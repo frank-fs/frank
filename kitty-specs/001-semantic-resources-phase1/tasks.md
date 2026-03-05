@@ -342,7 +342,7 @@
 **Requirement Refs**: FR-015, FR-016, FR-017, FR-018, FR-019, FR-020, FR-021
 
 ### Included Subtasks
-- [ ] T055 Create InstanceProjector tests — record → RDF triples, DU → typed triples, option handling, nested types
+- [x] T055 Create InstanceProjector tests — record → RDF triples, DU → typed triples, option handling, nested types
 - [ ] T056 [P] Create formatter tests — verify each formatter produces valid JSON-LD/Turtle/RDF/XML output for known input graphs
 - [ ] T057 Create content negotiation integration tests — TestHost with `linkedData` resource, verify Accept header routing
 - [ ] T058 Create startup validation tests — verify error on missing embedded resources, success on present resources
