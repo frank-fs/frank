@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: OWL/SHACL Mapping Engine
-lane: "doing"
+lane: "planned"
 dependencies:
 - WP02
 - WP03
@@ -19,8 +19,9 @@ phase: Phase 1 - Mapping
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "98582"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP04.md"
 history:
 - timestamp: '2026-03-04T22:10:13Z'
   lane: planned
@@ -312,8 +313,38 @@ Create a shared test fixture builder that produces consistent `AnalyzedType` and
 - Verify the vocabulary aligner does not add duplicate `owl:equivalentProperty` triples when called multiple times on the same graph
 - Confirm all vocabulary URI constants used in triples come from the `Vocabularies` module (no inline string literals)
 
+## Review Feedback
+
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-05
+**Feedback file**: `/private/var/folders/21/1fmrn5_d30734sj2v64kf6rh0000gn/T/spec-kitty-review-feedback-WP04.md`
+
+# WP04 Review Feedback
+
+## Issue 1: Missing VocabularyAligner entries (T022 violation)
+
+The spec lists 9 alignment groups but only 7 are implemented. Missing:
+
+- `image, imageUrl, photo` → `schema:image`
+- `telephone, phone` → `schema:telephone`
+
+Add `SchemaOrg.Image` and `SchemaOrg.Telephone` constants to `Vocabularies.fs` and add the two missing alignment entries in `VocabularyAligner.fs`.
+
+## Issue 2: Missing Turtle round-trip validation in tests (T023 violation)
+
+The spec explicitly requires: "In each test that produces a graph, parse the graph's Turtle serialization back using dotNetRdf's TurtleParser and assert it parses without errors."
+
+No test file performs this validation. Add a shared helper that serializes to Turtle and parses back, and call it in each test that produces a graph.
+
+## Issue 3 (minor): VocabularyAligner uses dotNetRdf API directly
+
+`VocabularyAligner.fs` calls `graph.GetTriplesWithPredicate()` and `graph.GetTriplesWithSubjectPredicate()` directly instead of using FSharpRdf wrappers. Use existing `triplesWithPredicate` wrapper, and add a `triplesWithSubjectPredicate` wrapper if needed.
+
+
 ## Activity Log
 
 - 2026-03-05T19:31:26Z – claude-opus – shell_pid=94273 – lane=doing – Assigned agent via workflow command
 - 2026-03-05T19:46:48Z – claude-opus – shell_pid=94273 – lane=for_review – Ready for review: 5 mapper modules + 22 tests, all passing
 - 2026-03-05T19:47:42Z – claude-opus-reviewer – shell_pid=98582 – lane=doing – Started review via workflow command
+- 2026-03-05T19:53:26Z – claude-opus-reviewer – shell_pid=98582 – lane=planned – Moved to planned
