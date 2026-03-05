@@ -1,0 +1,11 @@
+<Project>
+  <Target Name="EmbedFrankSemanticDefinitions" BeforeTargets="CoreCompile"
+          Condition="Exists('$(FrankCliIntermediateDir)')">
+    <ItemGroup>
+      <EmbeddedResource Include="$(FrankCliIntermediateDir)**/*.owl.xml"
+                        LogicalName="Frank.Semantic.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="$(FrankCliIntermediateDir)**/*.shacl.ttl"
+                        LogicalName="Frank.Semantic.%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

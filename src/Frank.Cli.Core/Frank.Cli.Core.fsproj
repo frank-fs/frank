@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageTags>rdf;owl;shacl;cli;semantic-web</PackageTags>
+    <Description>Core extraction library for frank-cli: derives OWL ontology and SHACL shapes from F# source definitions</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Rdf/FSharpRdf.fs" />
+    <Compile Include="Extraction/TypeMapper.fs" />
+    <Compile Include="Extraction/RouteMapper.fs" />
+    <Compile Include="Extraction/CapabilityMapper.fs" />
+    <Compile Include="Extraction/ShapeGenerator.fs" />
+    <Compile Include="Extraction/VocabularyAligner.fs" />
+    <Compile Include="Analysis/AstAnalyzer.fs" />
+    <Compile Include="Analysis/TypeAnalyzer.fs" />
+    <Compile Include="Analysis/ProjectLoader.fs" />
+    <Compile Include="State/ExtractionState.fs" />
+    <Compile Include="State/DiffEngine.fs" />
+    <Compile Include="Commands/ExtractCommand.fs" />
+    <Compile Include="Commands/ClarifyCommand.fs" />
+    <Compile Include="Commands/ValidateCommand.fs" />
+    <Compile Include="Commands/DiffCommand.fs" />
+    <Compile Include="Commands/CompileCommand.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="10.0.103" />
+    <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
+    <PackageReference Include="dotNetRdf.Ontology" Version="3.5.1" />
+    <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.*" />
+    <PackageReference Include="Ionide.ProjInfo" Version="0.74.*" />
+    <PackageReference Include="Ionide.ProjInfo.FCS" Version="0.74.*" />
+  </ItemGroup>
+
+</Project>

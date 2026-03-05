@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <FrankCliIntermediateDir>$(IntermediateOutputPath)frank-cli/</FrankCliIntermediateDir>
+  </PropertyGroup>
+</Project>
