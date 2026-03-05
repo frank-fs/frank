@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP06"
+work_package_id: WP06
+title: CLI Commands — Validate, Diff, Compile
+lane: "doing"
+dependencies: [WP05]
+base_branch: 001-semantic-resources-phase1-WP05
+base_commit: abe61520e8fdba26efb99e1078b280a99e998dc6
+created_at: '2026-03-05T23:39:06.552927+00:00'
 subtasks:
-  - "T029"
-  - "T030"
-  - "T031"
-  - "T032"
-  - "T033"
-  - "T034"
-title: "CLI Commands — Validate, Diff, Compile"
-phase: "Phase 1 - CLI"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP05"]
-requirement_refs: ["FR-009", "FR-010", "FR-011", "FR-012"]
+- T029
+- T030
+- T031
+- T032
+- T033
+- T034
+phase: Phase 1 - CLI
+assignee: ''
+agent: ''
+shell_pid: "10839"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-04T22:10:13Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-04T22:10:13Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-009, FR-010, FR-011, FR-012]
 ---
 
 # WP06: CLI Commands — Validate, Diff, Compile
