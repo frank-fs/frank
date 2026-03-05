@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: F# RDF Foundation
+lane: "doing"
+dependencies: [WP01]
+base_branch: 001-semantic-resources-phase1-WP01
+base_commit: e940579b385af16c14a3af584d68d03952856347
+created_at: '2026-03-05T15:23:55.981309+00:00'
 subtasks:
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-title: "F# RDF Foundation"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-022"]
+- T008
+- T009
+- T010
+- T011
+- T012
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "80069"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-04T22:10:13Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-04T22:10:13Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-022]
 ---
 
 # WP02: F# RDF Foundation
