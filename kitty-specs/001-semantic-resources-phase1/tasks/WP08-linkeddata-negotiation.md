@@ -1,7 +1,7 @@
 ---
 work_package_id: WP08
 title: Frank.LinkedData — Content Negotiation
-lane: "doing"
+lane: "for_review"
 dependencies: [WP07]
 base_branch: 001-semantic-resources-phase1-WP07
 base_commit: c5661f456e47221cad0833b44dc8bed02571f6b5
@@ -202,3 +202,4 @@ Tests:
 |---|---|---|---|
 | 2026-03-04T22:10:13Z | planned | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-05T20:16:36Z – claude-opus – shell_pid=4859 – lane=doing – Assigned agent via workflow command
+- 2026-03-05T20:32:53Z – claude-opus – shell_pid=4859 – lane=for_review – Ready for review: 3 formatters, LinkedDataMarker CE, middleware, useLinkedData extension + 30 tests passing
