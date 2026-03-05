@@ -26,7 +26,7 @@
 - [x] T004 [P] Create `src/Frank.LinkedData/Frank.LinkedData.fsproj` with dotNetRdf.Core dependency and Frank project reference
 - [x] T005 Create `test/Frank.Cli.Core.Tests/Frank.Cli.Core.Tests.fsproj` and `test/Frank.LinkedData.Tests/Frank.LinkedData.Tests.fsproj` with Expecto + TestSdk
 - [x] T006 [P] Create `sample/Frank.LinkedData.Sample/Frank.LinkedData.Sample.fsproj`
-- [ ] T007 Update `Frank.sln` to include all new projects
+- [x] T007 Update `Frank.sln` to include all new projects
 
 ### Implementation Notes
 - Follow existing Frank conventions: multi-target net8.0;net9.0;net10.0 for libraries, net10.0 for test/sample projects.
