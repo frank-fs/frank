@@ -19,6 +19,7 @@
     <Compile Include="RouteMapperTests.fs" />
     <Compile Include="CapabilityMapperTests.fs" />
     <Compile Include="ShapeGeneratorTests.fs" />
+    <Compile Include="VocabularyAlignerTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -34,6 +34,7 @@ module Vocabularies =
         let MinCount = ns + "minCount"
         let MaxCount = ns + "maxCount"
         let Class = ns + "class"
+        let Property = ns + "property"
 
     module Hydra =
         let ns = "http://www.w3.org/ns/hydra/core#"
@@ -41,6 +42,8 @@ module Vocabularies =
         let Operation = ns + "Operation"
         let SupportedOperation = ns + "supportedOperation"
         let Method = ns + "method"
+        let Template = ns + "template"
+        let SupportedClass = ns + "supportedClass"
         let ApiDocumentation = ns + "ApiDocumentation"
 
     module SchemaOrg =
