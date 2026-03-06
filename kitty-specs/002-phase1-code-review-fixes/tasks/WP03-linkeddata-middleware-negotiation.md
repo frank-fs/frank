@@ -2,13 +2,14 @@
 work_package_id: WP03
 title: Frank.LinkedData — Middleware & Negotiation
 lane: planned
-dependencies: []
+dependencies: [WP02]
 subtasks:
 - T011
 - T012
 - T013
 - T014
 - T015
+- T026
 phase: Phase 1 - Foundation
 assignee: ''
 agent: ''
@@ -44,10 +45,10 @@ requirement_refs: [FR-007, FR-008, FR-009, FR-011, FR-015]
 ## Implementation Command
 
 ```bash
-spec-kitty implement WP03
+spec-kitty implement WP03 --base WP02
 ```
 
-No dependencies — this is an independent module package.
+Depends on WP02 — both modify `WebHostBuilderExtensions.fs`, `InstanceProjector.fs`, and `GraphLoader.fs`.
 
 ---
 
@@ -59,6 +60,7 @@ No dependencies — this is an independent module package.
 - `Assembly.GetEntryAssembly()` null is handled gracefully
 - Cache keys use structural hash of RDF-relevant properties (content-addressable)
 - `LinkedDataConfig.loadConfig` uses composed pipelines (no nested match pyramids)
+- `GraphLoader.load` uses composed pipelines (no nested match pyramids) — FR-015 split with T015
 
 ## Context & Constraints
 
@@ -233,6 +235,39 @@ No dependencies — this is an independent module package.
 - **Files**: `src/Frank.LinkedData/LinkedDataConfig.fs`
 - **Parallel?**: Yes — independent of T011-T014
 - **Notes**: Per clarification, both CE and piped module functions are acceptable. Choose whichever reads more naturally for the specific chain. The key rule is: compose within the body, extract once at the boundary.
+
+### Subtask T026 – Replace Nested Match Pyramids in GraphLoader.load
+
+- **Purpose**: `GraphLoader.load` has nested `match` statements. Replace with composed pipelines using FsToolkit.ErrorHandling CEs. This is the second half of FR-015 (T015 covers `LinkedDataConfig`, T026 covers `GraphLoader`).
+- **Steps**:
+  1. Open `src/Frank.LinkedData/Rdf/GraphLoader.fs`
+  2. Locate the `load` function — identify the nested match pyramid
+  3. Determine the wrapper types involved (`Result`, `Option`, or mixed)
+  4. FsToolkit.ErrorHandling should already be in `Frank.LinkedData.fsproj` from T015
+  5. Refactor using the appropriate CE:
+     ```fsharp
+     open FsToolkit.ErrorHandling
+
+     let load (assembly: Assembly) =
+         result {
+             let! manifest = loadManifest assembly
+             let! ontologyStream = findResource assembly manifest.OntologyResource
+             use reader = new StreamReader(ontologyStream)  // Constitution VI
+             let! ontology = parseOntology reader
+             let! shapesStream = findResource assembly manifest.ShapesResource
+             let! shapes = parseShapes shapesStream
+             return { Ontology = ontology; Shapes = shapes; Manifest = manifest }
+         }
+     ```
+  6. Or use piped `Result.bind` / `Option.bind` if simpler
+  7. Key rules:
+     - Do NOT use `Async.RunSynchronously` mid-function
+     - Do NOT use `Option.get` or `Result.defaultValue` mid-function
+     - Compose naturally; extract once at the call site
+     - If some steps return `Option` and others `Result`, use `Result.requireSome` to unify
+- **Files**: `src/Frank.LinkedData/Rdf/GraphLoader.fs`
+- **Parallel?**: No — depends on T015 (FsToolkit.ErrorHandling already added)
+- **Notes**: WP02 T008 also modifies this file (StreamReader disposal). Since WP03 depends on WP02, the `use` binding from T008 should already be in place. Incorporate it into the CE refactor (the `use reader = ...` line in the example above).
 
 ## Risks & Mitigations
 

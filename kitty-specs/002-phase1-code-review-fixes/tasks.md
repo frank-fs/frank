@@ -88,6 +88,7 @@
 - [ ] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
 - [ ] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
 - [ ] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
+- [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 
 ### Implementation Notes
 - T011: Inject `ILogger<>` into middleware. Log with `LogWarning`/`LogError` + exception context. Let unrecoverable errors propagate (fail-fast). Do not wrap in Result.
@@ -95,14 +96,16 @@
 - T013: Use `Option.ofObj` or null check with fallback/informative error
 - T014: Hash the properties that affect RDF projection output; use F# structural equality for records
 - T015: Add FsToolkit.ErrorHandling to `Frank.LinkedData.fsproj`. Use `result {}` or `Result.bind` pipelines. Extract/unwrap only at top-level call site.
+- T026: Second half of FR-015. FsToolkit.ErrorHandling should already be added in T015. Compose with `result {}` or `option {}` CE. Incorporate `use` binding from WP02 T008.
 
 ### Parallel Opportunities
 - T011, T012, T013 are independent
 - T014 is independent
 - T015 is independent
+- T026 depends on T015 (FsToolkit.ErrorHandling already added)
 
 ### Dependencies
-- None (independent module)
+- Depends on WP02 (both modify `WebHostBuilderExtensions.fs`, `InstanceProjector.fs`, and `GraphLoader.fs`)
 
 ### Risks & Mitigations
 - T011: Changing error behavior may expose previously-hidden failures — this is intentional per Constitution VII
@@ -152,13 +155,12 @@
 **Independent Test**: `ValidationIssue.Severity` and `DiffEntry.Type` are type-safe. `AstAnalyzer.walkCeBody` uses fold. `FSharpRdf` requires explicit `open`. `JsonDocument` disposed. Vocabulary constants are `[<Literal>]`.
 **Prompt**: `tasks/WP05-cli-idiom-quality.md`
 **Estimated size**: ~500 lines
-**Requirement Refs**: FR-004, FR-014, FR-015, FR-016, FR-017, FR-021
+**Requirement Refs**: FR-004, FR-014, FR-016, FR-017, FR-021
 
 ### Included Subtasks
 - [ ] T023 Add FsToolkit.ErrorHandling package reference to `Frank.Cli.Core.fsproj`
 - [ ] T024 Replace string-typed `ValidationIssue.Severity` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
 - [ ] T025 [P] Replace string-typed `DiffEntry.Type` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
-- [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 - [ ] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
 - [ ] T028 Remove `[<AutoOpen>]` from `FSharpRdf` module; add explicit `open` to all consumers
 - [ ] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
@@ -167,7 +169,6 @@
 ### Implementation Notes
 - T023: Pin to latest stable version
 - T024/T025: These are NOT hot paths (validation/diff are developer-time operations). DUs are likely appropriate, but confirm with user if uncertain.
-- T026: Compose with `result {}` or `option {}` CE. Extract final value once at top-level call site. Do NOT use repeated `Async.RunSynchronously` or `Option.get` mid-function.
 - T027: Replace `let results = ResizeArray(); let state = ref ...` with `List.fold` or `Array.fold` accumulating an immutable state
 - T028: Search all `.fs` files for implicit use of `FSharpRdf` names; add `open Frank.Cli.Core.Rdf.FSharpRdf` where needed. Compiler errors will guide this.
 - T029: Wrap `JsonDocument.Parse(...)` result with `use doc = ...`
@@ -226,7 +227,7 @@
 
 ## Dependency & Execution Summary
 
-- **Phase 1 (parallel)**: WP01, WP02, WP03, WP04 — all independent, can run concurrently
+- **Phase 1 (parallel)**: WP01, WP02, WP04 — all independent, can run concurrently. WP03 depends on WP02.
 - **Phase 2 (parallel after Phase 1)**: WP05 — logically follows WP04 but no hard dependency
 - **Phase 3 (after all)**: WP06 — tests validate behavioral changes from WP02-WP05
 - **Parallelization**: WP01-WP04 are fully parallelizable (different subsystems). WP05 can overlap with WP01-WP03.
@@ -263,7 +264,7 @@
 | T023 | Add FsToolkit.ErrorHandling | WP05 | P2 | No |
 | T024 | DU for ValidationIssue.Severity | WP05 | P3 | No |
 | T025 | DU for DiffEntry.Type | WP05 | P3 | Yes |
-| T026 | GraphLoader match pyramid → CE/pipe | WP05 | P3 | No |
+| T026 | GraphLoader match pyramid → CE/pipe | WP03 | P2 | No |
 | T027 | AstAnalyzer fold refactor | WP05 | P3 | No |
 | T028 | Remove [AutoOpen] from FSharpRdf | WP05 | P3 | No |
 | T029 | Fix JsonDocument disposal | WP05 | P1 | Yes |

@@ -7,7 +7,6 @@ subtasks:
 - T023
 - T024
 - T025
-- T026
 - T027
 - T028
 - T029
@@ -24,7 +23,7 @@ history:
   agent: system
   shell_pid: ''
   action: Prompt generated via /spec-kitty.tasks
-requirement_refs: [FR-004, FR-014, FR-015, FR-016, FR-017, FR-021]
+requirement_refs: [FR-004, FR-014, FR-016, FR-017, FR-021]
 ---
 
 # Work Package Prompt: WP05 – Frank.Cli.Core — Idiom & Quality
@@ -57,7 +56,6 @@ No hard dependencies, but logically follows WP04 since both modify `Frank.Cli.Co
 ## Objectives & Success Criteria
 
 - `ValidationIssue.Severity` and `DiffEntry.Type` use type-safe alternatives (DU preferred unless hot path — escalate to user if uncertain)
-- `GraphLoader.load` uses composed pipelines (CE or piped module functions)
 - `AstAnalyzer.walkCeBody` uses functional fold (no `ResizeArray` + `ref`)
 - `FSharpRdf` module no longer has `[<AutoOpen>]` — all consumers use explicit `open`
 - `JsonDocument` in `CompileCommand.verifyRoundTrip` disposed via `use` (Constitution VI)
@@ -137,45 +135,6 @@ No hard dependencies, but logically follows WP04 since both modify `Frank.Cli.Co
   - `src/Frank.Cli.Core/Output/TextOutput.fs` (if it displays diff type)
   - `src/Frank.Cli.Core/Output/JsonOutput.fs` (if it serializes diff type)
 - **Parallel?**: Yes — independent of T024
-
-### Subtask T026 – Replace Nested Match Pyramids in GraphLoader.load
-
-- **Purpose**: `GraphLoader.load` has nested `match` statements. Replace with composed pipelines using FsToolkit.ErrorHandling CEs.
-- **Steps**:
-  1. Open `src/Frank.LinkedData/Rdf/GraphLoader.fs`
-  2. Locate the `load` function — identify the nested match pyramid
-  3. Determine the wrapper types involved (`Result`, `Option`, or mixed)
-  4. Add `FsToolkit.ErrorHandling` to `Frank.LinkedData.fsproj` if not already added (from WP03 T015)
-  5. Refactor using the appropriate CE:
-     ```fsharp
-     open FsToolkit.ErrorHandling
-
-     let load (assembly: Assembly) =
-         result {
-             let! manifest = loadManifest assembly
-             let! ontologyStream = findResource assembly manifest.OntologyResource
-             use reader = new StreamReader(ontologyStream)  // Constitution VI
-             let! ontology = parseOntology reader
-             let! shapesStream = findResource assembly manifest.ShapesResource
-             let! shapes = parseShapes shapesStream
-             return { Ontology = ontology; Shapes = shapes; Manifest = manifest }
-         }
-     ```
-  6. Or use piped `Result.bind` / `Option.bind` if simpler:
-     ```fsharp
-     loadManifest assembly
-     |> Result.bind (fun manifest ->
-         findResource assembly manifest.OntologyResource
-         |> Result.bind (fun stream -> ...))
-     ```
-  7. Key rules:
-     - Do NOT use `Async.RunSynchronously` mid-function
-     - Do NOT use `Option.get` or `Result.defaultValue` mid-function
-     - Compose naturally; extract once at the call site
-     - If some steps return `Option` and others `Result`, use `Result.requireSome` to unify
-- **Files**: `src/Frank.LinkedData/Rdf/GraphLoader.fs`
-- **Parallel?**: No — should be done after T023 (needs FsToolkit.ErrorHandling)
-- **Notes**: `GraphLoader.fs` is also modified by WP02 T008 (StreamReader disposal). If implementing after WP02, the `use` binding from T008 should already be in place. If implementing before or in parallel, ensure `use` binding is included here.
 
 ### Subtask T027 – Replace Imperative Accumulation in AstAnalyzer.walkCeBody
 
