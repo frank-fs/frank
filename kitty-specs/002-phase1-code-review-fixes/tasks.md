@@ -84,7 +84,7 @@
 
 ### Included Subtasks
 - [x] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
-- [ ] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
+- [x] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
 - [ ] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
 - [ ] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
 - [ ] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
