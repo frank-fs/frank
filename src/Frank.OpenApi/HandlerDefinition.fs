@@ -6,6 +6,11 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 
+[<AutoOpen>]
+module private MediaTypes =
+    [<Literal>]
+    let ApplicationJson = "application/json"
+
 type ProducesInfo =
     { StatusCode: int
       ResponseType: Type option
@@ -25,6 +30,7 @@ type HandlerDefinition =
       Tags: string list
       Produces: ProducesInfo list
       Accepts: AcceptsInfo list }
+
     static member Empty =
         { Handler = Unchecked.defaultof<_>
           Name = None
@@ -37,40 +43,41 @@ type HandlerDefinition =
 module HandlerDefinitionMetadata =
 
     let toConventions (def: HandlerDefinition) : (EndpointBuilder -> unit) list =
-        [
-            match def.Name with
-            | Some name ->
-                yield fun (b: EndpointBuilder) ->
-                    b.Metadata.Add(EndpointNameMetadata(name))
-            | None -> ()
+        [ match def.Name with
+          | Some name -> yield fun (b: EndpointBuilder) -> b.Metadata.Add(EndpointNameMetadata(name))
+          | None -> ()
 
-            match def.Summary with
-            | Some s ->
-                yield fun (b: EndpointBuilder) ->
-                    b.Metadata.Add(EndpointSummaryAttribute(s))
-            | None -> ()
+          match def.Summary with
+          | Some s -> yield fun (b: EndpointBuilder) -> b.Metadata.Add(EndpointSummaryAttribute(s))
+          | None -> ()
 
-            match def.Description with
-            | Some d ->
-                yield fun (b: EndpointBuilder) ->
-                    b.Metadata.Add(EndpointDescriptionAttribute(d))
-            | None -> ()
+          match def.Description with
+          | Some d -> yield fun (b: EndpointBuilder) -> b.Metadata.Add(EndpointDescriptionAttribute(d))
+          | None -> ()
 
-            if not (List.isEmpty def.Tags) then
-                yield fun (b: EndpointBuilder) ->
-                    b.Metadata.Add(TagsAttribute(def.Tags |> List.toArray))
+          if not (List.isEmpty def.Tags) then
+              yield fun (b: EndpointBuilder) -> b.Metadata.Add(TagsAttribute(def.Tags |> List.toArray))
 
-            for p in def.Produces do
-                yield fun (b: EndpointBuilder) ->
-                    let contentTypes = if List.isEmpty p.ContentTypes then [| "application/json" |] else p.ContentTypes |> Array.ofList
-                    match p.ResponseType with
-                    | Some t ->
-                        b.Metadata.Add(ProducesResponseTypeMetadata(p.StatusCode, t, contentTypes))
-                    | None ->
-                        b.Metadata.Add(ProducesResponseTypeMetadata(p.StatusCode, typeof<Void>, contentTypes))
+          for p in def.Produces do
+              yield
+                  fun (b: EndpointBuilder) ->
+                      let contentTypes =
+                          if List.isEmpty p.ContentTypes then
+                              [| ApplicationJson |]
+                          else
+                              p.ContentTypes |> Array.ofList
 
-            for a in def.Accepts do
-                yield fun (b: EndpointBuilder) ->
-                    let contentTypes = if List.isEmpty a.ContentTypes then [| "application/json" |] else a.ContentTypes |> Array.ofList
-                    b.Metadata.Add(AcceptsMetadata(contentTypes, a.RequestType, a.IsOptional))
-        ]
+                      match p.ResponseType with
+                      | Some t -> b.Metadata.Add(ProducesResponseTypeMetadata(p.StatusCode, t, contentTypes))
+                      | None -> b.Metadata.Add(ProducesResponseTypeMetadata(p.StatusCode, typeof<Void>, contentTypes))
+
+          for a in def.Accepts do
+              yield
+                  fun (b: EndpointBuilder) ->
+                      let contentTypes =
+                          if List.isEmpty a.ContentTypes then
+                              [| ApplicationJson |]
+                          else
+                              a.ContentTypes |> Array.ofList
+
+                      b.Metadata.Add(AcceptsMetadata(contentTypes, a.RequestType, a.IsOptional)) ]
