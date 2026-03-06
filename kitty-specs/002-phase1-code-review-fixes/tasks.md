@@ -197,12 +197,12 @@
 **Requirement Refs**: FR-001, FR-002, FR-004, FR-007, FR-008, FR-009, FR-010, FR-011
 
 ### Included Subtasks
-- [ ] T031 Add tests for multi-subject JSON-LD typed literal serialization (verifying @type/@value preserved in @graph output)
-- [ ] T032 [P] Add tests for `MediaTypeHeaderValue` Accept header parsing (proper media type matching, quality factors, edge cases: malformed, empty)
-- [ ] T033 [P] Add tests for structural hash cache key uniqueness (same content = same key, different content = different key, different identity same content = same key)
-- [ ] T034 [P] Add tests for `Assembly.GetEntryAssembly()` null handling
-- [ ] T035 [P] Add tests for `ExtractionState` serialization/deserialization with `Map<string, SourceLocation>` (including backward-compatible load of old Uri-keyed format)
-- [ ] T036 Run full test suite (`dotnet test`) to verify all 265 baseline tests pass and no regressions
+- [x] T031 Add tests for multi-subject JSON-LD typed literal serialization (verifying @type/@value preserved in @graph output)
+- [x] T032 [P] Add tests for `MediaTypeHeaderValue` Accept header parsing (proper media type matching, quality factors, edge cases: malformed, empty)
+- [x] T033 [P] Add tests for structural hash cache key uniqueness (same content = same key, different content = different key, different identity same content = same key)
+- [x] T034 [P] Add tests for `Assembly.GetEntryAssembly()` null handling
+- [x] T035 [P] Add tests for `ExtractionState` serialization/deserialization with `Map<string, SourceLocation>` (including backward-compatible load of old Uri-keyed format)
+- [x] T036 Run full test suite (`dotnet test`) to verify all 265 baseline tests pass and no regressions
 
 ### Implementation Notes
 - T031: Test in `Frank.LinkedData.Tests` — create multi-subject graph with int, bool, double, decimal properties, serialize to JSON-LD, assert `@type` annotations present
