@@ -50,3 +50,19 @@ Thumbs.db
 launchSettings.json
 .entire/
 nupkg/
+
+# Added by Spec Kitty CLI (auto-managed)
+.claude/
+.codex/
+.opencode/
+.windsurf/
+.gemini/
+.cursor/
+.qwen/
+.kilocode/
+.augment/
+.roo/
+.amazonq/
+.github/copilot/
+.kittify/.dashboard
+.kittify/missions/__pycache__/
