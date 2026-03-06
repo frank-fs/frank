@@ -50,6 +50,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.LinkedData.Tests", "t
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.LinkedData.Sample", "sample\Frank.LinkedData.Sample\Frank.LinkedData.Sample.fsproj", "{A8BA2333-8EDE-40AE-9CDD-21B6B3B7CE53}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Cli.IntegrationTests", "test\Frank.Cli.IntegrationTests\Frank.Cli.IntegrationTests.fsproj", "{7121B363-2A82-4121-8214-079D711C729C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -288,6 +290,18 @@ Global
 		{A8BA2333-8EDE-40AE-9CDD-21B6B3B7CE53}.Release|x64.Build.0 = Release|Any CPU
 		{A8BA2333-8EDE-40AE-9CDD-21B6B3B7CE53}.Release|x86.ActiveCfg = Release|Any CPU
 		{A8BA2333-8EDE-40AE-9CDD-21B6B3B7CE53}.Release|x86.Build.0 = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|x64.Build.0 = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Debug|x86.Build.0 = Debug|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|x64.ActiveCfg = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|x64.Build.0 = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|x86.ActiveCfg = Release|Any CPU
+		{7121B363-2A82-4121-8214-079D711C729C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -312,6 +326,7 @@ Global
 		{92DB1E51-D6C0-49D0-AC65-92CE3ABB16C2} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 		{D3048DE4-3EAA-4E97-BAE3-960167E1A79C} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 		{A8BA2333-8EDE-40AE-9CDD-21B6B3B7CE53} = {D44D293C-2E08-4249-8274-1B5BB8EA273D}
+		{7121B363-2A82-4121-8214-079D711C729C} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {69BCA08B-4B88-4702-91B2-B5E891A078D9}
