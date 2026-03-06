@@ -1,11 +1,23 @@
 <Project>
-  <Target Name="EmbedFrankSemanticDefinitions" BeforeTargets="CoreCompile"
-          Condition="Exists('$(FrankCliIntermediateDir)')">
+  <Target Name="EmbedFrankSemanticDefinitions"
+          BeforeTargets="CoreCompile"
+          Condition="Exists('$(FrankCliOutputPath)')">
     <ItemGroup>
-      <EmbeddedResource Include="$(FrankCliIntermediateDir)**/*.owl.xml"
-                        LogicalName="Frank.Semantic.%(Filename)%(Extension)" />
-      <EmbeddedResource Include="$(FrankCliIntermediateDir)**/*.shacl.ttl"
-                        LogicalName="Frank.Semantic.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
+                        LogicalName="Frank.Semantic.ontology.owl.xml"
+                        Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml')" />
+      <EmbeddedResource Include="$(FrankCliOutputPath)shapes.shacl.ttl"
+                        LogicalName="Frank.Semantic.shapes.shacl.ttl"
+                        Condition="Exists('$(FrankCliOutputPath)shapes.shacl.ttl')" />
+      <EmbeddedResource Include="$(FrankCliOutputPath)manifest.json"
+                        LogicalName="Frank.Semantic.manifest.json"
+                        Condition="Exists('$(FrankCliOutputPath)manifest.json')" />
     </ItemGroup>
+  </Target>
+
+  <Target Name="ValidateFrankSemanticDefinitions"
+          BeforeTargets="Build"
+          Condition="!Exists('$(FrankCliOutputPath)')">
+    <Warning Text="Frank.Cli.MSBuild is referenced but no semantic definitions found in '$(FrankCliOutputPath)'. Run 'frank-cli compile' to generate them." />
   </Target>
 </Project>

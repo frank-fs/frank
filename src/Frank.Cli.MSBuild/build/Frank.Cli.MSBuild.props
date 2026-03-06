@@ -1,5 +1,5 @@
 <Project>
   <PropertyGroup>
-    <FrankCliIntermediateDir>$(IntermediateOutputPath)frank-cli/</FrankCliIntermediateDir>
+    <FrankCliOutputPath Condition="'$(FrankCliOutputPath)' == ''">$(IntermediateOutputPath)frank-cli/</FrankCliOutputPath>
   </PropertyGroup>
 </Project>
