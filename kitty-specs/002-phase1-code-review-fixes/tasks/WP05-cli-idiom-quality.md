@@ -1,8 +1,11 @@
 ---
 work_package_id: WP05
 title: Frank.Cli.Core — Idiom & Quality
-lane: planned
+lane: "doing"
 dependencies: []
+base_branch: fix/cross-library-consistency
+base_commit: e3d8cb0dccf820416c6424eb119051023cc198a6
+created_at: '2026-03-06T19:26:38.049016+00:00'
 subtasks:
 - T023
 - T024
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 2 - Idiom
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "90835"
 review_status: ''
 reviewed_by: ''
 history:
