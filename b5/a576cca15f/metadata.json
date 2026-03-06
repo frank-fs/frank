@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.9",
+  "checkpoint_id": "b5a576cca15f",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "kitty-specs/001-semantic-resources-phase1/tasks.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b5/a576cca15f/0/metadata.json",
+      "transcript": "/b5/a576cca15f/0/full.jsonl",
+      "context": "/b5/a576cca15f/0/context.md",
+      "content_hash": "/b5/a576cca15f/0/content_hash.txt",
+      "prompt": "/b5/a576cca15f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4156,
+    "cache_creation_tokens": 1880150,
+    "cache_read_tokens": 53431754,
+    "output_tokens": 252617,
+    "api_call_count": 561
+  }
+}
