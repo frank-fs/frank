@@ -304,6 +304,42 @@ let tests =
               let body = response.Content.ReadAsStringAsync().Result
               Expect.stringContains body "Alice" "text/html should pass through to standard handler"
 
+          testCase "negotiateRdfType respects quality factors preferring highest q"
+          <| fun _ ->
+              // text/turtle;q=0.5, application/ld+json;q=0.9 → should pick ld+json
+              let result = negotiateRdfType "text/turtle;q=0.5, application/ld+json;q=0.9"
+              Expect.equal result (Some "application/ld+json") "Should prefer higher quality factor"
+
+          testCase "negotiateRdfType picks first supported when no quality factors"
+          <| fun _ ->
+              // Multiple supported types with no quality → first match wins (default q=1.0)
+              let result = negotiateRdfType "application/rdf+xml, text/turtle"
+              Expect.isSome result "Should match at least one supported type"
+
+          testCase "negotiateRdfType ignores unsupported types even with high quality"
+          <| fun _ ->
+              let result = negotiateRdfType "application/json;q=1.0, text/html;q=0.9"
+              Expect.equal result None "Should return None when no supported types match"
+
+          testCase "negotiateRdfType handles malformed Accept header gracefully"
+          <| fun _ ->
+              // Malformed headers should not throw, just return None
+              let result = negotiateRdfType ";;;not-a-media-type;;;"
+              Expect.equal result None "Malformed Accept should return None without throwing"
+
+          testCase "negotiateRdfType handles null-like whitespace-only input"
+          <| fun _ ->
+              let result = negotiateRdfType "   "
+              Expect.equal result None "Whitespace-only Accept should return None"
+
+          testCase "negotiateRdfType handles mixed supported and unsupported with quality"
+          <| fun _ ->
+              // text/html;q=1.0, text/turtle;q=0.8, application/json;q=0.5
+              let result =
+                  negotiateRdfType "text/html;q=1.0, text/turtle;q=0.8, application/json;q=0.5"
+
+              Expect.equal result (Some "text/turtle") "Should pick text/turtle as highest-q supported type"
+
           testCase "middleware passes through original response when JSON projection fails"
           <| fun _ ->
               let ontology = makeOntologyWithNameAndAge ()

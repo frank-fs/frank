@@ -116,6 +116,68 @@ let tests =
                   if Directory.Exists(dir) then
                       Directory.Delete(dir, true)
 
+          testCase "save and load roundtrip preserves SourceMap with multiple entries"
+          <| fun _ ->
+              let state =
+                  { Ontology = createGraph ()
+                    Shapes = createGraph ()
+                    SourceMap =
+                      Map.ofList
+                          [ "http://example.org/Person",
+                            { File = "Models.fs"
+                              Line = 10
+                              Column = 5 }
+                            "http://example.org/Order",
+                            { File = "Orders.fs"
+                              Line = 25
+                              Column = 0 }
+                            "http://example.org/Product",
+                            { File = "Models.fs"
+                              Line = 42
+                              Column = 8 } ]
+                    Clarifications = Map.empty
+                    Metadata =
+                      { Timestamp = DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+                        SourceHash = "map-test"
+                        ToolVersion = "1.0.0"
+                        BaseUri = Uri "http://example.org/"
+                        Vocabularies = [ "schema" ] }
+                    UnmappedTypes = [] }
+
+              let tmpPath =
+                  Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "state.json")
+
+              try
+                  ExtractionState.save tmpPath state |> ignore
+
+                  let loaded =
+                      ExtractionState.load tmpPath
+                      |> Result.defaultWith (fun _ -> failtest "unreachable")
+
+                  Expect.equal loaded.SourceMap.Count 3 "Should have 3 SourceMap entries"
+
+                  Expect.equal
+                      loaded.SourceMap.["http://example.org/Person"].File
+                      "Models.fs"
+                      "Person file should match"
+
+                  Expect.equal loaded.SourceMap.["http://example.org/Person"].Line 10 "Person line should match"
+                  Expect.equal loaded.SourceMap.["http://example.org/Person"].Column 5 "Person column should match"
+                  Expect.equal loaded.SourceMap.["http://example.org/Order"].File "Orders.fs" "Order file should match"
+                  Expect.equal loaded.SourceMap.["http://example.org/Order"].Line 25 "Order line should match"
+
+                  Expect.equal
+                      loaded.SourceMap.["http://example.org/Product"].File
+                      "Models.fs"
+                      "Product file should match"
+
+                  Expect.equal loaded.SourceMap.["http://example.org/Product"].Column 8 "Product column should match"
+              finally
+                  let dir = Path.GetDirectoryName(tmpPath)
+
+                  if Directory.Exists(dir) then
+                      Directory.Delete(dir, true)
+
           testCase "load on non-existent path returns Error"
           <| fun _ ->
               let result = ExtractionState.load "/nonexistent/path/state.json"
