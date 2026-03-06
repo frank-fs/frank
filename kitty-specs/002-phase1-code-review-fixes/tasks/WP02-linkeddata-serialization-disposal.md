@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Frank.LinkedData — Serialization & Disposal
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 1bd5337291a48a0f82ac3043f7f755a4b77c4437
@@ -15,7 +15,7 @@ subtasks:
 phase: Phase 1 - Foundation
 assignee: ''
 agent: "claude-opus"
-shell_pid: "88436"
+shell_pid: "94060"
 review_status: ''
 reviewed_by: ''
 history:
@@ -189,3 +189,4 @@ No dependencies — this is an independent module package.
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
 - 2026-03-06T18:55:05Z – claude-opus – shell_pid=88436 – lane=doing – Assigned agent via workflow command
 - 2026-03-06T18:59:17Z – claude-opus – shell_pid=88436 – lane=for_review – Ready for review: typed literals, XSD mappings, StreamReader disposal, RdfUriHelpers dedup
+- 2026-03-06T20:45:50Z – claude-opus – shell_pid=94060 – lane=doing – Started review via workflow command
