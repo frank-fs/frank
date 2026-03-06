@@ -15,7 +15,7 @@ subtasks:
 - T026
 phase: Phase 1 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "89475"
 review_status: ''
 reviewed_by: ''
@@ -290,3 +290,4 @@ Depends on WP02 — both modify `WebHostBuilderExtensions.fs`, `InstanceProjecto
 ## Activity Log
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
+- 2026-03-06T19:00:10Z – claude-opus – shell_pid=89475 – lane=doing – Assigned agent via workflow command
