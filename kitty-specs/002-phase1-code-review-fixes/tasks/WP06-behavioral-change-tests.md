@@ -19,7 +19,7 @@ subtasks:
 - T036
 phase: Phase 3 - Verification
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "95853"
 review_status: ''
 reviewed_by: ''
@@ -210,3 +210,4 @@ Depends on WP02, WP03, WP04, WP05 — tests validate behavioral changes from tho
 ## Activity Log
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
+- 2026-03-06T21:30:21Z – claude-opus – shell_pid=95853 – lane=doing – Assigned agent via workflow command
