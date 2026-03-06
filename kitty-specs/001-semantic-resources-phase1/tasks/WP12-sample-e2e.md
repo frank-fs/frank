@@ -1,7 +1,7 @@
 ---
 work_package_id: WP12
 title: Sample App & End-to-End Integration
-lane: planned
+lane: done
 dependencies:
 - WP06
 - WP08

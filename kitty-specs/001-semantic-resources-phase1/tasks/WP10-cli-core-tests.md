@@ -8,7 +8,7 @@ subtasks:
   - "T054"
 title: "CLI Core Tests"
 phase: "Phase 2 - Testing"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""

@@ -1,7 +1,7 @@
 ---
 work_package_id: WP09
 title: Frank.Cli.MSBuild Package
-lane: planned
+lane: done
 dependencies: [WP06]
 subtasks:
 - T045

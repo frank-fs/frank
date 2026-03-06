@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: CLI Commands — Validate, Diff, Compile
-lane: "doing"
+lane: "done"
 dependencies: [WP05]
 base_branch: 001-semantic-resources-phase1-WP05
 base_commit: abe61520e8fdba26efb99e1078b280a99e998dc6
