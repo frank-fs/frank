@@ -86,7 +86,7 @@
 - [x] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
 - [x] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
 - [x] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
-- [ ] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
+- [x] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
 - [ ] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
 - [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 
