@@ -122,13 +122,13 @@
 **Requirement Refs**: FR-002, FR-010, FR-012, FR-018
 
 ### Included Subtasks
-- [ ] T016 Create `UriHelpers.fs` in `Frank.Cli.Core/Extraction/` with `classUri`, `propertyUri`, `resourceUri`, `routeToSlug`, `fieldKindToRange`
-- [ ] T017 Update `TypeMapper.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`)
-- [ ] T018 [P] Update `ShapeGenerator.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`, `shapeUri` stays local)
-- [ ] T019 [P] Update `RouteMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
-- [ ] T020 [P] Update `CapabilityMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
-- [ ] T021 Change `ExtractionState.SourceMap` from `Dictionary<Uri, SourceLocation>` to `Map<string, SourceLocation>` and update `save`/`load` functions
-- [ ] T022 Remove dead `scope` parameter from `ExtractCommand` and `Program.fs` CLI argument definition
+- [x] T016 Create `UriHelpers.fs` in `Frank.Cli.Core/Extraction/` with `classUri`, `propertyUri`, `resourceUri`, `routeToSlug`, `fieldKindToRange`
+- [x] T017 Update `TypeMapper.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`)
+- [x] T018 [P] Update `ShapeGenerator.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`, `shapeUri` stays local)
+- [x] T019 [P] Update `RouteMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
+- [x] T020 [P] Update `CapabilityMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
+- [x] T021 Change `ExtractionState.SourceMap` from `Dictionary<Uri, SourceLocation>` to `Map<string, SourceLocation>` and update `save`/`load` functions
+- [x] T022 Remove dead `scope` parameter from `ExtractCommand` and `Program.fs` CLI argument definition
 
 ### Implementation Notes
 - T016: Place `UriHelpers.fs` before `TypeMapper.fs` in project file compilation order
