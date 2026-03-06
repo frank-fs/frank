@@ -163,7 +163,7 @@
 - [x] T025 [P] Replace string-typed `DiffEntry.Type` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
 - [x] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
 - [x] T028 Remove `[<AutoOpen>]` from `FSharpRdf` module; add explicit `open` to all consumers
-- [ ] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
+- [x] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
 - [ ] T030 [P] Add `[<Literal>]` annotations to vocabulary constants in `Vocabularies.fs`
 
 ### Implementation Notes
