@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.9",
+  "checkpoint_id": "7dd510cd60e2",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "kitty-specs/001-semantic-resources-phase1/tasks/WP06-cli-validate-diff-compile.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7d/d510cd60e2/0/metadata.json",
+      "transcript": "/7d/d510cd60e2/0/full.jsonl",
+      "context": "/7d/d510cd60e2/0/context.md",
+      "content_hash": "/7d/d510cd60e2/0/content_hash.txt",
+      "prompt": "/7d/d510cd60e2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 6497,
+    "cache_creation_tokens": 2532288,
+    "cache_read_tokens": 107840216,
+    "output_tokens": 366981,
+    "api_call_count": 1041
+  }
+}
