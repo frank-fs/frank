@@ -164,7 +164,7 @@
 - [x] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
 - [x] T028 Remove `[<AutoOpen>]` from `FSharpRdf` module; add explicit `open` to all consumers
 - [x] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
-- [ ] T030 [P] Add `[<Literal>]` annotations to vocabulary constants in `Vocabularies.fs`
+- [x] T030 [P] Add `[<Literal>]` annotations to vocabulary constants in `Vocabularies.fs`
 
 ### Implementation Notes
 - T023: Pin to latest stable version
