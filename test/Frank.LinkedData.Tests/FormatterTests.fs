@@ -19,6 +19,30 @@ let private createTestGraph () =
     g.Assert(Triple(subject, agePred, ageObj)) |> ignore
     g
 
+/// Creates a richer graph with 3 subjects and 7 triples for round-trip testing.
+let private createRichTestGraph () =
+    let g = new Graph()
+    let rdfType = g.CreateUriNode(UriFactory.Root.Create("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))
+    let person1 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/person/1"))
+    let person2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/person/2"))
+    let org1 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/org/1"))
+    let namePred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Person/Name"))
+    let agePred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Person/Age"))
+    let memberPred = g.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Org/member"))
+    let personType = g.CreateUriNode(UriFactory.Root.Create("http://example.org/types/Person"))
+    let orgType = g.CreateUriNode(UriFactory.Root.Create("http://example.org/types/Organization"))
+    // person1: Name, Age, rdf:type
+    g.Assert(Triple(person1, namePred, g.CreateLiteralNode("Alice"))) |> ignore
+    g.Assert(Triple(person1, agePred, g.CreateLiteralNode("30", UriFactory.Root.Create("http://www.w3.org/2001/XMLSchema#integer")))) |> ignore
+    g.Assert(Triple(person1, rdfType, personType)) |> ignore
+    // person2: Name
+    g.Assert(Triple(person2, namePred, g.CreateLiteralNode("Bob"))) |> ignore
+    g.Assert(Triple(person2, rdfType, personType)) |> ignore
+    // org1: rdf:type, member->person1, member->person2
+    g.Assert(Triple(org1, rdfType, orgType)) |> ignore
+    g.Assert(Triple(org1, memberPred, person1)) |> ignore
+    g
+
 [<Tests>]
 let tests =
     testList "Formatters" [
@@ -114,4 +138,109 @@ let tests =
             use reader = new StringReader(output)
             parser.Load(parsed, reader)
             Expect.equal parsed.Triples.Count 0 "Empty graph should produce 0 triples"
+
+        testCase "Turtle round-trip preserves graph isomorphism" <| fun _ ->
+            let g = createRichTestGraph ()
+            use ms = new MemoryStream()
+            TurtleFormatter.writeTurtle g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            let parser = TurtleParser()
+            use reader = new StringReader(output)
+            parser.Load(parsed, reader)
+            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match (7)"
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Round-tripped Turtle graph must be isomorphic to original"
+
+        testCase "RdfXml round-trip preserves graph isomorphism" <| fun _ ->
+            let g = createRichTestGraph ()
+            use ms = new MemoryStream()
+            RdfXmlFormatter.writeRdfXml g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            let parser = RdfXmlParser()
+            use reader = new StringReader(output)
+            parser.Load(parsed, reader)
+            Expect.equal parsed.Triples.Count g.Triples.Count "Triple count should match (7)"
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Round-tripped RDF/XML graph must be isomorphic to original"
+
+        testCase "Turtle round-trip with Unicode characters" <| fun _ ->
+            let g = new Graph()
+            let s = g.CreateUriNode(UriFactory.Root.Create("http://example.org/item/1"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/name"))
+            g.Assert(Triple(s, p, g.CreateLiteralNode("Ångström"))) |> ignore
+            let p2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/label"))
+            g.Assert(Triple(s, p2, g.CreateLiteralNode("日本語"))) |> ignore
+            use ms = new MemoryStream()
+            TurtleFormatter.writeTurtle g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            use reader = new StringReader(output)
+            TurtleParser().Load(parsed, reader)
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Unicode literals must survive Turtle round-trip"
+
+        testCase "RdfXml round-trip with Unicode characters" <| fun _ ->
+            let g = new Graph()
+            let s = g.CreateUriNode(UriFactory.Root.Create("http://example.org/item/2"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/name"))
+            g.Assert(Triple(s, p, g.CreateLiteralNode("Ångström"))) |> ignore
+            let p2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/label"))
+            g.Assert(Triple(s, p2, g.CreateLiteralNode("日本語"))) |> ignore
+            use ms = new MemoryStream()
+            RdfXmlFormatter.writeRdfXml g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let parsed = new Graph()
+            use reader = new StringReader(output)
+            RdfXmlParser().Load(parsed, reader)
+            Expect.isTrue (parsed.Difference(g).AreEqual)
+                "Unicode literals must survive RDF/XML round-trip"
+
+        testCase "JsonLdFormatter renders typed literals correctly" <| fun _ ->
+            let g = createTestGraph ()
+            use ms = new MemoryStream()
+            JsonLdFormatter.writeJsonLd g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let doc = System.Text.Json.JsonDocument.Parse(output)
+            let age = doc.RootElement.GetProperty("Age")
+            Expect.equal age.ValueKind System.Text.Json.JsonValueKind.Number "Age should be rendered as JSON number"
+
+        testCase "JsonLdFormatter uses @graph for multiple subjects" <| fun _ ->
+            let g = new Graph()
+            let s1 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/a"))
+            let s2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/b"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/p"))
+            g.Assert(Triple(s1, p, g.CreateLiteralNode("v1"))) |> ignore
+            g.Assert(Triple(s2, p, g.CreateLiteralNode("v2"))) |> ignore
+            use ms = new MemoryStream()
+            JsonLdFormatter.writeJsonLd g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            let doc = System.Text.Json.JsonDocument.Parse(output)
+            let hasGraph = doc.RootElement.TryGetProperty("@graph") |> fst
+            Expect.isTrue hasGraph "Multiple subjects should use @graph array"
+
+        testCase "Turtle handles graph with blank nodes" <| fun _ ->
+            let g = new Graph()
+            let s = g.CreateUriNode(UriFactory.Root.Create("http://example.org/x"))
+            let p = g.CreateUriNode(UriFactory.Root.Create("http://example.org/rel"))
+            let blank = g.CreateBlankNode()
+            let p2 = g.CreateUriNode(UriFactory.Root.Create("http://example.org/val"))
+            g.Assert(Triple(s, p, blank)) |> ignore
+            g.Assert(Triple(blank, p2, g.CreateLiteralNode("test"))) |> ignore
+            use ms = new MemoryStream()
+            TurtleFormatter.writeTurtle g ms
+            ms.Seek(0L, SeekOrigin.Begin) |> ignore
+            let output = (new StreamReader(ms)).ReadToEnd()
+            Expect.isNotEmpty output "Should produce output with blank nodes"
+            let parsed = new Graph()
+            use reader = new StringReader(output)
+            TurtleParser().Load(parsed, reader)
+            Expect.equal parsed.Triples.Count 2 "Should preserve both triples with blank node"
     ]

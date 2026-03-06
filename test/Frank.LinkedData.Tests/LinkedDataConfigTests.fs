@@ -35,4 +35,12 @@ let tests =
                 "Error should indicate invalid URI"
             Expect.stringContains expectedError invalidUri
                 "Error should include the offending value"
+
+        testCase "loadConfig validates shapes graph is loaded" <| fun _ ->
+            let assembly = Assembly.GetExecutingAssembly()
+            let result = LinkedDataConfig.loadConfig assembly
+            Expect.isOk result "Expected Ok result"
+            let config = Result.defaultWith (fun _ -> failwith "unreachable") result
+            Expect.isGreaterThan config.ShapesGraph.Triples.Count 0
+                "Shapes graph should have triples"
     ]

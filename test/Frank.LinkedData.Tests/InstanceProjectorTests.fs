@@ -9,6 +9,9 @@ type TestPerson = { Name: string; Age: int; Homepage: string option }
 type TestAddress = { Street: string; City: string }
 type TestWithNested = { Label: string; Address: TestAddress }
 type TestWithList = { Tags: string list }
+type TestWithFloat = { Score: float; Price: decimal; IsActive: bool }
+type TestWithDates = { CreatedAt: DateTimeOffset; ModifiedAt: DateTime }
+type TestEmpty = { Items: string list }
 
 /// Build a minimal ontology graph with property URI nodes for given local names.
 let private buildOntology (propertyNames: string list) =
@@ -97,4 +100,67 @@ let tests =
             let result3 = InstanceProjector.project ontology (Uri("http://example.org/people/12")) person3
             Expect.equal result3.Triples.Count 2
                 "Third projection should also have 2 triples, confirming cache consistency"
+
+        testCase "projects float as xsd:double, decimal as xsd:decimal, bool as xsd:boolean" <| fun _ ->
+            let ontology = buildOntology [ "Score"; "Price"; "IsActive" ]
+            let instance = { Score = 3.14; Price = 9.99m; IsActive = true }
+            let result = InstanceProjector.project ontology (Uri("http://example.org/test/1")) instance
+            Expect.equal result.Triples.Count 3 "Should have 3 triples"
+            let scoreTriples =
+                result.Triples |> Seq.filter (fun t ->
+                    match t.Predicate with
+                    | :? IUriNode as u -> u.Uri.ToString().EndsWith("/Score")
+                    | _ -> false)
+                |> Seq.toList
+            Expect.equal scoreTriples.Length 1 "Should have 1 Score triple"
+            match scoreTriples.[0].Object with
+            | :? ILiteralNode as lit ->
+                Expect.isNotNull lit.DataType "Score should have datatype"
+                Expect.stringContains (lit.DataType.ToString()) "double" "Score should be xsd:double"
+            | _ -> failwith "Expected literal node for Score"
+            let priceTriples =
+                result.Triples |> Seq.filter (fun t ->
+                    match t.Predicate with
+                    | :? IUriNode as u -> u.Uri.ToString().EndsWith("/Price")
+                    | _ -> false)
+                |> Seq.toList
+            match priceTriples.[0].Object with
+            | :? ILiteralNode as lit ->
+                Expect.stringContains (lit.DataType.ToString()) "decimal" "Price should be xsd:decimal"
+            | _ -> failwith "Expected literal node for Price"
+            let boolTriples =
+                result.Triples |> Seq.filter (fun t ->
+                    match t.Predicate with
+                    | :? IUriNode as u -> u.Uri.ToString().EndsWith("/IsActive")
+                    | _ -> false)
+                |> Seq.toList
+            match boolTriples.[0].Object with
+            | :? ILiteralNode as lit ->
+                Expect.stringContains (lit.DataType.ToString()) "boolean" "IsActive should be xsd:boolean"
+                Expect.equal lit.Value "true" "IsActive value should be 'true'"
+            | _ -> failwith "Expected literal node for IsActive"
+
+        testCase "projects DateTimeOffset as xsd:dateTime" <| fun _ ->
+            let ontology = buildOntology [ "CreatedAt"; "ModifiedAt" ]
+            let instance = { CreatedAt = DateTimeOffset(2024, 1, 15, 10, 30, 0, TimeSpan.Zero); ModifiedAt = DateTime(2024, 1, 15, 10, 30, 0) }
+            let result = InstanceProjector.project ontology (Uri("http://example.org/test/2")) instance
+            Expect.equal result.Triples.Count 2 "Should have 2 triples"
+            for t in result.Triples do
+                match t.Object with
+                | :? ILiteralNode as lit ->
+                    Expect.isNotNull lit.DataType "Date field should have datatype"
+                    Expect.stringContains (lit.DataType.ToString()) "dateTime" "Date should be xsd:dateTime"
+                | _ -> failwith "Expected literal node"
+
+        testCase "empty list produces zero triples" <| fun _ ->
+            let ontology = buildOntology [ "Items" ]
+            let instance : TestEmpty = { Items = [] }
+            let result = InstanceProjector.project ontology (Uri("http://example.org/test/3")) instance
+            Expect.equal result.Triples.Count 0 "Empty list should produce 0 triples"
+
+        testCase "skips properties not in ontology" <| fun _ ->
+            let ontology = buildOntology [ "Name" ]  // Only Name, not Age or Homepage
+            let person = { Name = "Alice"; Age = 30; Homepage = None }
+            let result = InstanceProjector.project ontology (Uri("http://example.org/test/4")) person
+            Expect.equal result.Triples.Count 1 "Should only project Name (1 triple)"
     ]
