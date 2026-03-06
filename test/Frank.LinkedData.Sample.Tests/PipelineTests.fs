@@ -1,13 +1,13 @@
 module Frank.LinkedData.Sample.Tests.PipelineTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open System.Text.Json
 open Expecto
 open VDS.RDF
 open VDS.RDF.Parsing
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Commands
@@ -75,7 +75,7 @@ let private createProductExtractionState () =
 
     { Ontology = ontology
       Shapes = shapes
-      SourceMap = Dictionary<Uri, SourceLocation>()
+      SourceMap = Map.empty
       Clarifications = Map.empty
       Metadata =
         { Timestamp = DateTimeOffset.UtcNow

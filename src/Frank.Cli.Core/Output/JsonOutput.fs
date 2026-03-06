@@ -9,15 +9,11 @@ open Frank.Cli.Core.State
 module JsonOutput =
 
     let private serializerOptions =
-        JsonSerializerOptions(
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true)
+        JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true)
 
-    let private writeString (w: Utf8JsonWriter) (name: string) (value: string) =
-        w.WriteString(name, value)
+    let private writeString (w: Utf8JsonWriter) (name: string) (value: string) = w.WriteString(name, value)
 
-    let private writeNumber (w: Utf8JsonWriter) (name: string) (value: int) =
-        w.WriteNumber(name, value)
+    let private writeNumber (w: Utf8JsonWriter) (name: string) (value: int) = w.WriteNumber(name, value)
 
     let formatExtractResult (result: ExtractCommand.ExtractResult) : string =
         use stream = new MemoryStream()
@@ -39,6 +35,7 @@ module JsonOutput =
         writer.WriteEndObject()
 
         writer.WriteStartArray("unmappedTypes")
+
         for ut in result.UnmappedTypes do
             writer.WriteStartObject()
             writeString writer "typeName" ut.TypeName
@@ -46,6 +43,7 @@ module JsonOutput =
             writeString writer "file" ut.Location.File
             writeNumber writer "line" ut.Location.Line
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writeString writer "stateFilePath" result.StateFilePath
@@ -63,6 +61,7 @@ module JsonOutput =
         writeString writer "status" "ok"
 
         writer.WriteStartArray("questions")
+
         for q in result.Questions do
             writer.WriteStartObject()
             writeString writer "id" q.Id
@@ -71,20 +70,25 @@ module JsonOutput =
 
             writer.WriteStartObject("context")
             writeString writer "sourceType" q.Context.SourceType
+
             match q.Context.Location with
             | Some loc -> writeString writer "location" loc
             | None -> writer.WriteNull("location")
+
             writer.WriteEndObject()
 
             writer.WriteStartArray("options")
+
             for opt in q.Options do
                 writer.WriteStartObject()
                 writeString writer "label" opt.Label
                 writeString writer "impact" opt.Impact
                 writer.WriteEndObject()
+
             writer.WriteEndArray()
 
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writeNumber writer "resolvedCount" result.ResolvedCount
@@ -105,14 +109,18 @@ module JsonOutput =
         writer.WriteNumber("coveragePercent", result.CoveragePercent)
 
         writer.WriteStartArray("issues")
+
         for issue in result.Issues do
             writer.WriteStartObject()
-            writeString writer "severity" issue.Severity
+            writeString writer "severity" (ValidateCommand.Severity.toString issue.Severity)
             writeString writer "message" issue.Message
+
             match issue.Uri with
             | Some uri -> writeString writer "uri" uri.AbsoluteUri
             | None -> writer.WriteNull("uri")
+
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writer.WriteEndObject()
@@ -128,45 +136,61 @@ module JsonOutput =
         writeString writer "status" "ok"
 
         writer.WriteStartArray("added")
+
         for entry in result.Diff.Added do
             writer.WriteStartObject()
             writeString writer "uri" entry.Uri.AbsoluteUri
+
             match entry.Field with
             | Some f -> writeString writer "field" f
             | None -> writer.WriteNull("field")
+
             match entry.To with
             | Some v -> writeString writer "value" v
             | None -> writer.WriteNull("value")
+
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writer.WriteStartArray("removed")
+
         for entry in result.Diff.Removed do
             writer.WriteStartObject()
             writeString writer "uri" entry.Uri.AbsoluteUri
+
             match entry.Field with
             | Some f -> writeString writer "field" f
             | None -> writer.WriteNull("field")
+
             match entry.From with
             | Some v -> writeString writer "value" v
             | None -> writer.WriteNull("value")
+
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writer.WriteStartArray("modified")
+
         for entry in result.Diff.Modified do
             writer.WriteStartObject()
             writeString writer "uri" entry.Uri.AbsoluteUri
+
             match entry.Field with
             | Some f -> writeString writer "field" f
             | None -> writer.WriteNull("field")
+
             match entry.From with
             | Some v -> writeString writer "from" v
             | None -> writer.WriteNull("from")
+
             match entry.To with
             | Some v -> writeString writer "to" v
             | None -> writer.WriteNull("to")
+
             writer.WriteEndObject()
+
         writer.WriteEndArray()
 
         writeNumber writer "addedCount" result.Diff.Added.Length
@@ -189,8 +213,10 @@ module JsonOutput =
         writeString writer "manifestPath" result.ManifestPath
 
         writer.WriteStartArray("embeddedResourceNames")
+
         for name in result.EmbeddedResourceNames do
             writer.WriteStringValue name
+
         writer.WriteEndArray()
 
         writer.WriteEndObject()
@@ -199,5 +225,8 @@ module JsonOutput =
         Encoding.UTF8.GetString(stream.ToArray())
 
     let formatError (message: string) : string =
-        let error = {| status = "error"; message = message |}
+        let error =
+            {| status = "error"
+               message = message |}
+
         JsonSerializer.Serialize(error, serializerOptions)

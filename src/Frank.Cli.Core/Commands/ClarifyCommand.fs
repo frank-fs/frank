@@ -4,6 +4,7 @@ open System
 open System.IO
 open VDS.RDF
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
 
@@ -14,7 +15,9 @@ module ClarifyCommand =
         { Id: string
           Category: string
           QuestionText: string
-          Context: {| SourceType: string; Location: string option |}
+          Context:
+              {| SourceType: string
+                 Location: string option |}
           Options: {| Label: string; Impact: string |} list }
 
     type ClarifyResult =
@@ -22,13 +25,13 @@ module ClarifyCommand =
           ResolvedCount: int
           TotalCount: int }
 
-    let private slugify (s: string) =
-        s.Replace(".", "-").Replace(" ", "-")
+    let private slugify (s: string) = s.Replace(".", "-").Replace(" ", "-")
 
     let private unmappedTypeQuestions (state: ExtractionState) : ClarifyQuestion list =
         state.UnmappedTypes
         |> List.map (fun ut ->
             let id = $"unmapped-type-%s{slugify ut.TypeName}"
+
             { Id = id
               Category = "unmapped-type"
               QuestionText = $"Type '%s{ut.TypeName}' was found but could not be mapped. Should it be:"
@@ -36,9 +39,12 @@ module ClarifyCommand =
                 {| SourceType = ut.TypeName
                    Location = Some $"%s{ut.Location.File}:%d{ut.Location.Line}" |}
               Options =
-                [ {| Label = "mapped as owl:Class"; Impact = "Will generate an OWL class definition" |}
-                  {| Label = "ignored"; Impact = "Will be excluded from the ontology" |}
-                  {| Label = "mapped as a custom vocabulary term"; Impact = "Will be added with a custom namespace" |} ] })
+                [ {| Label = "mapped as owl:Class"
+                     Impact = "Will generate an OWL class definition" |}
+                  {| Label = "ignored"
+                     Impact = "Will be excluded from the ontology" |}
+                  {| Label = "mapped as a custom vocabulary term"
+                     Impact = "Will be added with a custom namespace" |} ] })
 
     let private openOrClosedQuestions (state: ExtractionState) : ClarifyQuestion list =
         // Find classes in the ontology that have subclasses (DU types)
@@ -74,13 +80,18 @@ module ClarifyCommand =
         |> List.map (fun classUri ->
             let typeName = classUri.Segments |> Array.last
             let id = $"open-or-closed-%s{slugify typeName}"
+
             { Id = id
               Category = "open-or-closed"
               QuestionText = $"Is '%s{typeName}' an open or closed enumeration?"
-              Context = {| SourceType = typeName; Location = None |}
+              Context =
+                {| SourceType = typeName
+                   Location = None |}
               Options =
-                [ {| Label = "open (extensible)"; Impact = "New subtypes can be added without breaking compatibility" |}
-                  {| Label = "closed (fixed)"; Impact = "The set of subtypes is fixed and complete" |} ] })
+                [ {| Label = "open (extensible)"
+                     Impact = "New subtypes can be added without breaking compatibility" |}
+                  {| Label = "closed (fixed)"
+                     Impact = "The set of subtypes is fixed and complete" |} ] })
 
     let private objectOrDatatypeQuestions (state: ExtractionState) : ClarifyQuestion list =
         // Find properties with names like URL/email patterns
@@ -90,7 +101,8 @@ module ClarifyCommand =
         let domainNode = createUriNode graph (Uri Rdfs.Domain)
         let datatypePropUri = Uri Owl.DatatypeProperty
 
-        let urlLikeNames = Set.ofList ["url"; "uri"; "website"; "homepage"; "email"; "emailaddress"; "link"; "href"]
+        let urlLikeNames =
+            Set.ofList [ "url"; "uri"; "website"; "homepage"; "email"; "emailaddress"; "link"; "href" ]
 
         // Find datatype properties whose label matches URL-like names
         let datatypeProperties =
@@ -116,8 +128,7 @@ module ClarifyCommand =
                 |> Seq.toList
 
             let matchingLabel =
-                labels
-                |> List.tryFind (fun l -> urlLikeNames.Contains(l.ToLowerInvariant()))
+                labels |> List.tryFind (fun l -> urlLikeNames.Contains(l.ToLowerInvariant()))
 
             match matchingLabel with
             | None -> None
@@ -127,7 +138,7 @@ module ClarifyCommand =
                     triplesWithSubjectPredicate graph (propNode :> INode) domainNode
                     |> Seq.choose (fun t ->
                         match t.Object with
-                        | :? IUriNode as on -> Some (on.Uri.Segments |> Array.last)
+                        | :? IUriNode as on -> Some(on.Uri.Segments |> Array.last)
                         | _ -> None)
                     |> Seq.tryHead
                     |> Option.defaultValue "Unknown"
@@ -135,11 +146,16 @@ module ClarifyCommand =
                 Some
                     { Id = $"object-or-datatype-%s{slugify fieldName}-%s{slugify domainClass}"
                       Category = "object-or-datatype"
-                      QuestionText = $"Should '%s{fieldName}' on '%s{domainClass}' be an object property (link) or datatype property (literal)?"
-                      Context = {| SourceType = domainClass; Location = None |}
+                      QuestionText =
+                        $"Should '%s{fieldName}' on '%s{domainClass}' be an object property (link) or datatype property (literal)?"
+                      Context =
+                        {| SourceType = domainClass
+                           Location = None |}
                       Options =
-                        [ {| Label = "object property (link)"; Impact = "Value will be a URI reference to another resource" |}
-                          {| Label = "datatype property (literal)"; Impact = "Value will be a string literal (e.g., URL as text)" |} ] })
+                        [ {| Label = "object property (link)"
+                             Impact = "Value will be a URI reference to another resource" |}
+                          {| Label = "datatype property (literal)"
+                             Impact = "Value will be a string literal (e.g., URL as text)" |} ] })
 
     let private missingRelationshipQuestions (state: ExtractionState) : ClarifyQuestion list =
         // Detect pairs of classes where one type's name appears in the other's fields
@@ -159,7 +175,7 @@ module ClarifyCommand =
                 | _ -> false)
             |> Seq.choose (fun t ->
                 match t.Subject with
-                | :? IUriNode as sn -> Some (sn.Uri.AbsoluteUri, sn.Uri.Segments |> Array.last)
+                | :? IUriNode as sn -> Some(sn.Uri.AbsoluteUri, sn.Uri.Segments |> Array.last)
                 | _ -> None)
             |> Seq.toList
 
@@ -181,12 +197,14 @@ module ClarifyCommand =
                         match t.Object with
                         | :? IUriNode as on -> Some on.Uri.AbsoluteUri
                         | _ -> None)
+
                 let ranges =
                     triplesWithSubjectPredicate graph (propNode :> INode) rangeNode
                     |> Seq.choose (fun t ->
                         match t.Object with
                         | :? IUriNode as on -> Some on.Uri.AbsoluteUri
                         | _ -> None)
+
                 Seq.allPairs domains ranges)
             |> Set.ofSeq
 
@@ -202,23 +220,39 @@ module ClarifyCommand =
                 if uriA <> uriB then
                     let nameAppearsInB =
                         nameA.Length >= 3 && nameB.ToLowerInvariant().Contains(nameA.ToLowerInvariant())
+
                     if nameAppearsInB then
                         // Check if any object property links A -> B or B -> A
                         let linked =
                             objectPropertyLinks.Contains(uriA, uriB)
                             || objectPropertyLinks.Contains(uriB, uriA)
+
                         if not linked then
-                            let pairKey = if uriA < uriB then $"{nameA}-{nameB}" else $"{nameB}-{nameA}"
+                            let pairKey =
+                                if uriA < uriB then
+                                    $"{nameA}-{nameB}"
+                                else
+                                    $"{nameB}-{nameA}"
+
                             if seen.Add(pairKey) then
                                 questions.Add(
                                     { Id = $"missing-relationship-%s{slugify nameA}-%s{slugify nameB}"
                                       Category = "missing-relationship"
-                                      QuestionText = $"Types '%s{nameA}' and '%s{nameB}' appear related but have no explicit property linking them. Should a relationship be added?"
-                                      Context = {| SourceType = nameA; Location = None |}
+                                      QuestionText =
+                                        $"Types '%s{nameA}' and '%s{nameB}' appear related but have no explicit property linking them. Should a relationship be added?"
+                                      Context =
+                                        {| SourceType = nameA
+                                           Location = None |}
                                       Options =
-                                        [ {| Label = $"add object property from %s{nameA} to %s{nameB}"; Impact = $"Will create an owl:ObjectProperty linking %s{nameA} to %s{nameB}" |}
-                                          {| Label = $"add object property from %s{nameB} to %s{nameA}"; Impact = $"Will create an owl:ObjectProperty linking %s{nameB} to %s{nameA}" |}
-                                          {| Label = "no relationship needed"; Impact = "Types will remain unlinked in the ontology" |} ] })
+                                        [ {| Label = $"add object property from %s{nameA} to %s{nameB}"
+                                             Impact =
+                                              $"Will create an owl:ObjectProperty linking %s{nameA} to %s{nameB}" |}
+                                          {| Label = $"add object property from %s{nameB} to %s{nameA}"
+                                             Impact =
+                                              $"Will create an owl:ObjectProperty linking %s{nameB} to %s{nameA}" |}
+                                          {| Label = "no relationship needed"
+                                             Impact = "Types will remain unlinked in the ontology" |} ] }
+                                )
 
         questions |> Seq.toList
 
@@ -229,19 +263,23 @@ module ClarifyCommand =
         | Error e -> Error $"Failed to load state: {e}"
         | Ok state ->
 
-        let unmappedQuestions = unmappedTypeQuestions state
-        let openClosedQuestions = openOrClosedQuestions state
-        let objDatatypeQuestions = objectOrDatatypeQuestions state
-        let missingRelQuestions = missingRelationshipQuestions state
+            let unmappedQuestions = unmappedTypeQuestions state
+            let openClosedQuestions = openOrClosedQuestions state
+            let objDatatypeQuestions = objectOrDatatypeQuestions state
+            let missingRelQuestions = missingRelationshipQuestions state
 
-        let allQuestions = unmappedQuestions @ openClosedQuestions @ objDatatypeQuestions @ missingRelQuestions
+            let allQuestions =
+                unmappedQuestions
+                @ openClosedQuestions
+                @ objDatatypeQuestions
+                @ missingRelQuestions
 
-        let resolvedCount =
-            allQuestions
-            |> List.filter (fun q -> state.Clarifications.ContainsKey q.Id)
-            |> List.length
+            let resolvedCount =
+                allQuestions
+                |> List.filter (fun q -> state.Clarifications.ContainsKey q.Id)
+                |> List.length
 
-        Ok
-            { Questions = allQuestions
-              ResolvedCount = resolvedCount
-              TotalCount = allQuestions.Length }
+            Ok
+                { Questions = allQuestions
+                  ResolvedCount = resolvedCount
+                  TotalCount = allQuestions.Length }
