@@ -1,31 +1,34 @@
 ---
-work_package_id: "WP06"
-subtasks:
-  - "T031"
-  - "T032"
-  - "T033"
-  - "T034"
-  - "T035"
-  - "T036"
-title: "New Tests for Behavioral Changes"
-phase: "Phase 3 - Verification"
-lane: "planned"
+work_package_id: WP06
+title: New Tests for Behavioral Changes
+lane: "doing"
 dependencies:
-  - "WP02"
-  - "WP03"
-  - "WP04"
-  - "WP05"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- WP02
+- WP03
+- WP04
+- WP05
+base_branch: 002-phase1-code-review-fixes-WP05
+base_commit: 9324fef4bbfd589b83a9f2f3495b47be3f5564b8
+created_at: '2026-03-06T21:30:21.762324+00:00'
+subtasks:
+- T031
+- T032
+- T033
+- T034
+- T035
+- T036
+phase: Phase 3 - Verification
+assignee: ''
+agent: ''
+shell_pid: "95853"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-06T15:25:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T15:25:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 requirement_refs: [FR-001, FR-002, FR-004, FR-007, FR-008, FR-009, FR-010, FR-011]
 ---
 
