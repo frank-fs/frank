@@ -1,3 +1,41 @@
+### New in 7.3.0
+
+**Frank.LinkedData - Semantic RDF Content Negotiation**
+
+- **New Library:** Frank.LinkedData extension library for automatic RDF content negotiation
+- **Content Negotiation Middleware:** Endpoints marked with `linkedData` serve JSON-LD, Turtle, and RDF/XML alongside standard JSON based on the `Accept` header
+- **OWL Ontology Integration:** JSON responses are projected to RDF graphs using ontology-derived predicate URIs
+- **Supported Formats:**
+  - `application/ld+json` — JSON-LD
+  - `text/turtle` — Turtle
+  - `application/rdf+xml` — RDF/XML
+  - `application/json` — pass-through (no transformation)
+- **ResourceBuilder Extensions:**
+  - `linkedData` — marks a resource for RDF content negotiation
+- **WebHostBuilder Extensions:**
+  - `useLinkedData` — loads embedded semantic artifacts and enables content negotiation middleware
+  - `useLinkedDataWith` — uses a pre-loaded `LinkedDataConfig`
+
+**Frank.Cli - Semantic Resource Extraction Toolchain**
+
+- **New Tool:** `frank-cli` command-line tool for extracting semantic definitions from F# source code
+- **Commands:**
+  - `extract --project <path> --base-uri <uri>` — extract OWL ontology and SHACL shapes from F# types
+  - `clarify --project <path>` — identify ambiguities requiring human input
+  - `validate --project <path>` — validate completeness and consistency
+  - `compile --project <path>` — generate OWL/XML and SHACL Turtle artifacts
+  - `diff --project <path>` — compare current state with previous snapshot
+
+**Frank.Cli.MSBuild - Build-Time Semantic Artifact Embedding**
+
+- **New Package:** Content-only NuGet package that auto-embeds compiled semantic artifacts as assembly resources
+- **Embedded Resources:** `Frank.Semantic.ontology.owl.xml`, `Frank.Semantic.shapes.shacl.ttl`, `Frank.Semantic.manifest.json`
+- **Transitive:** Works automatically via `buildTransitive/` targets
+
+**Frank.Analyzers**
+
+- **FRANK001:** Duplicate HTTP handler detection now covers `datastar` operations
+
 ### New in 7.2.0 (Released 2026-02-10)
 
 **Frank.OpenApi - Native OpenAPI Document Generation Support**

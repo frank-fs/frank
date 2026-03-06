@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <VersionPrefix>7.2.0</VersionPrefix>
+    <VersionPrefix>7.3.0</VersionPrefix>
     <Authors>panesofglass</Authors>
     <Description>F# computation expressions for configuring the Microsoft.AspNetCore.Hosting.IWebHostBuilder and defining routes for HTTP resources using Microsoft.AspNetCore.Routing.</Description>
     <Copyright>Copyright © 2011-2026 Ryan Riley. All rights reserved.</Copyright>
@@ -36,12 +36,33 @@
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+  <UsingTask TaskName="ReadLatestReleaseNotes" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <File ParameterType="System.String" Required="true" />
+      <ReleaseNotes ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var lines = System.IO.File.ReadAllLines(File);
+        var sb = new System.Text.StringBuilder();
+        bool started = false;
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("### New in"))
+            {
+                if (started) break;
+                started = true;
+            }
+            if (started) sb.AppendLine(line);
+        }
+        ReleaseNotes = sb.ToString().TrimEnd();
+      ]]></Code>
+    </Task>
+  </UsingTask>
   <Target Name="PreparePackageReleaseNotesFromFile" BeforeTargets="GenerateNuspec">
-    <ReadLinesFromFile File="..\..\RELEASE_NOTES.md">
-      <Output TaskParameter="Lines" ItemName="ReleaseNoteLines" />
-    </ReadLinesFromFile>
-    <PropertyGroup>
-      <PackageReleaseNotes>@(ReleaseNoteLines, '%0a')</PackageReleaseNotes>
-    </PropertyGroup>
+    <ReadLatestReleaseNotes File="..\..\RELEASE_NOTES.md">
+      <Output TaskParameter="ReleaseNotes" PropertyName="PackageReleaseNotes" />
+    </ReadLatestReleaseNotes>
   </Target>
 </Project>
