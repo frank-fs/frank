@@ -1,8 +1,11 @@
 ---
 work_package_id: WP04
 title: Frank.Cli.Core — Extraction Deduplication & State
-lane: planned
+lane: "doing"
 dependencies: []
+base_branch: master
+base_commit: 0fa8b1a8903680cb246a4f2e6284671457a1e054
+created_at: '2026-03-06T18:55:23.080589+00:00'
 subtasks:
 - T016
 - T017
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 1 - Foundation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "88552"
 review_status: ''
 reviewed_by: ''
 history:
