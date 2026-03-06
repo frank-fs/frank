@@ -1,8 +1,11 @@
 ---
 work_package_id: WP01
 title: Build & Project Integrity
-lane: planned
+lane: "doing"
 dependencies: []
+base_branch: master
+base_commit: 081cc60979e19f9e180b351e104c4fe727eac9c8
+created_at: '2026-03-06T17:16:33.761979+00:00'
 subtasks:
 - T001
 - T002
@@ -12,7 +15,7 @@ subtasks:
 phase: Phase 1 - Foundation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "85622"
 review_status: ''
 reviewed_by: ''
 history:
