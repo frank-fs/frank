@@ -121,24 +121,28 @@ let main args =
 
     // ── diff ──
     let diffCmd = Command("diff")
-    diffCmd.Description <- "Compare two extraction states"
-    let oldStateArg = Argument<string>("old-state")
-    oldStateArg.Description <- "Path to old state file"
-    let newStateArg = Argument<string>("new-state")
-    newStateArg.Description <- "Path to new state file"
+    diffCmd.Description <- "Compare current extraction state with a previous snapshot"
+    let diffProjectArg = Argument<string>("project")
+    diffProjectArg.Description <- "Path to .fsproj file"
+    let previousOpt = Option<string>("--previous")
+    previousOpt.Description <- "Path to previous state file (auto-detects latest backup if omitted)"
     let diffFormatOpt = Option<string>("--format")
     diffFormatOpt.Description <- "Output format (text|json)"
     diffFormatOpt.DefaultValueFactory <- (fun _ -> "text")
-    diffCmd.Arguments.Add(oldStateArg)
-    diffCmd.Arguments.Add(newStateArg)
+    diffCmd.Arguments.Add(diffProjectArg)
+    diffCmd.Options.Add(previousOpt)
     diffCmd.Options.Add(diffFormatOpt)
 
     diffCmd.SetAction(fun parseResult ->
-        let oldPath = parseResult.GetValue(oldStateArg)
-        let newPath = parseResult.GetValue(newStateArg)
+        let project = parseResult.GetValue(diffProjectArg)
+        let previous = parseResult.GetValue(previousOpt)
         let format = parseResult.GetValue(diffFormatOpt)
 
-        let result = DiffCommand.execute oldPath newPath
+        let prevPath =
+            if String.IsNullOrEmpty previous then None
+            else Some previous
+
+        let result = DiffCommand.execute project prevPath
 
         match result with
         | Ok r ->

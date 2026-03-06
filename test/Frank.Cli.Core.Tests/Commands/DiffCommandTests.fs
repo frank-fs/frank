@@ -44,12 +44,18 @@ let tests =
                         let productNode = createUriNode graph (Uri "http://example.org/types/Product")
                         assertTriple graph (productNode, rdfType, owlClass))
 
-                let oldPath = Path.Combine(tempDir, "old-state.json")
-                let newPath = Path.Combine(tempDir, "new-state.json")
-                ExtractionState.save oldPath oldState |> ignore
-                ExtractionState.save newPath newState |> ignore
+                // Save current state at the default path
+                let statePath = ExtractionState.defaultStatePath tempDir
+                ExtractionState.save statePath newState |> ignore
 
-                let result = execute oldPath newPath
+                // Save old state as a backup
+                let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                Directory.CreateDirectory(backupDir) |> ignore
+                let backupPath = Path.Combine(backupDir, "extraction-state-20260101T000000Z.json")
+                ExtractionState.save backupPath oldState |> ignore
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath None
 
                 match result with
                 | Error e -> failtest $"Expected Ok but got Error: {e}"
@@ -61,7 +67,7 @@ let tests =
                 if Directory.Exists tempDir then
                     Directory.Delete(tempDir, true)
 
-        testCase "detects removed triples" <| fun _ ->
+        testCase "detects removed triples with explicit --previous" <| fun _ ->
             let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
             Directory.CreateDirectory(tempDir) |> ignore
 
@@ -75,12 +81,16 @@ let tests =
 
                 let newState = createTestState ignore
 
-                let oldPath = Path.Combine(tempDir, "old-state.json")
-                let newPath = Path.Combine(tempDir, "new-state.json")
-                ExtractionState.save oldPath oldState |> ignore
-                ExtractionState.save newPath newState |> ignore
+                // Save current state at the default path
+                let statePath = ExtractionState.defaultStatePath tempDir
+                ExtractionState.save statePath newState |> ignore
 
-                let result = execute oldPath newPath
+                // Save old state at an explicit path
+                let previousPath = Path.Combine(tempDir, "previous-state.json")
+                ExtractionState.save previousPath oldState |> ignore
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath (Some previousPath)
 
                 match result with
                 | Error e -> failtest $"Expected Ok but got Error: {e}"
@@ -105,12 +115,14 @@ let tests =
                 let state1 = createTestState setupOntology
                 let state2 = createTestState setupOntology
 
-                let oldPath = Path.Combine(tempDir, "old-state.json")
-                let newPath = Path.Combine(tempDir, "new-state.json")
-                ExtractionState.save oldPath state1 |> ignore
-                ExtractionState.save newPath state2 |> ignore
+                let statePath = ExtractionState.defaultStatePath tempDir
+                ExtractionState.save statePath state2 |> ignore
 
-                let result = execute oldPath newPath
+                let previousPath = Path.Combine(tempDir, "previous-state.json")
+                ExtractionState.save previousPath state1 |> ignore
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath (Some previousPath)
 
                 match result with
                 | Error e -> failtest $"Expected Ok but got Error: {e}"
@@ -123,12 +135,86 @@ let tests =
                 if Directory.Exists tempDir then
                     Directory.Delete(tempDir, true)
 
-        testCase "returns error when old state file missing" <| fun _ ->
-            let result = execute "/nonexistent/old.json" "/nonexistent/new.json"
+        testCase "no previous state returns empty diff without error" <| fun _ ->
+            let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
+            Directory.CreateDirectory(tempDir) |> ignore
+
+            try
+                let state = createTestState ignore
+                let statePath = ExtractionState.defaultStatePath tempDir
+                ExtractionState.save statePath state |> ignore
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath None
+
+                match result with
+                | Error e -> failtest $"Expected Ok but got Error: {e}"
+                | Ok r ->
+                    Expect.equal r.Diff.Added.Length 0 "No additions"
+                    Expect.equal r.Diff.Removed.Length 0 "No removals"
+                    Expect.equal r.Diff.Modified.Length 0 "No modifications"
+                    Expect.stringContains r.FormattedDiff "No previous state" "Should mention no previous state"
+            finally
+                if Directory.Exists tempDir then
+                    Directory.Delete(tempDir, true)
+
+        testCase "returns error when current state file missing" <| fun _ ->
+            let result = execute "/nonexistent/Test.fsproj" None
 
             match result with
             | Error msg ->
                 Expect.stringContains msg "not found" "Should mention file not found"
             | Ok _ ->
                 failtest "Expected error for missing state"
+
+        testCase "auto-detects latest backup" <| fun _ ->
+            let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
+            Directory.CreateDirectory(tempDir) |> ignore
+
+            try
+                let oldState = createTestState ignore
+                let newerOldState =
+                    createTestState (fun graph ->
+                        let rdfType = createUriNode graph (Uri Rdf.Type)
+                        let owlClass = createUriNode graph (Uri Owl.Class)
+                        let node = createUriNode graph (Uri "http://example.org/types/Older")
+                        assertTriple graph (node, rdfType, owlClass))
+
+                let newState =
+                    createTestState (fun graph ->
+                        let rdfType = createUriNode graph (Uri Rdf.Type)
+                        let owlClass = createUriNode graph (Uri Owl.Class)
+                        let node = createUriNode graph (Uri "http://example.org/types/Older")
+                        assertTriple graph (node, rdfType, owlClass)
+                        let node2 = createUriNode graph (Uri "http://example.org/types/Newer")
+                        assertTriple graph (node2, rdfType, owlClass))
+
+                let statePath = ExtractionState.defaultStatePath tempDir
+                ExtractionState.save statePath newState |> ignore
+
+                let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                Directory.CreateDirectory(backupDir) |> ignore
+
+                // Older backup
+                ExtractionState.save
+                    (Path.Combine(backupDir, "extraction-state-20260101T000000Z.json"))
+                    oldState |> ignore
+
+                // Newer backup (should be picked)
+                ExtractionState.save
+                    (Path.Combine(backupDir, "extraction-state-20260301T000000Z.json"))
+                    newerOldState |> ignore
+
+                let fakeProjectPath = Path.Combine(tempDir, "Test.fsproj")
+                let result = execute fakeProjectPath None
+
+                match result with
+                | Error e -> failtest $"Expected Ok but got Error: {e}"
+                | Ok r ->
+                    // Should diff against the newer backup (which has Older but not Newer)
+                    Expect.isGreaterThanOrEqual r.Diff.Added.Length 1 "Should detect added Newer class"
+                    Expect.equal r.Diff.Removed.Length 0 "Should have no removed triples"
+            finally
+                if Directory.Exists tempDir then
+                    Directory.Delete(tempDir, true)
     ]
