@@ -187,6 +187,12 @@ module JsonOutput =
         writeString writer "ontologyPath" result.OntologyPath
         writeString writer "shapesPath" result.ShapesPath
         writeString writer "manifestPath" result.ManifestPath
+
+        writer.WriteStartArray("embeddedResourceNames")
+        for name in result.EmbeddedResourceNames do
+            writer.WriteStringValue name
+        writer.WriteEndArray()
+
         writer.WriteEndObject()
         writer.Flush()
 

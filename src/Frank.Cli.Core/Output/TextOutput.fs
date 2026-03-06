@@ -113,6 +113,10 @@ module TextOutput =
         sb.AppendLine(sprintf "Ontology: %s" result.OntologyPath) |> ignore
         sb.AppendLine(sprintf "Shapes:   %s" result.ShapesPath) |> ignore
         sb.AppendLine(sprintf "Manifest: %s" result.ManifestPath) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("Embed these resources in your project:") |> ignore
+        for name in result.EmbeddedResourceNames do
+            sb.AppendLine(sprintf "  <EmbeddedResource Include=\"...\" LogicalName=\"%s\" />" name) |> ignore
         sb.ToString()
 
     let formatError (message: string) : string =

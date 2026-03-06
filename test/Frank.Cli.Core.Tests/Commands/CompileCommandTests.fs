@@ -117,7 +117,7 @@ let tests =
 
             match result with
             | Error msg ->
-                Expect.stringContains msg "not found" "Should mention file not found"
+                Expect.stringContains msg "No extraction state found" "Should mention missing state"
             | Ok _ ->
                 failtest "Expected error for missing state"
     ]
