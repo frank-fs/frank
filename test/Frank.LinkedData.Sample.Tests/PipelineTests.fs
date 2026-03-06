@@ -1,7 +1,6 @@
 module Frank.LinkedData.Sample.Tests.PipelineTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open System.Text.Json
 open Expecto
@@ -75,7 +74,7 @@ let private createProductExtractionState () =
 
     { Ontology = ontology
       Shapes = shapes
-      SourceMap = Dictionary<Uri, SourceLocation>()
+      SourceMap = Map.empty
       Clarifications = Map.empty
       Metadata =
         { Timestamp = DateTimeOffset.UtcNow

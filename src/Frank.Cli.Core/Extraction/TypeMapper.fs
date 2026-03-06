@@ -5,62 +5,39 @@ open VDS.RDF
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Maps F# types (DUs, records) to OWL classes and properties.
 module TypeMapper =
 
-    type MappingConfig = {
-        BaseUri: Uri
-        Vocabularies: string list
-    }
+    type MappingConfig =
+        { BaseUri: Uri
+          Vocabularies: string list }
 
-    type MappedProperty = {
-        PropertyUri: Uri
-        Label: string
-        Domain: Uri
-        Range: Uri
-        IsObjectProperty: bool
-    }
+    type MappedProperty =
+        { PropertyUri: Uri
+          Label: string
+          Domain: Uri
+          Range: Uri
+          IsObjectProperty: bool }
 
-    type MappedClass = {
-        ClassUri: Uri
-        Label: string
-        Properties: MappedProperty list
-        SuperClasses: Uri list
-    }
+    type MappedClass =
+        { ClassUri: Uri
+          Label: string
+          Properties: MappedProperty list
+          SuperClasses: Uri list }
 
-    let private classUri (config: MappingConfig) (typeName: string) =
-        Uri(config.BaseUri.ToString().TrimEnd('/') + "/types/" + typeName)
-
-    let private propertyUri (config: MappingConfig) (typeName: string) (fieldName: string) =
-        Uri(config.BaseUri.ToString().TrimEnd('/') + "/properties/" + typeName + "/" + fieldName)
-
-    let rec private fieldKindToRange (config: MappingConfig) (kind: FieldKind) : Uri * bool =
-        match kind with
-        | Primitive xsdType ->
-            let rangeUri =
-                match xsdType with
-                | "xsd:string" -> Uri Xsd.String
-                | "xsd:integer" -> Uri Xsd.Integer
-                | "xsd:long" -> Uri Xsd.Integer
-                | "xsd:double" | "xsd:float" -> Uri Xsd.Double
-                | "xsd:boolean" -> Uri Xsd.Boolean
-                | "xsd:dateTime" -> Uri Xsd.DateTime
-                | _ -> Uri Xsd.String
-            rangeUri, false
-        | Optional inner -> fieldKindToRange config inner
-        | Collection element -> fieldKindToRange config element
-        | Reference typeName -> classUri config typeName, true
+    let private baseStr (config: MappingConfig) = config.BaseUri.ToString().TrimEnd('/')
 
     let private mapField (config: MappingConfig) (typeName: string) (field: AnalyzedField) : MappedProperty =
-        let range, isObj = fieldKindToRange config field.Kind
-        {
-            PropertyUri = propertyUri config typeName field.Name
-            Label = field.Name
-            Domain = classUri config typeName
-            Range = range
-            IsObjectProperty = isObj
-        }
+        let b = baseStr config
+        let range, isObj = fieldKindToRange b field.Kind
+
+        { PropertyUri = propertyUri b typeName field.Name
+          Label = field.Name
+          Domain = classUri b typeName
+          Range = range
+          IsObjectProperty = isObj }
 
     let private assertProperty (graph: IGraph) (prop: MappedProperty) =
         let propNode = createUriNode graph prop.PropertyUri
@@ -68,8 +45,11 @@ module TypeMapper =
 
         // rdf:type owl:DatatypeProperty or owl:ObjectProperty
         let propTypeUri =
-            if prop.IsObjectProperty then Uri Owl.ObjectProperty
-            else Uri Owl.DatatypeProperty
+            if prop.IsObjectProperty then
+                Uri Owl.ObjectProperty
+            else
+                Uri Owl.DatatypeProperty
+
         assertTriple graph (propNode, rdfType, createUriNode graph propTypeUri)
 
         // rdfs:domain
@@ -100,44 +80,47 @@ module TypeMapper =
             assertProperty graph prop
 
     let private mapAnalyzedType (config: MappingConfig) (analyzedType: AnalyzedType) : MappedClass list =
+        let b = baseStr config
+
         match analyzedType.Kind with
         | Record fields ->
             let props = fields |> List.map (mapField config analyzedType.ShortName)
-            [{
-                ClassUri = classUri config analyzedType.ShortName
+
+            [ { ClassUri = classUri b analyzedType.ShortName
                 Label = analyzedType.ShortName
                 Properties = props
-                SuperClasses = []
-            }]
+                SuperClasses = [] } ]
         | DiscriminatedUnion cases ->
-            let parentUri = classUri config analyzedType.ShortName
-            let parentClass = {
-                ClassUri = parentUri
-                Label = analyzedType.ShortName
-                Properties = []
-                SuperClasses = []
-            }
+            let parentUri = classUri b analyzedType.ShortName
+
+            let parentClass =
+                { ClassUri = parentUri
+                  Label = analyzedType.ShortName
+                  Properties = []
+                  SuperClasses = [] }
+
             let caseClasses =
-                cases |> List.map (fun case ->
+                cases
+                |> List.map (fun case ->
                     let caseProps = case.Fields |> List.map (mapField config case.Name)
-                    {
-                        ClassUri = classUri config case.Name
-                        Label = case.Name
-                        Properties = caseProps
-                        SuperClasses = [parentUri]
-                    })
+
+                    { ClassUri = classUri b case.Name
+                      Label = case.Name
+                      Properties = caseProps
+                      SuperClasses = [ parentUri ] })
+
             parentClass :: caseClasses
         | Enum values ->
-            [{
-                ClassUri = classUri config analyzedType.ShortName
+            [ { ClassUri = classUri b analyzedType.ShortName
                 Label = analyzedType.ShortName
                 Properties = []
-                SuperClasses = []
-            }]
+                SuperClasses = [] } ]
 
     let mapTypes (config: MappingConfig) (types: AnalyzedType list) : IGraph =
         let graph = createGraph ()
         let allClasses = types |> List.collect (mapAnalyzedType config)
+
         for cls in allClasses do
             assertClass graph cls
+
         graph
