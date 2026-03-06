@@ -1,8 +1,11 @@
 ---
 work_package_id: WP03
 title: Frank.LinkedData — Middleware & Negotiation
-lane: planned
+lane: "doing"
 dependencies: [WP02]
+base_branch: 002-phase1-code-review-fixes-WP02
+base_commit: 4ebbaebb6b8f6bcc0bad74b37f685bafb57a1157
+created_at: '2026-03-06T19:00:10.737267+00:00'
 subtasks:
 - T011
 - T012
@@ -12,8 +15,8 @@ subtasks:
 - T026
 phase: Phase 1 - Foundation
 assignee: ''
-agent: ''
-shell_pid: ''
+agent: "claude-opus"
+shell_pid: "89475"
 review_status: ''
 reviewed_by: ''
 history:
@@ -287,3 +290,4 @@ Depends on WP02 — both modify `WebHostBuilderExtensions.fs`, `InstanceProjecto
 ## Activity Log
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
+- 2026-03-06T19:00:10Z – claude-opus – shell_pid=89475 – lane=doing – Assigned agent via workflow command

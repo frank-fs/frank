@@ -17,11 +17,11 @@
 **Requirement Refs**: FR-005, FR-006, FR-013, FR-019, FR-022
 
 ### Included Subtasks
-- [ ] T001 Add `Frank.Cli.MSBuild` project to `Frank.sln`
-- [ ] T002 Fix `Frank.LinkedData.Sample` to use `ProjectReference` instead of NuGet 7.3.0 for `Frank.Cli.MSBuild`
-- [ ] T003 Pin `FSharp.Compiler.Service`, `Ionide.ProjInfo`, `Ionide.ProjInfo.FCS` to specific versions in `Frank.Cli.Core.fsproj`
-- [ ] T004 Normalize `FSharp.Core` pinning across all projects
-- [ ] T005 Fix `ValidateFrankSemanticDefinitions` MSBuild target to check specific input artifacts instead of output directory
+- [x] T001 Add `Frank.Cli.MSBuild` project to `Frank.sln`
+- [x] T002 Fix `Frank.LinkedData.Sample` to use `ProjectReference` instead of NuGet 7.3.0 for `Frank.Cli.MSBuild`
+- [x] T003 Pin `FSharp.Compiler.Service`, `Ionide.ProjInfo`, `Ionide.ProjInfo.FCS` to specific versions in `Frank.Cli.Core.fsproj`
+- [x] T004 Normalize `FSharp.Core` pinning across all projects
+- [x] T005 Fix `ValidateFrankSemanticDefinitions` MSBuild target to check specific input artifacts instead of output directory
 
 ### Implementation Notes
 - Use `dotnet sln add` for T001
@@ -50,11 +50,11 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-020
 
 ### Included Subtasks
-- [ ] T006 Fix `JsonLdFormatter` multi-subject (`@graph`) branch to preserve typed literal info (int, bool, double, decimal)
-- [ ] T007 Fix `InstanceProjector` to map `Int64` → `xsd:long` and `Decimal` → `xsd:decimal`
-- [ ] T008 Fix `GraphLoader.fs` `StreamReader` to use `use` binding
-- [ ] T009 [P] Create shared `RdfUriHelpers` module in `Frank.LinkedData` with `localName` and `namespaceUri` functions
-- [ ] T010 [P] Update `JsonLdFormatter`, `InstanceProjector`, and `WebHostBuilderExtensions` to use shared helpers
+- [x] T006 Fix `JsonLdFormatter` multi-subject (`@graph`) branch to preserve typed literal info (int, bool, double, decimal)
+- [x] T007 Fix `InstanceProjector` to map `Int64` → `xsd:long` and `Decimal` → `xsd:decimal`
+- [x] T008 Fix `GraphLoader.fs` `StreamReader` to use `use` binding
+- [x] T009 [P] Create shared `RdfUriHelpers` module in `Frank.LinkedData` with `localName` and `namespaceUri` functions
+- [x] T010 [P] Update `JsonLdFormatter`, `InstanceProjector`, and `WebHostBuilderExtensions` to use shared helpers
 
 ### Implementation Notes
 - T006: The single-subject path correctly handles typed literals — mirror that logic in the `@graph` branch
@@ -122,13 +122,13 @@
 **Requirement Refs**: FR-002, FR-010, FR-012, FR-018
 
 ### Included Subtasks
-- [ ] T016 Create `UriHelpers.fs` in `Frank.Cli.Core/Extraction/` with `classUri`, `propertyUri`, `resourceUri`, `routeToSlug`, `fieldKindToRange`
-- [ ] T017 Update `TypeMapper.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`)
-- [ ] T018 [P] Update `ShapeGenerator.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`, `shapeUri` stays local)
-- [ ] T019 [P] Update `RouteMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
-- [ ] T020 [P] Update `CapabilityMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
-- [ ] T021 Change `ExtractionState.SourceMap` from `Dictionary<Uri, SourceLocation>` to `Map<string, SourceLocation>` and update `save`/`load` functions
-- [ ] T022 Remove dead `scope` parameter from `ExtractCommand` and `Program.fs` CLI argument definition
+- [x] T016 Create `UriHelpers.fs` in `Frank.Cli.Core/Extraction/` with `classUri`, `propertyUri`, `resourceUri`, `routeToSlug`, `fieldKindToRange`
+- [x] T017 Update `TypeMapper.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`)
+- [x] T018 [P] Update `ShapeGenerator.fs` to use `UriHelpers` (remove local `classUri`, `propertyUri`, `fieldKindToRange`, `shapeUri` stays local)
+- [x] T019 [P] Update `RouteMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
+- [x] T020 [P] Update `CapabilityMapper.fs` to use `UriHelpers` (remove local `routeToSlug`, `resourceUri`)
+- [x] T021 Change `ExtractionState.SourceMap` from `Dictionary<Uri, SourceLocation>` to `Map<string, SourceLocation>` and update `save`/`load` functions
+- [x] T022 Remove dead `scope` parameter from `ExtractCommand` and `Program.fs` CLI argument definition
 
 ### Implementation Notes
 - T016: Place `UriHelpers.fs` before `TypeMapper.fs` in project file compilation order
