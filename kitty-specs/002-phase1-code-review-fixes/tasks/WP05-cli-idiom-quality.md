@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Frank.Cli.Core — Idiom & Quality
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: fix/cross-library-consistency
 base_commit: e3d8cb0dccf820416c6424eb119051023cc198a6
@@ -18,8 +18,8 @@ phase: Phase 2 - Idiom
 assignee: ''
 agent: "claude-opus"
 shell_pid: "90835"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-06T15:25:00Z'
   lane: planned
@@ -259,3 +259,4 @@ No hard dependencies, but logically follows WP04 since both modify `Frank.Cli.Co
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
 - 2026-03-06T19:26:38Z – claude-opus – shell_pid=90835 – lane=doing – Assigned agent via workflow command
+- 2026-03-06T21:17:10Z – claude-opus – shell_pid=90835 – lane=done – Review passed: Severity DU, DiffType DU, walkCeBody functional fold, AutoOpen removed, JsonDocument use binding, Literal annotations, FsToolkit.ErrorHandling 5.0.1. 80 tests pass.
