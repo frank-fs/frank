@@ -17,11 +17,11 @@
 **Requirement Refs**: FR-005, FR-006, FR-013, FR-019, FR-022
 
 ### Included Subtasks
-- [ ] T001 Add `Frank.Cli.MSBuild` project to `Frank.sln`
-- [ ] T002 Fix `Frank.LinkedData.Sample` to use `ProjectReference` instead of NuGet 7.3.0 for `Frank.Cli.MSBuild`
-- [ ] T003 Pin `FSharp.Compiler.Service`, `Ionide.ProjInfo`, `Ionide.ProjInfo.FCS` to specific versions in `Frank.Cli.Core.fsproj`
-- [ ] T004 Normalize `FSharp.Core` pinning across all projects
-- [ ] T005 Fix `ValidateFrankSemanticDefinitions` MSBuild target to check specific input artifacts instead of output directory
+- [x] T001 Add `Frank.Cli.MSBuild` project to `Frank.sln`
+- [x] T002 Fix `Frank.LinkedData.Sample` to use `ProjectReference` instead of NuGet 7.3.0 for `Frank.Cli.MSBuild`
+- [x] T003 Pin `FSharp.Compiler.Service`, `Ionide.ProjInfo`, `Ionide.ProjInfo.FCS` to specific versions in `Frank.Cli.Core.fsproj`
+- [x] T004 Normalize `FSharp.Core` pinning across all projects
+- [x] T005 Fix `ValidateFrankSemanticDefinitions` MSBuild target to check specific input artifacts instead of output directory
 
 ### Implementation Notes
 - Use `dotnet sln add` for T001
