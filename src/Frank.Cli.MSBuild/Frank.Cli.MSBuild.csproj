@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <NoBuild>true</NoBuild>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>Frank.Cli.MSBuild</PackageId>
     <Description>MSBuild integration for Frank.Cli: auto-embeds semantic artifacts into compiled assemblies.</Description>
