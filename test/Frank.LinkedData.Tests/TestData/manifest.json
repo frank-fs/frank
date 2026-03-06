@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "baseUri": "http://example.org/api",
+  "sourceHash": "abc123",
+  "vocabularies": ["schema.org"],
+  "generatedAt": "2026-01-01T00:00:00+00:00"
+}
