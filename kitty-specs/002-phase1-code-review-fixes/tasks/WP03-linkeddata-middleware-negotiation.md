@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Frank.LinkedData — Middleware & Negotiation
-lane: "doing"
+lane: "for_review"
 dependencies: [WP02]
 base_branch: 002-phase1-code-review-fixes-WP02
 base_commit: 4ebbaebb6b8f6bcc0bad74b37f685bafb57a1157
@@ -291,3 +291,4 @@ Depends on WP02 — both modify `WebHostBuilderExtensions.fs`, `InstanceProjecto
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
 - 2026-03-06T19:00:10Z – claude-opus – shell_pid=89475 – lane=doing – Assigned agent via workflow command
+- 2026-03-06T19:30:14Z – claude-opus – shell_pid=89475 – lane=for_review – Ready for review: ILogger, MediaTypeHeaderValue, null assembly, structural hash, loadConfig/GraphLoader CE refactors. 50 tests pass.
