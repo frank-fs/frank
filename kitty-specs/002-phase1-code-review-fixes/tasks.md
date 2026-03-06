@@ -88,7 +88,7 @@
 - [x] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
 - [x] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
 - [x] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
-- [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
+- [x] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 
 ### Implementation Notes
 - T011: Inject `ILogger<>` into middleware. Log with `LogWarning`/`LogError` + exception context. Let unrecoverable errors propagate (fail-fast). Do not wrap in Result.
