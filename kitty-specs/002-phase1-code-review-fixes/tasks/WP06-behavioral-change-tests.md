@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: New Tests for Behavioral Changes
-lane: "doing"
+lane: "done"
 dependencies:
 - WP02
 - WP03
@@ -21,8 +21,8 @@ phase: Phase 3 - Verification
 assignee: ''
 agent: "claude-opus"
 shell_pid: "97050"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-06T15:25:00Z'
   lane: planned
@@ -213,3 +213,4 @@ Depends on WP02, WP03, WP04, WP05 — tests validate behavioral changes from tho
 - 2026-03-06T21:30:21Z – claude-opus – shell_pid=95853 – lane=doing – Assigned agent via workflow command
 - 2026-03-06T21:41:30Z – claude-opus – shell_pid=95853 – lane=for_review – Ready for review: 16 new behavioral change tests across 5 files. All 146 tests pass (130 baseline + 16 new). Tests cover T031-T036: JSON-LD @graph typed literals, Accept header quality factors, structural hash caching, null assembly handling, and Map<string,SourceLocation> round-trip.
 - 2026-03-06T21:43:24Z – claude-opus – shell_pid=97050 – lane=doing – Started review via workflow command
+- 2026-03-06T21:52:22Z – claude-opus – shell_pid=97050 – lane=done – Review passed: All 6 subtasks (T031-T036) verified. 16 new behavioral change tests across 5 files. All 146 tests pass, zero failures. kitty-specs from merged WP02-WP04 dependency branches are expected.
