@@ -1,0 +1,9 @@
+{
+  "feature_number": "002",
+  "slug": "002-phase1-code-review-fixes",
+  "feature_slug": "002-phase1-code-review-fixes",
+  "friendly_name": "phase1 code review fixes",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-06T05:41:02.895651+00:00"
+}
