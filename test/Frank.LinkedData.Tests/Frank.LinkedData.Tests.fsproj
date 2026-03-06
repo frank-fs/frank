@@ -25,10 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
-    <PackageReference Include="Expecto" Version="10.*" />
-    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.*" />
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0-preview.1.*" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Expecto" Version="10.2.3" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
