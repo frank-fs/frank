@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Rdf/RdfUriHelpers.fs" />
     <Compile Include="Rdf/GraphLoader.fs" />
     <Compile Include="Rdf/InstanceProjector.fs" />
     <Compile Include="Negotiation/JsonLdFormatter.fs" />
