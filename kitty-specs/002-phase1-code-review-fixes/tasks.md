@@ -83,12 +83,12 @@
 **Requirement Refs**: FR-007, FR-008, FR-009, FR-011, FR-015
 
 ### Included Subtasks
-- [ ] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
-- [ ] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
-- [ ] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
-- [ ] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
-- [ ] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
-- [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
+- [x] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
+- [x] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
+- [x] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
+- [x] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
+- [x] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
+- [x] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 
 ### Implementation Notes
 - T011: Inject `ILogger<>` into middleware. Log with `LogWarning`/`LogError` + exception context. Let unrecoverable errors propagate (fail-fast). Do not wrap in Result.
