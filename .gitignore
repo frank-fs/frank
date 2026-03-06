@@ -66,3 +66,4 @@ nupkg/
 .github/copilot/
 .kittify/.dashboard
 .kittify/missions/__pycache__/
+.kittify/workspaces
