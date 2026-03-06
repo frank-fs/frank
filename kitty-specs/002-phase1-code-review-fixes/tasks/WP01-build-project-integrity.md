@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Build & Project Integrity
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 081cc60979e19f9e180b351e104c4fe727eac9c8
@@ -158,3 +158,4 @@ No dependencies — this is a starting package.
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
 - 2026-03-06T17:16:33Z – claude-opus – shell_pid=85622 – lane=doing – Assigned agent via workflow command
+- 2026-03-06T18:54:28Z – claude-opus – shell_pid=85622 – lane=for_review – Ready for review: All 5 subtasks complete. Zero wildcards, Frank.Cli.MSBuild in sln, sample uses ProjectReference, MSBuild targets incremental. 227 tests pass.
