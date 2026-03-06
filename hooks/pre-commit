@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-commit hook: check F# formatting with fantomas
+# Setup: git config core.hooksPath hooks
+
+staged_fs=$(git diff --cached --name-only --diff-filter=ACM | grep '\.fs$' || true)
+
+if [ -z "$staged_fs" ]; then
+    exit 0
+fi
+
+echo "Checking F# formatting..."
+
+if ! echo "$staged_fs" | xargs dotnet fantomas --check 2>/dev/null; then
+    echo ""
+    echo "Formatting check failed. Run:"
+    echo "  dotnet fantomas <files>"
+    echo "or format all staged F# files:"
+    echo "  git diff --cached --name-only --diff-filter=ACM | grep '\\.fs$' | xargs dotnet fantomas"
+    exit 1
+fi

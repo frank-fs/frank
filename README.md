@@ -481,6 +481,21 @@ Make sure the following **requirements** are installed in your system:
 dotnet build
 ```
 
+## Contributing
+
+After cloning, restore local tools and enable the pre-commit hook:
+
+```bash
+dotnet tool restore
+git config core.hooksPath hooks
+```
+
+This installs [Fantomas](https://fsprojects.github.io/fantomas/) and enables a pre-commit hook that checks F# formatting. If a commit is blocked, format the staged files with:
+
+```bash
+git diff --cached --name-only --diff-filter=ACM | grep '\.fs$' | xargs dotnet fantomas
+```
+
 ---
 
 ## Sample Applications
