@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: CLI Commands — Validate, Diff, Compile
-lane: "done"
+lane: "doing"
 dependencies: [WP05]
 base_branch: 001-semantic-resources-phase1-WP05
 base_commit: abe61520e8fdba26efb99e1078b280a99e998dc6
@@ -16,7 +16,7 @@ subtasks:
 phase: Phase 1 - CLI
 assignee: ''
 agent: "claude-opus"
-shell_pid: "21815"
+shell_pid: "23653"
 review_status: "approved"
 reviewed_by: "Ryan Riley"
 history:
@@ -234,3 +234,4 @@ Location: `test/Frank.Cli.Core.Tests/` (unit tests) and a new `test/Frank.Cli.In
 - 2026-03-05T23:59:45Z – claude-opus – shell_pid=10839 – lane=for_review – Ready for review: ValidateCommand, DiffCommand, CompileCommand, Program.fs with System.CommandLine, output formatters, 12 new tests. 78 total passing.
 - 2026-03-05T23:59:48Z – claude-opus – shell_pid=21815 – lane=doing – Started review via workflow command
 - 2026-03-06T00:01:31Z – claude-opus – shell_pid=21815 – lane=done – Review passed: All 3 commands implemented correctly. ValidateCommand has proper URI comparison fix, DiffCommand delegates cleanly to DiffEngine, CompileCommand generates all artifacts. Program.fs wires 5 subcommands. 12 new tests all passing (78 total). Minor gaps (compile round-trip check, integration test project) acceptable for Phase 1.
+- 2026-03-06T00:04:41Z – claude-opus – shell_pid=23653 – lane=doing – Started implementation via workflow command
