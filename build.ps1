@@ -16,7 +16,11 @@ if ($env:appveyor){
     Update-AppveyorBuild -Version "$version$versionSuffix"
 }
 
+dotnet pack -c Release src/Frank.Cli.MSBuild -o $psscriptroot/nupkg
+
 dotnet build -c Release Frank.sln /p:Version=$version$versionSuffix
+
+dotnet test test/Frank.Tests
 dotnet pack -c Release src/Frank /p:Version=$version$versionSuffix -o $psscriptroot/bin
 
 dotnet test test/Frank.Analyzers.Tests
@@ -30,3 +34,10 @@ dotnet pack -c Release src/Frank.OpenApi /p:Version=$version$versionSuffix -o $p
 
 dotnet test test/Frank.Datastar.Tests
 dotnet pack -c Release src/Frank.Datastar /p:Version=$version$versionSuffix -o $psscriptroot/bin
+
+dotnet test test/Frank.Cli.Core.Tests
+dotnet test test/Frank.Cli.IntegrationTests
+dotnet test test/Frank.LinkedData.Tests
+dotnet test test/Frank.LinkedData.Sample.Tests
+dotnet pack -c Release src/Frank.LinkedData /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Cli.MSBuild -o $psscriptroot/bin

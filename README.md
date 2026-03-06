@@ -18,6 +18,8 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
 | **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/nuget/v/Frank.OpenApi)](https://www.nuget.org/packages/Frank.OpenApi/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
+| **Frank.LinkedData** | Semantic RDF/Linked Data content negotiation middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.LinkedData)](https://www.nuget.org/packages/Frank.LinkedData/) |
+| **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
 ---
@@ -377,6 +379,75 @@ Frank.OpenApi is fully backward compatible with existing Frank applications. You
 
 ---
 
+## Frank.LinkedData
+
+Frank.LinkedData provides automatic RDF content negotiation for Frank applications. Endpoints marked with `linkedData` can serve JSON-LD, Turtle, and RDF/XML representations alongside standard JSON — driven by an OWL ontology extracted from your F# domain types.
+
+### Installation
+
+```bash
+dotnet add package Frank.LinkedData
+dotnet add package Frank.Cli.MSBuild
+```
+
+The `Frank.Cli.MSBuild` package auto-embeds semantic artifacts (ontology, SHACL shapes, manifest) into your assembly at build time.
+
+### Marking Resources
+
+Add `linkedData` to any resource to enable RDF content negotiation:
+
+```fsharp
+open Frank.Builder
+open Frank.LinkedData
+
+let products =
+    resource "/products" {
+        name "Products"
+        linkedData
+        get (fun ctx -> ctx.Response.WriteAsJsonAsync(getAllProducts()))
+    }
+```
+
+### Application Wiring
+
+```fsharp
+[<EntryPoint>]
+let main args =
+    webHost args {
+        useDefaults
+        useLinkedData  // Loads embedded ontology and enables content negotiation
+
+        resource products
+    }
+    0
+```
+
+### Content Negotiation
+
+Clients request RDF formats via the `Accept` header:
+
+| Accept Header | Response Format |
+|---------------|----------------|
+| `application/ld+json` | JSON-LD |
+| `text/turtle` | Turtle |
+| `application/rdf+xml` | RDF/XML |
+| `application/json` (or any other) | Original JSON (pass-through) |
+
+### Semantic Toolchain
+
+Use `frank-cli` to extract an ontology from your F# types:
+
+```bash
+dotnet tool install --global frank-cli
+frank-cli extract --project MyApp.fsproj --base-uri https://example.org/api
+frank-cli validate --project MyApp.fsproj
+frank-cli compile --project MyApp.fsproj
+```
+
+The compiled artifacts are automatically embedded by `Frank.Cli.MSBuild` and loaded at startup by `useLinkedData`.
+
+---
+
 ## Frank.Datastar
 
 Frank.Datastar provides seamless integration with [Datastar](https://data-star.dev/), enabling reactive hypermedia applications using Server-Sent Events (SSE).
@@ -512,6 +583,7 @@ The `sample/` directory contains several example applications:
 | `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
 | `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
 | `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
+| `Frank.LinkedData.Sample` | Linked Data content negotiation with semantic RDF responses |
 
 ---
 
