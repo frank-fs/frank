@@ -16,7 +16,7 @@ subtasks:
 - T030
 phase: Phase 2 - Idiom
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "90835"
 review_status: ''
 reviewed_by: ''
@@ -258,3 +258,4 @@ No hard dependencies, but logically follows WP04 since both modify `Frank.Cli.Co
 ## Activity Log
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
+- 2026-03-06T19:26:38Z – claude-opus – shell_pid=90835 – lane=doing – Assigned agent via workflow command
