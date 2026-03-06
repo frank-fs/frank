@@ -4942,3 +4942,203 @@ Fix recommended. List what will be covered by WP12 and what remains.
 ---
 
 Continue with WP12
+
+---
+
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   The user is implementing Phase 1 of Semantic Resources (v7.3.0) for the Frank F# web framework using the spec-kitty workflow. This session covered:
+   - Fixing 3 failing CompileCommand tests in WP06 (file handle leak, error message assertion)
+   - Resolving review findings: DiffCommand interface change (`--project` + `--previous` with auto-detect backup), integration test project creation, spec update (`--text` → `--format`)
+   - Dispatching parallel agents for WP09 (MSBuild package) and WP10 (CLI Core Tests)
+   - Reviewing and approving WP09 and WP10
+   - Auditing all 11 completed WPs for gaps
+   - Fixing recommended gaps (WP09 missing buildTransitive props, WP06 integration test not in solution, WP11 startup test)
+   - Starting WP12 (Sample App & E2E Integration) — the final WP
+   - Resolving merge conflicts when combining WP06, WP08, and WP09 branches into WP12 worktree
+
+2. Key Technical Concepts:
+   - F# 8.0+ targeting .NET 10.0 for CLI, multi-targeting for libraries
+   - spec-kitty workflow: implement → for_review → done (with subtask marking)
+   - Git worktrees for isolated WP implementation; stacked branches
+   - System.CommandLine 2.0.* for CLI entry point
+   - dotNetRdf.Core 3.5.1 — `Difference().AreEqual` for graph isomorphism (no `IsIsomorphicWith`)
+   - SHA-256 hashing for source file staleness detection
+   - Content-only NuGet packages (MSBuild `.props`/`.targets` with `NoBuild=true`)
+   - `FrankCliOutputPath` property for MSBuild target embedding
+   - `EmbeddedResource` with `LogicalName` for stable resource naming
+   - `buildTransitive/` directory for NuGet transitive dependency flow
+   - `do` blocks in F# to scope `use` bindings for early disposal
+   - DiffCommand auto-detect: sorts backup files by filename (ISO 8601 timestamp in name) descending
+   - ExtractionState: `SourceMap: Dictionary<Uri, SourceLocation>`, `defaultStatePath` returns `obj/frank-cli/state.json`
+   - Merge conflict resolution strategy: "ours" for files owned by base branch, "theirs" for incoming branch
+
+3. Files and Code Sections:
+
+   **CompileCommand.fs** (`src/Frank.Cli.Core/Commands/CompileCommand.fs` in WP06 worktree):
+   - Fixed file handle leak by wrapping write operations in `do` blocks so `use` bindings dispose before `verifyRoundTrip`
+   ```fsharp
+   // Write ontology.owl.xml
+   let ontologyPath = Path.Combine(outDir, "ontology.owl.xml")
+   do
+       let rdfXmlWriter = RdfXmlWriter()
+       use ontologyStream = File.Create ontologyPath
+       use ontologySw = new StreamWriter(ontologyStream)
+       rdfXmlWriter.Save(state.Ontology, ontologySw :> TextWriter)
+   // ... same pattern for shapes and manifest
+   // Round-trip verification runs AFTER do blocks dispose file handles
+   verifyRoundTrip ontologyPath shapesPath manifestPath
+   ```
+
+   **DiffCommand.fs** (`src/Frank.Cli.Core/Commands/DiffCommand.fs` in WP06 worktree):
+   - Complete rewrite from two positional args to `--project` + `--previous` with auto-detect
+   ```fsharp
+   let private findLatestBackup (projectDir: string) : string option =
+       let backupDir = Path.Combine(projectDir, "obj", "frank-cli", "backups")
+       if Directory.Exists backupDir then
+           Directory.GetFiles(backupDir, "extraction-state-*.json")
+           |> Array.sortDescending
+           |> Array.tryHead
+       else
+           None
+
+   let private emptyResult () =
+       let emptyDiff = { Added = []; Removed = []; Modified = [] }
+       Ok { Diff = emptyDiff; FormattedDiff = "No previous state found. Nothing to compare." }
+
+   let execute (projectPath: string) (previousPath: string option) : Result<DiffCommandResult, string> =
+       let projectDir = Path.GetDirectoryName projectPath
+       let currentStatePath = ExtractionState.defaultStatePath projectDir
+       match ExtractionState.load currentStatePath with
+       | Error e -> Error $"Failed to load current state: {e}"
+       | Ok currentState ->
+       let resolvedPrevious =
+           match previousPath with
+           | Some p -> Some p
+           | None -> findLatestBackup projectDir
+       match resolvedPrevious with
+       | None -> emptyResult ()
+       | Some prevPath ->
+       match ExtractionState.load prevPath with
+       | Error e -> Error $"Failed to load previous state: {e}"
+       | Ok previousState ->
+       let diff = DiffEngine.diffStates previousState currentState
+       let formatted = DiffEngine.formatDiff diff
+       Ok { Diff = diff; FormattedDiff = formatted }
+   ```
+
+   **Program.fs** (`src/Frank.Cli/Program.fs` in WP06 worktree):
+   - Updated diff subcommand from two positional args to `--project` arg + `--previous` option
+   ```fsharp
+   let diffCmd = Command("diff")
+   diffCmd.Description <- "Compare current extraction state with a previous snapshot"
+   let diffProjectArg = Argument<string>("project")
+   let previousOpt = Option<string>("--previous")
+   previousOpt.Description <- "Path to previous state file (auto-detects latest backup if omitted)"
+   // ...
+   diffCmd.SetAction(fun parseResult ->
+       let project = parseResult.GetValue(diffProjectArg)
+       let previous = parseResult.GetValue(previousOpt)
+       let prevPath = if String.IsNullOrEmpty previous then None else Some previous
+       let result = DiffCommand.execute project prevPath
+       // ...)
+   ```
+
+   **DiffCommandTests.fs** (`test/Frank.Cli.Core.Tests/Commands/DiffCommandTests.fs`):
+   - Rewritten with 6 tests: auto-detect backup, explicit --previous, empty diff, no previous state (returns empty not error), error case, latest backup selection
+
+   **CompileCommandTests.fs** (`test/Frank.Cli.Core.Tests/Commands/CompileCommandTests.fs`):
+   - Fixed assertion: `"not found"` → `"No extraction state found"`
+
+   **Frank.Cli.IntegrationTests** (new project in WP06 worktree):
+   - `Frank.Cli.IntegrationTests.fsproj` — references Frank.Cli.Core, uses Expecto
+   - `PipelineTests.fs` — 3 tests: validate→compile, validate→compile→diff, validate with inconsistent state
+   - `Program.fs` — Expecto entry point
+   - Added to Frank.sln
+
+   **WP09 files** (`src/Frank.Cli.MSBuild/` in WP09 worktree):
+   - `build/Frank.Cli.MSBuild.props`: Defines `FrankCliOutputPath` with `$(IntermediateOutputPath)frank-cli/` default
+   - `build/Frank.Cli.MSBuild.targets`: `EmbedFrankSemanticDefinitions` (BeforeTargets=CoreCompile) + `ValidateFrankSemanticDefinitions` (warning when no artifacts)
+   - `buildTransitive/Frank.Cli.MSBuild.targets`: Identical to build/ version
+   - `buildTransitive/Frank.Cli.MSBuild.props`: Added as gap fix (copy of build/ props)
+   - `Frank.Cli.MSBuild.csproj`: Content-only package (`NoBuild=true`, `IncludeBuildOutput=false`, `netstandard2.0`)
+
+   **WP10 test files** (in WP10 worktree):
+   - 20 new tests added across TypeMapperTests.fs, RouteMapperTests.fs, CapabilityMapperTests.fs, ShapeGeneratorTests.fs, AstAnalyzerTests.fs (100 total, all passing)
+
+   **WP11 StartupValidationTests.fs** (in WP11 worktree):
+   - Added test "loadConfig failure wraps as InvalidOperationException per useLinkedData contract"
+
+   **WP06 spec** (`kitty-specs/001-semantic-resources-phase1/tasks/WP06-cli-validate-diff-compile.md`):
+   - Updated `--text` flag → `--format text|json` option
+
+   **WP12 Frank.sln** (merge conflict resolution):
+   - Resolved 3 conflict blocks: all were HEAD-only additions for Frank.Cli.IntegrationTests project entries
+
+4. Errors and fixes:
+   - **CompileCommand file handle leak**: `use manifestStream = File.Create` and `use writer = new Utf8JsonWriter` stayed in scope when `verifyRoundTrip` tried to read the file. Fixed by wrapping writes in `do` blocks.
+   - **Error message assertion**: Test expected `"not found"` substring but message was `"No extraction state found..."` — "not found" is NOT a substring of "state found". Fixed assertion to `"No extraction state found"`.
+   - **`.entire/` directory blocking spec-kitty**: User clarified it was already in master. Fixed by rebasing on master.
+   - **kitty-specs blocking spec-kitty move-to-review**: History contained task-tracking commits from parallel WP11 work. User criticized poor communication about what I was doing. Used `--force` after explaining clearly.
+   - **spec-kitty mark-status syntax**: Used `--done` flag which doesn't exist. Correct syntax is `--status done`.
+   - **WP12 multi-parent merge failure**: spec-kitty couldn't auto-merge WP06+WP08+WP09. Used `--base WP06` then manually merged WP08. Resolved add/add conflicts by keeping WP06's CLI files and WP08's LinkedData files.
+   - **Bash cd not persisting**: Ran `cd` in Bash but next command was back in main repo. Fixed by using full paths or `cd && command` chains.
+
+5. Problem Solving:
+   - Resolved the DiffCommand interface mismatch with spec by implementing `--project` + `--previous` with auto-detect backup feature
+   - Created integration test project that exercises validate→compile→diff pipeline
+   - Completed comprehensive audit of all 11 WPs, categorized gaps as "covered by WP12" vs "accepted deviations"
+   - Successfully merged divergent branches (WP06 CLI chain + WP08 LinkedData chain) into WP12 worktree
+   - WP09 merge still pending in WP12 worktree
+
+6. All user messages:
+   - (Context restoration message — continuation from prior session)
+   - "keep the .entire/ directory in source control."
+   - "I already added .entire/ to source control in master"
+   - "why are you cleaning up planning artifacts? Aren't those necessary to retain during the implementation?"
+   - "No, WP11 was implmeneted off the same branch in parallel, but WP11 made it back in before WP06. Rebasing on master has now changed the base on top of which WP06 was begun."
+   - "/spec-kitty.review WP06"
+   - "Let's resolve the key findings. We should get the integration test project in place, as that could block needed test cases. diff command should take the --project + --previous flags and implement auto-detect backup feature. --format instead of --text is reasonable, but update the spec to match."
+   - "What are the three integration tests?"
+   - "On which branch are we now? What's next?"
+   - "yes" (dispatch parallel agents for WP09/WP10)
+   - "yes" (review both WP09 and WP10)
+   - "Any gaps remaining in any completed WP?"
+   - "Fix recommended. List what will be covered by WP12 and what remains."
+   - "Continue with WP12"
+   - (Summary request)
+
+7. Pending Tasks:
+   - **Merge WP09 branch into WP12 worktree** (WP08 merge done, WP09 still needed)
+   - **Implement WP12 deliverables** (T059-T063):
+     - T059: Sample app Program.fs with Product domain model and linkedData resources
+     - T060: Full CLI pipeline test (extract → clarify → validate → compile → build)
+     - T061: Embedded resource verification + HTTP content negotiation tests
+     - T062: Quickstart validation
+     - T063: Solution integration + regression (all existing tests pass)
+   - **Review WP12** after implementation
+   - **Final feature merge** once all 12 WPs are done
+
+8. Current Work:
+   Working on WP12 (Sample App & E2E Integration) implementation. Created the WP12 worktree based on WP06 branch. Successfully merged WP08 branch into the WP12 worktree, resolving all merge conflicts:
+   - CLI files (Frank.Cli.Core, Frank.Cli, CLI tests) → kept WP06 versions (ours)
+   - LinkedData files (Frank.LinkedData, LinkedData tests) → kept WP08 versions (theirs)
+   - Frank.sln → manually resolved 3 conflict blocks (kept IntegrationTests project entries from WP06)
+   
+   The merge commit was created: `91ad48d Merge branch '001-semantic-resources-phase1-WP08' into 001-semantic-resources-phase1-WP12`
+   
+   Working directory: `/Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP12`
+
+9. Optional Next Step:
+   Merge the WP09 branch into the WP12 worktree to complete the dependency merge, then begin implementing WP12's deliverables. The user's most recent explicit request was "Continue with WP12." The WP08 merge is committed; WP09 (`001-semantic-resources-phase1-WP09`) still needs to be merged. After that, implement T059-T063 per the WP12 spec.
+
+   Next command to run:
+   ```bash
+   cd /Users/ryanr/Code/frank/.worktrees/001-semantic-resources-phase1-WP12 && git merge 001-semantic-resources-phase1-WP09 --no-edit
+   ```
+   Then verify the build compiles, and begin implementing the sample app and E2E tests.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/ryanr/.claude/projects/-Users-ryanr-Code-frank/f5bbbbab-b049-423c-b432-d5c155a5b347.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
