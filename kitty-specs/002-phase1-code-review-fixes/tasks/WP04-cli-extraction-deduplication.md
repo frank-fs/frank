@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Frank.Cli.Core — Extraction Deduplication & State
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 0fa8b1a8903680cb246a4f2e6284671457a1e054
@@ -17,7 +17,7 @@ subtasks:
 phase: Phase 1 - Foundation
 assignee: ''
 agent: "claude-opus"
-shell_pid: "88552"
+shell_pid: "94628"
 review_status: ''
 reviewed_by: ''
 history:
@@ -233,3 +233,4 @@ No dependencies — this is an independent module package.
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
 - 2026-03-06T18:55:23Z – claude-opus – shell_pid=88552 – lane=doing – Assigned agent via workflow command
 - 2026-03-06T19:25:59Z – claude-opus – shell_pid=88552 – lane=for_review – Ready for review: UriHelpers dedup, ExtractionState Map migration, scope param removed. 80 tests pass.
+- 2026-03-06T20:55:55Z – claude-opus – shell_pid=94628 – lane=doing – Started review via workflow command
