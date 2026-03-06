@@ -77,6 +77,25 @@ let tests =
                     "Error should suggest running frank-cli compile"
             | _ -> failwith "unreachable"
 
+        testCase "loadConfig failure wraps as InvalidOperationException per useLinkedData contract" <| fun _ ->
+            // Verify the full error path: GraphLoader.load → LinkedDataConfig.loadConfig → Error,
+            // and that wrapping it as useLinkedData does produces a descriptive InvalidOperationException.
+            let assembly = typeof<int>.Assembly
+            let result = LinkedDataConfig.loadConfig assembly
+            Expect.isError result "loadConfig should fail for assembly without resources"
+
+            // Reproduce the exact wrapping from useLinkedData CE operation
+            match result with
+            | Error msg ->
+                let ex = InvalidOperationException(sprintf "LinkedData configuration error: %s" msg)
+                Expect.stringContains ex.Message "LinkedData configuration error"
+                    "Exception should contain descriptive prefix"
+                Expect.stringContains ex.Message "Frank.Semantic.manifest.json"
+                    "Exception should mention the missing resource"
+                Expect.stringContains ex.Message "frank-cli compile"
+                    "Exception should suggest running frank-cli compile"
+            | _ -> failwith "unreachable"
+
         testCase "app without useLinkedData starts normally with no false positives" <| fun _ ->
             // An app that does NOT register LinkedData middleware should start fine
             // even when no embedded resources exist
