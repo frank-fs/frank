@@ -22,7 +22,7 @@ module InstanceProjector =
         propertyCache.GetOrAdd(t, fun t -> t.GetProperties(BindingFlags.Public ||| BindingFlags.Instance))
 
     let private getOntologyIndex (ontologyGraph: IGraph) =
-        let key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ontologyGraph)
+        let key = ontologyGraph.GetHashCode()
 
         ontologyIndexCache.GetOrAdd(
             key,

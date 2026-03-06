@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Reflection
 open System.Text.Json
+open FsToolkit.ErrorHandling
 open VDS.RDF
 open VDS.RDF.Parsing
 
@@ -42,39 +43,47 @@ module GraphLoader =
         | null -> missingResourceError assembly resource
         | s -> Ok s
 
+    let private loadManifest (assembly: Assembly) =
+        result {
+            let! manifestStream = loadStream assembly manifestResource
+            use _ms = manifestStream
+            let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+            return JsonSerializer.Deserialize<SemanticManifest>(manifestStream, options)
+        }
+
+    let private loadOntology (assembly: Assembly) =
+        result {
+            let! ontologyStream = loadStream assembly ontologyResource
+            use _os = ontologyStream
+            let ontologyGraph = new Graph()
+            let rdfXmlParser = RdfXmlParser()
+            use ontologyReader = new StreamReader(ontologyStream)
+            rdfXmlParser.Load(ontologyGraph, ontologyReader)
+            return ontologyGraph
+        }
+
+    let private loadShapes (assembly: Assembly) =
+        result {
+            let! shapesStream = loadStream assembly shapesResource
+            use _ss = shapesStream
+            let shapesGraph = new Graph()
+            let turtleParser = TurtleParser()
+            use shapesReader = new StreamReader(shapesStream)
+            turtleParser.Load(shapesGraph, shapesReader)
+            return shapesGraph
+        }
+
     let load (assembly: Assembly) : Result<LoadedSemantics, string> =
         try
-            // 1. Load and deserialize manifest
-            match loadStream assembly manifestResource with
-            | Error e -> Error e
-            | Ok manifestStream ->
-                use _ms = manifestStream
-                let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
-                let manifest = JsonSerializer.Deserialize<SemanticManifest>(manifestStream, options)
+            result {
+                let! manifest = loadManifest assembly
+                let! ontologyGraph = loadOntology assembly
+                let! shapesGraph = loadShapes assembly
 
-                // 2. Load ontology (RDF/XML)
-                match loadStream assembly ontologyResource with
-                | Error e -> Error e
-                | Ok ontologyStream ->
-                    use _os = ontologyStream
-                    let ontologyGraph = new Graph()
-                    let rdfXmlParser = RdfXmlParser()
-                    use ontologyReader = new StreamReader(ontologyStream)
-                    rdfXmlParser.Load(ontologyGraph, ontologyReader)
-
-                    // 3. Load shapes (Turtle)
-                    match loadStream assembly shapesResource with
-                    | Error e -> Error e
-                    | Ok shapesStream ->
-                        use _ss = shapesStream
-                        let shapesGraph = new Graph()
-                        let turtleParser = TurtleParser()
-                        use shapesReader = new StreamReader(shapesStream)
-                        turtleParser.Load(shapesGraph, shapesReader)
-
-                        Ok
-                            { OntologyGraph = ontologyGraph
-                              ShapesGraph = shapesGraph
-                              Manifest = manifest }
+                return
+                    { OntologyGraph = ontologyGraph
+                      ShapesGraph = shapesGraph
+                      Manifest = manifest }
+            }
         with :? RdfParseException as ex ->
             Error(sprintf "RDF parse error: %s" ex.Message)

@@ -8,6 +8,8 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
+open Microsoft.Net.Http.Headers
 open Frank.Builder
 open Frank.LinkedData.Negotiation
 open Frank.LinkedData.Rdf.RdfUriHelpers
@@ -16,16 +18,26 @@ open VDS.RDF
 [<AutoOpen>]
 module WebHostBuilderExtensions =
 
+    let private supportedMediaTypes =
+        [ "application/ld+json"; "text/turtle"; "application/rdf+xml" ]
+
     /// Determines the RDF media type from the Accept header, if any.
+    /// Uses MediaTypeHeaderValue for proper RFC 7231 parsing with quality factors.
     let negotiateRdfType (accept: string) =
-        if accept.Contains("text/turtle") then
-            Some "text/turtle"
-        elif accept.Contains("application/ld+json") then
-            Some "application/ld+json"
-        elif accept.Contains("application/rdf+xml") then
-            Some "application/rdf+xml"
-        else
+        if String.IsNullOrWhiteSpace accept then
             None
+        else
+            let mediaTypes =
+                try
+                    MediaTypeHeaderValue.ParseList(Microsoft.Extensions.Primitives.StringValues(accept))
+                with _ ->
+                    System.Collections.Generic.List<MediaTypeHeaderValue>()
+
+            mediaTypes
+            |> Seq.sortByDescending (fun mt -> mt.Quality |> Option.ofNullable |> Option.defaultValue 1.0)
+            |> Seq.tryPick (fun mt ->
+                supportedMediaTypes
+                |> List.tryFind (fun s -> mt.MediaType.Equals(s, StringComparison.OrdinalIgnoreCase)))
 
     /// Writes an IGraph to the stream in the specified RDF media type.
     let writeRdf (mediaType: string) (graph: IGraph) (stream: Stream) =
@@ -94,7 +106,7 @@ module WebHostBuilderExtensions =
         output
 
     /// Content negotiation middleware logic shared between useLinkedData overloads.
-    let linkedDataMiddleware (ctx: HttpContext) (next: RequestDelegate) =
+    let linkedDataMiddleware (logger: ILogger) (ctx: HttpContext) (next: RequestDelegate) =
         let endpoint = ctx.GetEndpoint()
 
         let hasLinkedData =
@@ -135,10 +147,27 @@ module WebHostBuilderExtensions =
                             ctx.Response.ContentType <- mediaType
                             ctx.Response.Headers.Remove("Content-Length") |> ignore
                             do! originalBody.WriteAsync(rdfBytes, 0, rdfBytes.Length)
-                        with _ ->
-                            // Projection failed; write original response through
+                        with
+                        | :? InvalidOperationException as ex ->
+                            // Recoverable: configuration/serialization issue, fall back to original response
+                            logger.LogWarning(ex, "LinkedData content negotiation failed for {Path}", ctx.Request.Path)
                             ctx.Response.Body <- originalBody
                             do! originalBody.WriteAsync(handlerOutput, 0, handlerOutput.Length)
+                        | :? JsonException as ex ->
+                            // Recoverable: response body was not valid JSON, fall back
+                            logger.LogWarning(ex, "LinkedData JSON parsing failed for {Path}", ctx.Request.Path)
+                            ctx.Response.Body <- originalBody
+                            do! originalBody.WriteAsync(handlerOutput, 0, handlerOutput.Length)
+                        | ex ->
+                            // Unrecoverable: log and re-raise (fail-fast per Constitution VII)
+                            logger.LogError(
+                                ex,
+                                "Unhandled exception in LinkedData middleware for {Path}",
+                                ctx.Request.Path
+                            )
+
+                            ctx.Response.Body <- originalBody
+                            raise (exn ("LinkedData middleware failure", ex))
                     else
                         ctx.Response.Body <- originalBody
                 }
@@ -153,7 +182,12 @@ module WebHostBuilderExtensions =
                 Services =
                     spec.Services
                     >> fun services ->
-                        let assembly = Assembly.GetEntryAssembly()
+                        let assembly =
+                            match Assembly.GetEntryAssembly() with
+                            | null ->
+                                failwith
+                                    "Assembly.GetEntryAssembly() returned null. This may occur in test host scenarios — provide the assembly explicitly via useLinkedDataWith."
+                            | asm -> asm
 
                         match LinkedDataConfig.loadConfig assembly with
                         | Ok config -> services.AddSingleton<LinkedDataConfig>(config) |> ignore
@@ -164,7 +198,12 @@ module WebHostBuilderExtensions =
                 Middleware =
                     spec.Middleware
                     >> fun app ->
-                        app.Use(Func<HttpContext, RequestDelegate, Task>(linkedDataMiddleware))
+                        let logger =
+                            app.ApplicationServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("Frank.LinkedData.Middleware")
+
+                        app.Use(Func<HttpContext, RequestDelegate, Task>(linkedDataMiddleware logger))
                         |> ignore
 
                         app }
@@ -181,7 +220,12 @@ module WebHostBuilderExtensions =
                 Middleware =
                     spec.Middleware
                     >> fun app ->
-                        app.Use(Func<HttpContext, RequestDelegate, Task>(linkedDataMiddleware))
+                        let logger =
+                            app.ApplicationServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("Frank.LinkedData.Middleware")
+
+                        app.Use(Func<HttpContext, RequestDelegate, Task>(linkedDataMiddleware logger))
                         |> ignore
 
                         app }

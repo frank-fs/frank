@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
   </ItemGroup>
 
 </Project>
