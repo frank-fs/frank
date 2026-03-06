@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.4.9",
+  "checkpoint_id": "dd64f87c8d3b",
+  "session_id": "981adbbf-4e3e-4a01-9463-75f0ea4d9af7",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-06T03:02:38.105268Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "kitty-specs/001-semantic-resources-phase1/tasks/WP12-sample-e2e.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "8c2d6c05e5a1",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 24323,
+    "cache_read_tokens": 53044,
+    "output_tokens": 2910,
+    "api_call_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-06T03:02:37.900973Z",
+    "agent_lines": 4,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 4,
+    "agent_percentage": 100
+  }
+}
