@@ -158,7 +158,7 @@
 **Requirement Refs**: FR-004, FR-014, FR-016, FR-017, FR-021
 
 ### Included Subtasks
-- [ ] T023 Add FsToolkit.ErrorHandling package reference to `Frank.Cli.Core.fsproj`
+- [x] T023 Add FsToolkit.ErrorHandling package reference to `Frank.Cli.Core.fsproj`
 - [ ] T024 Replace string-typed `ValidationIssue.Severity` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
 - [ ] T025 [P] Replace string-typed `DiffEntry.Type` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
 - [ ] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
