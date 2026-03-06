@@ -50,11 +50,11 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-020
 
 ### Included Subtasks
-- [ ] T006 Fix `JsonLdFormatter` multi-subject (`@graph`) branch to preserve typed literal info (int, bool, double, decimal)
-- [ ] T007 Fix `InstanceProjector` to map `Int64` → `xsd:long` and `Decimal` → `xsd:decimal`
-- [ ] T008 Fix `GraphLoader.fs` `StreamReader` to use `use` binding
-- [ ] T009 [P] Create shared `RdfUriHelpers` module in `Frank.LinkedData` with `localName` and `namespaceUri` functions
-- [ ] T010 [P] Update `JsonLdFormatter`, `InstanceProjector`, and `WebHostBuilderExtensions` to use shared helpers
+- [x] T006 Fix `JsonLdFormatter` multi-subject (`@graph`) branch to preserve typed literal info (int, bool, double, decimal)
+- [x] T007 Fix `InstanceProjector` to map `Int64` → `xsd:long` and `Decimal` → `xsd:decimal`
+- [x] T008 Fix `GraphLoader.fs` `StreamReader` to use `use` binding
+- [x] T009 [P] Create shared `RdfUriHelpers` module in `Frank.LinkedData` with `localName` and `namespaceUri` functions
+- [x] T010 [P] Update `JsonLdFormatter`, `InstanceProjector`, and `WebHostBuilderExtensions` to use shared helpers
 
 ### Implementation Notes
 - T006: The single-subject path correctly handles typed literals — mirror that logic in the `@graph` branch
