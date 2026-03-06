@@ -16,6 +16,7 @@ if ($env:appveyor){
     Update-AppveyorBuild -Version "$version$versionSuffix"
 }
 
+New-Item -ItemType Directory -Force -Path $psscriptroot/nupkg | Out-Null
 dotnet pack -c Release src/Frank.Cli.MSBuild -o $psscriptroot/nupkg
 
 dotnet build -c Release Frank.sln /p:Version=$version$versionSuffix

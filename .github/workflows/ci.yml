@@ -25,6 +25,7 @@ jobs:
             10.0.x
       - name: Pack local dependencies
         run: |
+          mkdir -p nupkg
           dotnet pack src/Frank.Cli.MSBuild -c Release -o nupkg
       - name: Build
         run: |
