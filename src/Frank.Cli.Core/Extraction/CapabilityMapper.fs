@@ -3,6 +3,7 @@ namespace Frank.Cli.Core.Extraction
 open System
 open VDS.RDF
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
 
@@ -59,10 +60,11 @@ module CapabilityMapper =
                 assertTriple graph (opNode, rdfType, createUriNode graph (Uri actionUri))
 
                 // hydra:method
-                assertTriple graph (
-                    opNode,
-                    createUriNode graph (Uri Hydra.Method),
-                    createLiteralNode graph methodStr (Some(Uri Xsd.String)))
+                assertTriple
+                    graph
+                    (opNode,
+                     createUriNode graph (Uri Hydra.Method),
+                     createLiteralNode graph methodStr (Some(Uri Xsd.String)))
 
                 // link resource to operation
                 assertTriple graph (resNode, createUriNode graph (Uri Hydra.SupportedOperation), opNode)

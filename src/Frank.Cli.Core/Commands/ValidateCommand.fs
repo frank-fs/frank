@@ -5,14 +5,27 @@ open System.IO
 open System.Security.Cryptography
 open VDS.RDF
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
 
 /// Validates completeness and consistency of extracted semantic definitions.
 module ValidateCommand =
 
+    type Severity =
+        | Error
+        | Warning
+        | Info
+
+    module Severity =
+        let toString =
+            function
+            | Error -> "error"
+            | Warning -> "warning"
+            | Info -> "info"
+
     type ValidationIssue =
-        { Severity: string
+        { Severity: Severity
           Message: string
           Uri: Uri option }
 
@@ -21,8 +34,7 @@ module ValidateCommand =
           CoveragePercent: float
           IsValid: bool }
 
-    let private uriEquals (a: Uri) (b: Uri) =
-        a.AbsoluteUri = b.AbsoluteUri
+    let private uriEquals (a: Uri) (b: Uri) = a.AbsoluteUri = b.AbsoluteUri
 
     let private findOwlClasses (graph: IGraph) : Uri list =
         let rdfTypeNode = createUriNode graph (Uri Rdf.Type)
@@ -57,8 +69,9 @@ module ValidateCommand =
                 None
             else
                 Some
-                    { Severity = "warning"
-                      Message = $"owl:Class '%s{classUri.AbsoluteUri}' has no properties (no rdfs:domain references it)"
+                    { Severity = Warning
+                      Message =
+                        $"owl:Class '%s{classUri.AbsoluteUri}' has no properties (no rdfs:domain references it)"
                       Uri = Some classUri })
 
     let private checkShapeTargetClasses (ontology: IGraph) (shapes: IGraph) : ValidationIssue list =
@@ -68,9 +81,7 @@ module ValidateCommand =
 
         // Collect all owl:Class URIs from ontology
         let ontologyClasses =
-            findOwlClasses ontology
-            |> List.map (fun u -> u.AbsoluteUri)
-            |> Set.ofList
+            findOwlClasses ontology |> List.map (fun u -> u.AbsoluteUri) |> Set.ofList
 
         // Find all NodeShapes
         let nodeShapes =
@@ -95,8 +106,9 @@ module ValidateCommand =
                         None
                     else
                         Some
-                            { Severity = "error"
-                              Message = $"SHACL NodeShape '%s{shapeNode.Uri.AbsoluteUri}' targets class '%s{targetUri.Uri.AbsoluteUri}' which does not exist in the ontology"
+                            { Severity = Error
+                              Message =
+                                $"SHACL NodeShape '%s{shapeNode.Uri.AbsoluteUri}' targets class '%s{targetUri.Uri.AbsoluteUri}' which does not exist in the ontology"
                               Uri = Some shapeNode.Uri }
                 | _ -> None)
             |> Seq.toList)
@@ -104,8 +116,9 @@ module ValidateCommand =
     let private checkUnmappedTypes (unmappedTypes: UnmappedType list) : ValidationIssue list =
         unmappedTypes
         |> List.map (fun ut ->
-            { Severity = "warning"
-              Message = $"Type '%s{ut.TypeName}' was not mapped: %s{ut.Reason} (at %s{ut.Location.File}:%d{ut.Location.Line})"
+            { Severity = Warning
+              Message =
+                $"Type '%s{ut.TypeName}' was not mapped: %s{ut.Reason} (at %s{ut.Location.File}:%d{ut.Location.Line})"
               Uri = None })
 
     let private computeFileHash (filePath: string) : string =
@@ -128,9 +141,7 @@ module ValidateCommand =
             // Compute current combined hash and compare to stored SourceHash
             let currentHashes =
                 sourceFiles
-                |> List.choose (fun f ->
-                    if File.Exists f then Some (computeFileHash f)
-                    else None)
+                |> List.choose (fun f -> if File.Exists f then Some(computeFileHash f) else None)
                 |> String.concat ""
 
             let currentCombinedHash =
@@ -141,8 +152,11 @@ module ValidateCommand =
                 else
                     ""
 
-            if currentCombinedHash <> state.Metadata.SourceHash && state.Metadata.SourceHash <> "" then
-                [ { Severity = "warning"
+            if
+                currentCombinedHash <> state.Metadata.SourceHash
+                && state.Metadata.SourceHash <> ""
+            then
+                [ { Severity = Warning
                     Message = "Source files have changed since last extraction. Run 'frank-cli extract' to update."
                     Uri = None } ]
             else
@@ -152,32 +166,31 @@ module ValidateCommand =
         let statePath = ExtractionState.defaultStatePath (Path.GetDirectoryName projectPath)
 
         match ExtractionState.load statePath with
-        | Error e -> Error $"Failed to load state: {e}"
-        | Ok state ->
+        | Result.Error e -> Result.Error $"Failed to load state: {e}"
+        | Result.Ok state ->
 
-        let owlClasses = findOwlClasses state.Ontology
-        let propertyIssues = checkClassesHaveProperties state.Ontology owlClasses
-        let shapeIssues = checkShapeTargetClasses state.Ontology state.Shapes
-        let unmappedIssues = checkUnmappedTypes state.UnmappedTypes
-        let stalenessIssues = checkStaleness state
+            let owlClasses = findOwlClasses state.Ontology
+            let propertyIssues = checkClassesHaveProperties state.Ontology owlClasses
+            let shapeIssues = checkShapeTargetClasses state.Ontology state.Shapes
+            let unmappedIssues = checkUnmappedTypes state.UnmappedTypes
+            let stalenessIssues = checkStaleness state
 
-        let allIssues = propertyIssues @ shapeIssues @ unmappedIssues @ stalenessIssues
+            let allIssues = propertyIssues @ shapeIssues @ unmappedIssues @ stalenessIssues
 
-        let mappedClassCount = owlClasses.Length |> float
-        let totalAnalyzedTypeCount = (owlClasses.Length + state.UnmappedTypes.Length) |> float
+            let mappedClassCount = owlClasses.Length |> float
 
-        let coveragePercent =
-            if totalAnalyzedTypeCount > 0.0 then
-                (mappedClassCount / totalAnalyzedTypeCount) * 100.0
-            else
-                100.0
+            let totalAnalyzedTypeCount =
+                (owlClasses.Length + state.UnmappedTypes.Length) |> float
 
-        let isValid =
-            allIssues
-            |> List.exists (fun i -> i.Severity = "error")
-            |> not
+            let coveragePercent =
+                if totalAnalyzedTypeCount > 0.0 then
+                    (mappedClassCount / totalAnalyzedTypeCount) * 100.0
+                else
+                    100.0
 
-        Ok
-            { Issues = allIssues
-              CoveragePercent = coveragePercent
-              IsValid = isValid }
+            let isValid = allIssues |> List.exists (fun i -> i.Severity = Severity.Error) |> not
+
+            Result.Ok
+                { Issues = allIssues
+                  CoveragePercent = coveragePercent
+                  IsValid = isValid }

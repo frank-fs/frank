@@ -8,6 +8,7 @@ open Expecto
 open VDS.RDF
 open VDS.RDF.Parsing
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Commands

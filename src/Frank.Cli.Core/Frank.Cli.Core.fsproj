@@ -34,6 +34,7 @@
     <PackageReference Include="dotNetRdf.Ontology" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
     <PackageReference Include="FSharp.Compiler.Service" Version="43.10.*" />
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
     <PackageReference Include="Ionide.ProjInfo" Version="0.74.*" />
     <PackageReference Include="Ionide.ProjInfo.FCS" Version="0.74.*" />
   </ItemGroup>

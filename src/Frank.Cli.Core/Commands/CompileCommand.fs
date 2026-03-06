@@ -21,8 +21,10 @@ module CompileCommand =
         if File.Exists statePath then
             let dir = Path.GetDirectoryName statePath
             let backupDir = Path.Combine(dir, "backups")
+
             if not (Directory.Exists backupDir) then
                 Directory.CreateDirectory backupDir |> ignore
+
             let timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssZ")
             let backupPath = Path.Combine(backupDir, $"extraction-state-%s{timestamp}.json")
             File.Copy(statePath, backupPath)
@@ -42,7 +44,8 @@ module CompileCommand =
 
         // Re-parse manifest
         let manifestJson = File.ReadAllText(manifestPath)
-        JsonDocument.Parse(manifestJson) |> ignore
+        use _ = JsonDocument.Parse(manifestJson)
+        ()
 
     let execute (projectPath: string) (outputDir: string option) : Result<CompileResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
@@ -52,67 +55,68 @@ module CompileCommand =
         | Error _ -> Error "No extraction state found. Run 'frank-cli extract' first."
         | Ok state ->
 
-        try
-            let outDir =
-                outputDir
-                |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
+            try
+                let outDir =
+                    outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
 
-            if not (Directory.Exists outDir) then
-                Directory.CreateDirectory outDir |> ignore
+                if not (Directory.Exists outDir) then
+                    Directory.CreateDirectory outDir |> ignore
 
-            // Back up existing state before overwriting
-            backupState statePath
+                // Back up existing state before overwriting
+                backupState statePath
 
-            // Write ontology.owl.xml
-            let ontologyPath = Path.Combine(outDir, "ontology.owl.xml")
-            do
-                let rdfXmlWriter = RdfXmlWriter()
-                use ontologyStream = File.Create ontologyPath
-                use ontologySw = new StreamWriter(ontologyStream)
-                rdfXmlWriter.Save(state.Ontology, ontologySw :> TextWriter)
+                // Write ontology.owl.xml
+                let ontologyPath = Path.Combine(outDir, "ontology.owl.xml")
 
-            // Write shapes.shacl.ttl
-            let shapesPath = Path.Combine(outDir, "shapes.shacl.ttl")
-            do
-                let turtleWriter = CompressingTurtleWriter()
-                use shapesStream = File.Create shapesPath
-                use shapesSw = new StreamWriter(shapesStream)
-                turtleWriter.Save(state.Shapes, shapesSw :> TextWriter)
+                do
+                    let rdfXmlWriter = RdfXmlWriter()
+                    use ontologyStream = File.Create ontologyPath
+                    use ontologySw = new StreamWriter(ontologyStream)
+                    rdfXmlWriter.Save(state.Ontology, ontologySw :> TextWriter)
 
-            // Write manifest.json
-            let manifestPath = Path.Combine(outDir, "manifest.json")
-            do
-                use manifestStream = File.Create manifestPath
+                // Write shapes.shacl.ttl
+                let shapesPath = Path.Combine(outDir, "shapes.shacl.ttl")
 
-                use writer =
-                    new Utf8JsonWriter(manifestStream, JsonWriterOptions(Indented = true))
+                do
+                    let turtleWriter = CompressingTurtleWriter()
+                    use shapesStream = File.Create shapesPath
+                    use shapesSw = new StreamWriter(shapesStream)
+                    turtleWriter.Save(state.Shapes, shapesSw :> TextWriter)
 
-                writer.WriteStartObject()
-                writer.WriteString("version", state.Metadata.ToolVersion)
-                writer.WriteString("baseUri", state.Metadata.BaseUri.AbsoluteUri)
-                writer.WriteString("sourceHash", state.Metadata.SourceHash)
+                // Write manifest.json
+                let manifestPath = Path.Combine(outDir, "manifest.json")
 
-                writer.WriteStartArray("vocabularies")
+                do
+                    use manifestStream = File.Create manifestPath
 
-                for v in state.Metadata.Vocabularies do
-                    writer.WriteStringValue v
+                    use writer = new Utf8JsonWriter(manifestStream, JsonWriterOptions(Indented = true))
 
-                writer.WriteEndArray()
+                    writer.WriteStartObject()
+                    writer.WriteString("version", state.Metadata.ToolVersion)
+                    writer.WriteString("baseUri", state.Metadata.BaseUri.AbsoluteUri)
+                    writer.WriteString("sourceHash", state.Metadata.SourceHash)
 
-                writer.WriteString("generatedAt", DateTimeOffset.UtcNow)
-                writer.WriteEndObject()
-                writer.Flush()
+                    writer.WriteStartArray("vocabularies")
 
-            // Round-trip verification: re-parse each file to confirm validity
-            verifyRoundTrip ontologyPath shapesPath manifestPath
+                    for v in state.Metadata.Vocabularies do
+                        writer.WriteStringValue v
 
-            Ok
-                { OntologyPath = ontologyPath
-                  ShapesPath = shapesPath
-                  ManifestPath = manifestPath
-                  EmbeddedResourceNames =
-                    [ "Frank.Semantic.ontology.owl.xml"
-                      "Frank.Semantic.shapes.shacl.ttl"
-                      "Frank.Semantic.manifest.json" ] }
-        with ex ->
-            Error $"Compile failed: {ex.Message}"
+                    writer.WriteEndArray()
+
+                    writer.WriteString("generatedAt", DateTimeOffset.UtcNow)
+                    writer.WriteEndObject()
+                    writer.Flush()
+
+                // Round-trip verification: re-parse each file to confirm validity
+                verifyRoundTrip ontologyPath shapesPath manifestPath
+
+                Ok
+                    { OntologyPath = ontologyPath
+                      ShapesPath = shapesPath
+                      ManifestPath = manifestPath
+                      EmbeddedResourceNames =
+                        [ "Frank.Semantic.ontology.owl.xml"
+                          "Frank.Semantic.shapes.shacl.ttl"
+                          "Frank.Semantic.manifest.json" ] }
+            with ex ->
+                Error $"Compile failed: {ex.Message}"
