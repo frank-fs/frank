@@ -6,43 +6,15 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Generates SHACL shapes from F# constraints.
 module ShapeGenerator =
 
+    let private baseStr (config: TypeMapper.MappingConfig) = config.BaseUri.ToString().TrimEnd('/')
+
     let private shapeUri (config: TypeMapper.MappingConfig) (typeName: string) =
         Uri(config.BaseUri.ToString().TrimEnd('/') + "/shapes/" + typeName + "Shape")
-
-    let private classUri (config: TypeMapper.MappingConfig) (typeName: string) =
-        Uri(config.BaseUri.ToString().TrimEnd('/') + "/types/" + typeName)
-
-    let private propertyUri (config: TypeMapper.MappingConfig) (typeName: string) (fieldName: string) =
-        Uri(
-            config.BaseUri.ToString().TrimEnd('/')
-            + "/properties/"
-            + typeName
-            + "/"
-            + fieldName
-        )
-
-    let rec private fieldKindToRange (config: TypeMapper.MappingConfig) (kind: FieldKind) : Uri * bool =
-        match kind with
-        | Primitive xsdType ->
-            let rangeUri =
-                match xsdType with
-                | "xsd:string" -> Uri Xsd.String
-                | "xsd:integer" -> Uri Xsd.Integer
-                | "xsd:long" -> Uri Xsd.Integer
-                | "xsd:double"
-                | "xsd:float" -> Uri Xsd.Double
-                | "xsd:boolean" -> Uri Xsd.Boolean
-                | "xsd:dateTime" -> Uri Xsd.DateTime
-                | _ -> Uri Xsd.String
-
-            rangeUri, false
-        | Optional inner -> fieldKindToRange config inner
-        | Collection element -> fieldKindToRange config element
-        | Reference typeName -> classUri config typeName, true
 
     let private fieldMinCount (kind: FieldKind) : int =
         match kind with
@@ -66,11 +38,12 @@ module ShapeGenerator =
         assertTriple graph (shapeNode, createUriNode graph (Uri Shacl.Property), psNode)
 
         // sh:path
-        let propUri = propertyUri config typeName field.Name
+        let b = baseStr config
+        let propUri = propertyUri b typeName field.Name
         assertTriple graph (psNode, createUriNode graph (Uri Shacl.Path), createUriNode graph propUri)
 
         // sh:datatype or sh:class
-        let range, isObj = fieldKindToRange config field.Kind
+        let range, isObj = fieldKindToRange b field.Kind
 
         if isObj then
             assertTriple graph (psNode, createUriNode graph (Uri Shacl.Class), createUriNode graph range)
@@ -109,7 +82,7 @@ module ShapeGenerator =
             assertTriple graph (sNode, rdfType, createUriNode graph (Uri Shacl.NodeShape))
 
             // sh:targetClass
-            let cUri = classUri config typeName
+            let cUri = classUri (baseStr config) typeName
             assertTriple graph (sNode, createUriNode graph (Uri Shacl.TargetClass), createUriNode graph cUri)
 
             // Property shapes

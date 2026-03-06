@@ -6,6 +6,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Maps F# types (DUs, records) to OWL classes and properties.
 module TypeMapper =
@@ -27,43 +28,15 @@ module TypeMapper =
           Properties: MappedProperty list
           SuperClasses: Uri list }
 
-    let private classUri (config: MappingConfig) (typeName: string) =
-        Uri(config.BaseUri.ToString().TrimEnd('/') + "/types/" + typeName)
-
-    let private propertyUri (config: MappingConfig) (typeName: string) (fieldName: string) =
-        Uri(
-            config.BaseUri.ToString().TrimEnd('/')
-            + "/properties/"
-            + typeName
-            + "/"
-            + fieldName
-        )
-
-    let rec private fieldKindToRange (config: MappingConfig) (kind: FieldKind) : Uri * bool =
-        match kind with
-        | Primitive xsdType ->
-            let rangeUri =
-                match xsdType with
-                | "xsd:string" -> Uri Xsd.String
-                | "xsd:integer" -> Uri Xsd.Integer
-                | "xsd:long" -> Uri Xsd.Integer
-                | "xsd:double"
-                | "xsd:float" -> Uri Xsd.Double
-                | "xsd:boolean" -> Uri Xsd.Boolean
-                | "xsd:dateTime" -> Uri Xsd.DateTime
-                | _ -> Uri Xsd.String
-
-            rangeUri, false
-        | Optional inner -> fieldKindToRange config inner
-        | Collection element -> fieldKindToRange config element
-        | Reference typeName -> classUri config typeName, true
+    let private baseStr (config: MappingConfig) = config.BaseUri.ToString().TrimEnd('/')
 
     let private mapField (config: MappingConfig) (typeName: string) (field: AnalyzedField) : MappedProperty =
-        let range, isObj = fieldKindToRange config field.Kind
+        let b = baseStr config
+        let range, isObj = fieldKindToRange b field.Kind
 
-        { PropertyUri = propertyUri config typeName field.Name
+        { PropertyUri = propertyUri b typeName field.Name
           Label = field.Name
-          Domain = classUri config typeName
+          Domain = classUri b typeName
           Range = range
           IsObjectProperty = isObj }
 
@@ -108,16 +81,18 @@ module TypeMapper =
             assertProperty graph prop
 
     let private mapAnalyzedType (config: MappingConfig) (analyzedType: AnalyzedType) : MappedClass list =
+        let b = baseStr config
+
         match analyzedType.Kind with
         | Record fields ->
             let props = fields |> List.map (mapField config analyzedType.ShortName)
 
-            [ { ClassUri = classUri config analyzedType.ShortName
+            [ { ClassUri = classUri b analyzedType.ShortName
                 Label = analyzedType.ShortName
                 Properties = props
                 SuperClasses = [] } ]
         | DiscriminatedUnion cases ->
-            let parentUri = classUri config analyzedType.ShortName
+            let parentUri = classUri b analyzedType.ShortName
 
             let parentClass =
                 { ClassUri = parentUri
@@ -130,14 +105,14 @@ module TypeMapper =
                 |> List.map (fun case ->
                     let caseProps = case.Fields |> List.map (mapField config case.Name)
 
-                    { ClassUri = classUri config case.Name
+                    { ClassUri = classUri b case.Name
                       Label = case.Name
                       Properties = caseProps
                       SuperClasses = [ parentUri ] })
 
             parentClass :: caseClasses
         | Enum values ->
-            [ { ClassUri = classUri config analyzedType.ShortName
+            [ { ClassUri = classUri b analyzedType.ShortName
                 Label = analyzedType.ShortName
                 Properties = []
                 SuperClasses = [] } ]

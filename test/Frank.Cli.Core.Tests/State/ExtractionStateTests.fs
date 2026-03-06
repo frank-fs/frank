@@ -1,7 +1,6 @@
 module Frank.Cli.Core.Tests.ExtractionStateTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open Expecto
 open VDS.RDF
@@ -42,14 +41,11 @@ let tests =
                   { Ontology = ontology
                     Shapes = shapes
                     SourceMap =
-                      let d = Dictionary<Uri, SourceLocation>()
-
-                      d.[Uri "http://example.org/Person"] <-
-                          { File = "Models.fs"
-                            Line = 10
-                            Column = 5 }
-
-                      d
+                      Map.ofList
+                          [ "http://example.org/Person",
+                            { File = "Models.fs"
+                              Line = 10
+                              Column = 5 } ]
                     Clarifications = Map.ofList [ "Person.name", "Use schema:name" ]
                     Metadata =
                       { Timestamp = DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -89,7 +85,7 @@ let tests =
               let state =
                   { Ontology = createGraph ()
                     Shapes = createGraph ()
-                    SourceMap = Dictionary<Uri, SourceLocation>()
+                    SourceMap = Map.empty
                     Clarifications = Map.empty
                     Metadata =
                       { Timestamp = DateTimeOffset(2026, 3, 5, 12, 0, 0, TimeSpan.Zero)

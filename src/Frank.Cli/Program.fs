@@ -22,27 +22,22 @@ let main args =
     let vocabOpt = Option<string array>("--vocabularies")
     vocabOpt.Description <- "Vocabulary namespaces to align"
     vocabOpt.DefaultValueFactory <- (fun _ -> [| "schema.org" |])
-    let scopeOpt = Option<string>("--scope")
-    scopeOpt.Description <- "Extraction scope"
-    scopeOpt.DefaultValueFactory <- (fun _ -> "full")
     let extractFormatOpt = Option<string>("--format")
     extractFormatOpt.Description <- "Output format (text|json)"
     extractFormatOpt.DefaultValueFactory <- (fun _ -> "text")
     extractCmd.Options.Add(extractProjectOpt)
     extractCmd.Options.Add(baseUriOpt)
     extractCmd.Options.Add(vocabOpt)
-    extractCmd.Options.Add(scopeOpt)
     extractCmd.Options.Add(extractFormatOpt)
 
     extractCmd.SetAction(fun parseResult ->
         let project = parseResult.GetValue(extractProjectOpt)
         let baseUri = parseResult.GetValue(baseUriOpt)
         let vocabs = parseResult.GetValue(vocabOpt)
-        let scope = parseResult.GetValue(scopeOpt)
         let format = parseResult.GetValue(extractFormatOpt)
 
         let result =
-            ExtractCommand.execute project (Uri baseUri) (Array.toList vocabs) scope
+            ExtractCommand.execute project (Uri baseUri) (Array.toList vocabs)
             |> Async.RunSynchronously
 
         match result with

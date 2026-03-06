@@ -1,7 +1,6 @@
 namespace Frank.Cli.Core.Commands
 
 open System
-open System.Collections.Generic
 open System.IO
 open VDS.RDF
 open FSharp.Compiler.CodeAnalysis
@@ -11,6 +10,7 @@ open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction
+open Frank.Cli.Core.Extraction.UriHelpers
 open Frank.Cli.Core.State
 
 type private StateSourceLocation = Frank.Cli.Core.State.SourceLocation
@@ -107,7 +107,9 @@ module ExtractCommand =
         : UnmappedType list =
         analyzedTypes
         |> List.choose (fun t ->
-            let classUri = Uri(config.BaseUri.ToString().TrimEnd('/') + "/types/" + t.ShortName)
+            let classUri =
+                UriHelpers.classUri (config.BaseUri.ToString().TrimEnd('/')) t.ShortName
+
             let node = getNode ontologyGraph classUri
 
             match node with
@@ -137,7 +139,6 @@ module ExtractCommand =
         (projectPath: string)
         (baseUri: Uri)
         (vocabularies: string list)
-        (scope: string)
         : Async<Result<ExtractResult, string>> =
         async {
             try
@@ -199,7 +200,7 @@ module ExtractCommand =
 
                     // Step 9: Persist state
                     let statePath = ExtractionState.defaultStatePath (Path.GetDirectoryName projectPath)
-                    let sourceMap = Dictionary<Uri, StateSourceLocation>()
+                    let sourceMap = Map.empty
 
                     let state: ExtractionState =
                         { Ontology = alignedOntology
@@ -238,6 +239,5 @@ module ExtractCommand =
         (projectPath: string)
         (baseUri: Uri)
         (vocabularies: string list)
-        (scope: string)
         : Async<Result<ExtractResult, string>> =
-        executeWithPipeline defaultPipeline projectPath baseUri vocabularies scope
+        executeWithPipeline defaultPipeline projectPath baseUri vocabularies

@@ -1,7 +1,6 @@
 module Frank.Cli.Core.Tests.ClarifyCommandTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open Expecto
 open VDS.RDF
@@ -23,7 +22,7 @@ let private createTestState
 
     { Ontology = ontology
       Shapes = shapes
-      SourceMap = Dictionary<Uri, SourceLocation>()
+      SourceMap = Map.empty
       Clarifications = clarifications
       Metadata =
         { Timestamp = DateTimeOffset.UtcNow

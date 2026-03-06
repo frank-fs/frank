@@ -1,7 +1,6 @@
 module Frank.Cli.Core.Tests.ExtractCommandTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open Expecto
 open VDS.RDF
@@ -22,7 +21,7 @@ let tests =
         [ testCase "execute returns error for non-existent project"
           <| fun _ ->
               let result =
-                  execute "/nonexistent/path/project.fsproj" (Uri "http://example.org/") [ "schema.org" ] "project"
+                  execute "/nonexistent/path/project.fsproj" (Uri "http://example.org/") [ "schema.org" ]
                   |> Async.RunSynchronously
 
               match result with
@@ -51,7 +50,7 @@ let tests =
                   let state: ExtractionState =
                       { Ontology = ontology
                         Shapes = shapes
-                        SourceMap = Dictionary<Uri, SourceLocation>()
+                        SourceMap = Map.empty
                         Clarifications = Map.ofList [ ("q1", "answer1") ]
                         Metadata =
                           { Timestamp = DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -182,12 +181,7 @@ let tests =
                                   } }
 
                   let result =
-                      executeWithPipeline
-                          fullPipeline
-                          fakeProjectPath
-                          (Uri "http://example.org/")
-                          [ "schema.org" ]
-                          "project"
+                      executeWithPipeline fullPipeline fakeProjectPath (Uri "http://example.org/") [ "schema.org" ]
                       |> Async.RunSynchronously
 
                   Expect.isOk result "Pipeline should succeed with mocked steps"

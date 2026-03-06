@@ -130,7 +130,8 @@ module ValidateCommand =
     let private checkStaleness (state: ExtractionState) : ValidationIssue list =
         // Collect unique source files from the SourceMap
         let sourceFiles =
-            state.SourceMap.Values
+            state.SourceMap
+            |> Map.values
             |> Seq.map (fun loc -> loc.File)
             |> Seq.distinct
             |> Seq.toList

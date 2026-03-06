@@ -1,7 +1,6 @@
 module Frank.Cli.Core.Tests.DiffCommandTests
 
 open System
-open System.Collections.Generic
 open System.IO
 open Expecto
 open VDS.RDF
@@ -18,7 +17,7 @@ let private createTestState (ontologySetup: IGraph -> unit) =
 
     { Ontology = ontology
       Shapes = shapes
-      SourceMap = Dictionary<Uri, SourceLocation>()
+      SourceMap = Map.empty
       Clarifications = Map.empty
       Metadata =
         { Timestamp = DateTimeOffset.UtcNow

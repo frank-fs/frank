@@ -6,6 +6,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Maps HTTP methods to Schema.org Actions and Hydra operations.
 module CapabilityMapper =
@@ -30,20 +31,14 @@ module CapabilityMapper =
         | Head -> "HEAD"
         | Options -> "OPTIONS"
 
-    let private routeToSlug (route: string) =
-        route.TrimStart('/').Replace("/", "_").Replace("{", "").Replace("}", "")
-
-    let private resourceUri (config: TypeMapper.MappingConfig) (route: string) =
-        let base' = config.BaseUri.ToString().TrimEnd('/')
-        let cleanRoute = route.TrimStart('/')
-        Uri(base' + "/resources/" + cleanRoute)
+    let private baseStr (config: TypeMapper.MappingConfig) = config.BaseUri.ToString().TrimEnd('/')
 
     let mapCapabilities (config: TypeMapper.MappingConfig) (resources: AnalyzedResource list) : IGraph =
         let graph = createGraph ()
         let rdfType = createUriNode graph (Uri Rdf.Type)
 
         for res in resources do
-            let resUri = resourceUri config res.RouteTemplate
+            let resUri = resourceUri (baseStr config) res.RouteTemplate
             let resNode = createUriNode graph resUri
             let slug = routeToSlug res.RouteTemplate
 

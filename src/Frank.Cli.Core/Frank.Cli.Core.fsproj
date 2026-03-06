@@ -11,6 +11,7 @@
     <Compile Include="Rdf/Vocabularies.fs" />
     <Compile Include="Analysis/AstAnalyzer.fs" />
     <Compile Include="Analysis/TypeAnalyzer.fs" />
+    <Compile Include="Extraction/UriHelpers.fs" />
     <Compile Include="Extraction/TypeMapper.fs" />
     <Compile Include="Extraction/RouteMapper.fs" />
     <Compile Include="Extraction/CapabilityMapper.fs" />
