@@ -120,7 +120,7 @@
 ### Included Subtasks
 - [x] T016 Create `src/Frank.Statecharts/Middleware.fs` with state-aware request interception
 - [x] T017 Implement state lookup: retrieve current state from `IStateMachineStore` using resolved instance ID
-- [ ] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
+- [x] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
 - [ ] T019 Implement guard evaluation: evaluate guards in order, map `BlockReason` to HTTP status codes
 - [ ] T020 Implement transition execution: on successful handler completion, apply transition and fire `onTransition` hook
 - [ ] T021 Create `test/Frank.Statecharts.Tests/MiddlewareTests.fs` with integration tests
