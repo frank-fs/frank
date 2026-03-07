@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP05"
+work_package_id: WP05
+title: WebHost & ResourceBuilder Extensions
+lane: "doing"
+dependencies: [WP03, WP04]
+base_branch: 004-frank-statecharts-WP05-merge-base
+base_commit: 19e9f5a2e73472bbea8b31e3c58894284d7ddb94
+created_at: '2026-03-07T17:06:06.105207+00:00'
 subtasks:
-  - "T022"
-  - "T023"
-  - "T024"
-  - "T025"
-title: "WebHost & ResourceBuilder Extensions"
-phase: "Phase 3 - Integration"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP03", "WP04"]
-requirement_refs: ["FR-011"]
+- T022
+- T023
+- T024
+- T025
+phase: Phase 3 - Integration
+assignee: ''
+agent: ''
+shell_pid: "58899"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-06T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-011]
 ---
 
 # Work Package Prompt: WP05 -- WebHost & ResourceBuilder Extensions
