@@ -587,6 +587,12 @@ The `sample/` directory contains several example applications:
 
 ---
 
+## References
+
+- [How is this different from Webmachine or Freya?](docs/COMPARISON.md) — Detailed comparison of Frank.Statecharts with Webmachine and Freya's approach to HTTP resource state machines
+
+---
+
 ## License
 
 [MIT](LICENSE)
