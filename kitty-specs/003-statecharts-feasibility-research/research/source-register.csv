@@ -1,0 +1,20 @@
+source_id,citation,url,accessed_date,relevance,status
+ttt-engine,"panesofglass/tic-tac-toe Engine (Model.fs, Engine.fs)",https://github.com/panesofglass/tic-tac-toe,2026-03-06,high,reviewed
+ttt-web,"panesofglass/tic-tac-toe Web (Handlers.fs, templates/game.fs)",https://github.com/panesofglass/tic-tac-toe,2026-03-06,high,reviewed
+frank-builder,"Frank core ResourceBuilder (Builder.fs)",https://github.com/frank-fs/frank/blob/master/src/Frank/Builder.fs,2026-03-06,high,reviewed
+frank-linkeddata,"Frank.LinkedData extension library",https://github.com/frank-fs/frank/tree/master/src/Frank.LinkedData,2026-03-06,high,reviewed
+frank-auth,"Frank.Auth extension library",https://github.com/frank-fs/frank/tree/master/src/Frank.Auth,2026-03-06,high,reviewed
+frank-openapi,"Frank.OpenApi extension library",https://github.com/frank-fs/frank/tree/master/src/Frank.OpenApi,2026-03-06,high,reviewed
+frank-datastar,"Frank.Datastar extension library",https://github.com/frank-fs/frank/tree/master/src/Frank.Datastar,2026-03-06,medium,reviewed
+issue57,"GitHub Issue #57: Add/modify CE to define resource state transitions",https://github.com/frank-fs/frank/issues/57,2026-03-06,high,reviewed
+issue80,"GitHub Issue #80: Tracking Issue: Semantic Metadata-Augmented Resources",https://github.com/frank-fs/frank/issues/80,2026-03-06,high,reviewed
+amundsen-wsd,"Amundsen, M. (2018). Using Web Sequence Diagrams with your APIs. RESTFest 2018.",https://mamund.site44.com/talks/2018-09-restfest/2018-09-restfest-wsd.pdf,2026-03-06,high,reviewed
+alps-spec,"ALPS Specification (draft-amundsen-richardson-foster-alps)",http://alps.io/spec/drafts/draft-01.html,2026-03-06,high,reviewed
+alps-asd,"app-state-diagram (ASD): ALPS state diagram generator",https://github.com/alps-asd/app-state-diagram,2026-03-06,medium,reviewed
+eiger,"Eiger: ALPS Processor CLI (archived)",https://github.com/filip26/eiger,2026-03-06,medium,reviewed
+xstate-docs,"XState documentation (Stately)",https://stately.ai/docs,2026-03-06,high,pending
+scxml-spec,"W3C SCXML Specification",https://www.w3.org/TR/scxml/,2026-03-06,high,pending
+smcat-repo,"state-machine-cat (smcat) GitHub repository",https://github.com/sverweij/state-machine-cat,2026-03-06,medium,pending
+wsd-gen-fsharp,"wsd-gen F# fork (WSD parser)",https://github.com/panesofglass/wsd-gen/tree/fsharp,2026-03-06,high,pending
+fsadvent2018,"State Transitions through Sequence Diagrams (F# Advent 2018)",https://wizardsofsmart.wordpress.com/2018/12/05/state-transitions-through-sequence-diagrams/,2026-03-06,medium,pending
+foxycart-api,"FoxyCart API Documentation",https://api.foxycart.com/docs,2026-03-06,medium,pending
