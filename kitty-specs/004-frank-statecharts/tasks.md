@@ -52,10 +52,10 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T006 Implement `MailboxProcessorStore<'S,'C>` in `src/Frank.Statecharts/Store.fs`
-- [ ] T007 Implement `IDisposable` on store with proper cleanup
-- [ ] T008 Implement `Subscribe` with `IObservable<'S * 'C>` semantics (for Provenance hooks)
-- [ ] T009 Create `test/Frank.Statecharts.Tests/StoreTests.fs` with concurrency and lifecycle tests
+- [x] T006 Implement `MailboxProcessorStore<'S,'C>` in `src/Frank.Statecharts/Store.fs`
+- [x] T007 Implement `IDisposable` on store with proper cleanup
+- [x] T008 Implement `Subscribe` with `IObservable<'S * 'C>` semantics (for Provenance hooks)
+- [x] T009 Create `test/Frank.Statecharts.Tests/StoreTests.fs` with concurrency and lifecycle tests
 
 ### Implementation Notes
 - Follow tic-tac-toe's `GameImpl` MailboxProcessor pattern (`../tic-tac-toe/src/TicTacToe.Engine/Engine.fs`)
