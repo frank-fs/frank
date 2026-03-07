@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Integration Tests & Tic-Tac-Toe Validation
-lane: "doing"
+lane: "for_review"
 dependencies: [WP04, WP05]
 base_branch: 004-frank-statecharts-WP06-merge-base
 base_commit: c7ad1e78ce4b347f69893e03e131d7e9fc4f573d
@@ -425,3 +425,4 @@ let affordanceTests =
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-07T18:09:48Z – claude-opus – shell_pid=64755 – lane=doing – Assigned agent via workflow command
+- 2026-03-07T18:21:41Z – claude-opus – shell_pid=64755 – lane=for_review – Ready for review: 16 integration tests with tic-tac-toe fixture covering method filtering, guards, hooks, affordances, and store lifecycle
