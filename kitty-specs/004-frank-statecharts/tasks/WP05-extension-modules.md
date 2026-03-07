@@ -13,7 +13,7 @@ subtasks:
 - T025
 phase: Phase 3 - Integration
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "58899"
 review_status: ''
 reviewed_by: ''
@@ -275,3 +275,4 @@ testTask "useStatecharts registers middleware" {
 ## Activity Log
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-07T17:06:06Z – claude-opus – shell_pid=58899 – lane=doing – Assigned agent via workflow command
