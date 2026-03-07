@@ -1,7 +1,6 @@
 namespace Frank.Cli.Core.State
 
 open System
-open System.Collections.Generic
 open System.IO
 open System.Text.Json
 open VDS.RDF
@@ -9,9 +8,7 @@ open VDS.RDF.Parsing
 open VDS.RDF.Writing
 
 type SourceLocation =
-    { File: string
-      Line: int
-      Column: int }
+    { File: string; Line: int; Column: int }
 
 type ExtractionMetadata =
     { Timestamp: DateTimeOffset
@@ -28,7 +25,7 @@ type UnmappedType =
 type ExtractionState =
     { Ontology: IGraph
       Shapes: IGraph
-      SourceMap: Dictionary<Uri, SourceLocation>
+      SourceMap: Map<string, SourceLocation>
       Clarifications: Map<string, string>
       Metadata: ExtractionMetadata
       UnmappedTypes: UnmappedType list }
@@ -69,8 +66,7 @@ module ExtractionState =
 
             use stream = File.Create(path)
 
-            use writer =
-                new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+            use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
 
             writer.WriteStartObject()
 
@@ -82,7 +78,7 @@ module ExtractionState =
             writer.WriteStartObject("sourceMap")
 
             for kvp in state.SourceMap do
-                writer.WritePropertyName(kvp.Key.AbsoluteUri)
+                writer.WritePropertyName(kvp.Key)
                 writeSourceLocation writer kvp.Value
 
             writer.WriteEndObject()
@@ -142,13 +138,14 @@ module ExtractionState =
 
                 let sourceMap =
                     let sm = root.GetProperty("sourceMap")
-                    let dict = Dictionary<Uri, SourceLocation>()
+                    let mutable map = Map.empty
 
                     for prop in sm.EnumerateObject() do
                         let loc = readSourceLocation prop.Value
-                        dict.[Uri(prop.Name)] <- loc
+                        // Handle both old (Uri) and new (string) key formats
+                        map <- Map.add prop.Name loc map
 
-                    dict
+                    map
 
                 let clarifications =
                     let cl = root.GetProperty("clarifications")

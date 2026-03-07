@@ -4,8 +4,20 @@ open System
 open System.Text
 open VDS.RDF
 
+type DiffType =
+    | Added
+    | Removed
+    | Modified
+
+module DiffType =
+    let toString =
+        function
+        | Added -> "Added"
+        | Removed -> "Removed"
+        | Modified -> "Modified"
+
 type DiffEntry =
-    { Type: string
+    { Type: DiffType
       Uri: Uri
       Label: string option
       Field: string option
@@ -29,7 +41,7 @@ module DiffEngine =
         | :? IUriNode as u -> u.Uri
         | _ -> Uri("urn:blank:" + node.ToString())
 
-    let private entryFromTriple (diffType: string) (t: Triple) : DiffEntry =
+    let private entryFromTriple (diffType: DiffType) (t: Triple) : DiffEntry =
         { Type = diffType
           Uri = nodeUri t.Subject
           Label = None
@@ -94,7 +106,7 @@ module DiffEngine =
                 let addedObjs = addedByKey.[key] |> List.map (fun (_, _, o) -> o)
 
                 modified <-
-                    { Type = "Modified"
+                    { Type = Modified
                       Uri = subjectUri
                       Label = None
                       Field = Some p
@@ -106,7 +118,7 @@ module DiffEngine =
 
                 for (_, _, o) in objs do
                     added <-
-                        { Type = "Added"
+                        { Type = Added
                           Uri = subjectUri
                           Label = None
                           Field = Some p
@@ -118,7 +130,7 @@ module DiffEngine =
 
                 for (_, _, o) in objs do
                     removed <-
-                        { Type = "Removed"
+                        { Type = Removed
                           Uri = subjectUri
                           Label = None
                           Field = Some p
@@ -147,8 +159,7 @@ module DiffEngine =
             for entry in diff.Added do
                 let field = entry.Field |> Option.defaultValue ""
                 let toVal = entry.To |> Option.defaultValue ""
-                sb.AppendLine($"  + {entry.Uri} [{field}] = {toVal}")
-                |> ignore
+                sb.AppendLine($"  + {entry.Uri} [{field}] = {toVal}") |> ignore
 
         if not (List.isEmpty diff.Removed) then
             sb.AppendLine("Removed:") |> ignore
@@ -156,8 +167,7 @@ module DiffEngine =
             for entry in diff.Removed do
                 let field = entry.Field |> Option.defaultValue ""
                 let fromVal = entry.From |> Option.defaultValue ""
-                sb.AppendLine($"  - {entry.Uri} [{field}] = {fromVal}")
-                |> ignore
+                sb.AppendLine($"  - {entry.Uri} [{field}] = {fromVal}") |> ignore
 
         if not (List.isEmpty diff.Modified) then
             sb.AppendLine("Modified:") |> ignore
@@ -166,10 +176,13 @@ module DiffEngine =
                 let field = entry.Field |> Option.defaultValue ""
                 let fromVal = entry.From |> Option.defaultValue ""
                 let toVal = entry.To |> Option.defaultValue ""
-                sb.AppendLine($"  ~ {entry.Uri} [{field}]: {fromVal} -> {toVal}")
-                |> ignore
+                sb.AppendLine($"  ~ {entry.Uri} [{field}]: {fromVal} -> {toVal}") |> ignore
 
-        if List.isEmpty diff.Added && List.isEmpty diff.Removed && List.isEmpty diff.Modified then
+        if
+            List.isEmpty diff.Added
+            && List.isEmpty diff.Removed
+            && List.isEmpty diff.Modified
+        then
             sb.AppendLine("No changes detected.") |> ignore
 
         sb.ToString().TrimEnd()

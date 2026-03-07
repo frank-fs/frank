@@ -4,6 +4,7 @@ open System
 open System.Text.RegularExpressions
 open VDS.RDF
 open Frank.Cli.Core.Rdf
+open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 
 /// Aligns extracted RDF to standard vocabularies (Schema.org, Hydra).
@@ -15,20 +16,20 @@ module VocabularyAligner =
     let private normalizeFieldName (name: string) =
         splitCamelCase(name).Replace(" ", "").ToLowerInvariant()
 
-    let private alignmentMap : (string list * string) list = [
-        (["name"; "title"], SchemaOrg.Name)
-        (["description"; "summary"; "body"], SchemaOrg.Description)
-        (["email"; "emailaddress"], SchemaOrg.Email)
-        (["url"; "uri"; "website"; "homepage"], SchemaOrg.Url)
-        (["price"; "cost"; "amount"], SchemaOrg.Price)
-        (["createdat"; "datecreated"; "created"], SchemaOrg.DateCreated)
-        (["updatedat"; "datemodified"; "modified"], SchemaOrg.DateModified)
-        (["image"; "imageurl"; "photo"], SchemaOrg.Image)
-        (["telephone"; "phone"], SchemaOrg.Telephone)
-    ]
+    let private alignmentMap: (string list * string) list =
+        [ ([ "name"; "title" ], SchemaOrg.Name)
+          ([ "description"; "summary"; "body" ], SchemaOrg.Description)
+          ([ "email"; "emailaddress" ], SchemaOrg.Email)
+          ([ "url"; "uri"; "website"; "homepage" ], SchemaOrg.Url)
+          ([ "price"; "cost"; "amount" ], SchemaOrg.Price)
+          ([ "createdat"; "datecreated"; "created" ], SchemaOrg.DateCreated)
+          ([ "updatedat"; "datemodified"; "modified" ], SchemaOrg.DateModified)
+          ([ "image"; "imageurl"; "photo" ], SchemaOrg.Image)
+          ([ "telephone"; "phone" ], SchemaOrg.Telephone) ]
 
     let private tryFindAlignment (fieldName: string) : string option =
         let normalized = normalizeFieldName fieldName
+
         alignmentMap
         |> List.tryFind (fun (names, _) -> names |> List.contains normalized)
         |> Option.map snd
@@ -52,8 +53,7 @@ module VocabularyAligner =
                 triplesWithPredicate graph rdfTypeNode
                 |> Seq.filter (fun t ->
                     match t.Object with
-                    | :? IUriNode as on ->
-                        on.Uri = datatypePropUri || on.Uri = objectPropUri
+                    | :? IUriNode as on -> on.Uri = datatypePropUri || on.Uri = objectPropUri
                     | _ -> false)
                 |> Seq.map (fun t -> t.Subject)
                 |> Seq.distinct
@@ -62,8 +62,7 @@ module VocabularyAligner =
             // For each property node, find its rdfs:label and try to align
             for propNode in propertyNodes do
                 let labelTriples =
-                    triplesWithSubjectPredicate graph propNode labelNode
-                    |> Seq.toList
+                    triplesWithSubjectPredicate graph propNode labelNode |> Seq.toList
 
                 for labelTriple in labelTriples do
                     match labelTriple.Object with

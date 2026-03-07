@@ -11,6 +11,7 @@
     <Compile Include="Rdf/Vocabularies.fs" />
     <Compile Include="Analysis/AstAnalyzer.fs" />
     <Compile Include="Analysis/TypeAnalyzer.fs" />
+    <Compile Include="Extraction/UriHelpers.fs" />
     <Compile Include="Extraction/TypeMapper.fs" />
     <Compile Include="Extraction/RouteMapper.fs" />
     <Compile Include="Extraction/CapabilityMapper.fs" />
@@ -33,9 +34,10 @@
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Ontology" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
-    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.*" />
-    <PackageReference Include="Ionide.ProjInfo" Version="0.74.*" />
-    <PackageReference Include="Ionide.ProjInfo.FCS" Version="0.74.*" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
+    <PackageReference Include="Ionide.ProjInfo" Version="0.74.2" />
+    <PackageReference Include="Ionide.ProjInfo.FCS" Version="0.74.2" />
   </ItemGroup>
 
 </Project>

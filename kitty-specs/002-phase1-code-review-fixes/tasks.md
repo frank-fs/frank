@@ -83,12 +83,12 @@
 **Requirement Refs**: FR-007, FR-008, FR-009, FR-011, FR-015
 
 ### Included Subtasks
-- [ ] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
-- [ ] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
-- [ ] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
-- [ ] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
-- [ ] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
-- [ ] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
+- [x] T011 Replace catch-all `with | _ ->` in `linkedDataMiddleware` with ILogger-backed exception handling (fail-fast for unrecoverable errors)
+- [x] T012 Replace `String.Contains` in `negotiateRdfType` with `MediaTypeHeaderValue` parsing
+- [x] T013 Add null check for `Assembly.GetEntryAssembly()` in `WebHostBuilderExtensions.fs`
+- [x] T014 Replace `RuntimeHelpers.GetHashCode` in `InstanceProjector` with structural hash of RDF-relevant properties
+- [x] T015 Replace nested match pyramids in `LinkedDataConfig.loadConfig` with composed pipelines (CE or piped module functions)
+- [x] T026 Replace nested match pyramids in `GraphLoader.load` with composed pipelines using FsToolkit.ErrorHandling CEs or `Result.bind`/`Option.bind`
 
 ### Implementation Notes
 - T011: Inject `ILogger<>` into middleware. Log with `LogWarning`/`LogError` + exception context. Let unrecoverable errors propagate (fail-fast). Do not wrap in Result.
@@ -158,13 +158,13 @@
 **Requirement Refs**: FR-004, FR-014, FR-016, FR-017, FR-021
 
 ### Included Subtasks
-- [ ] T023 Add FsToolkit.ErrorHandling package reference to `Frank.Cli.Core.fsproj`
-- [ ] T024 Replace string-typed `ValidationIssue.Severity` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
-- [ ] T025 [P] Replace string-typed `DiffEntry.Type` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
-- [ ] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
-- [ ] T028 Remove `[<AutoOpen>]` from `FSharpRdf` module; add explicit `open` to all consumers
-- [ ] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
-- [ ] T030 [P] Add `[<Literal>]` annotations to vocabulary constants in `Vocabularies.fs`
+- [x] T023 Add FsToolkit.ErrorHandling package reference to `Frank.Cli.Core.fsproj`
+- [x] T024 Replace string-typed `ValidationIssue.Severity` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
+- [x] T025 [P] Replace string-typed `DiffEntry.Type` with type-safe alternative (evaluate DU vs static byte array; escalate to user if on hot path)
+- [x] T027 Replace imperative `ResizeArray` + `ref` cells in `AstAnalyzer.walkCeBody` with functional fold
+- [x] T028 Remove `[<AutoOpen>]` from `FSharpRdf` module; add explicit `open` to all consumers
+- [x] T029 [P] Fix `CompileCommand.verifyRoundTrip` to dispose `JsonDocument` via `use` binding
+- [x] T030 [P] Add `[<Literal>]` annotations to vocabulary constants in `Vocabularies.fs`
 
 ### Implementation Notes
 - T023: Pin to latest stable version
@@ -197,12 +197,12 @@
 **Requirement Refs**: FR-001, FR-002, FR-004, FR-007, FR-008, FR-009, FR-010, FR-011
 
 ### Included Subtasks
-- [ ] T031 Add tests for multi-subject JSON-LD typed literal serialization (verifying @type/@value preserved in @graph output)
-- [ ] T032 [P] Add tests for `MediaTypeHeaderValue` Accept header parsing (proper media type matching, quality factors, edge cases: malformed, empty)
-- [ ] T033 [P] Add tests for structural hash cache key uniqueness (same content = same key, different content = different key, different identity same content = same key)
-- [ ] T034 [P] Add tests for `Assembly.GetEntryAssembly()` null handling
-- [ ] T035 [P] Add tests for `ExtractionState` serialization/deserialization with `Map<string, SourceLocation>` (including backward-compatible load of old Uri-keyed format)
-- [ ] T036 Run full test suite (`dotnet test`) to verify all 265 baseline tests pass and no regressions
+- [x] T031 Add tests for multi-subject JSON-LD typed literal serialization (verifying @type/@value preserved in @graph output)
+- [x] T032 [P] Add tests for `MediaTypeHeaderValue` Accept header parsing (proper media type matching, quality factors, edge cases: malformed, empty)
+- [x] T033 [P] Add tests for structural hash cache key uniqueness (same content = same key, different content = different key, different identity same content = same key)
+- [x] T034 [P] Add tests for `Assembly.GetEntryAssembly()` null handling
+- [x] T035 [P] Add tests for `ExtractionState` serialization/deserialization with `Map<string, SourceLocation>` (including backward-compatible load of old Uri-keyed format)
+- [x] T036 Run full test suite (`dotnet test`) to verify all 265 baseline tests pass and no regressions
 
 ### Implementation Notes
 - T031: Test in `Frank.LinkedData.Tests` — create multi-subject graph with int, bool, double, decimal properties, serialize to JSON-LD, assert `@type` annotations present

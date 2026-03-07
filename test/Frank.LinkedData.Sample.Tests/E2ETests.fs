@@ -49,7 +49,7 @@ let tests =
 
               // Step 1: Extract
               let extractResult =
-                  ExtractCommand.execute fsproj (Uri "http://example.org/api/") [ "schema.org" ] "full"
+                  ExtractCommand.execute fsproj (Uri "http://example.org/api/") [ "schema.org" ]
                   |> Async.RunSynchronously
 
               match extractResult with

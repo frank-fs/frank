@@ -1,31 +1,34 @@
 ---
-work_package_id: "WP06"
-subtasks:
-  - "T031"
-  - "T032"
-  - "T033"
-  - "T034"
-  - "T035"
-  - "T036"
-title: "New Tests for Behavioral Changes"
-phase: "Phase 3 - Verification"
-lane: "planned"
+work_package_id: WP06
+title: New Tests for Behavioral Changes
+lane: "done"
 dependencies:
-  - "WP02"
-  - "WP03"
-  - "WP04"
-  - "WP05"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- WP02
+- WP03
+- WP04
+- WP05
+base_branch: 002-phase1-code-review-fixes-WP05
+base_commit: 9324fef4bbfd589b83a9f2f3495b47be3f5564b8
+created_at: '2026-03-06T21:30:21.762324+00:00'
+subtasks:
+- T031
+- T032
+- T033
+- T034
+- T035
+- T036
+phase: Phase 3 - Verification
+assignee: ''
+agent: "claude-opus"
+shell_pid: "97050"
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
-  - timestamp: "2026-03-06T15:25:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T15:25:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 requirement_refs: [FR-001, FR-002, FR-004, FR-007, FR-008, FR-009, FR-010, FR-011]
 ---
 
@@ -207,3 +210,7 @@ Depends on WP02, WP03, WP04, WP05 — tests validate behavioral changes from tho
 ## Activity Log
 
 - 2026-03-06T15:25:00Z – system – lane=planned – Prompt created.
+- 2026-03-06T21:30:21Z – claude-opus – shell_pid=95853 – lane=doing – Assigned agent via workflow command
+- 2026-03-06T21:41:30Z – claude-opus – shell_pid=95853 – lane=for_review – Ready for review: 16 new behavioral change tests across 5 files. All 146 tests pass (130 baseline + 16 new). Tests cover T031-T036: JSON-LD @graph typed literals, Accept header quality factors, structural hash caching, null assembly handling, and Map<string,SourceLocation> round-trip.
+- 2026-03-06T21:43:24Z – claude-opus – shell_pid=97050 – lane=doing – Started review via workflow command
+- 2026-03-06T21:52:22Z – claude-opus – shell_pid=97050 – lane=done – Review passed: All 6 subtasks (T031-T036) verified. 16 new behavioral change tests across 5 files. All 146 tests pass, zero failures. kitty-specs from merged WP02-WP04 dependency branches are expected.

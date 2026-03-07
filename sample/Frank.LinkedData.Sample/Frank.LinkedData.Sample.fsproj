@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Frank.Cli.MSBuild" Version="7.3.0" />
+    <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.csproj" />
   </ItemGroup>
 
 </Project>
