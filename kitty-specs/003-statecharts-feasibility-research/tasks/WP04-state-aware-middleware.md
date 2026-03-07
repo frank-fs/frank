@@ -9,7 +9,7 @@ subtasks:
   - "T021"
 title: "State-Aware Middleware"
 phase: "Phase 2 - Core Pipeline"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""

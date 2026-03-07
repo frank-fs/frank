@@ -20,11 +20,11 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Statecharts/Frank.Statecharts.fsproj` (multi-target net8.0;net9.0;net10.0)
-- [ ] T002 Create `src/Frank.Statecharts/Types.fs` with `StateMachine<'S,'E,'C>`, `TransitionResult`, `BlockReason`, `Guard`, `GuardContext`, `GuardResult`, `StateInfo`
-- [ ] T003 Create `src/Frank.Statecharts/Store.fs` with `IStateMachineStore<'S,'C>` interface
-- [ ] T004 Create `test/Frank.Statecharts.Tests/Frank.Statecharts.Tests.fsproj` and `Program.fs`
-- [ ] T005 Create `test/Frank.Statecharts.Tests/TypeTests.fs` with unit tests for core types
+- [x] T001 Create `src/Frank.Statecharts/Frank.Statecharts.fsproj` (multi-target net8.0;net9.0;net10.0)
+- [x] T002 Create `src/Frank.Statecharts/Types.fs` with `StateMachine<'S,'E,'C>`, `TransitionResult`, `BlockReason`, `Guard`, `GuardContext`, `GuardResult`, `StateInfo`
+- [x] T003 Create `src/Frank.Statecharts/Store.fs` with `IStateMachineStore<'S,'C>` interface
+- [x] T004 Create `test/Frank.Statecharts.Tests/Frank.Statecharts.Tests.fsproj` and `Program.fs`
+- [x] T005 Create `test/Frank.Statecharts.Tests/TypeTests.fs` with unit tests for core types
 
 ### Implementation Notes
 - Follow `src/Frank.Auth/` project structure as reference for .fsproj configuration
@@ -52,10 +52,10 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T006 Implement `MailboxProcessorStore<'S,'C>` in `src/Frank.Statecharts/Store.fs`
-- [ ] T007 Implement `IDisposable` on store with proper cleanup
-- [ ] T008 Implement `Subscribe` with `IObservable<'S * 'C>` semantics (for Provenance hooks)
-- [ ] T009 Create `test/Frank.Statecharts.Tests/StoreTests.fs` with concurrency and lifecycle tests
+- [x] T006 Implement `MailboxProcessorStore<'S,'C>` in `src/Frank.Statecharts/Store.fs`
+- [x] T007 Implement `IDisposable` on store with proper cleanup
+- [x] T008 Implement `Subscribe` with `IObservable<'S * 'C>` semantics (for Provenance hooks)
+- [x] T009 Create `test/Frank.Statecharts.Tests/StoreTests.fs` with concurrency and lifecycle tests
 
 ### Implementation Notes
 - Follow tic-tac-toe's `GameImpl` MailboxProcessor pattern (`../tic-tac-toe/src/TicTacToe.Engine/Engine.fs`)
@@ -83,12 +83,12 @@
 **Estimated Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T010 Create `src/Frank.Statecharts/StatefulResourceBuilder.fs` with `StatefulResourceSpec` and `StatefulResourceBuilder` CE
-- [ ] T011 Implement `machine` custom operation for defining `StateMachine<'S,'E,'C>` inline
-- [ ] T012 Implement `inState` custom operation for per-state handler registration
-- [ ] T013 Implement `onTransition` custom operation for observable transition hooks
-- [ ] T014 Implement `resolveInstanceId` custom operation for configuring instance key extraction from route parameters
-- [ ] T015 Implement `Build` method that produces `Resource` with `StateMachineMetadata`
+- [x] T010 Create `src/Frank.Statecharts/StatefulResourceBuilder.fs` with `StatefulResourceSpec` and `StatefulResourceBuilder` CE
+- [x] T011 Implement `machine` custom operation for defining `StateMachine<'S,'E,'C>` inline
+- [x] T012 Implement `inState` custom operation for per-state handler registration
+- [x] T013 Implement `onTransition` custom operation for observable transition hooks
+- [x] T014 Implement `resolveInstanceId` custom operation for configuring instance key extraction from route parameters
+- [x] T015 Implement `Build` method that produces `Resource` with `StateMachineMetadata`
 
 ### Implementation Notes
 - The CE wraps `ResourceBuilder` rather than extending it (see plan DD-01)
@@ -118,12 +118,12 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T016 Create `src/Frank.Statecharts/Middleware.fs` with state-aware request interception
-- [ ] T017 Implement state lookup: retrieve current state from `IStateMachineStore` using resolved instance ID
-- [ ] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
-- [ ] T019 Implement guard evaluation: evaluate guards in order, map `BlockReason` to HTTP status codes
-- [ ] T020 Implement transition execution: on successful handler completion, apply transition and fire `onTransition` hook
-- [ ] T021 Create `test/Frank.Statecharts.Tests/MiddlewareTests.fs` with integration tests
+- [x] T016 Create `src/Frank.Statecharts/Middleware.fs` with state-aware request interception
+- [x] T017 Implement state lookup: retrieve current state from `IStateMachineStore` using resolved instance ID
+- [x] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
+- [x] T019 Implement guard evaluation: evaluate guards in order, map `BlockReason` to HTTP status codes
+- [x] T020 Implement transition execution: on successful handler completion, apply transition and fire `onTransition` hook
+- [x] T021 Create `test/Frank.Statecharts.Tests/MiddlewareTests.fs` with integration tests
 
 ### Implementation Notes
 - Follow `Frank.LinkedData`'s middleware pattern: check for `StateMachineMetadata` marker -> intercept or pass through
@@ -154,10 +154,10 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T022 Create `src/Frank.Statecharts/ResourceBuilderExtensions.fs` with `stateMachine` custom operation on `ResourceBuilder`
-- [ ] T023 Create `src/Frank.Statecharts/WebHostBuilderExtensions.fs` with `useStatecharts` custom operation
-- [ ] T024 Implement DI registration in `useStatecharts`: register `IStateMachineStore` (default `MailboxProcessorStore`) and middleware
-- [ ] T025 Verify compilation order in .fsproj (Types -> Store -> StatefulResourceBuilder -> Middleware -> Extensions)
+- [x] T022 Create `src/Frank.Statecharts/ResourceBuilderExtensions.fs` with `stateMachine` custom operation on `ResourceBuilder`
+- [x] T023 Create `src/Frank.Statecharts/WebHostBuilderExtensions.fs` with `useStatecharts` custom operation
+- [x] T024 Implement DI registration in `useStatecharts`: register `IStateMachineStore` (default `MailboxProcessorStore`) and middleware
+- [x] T025 Verify compilation order in .fsproj (Types -> Store -> StatefulResourceBuilder -> Middleware -> Extensions)
 
 ### Implementation Notes
 - `ResourceBuilderExtensions`: adds `stateMachine` operation to standard `ResourceBuilder` for cases where full `statefulResource` CE is not needed (simple metadata-only annotation)
@@ -186,12 +186,12 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T026 Create `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` with TestHost-based integration tests
-- [ ] T027 Implement simplified tic-tac-toe state machine as test fixture (XTurn/OTurn/Won/Draw states)
-- [ ] T028 Test state-dependent method availability (POST allowed in XTurn, not in Won)
-- [ ] T029 Test guard evaluation with mock ClaimsPrincipal (turn-based, role-based guards)
-- [ ] T030 Test transition hooks fire correctly (observable receives old/new state)
-- [ ] T031 Test filtered affordances (response includes only available transitions per state)
+- [x] T026 Create `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` with TestHost-based integration tests
+- [x] T027 Implement simplified tic-tac-toe state machine as test fixture (XTurn/OTurn/Won/Draw states)
+- [x] T028 Test state-dependent method availability (POST allowed in XTurn, not in Won)
+- [x] T029 Test guard evaluation with mock ClaimsPrincipal (turn-based, role-based guards)
+- [x] T030 Test transition hooks fire correctly (observable receives old/new state)
+- [x] T031 Test filtered affordances (response includes only available transitions per state)
 
 ### Implementation Notes
 - Use ASP.NET Core TestHost (`Microsoft.AspNetCore.TestHost`) like existing Frank tests

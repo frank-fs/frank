@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP05"
+work_package_id: WP05
+title: WebHost & ResourceBuilder Extensions
+lane: "done"
+dependencies: [WP03, WP04]
+base_branch: 004-frank-statecharts-WP05-merge-base
+base_commit: 19e9f5a2e73472bbea8b31e3c58894284d7ddb94
+created_at: '2026-03-07T17:06:06.105207+00:00'
 subtasks:
-  - "T022"
-  - "T023"
-  - "T024"
-  - "T025"
-title: "WebHost & ResourceBuilder Extensions"
-phase: "Phase 3 - Integration"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP03", "WP04"]
-requirement_refs: ["FR-011"]
+- T022
+- T023
+- T024
+- T025
+phase: Phase 3 - Integration
+assignee: ''
+agent: "claude-opus-reviewer"
+shell_pid: "60816"
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
-  - timestamp: "2026-03-06T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-011]
 ---
 
 # Work Package Prompt: WP05 -- WebHost & ResourceBuilder Extensions
@@ -272,3 +275,8 @@ testTask "useStatecharts registers middleware" {
 ## Activity Log
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-07T17:06:06Z – claude-opus – shell_pid=58899 – lane=doing – Assigned agent via workflow command
+- 2026-03-07T17:45:02Z – claude-opus – shell_pid=58899 – lane=for_review – Ready for review: useStatecharts and stateMachine extensions following Frank.Auth patterns. Clean build on all targets, 44 tests pass.
+- 2026-03-07T17:46:27Z – claude-opus-reviewer – shell_pid=60816 – lane=doing – Started review via workflow command
+- 2026-03-07T17:47:09Z – claude-opus-reviewer – shell_pid=60816 – lane=done – Review passed: Extensions follow Frank.Auth patterns exactly. useStatecharts correctly uses Middleware (not BeforeRoutingMiddleware). Compilation order correct. Both overloads present. Clean build, 44 tests pass.
+- 2026-03-07T18:50:27Z – claude-opus-reviewer – shell_pid=60816 – lane=done – Implementation complete and merged

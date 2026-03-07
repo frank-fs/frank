@@ -7,7 +7,7 @@ subtasks:
   - "T025"
 title: "WebHost & ResourceBuilder Extensions"
 phase: "Phase 3 - Integration"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
