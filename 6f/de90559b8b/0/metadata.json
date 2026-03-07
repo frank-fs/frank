@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "6fde90559b8b",
+  "session_id": "f5bbbbab-b049-423c-b432-d5c155a5b347",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-07T00:00:36.771767Z",
+  "branch": "002-phase1-code-review-fixes",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "test/Frank.LinkedData.Sample.Tests/E2ETests.fs",
+    "test/Frank.LinkedData.Sample.Tests/HttpTests.fs"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "30e0cb93ee55",
+  "token_usage": {
+    "input_tokens": 6497,
+    "cache_creation_tokens": 2532288,
+    "cache_read_tokens": 107840216,
+    "output_tokens": 366981,
+    "api_call_count": 1041
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-07T00:00:33.536841Z",
+    "agent_lines": 10,
+    "human_added": 6693,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 6703,
+    "agent_percentage": 0.1491869312248247
+  }
+}

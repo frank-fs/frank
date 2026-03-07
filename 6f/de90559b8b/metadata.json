@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.0",
+  "checkpoint_id": "6fde90559b8b",
+  "strategy": "manual-commit",
+  "branch": "002-phase1-code-review-fixes",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "test/Frank.LinkedData.Sample.Tests/E2ETests.fs",
+    "test/Frank.LinkedData.Sample.Tests/HttpTests.fs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6f/de90559b8b/0/metadata.json",
+      "transcript": "/6f/de90559b8b/0/full.jsonl",
+      "content_hash": "/6f/de90559b8b/0/content_hash.txt",
+      "prompt": "/6f/de90559b8b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 6497,
+    "cache_creation_tokens": 2532288,
+    "cache_read_tokens": 107840216,
+    "output_tokens": 366981,
+    "api_call_count": 1041
+  }
+}
