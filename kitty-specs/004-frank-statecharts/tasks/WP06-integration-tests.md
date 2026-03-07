@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Integration Tests & Tic-Tac-Toe Validation
-lane: "doing"
+lane: "done"
 dependencies: [WP04, WP05]
 base_branch: 004-frank-statecharts-WP06-merge-base
 base_commit: c7ad1e78ce4b347f69893e03e131d7e9fc4f573d
@@ -17,8 +17,8 @@ phase: Phase 3 - Integration
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "66164"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-06T00:00:00Z'
   lane: planned
@@ -427,3 +427,4 @@ let affordanceTests =
 - 2026-03-07T18:09:48Z – claude-opus – shell_pid=64755 – lane=doing – Assigned agent via workflow command
 - 2026-03-07T18:21:41Z – claude-opus – shell_pid=64755 – lane=for_review – Ready for review: 16 integration tests with tic-tac-toe fixture covering method filtering, guards, hooks, affordances, and store lifecycle
 - 2026-03-07T18:24:35Z – claude-opus-reviewer – shell_pid=66164 – lane=doing – Started review via workflow command
+- 2026-03-07T18:25:16Z – claude-opus-reviewer – shell_pid=66164 – lane=done – Review passed: 16 integration tests with tic-tac-toe fixture, all HTTP status codes verified, store lifecycle tested end-to-end, affordance discovery mechanism validated, docs added
