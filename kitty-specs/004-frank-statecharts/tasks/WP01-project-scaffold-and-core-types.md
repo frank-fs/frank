@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold & Core Types
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: ba2dbb72c4670e978011f1258560601fd712cce7
@@ -431,3 +431,4 @@ let typeTests =
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-07T05:33:42Z – claude-opus – shell_pid=32418 – lane=doing – Assigned agent via workflow command
+- 2026-03-07T05:37:48Z – claude-opus – shell_pid=32418 – lane=for_review – Ready for review: All 5 subtasks complete. Types.fs, Store.fs, test project with 16 passing tests. Solution builds clean on all 3 targets.
