@@ -15,7 +15,7 @@ subtasks:
 - T031
 phase: Phase 3 - Integration
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "64755"
 review_status: ''
 reviewed_by: ''
@@ -424,3 +424,4 @@ let affordanceTests =
 ## Activity Log
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-07T18:09:48Z – claude-opus – shell_pid=64755 – lane=doing – Assigned agent via workflow command
