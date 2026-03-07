@@ -83,12 +83,12 @@
 **Estimated Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T010 Create `src/Frank.Statecharts/StatefulResourceBuilder.fs` with `StatefulResourceSpec` and `StatefulResourceBuilder` CE
-- [ ] T011 Implement `machine` custom operation for defining `StateMachine<'S,'E,'C>` inline
-- [ ] T012 Implement `inState` custom operation for per-state handler registration
-- [ ] T013 Implement `onTransition` custom operation for observable transition hooks
-- [ ] T014 Implement `resolveInstanceId` custom operation for configuring instance key extraction from route parameters
-- [ ] T015 Implement `Build` method that produces `Resource` with `StateMachineMetadata`
+- [x] T010 Create `src/Frank.Statecharts/StatefulResourceBuilder.fs` with `StatefulResourceSpec` and `StatefulResourceBuilder` CE
+- [x] T011 Implement `machine` custom operation for defining `StateMachine<'S,'E,'C>` inline
+- [x] T012 Implement `inState` custom operation for per-state handler registration
+- [x] T013 Implement `onTransition` custom operation for observable transition hooks
+- [x] T014 Implement `resolveInstanceId` custom operation for configuring instance key extraction from route parameters
+- [x] T015 Implement `Build` method that produces `Resource` with `StateMachineMetadata`
 
 ### Implementation Notes
 - The CE wraps `ResourceBuilder` rather than extending it (see plan DD-01)
