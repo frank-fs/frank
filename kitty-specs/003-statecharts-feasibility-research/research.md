@@ -41,8 +41,8 @@ This research investigates whether Frank can support isomorphic round-tripping b
 ### D-005: CLI Tool Strategy
 
 **Decision**: Integrate statechart generation into frank-cli rather than a separate tool.
-**Rationale**: frank-cli already has assembly analysis, type extraction, MSBuild integration, and semantic artifact generation. A separate tool would duplicate this infrastructure. The `wsd-gen` F# parser can be consumed as a library dependency.
-**Evidence**: [E-006]
+**Rationale**: frank-cli already has assembly analysis, type extraction, MSBuild integration, and semantic artifact generation. A separate tool would duplicate this infrastructure. Note: the `wsd-gen` F# fork is NOT a WSD parser (see D-009) -- a parser must be written from scratch.
+**Evidence**: [E-006], [E-015]
 
 ### D-006: ALPS Limitations Acknowledged
 
@@ -69,10 +69,41 @@ ALPS remains valuable for semantic descriptor vocabulary (what states and transi
 ### D-008: smcat as Human-Friendly Notation
 
 **Decision**: smcat is the recommended human-authoring format for spec-to-code direction.
-**Rationale**: smcat v14.0.6 has excellent human-readable notation, supports guards (`[condition]`), hierarchical states, parallel states, and has a formal AST JSON schema. It can round-trip through SCXML for core constructs. JavaScript-only limitation means frank-cli would either shell out to smcat CLI or implement a custom F# parser (smcat grammar is PEG-based, feasible to port).
-**Evidence**: [E-012]
+**Rationale**: smcat v14.0.6 has excellent human-readable notation, supports guards (`[condition]`), hierarchical states, parallel states, and has a formal AST JSON schema. It can round-trip through SCXML for core constructs. JavaScript-only limitation means frank-cli would either shell out to smcat CLI or implement a custom F# parser (smcat grammar is PEG-based, feasible to port). Transition labels follow `event [guard] / action` format, parsed by regex into separate `event`, `cond`, and `action` AST fields. Guards are opaque strings -- smcat preserves guard *names* but cannot express `BlockReason` semantics. The smcat AST supports 12 state types (initial, final, parallel, history, choice, fork, join, junction, etc.).
+**Evidence**: [E-012], [E-019]
+
+### D-009: wsd-gen F# Fork Is Not a Parser
+
+**Decision**: The existing `wsd-gen` F# fork provides no foundation for local WSD parsing.
+**Rationale**: Review of the `fsharp` branch reveals it is a thin HTTP client that posts raw WSD text to the `websequencediagrams.com` API and downloads rendered images. There is no local lexer, parser, AST, or data model. Targets `netstandard2.0`/`netcoreapp2.1` (outdated). Only dependency is `Newtonsoft.Json` for API response parsing. A WSD parser for #57 must be written from scratch.
+**Impact**: The #57 effort estimate for "WSD Parser -- 1-2 weeks" is likely optimistic. This does not affect #87 (core runtime library).
+**Evidence**: [E-015]
+
+### D-010: XState Guard Model Validates DD-03
+
+**Decision**: XState v5's guard evaluation semantics confirm the Frank.Statecharts guard design.
+**Rationale**: XState v5 evaluates multiple guarded transitions in registration order -- "the first transition whose guard evaluates to true will be taken." This matches DD-03 (registration order, first `Blocked` short-circuits). XState's named guards via `setup()` parallel our `Guard.Name` pattern. XState also offers guard combinators (`and`/`or`/`not`) which are a potential future enhancement but not needed for v7.3.0 MVP.
+**Evidence**: [E-016]
+
+### D-011: SCXML Guard Semantics Diverge Intentionally
+
+**Decision**: Frank's `BlockReason` model is intentionally richer than SCXML's `cond` attribute.
+**Rationale**: SCXML `cond` is a boolean expression that silently evaluates to `false` on error. Frank's `GuardResult.Blocked(reason)` carries HTTP-mappable information (`NotAllowed`→403, `NotYourTurn`→409, etc.) that SCXML cannot express. This means code→SCXML export is lossy for guard *reasons* (only guard *names* survive as `cond` attribute values). This is acceptable per D-001 (lossy-but-documented).
+**Evidence**: [E-018]
 
 ## Case Study Analysis
+
+### Prior Art: F# Advent 2018 Blog Post
+
+**Source**: [State Transitions through Sequence Diagrams](https://wizardsofsmart.wordpress.com/2018/12/05/state-transitions-through-sequence-diagrams/)
+
+An earlier exploration of the WSD-to-state-machine concept. Defined `Transition<'State,'Message>` and an `Agent<'State,'Message>` type backed by `MailboxProcessor` with:
+- `Agent.Get`: returns `(currentState, allowedTransitions)` -- only transitions valid from the current state
+- `Agent.Post`: validates the message against the current state's allowed transitions before accepting
+- String-typed states and messages (not DUs)
+- No guards, no HTTP integration, no per-user discrimination
+
+The `Agent.Get` returning filtered transitions is an illustrative example of the "filtered affordances" concept that Frank.Statecharts formalizes with typed DUs, named guards, and HTTP method mapping. The `Agent.Post` validation pattern is analogous to the middleware's method filtering (405) behavior.
 
 ### Case Study 1: Tic-Tac-Toe State Machine
 
@@ -272,9 +303,9 @@ The union of (WSD + ALPS + XState) covers all information needed by the F# runti
 ### Key Finding: Format-Specific Limitations
 
 - **ALPS**: Cannot express conditional return types (`rt` is single-valued). A transition like `makeMove` that can lead to OTurn, Won, or Draw requires three separate ALPS descriptors (one per target state) rather than one transition with conditional targets. Cannot distinguish PUT from DELETE.
-- **XState v5**: SCXML import/export removed. JSON schema exists but describes compiled/internal form, not user-facing shorthand. Guard implementations are not serializable in JSON (only guard names/types).
-- **SCXML**: No HTTP domain model. ECMAScript guard expressions don't map to F#. No quality .NET libraries -- frank-cli must generate SCXML directly via XML APIs.
-- **smcat**: JavaScript-only parser. No .NET equivalent. Guards are opaque strings (parsed but not interpreted). No data model or execution semantics.
+- **XState v5**: SCXML import/export removed. JSON schema exists but describes compiled/internal form, not user-facing shorthand. Guard implementations are not serializable in JSON (only guard names/types). Guard evaluation order (first match wins) matches DD-03. Guard combinators (`and`/`or`/`not`) are a potential future enhancement.
+- **SCXML**: No HTTP domain model. `cond` attribute treats errors as `false` (silent failure), unlike Frank's explicit `BlockReason`. Full statechart semantics (parallel, history, invoke, datamodel). Actions execute in strict order: onexit → transition content → onentry. No quality .NET libraries -- frank-cli must generate SCXML directly via XML APIs.
+- **smcat**: JavaScript-only parser. No .NET equivalent. Guards are opaque strings (parsed but not interpreted via `event [guard] / action` label format). No data model or execution semantics. Supports 12 state types. SCXML round-trip is lossy: no datamodel, no executable content, no invoke.
 
 ### Key Finding: smcat as Bridge Format
 
@@ -494,7 +525,7 @@ type WebHostBuilder with
 - Timeout-based transitions (pending -> expired)
 - Round-trip achievable; external triggers need manual handler implementation
 
-### Complex (FoxyCart API)
+### Complex (e.g., Multi-Entity E-Commerce)
 
 **Feasibility**: Medium (60%)
 - Multi-entity state coordination (cart, order, shipment, payment -- each with own state machine)
@@ -502,6 +533,7 @@ type WebHostBuilder with
 - Parallel states (payment processing concurrent with inventory reservation)
 - Round-trip partially achievable; hierarchical/parallel states supported by XState and SCXML but not WSD or smcat
 - Would require composing multiple `statefulResource` instances with cross-resource transition coordination
+- Note: FoxyCart API was evaluated as a potential case study but its documentation does not expose state machine semantics explicitly enough for detailed analysis. A Stripe-like payment lifecycle would be a better hypothetical example for this tier.
 
 ### Assessment
 
@@ -509,13 +541,14 @@ The `statefulResource` CE should target simple-to-moderate complexity as the pri
 
 ## Open Questions
 
-1. **Parallel state composition**: How should multiple `statefulResource` instances coordinate? (e.g., FoxyCart's cart + order + payment). Defer to post-v7.3.0?
+1. **Parallel state composition**: How should multiple `statefulResource` instances coordinate? (e.g., multi-entity e-commerce). Defer to post-v7.3.0?
 2. **History states**: XState and SCXML support history states (return to previous sub-state). Is this needed for Frank's use cases?
 3. **Timeout transitions**: Some state machines have time-based transitions (e.g., session expiry). Should `statefulResource` support timer-based events, or is this left to external scheduling?
-4. **Existing `wsd-gen` fork status**: How complete is the F# WSD parser? This affects #57 timeline significantly.
+4. ~~**Existing `wsd-gen` fork status**~~: **Resolved (D-009)** -- the F# fork is not a parser. A WSD parser must be written from scratch for #57.
 5. **smcat parser portability**: Should frank-cli shell out to the Node.js smcat CLI for smcat parsing, or should we port the PEG grammar to F#? Shelling out adds a Node.js dependency; porting is more work but keeps the toolchain pure .NET.
 6. **ALPS conditional return types**: The `rt` single-value limitation means each conditional transition becomes multiple ALPS descriptors. Is this acceptable, or should we define an ALPS `ext` convention for multi-target transitions?
 7. **XState JSON schema version**: The existing schema describes the internal/compiled form, not user-facing config. Should frank-cli generate the compiled form (for Stately Studio compatibility) or the shorthand form (for human readability)?
+8. **Guard combinators**: XState v5 provides `and`/`or`/`not` guard combinators. Should Frank.Statecharts support these in a future version? (Not needed for v7.3.0 MVP.)
 
 ## References
 
