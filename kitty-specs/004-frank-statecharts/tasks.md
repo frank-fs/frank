@@ -186,12 +186,12 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T026 Create `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` with TestHost-based integration tests
-- [ ] T027 Implement simplified tic-tac-toe state machine as test fixture (XTurn/OTurn/Won/Draw states)
-- [ ] T028 Test state-dependent method availability (POST allowed in XTurn, not in Won)
-- [ ] T029 Test guard evaluation with mock ClaimsPrincipal (turn-based, role-based guards)
-- [ ] T030 Test transition hooks fire correctly (observable receives old/new state)
-- [ ] T031 Test filtered affordances (response includes only available transitions per state)
+- [x] T026 Create `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` with TestHost-based integration tests
+- [x] T027 Implement simplified tic-tac-toe state machine as test fixture (XTurn/OTurn/Won/Draw states)
+- [x] T028 Test state-dependent method availability (POST allowed in XTurn, not in Won)
+- [x] T029 Test guard evaluation with mock ClaimsPrincipal (turn-based, role-based guards)
+- [x] T030 Test transition hooks fire correctly (observable receives old/new state)
+- [x] T031 Test filtered affordances (response includes only available transitions per state)
 
 ### Implementation Notes
 - Use ASP.NET Core TestHost (`Microsoft.AspNetCore.TestHost`) like existing Frank tests
