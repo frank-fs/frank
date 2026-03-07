@@ -6,10 +6,35 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
+
+/// The outcome of a post-handler transition attempt evaluated by middleware.
+[<RequireQualifiedAccess>]
+type TransitionAttemptResult =
+    | NoEvent
+    | Succeeded of transitionEvent: obj
+    | Blocked of BlockReason
+    | Invalid of message: string
+
+/// Helpers for communicating events between handlers and middleware via HttpContext.Items.
+module StateMachineContext =
+    let private eventKey = "Frank.Statecharts.Event"
+    let internal stateKey = "Frank.Statecharts.State"
+    let internal contextKey = "Frank.Statecharts.Context"
+
+    /// Set the event that should trigger a state transition after handler execution.
+    let setEvent (ctx: HttpContext) (event: 'Event) = ctx.Items[eventKey] <- box event
+
+    /// Try to retrieve the event set by the handler.
+    let tryGetEvent<'Event> (ctx: HttpContext) : 'Event option =
+        match ctx.Items.TryGetValue(eventKey) with
+        | true, value -> Some(value :?> 'Event)
+        | false, _ -> None
 
 /// Endpoint metadata marker for stateful resources.
 /// All fields use obj/string keys because endpoint metadata is untyped.
+/// Closure fields bridge the generic type gap for middleware.
 type StateMachineMetadata =
     {
         /// Boxed StateMachine<'S,'E,'C>
@@ -20,6 +45,14 @@ type StateMachineMetadata =
         ResolveInstanceId: HttpContext -> string
         /// Boxed transition event handlers
         TransitionObservers: (obj -> unit) list
+        /// The initial state key (Initial.ToString())
+        InitialStateKey: string
+        /// Resolve state from store, cache in HttpContext.Items, return state key string.
+        GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
+        /// Evaluate guards using cached state from HttpContext.Items.
+        EvaluateGuards: HttpContext -> GuardResult
+        /// Post-handler: get event from HttpContext.Items, run transition, persist, return result.
+        ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -122,10 +155,6 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     routeData.Values.Values |> Seq.head |> string)
 
         // Build StateMetadata from inState registrations.
-        // IsFinal heuristic: a state is final if it has no non-GET handlers registered.
-        // States with only GET (read-only) handlers are considered terminal because
-        // they cannot trigger transitions. States with no handlers at all are also final.
-        // If uncertain, default to IsFinal = false (non-terminal).
         let stateMetadata =
             spec.StateHandlerMap
             |> Map.map (fun _state handlers ->
@@ -144,21 +173,103 @@ type StatefulResourceBuilder(routeTemplate: string) =
             { machine with
                 StateMetadata = stateMetadata }
 
-        // Create StateMachineMetadata for endpoint metadata (untyped/boxed).
+        let initialStateKey = machineWithMetadata.Initial.ToString()
+
+        // Closure: resolve state from store, cache typed values in HttpContext.Items
+        let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
+            let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
+
+            task {
+                let! result = store.GetState instanceId
+
+                match result with
+                | Some(state, context) ->
+                    ctx.Items[StateMachineContext.stateKey] <- box state
+                    ctx.Items[StateMachineContext.contextKey] <- box context
+                    return state.ToString()
+                | None ->
+                    ctx.Items[StateMachineContext.stateKey] <- box machineWithMetadata.Initial
+                    ctx.Items[StateMachineContext.contextKey] <- box Unchecked.defaultof<'C>
+                    return initialStateKey
+            }
+
+        // Closure: evaluate guards using cached typed state
+        let evaluateGuards (ctx: HttpContext) : GuardResult =
+            let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+
+            let guardCtx =
+                { User = ctx.User
+                  CurrentState = state
+                  Event = Unchecked.defaultof<'E> }
+
+            machineWithMetadata.Guards
+            |> List.tryPick (fun g ->
+                match g.Predicate guardCtx with
+                | Allowed -> None
+                | Blocked reason -> Some(Blocked reason))
+            |> Option.defaultValue Allowed
+
+        // Closure: get event from Items, run transition, persist, return result
+        let executeTransition
+            (sp: IServiceProvider)
+            (ctx: HttpContext)
+            (instanceId: string)
+            : Task<TransitionAttemptResult> =
+            task {
+                match StateMachineContext.tryGetEvent<'E> ctx with
+                | None -> return TransitionAttemptResult.NoEvent
+                | Some event ->
+                    let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+                    let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+                    let result = machineWithMetadata.Transition state event context
+
+                    match result with
+                    | TransitionResult.Transitioned(newState, newContext) ->
+                        let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
+                        do! store.SetState instanceId newState newContext
+
+                        let evt: TransitionEvent<'S, 'E, 'C> =
+                            { PreviousState = state
+                              PreviousContext = context
+                              NewState = newState
+                              NewContext = newContext
+                              Event = event
+                              Timestamp = DateTimeOffset.UtcNow
+                              User = if isNull (box ctx.User) then None else Some ctx.User }
+
+                        return TransitionAttemptResult.Succeeded(box evt)
+                    | TransitionResult.Blocked reason -> return TransitionAttemptResult.Blocked reason
+                    | TransitionResult.Invalid msg -> return TransitionAttemptResult.Invalid msg
+            }
+
+        let stateHandlerMap =
+            spec.StateHandlerMap
+            |> Map.toList
+            |> List.map (fun (s, h) -> (s.ToString(), h))
+            |> Map.ofList
+
         let metadata: StateMachineMetadata =
             { Machine = box machineWithMetadata
-              StateHandlerMap =
-                spec.StateHandlerMap
-                |> Map.toList
-                |> List.map (fun (s, h) -> (s.ToString(), h))
-                |> Map.ofList
+              StateHandlerMap = stateHandlerMap
               ResolveInstanceId = resolveId
               TransitionObservers =
                 spec.TransitionObservers
-                |> List.map (fun h -> (fun (evt: obj) -> h (evt :?> TransitionEvent<'S, 'E, 'C>))) }
+                |> List.map (fun h -> (fun (evt: obj) -> h (evt :?> TransitionEvent<'S, 'E, 'C>)))
+              InitialStateKey = initialStateKey
+              GetCurrentStateKey = getCurrentStateKey
+              EvaluateGuards = evaluateGuards
+              ExecuteTransition = executeTransition }
 
-        // Flatten all state handlers into a single handler list for ResourceSpec.
-        let allHandlers = spec.StateHandlerMap |> Map.toList |> List.collect snd
+        // Collect distinct HTTP methods across all states.
+        // Middleware dispatches the real state-specific handler; endpoints just need routing targets.
+        let distinctMethods =
+            spec.StateHandlerMap
+            |> Map.toList
+            |> List.collect (snd >> List.map fst)
+            |> List.distinct
+
+        let placeholderHandler = RequestDelegate(fun _ -> Task.CompletedTask)
+        let allHandlers = distinctMethods |> List.map (fun m -> (m, placeholderHandler))
 
         let resourceSpec =
             { ResourceSpec.Empty with
