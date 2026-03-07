@@ -20,11 +20,11 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Statecharts/Frank.Statecharts.fsproj` (multi-target net8.0;net9.0;net10.0)
-- [ ] T002 Create `src/Frank.Statecharts/Types.fs` with `StateMachine<'S,'E,'C>`, `TransitionResult`, `BlockReason`, `Guard`, `GuardContext`, `GuardResult`, `StateInfo`
-- [ ] T003 Create `src/Frank.Statecharts/Store.fs` with `IStateMachineStore<'S,'C>` interface
-- [ ] T004 Create `test/Frank.Statecharts.Tests/Frank.Statecharts.Tests.fsproj` and `Program.fs`
-- [ ] T005 Create `test/Frank.Statecharts.Tests/TypeTests.fs` with unit tests for core types
+- [x] T001 Create `src/Frank.Statecharts/Frank.Statecharts.fsproj` (multi-target net8.0;net9.0;net10.0)
+- [x] T002 Create `src/Frank.Statecharts/Types.fs` with `StateMachine<'S,'E,'C>`, `TransitionResult`, `BlockReason`, `Guard`, `GuardContext`, `GuardResult`, `StateInfo`
+- [x] T003 Create `src/Frank.Statecharts/Store.fs` with `IStateMachineStore<'S,'C>` interface
+- [x] T004 Create `test/Frank.Statecharts.Tests/Frank.Statecharts.Tests.fsproj` and `Program.fs`
+- [x] T005 Create `test/Frank.Statecharts.Tests/TypeTests.fs` with unit tests for core types
 
 ### Implementation Notes
 - Follow `src/Frank.Auth/` project structure as reference for .fsproj configuration
