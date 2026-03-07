@@ -123,7 +123,7 @@
 - [x] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
 - [x] T019 Implement guard evaluation: evaluate guards in order, map `BlockReason` to HTTP status codes
 - [x] T020 Implement transition execution: on successful handler completion, apply transition and fire `onTransition` hook
-- [ ] T021 Create `test/Frank.Statecharts.Tests/MiddlewareTests.fs` with integration tests
+- [x] T021 Create `test/Frank.Statecharts.Tests/MiddlewareTests.fs` with integration tests
 
 ### Implementation Notes
 - Follow `Frank.LinkedData`'s middleware pattern: check for `StateMachineMetadata` marker -> intercept or pass through
