@@ -9,6 +9,11 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
+    <Compile Include="StatefulResourceBuilder.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
