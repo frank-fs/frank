@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: MailboxProcessor Store Implementation
+lane: "doing"
+dependencies: [WP01]
+base_branch: 004-frank-statecharts-WP01
+base_commit: 08050bcc7e5921dcbe6341ee4587053d2a1e5295
+created_at: '2026-03-07T05:40:18.484968+00:00'
 subtasks:
-  - "T006"
-  - "T007"
-  - "T008"
-  - "T009"
-title: "MailboxProcessor Store Implementation"
-phase: "Phase 1 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-006", "FR-007", "FR-012", "FR-013"]
+- T006
+- T007
+- T008
+- T009
+phase: Phase 1 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "36213"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-06T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-006, FR-007, FR-012, FR-013]
 ---
 
 # Work Package Prompt: WP02 -- MailboxProcessor Store Implementation
