@@ -11,6 +11,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
 open Expecto
 open VDS.RDF
 open VDS.RDF.Parsing
@@ -64,8 +65,15 @@ let private createProductTestHost (config: LinkedDataConfig) =
                     .Configure(fun (app: IApplicationBuilder) ->
                         app.UseRouting() |> ignore
 
+                        let logger =
+                            app.ApplicationServices
+                                .GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                                .CreateLogger("Frank.LinkedData.Middleware")
+
                         app.Use(
-                            Func<HttpContext, RequestDelegate, Task>(WebHostBuilderExtensions.linkedDataMiddleware)
+                            Func<HttpContext, RequestDelegate, Task>(
+                                WebHostBuilderExtensions.linkedDataMiddleware logger
+                            )
                         )
                         |> ignore
 
