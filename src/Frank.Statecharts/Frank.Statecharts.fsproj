@@ -11,6 +11,8 @@
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
     <Compile Include="Middleware.fs" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
   <ItemGroup>
