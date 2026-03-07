@@ -279,3 +279,4 @@ testTask "useStatecharts registers middleware" {
 - 2026-03-07T17:45:02Z – claude-opus – shell_pid=58899 – lane=for_review – Ready for review: useStatecharts and stateMachine extensions following Frank.Auth patterns. Clean build on all targets, 44 tests pass.
 - 2026-03-07T17:46:27Z – claude-opus-reviewer – shell_pid=60816 – lane=doing – Started review via workflow command
 - 2026-03-07T17:47:09Z – claude-opus-reviewer – shell_pid=60816 – lane=done – Review passed: Extensions follow Frank.Auth patterns exactly. useStatecharts correctly uses Middleware (not BeforeRoutingMiddleware). Compilation order correct. Both overloads present. Clean build, 44 tests pass.
+- 2026-03-07T18:50:27Z – claude-opus-reviewer – shell_pid=60816 – lane=done – Implementation complete and merged
