@@ -15,7 +15,7 @@ subtasks:
 - T021
 phase: Phase 2 - Core Pipeline
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "55845"
 review_status: ''
 reviewed_by: ''
@@ -470,3 +470,4 @@ testTask "New instance uses Initial state from machine" {
 ## Activity Log
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-07T16:45:02Z – claude-opus – shell_pid=55845 – lane=doing – Assigned agent via workflow command
