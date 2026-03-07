@@ -156,7 +156,7 @@
 ### Included Subtasks
 - [x] T022 Create `src/Frank.Statecharts/ResourceBuilderExtensions.fs` with `stateMachine` custom operation on `ResourceBuilder`
 - [x] T023 Create `src/Frank.Statecharts/WebHostBuilderExtensions.fs` with `useStatecharts` custom operation
-- [ ] T024 Implement DI registration in `useStatecharts`: register `IStateMachineStore` (default `MailboxProcessorStore`) and middleware
+- [x] T024 Implement DI registration in `useStatecharts`: register `IStateMachineStore` (default `MailboxProcessorStore`) and middleware
 - [ ] T025 Verify compilation order in .fsproj (Types -> Store -> StatefulResourceBuilder -> Middleware -> Extensions)
 
 ### Implementation Notes
