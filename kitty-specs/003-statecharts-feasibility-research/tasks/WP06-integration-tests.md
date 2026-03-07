@@ -347,6 +347,8 @@ let transitionHookTests =
 
 **Purpose**: Verify that responses include only available transitions per state (affordance filtering).
 
+The core concept: a GET handler should be able to discover which methods/transitions are available in the current state and include that information in the response. This is analogous to returning `(currentState, allowedTransitions)` -- the handler knows what actions are possible and communicates them to the client. The exact format is an implementation decision for this WP.
+
 **Steps**:
 ```fsharp
 [<Tests>]
@@ -354,13 +356,22 @@ let affordanceTests =
     testList "Filtered affordances" [
         testTask "GET in XTurn returns state with available methods" {
             // GET /games/game1 in XTurn state
-            // Response should indicate POST is available
-            // Implementation detail: could be via Link headers, response body, or metadata
+            // Handler should be able to query StateMachineMetadata for current state's
+            // allowed methods and include them in the response.
+            // Verify response body or headers contain POST as an available action.
         }
 
         testTask "GET in Won returns no POST affordance" {
             // GET /games/game1 in Won state
-            // Response should NOT include POST as available
+            // Handler queries available methods for Won state -- only GET.
+            // Verify response does NOT include POST as available.
+        }
+
+        testTask "Handler can access allowed transitions for current state" {
+            // Verify that a handler can programmatically query which HTTP methods
+            // are available in the current state via StateMachineMetadata.
+            // This enables handlers to build hypermedia responses with only
+            // valid action links.
         }
     ]
 ```
@@ -368,9 +379,10 @@ let affordanceTests =
 **Files**: `test/Frank.Statecharts.Tests/StatefulResourceTests.fs`
 **Parallel?**: Yes -- independent of T028-T030.
 **Notes**:
-- The exact affordance format depends on how the handler exposes available methods
-- Could use response headers, response body, or let the handler query `StateMachineMetadata`
-- This test validates the concept; exact affordance format may evolve with LinkedData integration
+- The key requirement is that handlers can discover per-state allowed methods at runtime
+- The exact response format (Link headers, JSON body with `_links`, etc.) is an implementation decision -- not prescribed here
+- Consider providing a helper function (e.g., `StateMachineContext.getAllowedMethods`) that handlers can call to query the current state's available methods from `StateMachineMetadata`
+- This test validates the mechanism, not a specific hypermedia format; exact affordance serialization may evolve with LinkedData integration
 
 ---
 
