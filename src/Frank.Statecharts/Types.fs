@@ -45,6 +45,7 @@ type TransitionResult<'State, 'Context> =
 /// Compile-time definition of a state machine.
 type StateMachine<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
     { Initial: 'State
+      InitialContext: 'Context
       Transition: 'State -> 'Event -> 'Context -> TransitionResult<'State, 'Context>
       Guards: Guard<'State, 'Event, 'Context> list
       StateMetadata: Map<'State, StateInfo> }

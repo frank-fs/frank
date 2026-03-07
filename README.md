@@ -20,6 +20,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.LinkedData** | Semantic RDF/Linked Data content negotiation middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.LinkedData)](https://www.nuget.org/packages/Frank.LinkedData/) |
 | **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
+| **Frank.Statecharts** | Application-level state machines for stateful hypermedia resources | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
 ---
@@ -589,6 +590,7 @@ The `sample/` directory contains several example applications:
 
 ## References
 
+- [Frank.Statecharts Guide](docs/STATECHARTS.md) — Core concepts, hierarchical statechart support, and test coverage overview
 - [How is this different from Webmachine or Freya?](docs/COMPARISON.md) — Detailed comparison of Frank.Statecharts with Webmachine and Freya's approach to HTTP resource state machines
 
 ---

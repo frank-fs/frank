@@ -189,7 +189,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return state.ToString()
                 | None ->
                     ctx.Items[StateMachineContext.stateKey] <- box machineWithMetadata.Initial
-                    ctx.Items[StateMachineContext.contextKey] <- box Unchecked.defaultof<'C>
+                    ctx.Items[StateMachineContext.contextKey] <- box machineWithMetadata.InitialContext
                     return initialStateKey
             }
 

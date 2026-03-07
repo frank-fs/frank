@@ -35,6 +35,7 @@ let testTransition (state: TestState) (event: TestEvent) (_ctx: int) =
 
 let testMachine: StateMachine<TestState, TestEvent, int> =
     { Initial = Active
+      InitialContext = 0
       Transition = testTransition
       Guards = []
       StateMetadata = Map.empty }

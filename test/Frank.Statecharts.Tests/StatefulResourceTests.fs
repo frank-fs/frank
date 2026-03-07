@@ -66,6 +66,7 @@ let turnGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
 
 let gameMachine: StateMachine<TicTacToeState, TicTacToeEvent, int> =
     { Initial = XTurn
+      InitialContext = 0
       Transition = gameTransition
       Guards = []
       StateMetadata = Map.empty }
@@ -809,6 +810,432 @@ let observerResilienceTests =
 
                       // Verify second observer was still called (observers are independent)
                       Expect.isTrue secondObserverCalled "Second observer should run despite first throwing"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+// === Multi-level statechart domain (mirrors tic-tac-toe SCXML) ===
+//
+// The SCXML defines:
+//   Playing (parallel)
+//     ├── GamePlay: XTurn | OTurn | Won | Draw
+//     └── PlayerIdentity: Unassigned | XOnly | OOnly | BothAssigned
+//   Disposed (final)
+//
+// F# models the hierarchy via nested DU for the state tree
+// and folds the parallel PlayerIdentity region into context.
+
+[<Struct>]
+type PlayerAssignment =
+    | Unassigned
+    | XOnly of xId: string
+    | OOnly of oId: string
+    | BothAssigned of playerX: string * playerO: string
+
+type PlayingSubState =
+    | XTurn
+    | OTurn
+    | Won of winner: string
+    | Draw
+
+type HierarchicalGameState =
+    | Playing of PlayingSubState
+    | Disposed
+
+type HierarchicalGameEvent =
+    | MakeMove of player: string * position: int
+    | DisposeGame of userId: string
+
+type HierarchicalContext =
+    { MoveCount: int
+      Assignment: PlayerAssignment }
+
+let initialContext =
+    { MoveCount = 0
+      Assignment = Unassigned }
+
+let assignPlayer (userId: string) (isXMove: bool) (assignment: PlayerAssignment) =
+    match assignment, isXMove with
+    | Unassigned, true -> XOnly userId
+    | Unassigned, false -> OOnly userId
+    | XOnly xId, false when xId <> userId -> BothAssigned(xId, userId)
+    | OOnly oId, true when oId <> userId -> BothAssigned(userId, oId)
+    | other, _ -> other
+
+let hierarchicalTransition (state: HierarchicalGameState) (event: HierarchicalGameEvent) (ctx: HierarchicalContext) =
+    match state, event with
+    // Transitions within Playing (sub-state changes)
+    | Playing XTurn, MakeMove(player, _) ->
+        let newAssignment = assignPlayer player true ctx.Assignment
+        let n = ctx.MoveCount + 1
+
+        let newCtx =
+            { MoveCount = n
+              Assignment = newAssignment }
+
+        if n >= 5 then
+            TransitionResult.Transitioned(Playing(Won "X"), newCtx)
+        else
+            TransitionResult.Transitioned(Playing OTurn, newCtx)
+
+    | Playing OTurn, MakeMove(player, _) ->
+        let newAssignment = assignPlayer player false ctx.Assignment
+        let n = ctx.MoveCount + 1
+
+        let newCtx =
+            { MoveCount = n
+              Assignment = newAssignment }
+
+        if n >= 9 then
+            TransitionResult.Transitioned(Playing Draw, newCtx)
+        else
+            TransitionResult.Transitioned(Playing XTurn, newCtx)
+
+    // Transition OUT of Playing to Disposed (top-level state change)
+    | Playing _, DisposeGame _ -> TransitionResult.Transitioned(Disposed, ctx)
+
+    // Terminal states block all transitions
+    | Playing(Won _), MakeMove _ -> TransitionResult.Invalid "Game already over"
+    | Playing Draw, MakeMove _ -> TransitionResult.Invalid "Game is a draw"
+    | Disposed, _ -> TransitionResult.Invalid "Game disposed"
+
+let hierarchicalTurnGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
+    { Name = "HierarchicalTurnGuard"
+      Predicate =
+        fun ctx ->
+            match ctx.CurrentState with
+            | Playing XTurn ->
+                if ctx.User.HasClaim("player", "X") then
+                    Allowed
+                elif ctx.User.HasClaim("player", "O") then
+                    Blocked NotYourTurn
+                else
+                    Blocked NotAllowed
+            | Playing OTurn ->
+                if ctx.User.HasClaim("player", "O") then
+                    Allowed
+                elif ctx.User.HasClaim("player", "X") then
+                    Blocked NotYourTurn
+                else
+                    Blocked NotAllowed
+            | _ -> Allowed }
+
+/// Guard that checks player assignment from context (parallel region data)
+let participantGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
+    { Name = "ParticipantGuard"
+      Predicate =
+        fun ctx ->
+            match ctx.CurrentState with
+            | Playing(Won _)
+            | Playing Draw
+            | Disposed -> Allowed // anyone can view terminal states
+            | Playing _ ->
+                match ctx.Context.Assignment with
+                | Unassigned -> Allowed // open game, anyone can join
+                | XOnly _ -> Allowed // one slot open
+                | OOnly _ -> Allowed
+                | BothAssigned(xId, oId) ->
+                    let userId = ctx.User.FindFirst("userId")
+
+                    if isNull userId then Blocked NotAllowed
+                    elif userId.Value = xId || userId.Value = oId then Allowed
+                    else Blocked(Custom(403, "Game is full")) }
+
+let hierarchicalMachine: StateMachine<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
+    { Initial = Playing XTurn
+      InitialContext = initialContext
+      Transition = hierarchicalTransition
+      Guards = [ hierarchicalTurnGuard ]
+      StateMetadata = Map.empty }
+
+let hierarchicalMachineWithParticipant =
+    { hierarchicalMachine with
+        Guards = [ hierarchicalTurnGuard; participantGuard ] }
+
+let handleHierarchicalMove (ctx: HttpContext) : Task =
+    StateMachineContext.setEvent ctx (MakeMove("X", 0))
+    Task.CompletedTask
+
+let handleHierarchicalMoveO (ctx: HttpContext) : Task =
+    StateMachineContext.setEvent ctx (MakeMove("O", 0))
+    Task.CompletedTask
+
+let handleDispose (ctx: HttpContext) : Task =
+    StateMachineContext.setEvent ctx (DisposeGame "user1")
+    Task.CompletedTask
+
+let getHierarchicalState (ctx: HttpContext) : Task =
+    ctx.Response.WriteAsync("hierarchical state")
+
+let buildHierarchicalResource (sm: StateMachine<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext>) =
+    statefulResource "/hgames/{gameId}" {
+        machine sm
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+
+        inState (
+            forState
+                (Playing XTurn)
+                [ StateHandlerBuilder.get getHierarchicalState
+                  StateHandlerBuilder.post handleHierarchicalMove ]
+        )
+
+        inState (
+            forState
+                (Playing OTurn)
+                [ StateHandlerBuilder.get getHierarchicalState
+                  StateHandlerBuilder.post handleHierarchicalMoveO ]
+        )
+
+        inState (forState (Playing(Won "X")) [ StateHandlerBuilder.get getHierarchicalState ])
+
+        inState (
+            forState
+                (Playing Draw)
+                [ StateHandlerBuilder.get getHierarchicalState
+                  StateHandlerBuilder.delete handleDispose ]
+        )
+
+        inState (forState Disposed [ StateHandlerBuilder.get getHierarchicalState ])
+    }
+
+let addHierarchicalStore (services: IServiceCollection) =
+    services.AddStateMachineStore<HierarchicalGameState, HierarchicalContext>()
+    |> ignore
+
+let withHierarchicalServer (resource: Resource) configUser (f: TestServer -> HttpClient -> Task) =
+    task {
+        let server =
+            MiddlewareTests.buildTestServer resource addHierarchicalStore configUser
+
+        let client = server.CreateClient()
+
+        try
+            do! f server client
+        finally
+            client.Dispose()
+            server.Dispose()
+    }
+    :> Task
+
+let prePopulateHierarchical (server: TestServer) instanceId (state: HierarchicalGameState) (ctx: HierarchicalContext) =
+    let store =
+        server.Host.Services.GetRequiredService<IStateMachineStore<HierarchicalGameState, HierarchicalContext>>()
+
+    (store.SetState instanceId state ctx).GetAwaiter().GetResult()
+
+[<Tests>]
+let hierarchicalStatechartTests =
+    testList
+        "Multi-level statecharts"
+        [ testCase "Nested DU: initial state is Playing XTurn"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res (Some(playerX ())) (fun _server client ->
+                  task {
+                      let! (response: HttpResponseMessage) = client.GetAsync("/hgames/g1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "GET should work in Playing XTurn"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Sub-state transition: Playing XTurn -> Playing OTurn"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "POST should succeed"
+
+                      let store =
+                          server.Host.Services.GetRequiredService<
+                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                           >()
+
+                      let! stateOpt = store.GetState "g1"
+                      Expect.equal (fst stateOpt.Value) (Playing OTurn) "Should transition to Playing OTurn"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Sub-state transition preserves context across levels"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (_: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
+
+                      let store =
+                          server.Host.Services.GetRequiredService<
+                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                           >()
+
+                      let! stateOpt = store.GetState "g1"
+                      let (_, ctx) = stateOpt.Value
+                      Expect.equal ctx.MoveCount 1 "Move count should be 1"
+
+                      match ctx.Assignment with
+                      | XOnly _ -> ()
+                      | other -> failtest $"Expected XOnly assignment, got {other}"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Top-level transition: Playing -> Disposed"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res None (fun server client ->
+                  task {
+                      // Pre-populate as Draw (which has DELETE handler for disposal)
+                      prePopulateHierarchical
+                          server
+                          "g1"
+                          (Playing Draw)
+                          { MoveCount = 9
+                            Assignment = BothAssigned("u1", "u2") }
+
+                      let! (response: HttpResponseMessage) = client.DeleteAsync("/hgames/g1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "DELETE should trigger dispose"
+
+                      let store =
+                          server.Host.Services.GetRequiredService<
+                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                           >()
+
+                      let! stateOpt = store.GetState "g1"
+                      Expect.equal (fst stateOpt.Value) Disposed "Should transition to Disposed"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Disposed state only allows GET"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res None (fun server client ->
+                  task {
+                      prePopulateHierarchical server "g1" Disposed initialContext
+
+                      let! (getResp: HttpResponseMessage) = client.GetAsync("/hgames/g1")
+                      Expect.equal getResp.StatusCode HttpStatusCode.OK "GET should work on Disposed"
+
+                      let! (postResp: HttpResponseMessage) = client.PostAsync("/hgames/g1", new StringContent(""))
+
+                      Expect.equal postResp.StatusCode HttpStatusCode.MethodNotAllowed "POST should be 405 on Disposed"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Method availability differs per sub-state"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res None (fun server client ->
+                  task {
+                      // Won state only has GET
+                      prePopulateHierarchical
+                          server
+                          "g1"
+                          (Playing(Won "X"))
+                          { MoveCount = 5
+                            Assignment = BothAssigned("u1", "u2") }
+
+                      let! (postResp: HttpResponseMessage) = client.PostAsync("/hgames/g1", new StringContent(""))
+
+                      Expect.equal
+                          postResp.StatusCode
+                          HttpStatusCode.MethodNotAllowed
+                          "POST should be 405 on Playing Won"
+
+                      let! (getResp: HttpResponseMessage) = client.GetAsync("/hgames/g1")
+                      Expect.equal getResp.StatusCode HttpStatusCode.OK "GET should work on Playing Won"
+
+                      // Draw has GET + DELETE
+                      prePopulateHierarchical
+                          server
+                          "g2"
+                          (Playing Draw)
+                          { MoveCount = 9
+                            Assignment = BothAssigned("u1", "u2") }
+
+                      let! (delResp: HttpResponseMessage) = client.DeleteAsync("/hgames/g2")
+                      Expect.equal delResp.StatusCode HttpStatusCode.OK "DELETE should work on Playing Draw"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Guards work across nested state hierarchy"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res (Some(playerO ())) (fun _server client ->
+                  task {
+                      // Initial state is Playing XTurn — Player O should get 409
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
+
+                      Expect.equal
+                          response.StatusCode
+                          HttpStatusCode.Conflict
+                          "Player O should get 409 in Playing XTurn"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Full hierarchical lifecycle with player assignment in context"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachine
+
+              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+                  task {
+                      let store =
+                          server.Host.Services.GetRequiredService<
+                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                           >()
+
+                      // Move 1: Playing XTurn -> Playing OTurn (assigns player X)
+                      let! (_: HttpResponseMessage) = client.PostAsync("/hgames/g1", new StringContent(""))
+                      let! s1 = store.GetState "g1"
+                      Expect.equal (fst s1.Value) (Playing OTurn) "Move 1: Playing OTurn"
+
+                      match (snd s1.Value).Assignment with
+                      | XOnly id -> Expect.equal id "X" "Player X should be assigned"
+                      | other -> failtest $"Expected XOnly, got {other}"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Participant guard uses context to check player assignment"
+          <| fun () ->
+              let res = buildHierarchicalResource hierarchicalMachineWithParticipant
+
+              let thirdPlayer =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("player", "X"); Claim("userId", "user3") |], "test"))
+
+              (withHierarchicalServer res (Some thirdPlayer) (fun server client ->
+                  task {
+                      // Pre-populate with both players assigned
+                      prePopulateHierarchical
+                          server
+                          "g1"
+                          (Playing XTurn)
+                          { MoveCount = 2
+                            Assignment = BothAssigned("user1", "user2") }
+
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
+
+                      // turnGuard passes (has player=X), but participantGuard blocks
+                      // because userId=user3 is neither user1 nor user2
+                      Expect.equal (int response.StatusCode) 403 "Third player should be blocked by participant guard"
+
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "Game is full" "Should get custom message from participant guard"
                   }))
                   .GetAwaiter()
                   .GetResult() ]

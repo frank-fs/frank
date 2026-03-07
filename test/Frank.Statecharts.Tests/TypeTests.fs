@@ -21,6 +21,7 @@ let transition state event (_ctx: unit) =
 
 let turnstileMachine: StateMachine<TurnstileState, TurnstileEvent, unit> =
     { Initial = Locked
+      InitialContext = ()
       Transition = transition
       Guards = []
       StateMetadata =
