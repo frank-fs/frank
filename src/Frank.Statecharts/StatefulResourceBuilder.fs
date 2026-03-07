@@ -193,14 +193,16 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
-        // Closure: evaluate guards using cached typed state
+        // Closure: evaluate guards using cached typed state and context
         let evaluateGuards (ctx: HttpContext) : GuardResult =
             let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+            let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
 
             let guardCtx =
                 { User = ctx.User
                   CurrentState = state
-                  Event = Unchecked.defaultof<'E> }
+                  Event = Unchecked.defaultof<'E>
+                  Context = context }
 
             machineWithMetadata.Guards
             |> List.tryPick (fun g ->

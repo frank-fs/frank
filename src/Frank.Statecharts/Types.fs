@@ -18,15 +18,16 @@ type GuardResult =
     | Blocked of reason: BlockReason
 
 /// Context passed to guard predicates for evaluation.
-type GuardContext<'State, 'Event> =
+type GuardContext<'State, 'Event, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
-      Event: 'Event }
+      Event: 'Event
+      Context: 'Context }
 
 /// A named guard predicate.
 type Guard<'State, 'Event, 'Context> =
     { Name: string
-      Predicate: GuardContext<'State, 'Event> -> GuardResult }
+      Predicate: GuardContext<'State, 'Event, 'Context> -> GuardResult }
 
 /// Metadata about a single state (HTTP configuration).
 type StateInfo =

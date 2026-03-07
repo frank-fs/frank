@@ -314,6 +314,85 @@ let guardTests =
                       Expect.equal response.StatusCode HttpStatusCode.Conflict "Player X should get 409 in OTurn"
                   }))
                   .GetAwaiter()
+                  .GetResult()
+
+          testCase "Spectator gets 403 in OTurn state"
+          <| fun () ->
+              let res = buildGameResource guardedGameMachine
+
+              (withGameServer res (Some(spectator ())) (fun server client ->
+                  task {
+                      prePopulateState server "game1" OTurn 1
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.Forbidden "Spectator should get 403 in OTurn"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Guards allow GET in Won state with guarded machine"
+          <| fun () ->
+              let res = buildGameResource guardedGameMachine
+
+              (withGameServer res (Some(spectator ())) (fun server client ->
+                  task {
+                      prePopulateState server "game1" (Won "X") 5
+                      let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Spectator should GET Won state"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Context-aware guard blocks when move count exceeds limit"
+          <| fun () ->
+              let moveCountLimitMachine =
+                  { gameMachine with
+                      Guards =
+                          [ { Name = "MoveCountLimit"
+                              Predicate =
+                                fun ctx ->
+                                    if ctx.Context >= 4 then
+                                        Blocked(Custom(429, "Too many moves"))
+                                    else
+                                        Allowed } ] }
+
+              let res = buildGameResource moveCountLimitMachine
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      prePopulateState server "game1" XTurn 4
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal (int response.StatusCode) 429 "Should return 429 when move count at limit"
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "Too many moves" "Should return custom message"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Context-aware guard allows when move count below limit"
+          <| fun () ->
+              let moveCountLimitMachine =
+                  { gameMachine with
+                      Guards =
+                          [ { Name = "MoveCountLimit"
+                              Predicate =
+                                fun ctx ->
+                                    if ctx.Context >= 4 then
+                                        Blocked(Custom(429, "Too many moves"))
+                                    else
+                                        Allowed } ] }
+
+              let res = buildGameResource moveCountLimitMachine
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      prePopulateState server "game1" XTurn 2
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should allow when move count below limit"
+                  }))
+                  .GetAwaiter()
                   .GetResult() ]
 
 [<Tests>]

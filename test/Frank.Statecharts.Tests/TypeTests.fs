@@ -171,7 +171,8 @@ let guardTests =
               let ctx =
                   { User = adminPrincipal
                     CurrentState = Locked
-                    Event = Coin }
+                    Event = Coin
+                    Context = () }
 
               Expect.equal (adminGuard.Predicate ctx) Allowed "admin should be allowed"
           }
@@ -192,7 +193,8 @@ let guardTests =
               let ctx =
                   { User = userPrincipal
                     CurrentState = Locked
-                    Event = Coin }
+                    Event = Coin
+                    Context = () }
 
               Expect.equal (adminGuard.Predicate ctx) (Blocked(NotAllowed)) "non-admin should be blocked"
           } ]
