@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: StatefulResource Computation Expression
-lane: "doing"
+lane: "done"
 dependencies: [WP01]
 base_branch: 004-frank-statecharts-WP01
 base_commit: 08050bcc7e5921dcbe6341ee4587053d2a1e5295
@@ -17,8 +17,8 @@ phase: Phase 1 - Foundation
 assignee: ''
 agent: "claude-reviewer"
 shell_pid: "55145"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-06T00:00:00Z'
   lane: planned
@@ -430,3 +430,4 @@ Because F# generics are erased at runtime, the middleware stores these as closur
 - 2026-03-07T05:40:43Z – claude-wp03 – shell_pid=36411 – lane=doing – Assigned agent via workflow command
 - 2026-03-07T05:43:48Z – claude-wp03 – shell_pid=36411 – lane=for_review – Ready for review: statefulResource CE with machine, inState/forState, onTransition, resolveInstanceId, Build producing Resource with StateMachineMetadata
 - 2026-03-07T16:41:36Z – claude-reviewer – shell_pid=55145 – lane=doing – Started review via workflow command
+- 2026-03-07T16:43:09Z – claude-reviewer – shell_pid=55145 – lane=done – Review passed: All cross-WP contract fields present in StateMachineMetadata. CE follows Yield/Run pattern with [Sealed]. machine accepts record directly (Option A). inState/forState helpers correct. IsFinal heuristic properly implemented. TransitionEvent has all required fields. Build delegates to ResourceSpec.Build correctly. All 3 targets (net8.0/9.0/10.0) build clean with 0 warnings.
