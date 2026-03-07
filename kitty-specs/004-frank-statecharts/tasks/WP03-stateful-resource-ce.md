@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP03"
+work_package_id: WP03
+title: StatefulResource Computation Expression
+lane: "doing"
+dependencies: [WP01]
+base_branch: 004-frank-statecharts-WP01
+base_commit: 08050bcc7e5921dcbe6341ee4587053d2a1e5295
+created_at: '2026-03-07T05:40:43.514608+00:00'
 subtasks:
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-  - "T014"
-  - "T015"
-title: "StatefulResource Computation Expression"
-phase: "Phase 1 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-002", "FR-008", "FR-009"]
+- T010
+- T011
+- T012
+- T013
+- T014
+- T015
+phase: Phase 1 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "36411"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-06T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-06T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-008, FR-009]
 ---
 
 # Work Package Prompt: WP03 -- StatefulResource Computation Expression
