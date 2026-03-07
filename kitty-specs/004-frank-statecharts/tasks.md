@@ -118,7 +118,7 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T016 Create `src/Frank.Statecharts/Middleware.fs` with state-aware request interception
+- [x] T016 Create `src/Frank.Statecharts/Middleware.fs` with state-aware request interception
 - [ ] T017 Implement state lookup: retrieve current state from `IStateMachineStore` using resolved instance ID
 - [ ] T018 Implement method filtering: check if HTTP method is allowed in current state, return 405 if not
 - [ ] T019 Implement guard evaluation: evaluate guards in order, map `BlockReason` to HTTP status codes
