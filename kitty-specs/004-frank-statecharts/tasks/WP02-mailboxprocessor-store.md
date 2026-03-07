@@ -336,3 +336,4 @@ test "SetState then GetState returns stored value" {
 - 2026-03-07T05:43:24Z – claude-wp02 – shell_pid=36213 – lane=for_review – Ready for review: MailboxProcessorStore with ILogger, IDisposable, BehaviorSubject, concurrency tests
 - 2026-03-07T16:41:20Z – claude-reviewer – shell_pid=54992 – lane=doing – Started review via workflow command
 - 2026-03-07T16:42:44Z – claude-reviewer – shell_pid=54992 – lane=done – Review passed: All Constitution VII (LogWarning on observer exceptions) and VI (IDisposable with PostAndReply drain, ObjectDisposedException) requirements met. BehaviorSubject semantics correct. MailboxProcessor terminates on Stop. DI resolves ILogger from SP. 33 tests pass covering CRUD, subscriptions, concurrency (100+ ops), and disposal lifecycle. Clean API surface for WP03/WP04 dependents.
+- 2026-03-07T18:50:26Z – claude-reviewer – shell_pid=54992 – lane=done – Implementation complete and merged
