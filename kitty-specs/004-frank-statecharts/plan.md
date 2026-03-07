@@ -1,7 +1,7 @@
 # Implementation Plan: Frank.Statecharts Core Runtime Library
 
-**Branch**: `003-statecharts-feasibility-research` | **Date**: 2026-03-06 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `kitty-specs/003-statecharts-feasibility-research/spec.md`
+**Branch**: `004-frank-statecharts` | **Date**: 2026-03-07 | **Spec**: [spec.md](spec.md)
+**Input**: Research from `kitty-specs/003-statecharts-feasibility-research/` | Feature spec: [spec.md](spec.md)
 **Research**: [research.md](research.md) | **Data Model**: [data-model.md](data-model.md)
 
 ## Summary
