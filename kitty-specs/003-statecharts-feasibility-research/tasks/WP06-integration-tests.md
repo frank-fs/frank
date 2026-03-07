@@ -9,7 +9,7 @@ subtasks:
   - "T031"
 title: "Integration Tests & Tic-Tac-Toe Validation"
 phase: "Phase 3 - Integration"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""

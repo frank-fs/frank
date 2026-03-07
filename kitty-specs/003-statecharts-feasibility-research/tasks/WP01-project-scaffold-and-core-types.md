@@ -8,7 +8,7 @@ subtasks:
   - "T005"
 title: "Project Scaffold & Core Types"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""

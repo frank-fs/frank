@@ -7,7 +7,7 @@ subtasks:
   - "T009"
 title: "MailboxProcessor Store Implementation"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
