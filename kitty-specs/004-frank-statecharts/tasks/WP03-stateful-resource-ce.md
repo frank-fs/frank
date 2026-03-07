@@ -15,7 +15,7 @@ subtasks:
 - T015
 phase: Phase 1 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-wp03"
 shell_pid: "36411"
 review_status: ''
 reviewed_by: ''
@@ -427,3 +427,4 @@ Because F# generics are erased at runtime, the middleware stores these as closur
 ## Activity Log
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-07T05:40:43Z – claude-wp03 – shell_pid=36411 – lane=doing – Assigned agent via workflow command
