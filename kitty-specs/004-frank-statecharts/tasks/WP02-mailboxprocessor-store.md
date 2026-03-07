@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: MailboxProcessor Store Implementation
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 004-frank-statecharts-WP01
 base_commit: 08050bcc7e5921dcbe6341ee4587053d2a1e5295
@@ -333,3 +333,4 @@ test "SetState then GetState returns stored value" {
 
 - 2026-03-06T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-07T05:40:18Z – claude-wp02 – shell_pid=36213 – lane=doing – Assigned agent via workflow command
+- 2026-03-07T05:43:24Z – claude-wp02 – shell_pid=36213 – lane=for_review – Ready for review: MailboxProcessorStore with ILogger, IDisposable, BehaviorSubject, concurrency tests
