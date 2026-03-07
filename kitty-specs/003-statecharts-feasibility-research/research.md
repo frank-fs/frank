@@ -2,7 +2,7 @@
 
 **Feature**: 003-statecharts-feasibility-research
 **Date**: 2026-03-06
-**Status**: In Progress
+**Status**: Complete
 
 ## Executive Summary
 
@@ -43,6 +43,34 @@ This research investigates whether Frank can support isomorphic round-tripping b
 **Decision**: Integrate statechart generation into frank-cli rather than a separate tool.
 **Rationale**: frank-cli already has assembly analysis, type extraction, MSBuild integration, and semantic artifact generation. A separate tool would duplicate this infrastructure. The `wsd-gen` F# parser can be consumed as a library dependency.
 **Evidence**: [E-006]
+
+### D-006: ALPS Limitations Acknowledged
+
+**Decision**: ALPS is useful for semantic vocabulary but has significant limitations as a statechart format.
+**Rationale**: Research confirmed ALPS is an expired IETF draft (never became RFC). Key limitations:
+- Cannot distinguish PUT from DELETE (both `type="idempotent"`)
+- `rt` (return type) is single-valued -- cannot express conditional return states (e.g., XTurn -> OTurn OR Won OR Draw)
+- No concept of initial state
+- No native guards/preconditions (by design, per FAQ A.2)
+- No normative HTTP method mapping document (convention only)
+ALPS remains valuable for semantic descriptor vocabulary (what states and transitions *mean*) but cannot serve as a standalone statechart format.
+**Evidence**: [E-009]
+
+### D-007: XState v5 SCXML Removal Impact
+
+**Decision**: XState JSON and SCXML are treated as independent output formats, not interconvertible.
+**Rationale**: XState v5 removed the `@xstate/scxml` import/export package. The formats are no longer interoperable through XState tooling. However:
+- XState v5 has a formal JSON schema (`machine.schema.json`, JSON Schema draft-07)
+- SCXML is a W3C Recommendation with full statechart semantics
+- smcat can read/write SCXML (core constructs) and has its own AST JSON schema
+- frank-cli will generate each format independently from the F# type model
+**Evidence**: [E-010], [E-011]
+
+### D-008: smcat as Human-Friendly Notation
+
+**Decision**: smcat is the recommended human-authoring format for spec-to-code direction.
+**Rationale**: smcat v14.0.6 has excellent human-readable notation, supports guards (`[condition]`), hierarchical states, parallel states, and has a formal AST JSON schema. It can round-trip through SCXML for core constructs. JavaScript-only limitation means frank-cli would either shell out to smcat CLI or implement a custom F# parser (smcat grammar is PEG-based, feasible to port).
+**Evidence**: [E-012]
 
 ## Case Study Analysis
 
@@ -240,6 +268,22 @@ The union of (WSD + ALPS + XState) covers all information needed by the F# runti
 - **Per-user authorization**: Requires Frank.Auth integration, not expressible in any standard spec format. Guards in WSD/ALPS carry labels but not implementation.
 - **Error recovery semantics**: Tic-tac-toe's `Error` state preserves previous GameState -- this is an implementation detail not captured by any format.
 - **F#-specific type structure**: DU payloads, Option types, etc. are language-specific.
+
+### Key Finding: Format-Specific Limitations
+
+- **ALPS**: Cannot express conditional return types (`rt` is single-valued). A transition like `makeMove` that can lead to OTurn, Won, or Draw requires three separate ALPS descriptors (one per target state) rather than one transition with conditional targets. Cannot distinguish PUT from DELETE.
+- **XState v5**: SCXML import/export removed. JSON schema exists but describes compiled/internal form, not user-facing shorthand. Guard implementations are not serializable in JSON (only guard names/types).
+- **SCXML**: No HTTP domain model. ECMAScript guard expressions don't map to F#. No quality .NET libraries -- frank-cli must generate SCXML directly via XML APIs.
+- **smcat**: JavaScript-only parser. No .NET equivalent. Guards are opaque strings (parsed but not interpreted). No data model or execution semantics.
+
+### Key Finding: smcat as Bridge Format
+
+smcat can read/write SCXML (core constructs: states, transitions, hierarchy, parallel). This means:
+- `F# code -> frank-cli -> smcat` for human-readable output
+- `smcat -> SCXML` via smcat tooling for W3C standard interchange
+- `smcat AST JSON` as a programmatic interchange format with formal schema
+
+This three-way bridge (smcat <-> SCXML <-> XState JSON via shared semantics) provides practical interoperability even though XState v5 dropped direct SCXML support.
 
 **Conclusion**: Code-to-spec generation can be comprehensive for the spec formats' domains. Spec-to-code is viable for structure (states, transitions, guard names, context shape) but requires developer-supplied implementations for guard predicates, error handling, and authorization logic.
 
@@ -469,6 +513,9 @@ The `statefulResource` CE should target simple-to-moderate complexity as the pri
 2. **History states**: XState and SCXML support history states (return to previous sub-state). Is this needed for Frank's use cases?
 3. **Timeout transitions**: Some state machines have time-based transitions (e.g., session expiry). Should `statefulResource` support timer-based events, or is this left to external scheduling?
 4. **Existing `wsd-gen` fork status**: How complete is the F# WSD parser? This affects #57 timeline significantly.
+5. **smcat parser portability**: Should frank-cli shell out to the Node.js smcat CLI for smcat parsing, or should we port the PEG grammar to F#? Shelling out adds a Node.js dependency; porting is more work but keeps the toolchain pure .NET.
+6. **ALPS conditional return types**: The `rt` single-value limitation means each conditional transition becomes multiple ALPS descriptors. Is this acceptable, or should we define an ALPS `ext` convention for multi-target transitions?
+7. **XState JSON schema version**: The existing schema describes the internal/compiled form, not user-facing config. Should frank-cli generate the compiled form (for Stately Studio compatibility) or the shorthand form (for human readability)?
 
 ## References
 
