@@ -559,3 +559,256 @@ let storeLifecycleTests =
                   }))
                   .GetAwaiter()
                   .GetResult() ]
+
+[<Tests>]
+let multipleInstanceTests =
+    testList
+        "Multiple instances"
+        [ testCase "Two game instances maintain independent state"
+          <| fun () ->
+              let res = buildGameResource gameMachine
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      let store =
+                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+
+                      // Move game1: XTurn -> OTurn
+                      let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
+                      // Move game2: XTurn -> OTurn
+                      let! (_: HttpResponseMessage) = client.PostAsync("/games/game2", new StringContent(""))
+                      // Move game2 again: OTurn -> XTurn
+                      let! (_: HttpResponseMessage) = client.PostAsync("/games/game2", new StringContent(""))
+
+                      // game1 should be OTurn (1 move)
+                      let! s1 = store.GetState "game1"
+                      Expect.equal (fst s1.Value) OTurn "game1 should be OTurn"
+                      Expect.equal (snd s1.Value) 1 "game1 move count should be 1"
+
+                      // game2 should be XTurn (2 moves)
+                      let! s2 = store.GetState "game2"
+                      Expect.equal (fst s2.Value) XTurn "game2 should be XTurn"
+                      Expect.equal (snd s2.Value) 2 "game2 move count should be 2"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let transitionBlockedTests =
+    testList
+        "TransitionResult.Blocked from transition function"
+        [ testCase "Transition returning Blocked maps to correct HTTP status"
+          <| fun () ->
+              let blockingTransition (state: TicTacToeState) (_event: TicTacToeEvent) (_moveCount: int) =
+                  match state with
+                  | XTurn -> TransitionResult.Blocked(PreconditionFailed)
+                  | _ -> TransitionResult.Transitioned(OTurn, 0)
+
+              let blockingMachine =
+                  { gameMachine with
+                      Transition = blockingTransition }
+
+              let res = buildGameResource blockingMachine
+
+              (withGameServer res None (fun _server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+
+                      Expect.equal
+                          response.StatusCode
+                          HttpStatusCode.PreconditionFailed
+                          "Transition Blocked(PreconditionFailed) should return 412"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Transition returning Blocked with Custom reason"
+          <| fun () ->
+              let blockingTransition (state: TicTacToeState) (_event: TicTacToeEvent) (_moveCount: int) =
+                  match state with
+                  | XTurn -> TransitionResult.Blocked(Custom(503, "Service unavailable"))
+                  | _ -> TransitionResult.Transitioned(OTurn, 0)
+
+              let blockingMachine =
+                  { gameMachine with
+                      Transition = blockingTransition }
+
+              let res = buildGameResource blockingMachine
+
+              (withGameServer res None (fun _server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal (int response.StatusCode) 503 "Should return custom 503"
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "Service unavailable" "Should return custom message"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let responseStartedTests =
+    testList
+        "Response already started"
+        [ testCase "Late transition failure logged when response already started"
+          <| fun () ->
+              let blockingTransition (_state: TicTacToeState) (_event: TicTacToeEvent) (_moveCount: int) =
+                  TransitionResult.Blocked(InvalidTransition)
+
+              let blockingMachine =
+                  { gameMachine with
+                      Transition = blockingTransition }
+
+              let handlerThatWritesBody (ctx: HttpContext) : Task =
+                  task {
+                      do! ctx.Response.WriteAsync("response body written")
+                      StateMachineContext.setEvent ctx (MakeMove 0)
+                  }
+                  :> Task
+
+              let res =
+                  statefulResource "/games/{gameId}" {
+                      machine blockingMachine
+                      resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+
+                      inState (
+                          forState
+                              XTurn
+                              [ StateHandlerBuilder.post handlerThatWritesBody
+                                StateHandlerBuilder.get getGameState ]
+                      )
+                  }
+
+              // Response should still be 200 because it was already started by the handler
+              (withGameServer res None (fun _server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+
+                      Expect.equal
+                          response.StatusCode
+                          HttpStatusCode.OK
+                          "Status should be 200 because response already started"
+
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.stringContains body "response body written" "Handler body should be in response"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let multipleGuardTests =
+    testList
+        "Multiple guards"
+        [ testCase "First blocking guard short-circuits evaluation"
+          <| fun () ->
+              let mutable secondGuardCalled = false
+
+              let firstGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
+                  { Name = "AlwaysBlocks"
+                    Predicate = fun _ -> Blocked NotAllowed }
+
+              let secondGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
+                  { Name = "NeverReached"
+                    Predicate =
+                      fun _ ->
+                          secondGuardCalled <- true
+                          Allowed }
+
+              let multiGuardMachine =
+                  { gameMachine with
+                      Guards = [ firstGuard; secondGuard ] }
+
+              let res = buildGameResource multiGuardMachine
+
+              (withGameServer res None (fun _server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.Forbidden "First guard should block with 403"
+                      Expect.isFalse secondGuardCalled "Second guard should NOT be called"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "All guards pass when none block"
+          <| fun () ->
+              let mutable bothCalled = 0
+
+              let guard1: Guard<TicTacToeState, TicTacToeEvent, int> =
+                  { Name = "PassOne"
+                    Predicate =
+                      fun _ ->
+                          bothCalled <- bothCalled + 1
+                          Allowed }
+
+              let guard2: Guard<TicTacToeState, TicTacToeEvent, int> =
+                  { Name = "PassTwo"
+                    Predicate =
+                      fun _ ->
+                          bothCalled <- bothCalled + 1
+                          Allowed }
+
+              let multiGuardMachine =
+                  { gameMachine with
+                      Guards = [ guard1; guard2 ] }
+
+              let res = buildGameResource multiGuardMachine
+
+              (withGameServer res None (fun _server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should pass when all guards allow"
+                      Expect.equal bothCalled 2 "Both guards should have been evaluated"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let observerResilienceTests =
+    testList
+        "Observer error resilience"
+        [ testCase "Throwing observer does not break response"
+          <| fun () ->
+              let mutable secondObserverCalled = false
+
+              let res =
+                  statefulResource "/games/{gameId}" {
+                      machine gameMachine
+                      resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+                      onTransition (fun _ -> failwith "Observer explosion!")
+                      onTransition (fun _ -> secondObserverCalled <- true)
+
+                      inState (
+                          forState XTurn [ StateHandlerBuilder.post handleMove; StateHandlerBuilder.get getGameState ]
+                      )
+
+                      inState (
+                          forState OTurn [ StateHandlerBuilder.post handleMove; StateHandlerBuilder.get getGameState ]
+                      )
+                  }
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
+
+                      Expect.equal
+                          response.StatusCode
+                          HttpStatusCode.OK
+                          "Response should succeed despite observer error"
+
+                      // Verify state was still persisted
+                      let store =
+                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+
+                      let! stateOpt = store.GetState "game1"
+                      Expect.equal (fst stateOpt.Value) OTurn "Transition should still be persisted"
+
+                      // Verify second observer was still called (observers are independent)
+                      Expect.isTrue secondObserverCalled "Second observer should run despite first throwing"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
