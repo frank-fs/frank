@@ -134,6 +134,7 @@ let createClientWithClaims (server: TestServer) (claims: Claim list) =
 - Use `Microsoft.AspNetCore.TestHost` like existing Frank tests
 - May need to register test authentication scheme to inject `ClaimsPrincipal`
 - TestServer should be disposed after each test (use `use` binding)
+- **Optional edge case test**: Verify that disposing the store while a request is in-flight raises `ObjectDisposedException` (or a graceful error) rather than hanging. Low priority — add if time permits after T028-T031 pass.
 
 ### Subtask T027 -- Implement simplified tic-tac-toe state machine as test fixture
 

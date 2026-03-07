@@ -220,12 +220,14 @@ let machine<'S, 'E, 'C when 'S : equality> = MachineBuilder<'S, 'E, 'C>()
 
 **Purpose**: Register per-state HTTP method handlers within the CE.
 
+**Approach**: Use `forState` helper functions (primary API). Nested CE syntax is a future enhancement — do not implement it in this WP.
+
 **Steps**:
 1. `inState` collects handlers for a specific state value
 2. The handlers are HTTP method + `RequestDelegate` pairs, just like `ResourceBuilder`
 
-**Implementation approach**:
-The `inState` operation needs to accept a state value and a collection of handlers. Since F# CEs don't easily support nested blocks with different builder types, use a function that takes a `StateHandlers` record:
+**Implementation**:
+The `inState` operation accepts a `StateHandlers` record built via `forState` helper functions. This avoids nested CE complexity (plan.md risk mitigation):
 
 ```fsharp
 [<CustomOperation("inState")>]
@@ -366,7 +368,7 @@ let statefulResource routeTemplate = StatefulResourceBuilder(routeTemplate)
 **Notes**:
 - `Build` validates that `machine` was provided (fail fast, not silent)
 - `StateMetadata` is auto-populated from `inState` registrations -- `AllowedMethods` are derived from the HTTP methods registered for each state
-- `IsFinal` is set to `true` for states with no handlers (no outgoing transitions via HTTP)
+- **IsFinal heuristic**: A state is considered "final" (terminal) if no `inState` block registers a handler that would trigger a transition (i.e., only GET/read-only handlers, or no handlers at all). This is derived at build time by checking whether any non-GET handler exists in that state's block. If uncertain, default to `IsFinal = false` (non-terminal). Document this derivation in a code comment on `StateInfo.IsFinal`.
 - All handlers are flattened into a single `ResourceSpec` -- the middleware (WP04) handles routing to the correct handler based on current state
 - The `StateMachineMetadata` is boxed and added to every endpoint's metadata via `EndpointBuilder.Metadata.Add`
 
@@ -392,6 +394,18 @@ let statefulResource routeTemplate = StatefulResourceBuilder(routeTemplate)
 | Type inference for `inState` blocks | Use explicit type annotations on builder or helper functions |
 | Handler signature overloads | Mirror `ResourceBuilder.AddHandler` patterns exactly |
 | `obj` boxing in metadata | Required by `EndpointBuilder.Metadata` (IList<obj>) -- same as LinkedData |
+
+---
+
+## Cross-WP Contract: StateMachineMetadata
+
+WP04 (Middleware) depends on the shape of `StateMachineMetadata`. The metadata record MUST include at minimum:
+- `StateHandlerMap: Map<string, (string * RequestDelegate) list>` — per-state allowed HTTP methods (keyed by `state.ToString()`)
+- `Machine: obj` — the boxed `StateMachine<'State, 'Event, 'Context>` definition
+- `ResolveInstanceId: HttpContext -> string` — instance key extractor
+- `TransitionObservers: (obj -> unit) list` — boxed transition event handlers
+
+Because F# generics are erased at runtime, the middleware stores these as closures over concrete types (boxed). WP04's middleware accesses typed behavior via closure calls, not via casting the generic parameters. Additional typed closure fields (`GetCurrentStateKey`, `SetStateAfterTransition`, `EvaluateGuards`, `TryGetEventAndTransition`) will be added by WP04 to bridge the type gap.
 
 ---
 

@@ -50,6 +50,8 @@ spec-kitty implement WP04 --base WP03
 
 Depends on WP01 (types), WP02 (store), WP03 (CE produces metadata). Use `--base WP03` since WP03 is the last dependency in the chain (WP02 and WP03 both depend on WP01, and WP04 needs all three).
 
+**Cross-WP dependency**: This WP consumes `StateMachineMetadata` as defined by WP03. See WP03's "Cross-WP Contract" section for the required record shape. The middleware accesses all machine behavior through closures stored in the metadata — no generic type parameters are needed at the middleware level. This WP will extend `StateMachineMetadata` with additional closure fields (`GetCurrentStateKey`, `SetStateAfterTransition`, `EvaluateGuards`, `TryGetEventAndTransition`) that are wired up during WP03's `Build` method.
+
 ---
 
 ## Objectives & Success Criteria
@@ -149,6 +151,8 @@ type StateMachineMiddleware(next: RequestDelegate) =
 - The middleware checks `ep.Metadata.GetMetadata<StateMachineMetadata>()` which returns `null` for non-stateful endpoints
 - This is the exact same pattern as `Frank.LinkedData` (check for marker metadata, intercept or pass through)
 - The middleware must run **after routing but before endpoint execution** (registered via `plug` not `plugBeforeRouting`)
+
+**FR-014 Implementation**: The middleware exposes per-state allowed methods through `StateMachineMetadata` so that GET handlers (or any handler) can discover which HTTP methods are valid in the current state. This is inherent in `StateMachineMetadata.StateHandlerMap` — handlers access it via `HttpContext.GetEndpoint().Metadata.GetMetadata<StateMachineMetadata>()`. WP03's `Build` method populates this map; WP04's middleware uses it for 405 filtering; handlers read it directly for affordance generation.
 
 ### Subtask T017 -- Implement state lookup from store
 
@@ -280,6 +284,11 @@ module BlockReasonMapping =
 - `GuardContext` requires `ClaimsPrincipal` from `HttpContext.User`
 - The `EvaluateGuards` function must be created at `Build` time to close over typed machine
 
+**Distinction — BlockReason.InvalidTransition vs TransitionResult.Invalid**:
+- `BlockReason.InvalidTransition` → returned by a **guard** that determines the requested event is structurally invalid for the current state (e.g., wrong event type). Maps to 400.
+- `TransitionResult.Invalid` → returned by the **transition function** when it cannot produce a valid next state (e.g., illegal move in tic-tac-toe). Also maps to 400 but with the message from the `Invalid` case.
+- Guards run first. If all guards pass, the handler executes, then the transition function runs. Either can produce a 400, but from different evaluation phases.
+
 ### Subtask T020 -- Implement transition execution and hooks
 
 **Purpose**: After successful handler execution, apply the state transition and fire `onTransition` hooks.
@@ -328,8 +337,10 @@ match meta.TryGetEventAndTransition ctx instanceId with
         do! meta.SetStateAfterTransition ctx.RequestServices instanceId (box (newState, newCtx))
         // Fire onTransition hooks
         let event = { PreviousState = ...; NewState = newState; ... }
+        let logger = ctx.RequestServices.GetRequiredService<ILogger<StateMachineMiddleware>>()
         for observer in meta.TransitionObservers do
-            try observer (box event) with _ -> ()
+            try observer (box event)
+            with ex -> logger.LogWarning(ex, "onTransition observer threw for instance {InstanceId}", instanceId)
     | TransitionResult.Blocked reason ->
         // This shouldn't happen after guards pass, but handle gracefully
         ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
@@ -345,7 +356,7 @@ match meta.TryGetEventAndTransition ctx instanceId with
 **Notes**:
 - `onTransition` hooks fire AFTER successful state update, not before (DD-04)
 - Read-only operations (GET) don't set an event, so no transition occurs
-- Observer errors are caught and ignored (one bad observer doesn't break the pipeline)
+- Observer errors are caught and logged via `ILogger<StateMachineMiddleware>` resolved from `HttpContext.RequestServices` (constitution VII: no silent exception swallowing)
 - The typed transition logic needs to be closed over at Build time (same pattern as guards)
 
 ### Subtask T021 -- Create `MiddlewareTests.fs`

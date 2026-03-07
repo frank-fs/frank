@@ -102,7 +102,7 @@ type private StoreMessage<'State, 'Context when 'State : equality> =
 4. Implement the MailboxProcessor loop:
 
 ```fsharp
-type MailboxProcessorStore<'State, 'Context when 'State : equality>() =
+type MailboxProcessorStore<'State, 'Context when 'State : equality>(logger: ILogger<MailboxProcessorStore<'State, 'Context>>) =
     let mutable disposed = false
 
     let agent = MailboxProcessor<StoreMessage<'State, 'Context>>.Start(fun inbox ->
@@ -122,7 +122,8 @@ type MailboxProcessorStore<'State, 'Context when 'State : equality>() =
                 match Map.tryFind id subscribers with
                 | Some observers ->
                     for obs in observers do
-                        try obs.OnNext(state, ctx) with _ -> ()
+                        try obs.OnNext(state, ctx)
+                        with ex -> logger.LogWarning(ex, "Store subscriber OnNext threw for instance {InstanceId}", id)
                 | None -> ()
                 reply.Reply(())
                 return! loop()
@@ -132,7 +133,9 @@ type MailboxProcessorStore<'State, 'Context when 'State : equality>() =
                 subscribers <- Map.add id (observer :: current) subscribers
                 // BehaviorSubject: emit current state immediately
                 match Map.tryFind id instances with
-                | Some state -> try observer.OnNext(state) with _ -> ()
+                | Some state ->
+                    try observer.OnNext(state)
+                    with ex -> logger.LogWarning(ex, "Store subscriber OnNext threw during initial emit for instance {InstanceId}", id)
                 | None -> ()
                 let disposable = { new IDisposable with
                     member _.Dispose() = inbox.Post(Unsubscribe(id, observer)) }
@@ -149,9 +152,10 @@ type MailboxProcessorStore<'State, 'Context when 'State : equality>() =
 
             | Stop reply ->
                 // Notify all subscribers of completion
-                for KeyValue(_, observers) in subscribers do
+                for KeyValue(id, observers) in subscribers do
                     for obs in observers do
-                        try obs.OnCompleted() with _ -> ()
+                        try obs.OnCompleted()
+                        with ex -> logger.LogWarning(ex, "Store subscriber OnCompleted threw for instance {InstanceId}", id)
                 subscribers <- Map.empty
                 instances <- Map.empty
                 reply.Reply(())
@@ -166,7 +170,8 @@ type MailboxProcessorStore<'State, 'Context when 'State : equality>() =
 **Notes**:
 - The MailboxProcessor naturally serializes all access -- no locks needed
 - Subscriber notification happens inline (synchronous) since it's just calling `OnNext`
-- Error handling on observer notification: catch and ignore to prevent one bad subscriber from breaking the store
+- Error handling on observer notification: catch and log via `ILogger` to prevent one bad subscriber from breaking the store (constitution VII: no silent exception swallowing)
+- Constructor requires `ILogger<MailboxProcessorStore<'S,'C>>` — resolved via DI
 - `Stop` does NOT recurse, so the agent loop terminates after processing all pending messages
 
 ### Subtask T007 -- Implement `IDisposable` on store
@@ -237,8 +242,9 @@ module StoreServiceCollectionExtensions =
 
     type IServiceCollection with
         member services.AddStateMachineStore<'State, 'Context when 'State : equality>() =
-            services.AddSingleton<IStateMachineStore<'State, 'Context>>(fun _ ->
-                new MailboxProcessorStore<'State, 'Context>() :> _)
+            services.AddSingleton<IStateMachineStore<'State, 'Context>>(fun sp ->
+                let logger = sp.GetRequiredService<ILogger<MailboxProcessorStore<'State, 'Context>>>()
+                new MailboxProcessorStore<'State, 'Context>(logger) :> _)
 ```
 
 ### Subtask T009 -- Create `StoreTests.fs`
@@ -303,7 +309,7 @@ test "SetState then GetState returns stored value" {
 | Risk | Mitigation |
 |------|-----------|
 | MailboxProcessor disposal timing | `PostAndReply(Stop)` blocks until drain completes |
-| Observer exceptions breaking store | Wrap all `OnNext`/`OnCompleted` calls in try/catch |
+| Observer exceptions breaking store | Wrap all `OnNext`/`OnCompleted` calls in try/catch with `ILogger.LogWarning` (constitution VII) |
 | Memory leaks from forgotten subscriptions | `IDisposable` pattern; document that callers must `use` |
 | `Async.RunSynchronously` on Subscribe | Only used at setup time, not in hot path; consider making async if needed |
 
