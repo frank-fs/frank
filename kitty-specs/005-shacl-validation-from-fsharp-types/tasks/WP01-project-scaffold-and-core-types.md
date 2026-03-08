@@ -1,16 +1,20 @@
 ---
-work_package_id: "WP01"
-title: "Project Scaffold & Core Types"
-lane: "planned"
+work_package_id: WP01
+title: Project Scaffold & Core Types
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-010"]
-subtasks: ["T001", "T002", "T003", "T004", "T005"]
+base_branch: master
+base_commit: eb3ec1d134df7f725105e1203a7aaaf2a9a6b507
+created_at: '2026-03-08T17:30:46.117744+00:00'
+subtasks: [T001, T002, T003, T004, T005]
+shell_pid: "97836"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-010]
 ---
 
 # Work Package Prompt: WP01 -- Project Scaffold & Core Types
