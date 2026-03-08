@@ -5,6 +5,7 @@
 **Status**: Draft
 **GitHub Issue**: #77
 **Dependencies**: Frank.Statecharts (#87, complete), Frank.LinkedData (#75, complete)
+**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, and `HttpMethod: string` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
 **Input**: Phase 2 of #80 (Semantic Metadata-Augmented Resources). Provenance layer consuming `onTransition` hooks from Frank.Statecharts.
 
 ## Clarifications

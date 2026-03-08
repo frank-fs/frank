@@ -18,6 +18,7 @@ Implement automatic ETag generation and conditional request handling in Frank co
 **Project Type**: Extension to existing Frank core library (`src/Frank/`)
 **Performance Goals**: ETag computation < 1ms for typical state sizes; zero overhead for non-ETag-enabled resources; MailboxProcessor per-message overhead ~1-5us
 **Constraints**: No external NuGet dependencies; strong ETags only (weak ETags deferred); must not alter behavior of resources without an `IETagProvider`
+**Cache Invalidation Note**: `IStateMachineStore.Subscribe` is per-instance only (`instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable`) -- there is no way to subscribe to all state changes globally. Cache invalidation uses a middleware-driven approach: after the handler returns a 2xx response for a mutation (POST/PUT/DELETE), the middleware sends an `InvalidateETag` message to the cache.
 **Scale/Scope**: Framework-wide middleware; all resources with an `IETagProvider` participate automatically
 
 ## Constitution Check
@@ -146,7 +147,7 @@ Note: The `('State * 'Context) -> string` hashing pipeline refers to the concret
 - `StatechartETagProvider<'State, 'Context>` implementation
 - SHA-256 hashing of `('State * 'Context)` pair
 - Integration with `IStateMachineStore` for state retrieval
-- Cache invalidation hook on state transitions
+- Cache invalidation via middleware (after 2xx mutation response)
 - **Depends on**: Stream A (IETagProvider interface) and Frank.Statecharts types
 
 ### Stream E: Tests

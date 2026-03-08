@@ -126,7 +126,7 @@
 - [ ] T019 Implement SHA-256 hashing: serialize state via `string`, context via user-supplied `'Context -> byte[]`, concatenate, hash, truncate to 128 bits
 - [ ] T019b Unit test: same ('State * 'Context) pair produces identical ETag; different pairs produce different ETags
 - [ ] T020 Implement `IETagProviderFactory` for statechart resources (resolves provider from endpoint StateMachineMetadata)
-- [ ] T021 Implement cache invalidation subscription: subscribe to `IStateMachineStore` state changes, send `InvalidateETag` to `ETagCache`
+- [ ] T021 Implement middleware-driven cache invalidation: after the handler returns a 2xx response for a mutation (POST/PUT/DELETE), the middleware sends an `InvalidateETag` message to the `ETagCache` (consistent with T015 in WP03). Note: `IStateMachineStore.Subscribe` is per-instance only and cannot be used for global cache invalidation.
 - [ ] T022 Add DI registration helper: `IServiceCollection.AddStatechartETagProvider<'State, 'Context>(contextSerializer)`
 
 ### Implementation Notes
@@ -136,8 +136,8 @@
 - `contextSerializer: 'Context -> byte[]` is provided at registration time
 - State serialization: `System.Text.Encoding.UTF8.GetBytes(string state)` for DU states
 - Hash: `SHA256.Create().ComputeHash(combined) |> Array.take 16 |> hex-encode |> ETagFormat.quote`
-- Cache invalidation: subscribe via `IStateMachineStore.Subscribe`, on each state change post `InvalidateETag` to cache
-- IDisposable: store subscription unsubscribed on disposal
+- Cache invalidation: middleware-driven (after 2xx mutation response, middleware posts `InvalidateETag` to cache); no store-level subscription needed
+- `IStateMachineStore.Subscribe` is per-instance only and cannot provide global cache invalidation
 
 ### Dependencies
 - Depends on WP01 (IETagProvider, ETagFormat) and WP02 (ETagCache for invalidation)

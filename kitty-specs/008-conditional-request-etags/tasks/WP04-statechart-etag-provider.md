@@ -49,7 +49,7 @@ Depends on WP01 (IETagProvider, ETagFormat) and WP02 (ETagCache for invalidation
 - Implement `StatechartETagProvider<'State, 'Context>` as the default `IETagProvider` for statechart-backed resources
 - Hash `('State * 'Context)` pairs using SHA-256 truncated to 128 bits via user-supplied context serializer
 - Implement `StatechartETagProviderFactory` as `IETagProviderFactory` for statechart endpoints
-- Subscribe to `IStateMachineStore` state changes and invalidate `ETagCache` entries on transitions
+- Cache invalidation is middleware-driven: after a 2xx mutation response, the middleware invalidates the `ETagCache` entry (no store-level subscription)
 - Provide `AddStatechartETagProvider<'State, 'Context>` DI registration helper
 - ETags are deterministic: same `('State * 'Context)` always produces the same ETag
 - ETags change when state transitions occur
@@ -72,7 +72,7 @@ Depends on WP01 (IETagProvider, ETagFormat) and WP02 (ETagCache for invalidation
 - State serialization: `System.Text.Encoding.UTF8.GetBytes(string state)` for DU case names
 - SHA-256 via `System.Security.Cryptography.SHA256` (framework built-in)
 - No new NuGet dependencies
-- IDisposable: subscription to state changes must be cleaned up on disposal
+- No subscription lifecycle to manage -- cache invalidation is handled by the middleware (WP03)
 
 ---
 
@@ -202,50 +202,23 @@ type StatechartETagProviderFactory<'State, 'Context when 'State : equality>
 - `isNull (box metadata)` handles the case where `StateMachineMetadata` is a value type or record -- box to check null
 - If the endpoint is not a statechart resource, returns `None` (middleware skips it)
 
-### Subtask T021 -- Implement cache invalidation subscription
+### Subtask T021 -- Implement middleware-driven cache invalidation
 
-**Purpose**: When statechart state transitions occur, invalidate the corresponding ETag cache entry so the next request computes a fresh ETag.
+**Purpose**: When statechart state transitions occur via mutation requests, invalidate the corresponding ETag cache entry so the next request computes a fresh ETag.
+
+**Note**: `IStateMachineStore.Subscribe` is per-instance only (`instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable`) and cannot be used for global cache invalidation. Instead, cache invalidation is driven by the middleware itself (consistent with T015 in WP03).
 
 **Steps**:
-1. Add a subscription mechanism to `StatechartETagProvider`:
+1. Cache invalidation is handled by the `ConditionalRequestMiddleware` (WP03), not by the provider. After the handler returns a 2xx response for a mutation (POST/PUT/DELETE), the middleware sends an `InvalidateETag` message to the `ETagCache`. The `StatechartETagProvider` itself is stateless -- it computes ETags on demand and does not manage subscriptions.
 
-```fsharp
-type StatechartETagProvider<'State, 'Context when 'State : equality>
-    (store: IStateMachineStore<'State, 'Context>,
-     contextSerializer: 'Context -> byte[],
-     cache: ETagCache) =
+2. No subscription mechanism is needed on `StatechartETagProvider`. The provider's responsibility is limited to computing ETags from the current state via `IStateMachineStore.GetState`.
 
-    let subscriptions = System.Collections.Generic.Dictionary<string, IDisposable>()
-
-    /// Subscribe to state changes for a resource instance.
-    /// When the state changes, the cache entry is invalidated.
-    member _.SubscribeToInstance(instanceId: string, resourceKey: string) =
-        if not (subscriptions.ContainsKey(resourceKey)) then
-            let subscription =
-                store.Subscribe(instanceId,
-                    { new IObserver<'State * 'Context> with
-                        member _.OnNext(_) = cache.Invalidate(resourceKey)
-                        member _.OnError(_) = ()
-                        member _.OnCompleted() = () })
-            subscriptions.[resourceKey] <- subscription
-
-    interface IDisposable with
-        member _.Dispose() =
-            for kvp in subscriptions do
-                kvp.Value.Dispose()
-            subscriptions.Clear()
-```
-
-2. The middleware should call `SubscribeToInstance` on first access to a statechart resource instance (lazy subscription).
-
-**Files**: `src/Frank.Statecharts/StatechartETagProvider.fs`
+**Files**: `src/Frank.Statecharts/StatechartETagProvider.fs` (no subscription code needed)
 **Notes**:
-- Subscriptions are lazy (created on first access) to avoid subscribing to instances that are never accessed
-- `cache.Invalidate(resourceKey)` is fire-and-forget -- the subscription callback must be non-blocking
-- The `IObserver.OnError` handler does nothing -- subscription errors are not expected from the in-memory store
-- `IDisposable` cleans up all subscriptions (Constitution principle VI)
-- The resource key (path) is used for cache invalidation, not the instance ID, because the cache is keyed by request path
-- Consider: the middleware (WP03) could trigger `SubscribeToInstance` after the first ETag computation for a new instance
+- The middleware (WP03 T015) already describes the pattern: after observing a 2xx response from the handler, invalidate the cache entry
+- This avoids the complexity of managing per-instance subscriptions and their lifecycle
+- The provider remains simple: read state, hash it, return ETag
+- No `IDisposable` needed on the provider for subscription cleanup (Constitution principle VI still satisfied -- nothing to dispose)
 
 ### Subtask T022 -- Add DI registration helper
 
@@ -296,7 +269,7 @@ type IServiceCollection with
 | `string state` representation unstable for complex DU cases | Test with actual DU types; document that state types should have clean `ToString()` |
 | Generic type erasure at metadata/DI level | Factory pattern hides generics; middleware only sees `IETagProvider` |
 | Multiple statechart resource types need separate providers | Document single-type limitation; composite factory as future enhancement |
-| Subscription leak if instances are never cleaned up | IDisposable on provider clears all subscriptions on app shutdown |
+| N/A (no subscriptions) | Cache invalidation is middleware-driven, no subscription lifecycle to manage |
 | Context serializer produces non-deterministic output | Document requirement for deterministic serialization; test with known inputs |
 
 ---
@@ -308,8 +281,7 @@ type IServiceCollection with
 - Verify truncation is 16 bytes (128 bits), not 16 characters
 - Verify `computeETagFromState` produces hex-encoded output with `ETagFormat.quote`
 - Verify `StatechartETagProviderFactory` checks for `StateMachineMetadata` on endpoint
-- Verify subscription-based cache invalidation fires on state changes
-- Verify `IDisposable` cleans up all subscriptions
+- Verify cache invalidation is middleware-driven (no store-level subscriptions in provider)
 - Verify DI registration resolves `IStateMachineStore` and `ETagCache` from service provider
 - Run `dotnet build Frank.sln` and relevant tests to confirm green
 

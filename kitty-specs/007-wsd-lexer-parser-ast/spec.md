@@ -117,7 +117,7 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - **FR-003**: System MUST support all four arrow types with correct semantic interpretation per Amundsen's approach:
   - `->` (solid forward): synchronous call, activates target
   - `-->` (dashed forward): asynchronous or optional call
-  - `->-` (solid deactivating): return from activation, safe/idempotent
+  - `->-` (solid deactivating): return from activation
   - `-->-` (dashed deactivating): asynchronous return
 - **FR-004**: System MUST parse guard extension syntax from `note` annotations, extracting `[guard: key=value, ...]` into structured key-value pairs on the AST node
 - **FR-005**: System MUST parse message parameters from parenthesized argument lists (e.g., `makeMove(position, value)`) into an ordered list of parameter names on the `Message` AST node

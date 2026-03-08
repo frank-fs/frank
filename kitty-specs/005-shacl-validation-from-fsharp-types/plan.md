@@ -34,7 +34,7 @@ The `validate` custom operation extends the `resource` CE, keeping validation as
 - `validate` is a `[<CustomOperation>]` on `ResourceBuilder` (CE pattern)
 - Shape derivation uses F# reflection metadata (records, DUs, option types)
 - `ShaclShape`, `PropertyShape`, `ValidationReport`, `ValidationResult` are F# record types
-- `ShapeConstraint` uses discriminated unions for constraint variants
+- `ConstraintKind` uses discriminated unions for constraint variants
 - Pipeline-friendly: `Type -> ShaclShape` derivation is a pure function
 - `option` types used for optional fields, not nulls
 

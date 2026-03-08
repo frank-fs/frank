@@ -46,6 +46,8 @@ Depends on WP01 (core types) and WP02 (store for appending records).
 
 ## Objectives & Success Criteria
 
+**PREREQUISITE: TransitionEvent must be extended with InstanceId, ResourceUri, HttpMethod fields before this WP can proceed.** The actual `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts currently has fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User. It does NOT have InstanceId, ResourceUri, or HttpMethod.
+
 - Implement `TransitionObserver` that receives `TransitionEvent` from Frank.Statecharts `onTransition` hooks
 - Extract agent identity from `ClaimsPrincipal` (Person, SoftwareAgent, LlmAgent classification)
 - Construct complete `ProvenanceRecord` from transition event data
@@ -89,7 +91,7 @@ Depends on WP01 (core types) and WP02 (store for appending records).
 
 ### Subtask T022 -- Create `TransitionObserver.fs` with IObserver implementation
 
-**Purpose**: Create the observer that subscribes to state transition events and produces provenance records.
+**Purpose**: Create the observer that is injected per-resource via the `onTransition` CE operation on `StatefulResourceBuilder`. Note: `onTransition` is per-resource, not a global observable. There is no single global stream to subscribe to. The `ProvenanceSubscriptionManager` (WP07) must iterate over all registered stateful resource endpoints and inject this observer into each resource's `onTransition` callback.
 
 **Steps**:
 1. Create `src/Frank.Provenance/TransitionObserver.fs`

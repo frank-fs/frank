@@ -3,8 +3,8 @@ work_package_id: "WP02"
 title: "Type Mapping & Shape Derivation Engine"
 lane: "planned"
 dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-017"]
-subtasks: ["T006", "T007", "T008", "T009", "T010", "T011", "T012", "T013", "T014"]
+requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-017", "FR-020"]
+subtasks: ["T006", "T007", "T008", "T009", "T010", "T011", "T012", "T013", "T014", "T014b"]
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"

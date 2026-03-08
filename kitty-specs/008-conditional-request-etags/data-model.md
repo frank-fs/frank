@@ -6,7 +6,7 @@
 ## Entity Relationship Overview
 
 ```
-IETagProvider<'State, 'Context>
+IETagProvider
        │
        │ implemented by
        ├──────────────────────> StatechartETagProvider<'S,'C>
