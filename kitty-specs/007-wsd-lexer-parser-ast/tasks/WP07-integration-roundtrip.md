@@ -3,7 +3,7 @@ work_package_id: "WP07"
 title: "Integration, round-trip tests + build verification"
 lane: "planned"
 dependencies: ["WP05", "WP06"]
-requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-009", "FR-010", "FR-011", "FR-012", "FR-013"]
+requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-008a", "FR-009", "FR-010", "FR-011", "FR-012", "FR-013"]
 subtasks: ["T039", "T040", "T041", "T042", "T043", "T044"]
 history:
   - timestamp: "2026-03-07T00:00:00Z"

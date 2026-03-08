@@ -4,6 +4,7 @@ title: StatechartETagProvider
 lane: planned
 dependencies:
 - WP01
+- WP02
 subtasks: [T018, T019, T020, T021, T022]
 history:
 - timestamp: '2026-03-07T00:00:00Z'

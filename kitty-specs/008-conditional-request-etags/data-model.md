@@ -75,6 +75,8 @@ type IETagProviderFactory =
 |--------|-----------|-------------|
 | CreateProvider | `Endpoint -> IETagProvider option` | Resolve a provider for the matched endpoint |
 
+**Resolution behavior**: The factory checks endpoint metadata for `ETagMetadata`; if present, resolves the provider from DI by the metadata's provider type; if absent, returns `None` (resource does not participate in conditional requests).
+
 ### ETagMetadata
 
 Endpoint metadata marker indicating a resource participates in conditional request handling. Attached to endpoints during resource building. The middleware checks for this marker to avoid processing non-participating resources.

@@ -75,6 +75,8 @@ Depends on WP01 (core types).
 
 ### Subtask T006 -- Create `TypeMapping.fs`
 
+**Implementation note**: NodeShape URIs follow the pattern `urn:frank:shape:{assembly-name}:{type-full-name}`. Generic type parameters are expanded at point of use (e.g., `PagedResult<Customer>` becomes `urn:frank:shape:MyApp:MyApp.PagedResult_MyApp.Customer`). Type names are URL-encoded to handle special characters.
+
 **Purpose**: Define the static mapping from F# CLR types to XSD datatypes. This is a pure function used by shape derivation.
 
 **Steps**:

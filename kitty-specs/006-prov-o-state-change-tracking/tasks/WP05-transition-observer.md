@@ -111,7 +111,7 @@ type TransitionEvent = {
     ResourceUri: string
     PreviousState: string
     NewState: string
-    EventName: string
+    Event: string
     Timestamp: DateTimeOffset
     User: ClaimsPrincipal option
     HttpMethod: string
@@ -237,7 +237,7 @@ let private createRecord (event: TransitionEvent) : ProvenanceRecord =
         Id = activityId
         HttpMethod = event.HttpMethod
         ResourceUri = event.ResourceUri
-        EventName = event.EventName
+        EventName = event.Event
         PreviousState = event.PreviousState
         NewState = event.NewState
         StartedAt = now
@@ -272,7 +272,7 @@ let private createRecord (event: TransitionEvent) : ProvenanceRecord =
 - All IDs are GUID-based URNs (unique per entity instance)
 - `StartedAt` and `EndedAt` are both set to the transition timestamp for synchronous transitions. For async transitions (future enhancement), `EndedAt` would be set later.
 - `ResourceUri` is the route path (e.g., `/orders/42`), matching what the middleware will query
-- `EventName` comes from `TransitionEvent.EventName` (the triggering event's string representation)
+- `EventName` comes from `TransitionEvent.Event` (the triggering event's string representation)
 - `PreviousState` and `NewState` are string representations (not boxed objects) per data-model.md
 
 ### Subtask T025 -- Implement resilient error handling

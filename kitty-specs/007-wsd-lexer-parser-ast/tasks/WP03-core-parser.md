@@ -124,6 +124,8 @@ let parseWsd (source: string) : ParseResult =
 
 ### T019: Participant Declarations
 
+> **Implementation note:** The parser maintains a mutable participant registry during parsing. When an explicit `participant X` declaration is encountered and X already exists as an implicit participant (from a prior message reference), the registry entry is updated to set `Explicit = true`. The final `Diagram.Participants` list contains one entry per unique participant name, with `Explicit` reflecting whether an explicit declaration was seen.
+
 Parse `participant <name>` and `participant <name> as <alias>` lines.
 
 **Token sequence**: `Participant` `Identifier(name)` [optional: `As` `Identifier(alias)` or `As` `StringLiteral(alias)`] `Newline`

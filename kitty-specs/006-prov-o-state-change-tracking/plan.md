@@ -10,7 +10,7 @@ Implement `Frank.Provenance`, a library that records W3C PROV-O provenance for e
 
 ## Technical Context
 
-**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, and `HttpMethod: string` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
+**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, `HttpMethod: string`, and `Headers: Map<string, string>` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
 
 **Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core)
 **Primary Dependencies**: Frank (project reference), Frank.LinkedData (project reference), Frank.Statecharts (project reference), dotNetRdf.Core (NuGet)
