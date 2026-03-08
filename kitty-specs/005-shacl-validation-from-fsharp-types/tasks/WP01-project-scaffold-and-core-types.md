@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold & Core Types
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: eb3ec1d134df7f725105e1203a7aaaf2a9a6b507
@@ -399,3 +399,4 @@ let main args =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:46Z – claude-opus – shell_pid=97836 – lane=doing – Assigned agent via workflow command
+- 2026-03-08T17:55:54Z – claude-opus – shell_pid=97836 – lane=for_review – T001-T005 complete. Builds clean. 13 tests pass.
