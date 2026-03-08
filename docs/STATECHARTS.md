@@ -2,6 +2,8 @@
 
 Frank.Statecharts adds application-level state machines to Frank, enabling resources whose HTTP surface changes based on persisted domain state. Each resource instance has its own state, and the framework enforces which HTTP methods are available, evaluates guards, and manages transitions automatically.
 
+State machines can be defined directly in F# (as shown below) or generated from design specifications such as SCXML, WSD, or ALPS profiles. See [SPEC-PIPELINE.md](SPEC-PIPELINE.md) for the design-to-implementation workflow.
+
 For how this differs from Webmachine and Freya, see [COMPARISON.md](COMPARISON.md).
 
 ## Core Concepts
@@ -201,3 +203,9 @@ The integration test suite validates:
 - **Hierarchical statecharts** -- nested DU states, sub-state transitions, top-level transitions, cross-hierarchy guards, context-aware participant guards
 
 See [`test/Frank.Statecharts.Tests/`](../test/Frank.Statecharts.Tests/) for the full test suite.
+
+## See Also
+
+- [SPEC-PIPELINE.md](SPEC-PIPELINE.md) — Bidirectional design spec pipeline: how statecharts are designed from WSD/SCXML/ALPS and extracted from running applications for verification
+- [SEMANTIC-RESOURCES.md](SEMANTIC-RESOURCES.md) — How statecharts participate in the semantic layer, enabling agent-legible applications
+- [COMPARISON.md](COMPARISON.md) — How Frank.Statecharts differs from Webmachine and Freya
