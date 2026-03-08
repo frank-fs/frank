@@ -90,7 +90,7 @@
 - [ ] T012 Implement If-None-Match evaluation: GET/HEAD with matching ETag returns 304 Not Modified
 - [ ] T013 Implement If-Match evaluation: POST/PUT/DELETE with non-matching ETag returns 412 Precondition Failed
 - [ ] T014 Implement wildcard `*` handling for both If-None-Match and If-Match per RFC 9110
-- [ ] T015 Implement ETag header setting on successful responses and cache invalidation after mutations
+- [ ] T015 Implement ETag header setting on successful responses and cache invalidation after mutations. Cache invalidation triggers after observing a 2xx response status from the handler, not before handler execution
 - [ ] T016 Add `useConditionalRequests` plug registration and `AddETagCache` DI extension
 - [ ] T017 Create `test/Frank.Tests/ConditionalRequestTests.fs` with TestHost integration tests
 
@@ -124,6 +124,7 @@
 ### Included Subtasks
 - [ ] T018 Create `src/Frank.Statecharts/StatechartETagProvider.fs` implementing `IETagProvider`
 - [ ] T019 Implement SHA-256 hashing: serialize state via `string`, context via user-supplied `'Context -> byte[]`, concatenate, hash, truncate to 128 bits
+- [ ] T019b Unit test: same ('State * 'Context) pair produces identical ETag; different pairs produce different ETags
 - [ ] T020 Implement `IETagProviderFactory` for statechart resources (resolves provider from endpoint StateMachineMetadata)
 - [ ] T021 Implement cache invalidation subscription: subscribe to `IStateMachineStore` state changes, send `InvalidateETag` to `ETagCache`
 - [ ] T022 Add DI registration helper: `IServiceCollection.AddStatechartETagProvider<'State, 'Context>(contextSerializer)`
@@ -163,6 +164,7 @@
 - [ ] T026 Test User Story 3: If-Match on mutations -- matching proceeds, non-matching returns 412, wildcard, no If-Match proceeds normally
 - [ ] T027 Test User Story 4: custom IETagProvider on plain resource -- ETags generated, conditional requests work identically
 - [ ] T028 Test edge cases: resource without IETagProvider unaffected, DELETE responses, concurrent clients (optimistic concurrency scenario)
+- [ ] T028b Benchmark ETag overhead via BenchmarkDotNet — verify <1ms for typical state sizes
 
 ### Implementation Notes
 - Tests go in `test/Frank.Tests/ConditionalRequestIntegrationTests.fs` (separate from unit tests in WP03)

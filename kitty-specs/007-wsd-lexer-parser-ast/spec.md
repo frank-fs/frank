@@ -106,13 +106,13 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - Messages with no parameters vs. empty parentheses vs. multiple parameters
 - Tabs vs. spaces for indentation (both accepted, not significant)
 - Windows (`\r\n`) and Unix (`\n`) line endings
-- Corrective examples: Each error type produces a corrective example following Amundsen's API design conventions. The catalogue of error-to-example mappings is defined in the data model (data-model.md) and includes: unrecognized arrow syntax (show four valid forms), undeclared participant (suggest participant declaration), unclosed group block (show matching end), malformed guard (show correct [guard: key=value] syntax).
+- Corrective examples: Each error type produces a corrective example following Amundsen's API design conventions. The error-to-example mappings are: (1) unrecognized arrow syntax — show the four valid forms: `->`, `-->`, `->-`, `-->-`; (2) undeclared participant — suggest adding a `participant X` declaration; (3) unclosed group block — show the matching `end` keyword; (4) malformed guard annotation — show correct `[guard: key=value]` syntax. (The full catalogue is also documented in data-model.md.)
 
 ## Requirements
 
 ### Functional Requirements
 
-- **FR-001**: System MUST tokenize all WSD syntax elements into a flat token stream: keywords (`participant`, `title`, `autonumber`, `note`, `over`, `left of`, `right of`, `alt`, `opt`, `loop`, `par`, `break`, `critical`, `ref`, `else`, `end`), arrows (`->`, `-->`, `->-`, `-->-`), identifiers, string literals, colons, parentheses, commas, and newlines
+- **FR-001**: System MUST tokenize all WSD syntax elements into a flat token stream: keywords (`participant`, `title`, `autonumber`, `note`, `over`, `left of`, `right of`, `alt`, `opt`, `loop`, `par`, `break`, `critical`, `ref`, `else`, `end`, `as`), arrows (`->`, `-->`, `->-`, `-->-`), identifiers, string literals, colons, parentheses, commas, left bracket, right bracket, equals sign, and newlines. Note: Multi-word keywords (`left of`, `right of`) require lookahead during tokenization.
 - **FR-002**: System MUST parse the token stream into a typed F# AST using discriminated unions, producing a `Diagram` record containing an ordered list of `DiagramElement` nodes
 - **FR-003**: System MUST support all four arrow types with correct semantic interpretation per Amundsen's approach:
   - `->` (solid forward): synchronous call, activates target
@@ -123,7 +123,7 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - **FR-005**: System MUST parse message parameters from parenthesized argument lists (e.g., `makeMove(position, value)`) into an ordered list of parameter names on the `Message` AST node
 - **FR-006**: System MUST parse grouping blocks (`alt`, `opt`, `loop`, `par`, `break`, `critical`, `ref`) with `else` branches and `end` terminators, supporting arbitrary nesting depth
 - **FR-007**: System MUST produce structured failure reports for unparseable input, each containing: source position (line and column), description of the error, what was expected, what was found, and a corrective example following Amundsen conventions
-- **FR-008**: System MUST collect multiple parse errors and warnings (up to a configurable limit, default: 50) rather than aborting on the first error. Errors represent hard failures; warnings represent valid WSD that may not map cleanly to Frank.Statecharts semantics.
+- **FR-008**: System MUST collect multiple parse errors and warnings (up to a configurable limit, default: 50) rather than aborting on the first error. Errors represent hard failures; warnings represent valid WSD that may not map cleanly to Frank.Statecharts semantics. The limit is configurable via the `maxErrors` parameter on the `parse` function; the `parseWsd` convenience function applies the default.
 - **FR-008a**: System MUST return a best-effort partial AST alongside collected warnings, allowing consumers to use successfully parsed elements even when some constructs produced warnings
 - **FR-009**: System MUST handle implicit participant declarations (participants introduced by first appearance in a message without an explicit `participant` line)
 - **FR-010**: System MUST ignore comment lines (starting with `#`) and blank lines
@@ -140,14 +140,14 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - **Note**: Position (`Over`/`LeftOf`/`RightOf`), target participant, content text, and optional guard annotation
 - **GuardAnnotation**: List of key-value string pairs extracted from `[guard: ...]` syntax
 - **Group**: Kind (`Alt`/`Opt`/`Loop`/`Par`/`Break`/`Critical`/`Ref`), condition text, ordered list of branches (each branch has optional condition and child elements)
-- **ParseFailure**: Source position (line, column), error description, expected/found tokens, corrective example text
+- **ParseFailure**: Source position (line, column), error description, expected/found descriptions (human-readable strings), corrective example text
 - **ParseResult**: Record containing a `Diagram` (always present, possibly partial -- never optional), a `ParseFailure list` for hard errors, and a `ParseWarning list` for ambiguities or WSD constructs that are valid but not a fit for Frank.Statecharts. Consumers check errors for fail-fast; warnings allow graceful degradation.
 
 ## Success Criteria
 
 ### Measurable Outcomes
 
-- **SC-001**: Parser correctly handles Amundsen's onboarding WSD example end-to-end, producing an AST where every element can be round-tripped back to equivalent WSD text
+- **SC-001**: Parser correctly handles Amundsen's onboarding WSD example end-to-end, producing an AST where every element can be verified by walking the AST and confirming every element's field values match the original input's participants, messages, arrow styles, directions, labels, parameters, notes, guards, and grouping blocks
 - **SC-002**: Parser correctly handles the tic-tac-toe WSD example with guard extensions, producing `GuardAnnotation` values on all annotated notes
 - **SC-003**: All four WSD arrow types produce correct `Message` AST nodes with the expected `ArrowStyle` and `Direction` values
 - **SC-004**: Grouping blocks nest correctly to at least 5 levels deep without error or performance degradation

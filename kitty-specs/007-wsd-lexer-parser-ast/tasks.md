@@ -27,7 +27,7 @@
 | T017 | Lexer tests (all token types, edge cases, position accuracy) | WP02 |
 | T018 | Core parser infrastructure (token stream cursor, peek/advance/expect helpers, error collection) | WP03 |
 | T019 | Parser - participant declarations (explicit `participant` lines + alias with `as`) | WP03 |
-| T020 | Parser - message parsing (all arrow styles, labels, parameter lists) | WP03 |
+| T020 | Parser - message parsing (all arrow styles, labels, parameter lists, implicit participant declaration on first message reference) | WP03 |
 | T021 | Parser - directive parsing (title, autonumber) | WP03 |
 | T022 | Parser - note parsing (over, left of, right of, content extraction) | WP03 |
 | T023 | Core parser tests (participants, messages, directives, notes) | WP03 |
@@ -46,10 +46,10 @@
 | T036 | Error limit configuration (configurable max errors, default 50) | WP06 |
 | T037 | Corrective example generation for each error type (Amundsen conventions) | WP06 |
 | T038 | Error/warning tests (structured failure reports, multiple errors, corrective examples, error limit cutoff at configured max) | WP06 |
-| T039 | Convenience parseWsd function + .fsproj updates + multi-target build verification | WP07 |
+| T039 | Convenience parseWsd function (parseWsd internally calls parse with maxErrors=50, the FR-008 default) + .fsproj updates + multi-target build verification | WP07 |
 | T040 | Round-trip tests - Amundsen onboarding WSD example (SC-001) | WP07 |
 | T041 | Round-trip tests - tic-tac-toe WSD with guard extensions (SC-002) | WP07 |
-| T042 | Edge case tests (Unicode, empty input, deep nesting 5+, duplicate participants, tabs vs spaces, Windows line endings) | WP07 |
+| T042 | Edge case tests (Unicode, empty input, deep nesting 5+, duplicate participants, tabs vs spaces, Windows line endings, empty parentheses makeMove() vs no parentheses makeMove distinction) | WP07 |
 | T043 | .fsproj Compile item ordering (Types.fs, Lexer.fs, GuardParser.fs, Parser.fs) | WP07 |
 | T044 | Multi-target build verification (net8.0/net9.0/net10.0) | WP07 |
 

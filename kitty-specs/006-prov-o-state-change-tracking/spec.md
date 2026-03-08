@@ -91,7 +91,7 @@ A Frank developer swaps the default in-memory provenance store for an external t
 - **Unauthenticated requests**: System agent (`prov:SoftwareAgent`) is used when no `ClaimsPrincipal` is available or the principal has no identity claims.
 - **Failed state transitions**: Provenance records are NOT created for failed transitions (guard-blocked, invalid transition). Provenance tracks what happened, not what was attempted.
 - **Concurrent mutations**: The MailboxProcessor-backed store serializes writes, ensuring provenance records have consistent ordering even under concurrent access.
-- **Memory pressure**: The default in-memory store must support a configurable retention policy (max record count or time window) to prevent unbounded growth. Default: 10,000 records with oldest-first eviction.
+- **Memory pressure**: The default in-memory store must support a configurable retention policy (max record count) to prevent unbounded growth. Default: 10,000 records with oldest-first eviction.
 - **Provenance of provenance (meta-provenance)**: Out of scope for this feature. The provenance system does not record provenance of its own operations.
 - **Resource without statecharts**: Non-stateful resources do not participate in provenance recording. Provenance is scoped to `statefulResource` endpoints with `onTransition` hooks.
 - **Store disposal during requests**: The provenance observer must handle `ObjectDisposedException` gracefully if the store is disposed while transitions are in-flight.
@@ -102,15 +102,15 @@ A Frank developer swaps the default in-memory provenance store for an external t
 
 - **FR-001**: System MUST subscribe to `onTransition` hooks from Frank.Statecharts to capture state change events as the provenance unit.
 - **FR-002**: System MUST produce a `ProvenanceRecord` for every successful state transition containing `prov:Agent`, `prov:Activity`, and `prov:Entity` assertions.
-- **FR-003**: System MUST extract agent identity from `ClaimsPrincipal` when available, falling back to a system agent (`prov:SoftwareAgent`) for unauthenticated requests.
+- **FR-003**: System MUST extract agent identity from `ClaimsPrincipal` when available, falling back to a system identifier for unauthenticated requests.
 - **FR-004**: System MUST capture pre-transition state as `prov:Entity` referenced via `prov:used` and post-transition state as `prov:Entity` referenced via `prov:wasGeneratedBy`.
-- **FR-005**: System MUST record `prov:Activity` with `prov:startedAtTime` and `prov:endedAtTime` timestamps derived from the transition event.
+- **FR-005**: System MUST record `prov:Activity` with `prov:startedAtTime` derived from the HTTP request timestamp (`HttpContext`) and `prov:endedAtTime` derived from the `TransitionEvent` timestamp.
 - **FR-006**: System MUST associate activities with their triggering HTTP method and resource URI via `prov:wasAssociatedWith` (agent) and `prov:used` (input entity).
-- **FR-007**: System MUST provide `IProvenanceStore` interface with `Append`, `QueryByResource`, `QueryByAgent`, and `QueryByTimeRange` operations.
+- **FR-007**: System MUST provide `IProvenanceStore` interface with `Append`, `QueryByResource`, `QueryByAgent`, and `QueryByTimeRange` operations. The interface inherits `IDisposable` (see FR-015).
 - **FR-008**: System MUST provide a `MailboxProcessor`-backed default `IProvenanceStore` implementation with serialized append and concurrent-safe reads.
 - **FR-009**: System MUST support a configurable retention policy on the default in-memory store (max record count, default 10,000) with oldest-first eviction.
-- **FR-010**: System MUST serve provenance via content negotiation on the resource URI itself using custom `application/vnd.frank.provenance+*` media types, integrated with Frank.LinkedData.
-- **FR-011**: System MUST provide `useProvenance` custom operation on `WebHostBuilder` for DI registration and `onTransition` subscription setup.
+- **FR-010**: System MUST serve provenance via content negotiation on the resource URI itself using custom `application/vnd.frank.provenance+*` media types, integrated with Frank.LinkedData. Supported media types: `application/vnd.frank.provenance+turtle` (Turtle), `application/vnd.frank.provenance+json` (JSON-LD), `application/vnd.frank.provenance+xml` (RDF/XML). Provenance middleware MUST be registered before Frank.LinkedData middleware in the pipeline.
+- **FR-011**: System MUST provide `useProvenance` as a computation expression builder on `WebHostBuilder` for DI registration, `onTransition` subscription setup, and configuration options (e.g., `maxRecords`).
 - **FR-012**: System MUST classify agents as `prov:Person` (authenticated human), `prov:SoftwareAgent` (system/unauthenticated), or LLM-specific subclass based on available identity metadata. LLM classification is determined by the presence of an X-Agent-Type request header with value `llm`.
 - **FR-013**: System MUST NOT record provenance for failed transitions (guard-blocked or invalid).
 - **FR-014**: System MUST use W3C PROV-O namespace (`http://www.w3.org/ns/prov#`) for all provenance vocabulary terms.
@@ -125,6 +125,7 @@ A Frank developer swaps the default in-memory provenance store for an external t
 - **ProvenanceGraph**: A queryable collection of `ProvenanceRecord` instances for a given resource or scope. Serializable to RDF via Frank.LinkedData formatters.
 - **IProvenanceStore**: Persistence abstraction with `Append`, `QueryByResource`, `QueryByAgent`, `QueryByTimeRange`, and `Dispose`. Pluggable via DI.
 - **MailboxProcessorProvenanceStore**: Default in-memory `IProvenanceStore` implementation using `MailboxProcessor` for serialized writes and configurable retention.
+- **TransitionEvent**: Event raised by `onTransition` hooks containing `InstanceId`, `ResourceUri`, `PreviousState`, `NewState`, `Event`, `Timestamp`, `User`, and `HttpMethod`.
 
 ## Success Criteria
 

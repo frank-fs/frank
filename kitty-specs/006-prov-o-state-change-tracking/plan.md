@@ -153,12 +153,12 @@ WP01: Project Scaffold + ProvVocabulary + Types
   │               │
   │               └──> WP07: WebHostBuilderExtensions + Integration
   │
-  └──> WP05: TransitionObserver                          (depends: WP01)
+  └──> WP05: TransitionObserver                          (depends: WP01, WP02)
 ```
 
 ### Parallelism Opportunities
 
-- **WP02, WP03, and WP05** can all proceed in parallel after WP01 (store, graph builder, and observer are independent)
+- **WP02 and WP03** can proceed in parallel after WP01; **WP05** depends on WP01 and WP02 (needs `IProvenanceStore` interface)
 - **WP04** depends on both WP02 and WP03
 - **WP06** depends on WP03
 - **WP07** is the convergence point, depending on WP04 and WP06

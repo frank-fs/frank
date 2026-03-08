@@ -153,7 +153,7 @@
 - T026 (tests) depends on both but can be scaffolded early
 
 ### Dependencies
-- Depends on WP01 (types), WP03 (validator produces ValidationReport)
+- Depends on WP01 (types), WP02 (shape derivation), WP03 (validator produces ValidationReport)
 
 ### Risks & Mitigations
 - Frank.LinkedData content negotiation API surface: verify `IGraph` serialization is exposed as a public API
@@ -248,6 +248,7 @@
 - [ ] T040 Create `src/Frank.Validation/WebHostBuilderExtensions.fs` with `useValidation` extension
 - [ ] T041 Implement shape cache initialization at startup (derive all shapes from ValidationMarker metadata)
 - [ ] T042 Implement response validation opt-in (diagnostic mode: validate handler return types, log violations, do not block)
+- [ ] T042b Create test verifying response validation logs warning but does not block response when output shape is violated
 
 ### Implementation Notes
 - Follow `Frank.Auth.ResourceBuilderExtensions` and `Frank.LinkedData.ResourceBuilderExtensions` patterns exactly
@@ -286,6 +287,8 @@
 - [ ] T047 Test capability-dependent shapes: admin vs. regular user with same request body
 - [ ] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
 - [ ] T049 Test edge cases: recursive types, nested records, empty body, generic types, non-derivable handler types
+- [ ] T049b Integration test: handler returns invalid response data with response validation enabled — warning logged, response delivered unmodified
+- [ ] T049c Benchmark validation overhead via BenchmarkDotNet — verify <1ms for shapes with 20 properties
 
 ### Implementation Notes
 - Use ASP.NET Core TestHost (`Microsoft.AspNetCore.TestHost`) like existing Frank tests
@@ -323,7 +326,7 @@ WP01 (Scaffold + Types) ──> WP02 (Type Mapping + Derivation) ──> WP03 (V
          └──────────────────────────> WP08 (Integration Tests) <── all prior WPs
 ```
 
-- **Sequence**: WP01 -> WP02 -> (WP03 || WP05 || WP06) -> WP04 -> WP07 -> WP08
+- **Sequence**: WP01 -> WP02 -> WP03 -> WP04 -> WP07 -> WP08 (WP05 and WP06 parallel with WP03, feed into WP07)
 - **Parallelization**: WP03, WP05, and WP06 can run in parallel after WP02 completes. WP04 can start after WP03.
 - **Critical Path**: WP01 -> WP02 -> WP03 -> WP04 -> WP07 -> WP08
 - **MVP Scope**: WP01 + WP02 + WP03 + WP04 + WP07 (core validation without capabilities or custom constraints)
@@ -371,11 +374,13 @@ WP01 (Scaffold + Types) ──> WP02 (Type Mapping + Derivation) ──> WP03 (V
 | T035 | SPARQL cross-field constraints | WP06 | P2 | No |
 | T036 | ShapeMergerTests.fs | WP06 | P2 | Yes |
 | T037 | ResourceBuilderExtensions.fs (validate) | WP07 | P1 | Yes |
+| T037b | Unit test verifying validate CE operation adds ValidationMarker to endpoint metadata | WP07 | P1 | Yes |
 | T038 | customConstraint CE operation | WP07 | P1 | Yes |
 | T039 | validateWithCapabilities CE operation | WP07 | P1 | Yes |
 | T040 | WebHostBuilderExtensions.fs (useValidation) | WP07 | P1 | Yes |
 | T041 | Shape cache initialization at startup | WP07 | P1 | No |
 | T042 | Response validation opt-in (diagnostic mode) | WP07 | P1 | No |
+| T042b | Test response validation logs warning but does not block response | WP07 | P1 | Yes |
 | T043 | IntegrationTests.fs (TestHost setup) | WP08 | P1 | No |
 | T044 | Valid request passes to handler | WP08 | P1 | Yes |
 | T045 | Invalid request returns 422 | WP08 | P1 | Yes |
@@ -383,3 +388,5 @@ WP01 (Scaffold + Types) ──> WP02 (Type Mapping + Derivation) ──> WP03 (V
 | T047 | Capability-dependent shape tests | WP08 | P1 | Yes |
 | T048 | Custom constraint tests | WP08 | P1 | Yes |
 | T049 | Edge case tests (recursive, generic, empty body) | WP08 | P1 | Yes |
+| T049b | Integration test: invalid response with response validation — warning logged, response unmodified | WP08 | P1 | Yes |
+| T049c | Benchmark validation overhead via BenchmarkDotNet — verify <1ms for 20-property shapes | WP08 | P1 | Yes |

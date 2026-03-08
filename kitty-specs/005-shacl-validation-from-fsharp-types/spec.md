@@ -56,6 +56,8 @@ When a client sends a POST or PUT request to a validated resource, the Frank.Val
 2. **Given** a validated resource expecting `quantity: int`, **When** a POST arrives with `quantity: "abc"`, **Then** the middleware returns a validation failure citing a datatype constraint violation.
 3. **Given** a validated resource with a DU-constrained field `status: OrderStatus`, **When** a POST arrives with `status: "InvalidValue"`, **Then** the middleware returns a validation failure citing an sh:in constraint violation.
 4. **Given** a valid request that satisfies all SHACL constraints, **When** it passes through validation, **Then** the handler receives the deserialized, validated data and executes normally.
+5. **Given** a validated resource expecting `status: OrderStatus` via query parameter, **When** a GET arrives with `?status=InvalidValue`, **Then** the middleware returns a validation failure citing an sh:in constraint violation.
+6. **Given** a valid query parameter that satisfies all constraints, **When** a GET passes through validation, **Then** the handler executes normally.
 
 ---
 
@@ -69,7 +71,7 @@ When validation fails, the response body is a SHACL ValidationReport containing 
 
 **Acceptance Scenarios**:
 
-1. **Given** a request with three distinct violations, **When** validation fails, **Then** the ValidationReport contains exactly three ValidationResult entries, each with sh:focusNode, sh:resultPath, sh:value (if applicable), and sh:resultMessage.
+1. **Given** a request with three distinct violations, **When** validation fails, **Then** the ValidationReport contains exactly three ValidationResult entries, each with the fields specified in FR-010.
 2. **Given** an invalid request and a client sending `Accept: application/ld+json`, **When** the violation response is returned, **Then** it is serialized as a JSON-LD SHACL ValidationReport via Frank.LinkedData.
 3. **Given** an invalid request and a client sending `Accept: application/json`, **When** the violation response is returned, **Then** it is serialized as an RFC 9457 Problem Details response with violation details in the `errors` extension member.
 4. **Given** a violation on a nested field (e.g., `customer.address.zipCode`), **Then** the sh:resultPath reflects the full property path from the root node.
@@ -142,12 +144,12 @@ A Frank developer enables response validation as a diagnostic tool to verify tha
 - **FR-002**: System MUST derive sh:minCount 1 for required fields and sh:minCount 0 for `option`-wrapped fields.
 - **FR-003**: System MUST derive sh:in constraints from F# discriminated union types used as field types, listing each case name as an allowed value.
 - **FR-004**: System MUST derive nested sh:node references for record types containing other record types, producing a separate NodeShape for each nested type.
-- **FR-005**: System MUST handle recursive/self-referential types by detecting cycles and limiting derivation depth (configurable, default 5).
+- **FR-005**: System MUST handle recursive/self-referential types by detecting cycles and limiting derivation depth, configurable via the maxDerivationDepth parameter on deriveShape, default 5.
 - **FR-006**: System MUST derive sh:or constraints for discriminated unions with data payloads, producing a separate NodeShape per case.
 - **FR-007**: System MUST expand generic type parameters at the point of use, producing concrete NodeShapes for each instantiation.
 - **FR-008**: System MUST validate incoming request bodies (POST/PUT/PATCH) and GET query parameters against derived shapes after Frank.Auth authorization and before handler dispatch in the middleware pipeline.
 - **FR-009**: System MUST short-circuit with a 422 Unprocessable Content response when validation fails, preventing the handler from executing.
-- **FR-010**: System MUST produce a SHACL ValidationReport for constraint violations, containing one sh:ValidationResult per violation with sh:focusNode, sh:resultPath, sh:value, sh:sourceConstraintComponent, and sh:resultMessage.
+- **FR-010**: System MUST produce a SHACL ValidationReport for constraint violations, containing one sh:ValidationResult per violation with sh:focusNode, sh:resultPath, sh:value, sh:sourceConstraintComponent, and sh:resultMessage. sh:value is included for datatype, pattern, in, and node constraint violations; omitted for minCount/maxCount cardinality violations.
 - **FR-011**: System MUST content-negotiate violation responses via Frank.LinkedData -- serving SHACL ValidationReport as JSON-LD, Turtle, or RDF/XML for semantic clients.
 - **FR-012**: System MUST serve RFC 9457 Problem Details JSON for non-semantic clients (Accept: application/json or no semantic Accept header).
 - **FR-013**: System MUST support capability-dependent shape selection, where the active SHACL shape varies based on the authenticated principal's Frank.Auth capabilities.
@@ -157,6 +159,7 @@ A Frank developer enables response validation as a diagnostic tool to verify tha
 - **FR-017**: System MUST skip validation for handlers whose input type is not a derivable domain type (e.g., `HttpContext`, `HttpRequest`), with a startup warning if validation was explicitly enabled on such a resource.
 - **FR-018**: System MUST provide a `validate` custom operation on the `ResourceBuilder` computation expression, following the same extension pattern as Frank.Auth and Frank.LinkedData.
 - **FR-019**: System MUST support response validation (postconditions) as an opt-in diagnostic mode, validating handler return types against output shapes and logging violations without blocking the response.
+- **FR-020**: System MUST derive sh:minCount/sh:maxCount constraints for F# collection types (list, array, seq) at the collection level, using the inner type's datatype for individual items.
 
 ### Key Entities
 
@@ -164,8 +167,9 @@ A Frank developer enables response validation as a diagnostic tool to verify tha
 - **PropertyShape**: A SHACL property shape within a NodeShape, corresponding to a single field of an F# record. Carries datatype, cardinality (minCount/maxCount), and optional value constraints (sh:in, sh:pattern, sh:node for nested types).
 - **ValidationReport**: A W3C SHACL ValidationReport produced when request data violates one or more constraints. Contains the conformance status (sh:conforms) and a collection of ValidationResult entries. Serializable via Frank.LinkedData or as RFC 9457 Problem Details.
 - **ValidationResult**: A single constraint violation within a ValidationReport. Identifies the focus node (the data being validated), the result path (which property failed), the offending value, the source constraint component, and a human-readable message.
-- **ShapeDerivation**: The compile-time/startup-time process that maps F# types to SHACL shapes. Handles records, discriminated unions, option types, collections, nested types, recursive types, and generic type instantiations.
+- **ShapeDerivation**: The startup-time process that maps F# types to SHACL shapes. Handles records, discriminated unions, option types, collections, nested types, recursive types, and generic type instantiations.
 - **ShapeResolver**: The runtime component that selects the appropriate SHACL shape for a given request, considering capability-dependent overrides from Frank.Auth. Falls back to the base auto-derived shape when no override applies.
+- **ConstraintKind**: Discriminated union enumerating constraint types (Datatype, MinCount, MaxCount, In, Pattern, Node, Or) used within PropertyShape.
 - **CustomConstraint**: A developer-provided SHACL constraint that extends an auto-derived shape. Additive only -- merged with the base shape at startup, with conflict detection.
 
 ## Success Criteria
@@ -174,12 +178,13 @@ A Frank developer enables response validation as a diagnostic tool to verify tha
 
 - **SC-001**: All F# record types used as handler input types produce valid, well-formed SHACL NodeShapes that pass W3C SHACL syntax validation.
 - **SC-002**: Invalid requests are rejected before reaching handler code -- a handler instrumented with a counter confirms zero invocations for requests that fail validation.
-- **SC-003**: Violation reports contain sufficient detail for clients to self-correct: every ValidationResult includes the field path, the violated constraint type, the offending value, and an actionable message.
-- **SC-004**: Validation middleware adds less than 1ms of overhead per request for shapes with up to 20 property constraints (measured via benchmark on reference hardware).
+- **SC-003**: Violation reports contain sufficient detail for clients to self-correct: every sh:resultMessage includes the field name, the violated constraint type, and the expected vs. actual value.
+- **SC-004**: Less than 1ms of overhead per request for shapes with up to 20 property constraints, measured as p95 latency delta with and without validation enabled.
 - **SC-005**: Content negotiation for violation responses works correctly -- JSON-LD, Turtle, RDF/XML, and Problem Details JSON all produce valid, parseable output for the same set of violations.
 - **SC-006**: Capability-dependent shape selection produces different validation outcomes for the same request body when sent by principals with different capabilities.
 - **SC-007**: Custom constraints are correctly merged with auto-derived shapes, and conflicting constraints are detected at startup (not at request time).
 - **SC-008**: Existing Frank applications without Frank.Validation experience zero behavioral changes -- all current tests continue to pass.
+- **SC-009**: Shape derivation for 50 types completes in under 500ms at application startup.
 
 ## Assumptions
 

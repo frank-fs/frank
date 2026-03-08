@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement automatic ETag generation and conditional request handling in Frank core (`src/Frank/`). The feature adds a framework-wide opt-in middleware that computes strong ETags from resource state via an `IETagProvider<'State, 'Context>` interface, caches them in a MailboxProcessor-backed store, and evaluates `If-None-Match` (304 Not Modified) and `If-Match` (412 Precondition Failed) headers per RFC 9110. A default `StatechartETagProvider` integrates with Frank.Statecharts' `IStateMachineStore` for statechart-backed resources, while custom `IETagProvider` implementations support plain resources. Resources without a provider are untouched -- no headers, no overhead.
+Implement automatic ETag generation and conditional request handling in Frank core (`src/Frank/`). The feature adds a framework-wide opt-in middleware that computes strong ETags from resource state via an `IETagProvider` interface, caches them in a MailboxProcessor-backed store, and evaluates `If-None-Match` (304 Not Modified) and `If-Match` (412 Precondition Failed) headers per RFC 9110. A default `StatechartETagProvider` integrates with Frank.Statecharts' `IStateMachineStore` for statechart-backed resources, while custom `IETagProvider` implementations support plain resources. Resources without a provider are untouched -- no headers, no overhead.
 
 ## Technical Context
 
@@ -30,7 +30,7 @@ Conditional requests are fundamental HTTP resource semantics (RFC 9110 Section 1
 
 ### II. Idiomatic F# -- PASS
 
-- `IETagProvider<'State, 'Context>` uses generic type parameters matching Frank.Statecharts conventions
+- IETagProvider uses a non-generic interface (ComputeETag: string -> Task<string option>). StatechartETagProvider<'State, 'Context> is generic at the class level.
 - ETag cache uses MailboxProcessor (idiomatic F# concurrency primitive)
 - Registration via computation expression custom operations on `WebHostBuilder`
 - Provider interface is pipeline-friendly: `('State * 'Context) -> string`
@@ -121,11 +121,13 @@ test/
 The following work streams are independent and can proceed in parallel:
 
 ### Stream A: Core ETag Types and Interface (ETag.fs)
-- `IETagProvider<'State, 'Context>` interface definition
+- `IETagProvider` interface definition. IETagProvider signature: ComputeETag: string -> Task<string option>
 - `ETagMetadata` endpoint metadata marker
 - `ETagFormat` module (quoting, strong ETag formatting per RFC 9110)
 - `ETagComparison` module (strong comparison, wildcard matching)
 - **No dependencies** on other new files
+
+Note: The `('State * 'Context) -> string` hashing pipeline refers to the concrete `StatechartETagProvider<'State, 'Context>` implementation, not the `IETagProvider` interface itself. The non-generic `IETagProvider` accepts a resource instance key string and returns an ETag.
 
 ### Stream B: ETag Cache (ETagCache.fs)
 - `ETagCacheMessage` discriminated union (message types for MailboxProcessor)
