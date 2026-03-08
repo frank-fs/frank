@@ -8,6 +8,7 @@ base_commit: 17eb0dbfb272896d5ae71c74b9a65ce93d4ddd26
 created_at: '2026-03-08T17:30:54.800354+00:00'
 subtasks: [T001, T002, T003, T004, T005, T006, T007, T008, T009, T010, T011]
 shell_pid: "98012"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -309,3 +310,4 @@ type ParseResult = {
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-08T17:30:54Z – claude-opus – shell_pid=98012 – lane=doing – Assigned agent via workflow command
