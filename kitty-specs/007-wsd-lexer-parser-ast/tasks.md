@@ -45,7 +45,7 @@
 | T035 | Error recovery - implicit participant warnings (first-appearance declaration) | WP06 |
 | T036 | Error limit configuration (configurable max errors, default 50) | WP06 |
 | T037 | Corrective example generation for each error type (Amundsen conventions) | WP06 |
-| T038 | Error/warning tests (structured failure reports, multiple errors, corrective examples) | WP06 |
+| T038 | Error/warning tests (structured failure reports, multiple errors, corrective examples, error limit cutoff at configured max) | WP06 |
 | T039 | Convenience parseWsd function + .fsproj updates + multi-target build verification | WP07 |
 | T040 | Round-trip tests - Amundsen onboarding WSD example (SC-001) | WP07 |
 | T041 | Round-trip tests - tic-tac-toe WSD with guard extensions (SC-002) | WP07 |

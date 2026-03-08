@@ -71,7 +71,7 @@
 
 ### Included Subtasks
 - [ ] T012 Create `src/Frank.Provenance/GraphBuilder.fs` with `toGraph : ProvenanceRecord list -> IGraph`
-- [ ] T013 Implement Activity triple construction (type, startedAtTime, endedAtTime, wasAssociatedWith, used, frank:httpMethod, frank:eventName)
+- [ ] T013 Implement Activity triple construction (type, startedAtTime, endedAtTime, wasAssociatedWith, used, frank:httpMethod, frank:eventName). Note: must include explicit `prov:wasAssociatedWith` triple construction linking activities to agents (FR-006).
 - [ ] T014 Implement Agent triple construction (type based on AgentType DU, prov:label)
 - [ ] T015 Implement Entity triple construction (type, wasGeneratedBy, wasAttributedTo, wasDerivedFrom, frank:stateName)
 - [ ] T016 Create `test/Frank.Provenance.Tests/GraphBuilderTests.fs` with triple validation tests
@@ -144,7 +144,7 @@
 ### Included Subtasks
 - [ ] T027 Implement `X-Agent-Type` and `X-Agent-Model` header extraction in TransitionObserver
 - [ ] T028 Implement `AgentType.LlmAgent` graph builder support (dual `prov:SoftwareAgent` + `frank:LlmAgent` typing)
-- [ ] T029 Implement ClaimsPrincipal identity extraction (ClaimTypes.Name, ClaimTypes.NameIdentifier)
+- [ ] T029 LLM-specific agent detection (X-Agent-Type/X-Agent-Model header extraction, extends WP05 base agent extraction)
 - [ ] T030 Create `test/Frank.Provenance.Tests/AgentTypeTests.fs` with discrimination tests for all three agent types
 
 ### Dependencies
@@ -185,22 +185,18 @@
 ```
 WP01 (Scaffold + Types)
   │
-  ├──> WP02 (Store)  ────────────────────────────────────────> WP07 (Extensions + Integration)
-  │       │                                                       ^
-  │       ├──> WP04 (Middleware) ─────────────────────────────────┤
-  │       │       ^                                               │
-  │       │       │                                               │
-  │       └──> WP05 (Observer) ──> WP06 (Agent Discrimination) ──┘
-  │               ^
-  ├──> WP03 (GraphBuilder) ──> WP04 (Middleware)
-  │                        └──> WP06 (Agent Discrimination)
+  ├──> WP02 (Store) ──────────────────> WP04 (Middleware) ──> WP07 (Extensions + Integration)
+  │                                        ^                     ^
+  ├──> WP03 (GraphBuilder) ───────────────┘                     │
+  │       │                                                      │
+  │       └──> WP06 (Agent Discrimination) ─────────────────────┘
   │
   └──> WP05 (Observer)
 ```
 
-- **Sequence**: WP01 -> (WP02 || WP03) -> (WP04 || WP05) -> WP06 -> WP07
-- **Parallelization**: WP02 and WP03 can run in parallel after WP01; WP04 and WP05 can partially overlap after their deps
-- **Critical Path**: WP01 -> WP03 -> WP04 -> WP07
+- **Sequence**: WP01 -> (WP02 || WP03 || WP05) -> (WP04, WP06) -> WP07
+- **Parallelization**: WP02, WP03, and WP05 can all run in parallel after WP01; WP04 and WP06 can partially overlap
+- **Critical Path**: WP01 -> WP02 -> WP04 -> WP07
 
 ---
 
@@ -220,7 +216,7 @@ WP01 (Scaffold + Types)
 | T010 | IDisposable with drain | WP02 | P0 | No |
 | T011 | Store tests (append, query, retention, disposal) | WP02 | P0 | Yes |
 | T012 | GraphBuilder.toGraph function | WP03 | P1 | No |
-| T013 | Activity triple construction | WP03 | P1 | No |
+| T013 | Activity triple construction (incl. prov:wasAssociatedWith) | WP03 | P1 | No |
 | T014 | Agent triple construction | WP03 | P1 | No |
 | T015 | Entity triple construction | WP03 | P1 | No |
 | T016 | Graph builder tests | WP03 | P1 | Yes |
@@ -236,7 +232,7 @@ WP01 (Scaffold + Types)
 | T026 | Observer tests | WP05 | P1 | Yes |
 | T027 | X-Agent-Type/X-Agent-Model header extraction | WP06 | P2 | No |
 | T028 | LlmAgent dual-typing in graph builder | WP06 | P2 | No |
-| T029 | ClaimsPrincipal identity extraction | WP06 | P2 | No |
+| T029 | LLM-specific agent detection (header extraction) | WP06 | P2 | No |
 | T030 | Agent type discrimination tests | WP06 | P2 | Yes |
 | T031 | WebHostBuilderExtensions useProvenance | WP07 | P1 | No |
 | T032 | DI registration | WP07 | P1 | No |

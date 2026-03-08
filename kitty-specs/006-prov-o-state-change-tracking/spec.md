@@ -12,6 +12,8 @@
 ### Session 2026-03-07
 
 - Q: How is the provenance graph exposed to clients? → A: Via content negotiation on the resource URI itself using a custom `Accept` media type (e.g., `application/vnd.frank.provenance+json`, `application/vnd.frank.provenance+ld+json`). No separate `/provenance` sub-route. Aggregate cross-resource queries are deferred to Frank.Sparql (#78).
+- Q: What are the exact custom media type mappings? → A: application/vnd.frank.provenance+turtle → Turtle, application/vnd.frank.provenance+json → JSON-LD, application/vnd.frank.provenance+xml → RDF/XML.
+- Q: How are prov:startedAtTime and prov:endedAtTime derived? → A: The TransitionEvent carries a single timestamp (the moment the transition completes). prov:startedAtTime uses the HTTP request timestamp from HttpContext; prov:endedAtTime uses the TransitionEvent timestamp.
 
 ## Overview
 
@@ -109,7 +111,7 @@ A Frank developer swaps the default in-memory provenance store for an external t
 - **FR-009**: System MUST support a configurable retention policy on the default in-memory store (max record count, default 10,000) with oldest-first eviction.
 - **FR-010**: System MUST serve provenance via content negotiation on the resource URI itself using custom `application/vnd.frank.provenance+*` media types, integrated with Frank.LinkedData.
 - **FR-011**: System MUST provide `useProvenance` custom operation on `WebHostBuilder` for DI registration and `onTransition` subscription setup.
-- **FR-012**: System MUST classify agents as `prov:Person` (authenticated human), `prov:SoftwareAgent` (system/unauthenticated), or LLM-specific subclass based on available identity metadata.
+- **FR-012**: System MUST classify agents as `prov:Person` (authenticated human), `prov:SoftwareAgent` (system/unauthenticated), or LLM-specific subclass based on available identity metadata. LLM classification is determined by the presence of an X-Agent-Type request header with value `llm`.
 - **FR-013**: System MUST NOT record provenance for failed transitions (guard-blocked or invalid).
 - **FR-014**: System MUST use W3C PROV-O namespace (`http://www.w3.org/ns/prov#`) for all provenance vocabulary terms.
 - **FR-015**: System MUST implement `IDisposable` on the default provenance store with proper cleanup (drain pending appends, release memory).

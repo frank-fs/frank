@@ -19,6 +19,7 @@
 - Q: Does this compose with Frank.Auth? -> A: Yes. SHACL shapes can express capability preconditions -- e.g., a shape that constrains valid input differently based on the authenticated principal's capabilities.
 - Q: What HTTP status code for validation failures? → A: 422 Unprocessable Content (RFC 9110) — request is syntactically valid but violates semantic constraints.
 - Q: Does validation apply to request bodies only or also query parameters? → A: Both. Request bodies (POST/PUT/PATCH) and GET query parameters are validated against derived shapes.
+- Q: How are GET query parameters mapped to SHACL property paths? → A: Query parameter names map directly to property paths using the parameter name as the RDF predicate local name. Nested properties use dot notation (e.g., ?address.zipCode maps to sh:path address/zipCode).
 
 ---
 
@@ -105,6 +106,21 @@ A Frank developer extends an auto-derived shape with custom SHACL constraints th
 2. **Given** auto-derived shapes for `startDate: DateTimeOffset` and `endDate: DateTimeOffset`, **When** a custom cross-field constraint requiring `endDate > startDate` is added, **Then** requests where `endDate <= startDate` are rejected.
 3. **Given** a custom constraint added to a field that also has auto-derived constraints, **When** validation runs, **Then** both the auto-derived and custom constraints are evaluated, and violations from either source appear in the report.
 4. **Given** an attempt to define a custom constraint that contradicts an auto-derived constraint (e.g., making a required field optional), **When** the application starts, **Then** a startup error is raised identifying the conflict.
+
+---
+
+### User Story 6 -- Response Validation Diagnostic Mode (Priority: P4)
+
+A Frank developer enables response validation as a diagnostic tool to verify that handler return values conform to the expected output shape. This is opt-in, non-blocking, and logs violations without interfering with the response.
+
+**Why this priority**: Response validation is a development-time diagnostic, not a production enforcement mechanism. Core request validation must be solid first.
+
+**Independent Test**: Enable response validation on a resource, return data that violates the output shape from the handler, and verify a warning is logged but the response is delivered unmodified.
+
+**Acceptance Scenarios**:
+
+1. **Given** a validated resource with response validation enabled, **When** the handler returns data that violates the output shape, **Then** a warning is logged but the response is NOT blocked.
+2. **Given** response validation is not enabled (default), **When** the handler returns data, **Then** no output validation occurs.
 
 ---
 

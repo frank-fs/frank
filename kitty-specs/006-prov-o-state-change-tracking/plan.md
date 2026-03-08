@@ -139,34 +139,33 @@ test/
 ```
 WP01: Project Scaffold + ProvVocabulary + Types
   │
-  ├──> WP02: IProvenanceStore + MailboxProcessorStore  (depends: WP01 types)
+  ├──> WP02: IProvenanceStore + MailboxProcessorStore  (depends: WP01)
   │       │
-  │       └──> WP05: WebHostBuilderExtensions           (depends: WP02 store, WP04 middleware)
-  │
-  ├──> WP03: GraphBuilder (dotNetRdf)                   (depends: WP01 types + vocabulary)
-  │       │
-  │       └──> WP04: Middleware (content negotiation)    (depends: WP03 graph, WP02 store)
+  │       └──> WP04: Provenance Middleware              (depends: WP02, WP03)
   │               │
-  │               └──> WP05: WebHostBuilderExtensions
+  │               └──> WP07: WebHostBuilderExtensions + Integration  (depends: WP04, WP06)
   │
-  └──> WP06: TransitionObserver                          (depends: WP01 types, WP02 store)
-              │
-              └──> WP05: WebHostBuilderExtensions
-
-WP07: Integration Tests (TestHost)                       (depends: WP05)
+  ├──> WP03: GraphBuilder (dotNetRdf)                   (depends: WP01)
+  │       │
+  │       ├──> WP04: Provenance Middleware
+  │       │
+  │       └──> WP06: Agent Type Discrimination          (depends: WP03)
+  │               │
+  │               └──> WP07: WebHostBuilderExtensions + Integration
+  │
+  └──> WP05: TransitionObserver                          (depends: WP01)
 ```
 
 ### Parallelism Opportunities
 
-- **WP02 and WP03** can proceed in parallel after WP01 (store and graph builder are independent)
-- **WP06** can proceed in parallel with WP03/WP04 after WP02 is complete
+- **WP02, WP03, and WP05** can all proceed in parallel after WP01 (store, graph builder, and observer are independent)
 - **WP04** depends on both WP02 and WP03
-- **WP05** is the convergence point, wiring store + middleware + observer
-- **WP07** must wait for WP05 (full pipeline required for integration tests)
+- **WP06** depends on WP03
+- **WP07** is the convergence point, depending on WP04 and WP06
 
 ### Critical Path
 
-WP01 -> WP03 -> WP04 -> WP05 -> WP07
+WP01 -> WP02 -> WP04 -> WP07
 
 ## Complexity Tracking
 
