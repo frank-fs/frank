@@ -1,16 +1,20 @@
 ---
-work_package_id: "WP01"
-title: "Project Scaffold + ProvVocabulary + Core Types"
-lane: "planned"
+work_package_id: WP01
+title: Project Scaffold + ProvVocabulary + Core Types
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-002", "FR-012", "FR-014"]
-subtasks: ["T001", "T002", "T003", "T004", "T005", "T006"]
+base_branch: master
+base_commit: 9aa38215ad756a6530526dcd467907c32819df36
+created_at: '2026-03-08T17:30:50.626046+00:00'
+subtasks: [T001, T002, T003, T004, T005, T006]
+shell_pid: "97922"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-002, FR-012, FR-014]
 ---
 
 # Work Package Prompt: WP01 -- Project Scaffold + ProvVocabulary + Core Types
