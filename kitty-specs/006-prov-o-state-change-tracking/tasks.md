@@ -27,7 +27,7 @@
 - [x] T003 Create `src/Frank.Provenance/Types.fs` with `AgentType`, `ProvenanceAgent`, `ProvenanceActivity`, `ProvenanceEntity`, `ProvenanceRecord`, `ProvenanceGraph`, `ProvenanceStoreConfig`
 - [x] T004 Create `test/Frank.Provenance.Tests/Frank.Provenance.Tests.fsproj` and `Program.fs`
 - [x] T005 Create `test/Frank.Provenance.Tests/VocabularyTests.fs` with PROV-O URI correctness tests
-- [ ] T006 Create `test/Frank.Provenance.Tests/TypeTests.fs` with construction and pattern-matching tests
+- [x] T006 Create `test/Frank.Provenance.Tests/TypeTests.fs` with construction and pattern-matching tests
 
 ### Dependencies
 - None (starting package)
