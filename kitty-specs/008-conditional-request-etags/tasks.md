@@ -22,11 +22,11 @@
 **Requirement Refs**: FR-007, FR-011, FR-012, FR-013, FR-014
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank/ETag.fs` with `IETagProvider` and `IETagProviderFactory` interfaces
-- [ ] T002 Define `ETagMetadata` sealed class (endpoint metadata marker with ProviderKey and ResolveInstanceId)
-- [ ] T003 Implement `ETagFormat` module (quote, unquote, isWeak, computeFromBytes with SHA-256 truncated to 128 bits)
-- [ ] T004 Implement `ETagComparison` module (strongMatch, parseIfNoneMatch, parseIfMatch, anyMatch)
-- [ ] T005 Create `test/Frank.Tests/ETagTests.fs` with unit tests for ETagFormat and ETagComparison
+- [x] T001 Create `src/Frank/ETag.fs` with `IETagProvider` and `IETagProviderFactory` interfaces
+- [x] T002 Define `ETagMetadata` sealed class (endpoint metadata marker with ProviderKey and ResolveInstanceId)
+- [x] T003 Implement `ETagFormat` module (quote, unquote, isWeak, computeFromBytes with SHA-256 truncated to 128 bits)
+- [x] T004 Implement `ETagComparison` module (strongMatch, parseIfNoneMatch, parseIfMatch, anyMatch)
+- [x] T005 Create `test/Frank.Tests/ETagTests.fs` with unit tests for ETagFormat and ETagComparison
 
 ### Implementation Notes
 - All types live in a single file `ETag.fs` in `src/Frank/`
