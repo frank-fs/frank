@@ -266,6 +266,17 @@ webHost { useProvenance; configureProvenance { maxRecords 50_000 }; ... }
 - The quickstart.md shows `useProvenance { maxRecords 50_000 }` syntax -- try to match this
 - If CE nesting is too complex, a separate `configureProvenance` operation is acceptable
 
+**Implementation note**: The `useProvenance` CE supports optional configuration:
+```fsharp
+webHost {
+    useProvenance {
+        maxRecords 50_000
+    }
+    useStatecharts
+}
+```
+Default configuration uses 10,000 max records if no `maxRecords` is specified.
+
 ### Subtask T035 -- Create `IntegrationTests.fs` with full-pipeline TestHost tests
 
 **Purpose**: End-to-end tests verifying the complete provenance pipeline: transition -> record -> query -> response.

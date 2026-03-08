@@ -136,6 +136,8 @@ Recognize all four WSD arrow forms using longest-match semantics.
 
 ### T015: Punctuation, Identifiers, String Literals, Text Content
 
+> **Implementation note:** TextContent tokens are emitted in two contexts: (1) after a colon (for message labels, note content), and (2) after grouping block keywords (alt, opt, loop, par, break, critical, ref) — the condition text is everything after the keyword up to the newline, emitted as a single TextContent token.
+
 Handle all remaining token types.
 
 **Punctuation**: Single-character tokens: `:` (Colon), `(` (LeftParen), `)` (RightParen), `,` (Comma), `[` (LeftBracket), `]` (RightBracket), `=` (Equals).

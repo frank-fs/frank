@@ -4,6 +4,7 @@ title: Conditional Request Middleware
 lane: planned
 dependencies:
 - WP01
+- WP02
 subtasks: [T011, T012, T013, T014, T015, T016, T017]
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -11,7 +12,7 @@ history:
   agent: system
   shell_pid: ''
   action: Prompt generated via /spec-kitty.tasks
-requirement_refs: [FR-001, FR-003, FR-004, FR-005, FR-006, FR-011, FR-012, FR-013, FR-015]
+requirement_refs: [FR-001, FR-003, FR-004, FR-005, FR-006, FR-011, FR-012, FR-013, FR-015, FR-016]
 ---
 
 # Work Package Prompt: WP03 -- Conditional Request Middleware
@@ -133,6 +134,8 @@ type ConditionalRequestMiddleware(next: RequestDelegate,
 - The middleware uses constructor injection for `ETagCache`, `IETagProviderFactory`, and `ILogger`
 - The skeleton handles three pass-through cases: no endpoint, no ETagMetadata, no provider
 - The actual conditional logic (T012-T015) will be added inside the `Some provider` branch
+
+**Implementation note**: If `IETagProvider.ComputeETag` throws, log via `ILogger.LogError` before propagating the exception (Constitution Principle VII -- no silent exception swallowing).
 
 ### Subtask T012 -- Implement If-None-Match evaluation (304 Not Modified)
 

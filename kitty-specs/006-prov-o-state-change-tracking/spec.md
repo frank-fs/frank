@@ -5,7 +5,7 @@
 **Status**: Draft
 **GitHub Issue**: #77
 **Dependencies**: Frank.Statecharts (#87, complete), Frank.LinkedData (#75, complete)
-**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, and `HttpMethod: string` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
+**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, `HttpMethod: string`, and `Headers: Map<string, string>` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
 **Input**: Phase 2 of #80 (Semantic Metadata-Augmented Resources). Provenance layer consuming `onTransition` hooks from Frank.Statecharts.
 
 ## Clarifications
@@ -53,6 +53,7 @@ A client requests provenance for a resource by sending a GET to the same resourc
 2. **Given** the same resource, **When** a GET request with `Accept: application/vnd.frank.provenance+ld+json` arrives, **Then** the response contains valid JSON-LD with the `@context` including the PROV-O namespace.
 3. **Given** a resource with no provenance records, **When** the provenance media type is requested, **Then** an empty graph is returned (200 with empty collection, not 404).
 4. **Given** a standard `Accept: application/json` request, **When** it arrives at the resource URI, **Then** the normal resource representation is returned (not provenance).
+5. **Given** a `webHost` with both `useProvenance` and `useStatecharts`, **When** `useProvenance` is registered before `useStatecharts` in the pipeline, **Then** a startup warning is logged indicating provenance must be registered after statecharts.
 
 ---
 

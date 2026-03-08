@@ -264,6 +264,12 @@ module ReportSerializer =
 
 ---
 
+## Implementation Guidance
+
+**Content negotiation note**: Content negotiation precedence for violation responses: (1) If Accept includes `application/ld+json`, `text/turtle`, or `application/rdf+xml`, use Frank.LinkedData serialization for SHACL ValidationReport. (2) If Accept includes `application/problem+json` or `application/json`, use RFC 9457 Problem Details. (3) If Accept is `*/*` or absent, default to Problem Details JSON.
+
+---
+
 ## Test Strategy
 
 - Run `dotnet build` to verify compilation of ReportSerializer.fs

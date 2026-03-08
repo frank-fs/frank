@@ -4,6 +4,7 @@ title: Validator & Validation Middleware
 lane: planned
 dependencies:
 - WP01
+- WP02
 subtasks: [T015, T016, T017, T018, T019, T020, T021]
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -278,6 +279,8 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache) =
 
 **Files**: `src/Frank.Validation/ValidationMiddleware.fs`
 **Notes**: Not all shapes make sense for GET validation (e.g., deeply nested records). The middleware should validate whatever properties are present in the query string and skip properties that are not present (missing optional fields are allowed).
+
+**Implementation note**: Query parameters are deserialized using parameter name mapping: a parameter `name` maps to the record field `Name` (case-insensitive). Nested fields use dot notation in the query string (e.g., `?address.zipCode` maps to the `ZipCode` field of the nested `Address` record). Validation failure on any query parameter produces a validation error with resultPath indicating the parameter name. If the resource requires both body and query parameter validation, both are executed; a violation in either causes a 422 short-circuit.
 
 ### Subtask T020 -- Create `ValidatorTests.fs`
 

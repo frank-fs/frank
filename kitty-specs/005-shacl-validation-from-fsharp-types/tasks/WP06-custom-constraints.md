@@ -242,6 +242,16 @@ module ShapeMerger =
 **Files**: `src/Frank.Validation/ShapeMerger.fs`, `src/Frank.Validation/Validator.fs` (or `ShapeGraphBuilder.fs`)
 **Notes**: SPARQL-based SHACL constraints use ASK queries that return bindings for focus nodes violating the constraint. Example: `SELECT $this WHERE { $this <urn:frank:property:startDate> ?start . $this <urn:frank:property:endDate> ?end . FILTER (?end <= ?start) }`. dotNetRdf's SHACL engine evaluates these automatically during `ShapesGraph.Validate()`.
 
+**Implementation note**: SPARQL constraints must be ASK queries that return true when the constraint is satisfied. Syntax is validated at startup; invalid SPARQL raises `InvalidOperationException`. Example:
+```fsharp
+customConstraint "DateRange" (SparqlConstraint """
+  ASK WHERE {
+    $this :startDate ?start ; :endDate ?end .
+    FILTER (?end > ?start)
+  }
+""")
+```
+
 ### Subtask T036 -- Create `ShapeMergerTests.fs`
 
 **Purpose**: Verify constraint merging and conflict detection.
