@@ -8,6 +8,7 @@ base_commit: eb3ec1d134df7f725105e1203a7aaaf2a9a6b507
 created_at: '2026-03-08T17:30:46.117744+00:00'
 subtasks: [T001, T002, T003, T004, T005]
 shell_pid: "97836"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -397,3 +398,4 @@ let main args =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-08T17:30:46Z – claude-opus – shell_pid=97836 – lane=doing – Assigned agent via workflow command
