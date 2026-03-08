@@ -106,6 +106,7 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - Messages with no parameters vs. empty parentheses vs. multiple parameters
 - Tabs vs. spaces for indentation (both accepted, not significant)
 - Windows (`\r\n`) and Unix (`\n`) line endings
+- Corrective examples: Each error type produces a corrective example following Amundsen's API design conventions. The catalogue of error-to-example mappings is defined in the data model (data-model.md) and includes: unrecognized arrow syntax (show four valid forms), undeclared participant (suggest participant declaration), unclosed group block (show matching end), malformed guard (show correct [guard: key=value] syntax).
 
 ## Requirements
 
@@ -122,7 +123,7 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - **FR-005**: System MUST parse message parameters from parenthesized argument lists (e.g., `makeMove(position, value)`) into an ordered list of parameter names on the `Message` AST node
 - **FR-006**: System MUST parse grouping blocks (`alt`, `opt`, `loop`, `par`, `break`, `critical`, `ref`) with `else` branches and `end` terminators, supporting arbitrary nesting depth
 - **FR-007**: System MUST produce structured failure reports for unparseable input, each containing: source position (line and column), description of the error, what was expected, what was found, and a corrective example following Amundsen conventions
-- **FR-008**: System MUST collect multiple parse errors and warnings (up to a configurable limit) rather than aborting on the first error. Errors represent hard failures; warnings represent valid WSD that may not map cleanly to Frank.Statecharts semantics.
+- **FR-008**: System MUST collect multiple parse errors and warnings (up to a configurable limit, default: 50) rather than aborting on the first error. Errors represent hard failures; warnings represent valid WSD that may not map cleanly to Frank.Statecharts semantics.
 - **FR-008a**: System MUST return a best-effort partial AST alongside collected warnings, allowing consumers to use successfully parsed elements even when some constructs produced warnings
 - **FR-009**: System MUST handle implicit participant declarations (participants introduced by first appearance in a message without an explicit `participant` line)
 - **FR-010**: System MUST ignore comment lines (starting with `#`) and blank lines
@@ -140,7 +141,7 @@ A developer submits WSD text that cannot be parsed. Instead of a generic error, 
 - **GuardAnnotation**: List of key-value string pairs extracted from `[guard: ...]` syntax
 - **Group**: Kind (`Alt`/`Opt`/`Loop`/`Par`/`Break`/`Critical`/`Ref`), condition text, ordered list of branches (each branch has optional condition and child elements)
 - **ParseFailure**: Source position (line, column), error description, expected/found tokens, corrective example text
-- **ParseResult**: Record containing a best-effort `Diagram` (possibly partial), a `ParseFailure list` for hard errors, and a `ParseWarning list` for ambiguities or WSD constructs that are valid but not a fit for Frank.Statecharts. Consumers check errors for fail-fast; warnings allow graceful degradation.
+- **ParseResult**: Record containing a `Diagram` (always present, possibly partial -- never optional), a `ParseFailure list` for hard errors, and a `ParseWarning list` for ambiguities or WSD constructs that are valid but not a fit for Frank.Statecharts. Consumers check errors for fail-fast; warnings allow graceful degradation.
 
 ## Success Criteria
 

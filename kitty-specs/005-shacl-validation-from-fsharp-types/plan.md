@@ -142,26 +142,25 @@ test/
 ### Dependency Graph
 
 ```
-WP01: TypeMapping.fs          WP02: ShapeDerivation.fs
-  (F# type -> XSD)              (Type -> ShaclShape)
-         \                        /          \
-          \                      / depends     \
-           \                    /               \
-            v                  v                 v
-WP03: ShapeMerger.fs      WP04: Validator.fs   WP05: ShapeResolver.fs
-  (custom constraints)     (dotNetRdf SHACL)    (capability-dependent)
-            \                    |               /
-             \                   |              /
-              v                  v             v
-           WP06: ValidationMiddleware.fs + ReportSerializer.fs
-                 (pipeline integration, content negotiation)
-                          |
-                          v
-           WP07: ResourceBuilderExtensions.fs + WebHostBuilderExtensions.fs
-                 (CE custom operation, DI registration)
-                          |
-                          v
-           WP08: Integration tests (TestHost, end-to-end)
+WP01: Project Scaffold & Core Types
+         |
+         v
+WP02: Type Mapping & Shape Derivation
+         |
+         ├──> WP03: Validator & Middleware
+         |         |
+         |         v
+         |    WP04: Violation Reporting
+         |
+         ├──> WP05: Capability-Dependent Shapes
+         |
+         └──> WP06: Custom Constraints
+                    |
+                    v
+         WP07: Builder Extensions <── depends on WP02-WP06
+                    |
+                    v
+         WP08: Integration Tests <── depends on all prior WPs
 ```
 
 ### Parallelism Opportunities
@@ -173,7 +172,7 @@ WP03: ShapeMerger.fs      WP04: Validator.fs   WP05: ShapeResolver.fs
 
 ### Critical Path
 
-WP01 -> WP02 -> WP04 -> WP06 -> WP07 -> WP08
+WP01->WP02->WP03->WP04->WP07->WP08
 
 ## Complexity Tracking
 

@@ -95,7 +95,7 @@ A Frank developer uses plain `resource` (not `statefulResource`) but wants condi
 - **Wildcard `*` in conditional headers**: `If-None-Match: *` matches any existing ETag (resource exists). `If-Match: *` matches any existing resource.
 - **First request to a new resource instance**: ETag is computed from the machine's initial state -- there is always a state, even before explicit interaction.
 - **Hash collisions**: SHA-256 truncation makes collisions astronomically unlikely (birthday bound ~2^128). Not mitigated beyond hash quality.
-- **Race condition between ETag check and handler execution**: A state transition could occur between the conditional header check and the handler running. The MailboxProcessor serialization on state access mitigates this for single-instance access; cross-instance races are inherent to optimistic concurrency and result in a 412 on the next attempt.
+- **Race condition between ETag check and handler execution**: A state transition could occur between the conditional header check and the handler running. The MailboxProcessor serialization on state access mitigates this for single-instance access; cross-instance races are inherent to optimistic concurrency and result in a 412 on the next attempt. The MailboxProcessor serialization ensures that within a single resource instance, a GET request between a state transition and cache update will either see the old ETag (resulting in a correct 200 with new state on the next request) or the new ETag. Cross-instance races are inherent to optimistic concurrency.
 - **ETag for DELETE responses**: After a successful DELETE, the resource may no longer have state. No ETag is set on the response.
 - **Cache invalidation on state transition**: When state transitions occur, the ETag cache entry for that resource instance must be invalidated or updated atomically with the state change.
 - **Opted-in resource with conditional headers from a different resource**: `If-Match`/`If-None-Match` ETags are scoped to the resource URI. The middleware only compares against the ETag for the resource being requested, not across resources.
@@ -110,9 +110,9 @@ A Frank developer uses plain `resource` (not `statefulResource`) but wants condi
 - **FR-004**: System MUST return 304 Not Modified when a GET request to an ETag-enabled resource includes `If-None-Match` matching the current ETag
 - **FR-005**: System MUST return 412 Precondition Failed when a mutation request (POST, PUT, DELETE) to an ETag-enabled resource includes `If-Match` that does not match the current ETag
 - **FR-006**: System MUST process requests normally when no conditional headers are present, regardless of ETag middleware registration
-- **FR-007**: System MUST expose an `IETagProvider<'State, 'Context>` interface for custom ETag computation from arbitrary state sources
-- **FR-008**: System MUST provide a default `IETagProvider` implementation for statechart-backed resources that hashes the current `('State * 'Context)` pair
-- **FR-009**: System MUST use a MailboxProcessor-backed cache for ETag-to-state mapping with serialized access (consistent with Frank.Statecharts pattern)
+- **FR-007**: System MUST expose a non-generic `IETagProvider` interface (accepts a resource instance key string, returns an ETag) for custom ETag computation from arbitrary state sources. Generic type parameters exist only on concrete implementations (e.g., `StatechartETagProvider<'State, 'Context>`), not on the interface itself. System MUST also expose an `IETagProviderFactory` abstraction that resolves the appropriate `IETagProvider` for a given resource endpoint, registered in DI and consumed by the `ConditionalRequestMiddleware`
+- **FR-008**: System MUST provide a default `StatechartETagProvider<'State, 'Context>` that implements the non-generic `IETagProvider` interface, hashing the current `('State * 'Context)` pair using stable structural hashing
+- **FR-009**: System MUST use a MailboxProcessor-backed cache for resource-instance-to-ETag mapping with serialized access (consistent with Frank.Statecharts pattern)
 - **FR-010**: ETag value MUST change when resource state transitions occur
 - **FR-011**: System MUST support multiple ETags in `If-None-Match` headers (comma-separated per RFC 9110)
 - **FR-012**: System MUST support wildcard `*` in both `If-None-Match` and `If-Match` headers per RFC 9110 semantics
@@ -122,10 +122,11 @@ A Frank developer uses plain `resource` (not `statefulResource`) but wants condi
 
 ### Key Entities
 
-- **IETagProvider<'State, 'Context>**: Abstraction for computing an ETag string from a `('State * 'Context)` pair. Implementations may hash statechart state, database version stamps, or any domain state.
+- **IETagProvider**: Non-generic abstraction for computing an ETag string from a resource instance key. Implementations may hash statechart state, database version stamps, or any domain state. Generic type parameters exist only on concrete implementations (e.g., `StatechartETagProvider<'State, 'Context>`), not on this interface.
+- **IETagProviderFactory**: Factory abstraction that resolves the appropriate `IETagProvider` for a given resource endpoint. Registered in DI and consumed by the `ConditionalRequestMiddleware` to obtain per-resource ETag providers.
 - **ConditionalRequestMiddleware**: ASP.NET Core middleware that intercepts requests to ETag-enabled resources, evaluates conditional headers (`If-Match`, `If-None-Match`) against current ETags, and short-circuits with 304/412 when appropriate. Passes through non-ETag-enabled resources untouched.
 - **ETagCache**: MailboxProcessor-backed concurrent cache mapping resource instance identifiers to their current ETag values. Serializes access to prevent races.
-- **StatechartETagProvider**: Default `IETagProvider` implementation for statechart-backed resources that hashes the `('State * 'Context)` pair using stable structural hashing.
+- **StatechartETagProvider<'State, 'Context>**: Default `IETagProvider` implementation for statechart-backed resources that hashes the `('State * 'Context)` pair using stable structural hashing.
 - **ETagMetadata**: Endpoint metadata marker indicating a resource has an available `IETagProvider` for conditional request processing. Absence of this metadata means the resource does not participate.
 
 ## Success Criteria
@@ -136,7 +137,7 @@ A Frank developer uses plain `resource` (not `statefulResource`) but wants condi
 - **SC-002**: GET responses to non-ETag-enabled resources contain no `ETag` header and experience zero overhead from the middleware
 - **SC-003**: Conditional GET with matching `If-None-Match` returns 304 Not Modified with no body, reducing bandwidth for unchanged resources
 - **SC-004**: Mutation requests with stale `If-Match` return 412 Precondition Failed, detecting concurrent modifications via optimistic concurrency
-- **SC-005**: ETag computation adds negligible overhead to request processing (< 1ms for typical state sizes)
+- **SC-005**: ETag computation adds negligible overhead to request processing (< 1ms for state pairs serialized under 1 KB)
 - **SC-006**: Custom `IETagProvider` implementations work identically to the built-in statechart provider for conditional request handling
 - **SC-007**: All ETags conform to RFC 9110 strong ETag format (quoted strings, deterministic, change on state transition)
 - **SC-008**: The ETag cache handles concurrent access without deadlocks or data races under load

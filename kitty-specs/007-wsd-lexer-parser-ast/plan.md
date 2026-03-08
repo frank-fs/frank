@@ -31,7 +31,7 @@ The WSD parser is a pure text-processing module with no HTTP surface. It produce
 ### II. Idiomatic F# -- PASS
 
 - AST modeled entirely with discriminated unions (`DiagramElement`, `ArrowStyle`, `Direction`, `NotePosition`, `GroupKind`)
-- `ParseResult` uses a record with `Diagram option` + `ParseFailure list` + `ParseWarning list` (no exceptions for parse errors)
+- `ParseResult` uses a record with `Diagram` (non-optional, always present, possibly partial) + `ParseFailure list` + `ParseWarning list` (no exceptions for parse errors)
 - Lexer produces an immutable token list; parser is a pure function from tokens to AST
 - Pipeline-friendly: `string -> ParseResult` top-level signature
 
