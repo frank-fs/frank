@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: AST types + token definitions
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 17eb0dbfb272896d5ae71c74b9a65ce93d4ddd26
@@ -311,3 +311,4 @@ type ParseResult = {
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-08T17:30:54Z – claude-opus – shell_pid=98012 – lane=doing – Assigned agent via workflow command
+- 2026-03-08T17:36:47Z – claude-opus – shell_pid=98012 – lane=for_review – All 11 subtasks (T001-T011) implemented: SourcePosition, TokenKind, ArrowStyle/Direction, Participant, Message, GuardAnnotation, Note/NotePosition, GroupKind/GroupBranch/Group, DiagramElement, Diagram, ParseFailure/ParseWarning/ParseResult. Builds clean on net8.0/net9.0/net10.0.
