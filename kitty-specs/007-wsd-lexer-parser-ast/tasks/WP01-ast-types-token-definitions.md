@@ -16,6 +16,7 @@ requirement_refs:
 - FR-003
 - FR-004
 - FR-007
+- FR-008a
 ---
 
 # WP01: AST Types + Token Definitions

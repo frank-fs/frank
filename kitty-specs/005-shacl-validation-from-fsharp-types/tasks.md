@@ -53,7 +53,7 @@
 **Independent Test**: Given various F# record and DU types, `deriveShape` produces correct `ShaclShape` with appropriate property shapes, datatypes, cardinality, and nested references.
 **Prompt**: `tasks/WP02-type-mapping-and-shape-derivation.md`
 **Estimated Size**: ~500 lines
-**Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-017
+**Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-017, FR-020
 
 ### Included Subtasks
 - [ ] T006 Create `src/Frank.Validation/TypeMapping.fs` with `mapType : Type -> XsdDatatype option` and `xsdUri : XsdDatatype -> Uri`
@@ -65,6 +65,7 @@
 - [ ] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
 - [ ] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
 - [ ] T014 Create `test/Frank.Validation.Tests/ShapeDerivationTests.fs` with derivation tests for records, DUs, nested/recursive types
+- [ ] T014b Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype)
 
 ### Implementation Notes
 - `TypeMapping.mapType` is a pure function: `Type -> XsdDatatype option` (None for non-primitive types that need sh:node)
@@ -351,6 +352,7 @@ WP01 (Scaffold + Types) ──> WP02 (Type Mapping + Derivation) ──> WP03 (V
 | T012 | Generic type expansion | WP02 | P0 | No |
 | T013 | TypeMappingTests.fs | WP02 | P0 | Yes |
 | T014 | ShapeDerivationTests.fs | WP02 | P0 | Yes |
+| T014b | Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype) | WP02 | P0 | No |
 | T015 | Validator.fs (SHACL validation execution) | WP03 | P0 | No |
 | T016 | ShaclShape -> ShapesGraph conversion | WP03 | P0 | No |
 | T017 | Request data -> IGraph conversion | WP03 | P0 | No |

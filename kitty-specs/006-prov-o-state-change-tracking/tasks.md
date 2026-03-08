@@ -111,14 +111,14 @@
 
 ## Work Package WP05: TransitionObserver (Priority: P1)
 
-**Goal**: Implement `TransitionObserver` that subscribes to `onTransition` hooks from Frank.Statecharts, extracts agent identity from `ClaimsPrincipal`, constructs `ProvenanceRecord` instances, and appends them to `IProvenanceStore`.
+**Goal**: Implement `TransitionObserver` that hooks into each stateful resource's `onTransition` CE operation individually (there is no global observable -- `onTransition` is per-resource on `StatefulResourceBuilder`), extracts agent identity from `ClaimsPrincipal`, constructs `ProvenanceRecord` instances, and appends them to `IProvenanceStore`.
 **Independent Test**: Given a mock `TransitionEvent`, the observer produces a correct `ProvenanceRecord` with proper agent classification and appends it to the store.
 **Prompt**: `tasks/WP05-transition-observer.md`
 **Estimated Size**: ~400 lines
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-013
 
 ### Included Subtasks
-- [ ] T022 Create `src/Frank.Provenance/TransitionObserver.fs` with `IObserver<TransitionEvent>` implementation
+- [ ] T022 Create `src/Frank.Provenance/TransitionObserver.fs` -- observer is injected per-resource via the `onTransition` CE operation on `StatefulResourceBuilder`, not subscribed to a global stream
 - [ ] T023 Implement agent extraction from `ClaimsPrincipal` (Person, SoftwareAgent, LlmAgent classification)
 - [ ] T024 Implement `ProvenanceRecord` construction from `TransitionEvent` (Activity, pre/post Entities, Agent)
 - [ ] T025 ObjectDisposedException and all other observer exceptions logged per Constitution VII — never silently discarded
@@ -156,7 +156,7 @@
 
 ## Work Package WP07: WebHostBuilderExtensions + Integration Tests (Priority: P1)
 
-**Goal**: Create `useProvenance` custom operation on `WebHostBuilder` for DI registration, onTransition subscription setup, and `ProvenanceSubscriptionManager` (IHostedService). Full end-to-end integration tests with TestHost.
+**Goal**: Create `useProvenance` custom operation on `WebHostBuilder` for DI registration, per-resource `onTransition` observer injection (since `onTransition` is per-resource on `StatefulResourceBuilder`, not a global observable), and `ProvenanceSubscriptionManager` (IHostedService) that iterates over all registered stateful resource endpoints to inject the observer. Full end-to-end integration tests with TestHost.
 **Independent Test**: `useProvenance` in a `webHost` CE registers all services; state transitions produce provenance records; custom store via DI receives all records.
 **Prompt**: `tasks/WP07-extensions-and-integration.md`
 **Estimated Size**: ~500 lines
@@ -165,7 +165,7 @@
 ### Included Subtasks
 - [ ] T030 Create `src/Frank.Provenance/WebHostBuilderExtensions.fs` with `useProvenance` custom operation
 - [ ] T031 Implement DI registration (IProvenanceStore singleton, TransitionObserver, ProvenanceSubscriptionManager)
-- [ ] T032 Implement `ProvenanceSubscriptionManager` as `IHostedService` (subscribe on start, dispose subscriptions on stop)
+- [ ] T032 Implement `ProvenanceSubscriptionManager` as `IHostedService` (iterate all registered stateful resource endpoints and inject observer via per-resource `onTransition` on start, dispose subscriptions on stop)
 - [ ] T033 Implement optional `ProvenanceStoreConfig` passthrough (`useProvenance { maxRecords 50_000 }`)
 - [ ] T034 Create `test/Frank.Provenance.Tests/IntegrationTests.fs` with full-pipeline TestHost tests
 - [ ] T035 Create `test/Frank.Provenance.Tests/CustomStoreTests.fs` with DI replacement tests

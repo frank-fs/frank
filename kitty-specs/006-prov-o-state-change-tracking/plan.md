@@ -10,6 +10,8 @@ Implement `Frank.Provenance`, a library that records W3C PROV-O provenance for e
 
 ## Technical Context
 
+**Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, and `HttpMethod: string` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.
+
 **Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core)
 **Primary Dependencies**: Frank (project reference), Frank.LinkedData (project reference), Frank.Statecharts (project reference), dotNetRdf.Core (NuGet)
 **Storage**: In-memory MailboxProcessor-backed store by default; `IProvenanceStore` interface for external stores
@@ -19,6 +21,7 @@ Implement `Frank.Provenance`, a library that records W3C PROV-O provenance for e
 **Performance Goals**: Sub-millisecond append and query for up to 10,000 records; less than 1ms overhead per request in the state transition pipeline
 **Constraints**: Configurable retention policy (default 10,000 records, oldest-first eviction); no external NuGet dependencies beyond dotNetRdf.Core
 **Scale/Scope**: Framework-wide provenance for all stateful resources; per-resource opt-in deferred to future enhancement
+**Subscription Model**: The `onTransition` CE operation is defined on `StatefulResourceBuilder` and applies per-resource. There is no global observable for all transitions. Provenance must hook into each resource's `onTransition` individually. The `ProvenanceSubscriptionManager` must iterate over all registered stateful resource endpoints and inject the observer via middleware or endpoint metadata, not subscribe to a single global stream.
 
 ## Constitution Check
 
@@ -175,6 +178,7 @@ No constitution violations requiring justification. The design adds one new libr
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
+| Frank.Statecharts `TransitionEvent` missing required fields | **High** | `TransitionEvent<'State, 'Event, 'Context>` currently lacks `InstanceId`, `ResourceUri`, and `HttpMethod`. These fields must be added to Frank.Statecharts before WP05 (TransitionObserver) can proceed. Coordinate with Statecharts maintainer. |
 | Frank.Statecharts API surface changes | Low | The `onTransition` CE operation and `IStateMachineStore.Subscribe` are implemented and stable on master. Pin to current API surface. |
 | dotNetRdf.Core version conflicts with Frank.LinkedData | Medium | Pin to same version as Frank.LinkedData; verify with multi-target build |
 | MailboxProcessor store memory pressure under high write volume | Low | Retention policy (10,000 records, oldest-first eviction) bounds memory; configurable via `useProvenance` |

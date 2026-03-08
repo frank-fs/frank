@@ -245,8 +245,9 @@ val tokenize: source: string -> Token list
 module internal Frank.Statecharts.Wsd.GuardParser
 
 /// Attempt to extract a guard annotation from note content text.
-/// Returns the guard (if found) and remaining content text.
-val tryParseGuard: content: string -> position: SourcePosition -> (GuardAnnotation option * string)
+/// Returns the guard (if found), remaining content text, and any
+/// diagnostics produced during guard parsing.
+val tryParseGuard: content: string -> position: SourcePosition -> (GuardAnnotation option * string * ParseFailure list * ParseWarning list)
 
 /// Wsd/Parser.fs
 module internal Frank.Statecharts.Wsd.Parser
