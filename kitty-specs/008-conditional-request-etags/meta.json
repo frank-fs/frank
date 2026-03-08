@@ -1,0 +1,9 @@
+{
+  "feature_number": "008",
+  "slug": "008-conditional-request-etags",
+  "feature_slug": "008-conditional-request-etags",
+  "friendly_name": "conditional request etags",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-08T02:38:51.296147+00:00"
+}
