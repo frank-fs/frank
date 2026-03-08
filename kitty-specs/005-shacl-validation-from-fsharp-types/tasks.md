@@ -22,11 +22,11 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-010
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Validation/Frank.Validation.fsproj` (multi-target net8.0;net9.0;net10.0)
-- [ ] T002 Create `src/Frank.Validation/Types.fs` with `XsdDatatype`, `PropertyShape`, `ShaclShape`, `ValidationSeverity`, `ValidationResult`, `ValidationReport`
-- [ ] T003 Create `src/Frank.Validation/Constraints.fs` with `ConstraintKind`, `CustomConstraint`, `ValidationMarker`, `ShapeOverride`, `ShapeResolverConfig`
-- [ ] T004 Create `test/Frank.Validation.Tests/Frank.Validation.Tests.fsproj` and `Program.fs`
-- [ ] T005 Create `test/Frank.Validation.Tests/TypeTests.fs` with unit tests for core types
+- [x] T001 Create `src/Frank.Validation/Frank.Validation.fsproj` (multi-target net8.0;net9.0;net10.0)
+- [x] T002 Create `src/Frank.Validation/Types.fs` with `XsdDatatype`, `PropertyShape`, `ShaclShape`, `ValidationSeverity`, `ValidationResult`, `ValidationReport`
+- [x] T003 Create `src/Frank.Validation/Constraints.fs` with `ConstraintKind`, `CustomConstraint`, `ValidationMarker`, `ShapeOverride`, `ShapeResolverConfig`
+- [x] T004 Create `test/Frank.Validation.Tests/Frank.Validation.Tests.fsproj` and `Program.fs`
+- [x] T005 Create `test/Frank.Validation.Tests/TypeTests.fs` with unit tests for core types
 
 ### Implementation Notes
 - Follow `src/Frank.Auth/Frank.Auth.fsproj` structure for project configuration
