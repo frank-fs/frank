@@ -119,9 +119,6 @@ src/
 │   ├── ValidationMiddleware.fs     # ASP.NET Core middleware (pipeline integration)
 │   ├── ResourceBuilderExtensions.fs # [<AutoOpen>] validate CE custom operation
 │   └── WebHostBuilderExtensions.fs  # [<AutoOpen>] useValidation extension
-│
-└── Frank.Auth/                     # Existing (guard context uses ClaimsPrincipal)
-
 test/
 └── Frank.Validation.Tests/         # NEW: Test project
     ├── Frank.Validation.Tests.fsproj  # Target: net10.0
@@ -165,7 +162,7 @@ WP02: Type Mapping & Shape Derivation
 
 ### Parallelism Opportunities
 
-- **WP01 + WP02**: TypeMapping and ShapeDerivation can be started concurrently (WP02 calls WP01 but can stub the mapping initially)
+- **WP01 -> WP02**: WP02 depends on WP01 (core types must exist before type mapping and shape derivation can be implemented)
 - **WP03 + WP04 + WP05**: ShapeMerger, Validator, and ShapeResolver are independent once WP02 is complete
 - **WP06 + WP07**: Middleware and CE extensions depend on WP03-05 but can be developed together
 - **WP08**: Integration tests require all prior WPs

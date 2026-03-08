@@ -46,7 +46,7 @@ The WSD parser has no ASP.NET Core dependency. It is a pure text parser consumed
 ### V. Performance Parity -- PASS
 
 - Hand-written recursive descent parser (no parser combinator overhead)
-- Lexer operates on `ReadOnlySpan<char>` or string slicing (no intermediate string allocations in tokenization)
+- Lexer operates on `ReadOnlySpan<char>` internally but produces a `Token list` as output (no intermediate string allocations in tokenization)
 - No external library overhead
 - SC-007 establishes the performance bar: 1000-line inputs without allocation pressure
 

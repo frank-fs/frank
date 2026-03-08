@@ -56,7 +56,7 @@ Final integration work package that ties all parser components together and vali
 
 ### T039: Convenience parseWsd Function
 
-Verify and finalize the `parseWsd` function that provides the one-call entry point.
+Verify and finalize the `parseWsd` function that provides the one-call entry point. `parseWsd` internally calls `parse` with `maxErrors=50` (the FR-008 default).
 
 **Signature**: `val parseWsd: source: string -> ParseResult`
 
@@ -69,7 +69,7 @@ let parseWsd (source: string) : ParseResult =
 
 This should already exist from WP03. Verify:
 - It calls `Lexer.tokenize` then `parse`
-- Default error limit is 50
+- Default error limit is 50 (FR-008 default)
 - It handles null/empty input gracefully (empty string → empty diagram, null → either empty diagram or ArgumentNullException — decide and document)
 
 **Additional convenience functions to consider**:

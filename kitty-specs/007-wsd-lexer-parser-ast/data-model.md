@@ -258,6 +258,16 @@ val parse: tokens: Token list -> maxErrors: int -> ParseResult
 val parseWsd: source: string -> ParseResult
 ```
 
+## Error-to-Corrective-Example Mapping
+
+| Error Type | Corrective Example |
+|------------|-------------------|
+| Unrecognized arrow syntax | Show four valid forms: `->`, `-->`, `->-`, `-->-` |
+| Undeclared participant | Suggest adding `participant X` declaration |
+| Unclosed group block | Show matching `end` keyword |
+| Malformed guard annotation | Show correct `[guard: key=value]` syntax |
+| Unknown keyword | List valid keywords |
+
 ## Entity Relationships
 
 ```
