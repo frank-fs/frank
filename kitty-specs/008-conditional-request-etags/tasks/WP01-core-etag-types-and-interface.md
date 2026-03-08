@@ -1,16 +1,20 @@
 ---
-work_package_id: "WP01"
-title: "Core ETag Types & Interface"
-lane: "planned"
+work_package_id: WP01
+title: Core ETag Types & Interface
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-007", "FR-011", "FR-012", "FR-013", "FR-014"]
-subtasks: ["T001", "T002", "T003", "T004", "T005"]
+base_branch: master
+base_commit: c08cbedce71702e173699650bcc6a50b87fa9ff3
+created_at: '2026-03-08T17:30:59.293617+00:00'
+subtasks: [T001, T002, T003, T004, T005]
+shell_pid: "98096"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-007, FR-011, FR-012, FR-013, FR-014]
 ---
 
 # Work Package Prompt: WP01 -- Core ETag Types & Interface
