@@ -22,6 +22,33 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
 | **Frank.Statecharts** | Application-level state machines for stateful hypermedia resources | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
+| **Frank.Statecharts** | Stateful resources with state machines, guards, and WSD parser | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
+| **Frank.Validation** | SHACL shape validation derived from F# types | [![NuGet](https://img.shields.io/nuget/v/Frank.Validation)](https://www.nuget.org/packages/Frank.Validation/) |
+| **Frank.Provenance** | PROV-O provenance tracking for resource state changes | [![NuGet](https://img.shields.io/nuget/v/Frank.Provenance)](https://www.nuget.org/packages/Frank.Provenance/) |
+
+### Package Dependency Graph
+
+```
+Frank (core)
+│   ETag / conditional request middleware
+│
+├── Frank.Auth
+│
+├── Frank.LinkedData ──────────── Frank
+│
+├── Frank.OpenApi ─────────────── Frank
+│
+├── Frank.Datastar ────────────── Frank
+│
+├── Frank.Statecharts ─────────── Frank
+│   └── WSD parser (internal)
+│
+├── Frank.Validation ──────────── Frank.LinkedData + Frank.Auth
+│
+├── Frank.Provenance ──────────── Frank.LinkedData + Frank.Statecharts
+│
+└── Frank.Sparql (planned) ────── Frank.LinkedData + Frank.Provenance
+```
 
 ---
 

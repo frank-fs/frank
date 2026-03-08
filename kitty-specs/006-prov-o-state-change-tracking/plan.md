@@ -1,108 +1,183 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Frank.Provenance (PROV-O State Change Tracking)
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `006-prov-o-state-change-tracking` | **Date**: 2026-03-07 | **Spec**: [spec.md](spec.md)
+**Input**: Phase 2 of #80 (Semantic Metadata-Augmented Resources). Provenance layer consuming `onTransition` hooks from Frank.Statecharts.
+**Research**: [research.md](research.md) | **Data Model**: [data-model.md](data-model.md)
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Implement `Frank.Provenance`, a library that records W3C PROV-O provenance for every successful state transition in Frank.Statecharts-managed resources. Subscribes to `onTransition` hooks, constructs provenance graphs (Agent, Activity, Entity) using dotNetRdf.Core, stores them in a MailboxProcessor-backed in-memory store (with pluggable `IProvenanceStore`), and serves provenance via content negotiation on resource URIs using custom `application/vnd.frank.provenance+*` media types through Frank.LinkedData. Agent type discrimination (Person, SoftwareAgent, LLM subclass) enriches audit trails. This unblocks the provenance layer for v7.3.0 milestone.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core)
+**Primary Dependencies**: Frank (project reference), Frank.LinkedData (project reference), Frank.Statecharts (project reference), dotNetRdf.Core (NuGet)
+**Storage**: In-memory MailboxProcessor-backed store by default; `IProvenanceStore` interface for external stores
+**Testing**: Expecto + ASP.NET Core TestHost (matching existing Frank test patterns)
+**Target Platform**: .NET multi-target library (net8.0;net9.0;net10.0)
+**Project Type**: Library extension for Frank
+**Performance Goals**: Sub-millisecond append and query for up to 10,000 records; less than 1ms overhead per request in the state transition pipeline
+**Constraints**: Configurable retention policy (default 10,000 records, oldest-first eviction); no external NuGet dependencies beyond dotNetRdf.Core
+**Scale/Scope**: Framework-wide provenance for all stateful resources; per-resource opt-in deferred to future enhancement
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+### I. Resource-Oriented Design -- PASS
+
+Provenance is served via content negotiation on the resource URI itself using custom `Accept` media types (`application/vnd.frank.provenance+turtle`, etc.). No separate `/provenance` sub-route is introduced. This preserves the resource as the primary abstraction -- provenance is an alternate representation of the resource, not a separate endpoint. The approach aligns with REST content negotiation semantics where the same resource can have multiple representations.
+
+### II. Idiomatic F# -- PASS
+
+- `useProvenance` is a computation expression custom operation on `WebHostBuilder`
+- `ProvenanceRecord`, `ProvenanceAgent`, `ProvenanceActivity`, `ProvenanceEntity` are immutable F# records
+- `AgentType` is a discriminated union (Person, SoftwareAgent, LlmAgent)
+- `IProvenanceStore` uses `Async`/`Task` for async operations
+- MailboxProcessor for serialized, lock-free concurrent access (idiomatic F# concurrency)
+- Pipeline-friendly query functions (`queryByResource`, `queryByAgent`, `queryByTimeRange`)
+
+### III. Library, Not Framework -- PASS
+
+Frank.Provenance is an opt-in library extension. Resources without `useProvenance` enabled have zero overhead. Non-stateful resources (`resource` CE instead of `statefulResource`) do not participate. No opinions on view engines, authentication systems, or data access. Users can swap the store implementation via DI without changing any other code.
+
+### IV. ASP.NET Core Native -- PASS
+
+- Uses `IServiceCollection` for DI registration (`IProvenanceStore`)
+- Middleware pattern follows Frank.LinkedData's established approach (endpoint metadata marker, `app.Use`)
+- `ClaimsPrincipal` from `HttpContext.User` for agent identity
+- Standard ASP.NET Core content negotiation via `Accept` header
+- `ILogger` for all observability (Constitution VII compliance)
+
+### V. Performance Parity -- PASS
+
+- MailboxProcessor per-message overhead: ~1-5us (negligible vs network latency)
+- Provenance recording is fire-and-forget from the transition hot path (MailboxProcessor `Post`, not `PostAndAsyncReply`)
+- No allocations in the request path beyond the provenance record construction
+- Read queries can proceed concurrently with writes (MailboxProcessor serializes writes only)
+- Retention policy prevents unbounded memory growth
+
+### VI. Resource Disposal Discipline -- PASS
+
+- `MailboxProcessorProvenanceStore` implements `IDisposable` with proper drain of pending appends
+- `IGraph` instances from dotNetRdf are created with `use` in middleware response serialization
+- Subscription to `onTransition` returns `IDisposable` -- stored and disposed during host shutdown
+- `ObjectDisposedException` handled gracefully in the provenance observer (spec edge case)
+
+### VII. No Silent Exception Swallowing -- PASS
+
+- Provenance middleware logs via `ILogger` on all error paths
+- Store append failures are logged (not silently dropped)
+- Content negotiation errors for provenance media types follow Frank.LinkedData's graduated exception handling (recoverable -> log + fallback, unrecoverable -> log + re-raise)
+- No bare `with _ ->` handlers in request-serving code
+
+### VIII. No Duplicated Logic -- PASS
+
+- RDF URI construction reuses `Frank.LinkedData.Rdf.RdfUriHelpers` (no duplication)
+- Content negotiation shared utilities from Frank.LinkedData are reused, not copied
+- PROV-O namespace constants defined once in a shared `ProvVocabulary` module
+- Graph serialization delegates to Frank.LinkedData's existing `writeRdf` function
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/006-prov-o-state-change-tracking/
+├── spec.md              # Feature specification
+├── plan.md              # This file
+├── research.md          # Research decisions and rationale
+├── data-model.md        # Entity model with F# type signatures
+└── quickstart.md        # Developer quickstart guide
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
 src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+├── Frank/                              # Existing core library
+│   └── Builder.fs                      # WebHostBuilder, WebHostSpec
+│
+├── Frank.LinkedData/                   # Existing LinkedData library (dependency)
+│   ├── Rdf/RdfUriHelpers.fs            # Reused for URI construction
+│   └── WebHostBuilderExtensions.fs     # Pattern reference for middleware + negotiation
+│
+├── Frank.Statecharts/                  # Existing Statecharts library (dependency)
+│   ├── Types.fs                        # TransitionEvent, onTransition hooks
+│   └── Store.fs                        # IStateMachineStore (subscription source)
+│
+├── Frank.Provenance/                   # NEW: Provenance library
+│   ├── Frank.Provenance.fsproj         # Multi-target: net8.0;net9.0;net10.0
+│   ├── ProvVocabulary.fs               # PROV-O namespace URIs and term constants
+│   ├── Types.fs                        # ProvenanceRecord, Agent, Activity, Entity, AgentType
+│   ├── Store.fs                        # IProvenanceStore interface
+│   ├── MailboxProcessorStore.fs        # Default in-memory store with retention
+│   ├── GraphBuilder.fs                 # ProvenanceRecord -> dotNetRdf IGraph construction
+│   ├── TransitionObserver.fs           # onTransition subscription -> ProvenanceRecord creation
+│   ├── Middleware.fs                    # Content negotiation for provenance media types
+│   └── WebHostBuilderExtensions.fs     # [<AutoOpen>] useProvenance custom operation
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+test/
+└── Frank.Provenance.Tests/             # NEW: Test project
+    ├── Frank.Provenance.Tests.fsproj   # Target: net10.0
+    ├── VocabularyTests.fs              # PROV-O URI correctness
+    ├── TypeTests.fs                    # ProvenanceRecord, AgentType construction
+    ├── StoreTests.fs                   # MailboxProcessorStore append, query, retention
+    ├── GraphBuilderTests.fs            # RDF graph construction validation
+    ├── TransitionObserverTests.fs      # Hook subscription and record creation
+    ├── MiddlewareTests.fs              # Content negotiation integration tests (TestHost)
+    ├── CustomStoreTests.fs             # IProvenanceStore DI replacement
+    └── Program.fs                      # Expecto entry point
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Single library project + single test project. Follows the same pattern as Frank.LinkedData, Frank.Auth, Frank.Statecharts, and Frank.OpenApi. The `ProvVocabulary` module is a shared constants module within the project, not a separate project, satisfying Constitution VIII without adding project complexity.
+
+## Parallel Work Analysis
+
+### Dependency Graph
+
+```
+WP01: Project Scaffold + ProvVocabulary + Types
+  │
+  ├──> WP02: IProvenanceStore + MailboxProcessorStore  (depends: WP01 types)
+  │       │
+  │       └──> WP05: WebHostBuilderExtensions           (depends: WP02 store, WP04 middleware)
+  │
+  ├──> WP03: GraphBuilder (dotNetRdf)                   (depends: WP01 types + vocabulary)
+  │       │
+  │       └──> WP04: Middleware (content negotiation)    (depends: WP03 graph, WP02 store)
+  │               │
+  │               └──> WP05: WebHostBuilderExtensions
+  │
+  └──> WP06: TransitionObserver                          (depends: WP01 types, WP02 store)
+              │
+              └──> WP05: WebHostBuilderExtensions
+
+WP07: Integration Tests (TestHost)                       (depends: WP05)
+```
+
+### Parallelism Opportunities
+
+- **WP02 and WP03** can proceed in parallel after WP01 (store and graph builder are independent)
+- **WP06** can proceed in parallel with WP03/WP04 after WP02 is complete
+- **WP04** depends on both WP02 and WP03
+- **WP05** is the convergence point, wiring store + middleware + observer
+- **WP07** must wait for WP05 (full pipeline required for integration tests)
+
+### Critical Path
+
+WP01 -> WP03 -> WP04 -> WP05 -> WP07
 
 ## Complexity Tracking
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+No constitution violations requiring justification. The design adds one new library project following established patterns. The only external NuGet dependency (dotNetRdf.Core) is shared with Frank.LinkedData, which already depends on it.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Frank.Statecharts API surface changes | Low | The `onTransition` CE operation and `IStateMachineStore.Subscribe` are implemented and stable on master. Pin to current API surface. |
+| dotNetRdf.Core version conflicts with Frank.LinkedData | Medium | Pin to same version as Frank.LinkedData; verify with multi-target build |
+| MailboxProcessor store memory pressure under high write volume | Low | Retention policy (10,000 records, oldest-first eviction) bounds memory; configurable via `useProvenance` |
+| Custom media type registration may conflict with Frank.LinkedData negotiation | Medium | Provenance media types use `vnd.frank.provenance+*` prefix, checked before LinkedData's standard types |
+| Agent identity extraction from `ClaimsPrincipal` varies across auth providers | Low | Fall back to `prov:SoftwareAgent` when identity claims are absent or ambiguous |
