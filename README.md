@@ -590,7 +590,10 @@ The `sample/` directory contains several example applications:
 
 ## References
 
+- [Design Documents](docs/) — Design philosophy, vision, and architecture documents
 - [Frank.Statecharts Guide](docs/STATECHARTS.md) — Core concepts, hierarchical statechart support, and test coverage overview
+- [Semantic Resources Vision](docs/SEMANTIC-RESOURCES.md) — Agent-legible applications and the self-describing app architecture
+- [Spec Pipeline](docs/SPEC-PIPELINE.md) — Bidirectional design spec pipeline (WSD, SCXML, ALPS)
 - [How is this different from Webmachine or Freya?](docs/COMPARISON.md) — Detailed comparison of Frank.Statecharts with Webmachine and Freya's approach to HTTP resource state machines
 
 ---
