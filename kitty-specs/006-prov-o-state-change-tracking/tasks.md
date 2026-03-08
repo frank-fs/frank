@@ -22,11 +22,11 @@
 **Requirement Refs**: FR-002, FR-012, FR-014
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Provenance/Frank.Provenance.fsproj` (multi-target net8.0;net9.0;net10.0)
-- [ ] T002 Create `src/Frank.Provenance/ProvVocabulary.fs` with PROV-O namespace URIs and term constants
-- [ ] T003 Create `src/Frank.Provenance/Types.fs` with `AgentType`, `ProvenanceAgent`, `ProvenanceActivity`, `ProvenanceEntity`, `ProvenanceRecord`, `ProvenanceGraph`, `ProvenanceStoreConfig`
-- [ ] T004 Create `test/Frank.Provenance.Tests/Frank.Provenance.Tests.fsproj` and `Program.fs`
-- [ ] T005 Create `test/Frank.Provenance.Tests/VocabularyTests.fs` with PROV-O URI correctness tests
+- [x] T001 Create `src/Frank.Provenance/Frank.Provenance.fsproj` (multi-target net8.0;net9.0;net10.0)
+- [x] T002 Create `src/Frank.Provenance/ProvVocabulary.fs` with PROV-O namespace URIs and term constants
+- [x] T003 Create `src/Frank.Provenance/Types.fs` with `AgentType`, `ProvenanceAgent`, `ProvenanceActivity`, `ProvenanceEntity`, `ProvenanceRecord`, `ProvenanceGraph`, `ProvenanceStoreConfig`
+- [x] T004 Create `test/Frank.Provenance.Tests/Frank.Provenance.Tests.fsproj` and `Program.fs`
+- [x] T005 Create `test/Frank.Provenance.Tests/VocabularyTests.fs` with PROV-O URI correctness tests
 - [ ] T006 Create `test/Frank.Provenance.Tests/TypeTests.fs` with construction and pattern-matching tests
 
 ### Dependencies
