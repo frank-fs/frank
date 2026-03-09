@@ -1,8 +1,10 @@
 # Multi-Party Sessions: Protocol Enforcement through Hypermedia
 
-Frank does not implement session types in the type-theoretic sense. F# does not have the dependent or indexed type features that would make compile-time session type enforcement practical. Instead, Frank approximates the guarantees of multi-party session types (MPSTs) at runtime through the composition of its existing layers: statecharts, guards, ALPS profiles, SHACL shapes, content negotiation, and the spec pipeline.
+Frank does not implement session types in the type-theoretic sense. F# does not have the dependent or indexed type features that would make compile-time session type enforcement practical. Instead, Frank enforces multi-party protocol discipline at runtime through the composition of its existing layers: statecharts, guards, ALPS profiles, SHACL shapes, content negotiation, provenance, and the spec pipeline.
 
-This document explains how those layers compose into a coherent multi-party protocol enforcement mechanism, identifies the gap that makes this approximation incomplete (explicit role projection), and describes how to close it.
+This is not merely an approximation of multi-party session types (MPSTs) with some gaps. Frank and formal MPST systems occupy overlapping but distinct design spaces. MPSTs provide static proof of safety and progress. Frank provides runtime enforcement, discoverability, auditability, reflective evolution, and open participation — properties that matter specifically because the trust boundary is HTTP and the participants may be unknown at design time.
+
+This document maps the overlap, identifies what each approach provides that the other lacks, and describes the one significant gap in Frank’s coverage (explicit role projection) alongside the capabilities Frank offers that have no MPST equivalent.
 
 ## Background: What Multi-Party Session Types Guarantee
 
@@ -15,57 +17,121 @@ The key guarantees are:
 - **Session fidelity**: the actual interaction conforms to the specified protocol
 - **Role separation**: each participant sees only the actions relevant to their role
 
-Static MPST systems enforce these at compile time. Frank enforces them at the HTTP boundary through middleware, with verification support from the spec pipeline.
+Static MPST systems enforce these at compile time. Frank enforces them at the HTTP boundary through middleware, with verification support from the spec pipeline. But Frank also provides guarantees that MPST systems do not address — discoverability, auditability, and reflective evolution among them.
 
-## How Frank’s Layers Map to MPST Concepts
+## The Overlap: Where Frank and MPSTs Correspond
 
-|MPST Concept                    |Frank Layer                            |Mechanism                                                                                                       |
-|--------------------------------|---------------------------------------|----------------------------------------------------------------------------------------------------------------|
-|Global type                     |Frank.Statecharts                      |SCXML statechart defining all states, transitions, and events across all roles                                  |
-|Local type (per-role view)      |ALPS profile + role projection         |Per-role ALPS profile derived from global SCXML + role definitions (see [Role Projection](#role-projection))    |
-|Role                            |ASP.NET Core authentication            |`ClaimsPrincipal` with role claims (e.g., `player=X`, `player=O`)                                               |
-|Message type (payload schema)   |Frank.Validation                       |SHACL shapes constraining request and response bodies                                                           |
-|Send action                     |ALPS `unsafe` / `idempotent` transition|POST/PUT/PATCH/DELETE with SHACL-validated payload                                                              |
-|Receive action                  |ALPS `safe` transition                 |GET returning state-appropriate representation                                                                  |
-|Protocol state                  |`IStateMachineStore`                   |Persisted per-instance state determining available transitions                                                  |
-|Safety (no invalid sends)       |Guards + state-dependent routing       |Middleware returns 405 (method unavailable in state) or 403/409 (guard blocked)                                 |
-|Session fidelity                |Spec pipeline                          |Extract spec from running app, compare against design spec                                                      |
-|Provenance (interaction history)|Frank.Provenance                       |PROV-O annotations recording actual state transitions for post-hoc conformance checking                         |
-|Progress (liveness)             |Cross-validator + projection analysis  |Static check on global type + projections for deadlock-free states (see [Progress Analysis](#progress-analysis))|
+|MPST Concept                 |Frank Layer                            |Mechanism                                                                                                   |
+|-----------------------------|---------------------------------------|------------------------------------------------------------------------------------------------------------|
+|Global type                  |Frank.Statecharts                      |SCXML statechart defining all states, transitions, and events across all roles                              |
+|Local type (per-role view)   |ALPS profile + role projection         |Per-role ALPS profile derived from global SCXML + role definitions (see [Role Projection](#role-projection))|
+|Role                         |ASP.NET Core authentication            |`ClaimsPrincipal` with role claims (e.g., `player=X`, `player=O`)                                           |
+|Message type (payload schema)|Frank.Validation                       |SHACL shapes constraining request and response bodies                                                       |
+|Send action                  |ALPS `unsafe` / `idempotent` transition|POST/PUT/PATCH/DELETE with SHACL-validated payload                                                          |
+|Receive action               |ALPS `safe` transition                 |GET returning state-appropriate representation                                                              |
+|Protocol state               |`IStateMachineStore`                   |Persisted per-instance state determining available transitions                                              |
+|Safety (no invalid sends)    |Guards + state-dependent routing       |Middleware returns 405 (method unavailable in state) or 403/409 (guard blocked)                             |
+|Session fidelity             |Spec pipeline                          |Extract spec from running app, compare against design spec                                                  |
+|Progress (liveness)          |Cross-validator + projection analysis  |Static check on global type + projections for deadlock-free states                                          |
 
-## What Frank Already Enforces
+## What Frank Provides That MPSTs Do Not
 
-The existing layers provide runtime enforcement of most MPST safety properties without any new machinery:
+### Provenance and Auditability
 
-### State-Dependent Method Availability (Safety)
+MPSTs guarantee conformance by construction — if it compiles, it follows the protocol. But they do not record what happened. There is no trace. Once the interaction completes, the only evidence of protocol conformance is the fact that the program compiled and ran without a type error.
 
-`Frank.Statecharts` middleware checks the resource’s current state before dispatching to a handler. If POST is not registered for the `Won` state, the middleware returns 405 with an `Allow` header listing the methods that are available. This is the runtime analog of a session type system rejecting a send action that doesn’t match the current protocol state.
+Frank’s PROV-O layer (`Frank.Provenance`, built on `onTransition` observers) records every state transition: who triggered it, when, from what state, to what state, with what event. This creates an auditable history of the actual interaction that can be queried after the fact.
 
-### Role-Based Guard Evaluation (Role Separation)
+This matters for:
 
-Guards evaluate `ClaimsPrincipal` claims against the current state. In the tic-tac-toe example, a `TurnGuard` checks whether the authenticated user holds the claim matching the active player. The middleware returns 409 (Conflict) for a valid participant acting out of turn, and 403 (Forbidden) for a non-participant. This enforces that each role can only perform actions the protocol permits at the current state — the runtime equivalent of local type conformance.
+- **Compliance**: demonstrating that an interaction followed the specified protocol
+- **Debugging**: tracing how a resource reached an unexpected state
+- **Agent reasoning**: an agent can inspect the provenance graph to understand not just what the current state is, but how the resource arrived there
+- **Post-hoc conformance checking**: even if a bug allowed a protocol violation, the provenance record captures it rather than silently proceeding
 
-### Typed Transitions (Session Fidelity)
+A formal MPST system can tell you violations are impossible. Frank can tell you exactly what did happen.
 
-The `StateMachine<'State, 'Event, 'Context>` transition function is a total function over the state × event product. `TransitionResult.Invalid` rejects events that are not valid for the current state. Combined with F#’s exhaustive pattern matching on discriminated unions, this ensures that every state/event combination is explicitly handled — either producing a valid successor state or an explicit rejection.
+### Runtime Discoverability
 
-### SHACL Validation (Message Typing)
+MPST systems assume all participants are compiled against a shared protocol definition. Every participant knows the protocol before the interaction begins. The protocol is a build-time artifact, not a runtime one.
 
-Frank.Validation applies SHACL shapes to request and response bodies. In MPST terms, this constrains the payload types at each communication point. A `makeMove` transition might require a SHACL shape specifying that `position` is an integer in range 0–8 — this is the message type associated with that protocol action.
+Frank’s semantic layer means the protocol is discoverable at runtime by participants who have no prior knowledge of it. An agent with HTTP tool use can:
 
-### Provenance (After-the-Fact Conformance)
+1. `OPTIONS /` to discover supported media types
+1. Follow `Link` headers to the discovery endpoint
+1. `GET /` with `Accept: application/alps+json` to retrieve the ALPS profile
+1. `GET /` with `Accept: application/scxml+xml` to retrieve the statechart definition
+1. Inspect SHACL shapes to understand payload constraints
+1. Begin participating in the protocol
 
-Frank.Provenance records PROV-O annotations for every state transition via `onTransition` observers. An agent or auditor can query the provenance graph to verify that the actual interaction history conforms to the protocol. This is weaker than compile-time checking but provides accountability: if a bug allows a protocol violation, the provenance record captures it.
+No shared code, no shared type definitions, no compile-time coupling. The protocol is self-describing at the HTTP boundary. MPSTs have no equivalent to this — they are closed-world systems where participants must be compiled against the protocol definition.
 
-## What Is Missing: Role Projection
+### Late Binding and Open Participation
 
-The significant gap is **explicit projection from the global type to per-role local types**.
+MPSTs typically bind roles to participants at session initiation, and the set of participants is fixed for the session’s lifetime. The session channel is established between specific processes, and replacing a participant requires session delegation (which is itself a protocol extension with its own typing rules).
 
-Currently, the global protocol (SCXML statechart) exists as a single artifact. Each role’s view of the protocol is an emergent property of guards and state-dependent handler registration — it works correctly at runtime, but there is no formal artifact representing “what Player X can do at each protocol state.” The projection is implicit, spread across guard predicates, `inState` blocks, and claims checks.
+Frank enforces the protocol per-request against whoever presents the right credentials. The statechart and guards do not care about connection identity — only about claims. A player can disconnect, reconnect from a different client, switch devices, or even be replaced by another user who holds the same role claim. The protocol survives participant mobility because the enforcement is stateless with respect to connection identity.
 
-Making projection explicit closes the gap between Frank’s runtime enforcement and the formal MPST guarantees.
+This is not an accidental property — it follows directly from HTTP’s request/response model and Frank’s decision to enforce at the HTTP boundary rather than at the channel/process boundary.
 
-### The Projection Operator
+### Observation Without Participation
+
+In Frank, any agent can `GET` a resource and observe its state without being a protocol participant. A spectator watching a tic-tac-toe game, an admin monitoring system state, or an LLM agent evaluating the application can all read the resource’s current representation.
+
+The projected ALPS profile for an unauthenticated or observer-role agent would contain only `safe` transitions — pure read access. The observer sees the protocol unfolding without having send obligations.
+
+MPSTs do not typically model observers. Every party in the global type is an active participant with send and receive obligations. Pure observation requires either modeling the observer as a degenerate role (which pollutes the protocol definition) or operating outside the session type system entirely.
+
+### Incremental Constraint Coverage
+
+SHACL validation does not need to be exhaustive. The SEMANTIC-RESOURCES.md design document explicitly states this: “even partial SHACL coverage adds value for agent-driven analysis.”
+
+You can add shapes incrementally — validate the critical fields first, add more constraints as the application matures. The protocol is not invalidated by incomplete constraint coverage; it is strengthened by each new shape.
+
+MPST message types are all-or-nothing. The payload type is part of the protocol definition and must be complete for the type system to check it. Adding or changing a field in a message type is a protocol change that requires re-projection and re-compilation of all participants.
+
+### Reflective Evolution
+
+The feedback loop from <SEMANTIC-RESOURCES.md> — build → deploy → reflect → refine → rebuild — means the protocol itself evolves based on runtime observation:
+
+```
+Running Frank app serves semantic model
+    → Agent queries model, identifies gap
+        (e.g., "makeMove transition has no SHACL constraint on position range")
+    → Agent proposes refinement
+    → Developer implements SHACL shape for position
+    → Updated app serves updated model
+    → Agent verifies the constraint is present
+    → Cycle continues
+```
+
+The application participates in its own evolution. The protocol is not a static specification frozen at design time — it is a living artifact that grows through the reflection/refinement loop.
+
+MPSTs are static specifications. Once the global type is defined, projected, and compiled, the protocol does not participate in its own improvement. Changing the protocol means editing the Scribble definition, re-projecting, and recompiling all participants.
+
+### Cross-Application Interop Without Shared Definitions
+
+Because Frank’s protocol surface is expressed in durable standards (HTTP, RDF, ALPS, SCXML, SHACL), two independently developed Frank applications can interoperate if they share vocabulary — without sharing code or type definitions. An ALPS profile from one application can reference semantic descriptors from another via standard URIs.
+
+MPSTs require a shared Scribble (or equivalent) definition compiled into every participant. They are closed-world systems by design. Cross-system interop requires explicit protocol composition, which is an active research area with limited practical tooling.
+
+### Transport Semantics
+
+HTTP provides caching, conditional requests, ETags, content negotiation, idempotency semantics, and range requests — all of which Frank’s statecharts can leverage. The ETag-from-state issue (#93 in the spec pipeline) is a concrete example: the protocol state directly informs HTTP caching behavior, so clients and intermediaries can make correct caching decisions based on the resource’s domain state.
+
+MPST systems operate over abstract channels that have no concept of caching, conditional requests, or content negotiation. These transport-level properties must be either ignored or reimplemented at the application layer.
+
+## What MPSTs Provide That Frank Does Not (Yet)
+
+### Explicit Role Projection
+
+This is the significant gap. Currently, the global protocol (SCXML statechart) exists as a single artifact. Each role’s view of the protocol is an emergent property of guards and state-dependent handler registration — it works correctly at runtime, but there is no formal artifact representing “what Player X can do at each protocol state.” The projection is implicit, spread across guard predicates, `inState` blocks, and claims checks.
+
+In MPST theory, the projection operator takes a global type and a role name and produces a local type — a complete description of what that participant can send, receive, and observe at each point in the protocol. That local type is what enables static verification: you check each role’s implementation against its projected local type independently.
+
+Making projection explicit closes the gap and unlocks several capabilities that Frank currently lacks.
+
+#### The Projection Operator
 
 Projection takes the global SCXML statechart plus a set of role definitions and produces a **per-role ALPS profile** for each role at each reachable state.
 
@@ -83,7 +149,7 @@ Output per role:
 
 The projection is not a separate runtime system — it is a **derivation step** that produces ALPS documents from existing artifacts. It can run at build time (as part of the spec pipeline) or at request time (filtered by the authenticated user’s role).
 
-### Per-Role ALPS Profile Example
+#### Per-Role ALPS Profile Example
 
 Given a tic-tac-toe global protocol with states `XTurn`, `OTurn`, `Won`, `Draw` and two roles (`PlayerX`, `PlayerO`):
 
@@ -151,7 +217,7 @@ Given a tic-tac-toe global protocol with states `XTurn`, `OTurn`, `Won`, `Draw` 
 
 Player O cannot see the `makeMove` transition in `XTurn` state — it does not exist in their projected local type.
 
-### Projection via Content Negotiation
+#### Projection via Content Negotiation
 
 An authenticated agent requesting their ALPS profile receives the projected view:
 
@@ -168,7 +234,7 @@ The response contains only the descriptors available to PlayerO given the curren
 
 For unauthenticated or administrative access, the global (unprojected) ALPS profile is served instead, giving a complete view of the protocol.
 
-### Where Projection Lives in the Architecture
+#### Where Projection Lives in the Architecture
 
 Projection is a function of existing artifacts, not a new runtime system:
 
@@ -183,11 +249,35 @@ Frank.Statecharts (global SCXML)
     → Filtered ALPS responses (request-time, via content negotiation)
 ```
 
-At build time, the spec pipeline can generate all per-role profiles and validate them. At request time, the content negotiation layer filters the ALPS response based on the authenticated user’s role and the resource’s current state.
+At build time, the spec pipeline generates all per-role profiles and validates them. At request time, the content negotiation layer filters the ALPS response based on the authenticated user’s role and the resource’s current state.
+
+### Progress Analysis
+
+The other MPST guarantee that Frank does not currently provide is **progress** (liveness): the assurance that the protocol can always advance if all participants cooperate. Deadlock and starvation are properties of the protocol design, not of individual requests — they cannot be detected by middleware that handles one request at a time.
+
+Frank can support progress analysis as a static check in the spec pipeline:
+
+#### Deadlock Detection
+
+A state is a **deadlock** if no role has an available transition. Given the global SCXML and role projections, enumerate all reachable states and verify that at least one role has at least one available transition in each non-final state.
+
+#### Starvation Detection
+
+A role is **starved** if there exists a reachable execution path where that role is permanently unable to act — the protocol continues, but only through other roles’ actions, and the starved role never regains an available transition. This requires path analysis on the projected state machines.
+
+#### Implementation
+
+Both analyses operate on the typed ASTs from the spec pipeline parsers. The cross-validator (#91) could include a `--check-progress` flag:
+
+```
+frank validate --check-progress game.scxml --roles PlayerX,PlayerO
+```
+
+This is a build-time check, not a runtime enforcement mechanism. It tells the developer whether their protocol design guarantees progress before any code is written.
 
 ## Session Establishment
 
-The tic-tac-toe SCXML models two parallel regions: **GamePlay** (turn progression) and **PlayerIdentity** (role assignment). Issue [#12](https://github.com/panesofglass/tic-tac-toe/issues/12) recommends folding PlayerIdentity into `GameContext` data rather than modeling it as a separate state region.
+The tic-tac-toe SCXML models two parallel regions: **GamePlay** (turn progression) and **PlayerIdentity** (role assignment). Issue [panesofglass/tic-tac-toe#12](https://github.com/panesofglass/tic-tac-toe/issues/12) recommends folding PlayerIdentity into `GameContext` data rather than modeling it as a separate state region.
 
 From the MPST perspective, session establishment is a **distinct protocol phase** that precedes the main interaction. The session establishment protocol has its own global type:
 
@@ -218,31 +308,9 @@ This is appropriate when:
 
 For tic-tac-toe, Option A is sufficient. For more complex applications (e.g., multi-player games with role selection, auction protocols with registration phases), Option B provides the same guarantees for establishment that Frank.Statecharts provides for the main protocol.
 
-## Progress Analysis
+Notably, MPSTs also struggle with session establishment — the standard theory assumes roles are bound before the protocol begins. Session initiation protocols and dynamic role assignment are active research areas in the MPST community. Frank’s per-request enforcement model, where role binding is just a claims check, sidesteps much of this complexity.
 
-The one MPST guarantee that is hardest to enforce at runtime is **progress** (liveness): the assurance that the protocol can always advance if all participants cooperate. Deadlock and starvation are properties of the protocol design, not of individual requests.
-
-Frank can support progress analysis as a static check in the spec pipeline:
-
-### Deadlock Detection
-
-A state is a **deadlock** if no role has an available transition. Given the global SCXML and role projections, enumerate all reachable states and verify that at least one role has at least one available transition in each non-final state.
-
-### Starvation Detection
-
-A role is **starved** if there exists a reachable execution path where that role is permanently unable to act — the protocol continues, but only through other roles’ actions, and the starved role never regains an available transition. This requires path analysis on the projected state machines.
-
-### Implementation
-
-Both analyses operate on the typed ASTs from the spec pipeline parsers. The cross-validator (#91) could include a `--check-progress` flag:
-
-```
-frank validate --check-progress game.scxml --roles PlayerX,PlayerO
-```
-
-This is a build-time check, not a runtime enforcement mechanism. It tells the developer whether their protocol design guarantees progress before any code is written.
-
-## Comparison with Formal MPST Systems
+## Full Comparison
 
 |Property                     |Formal MPSTs (Scribble, etc.)            |Frank                                                                              |
 |-----------------------------|-----------------------------------------|-----------------------------------------------------------------------------------|
@@ -251,26 +319,32 @@ This is a build-time check, not a runtime enforcement mechanism. It tells the de
 |**Projection**               |Automatic, type-level                    |Derived from SCXML + role defs → per-role ALPS profiles                            |
 |**Safety**                   |Type errors for protocol violations      |403/405/409 HTTP responses for protocol violations                                 |
 |**Progress**                 |Checked by projection algorithm          |Static analysis via spec pipeline cross-validator                                  |
-|**Message typing**           |Payload types in protocol definition     |SHACL shapes                                                                       |
+|**Message typing**           |Payload types in protocol definition     |SHACL shapes (incremental, partial coverage valid)                                 |
 |**Session fidelity**         |Guaranteed by construction               |Verified by spec extraction + comparison; auditable via PROV-O                     |
+|**Auditability**             |None — conformance by construction       |Full provenance graph via PROV-O                                                   |
+|**Discoverability**          |None — compile-time coupling required    |Runtime self-description via ALPS, RDF, content negotiation                        |
+|**Participant binding**      |Fixed at session initiation              |Per-request claims evaluation; participants can change                             |
+|**Observation**              |Not modeled                              |Any agent can GET; observer role via projected ALPS                                |
+|**Constraint evolution**     |Protocol change requires recompilation   |Incremental SHACL shapes; reflective refinement loop                               |
+|**Cross-application interop**|Shared Scribble definition required      |Shared ALPS vocabulary sufficient                                                  |
+|**Transport semantics**      |Abstract channels                        |HTTP caching, ETags, content negotiation, idempotency                              |
 |**Enforcement boundary**     |Process/channel boundary                 |HTTP request/response boundary                                                     |
-|**Transport independence**   |Yes (abstract channels)                  |No (HTTP-specific, by design)                                                      |
 |**Language support required**|Type system extensions or code generation|None — standard F#, standard HTTP                                                  |
 
-Frank trades compile-time completeness for **deployment-time verifiability** and **runtime enforcement at the network boundary**. The protocol is not proven correct by the compiler, but it is checkable by the spec pipeline, enforceable by middleware, and auditable through provenance. For HTTP applications where the trust boundary is between client and server, this is the appropriate level of enforcement — you cannot statically verify that a remote client will follow the protocol regardless of what your type system guarantees about your own code.
+Frank trades compile-time completeness for **deployment-time verifiability** and **runtime enforcement at the network boundary**, while gaining capabilities — provenance, discoverability, reflective evolution, open participation — that static MPST systems do not address. For HTTP applications where the trust boundary is between client and server, and where participants may be unknown at design time, this is the appropriate set of tradeoffs.
 
 ## Integration with Existing Documents
 
 This document connects to the other design documents as follows:
 
 - **<STATECHARTS.md>** provides the global type: the `StateMachine<'State, 'Event, 'Context>` definition and the `statefulResource` CE that enforces state-dependent behavior.
-- **<SEMANTIC-RESOURCES.md>** provides the self-description mechanism: ALPS profiles, RDF models, and content negotiation are the substrate for serving projected local types to authenticated agents.
+- **<SEMANTIC-RESOURCES.md>** provides the self-description mechanism: ALPS profiles, RDF models, and content negotiation are the substrate for serving projected local types to authenticated agents. The reflective evolution loop is what gives Frank’s protocol enforcement its ability to improve over time.
 - **<SPEC-PIPELINE.md>** provides the verification loop: the cross-validator can be extended with projection consistency checks and progress analysis.
 - **<COMPARISON.md>** clarifies why Frank operates at the application level rather than the protocol level — the same reasoning applies here. Multi-party session enforcement belongs at the application/domain layer, not in a reimplementation of HTTP.
 
 ## Implementation Priorities
 
-The layers that already exist (statecharts, guards, SHACL, ALPS, provenance) provide the runtime safety guarantees. The missing piece — explicit role projection — can be built incrementally:
+The layers that already exist (statecharts, guards, SHACL, ALPS, provenance) provide the runtime safety guarantees and the capabilities that go beyond what MPSTs offer. The missing piece — explicit role projection — can be built incrementally:
 
 1. **Role definition schema**: a declarative way to map authentication claims to protocol roles, associated with a `statefulResource`. This is the foundation everything else depends on.
 1. **Projection operator**: given the SCXML + role definitions + ALPS descriptors, derive per-role ALPS profiles. This can be a build-time tool in the spec pipeline initially.
@@ -287,6 +361,7 @@ The layers that already exist (statecharts, guards, SHACL, ALPS, provenance) pro
 - [SCXML W3C Recommendation](https://www.w3.org/TR/scxml/) — State Chart XML standard
 - [SHACL](https://www.w3.org/TR/shacl/) — Shapes Constraint Language
 - [PROV-O](https://www.w3.org/TR/prov-o/) — Provenance Ontology
+- [JSON-LD](https://www.w3.org/TR/json-ld11/) — JSON for Linking Data
 - [Frank.Statecharts](STATECHARTS.md) — Application-level state machines
 - [Semantic Resources](SEMANTIC-RESOURCES.md) — Agent-legible application architecture
 - [Spec Pipeline](SPEC-PIPELINE.md) — Bidirectional design spec pipeline
