@@ -70,11 +70,11 @@
 **Requirement Refs**: FR-004, FR-005, FR-006, FR-014
 
 ### Included Subtasks
-- [ ] T012 Create `src/Frank.Provenance/GraphBuilder.fs` with `toGraph : ProvenanceRecord list -> IGraph`
-- [ ] T013 Implement Activity triple construction (type, startedAtTime, endedAtTime, wasAssociatedWith, used, frank:httpMethod, frank:eventName). Note: must include explicit `prov:wasAssociatedWith` triple construction linking activities to agents (FR-006).
-- [ ] T014 Implement Agent triple construction (type based on AgentType DU, prov:label)
-- [ ] T015 Implement Entity triple construction (type, wasGeneratedBy, wasAttributedTo, wasDerivedFrom, frank:stateName)
-- [ ] T016 Create `test/Frank.Provenance.Tests/GraphBuilderTests.fs` with triple validation tests
+- [x] T012 Create `src/Frank.Provenance/GraphBuilder.fs` with `toGraph : ProvenanceRecord list -> IGraph`
+- [x] T013 Implement Activity triple construction (type, startedAtTime, endedAtTime, wasAssociatedWith, used, frank:httpMethod, frank:eventName). Note: must include explicit `prov:wasAssociatedWith` triple construction linking activities to agents (FR-006).
+- [x] T014 Implement Agent triple construction (type based on AgentType DU, prov:label)
+- [x] T015 Implement Entity triple construction (type, wasGeneratedBy, wasAttributedTo, wasDerivedFrom, frank:stateName)
+- [x] T016 Create `test/Frank.Provenance.Tests/GraphBuilderTests.fs` with triple validation tests
 
 ### Dependencies
 - Depends on WP01 (types + vocabulary)
