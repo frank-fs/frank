@@ -16,6 +16,7 @@
     <Compile Include="Wsd/GuardParserTests.fs" />
     <Compile Include="Wsd/ParserTests.fs" />
     <Compile Include="Wsd/GroupingTests.fs" />
+    <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

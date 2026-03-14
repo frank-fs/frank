@@ -265,13 +265,14 @@ let parserTests =
               Expect.hasLength ns 1 "one note"
               Expect.equal ns.[0].NotePosition NotePosition.RightOf "right of"
 
-          testCase "note with guard text passes through as content"
+          testCase "note with guard text is parsed by guard parser"
           <| fun _ ->
               let result = parseWsd "participant Client\nnote over Client: [guard: role=admin]\n"
               Expect.isEmpty result.Errors "no errors"
               let ns = notes result
-              Expect.equal ns.[0].Content "[guard: role=admin]" "guard text in content"
-              Expect.isNone ns.[0].Guard "guard is None (deferred to WP04)"
+              Expect.isSome ns.[0].Guard "guard is parsed (WP06 integration)"
+              Expect.equal ns.[0].Guard.Value.Pairs [ ("role", "admin") ] "guard pairs"
+              Expect.equal ns.[0].Content "" "content is empty after guard extraction"
 
           testCase "note with missing position keyword produces error"
           <| fun _ ->
