@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Constraints.fs" />
+    <Compile Include="TypeMapping.fs" />
+    <Compile Include="ShapeDerivation.fs" />
   </ItemGroup>
 
   <ItemGroup>
