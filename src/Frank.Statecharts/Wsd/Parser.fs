@@ -460,7 +460,7 @@ let rec private parseGroup (state: ParserState) (depth: int) : unit =
     let groupKind =
         match mapGroupKind startToken.Kind with
         | Some kind -> kind
-        | None -> GroupKind.Alt // should never happen
+        | None -> failwithf "Internal error: parseGroup called with non-group token %A" startToken.Kind
 
     if depth > 50 then
         addWarning
@@ -636,6 +636,28 @@ and private parseElements (state: ParserState) : unit =
         parseElements state
     | Identifier _ ->
         parseMessage state
+        parseElements state
+    | TokenKind.End ->
+        addError
+            state
+            token.Position
+            "'end' without matching grouping block"
+            "participant, message, note, or directive"
+            (tokenDescription token)
+            ""
+
+        skipToNewline state
+        parseElements state
+    | TokenKind.Else ->
+        addError
+            state
+            token.Position
+            "'else' without matching grouping block"
+            "participant, message, note, or directive"
+            (tokenDescription token)
+            ""
+
+        skipToNewline state
         parseElements state
     | _ ->
         addError

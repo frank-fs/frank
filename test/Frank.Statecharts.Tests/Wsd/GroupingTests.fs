@@ -596,4 +596,16 @@ end
               Expect.equal b1.Condition (Some "unauthorized") "second branch condition"
               let b1msgs = branchMessages b1
               Expect.hasLength b1msgs 1 "one message in second branch"
-              Expect.equal b1msgs.[0].Label "401" "unauthorized response" ]
+              Expect.equal b1msgs.[0].Label "401" "unauthorized response"
+
+          // === 26. Extra 'end' with no open group ===
+          testCase "extra end with no open group produces error"
+          <| fun _ ->
+              let result = parseWsd "participant A\nparticipant B\nA->B: hello\nend\n"
+              Expect.isGreaterThanOrEqual result.Errors.Length 1 "at least one error"
+
+              let endError =
+                  result.Errors
+                  |> List.tryFind (fun e -> e.Description.Contains("'end' without matching grouping block"))
+
+              Expect.isSome endError "has mismatched end error" ]
