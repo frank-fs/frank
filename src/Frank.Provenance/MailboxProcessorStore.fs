@@ -158,4 +158,8 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
         member _.Dispose() =
             if not disposed then
                 disposed <- true
-                agent.PostAndAsyncReply(fun reply -> Dispose reply) |> Async.RunSynchronously
+
+                try
+                    agent.PostAndAsyncReply(fun reply -> Dispose reply) |> Async.RunSynchronously
+                with :? System.ObjectDisposedException ->
+                    logger.LogWarning("Provenance store MailboxProcessor was already disposed")
