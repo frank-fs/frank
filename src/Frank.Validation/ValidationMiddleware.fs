@@ -21,6 +21,10 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
     /// HTTP methods where query parameter validation applies.
     static let queryMethods = set [ "GET" ]
 
+    /// Shared serializer options for writing validation reports.
+    static let jsonOptions =
+        JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase)
+
     /// Serialize a ValidationReport as a JSON response body (placeholder until WP04).
     static let writeReport (ctx: HttpContext) (report: ValidationReport) =
         task {
@@ -44,14 +48,11 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
                    shapeUri = report.ShapeUri.ToString()
                    results = results |}
 
-            let options =
-                JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase)
-
-            do! JsonSerializer.SerializeAsync(ctx.Response.Body, body, options)
+            do! JsonSerializer.SerializeAsync(ctx.Response.Body, body, jsonOptions)
         }
 
     /// Read the request body as a JsonElement. Returns None if body is empty or unreadable.
-    static let readJsonBody (ctx: HttpContext) =
+    let readJsonBody (ctx: HttpContext) =
         task {
             ctx.Request.EnableBuffering()
 
@@ -66,10 +67,11 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
                     if System.String.IsNullOrWhiteSpace(bodyText) then
                         return None
                     else
-                        let doc = JsonDocument.Parse(bodyText)
+                        use doc = JsonDocument.Parse(bodyText)
                         let cloned = doc.RootElement.Clone()
                         return Some cloned
-                with _ex ->
+                with ex ->
+                    logger.LogWarning(ex, "Failed to read JSON request body for {Path}", ctx.Request.Path)
                     ctx.Request.Body.Position <- 0L
                     return None
         }
