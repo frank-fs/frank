@@ -21,35 +21,9 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
     /// HTTP methods where query parameter validation applies.
     static let queryMethods = set [ "GET" ]
 
-    /// Shared serializer options for writing validation reports.
-    static let jsonOptions =
-        JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase)
-
-    /// Serialize a ValidationReport as a JSON response body (placeholder until WP04).
+    /// Write a validation report using content-negotiated serialization (WP04).
     static let writeReport (ctx: HttpContext) (report: ValidationReport) =
-        task {
-            ctx.Response.ContentType <- "application/json"
-
-            let results =
-                report.Results
-                |> List.map (fun r ->
-                    {| focusNode = r.FocusNode
-                       resultPath = r.ResultPath
-                       message = r.Message
-                       sourceConstraint = r.SourceConstraint
-                       severity =
-                        match r.Severity with
-                        | Violation -> "Violation"
-                        | Warning -> "Warning"
-                        | Info -> "Info" |})
-
-            let body =
-                {| conforms = report.Conforms
-                   shapeUri = report.ShapeUri.ToString()
-                   results = results |}
-
-            do! JsonSerializer.SerializeAsync(ctx.Response.Body, body, jsonOptions)
-        }
+        ReportSerializer.writeNegotiated ctx report
 
     /// Read the request body as a JsonElement. Returns None if body is empty or unreadable.
     let readJsonBody (ctx: HttpContext) =
