@@ -53,14 +53,6 @@ let tokenize (source: string) : Token list =
         while pos < len && (source[pos] = ' ' || source[pos] = '\t') do
             advance ()
 
-    let readIdentWord () =
-        let start = pos
-
-        while pos < len && isIdentChar (source[pos]) do
-            advance ()
-
-        source.Substring(start, pos - start)
-
     let readIdentWithHyphens () =
         // Read identifier that can contain hyphens, but stop before arrow sequences
         let start = pos
@@ -91,13 +83,14 @@ let tokenize (source: string) : Token list =
         while pos < len && (source[pos] = ' ' || source[pos] = '\t') do
             advance ()
 
+        let textCol = col
         let start = pos
 
         while pos < len && source[pos] <> '\n' && source[pos] <> '\r' do
             advance ()
 
         let text = source.Substring(start, pos - start).TrimEnd()
-        text
+        (text, textCol)
 
     let tryMatchKeyword (word: string) =
         match word.ToLowerInvariant() with
@@ -145,12 +138,12 @@ let tokenize (source: string) : Token list =
         | ':' ->
             let startCol = col
             advance ()
-            let text = readTextContent ()
+            let (text, textCol) = readTextContent ()
 
             tokens.Add(makeToken Colon line startCol)
 
             if text.Length > 0 then
-                tokens.Add(makeToken (TextContent text) line (startCol + 1))
+                tokens.Add(makeToken (TextContent text) line textCol)
         | '(' ->
             tokens.Add(makeToken LeftParen line col)
             advance ()
@@ -223,7 +216,8 @@ let tokenize (source: string) : Token list =
                 advance ()
                 advance ()
             else
-                // Stray hyphen — treat as identifier start? Skip it.
+                // Stray hyphen — emit as identifier so the parser can report a meaningful error
+                tokens.Add(makeToken (Identifier "-") line startCol)
                 advance ()
         | _ when isAlphaOrUnderscore c ->
             let startCol = col
@@ -245,16 +239,12 @@ let tokenize (source: string) : Token list =
                     spaceCount <- spaceCount + 1
 
                 if spaceCount > 0 && pos + 1 < len then
-                    let nextTwo =
-                        if pos + 2 <= len then
-                            source.Substring(pos, 2).ToLowerInvariant()
-                        else
-                            ""
+                    let isOf =
+                        pos + 2 <= len
+                        && (source[pos] = 'o' || source[pos] = 'O')
+                        && (source[pos + 1] = 'f' || source[pos + 1] = 'F')
 
-                    if
-                        nextTwo = "of"
-                        && (pos + 2 >= len || not (isIdentCharOrHyphen (peekAt (pos + 2))))
-                    then
+                    if isOf && (pos + 2 >= len || not (isIdentCharOrHyphen (peekAt (pos + 2)))) then
                         // Consume "of"
                         advance ()
                         advance ()
@@ -289,11 +279,10 @@ let tokenize (source: string) : Token list =
 
                     // For grouping keywords, emit rest of line as TextContent
                     if groupingKeywords.Contains kind then
-                        let tcCol = col
-                        let text = readTextContent ()
+                        let (text, textCol) = readTextContent ()
 
                         if text.Length > 0 then
-                            tokens.Add(makeToken (TextContent text) startLine tcCol)
+                            tokens.Add(makeToken (TextContent text) startLine textCol)
                 | None -> tokens.Add(makeToken (Identifier word) startLine startCol)
         | _ ->
             // Unknown character, skip
