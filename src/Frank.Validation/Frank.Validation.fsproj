@@ -11,6 +11,11 @@
     <Compile Include="Constraints.fs" />
     <Compile Include="TypeMapping.fs" />
     <Compile Include="ShapeDerivation.fs" />
+    <Compile Include="ShapeGraphBuilder.fs" />
+    <Compile Include="DataGraphBuilder.fs" />
+    <Compile Include="Validator.fs" />
+    <Compile Include="ShapeCache.fs" />
+    <Compile Include="ValidationMiddleware.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +26,7 @@
 
   <ItemGroup>
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
+    <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
   </ItemGroup>
 
   <ItemGroup>

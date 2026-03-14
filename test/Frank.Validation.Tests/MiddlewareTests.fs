@@ -1,0 +1,207 @@
+module Frank.Validation.Tests.MiddlewareTests
+
+open System.Net.Http
+open System.Text
+open System.Threading
+open Expecto
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
+open Frank.Validation
+
+// ──────────────────────────────────────────────
+// Test domain types
+// ──────────────────────────────────────────────
+
+type CreateUser = { Name: string; Age: int }
+
+type SearchQuery = { Q: string; Page: int }
+
+// ──────────────────────────────────────────────
+// Test infrastructure
+// ──────────────────────────────────────────────
+
+/// Counter to track handler invocations.
+type HandlerCounter() =
+    let mutable count = 0
+    member _.Increment() = Interlocked.Increment(&count) |> ignore
+    member _.Count = count
+
+/// Build a test server with validation middleware and return (counter, client).
+let private buildTestHost
+    (configureEndpoints: HandlerCounter -> IEndpointRouteBuilder -> unit)
+    : HandlerCounter * HttpClient =
+    let counter = HandlerCounter()
+
+    let builder =
+        WebHostBuilder()
+            .UseTestServer()
+            .ConfigureServices(fun services ->
+                services.AddSingleton<ShapeCache>() |> ignore
+                services.AddRouting() |> ignore
+                services.AddLogging() |> ignore)
+            .Configure(fun (app: IApplicationBuilder) ->
+                app.UseRouting() |> ignore
+
+                app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                    let shapeCache = ctx.RequestServices.GetRequiredService<ShapeCache>()
+
+                    let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+
+                    let logger = loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+
+                    let typedLogger =
+                        { new ILogger<ValidationMiddleware> with
+                            member _.Log(logLevel, eventId, state, ex, formatter) =
+                                logger.Log(logLevel, eventId, state, ex, formatter)
+
+                            member _.IsEnabled(logLevel) = logger.IsEnabled(logLevel)
+                            member _.BeginScope(state) = logger.BeginScope(state) }
+
+                    let middleware = ValidationMiddleware(next, shapeCache, typedLogger)
+                    middleware.InvokeAsync(ctx))
+                |> ignore
+
+                app.UseEndpoints(fun endpoints -> configureEndpoints counter endpoints)
+                |> ignore)
+
+    let server = new TestServer(builder)
+    counter, server.CreateClient()
+
+/// Create a POST endpoint with ValidationMarker metadata.
+let private mapValidatedPost<'T> (pattern: string) (counter: HandlerCounter) (endpoints: IEndpointRouteBuilder) =
+    endpoints
+        .MapPost(
+            pattern,
+            RequestDelegate(fun ctx ->
+                counter.Increment()
+                ctx.Response.StatusCode <- 201
+                System.Threading.Tasks.Task.CompletedTask)
+        )
+        .WithMetadata(
+            { ShapeType = typeof<'T>
+              CustomConstraints = []
+              ResolverConfig = None }
+            : ValidationMarker
+        )
+    |> ignore
+
+/// Create a POST endpoint WITHOUT ValidationMarker (no validation).
+let private mapUnvalidatedPost (pattern: string) (counter: HandlerCounter) (endpoints: IEndpointRouteBuilder) =
+    endpoints.MapPost(
+        pattern,
+        RequestDelegate(fun ctx ->
+            counter.Increment()
+            ctx.Response.StatusCode <- 200
+            System.Threading.Tasks.Task.CompletedTask)
+    )
+    |> ignore
+
+/// Create a GET endpoint with ValidationMarker metadata.
+let private mapValidatedGet<'T> (pattern: string) (counter: HandlerCounter) (endpoints: IEndpointRouteBuilder) =
+    endpoints
+        .MapGet(
+            pattern,
+            RequestDelegate(fun ctx ->
+                counter.Increment()
+                ctx.Response.StatusCode <- 200
+                System.Threading.Tasks.Task.CompletedTask)
+        )
+        .WithMetadata(
+            { ShapeType = typeof<'T>
+              CustomConstraints = []
+              ResolverConfig = None }
+            : ValidationMarker
+        )
+    |> ignore
+
+// ──────────────────────────────────────────────
+// T021: Middleware integration tests
+// ──────────────────────────────────────────────
+
+[<Tests>]
+let validPostTests =
+    testList
+        "ValidationMiddleware - valid POST"
+        [ testCase "valid POST passes through to handler"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+
+              let content =
+                  new StringContent("""{"Name":"Alice","Age":30}""", Encoding.UTF8, "application/json")
+
+              let response = client.PostAsync("/users", content).Result
+              Expect.equal (int response.StatusCode) 201 "Should return 201 from handler"
+              Expect.equal counter.Count 1 "Handler should have been invoked once" ]
+
+[<Tests>]
+let invalidPostTests =
+    testList
+        "ValidationMiddleware - invalid POST"
+        [ testCase "invalid POST returns 422"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+
+              let content = new StringContent("""{"Age":30}""", Encoding.UTF8, "application/json")
+              let response = client.PostAsync("/users", content).Result
+              Expect.equal (int response.StatusCode) 422 "Should return 422 for invalid data"
+              Expect.equal counter.Count 0 "Handler should NOT have been invoked"
+
+          testCase "completely empty JSON object returns 422"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+
+              let content = new StringContent("""{}""", Encoding.UTF8, "application/json")
+              let response = client.PostAsync("/users", content).Result
+              Expect.equal (int response.StatusCode) 422 "Should return 422 for empty object"
+              Expect.equal counter.Count 0 "Handler should NOT have been invoked" ]
+
+[<Tests>]
+let missingBodyTests =
+    testList
+        "ValidationMiddleware - missing body"
+        [ testCase "missing body on POST returns 422"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+
+              let content = new StringContent("", Encoding.UTF8, "application/json")
+              let response = client.PostAsync("/users", content).Result
+              Expect.equal (int response.StatusCode) 422 "Should return 422 for missing body"
+              Expect.equal counter.Count 0 "Handler should NOT have been invoked" ]
+
+[<Tests>]
+let nonValidatedEndpointTests =
+    testList
+        "ValidationMiddleware - non-validated endpoint"
+        [ testCase "non-validated endpoint passes through"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapUnvalidatedPost "/unvalidated" c ep)
+
+              let content =
+                  new StringContent("""{"anything":"goes"}""", Encoding.UTF8, "application/json")
+
+              let response = client.PostAsync("/unvalidated", content).Result
+              Expect.equal (int response.StatusCode) 200 "Should return 200 from handler"
+              Expect.equal counter.Count 1 "Handler should have been invoked" ]
+
+[<Tests>]
+let getValidationTests =
+    testList
+        "ValidationMiddleware - GET query param validation"
+        [ testCase "valid GET with query params passes through"
+          <| fun _ ->
+              let counter, client =
+                  buildTestHost (fun c ep -> mapValidatedGet<SearchQuery> "/search" c ep)
+
+              let response = client.GetAsync("/search?Q=hello&Page=1").Result
+              Expect.equal (int response.StatusCode) 200 "Should return 200 for valid query"
+              Expect.equal counter.Count 1 "Handler should have been invoked" ]
