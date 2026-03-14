@@ -65,7 +65,14 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
                     do! next.Invoke(ctx)
                 | _ ->
                     let method = ctx.Request.Method.ToUpperInvariant()
-                    let struct (shapesGraph, shape) = shapeCache.GetOrAdd(marker.ShapeType)
+
+                    let struct (shapesGraph, shape) =
+                        match marker.ResolverConfig with
+                        | Some config ->
+                            let resolvedShape = ShapeResolver.resolve config ctx.User
+                            let sg = ShapeGraphBuilder.buildShapesGraph resolvedShape
+                            struct (sg, resolvedShape)
+                        | None -> shapeCache.GetOrAdd(marker.ShapeType)
 
                     if bodyMethods.Contains(method) then
                         // POST/PUT/PATCH: validate request body

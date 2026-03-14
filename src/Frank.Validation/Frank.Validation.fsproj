@@ -11,6 +11,7 @@
     <Compile Include="Constraints.fs" />
     <Compile Include="TypeMapping.fs" />
     <Compile Include="ShapeDerivation.fs" />
+    <Compile Include="ShapeResolver.fs" />
     <Compile Include="ShapeGraphBuilder.fs" />
     <Compile Include="DataGraphBuilder.fs" />
     <Compile Include="Validator.fs" />
