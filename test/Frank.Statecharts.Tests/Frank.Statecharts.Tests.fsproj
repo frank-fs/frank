@@ -13,6 +13,7 @@
     <Compile Include="StoreTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="StatefulResourceTests.fs" />
+    <Compile Include="Wsd/LexerTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
