@@ -14,6 +14,7 @@
     <Compile Include="MetadataTests.fs" />
     <Compile Include="ETagCacheTests.fs" />
     <Compile Include="ConditionalRequestTests.fs" />
+    <Compile Include="ConditionalRequestIntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -26,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
 </Project>
