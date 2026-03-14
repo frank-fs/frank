@@ -431,24 +431,12 @@ let private parseNote (state: ParserState) : unit =
             let (guard, remainingContent, guardErrors, guardWarnings) =
                 GuardParser.tryParseGuard content startToken.Position
 
-            // Merge guard parser errors/warnings into parser state
+            // Merge guard parser errors/warnings into parser state via addError/addWarning
             for ge in guardErrors do
-                if not state.ErrorLimitReached then
-                    state.Errors <- ge :: state.Errors
-
-                    if state.Errors.Length >= state.MaxErrors then
-                        let limitFailure =
-                            { Position = ge.Position
-                              Description = "Error limit reached; further errors suppressed"
-                              Expected = ""
-                              Found = ""
-                              CorrectiveExample = "" }
-
-                        state.Errors <- limitFailure :: state.Errors
-                        state.ErrorLimitReached <- true
+                addError state ge.Position ge.Description ge.Expected ge.Found ge.CorrectiveExample
 
             for gw in guardWarnings do
-                state.Warnings <- gw :: state.Warnings
+                addWarning state gw.Position gw.Description gw.Suggestion
 
             let finalContent =
                 if guard.IsSome && remainingContent.Length > 0 then

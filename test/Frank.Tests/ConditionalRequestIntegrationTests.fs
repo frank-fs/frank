@@ -29,6 +29,18 @@ let contextSerializer (ctx: ItemContext) : byte[] =
     let json = sprintf """{"name":"%s","updateCount":%d}""" ctx.Name ctx.UpdateCount
     Encoding.UTF8.GetBytes(json)
 
+/// Disposable wrapper for test server resources.
+type TestServer<'P>(app: WebApplication, client: HttpClient, provider: 'P, cache: ETagCache) =
+    member _.Client = client
+    member _.Provider = provider
+    member _.Cache = cache
+
+    interface IAsyncDisposable with
+        member _.DisposeAsync() =
+            client.Dispose()
+            (cache :> IDisposable).Dispose()
+            app.DisposeAsync()
+
 // -- Dictionary-backed IETagProvider for non-statechart integration tests --
 
 /// Mutable ETag provider wrapping an in-memory dictionary of instance ID -> raw ETag value.
@@ -118,7 +130,7 @@ let createIntegrationTestServer () =
     |> ignore
 
     app.Start()
-    (app.GetTestClient(), provider, cache)
+    new TestServer<_>(app, app.GetTestClient(), provider, cache)
 
 /// Creates a test server backed by StatechartETagProvider using MailboxProcessorStore.
 let createStatechartTestServer () =
@@ -180,7 +192,7 @@ let createStatechartTestServer () =
     |> ignore
 
     app.Start()
-    (app.GetTestClient(), store, cache)
+    new TestServer<_>(app, app.GetTestClient(), store, cache)
 
 [<Tests>]
 let conditionalRequestIntegrationTests =
@@ -189,9 +201,9 @@ let conditionalRequestIntegrationTests =
         [
           // -- GET returns ETag header --
           testTask "GET includes ETag header when provider has a value" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "abc123")
-              let! (response: HttpResponseMessage) = client.GetAsync("/items/42")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "abc123")
+              let! (response: HttpResponseMessage) = s.Client.GetAsync("/items/42")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               Expect.isTrue (response.Headers.ETag <> null) "Should have ETag header"
               let etag = response.Headers.ETag.ToString()
@@ -200,25 +212,25 @@ let conditionalRequestIntegrationTests =
 
           // -- ETag changes when provider returns different value --
           testTask "ETag changes when provider returns different value after mutation" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "version1")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "version1")
 
               // First GET
-              let! (r1: HttpResponseMessage) = client.GetAsync("/items/42")
+              let! (r1: HttpResponseMessage) = s.Client.GetAsync("/items/42")
               Expect.equal r1.StatusCode HttpStatusCode.OK "First GET should return 200"
               let etag1 = r1.Headers.ETag.ToString()
               Expect.equal etag1 "\"version1\"" "First ETag should be version1"
 
               // Update the provider
-              provider.Set("42", "version2")
+              s.Provider.Set("42", "version2")
 
               // POST triggers cache invalidation and re-computation
               let postReq = new HttpRequestMessage(HttpMethod.Post, "/items/42")
               postReq.Content <- new StringContent("data")
-              let! (_postResp: HttpResponseMessage) = client.SendAsync(postReq)
+              let! (_postResp: HttpResponseMessage) = s.Client.SendAsync(postReq)
 
               // Second GET should get the new ETag
-              let! (r2: HttpResponseMessage) = client.GetAsync("/items/42")
+              let! (r2: HttpResponseMessage) = s.Client.GetAsync("/items/42")
               Expect.equal r2.StatusCode HttpStatusCode.OK "Second GET should return 200"
               let etag2 = r2.Headers.ETag.ToString()
               Expect.equal etag2 "\"version2\"" "ETag should be updated after mutation"
@@ -226,11 +238,11 @@ let conditionalRequestIntegrationTests =
 
           // -- Conditional GET with matching If-None-Match returns 304 no body --
           testTask "Conditional GET with matching If-None-Match returns 304 with no body" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "abc123")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "abc123")
               let request = new HttpRequestMessage(HttpMethod.Get, "/items/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"abc123\"") |> ignore
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.NotModified "Should return 304"
               let! body = response.Content.ReadAsStringAsync()
               Expect.equal body "" "304 should have no body"
@@ -238,14 +250,14 @@ let conditionalRequestIntegrationTests =
 
           // -- GET with old If-None-Match returns 200 with new ETag --
           testTask "GET with old If-None-Match returns 200 with new ETag" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "newversion")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "newversion")
               let request = new HttpRequestMessage(HttpMethod.Get, "/items/42")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"oldversion\"")
               |> ignore
 
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 for non-matching ETag"
               Expect.isTrue (response.Headers.ETag <> null) "Should include new ETag header"
               let etag = response.Headers.ETag.ToString()
@@ -254,49 +266,49 @@ let conditionalRequestIntegrationTests =
 
           // -- If-None-Match: * returns 304 --
           testTask "If-None-Match: * returns 304 when resource has an ETag" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "somevalue")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "somevalue")
               let request = new HttpRequestMessage(HttpMethod.Get, "/items/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "*") |> ignore
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.NotModified "Wildcard should match existing resource"
           }
 
           // -- Multiple ETags in If-None-Match, one matches returns 304 --
           testTask "Multiple ETags in If-None-Match, one matches returns 304" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "match_me")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "match_me")
               let request = new HttpRequestMessage(HttpMethod.Get, "/items/42")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"other\", \"match_me\", \"another\"")
               |> ignore
 
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.NotModified "Should match one of the multiple ETags"
           }
 
           // -- POST with matching If-Match returns 200 --
           testTask "POST with matching If-Match proceeds with 200" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "current_etag")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "current_etag")
               let request = new HttpRequestMessage(HttpMethod.Post, "/items/42")
 
               request.Headers.TryAddWithoutValidation("If-Match", "\"current_etag\"")
               |> ignore
 
               request.Content <- new StringContent("data")
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.OK "Matching If-Match should proceed"
           }
 
           // -- POST with stale If-Match returns 412 --
           testTask "POST with stale If-Match returns 412 Precondition Failed" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "current_etag")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "current_etag")
               let request = new HttpRequestMessage(HttpMethod.Post, "/items/42")
               request.Headers.TryAddWithoutValidation("If-Match", "\"stale_etag\"") |> ignore
               request.Content <- new StringContent("data")
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
 
               Expect.equal response.StatusCode HttpStatusCode.PreconditionFailed "Stale If-Match should return 412"
 
@@ -306,11 +318,11 @@ let conditionalRequestIntegrationTests =
 
           // -- POST without If-Match proceeds normally --
           testTask "POST without If-Match proceeds normally" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "current_etag")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "current_etag")
               let request = new HttpRequestMessage(HttpMethod.Post, "/items/42")
               request.Content <- new StringContent("data")
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.OK "POST without If-Match should proceed"
               let! body = response.Content.ReadAsStringAsync()
               Expect.equal body "Mutated 42" "Should return handler response"
@@ -318,13 +330,13 @@ let conditionalRequestIntegrationTests =
 
           // -- Resource without provider returns no ETag, no conditional processing --
           testTask "Resource without ETag provider returns no ETag header and no conditional processing" {
-              let (client, _provider, _cache) = createIntegrationTestServer ()
+              use s = createIntegrationTestServer ()
               let request = new HttpRequestMessage(HttpMethod.Get, "/plain")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"anything\"")
               |> ignore
 
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200 regardless of If-None-Match"
 
               Expect.isFalse (response.Headers.Contains("ETag")) "Should not have ETag header on non-ETag resource"
@@ -335,14 +347,14 @@ let conditionalRequestIntegrationTests =
 
           // -- 304 has ETag header but no body --
           testTask "304 response includes ETag header but no body" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
-              provider.Set("42", "etag_value")
+              use s = createIntegrationTestServer ()
+              s.Provider.Set("42", "etag_value")
               let request = new HttpRequestMessage(HttpMethod.Get, "/items/42")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"etag_value\"")
               |> ignore
 
-              let! (response: HttpResponseMessage) = client.SendAsync(request)
+              let! (response: HttpResponseMessage) = s.Client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.NotModified "Should return 304"
               Expect.isTrue (response.Headers.ETag <> null) "304 should include ETag header"
               let etag = response.Headers.ETag.ToString()
@@ -353,10 +365,10 @@ let conditionalRequestIntegrationTests =
 
           // -- ETag format: quoted hex string --
           testTask "ETag format is a quoted string on the wire" {
-              let (client, provider, _cache) = createIntegrationTestServer ()
+              use s = createIntegrationTestServer ()
               // Use a hex-like raw ETag to verify quoting
-              provider.Set("42", "0a1b2c3d4e5f6789")
-              let! (response: HttpResponseMessage) = client.GetAsync("/items/42")
+              s.Provider.Set("42", "0a1b2c3d4e5f6789")
+              let! (response: HttpResponseMessage) = s.Client.GetAsync("/items/42")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               let etag = response.Headers.ETag.ToString()
               // Should be quoted: "0a1b2c3d4e5f6789"
@@ -367,16 +379,16 @@ let conditionalRequestIntegrationTests =
 
           // -- StatechartETagProvider integration: ETag from statechart state --
           testTask "StatechartETagProvider computes ETag from state and context" {
-              let (client, store, _cache) = createStatechartTestServer ()
+              use s = createStatechartTestServer ()
 
               // Set initial state
               do!
-                  (store :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>).SetState
+                  (s.Provider :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>).SetState
                       "item1"
                       Active
                       { Name = "Widget"; UpdateCount = 0 }
 
-              let! (response: HttpResponseMessage) = client.GetAsync("/items/item1")
+              let! (response: HttpResponseMessage) = s.Client.GetAsync("/items/item1")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               Expect.isTrue (response.Headers.ETag <> null) "Should have ETag from statechart provider"
               let etag1 = response.Headers.ETag.ToString()
@@ -393,21 +405,21 @@ let conditionalRequestIntegrationTests =
 
           // -- StatechartETagProvider: ETag changes when state changes --
           testTask "StatechartETagProvider produces different ETag after state change" {
-              let (client, store, cache) = createStatechartTestServer ()
-              let storeI = store :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>
+              use s = createStatechartTestServer ()
+              let storeI = s.Provider :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>
 
               // Set initial state
               do! storeI.SetState "item2" Active { Name = "Gadget"; UpdateCount = 0 }
 
-              let! (r1: HttpResponseMessage) = client.GetAsync("/items/item2")
+              let! (r1: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
               let etag1 = r1.Headers.ETag.ToString()
 
               // Invalidate cache and change state
-              cache.Invalidate("/items/item2")
+              s.Cache.Invalidate("/items/item2")
 
               do! storeI.SetState "item2" Completed { Name = "Gadget"; UpdateCount = 1 }
 
-              let! (r2: HttpResponseMessage) = client.GetAsync("/items/item2")
+              let! (r2: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
               let etag2 = r2.Headers.ETag.ToString()
 
               Expect.notEqual etag1 etag2 "ETag should change after state transition"

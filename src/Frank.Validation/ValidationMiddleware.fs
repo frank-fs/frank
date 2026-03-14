@@ -70,8 +70,7 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
                         match marker.ResolverConfig with
                         | Some config ->
                             let resolvedShape = ShapeResolver.resolve config ctx.User
-                            let sg = ShapeGraphBuilder.buildShapesGraph resolvedShape
-                            struct (sg, resolvedShape)
+                            shapeCache.GetOrAddResolved(resolvedShape)
                         | None -> shapeCache.GetOrAdd(marker.ShapeType)
 
                     if bodyMethods.Contains(method) then

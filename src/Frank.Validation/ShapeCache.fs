@@ -10,6 +10,7 @@ open VDS.RDF.Shacl
 type ShapeCache() =
 
     let cache = ConcurrentDictionary<Type, struct (ShapesGraph * ShaclShape)>()
+    let resolvedCache = ConcurrentDictionary<Uri, struct (ShapesGraph * ShaclShape)>()
 
     /// Get or create a ShapesGraph for the given type. The shape is derived via
     /// ShapeDerivation and converted via ShapeGraphBuilder. Thread-safe: concurrent
@@ -23,5 +24,17 @@ type ShapeCache() =
                 struct (shapesGraph, shape)
         )
 
+    /// Get or create a ShapesGraph for a resolved ShaclShape (capability-dependent).
+    /// Keyed by the shape's NodeShapeUri to avoid rebuilding per-request.
+    member _.GetOrAddResolved(shape: ShaclShape) : struct (ShapesGraph * ShaclShape) =
+        resolvedCache.GetOrAdd(
+            shape.NodeShapeUri,
+            fun _ ->
+                let shapesGraph = ShapeGraphBuilder.buildShapesGraph shape
+                struct (shapesGraph, shape)
+        )
+
     /// Clear all cached shapes. Useful for testing.
-    member _.Clear() = cache.Clear()
+    member _.Clear() =
+        cache.Clear()
+        resolvedCache.Clear()
