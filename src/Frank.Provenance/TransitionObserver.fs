@@ -44,23 +44,34 @@ module private AgentExtraction =
           AgentType = AgentType.SoftwareAgent("system") }
 
     let extractAgent (user: ClaimsPrincipal option) (headers: Map<string, string>) =
-        match user with
-        | None -> systemAgent ()
-        | Some principal when principal.Identity = null || not principal.Identity.IsAuthenticated -> systemAgent ()
-        | Some principal ->
-            match headers |> Map.tryFind "X-Agent-Type" with
-            | Some agentType when agentType.Equals("llm", StringComparison.OrdinalIgnoreCase) ->
-                let identifier =
-                    principal
+        // Check X-Agent-Type header FIRST, before authentication.
+        // This allows unauthenticated LLM agents to be identified as "anonymous-llm".
+        match headers |> Map.tryFind "X-Agent-Type" with
+        | Some agentType when agentType.Equals("llm", StringComparison.OrdinalIgnoreCase) ->
+            let isAuthenticated =
+                match user with
+                | Some p when p.Identity <> null && p.Identity.IsAuthenticated -> true
+                | _ -> false
+
+            let identifier =
+                if isAuthenticated then
+                    user.Value
                     |> tryGetClaim ClaimTypes.NameIdentifier
                     |> Option.defaultValue "unknown"
+                else
+                    "anonymous-llm"
 
-                let model = headers |> Map.tryFind "X-Agent-Model"
+            let model = headers |> Map.tryFind "X-Agent-Model"
 
-                { ProvenanceAgent.Id = $"urn:frank:agent:llm:{identifier}"
-                  AgentType = AgentType.LlmAgent(identifier, model) }
-            | _ ->
-                let name = principal |> tryGetClaim ClaimTypes.Name |> Option.defaultValue "unknown"
+            { ProvenanceAgent.Id = $"urn:frank:agent:llm:{identifier}"
+              AgentType = AgentType.LlmAgent(identifier, model) }
+        | _ ->
+            // Unknown X-Agent-Type values (e.g. "robot") are ignored.
+            match user with
+            | None -> systemAgent ()
+            | Some principal when principal.Identity = null || not principal.Identity.IsAuthenticated -> systemAgent ()
+            | Some principal ->
+                let name = principal |> tryGetClaim ClaimTypes.Name |> Option.defaultValue "Unknown"
 
                 let identifier =
                     principal

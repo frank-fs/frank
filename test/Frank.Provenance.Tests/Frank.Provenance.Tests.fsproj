@@ -15,6 +15,7 @@
     <Compile Include="GraphBuilderTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="TransitionObserverTests.fs" />
+    <Compile Include="AgentTypeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
