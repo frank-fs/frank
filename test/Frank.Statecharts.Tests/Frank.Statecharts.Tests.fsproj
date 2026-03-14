@@ -15,6 +15,7 @@
     <Compile Include="StatefulResourceTests.fs" />
     <Compile Include="Wsd/GuardParserTests.fs" />
     <Compile Include="Wsd/ParserTests.fs" />
+    <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
