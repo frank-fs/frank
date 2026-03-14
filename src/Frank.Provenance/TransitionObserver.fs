@@ -28,7 +28,6 @@ type TransitionEvent =
     }
 
 /// Private module for extracting a ProvenanceAgent from request context.
-[<AutoOpen>]
 module private AgentExtraction =
 
     let private tryGetClaim (claimType: string) (principal: ClaimsPrincipal) =
@@ -75,7 +74,7 @@ module private AgentExtraction =
 type TransitionObserver(store: IProvenanceStore, logger: ILogger<TransitionObserver>) =
 
     let createRecord (event: TransitionEvent) =
-        let agent = extractAgent event.User event.Headers
+        let agent = AgentExtraction.extractAgent event.User event.Headers
 
         let activityId = $"urn:frank:activity:{Guid.NewGuid()}"
         let usedEntityId = $"urn:frank:entity:{Guid.NewGuid()}"
