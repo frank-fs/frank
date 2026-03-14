@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Lexer (tokenizer)
-lane: "doing"
+lane: "done"
 dependencies: [WP01]
 base_branch: 007-wsd-lexer-parser-ast-WP01
 base_commit: 48c67df080b71baa278940e8b9c960a161564cfc
@@ -9,6 +9,8 @@ created_at: '2026-03-14T15:36:13.721821+00:00'
 subtasks: [T012, T013, T014, T015, T016, T017]
 shell_pid: "814"
 agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -248,3 +250,4 @@ Write at least 30 test cases covering the categories above. Focus on correctness
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-14T15:36:13Z – claude-opus – shell_pid=814 – lane=doing – Assigned agent via workflow command
+- 2026-03-14T16:19:37Z – claude-opus – shell_pid=814 – lane=done – Review passed: TextContent position, dead code, stray hyphen fixes
