@@ -176,7 +176,7 @@ let storeTests =
 
           testList
               "Disposal"
-              [ testAsync "queries return empty after dispose" {
+              [ testAsync "queries throw ObjectDisposedException after dispose" {
                     let store = createStore defaultConfig
                     let istore = store :> IProvenanceStore
                     let baseTime = DateTimeOffset(2025, 6, 1, 12, 0, 0, TimeSpan.Zero)
@@ -186,11 +186,12 @@ let storeTests =
 
                     (store :> IDisposable).Dispose()
 
-                    let! results = istore.QueryByResource("/orders/1") |> Async.AwaitTask
-                    Expect.isEmpty results "Should return empty after dispose"
+                    Expect.throws
+                        (fun () -> istore.QueryByResource("/orders/1") |> ignore)
+                        "Should throw ObjectDisposedException after dispose"
                 }
 
-                testAsync "append after dispose does not throw" {
+                testAsync "append after dispose throws ObjectDisposedException" {
                     let store = createStore defaultConfig
                     let istore = store :> IProvenanceStore
                     (store :> IDisposable).Dispose()
@@ -198,8 +199,7 @@ let storeTests =
                     let record =
                         makeRecord "r1" "/orders/1" "agent-1" (DateTimeOffset(2025, 6, 1, 12, 0, 0, TimeSpan.Zero))
 
-                    // Should not throw, just log a warning
-                    istore.Append(record)
+                    Expect.throws (fun () -> istore.Append(record)) "Should throw ObjectDisposedException after dispose"
                 } ]
 
           testList
