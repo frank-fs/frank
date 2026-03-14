@@ -13,6 +13,14 @@ module ProvVocabulary =
     [<Literal>]
     let FrankNamespace = "https://frank-web.dev/ns/provenance#"
 
+    /// The RDF namespace URI.
+    [<Literal>]
+    let RdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+    /// The RDF Schema namespace URI.
+    [<Literal>]
+    let RdfsNamespace = "http://www.w3.org/2000/01/rdf-schema#"
+
     /// The XML Schema namespace URI.
     [<Literal>]
     let XsdNamespace = "http://www.w3.org/2001/XMLSchema#"
@@ -97,7 +105,7 @@ module ProvVocabulary =
     module Rdf =
 
         [<Literal>]
-        let Type = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+        let Type = RdfNamespace + "type"
 
     /// XML Schema datatype constants.
     [<RequireQualifiedAccess>]
@@ -111,4 +119,4 @@ module ProvVocabulary =
     module Rdfs =
 
         [<Literal>]
-        let label = "http://www.w3.org/2000/01/rdf-schema#label"
+        let label = RdfsNamespace + "label"
