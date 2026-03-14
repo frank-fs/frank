@@ -149,9 +149,10 @@ module ShapeDerivation =
     // ──────────────────────────────────────────────
 
     /// Discriminated union to represent the result of DU constraint analysis.
+    [<Struct>]
     type DuConstraintResult =
-        | InValues of string list
-        | OrShapes of Uri list
+        | InValues of values: string list
+        | OrShapes of shapes: Uri list
 
     /// Derive a PropertyShape from a single record field.
     let rec deriveProperty (maxDepth: int) (stack: Set<string>) (field: PropertyInfo) : PropertyShape =
