@@ -288,15 +288,22 @@ let parserTests =
               let result = parseWsd "participant Client\nnote over Client text\n"
               Expect.isGreaterThanOrEqual result.Errors.Length 1 "at least one error"
 
-          // === Group stub ===
-          testCase "group keyword produces warning"
+          // === Group parsing (WP05) ===
+          testCase "group keyword produces GroupElement"
           <| fun _ ->
               let result = parseWsd "alt condition\nend\n"
+              Expect.isEmpty result.Errors "no errors"
 
-              Expect.isTrue
-                  (result.Warnings
-                   |> List.exists (fun w -> w.Description.Contains("Grouping blocks")))
-                  "has group warning"
+              let groups =
+                  result.Diagram.Elements
+                  |> List.choose (function
+                      | GroupElement g -> Some g
+                      | _ -> None)
+
+              Expect.hasLength groups 1 "one group"
+              Expect.equal groups.[0].Kind GroupKind.Alt "alt kind"
+              Expect.hasLength groups.[0].Branches 1 "one branch"
+              Expect.equal groups.[0].Branches.[0].Condition (Some "condition") "condition text"
 
           // === Mixed input / acceptance scenarios (T023) ===
           testCase "US1-S1: participants and solid messages"

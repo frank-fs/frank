@@ -412,20 +412,202 @@ let private parseNote (state: ParserState) : unit =
 
     skipToNewline state
 
-// Stub for group parsing (WP05)
-let private parseGroup (state: ParserState) : unit =
+// WP05: Map group keyword token to GroupKind
+let private mapGroupKind (kind: TokenKind) : GroupKind option =
+    match kind with
+    | TokenKind.Alt -> Some GroupKind.Alt
+    | TokenKind.Opt -> Some GroupKind.Opt
+    | TokenKind.Loop -> Some GroupKind.Loop
+    | TokenKind.Par -> Some GroupKind.Par
+    | TokenKind.Break -> Some GroupKind.Break
+    | TokenKind.Critical -> Some GroupKind.Critical
+    | TokenKind.Ref -> Some GroupKind.Ref
+    | _ -> None
+
+// WP05: Parse condition text after group/else keyword (TextContent until Newline)
+let private parseConditionText (state: ParserState) : string option =
+    match (peek state).Kind with
+    | TextContent text ->
+        advance state |> ignore
+        let trimmed = text.Trim()
+        if trimmed.Length > 0 then Some trimmed else None
+    | Identifier text ->
+        advance state |> ignore
+        // Collect remaining identifiers/text on the same line
+        let parts = ResizeArray<string>()
+        parts.Add(text)
+
+        let rec collect () =
+            match (peek state).Kind with
+            | Identifier word ->
+                advance state |> ignore
+                parts.Add(word)
+                collect ()
+            | TextContent word ->
+                advance state |> ignore
+                parts.Add(word)
+            | _ -> ()
+
+        collect ()
+        Some(System.String.Join(" ", parts))
+    | _ -> None
+
+// WP05: Group parsing with full branch support and recursive nesting
+// parseGroup and parseElements are mutually recursive
+let rec private parseGroup (state: ParserState) (depth: int) : unit =
     let startToken = advance state // consume group keyword
 
-    addWarning
-        state
-        startToken.Position
-        "Grouping blocks not yet supported"
-        (Some "Grouping blocks (alt, opt, loop, etc.) will be supported in a future version")
+    let groupKind =
+        match mapGroupKind startToken.Kind with
+        | Some kind -> kind
+        | None -> GroupKind.Alt // should never happen
 
-    skipToNewline state
+    if depth > 50 then
+        addWarning
+            state
+            startToken.Position
+            (sprintf "Deeply nested grouping block (depth %d)" depth)
+            (Some "Consider simplifying the diagram to reduce nesting depth")
+
+    // Parse condition text
+    let condition = parseConditionText state
+
+    // Consume newline after group keyword line
+    if (peek state).Kind = Newline then
+        state.Position <- state.Position + 1
+
+    // Parse branches: initial branch + else branches
+    let branches = ResizeArray<GroupBranch>()
+
+    // Parse initial branch body
+    let initialElements = parseBranchBody state depth
+
+    branches.Add(
+        { Condition = condition
+          Elements = initialElements }
+    )
+
+    // Parse else branches
+    let mutable finished = false
+
+    while not finished do
+        skipNewlines state
+        let current = peek state
+
+        match current.Kind with
+        | TokenKind.Else ->
+            advance state |> ignore // consume Else
+            let elseCondition = parseConditionText state
+
+            if (peek state).Kind = Newline then
+                state.Position <- state.Position + 1
+
+            let elseElements = parseBranchBody state depth
+
+            branches.Add(
+                { Condition = elseCondition
+                  Elements = elseElements }
+            )
+        | TokenKind.End ->
+            advance state |> ignore // consume End
+            skipToNewline state
+            finished <- true
+        | Eof ->
+            addError
+                state
+                startToken.Position
+                (sprintf
+                    "Unclosed grouping block '%s' starting at line %d"
+                    (startToken.Kind.ToString().ToLowerInvariant())
+                    startToken.Position.Line)
+                "'end'"
+                "end of input"
+                (sprintf "%s condition\n  ...\nend" (startToken.Kind.ToString().ToLowerInvariant()))
+
+            finished <- true
+        | _ ->
+            // Unexpected token — this shouldn't happen but handle gracefully
+            addError
+                state
+                current.Position
+                "Unexpected token in grouping block"
+                "'else' or 'end'"
+                (tokenDescription current)
+                ""
+
+            skipToNewline state
+            finished <- true
+
+    let group =
+        { Kind = groupKind
+          Branches = branches |> Seq.toList
+          Position = startToken.Position }
+
+    state.Elements <- GroupElement group :: state.Elements
+
+// WP05: Parse branch body elements, isolating from parent state.Elements
+and private parseBranchBody (state: ParserState) (depth: int) : DiagramElement list =
+    // Save parent elements
+    let savedElements = state.Elements
+    state.Elements <- []
+
+    // Parse elements until Else, End, or Eof
+    parseBranchElements state depth
+
+    // Collect branch elements (they were prepended, so reverse)
+    let branchElements = List.rev state.Elements
+
+    // Restore parent elements
+    state.Elements <- savedElements
+    branchElements
+
+// WP05: Parse elements within a branch body — stops at Else, End, or Eof
+and private parseBranchElements (state: ParserState) (depth: int) : unit =
+    skipNewlines state
+    let token = peek state
+
+    match token.Kind with
+    | Eof -> ()
+    | TokenKind.Else -> () // branch terminator — let caller handle
+    | TokenKind.End -> () // block terminator — let caller handle
+    | TokenKind.Participant ->
+        parseParticipant state
+        parseBranchElements state depth
+    | TokenKind.Title ->
+        parseTitleDirective state
+        parseBranchElements state depth
+    | TokenKind.AutoNumber ->
+        parseAutoNumberDirective state
+        parseBranchElements state depth
+    | TokenKind.Note ->
+        parseNote state
+        parseBranchElements state depth
+    | TokenKind.Alt
+    | TokenKind.Opt
+    | TokenKind.Loop
+    | TokenKind.Par
+    | TokenKind.Break
+    | TokenKind.Critical
+    | TokenKind.Ref ->
+        parseGroup state (depth + 1)
+        parseBranchElements state depth
+    | Identifier _ ->
+        parseMessage state
+        parseBranchElements state depth
+    | _ ->
+        addError
+            state
+            token.Position
+            "Unexpected token"
+            "participant, message, note, or directive"
+            (tokenDescription token)
+            ""
+
+        skipToNewline state
+        parseBranchElements state depth
 
 // Main parse loop
-let rec private parseElements (state: ParserState) : unit =
+and private parseElements (state: ParserState) : unit =
     skipNewlines state
     let token = peek state
 
@@ -450,7 +632,7 @@ let rec private parseElements (state: ParserState) : unit =
     | TokenKind.Break
     | TokenKind.Critical
     | TokenKind.Ref ->
-        parseGroup state
+        parseGroup state 0
         parseElements state
     | Identifier _ ->
         parseMessage state
