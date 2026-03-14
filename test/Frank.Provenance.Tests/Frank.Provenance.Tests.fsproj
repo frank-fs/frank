@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="VocabularyTests.fs" />
+    <Compile Include="TypeTests.fs" />
+    <Compile Include="StoreTests.fs" />
+    <Compile Include="GraphBuilderTests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Expecto" Version="10.2.3" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
+  </ItemGroup>
+
+</Project>
