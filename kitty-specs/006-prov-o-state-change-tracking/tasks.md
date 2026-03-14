@@ -46,11 +46,11 @@
 **Requirement Refs**: FR-007, FR-008, FR-009, FR-015
 
 ### Included Subtasks
-- [ ] T007 Create `src/Frank.Provenance/Store.fs` with `IProvenanceStore` interface
-- [ ] T008 Create `src/Frank.Provenance/MailboxProcessorStore.fs` with `StoreMessage` DU, `StoreState`, and `MailboxProcessorProvenanceStore` class
-- [ ] T009 Implement retention policy (oldest-first eviction in configurable batches)
-- [ ] T010 Implement `IDisposable` with drain of pending appends and graceful post-disposal behavior
-- [ ] T011 Create `test/Frank.Provenance.Tests/StoreTests.fs` with append, query, retention, disposal, and concurrency tests
+- [x] T007 Create `src/Frank.Provenance/Store.fs` with `IProvenanceStore` interface
+- [x] T008 Create `src/Frank.Provenance/MailboxProcessorStore.fs` with `StoreMessage` DU, `StoreState`, and `MailboxProcessorProvenanceStore` class
+- [x] T009 Implement retention policy (oldest-first eviction in configurable batches)
+- [x] T010 Implement `IDisposable` with drain of pending appends and graceful post-disposal behavior
+- [x] T011 Create `test/Frank.Provenance.Tests/StoreTests.fs` with append, query, retention, disposal, and concurrency tests
 
 ### Dependencies
 - Depends on WP01 (core types)
