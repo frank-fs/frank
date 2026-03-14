@@ -14,6 +14,7 @@
     <Compile Include="ShapeGraphBuilder.fs" />
     <Compile Include="DataGraphBuilder.fs" />
     <Compile Include="Validator.fs" />
+    <Compile Include="ReportSerializer.fs" />
     <Compile Include="ShapeCache.fs" />
     <Compile Include="ValidationMiddleware.fs" />
   </ItemGroup>
