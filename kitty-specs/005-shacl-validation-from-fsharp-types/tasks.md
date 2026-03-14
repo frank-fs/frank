@@ -56,15 +56,15 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-017, FR-020
 
 ### Included Subtasks
-- [x] T006 Create `src/Frank.Validation/TypeMapping.fs` with `mapType : Type -> XsdDatatype option` and `xsdUri : XsdDatatype -> Uri`
-- [x] T007 Implement record field derivation: `PropertyInfo -> PropertyShape` with datatype, minCount/maxCount
-- [x] T008 Implement option type unwrapping (`option<T>` -> minCount 0, inner type mapping)
-- [x] T009 Implement DU derivation: simple cases -> `sh:in`, payload cases -> `sh:or` with per-case NodeShapes
-- [x] T010 Implement nested record handling: `sh:node` references to child NodeShapes
-- [x] T011 Implement recursive type cycle detection with configurable depth limit (default 5)
-- [x] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
-- [x] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
-- [x] T014 Create `test/Frank.Validation.Tests/ShapeDerivationTests.fs` with derivation tests for records, DUs, nested/recursive types
+- [ ] T006 Create `src/Frank.Validation/TypeMapping.fs` with `mapType : Type -> XsdDatatype option` and `xsdUri : XsdDatatype -> Uri`
+- [ ] T007 Implement record field derivation: `PropertyInfo -> PropertyShape` with datatype, minCount/maxCount
+- [ ] T008 Implement option type unwrapping (`option<T>` -> minCount 0, inner type mapping)
+- [ ] T009 Implement DU derivation: simple cases -> `sh:in`, payload cases -> `sh:or` with per-case NodeShapes
+- [ ] T010 Implement nested record handling: `sh:node` references to child NodeShapes
+- [ ] T011 Implement recursive type cycle detection with configurable depth limit (default 5)
+- [ ] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
+- [ ] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
+- [ ] T014 Create `test/Frank.Validation.Tests/ShapeDerivationTests.fs` with derivation tests for records, DUs, nested/recursive types
 - [ ] T014b Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype)
 
 ### Implementation Notes
