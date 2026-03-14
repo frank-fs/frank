@@ -387,3 +387,4 @@ let etagComparisonTests =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:59Z – claude-opus – shell_pid=98096 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:57:54Z – claude-opus – shell_pid=98096 – lane=for_review – T001-T005 complete: IETagProvider, IETagProviderFactory, ETagMetadata, ETagFormat, ETagComparison. Builds clean.
+- 2026-03-14T15:33:57Z – claude-opus – shell_pid=98096 – lane=for_review – Rework complete: ETagMetadata with ctor params, CreateProvider(Endpoint), spec-matching function names, anyMatch with option, computeFromBytes, 36 passing tests. [claude-opus]
