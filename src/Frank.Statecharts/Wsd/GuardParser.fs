@@ -83,9 +83,9 @@ let tryParseGuard
                 else
                     // Split on commas
                     let parts = innerTrimmed.Split(',')
-                    let mutable pairs = []
-                    let mutable errors = []
-                    let mutable warnings = []
+                    let pairs = ResizeArray<string * string>()
+                    let errors = ResizeArray<ParseFailure>()
+                    let warnings = ResizeArray<ParseWarning>()
                     // Track column offset within inner content
                     let mutable colOffset = baseCol + prefixLen
 
@@ -117,7 +117,7 @@ let tryParseGuard
                                       Found = partTrimmed
                                       CorrectiveExample = partTrimmed + "=value" }
 
-                                errors <- errors @ [ failure ]
+                                errors.Add(failure)
                             elif eqIdx = 0 then
                                 // Empty key
                                 let failure =
@@ -129,7 +129,7 @@ let tryParseGuard
                                       Found = partTrimmed
                                       CorrectiveExample = "key" + partTrimmed }
 
-                                errors <- errors @ [ failure ]
+                                errors.Add(failure)
                             else
                                 let key = partTrimmed.Substring(0, eqIdx).Trim()
                                 let value = partTrimmed.Substring(eqIdx + 1).Trim()
@@ -142,17 +142,17 @@ let tryParseGuard
                                           Description = "Empty value in guard annotation"
                                           Suggestion = Some("Provide a value for key '" + key + "'") }
 
-                                    warnings <- warnings @ [ warning ]
+                                    warnings.Add(warning)
 
-                                pairs <- pairs @ [ (key, value) ]
+                                pairs.Add((key, value))
 
                         // Advance column offset past this part and the comma
                         colOffset <- colOffset + part.Length + 1
 
                     let guard =
-                        { Pairs = pairs
+                        { Pairs = Seq.toList pairs
                           Position =
                             { Line = position.Line
                               Column = baseCol } }
 
-                    (Some guard, remaining, errors, warnings)
+                    (Some guard, remaining, Seq.toList errors, Seq.toList warnings)
