@@ -5,9 +5,13 @@
 **Research**: [research.md](research.md) | **Data Model**: [data-model.md](data-model.md) | **Quickstart**: [quickstart.md](quickstart.md)
 **GitHub Issue**: #76
 
+## Amendment: Build-Time SHACL Unification (2026-03-14)
+
+> **This plan is amended by the [build-time SHACL unification design](../../docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md).** The amendment replaces runtime .NET reflection with build-time FCS analysis via Frank.Cli.Core, producing a single Turtle artifact consumed by all readers. New WPs 09-12 are added; WPs 06-08 are amended. The original summary below is retained for historical context but is superseded where it mentions reflection-based derivation.
+
 ## Summary
 
-Implement `Frank.Validation`, an extension library that derives W3C SHACL NodeShapes from F# record types and discriminated unions at application startup, then validates incoming HTTP requests against those shapes before handler dispatch. Provides a `validate` custom operation on the `ResourceBuilder` CE, returns 422 Unprocessable Content with SHACL ValidationReport (content-negotiated via Frank.LinkedData) or RFC 9457 Problem Details for non-semantic clients. Composes with Frank.Auth for capability-dependent shape selection and supports developer-supplied custom constraints that are additive to auto-derived shapes. Shape derivation uses .NET reflection (no FSharp.Compiler.Service dependency); runtime validation uses dotNetRdf.Core's SHACL engine.
+Implement `Frank.Validation`, an extension library that derives W3C SHACL NodeShapes from F# record types and discriminated unions ~~at application startup~~ **at build time via FSharp.Compiler.Service**, then validates incoming HTTP requests against those shapes before handler dispatch. Provides a `validate` custom operation on the `ResourceBuilder` CE, returns 422 Unprocessable Content with SHACL ValidationReport (content-negotiated via Frank.LinkedData) or RFC 9457 Problem Details for non-semantic clients. Composes with Frank.Auth for capability-dependent shape selection and supports developer-supplied custom constraints that are additive to auto-derived shapes. ~~Shape derivation uses .NET reflection (no FSharp.Compiler.Service dependency)~~ **Shape derivation uses FCS at build time via Frank.Cli.Core; Frank.Validation loads pre-computed shapes from an embedded Turtle resource**; runtime validation uses dotNetRdf.Core's SHACL engine.
 
 ## Technical Context
 

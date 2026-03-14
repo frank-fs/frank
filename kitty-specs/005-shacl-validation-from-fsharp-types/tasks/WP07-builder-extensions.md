@@ -3,7 +3,9 @@ work_package_id: WP07
 title: ResourceBuilder & WebHost Extensions
 lane: planned
 dependencies:
-- WP02
+- WP11
+- WP12
+- WP06
 subtasks: [T037, T038, T039, T040, T041, T042]
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -11,7 +13,13 @@ history:
   agent: system
   shell_pid: ''
   action: Prompt generated via /spec-kitty.tasks
+- timestamp: '2026-03-14T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Amended per build-time SHACL unification design
 requirement_refs: [FR-017, FR-018, FR-019]
+amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
 ---
 
 # Work Package Prompt: WP07 -- ResourceBuilder & WebHost Extensions
@@ -34,13 +42,25 @@ requirement_refs: [FR-017, FR-018, FR-019]
 
 ---
 
+## Amendment (2026-03-14): Build-Time SHACL Unification
+
+> This WP is amended per the [build-time SHACL unification design](../../../docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md). Key changes:
+>
+> - **`useValidation` initializes `ShapeLoader`** instead of shape derivation. Shape cache warm-up calls `ShapeLoader.loadFromAssembly` instead of reflecting over types.
+> - **`validate` CE operation** populates `ValidationMarker.ShapeUri` (now a `Uri`, not `Type`) with the NodeShape URI from the loaded shapes.
+> - **`ValidationOptions.MaxDerivationDepth`** is no longer relevant at runtime (depth is controlled at build time); rename to `MaxShapeDepth` and pass it to the CLI configuration.
+> - **Startup warnings for framework types** (FR-017) move to build-time diagnostics (emitted by the MSBuild target, WP11). Runtime startup still warns if the embedded resource is missing.
+> - **Dependencies updated**: now depends on WP11 (MSBuild auto-invoke), WP12 (ShapeLoader), and WP06 (custom constraints).
+
+---
+
 ## Implementation Command
 
 ```bash
-spec-kitty implement WP07 --base WP06
+spec-kitty implement WP07 --base WP12
 ```
 
-Depends on WP02 (shape derivation), WP03 (middleware), WP04 (report serializer), WP05 (shape resolver), WP06 (shape merger).
+Depends on WP11 (MSBuild auto-invoke), WP12 (ShapeLoader), WP06 (shape merger), WP03 (middleware), WP04 (report serializer), WP05 (shape resolver).
 
 ---
 
@@ -48,7 +68,7 @@ Depends on WP02 (shape derivation), WP03 (middleware), WP04 (report serializer),
 
 - Implement `ResourceBuilderExtensions.fs`: `validate`, `customConstraint`, `validateWithCapabilities` custom operations on `ResourceBuilder` (FR-018)
 - Implement `WebHostBuilderExtensions.fs`: `useValidation` extension for middleware registration and DI setup
-- Shape cache initialization at startup: derive all shapes from `ValidationMarker` metadata
+- Shape cache initialization at startup: load all shapes from embedded Turtle resource via `ShapeLoader`
 - Response validation opt-in for diagnostic mode (FR-019)
 - `validate typeof<MyRecord>` in a `resource` CE compiles and adds `ValidationMarker` to endpoint metadata
 - `useValidation` registers middleware in the correct pipeline position
@@ -69,7 +89,7 @@ Depends on WP02 (shape derivation), WP03 (middleware), WP04 (report serializer),
 - Pipeline ordering: `useAuth` -> `useValidation` -> handler dispatch
 - Framework types (HttpContext, HttpRequest) -> skip validation, log startup warning if `validate` was explicit (FR-017)
 - Response validation is diagnostic-only: logs violations via `ILogger`, never blocks responses (FR-019)
-- .fsproj compilation order: Types -> Constraints -> TypeMapping -> ShapeDerivation -> ShapeMerger -> ShapeResolver -> Validator -> ReportSerializer -> ValidationMiddleware -> ResourceBuilderExtensions -> WebHostBuilderExtensions
+- .fsproj compilation order: Types -> Constraints -> UriConventions -> TypeMapping -> ShapeLoader -> ShapeCache -> ShapeGraphBuilder -> DataGraphBuilder -> ShapeMerger -> ShapeResolver -> Validator -> ReportSerializer -> ValidationMiddleware -> ResourceBuilderExtensions -> WebHostBuilderExtensions
 
 ---
 
@@ -95,15 +115,15 @@ module ResourceBuilderExtensions =
         /// Enable SHACL validation for this resource.
         /// Derives a NodeShape from the specified F# type at startup.
         [<CustomOperation("validate")>]
-        member _.Validate(state: ResourceSpec, shapeType: System.Type) =
-            let marker = { ShapeType = shapeType
+        member _.Validate(state: ResourceSpec, shapeUri: System.Uri) =
+            let marker = { ShapeUri = shapeUri
                            CustomConstraints = []
                            ResolverConfig = None }
             // Add ValidationMarker to the resource's metadata
             { state with Metadata = (box marker) :: state.Metadata }
 ```
 
-3. Verify that `validate typeof<MyRecord>` compiles inside a `resource` CE.
+3. Verify that `validate (Uri "urn:frank:shape:MyRecord")` compiles inside a `resource` CE. Consider a helper `validateType<'T>` that constructs the URI from the type name for convenience.
 4. Verify that the `ValidationMarker` appears in the built endpoint's metadata collection.
 
 **Files**: `src/Frank.Validation/ResourceBuilderExtensions.fs`
@@ -218,41 +238,31 @@ module WebHostBuilderExtensions =
 **Files**: `src/Frank.Validation/WebHostBuilderExtensions.fs`
 **Notes**: Follow `Frank.Auth.WebHostBuilderExtensions` and `Frank.LinkedData.WebHostBuilderExtensions` patterns exactly. Check how they register middleware and services. The `ShapeCache` is a singleton that holds the `ConcurrentDictionary<Type, ShapesGraph>`.
 
-### Subtask T041 -- Implement shape cache initialization at startup
+### Subtask T041 -- Implement shape cache initialization at startup via ShapeLoader
 
-**Purpose**: At application startup, derive SHACL shapes for all types referenced by `ValidationMarker` metadata, and build/cache `ShapesGraph` instances.
+**Purpose**: At application startup, load pre-computed SHACL shapes from the embedded Turtle resource and populate the ShapeCache.
 
 **Steps**:
-1. In `ShapeCache` (new class or module), implement:
+1. `ShapeCache` is already refactored in WP12 to be `Uri`-keyed with a `LoadAll` method.
+2. In the `useValidation` middleware registration, initialize eagerly:
 
 ```fsharp
-type ShapeCache() =
-    let shapes = ConcurrentDictionary<Type, ShaclShape>()
-    let shapesGraphs = ConcurrentDictionary<ShaclShape, ShapesGraph>()
-
-    /// Get or derive a shape for a type.
-    member _.GetOrDeriveShape(typ: Type, ?maxDepth: int) =
-        shapes.GetOrAdd(typ, fun t ->
-            ShapeDerivation.deriveShape (defaultArg maxDepth 5) Set.empty t)
-
-    /// Get or build a ShapesGraph for a shape.
-    member _.GetOrBuildShapesGraph(shape: ShaclShape) =
-        shapesGraphs.GetOrAdd(shape, fun s ->
-            ShapeGraphBuilder.buildShapesGraph s)
+let configureApp (app: IApplicationBuilder) =
+    let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
+    // Load shapes from the entry assembly's embedded resource
+    let assembly = Assembly.GetEntryAssembly()
+    let shapes = ShapeLoader.loadFromAssembly assembly
+    shapeCache.LoadAll(shapes)
+    app.UseMiddleware<ValidationMiddleware>() |> ignore
+    app
 ```
 
-2. Initialize eagerly at startup via `IHostedService` or on first use:
-   - Scan all registered endpoints for `ValidationMarker` metadata
-   - For each marker: derive shape, apply custom constraints (via ShapeMerger), build ShapesGraph
-   - Store in cache
+3. Apply custom constraints (via ShapeMerger, WP06) to pre-loaded shapes where `ValidationMarker` has `CustomConstraints`.
+4. Build-time diagnostics (FR-017 framework type warnings) are handled by WP11's MSBuild target. Runtime startup focuses on loading and constraint merging.
+5. Log startup info: number of shapes loaded, number of custom constraints applied.
 
-3. Log startup warnings for:
-   - `validate` on a non-derivable type (HttpContext, etc.) (FR-017)
-   - Custom constraint on a property that doesn't exist
-   - Very deep recursive types that hit the depth limit
-
-**Files**: `src/Frank.Validation/ShapeCache.fs` or inline in `ValidationMiddleware.fs`
-**Notes**: `ConcurrentDictionary` provides thread-safe lazy initialization. The cache is populated on first access (or eagerly at startup if using `IHostedService`). Eager initialization is preferred to surface configuration errors early.
+**Files**: `src/Frank.Validation/WebHostBuilderExtensions.fs`
+**Notes**: Eager initialization is required to surface configuration errors (missing resource, constraint conflicts) early. The `ShapeLoader` fails fast with `InvalidOperationException` if the embedded resource is missing.
 
 ### Subtask T042 -- Implement response validation opt-in (diagnostic mode)
 
