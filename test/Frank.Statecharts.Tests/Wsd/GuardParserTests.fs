@@ -111,7 +111,7 @@ let guardParserTests =
 
               Expect.isSome guard "guard found"
               Expect.equal guard.Value.Pairs [ ("x", "y") ] "pair extracted"
-              Expect.equal remaining " " "whitespace remaining (one space stripped)"
+              Expect.equal remaining "" "whitespace remaining fully trimmed"
 
           testCase "US2-S3: regular note no guard"
           <| fun _ ->
@@ -236,4 +236,16 @@ let guardParserTests =
           <| fun _ ->
               let (guard, _, _, _) = tryParseGuard "  [guard: x=y]" (pos 1 1)
               Expect.isSome guard "guard found"
-              Expect.equal guard.Value.Position.Column 3 "column offset by leading spaces" ]
+              Expect.equal guard.Value.Position.Column 3 "column offset by leading spaces"
+
+          // === Multiple guards ===
+          testCase "multiple guards - only first extracted"
+          <| fun _ ->
+              let (guard, remaining, errors, warnings) =
+                  tryParseGuard "[guard: a=1] [guard: b=2] extra" (pos 1 1)
+
+              Expect.isSome guard "first guard found"
+              Expect.equal guard.Value.Pairs [ ("a", "1") ] "first guard pairs"
+              Expect.equal remaining "[guard: b=2] extra" "second guard is in remaining"
+              Expect.isEmpty errors "no errors"
+              Expect.isEmpty warnings "no warnings" ]
