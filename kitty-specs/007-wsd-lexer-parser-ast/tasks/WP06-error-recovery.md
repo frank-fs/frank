@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Error recovery + failure reports
-lane: planned
+lane: done
 dependencies: [WP03, WP04]
 subtasks: [T032, T033, T034, T035, T036, T037, T038]
 history:

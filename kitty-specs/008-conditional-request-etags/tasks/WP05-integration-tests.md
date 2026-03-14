@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Integration Tests & End-to-End Validation
-lane: planned
+lane: done
 dependencies:
 - WP03
 subtasks: [T023, T024, T025, T026, T027, T028]
