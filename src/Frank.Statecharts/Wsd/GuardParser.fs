@@ -14,7 +14,8 @@ let tryParseGuard
         // Trim leading whitespace and track column offset
         let mutable leadingSpaces = 0
 
-        while leadingSpaces < content.Length && content.[leadingSpaces] = ' ' do
+        while leadingSpaces < content.Length
+              && System.Char.IsWhiteSpace(content.[leadingSpaces]) do
             leadingSpaces <- leadingSpaces + 1
 
         let trimmed = content.Substring(leadingSpaces)
@@ -59,11 +60,7 @@ let tryParseGuard
 
                 let remaining =
                     let afterBracket = trimmed.Substring(closingIdx + 1)
-
-                    if afterBracket.Length > 0 && afterBracket.[0] = ' ' then
-                        afterBracket.Substring(1)
-                    else
-                        afterBracket
+                    afterBracket.Trim()
 
                 let innerTrimmed = inner.Trim()
 
