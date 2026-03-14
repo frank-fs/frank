@@ -12,6 +12,8 @@
     <Compile Include="TypeTests.fs" />
     <Compile Include="TypeMappingTests.fs" />
     <Compile Include="ShapeDerivationTests.fs" />
+    <Compile Include="ValidatorTests.fs" />
+    <Compile Include="MiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
