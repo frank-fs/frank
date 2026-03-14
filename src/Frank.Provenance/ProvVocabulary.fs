@@ -1,13 +1,21 @@
 namespace Frank.Provenance
 
-/// W3C PROV-O vocabulary constants.
+/// W3C PROV-O vocabulary constants and Frank extension vocabulary.
 /// See https://www.w3.org/TR/prov-o/
 [<RequireQualifiedAccess>]
-module Vocabulary =
+module ProvVocabulary =
 
     /// The W3C PROV namespace URI.
     [<Literal>]
     let Namespace = "http://www.w3.org/ns/prov#"
+
+    /// The Frank provenance extension namespace URI.
+    [<Literal>]
+    let FrankNamespace = "https://frank-web.dev/ns/provenance#"
+
+    /// The XML Schema namespace URI.
+    [<Literal>]
+    let XsdNamespace = "http://www.w3.org/2001/XMLSchema#"
 
     /// Common PROV-O class URIs.
     [<RequireQualifiedAccess>]
@@ -64,3 +72,43 @@ module Vocabulary =
 
         [<Literal>]
         let Value = Namespace + "value"
+
+    /// Frank extension vocabulary constants.
+    [<RequireQualifiedAccess>]
+    module Frank =
+
+        [<Literal>]
+        let LlmAgent = FrankNamespace + "LlmAgent"
+
+        [<Literal>]
+        let httpMethod = FrankNamespace + "httpMethod"
+
+        [<Literal>]
+        let eventName = FrankNamespace + "eventName"
+
+        [<Literal>]
+        let stateName = FrankNamespace + "stateName"
+
+        [<Literal>]
+        let agentModel = FrankNamespace + "agentModel"
+
+    /// RDF vocabulary constants.
+    [<RequireQualifiedAccess>]
+    module Rdf =
+
+        [<Literal>]
+        let Type = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+
+    /// XML Schema datatype constants.
+    [<RequireQualifiedAccess>]
+    module Xsd =
+
+        [<Literal>]
+        let DateTime = XsdNamespace + "dateTime"
+
+    /// RDF Schema vocabulary constants.
+    [<RequireQualifiedAccess>]
+    module Rdfs =
+
+        [<Literal>]
+        let label = "http://www.w3.org/2000/01/rdf-schema#label"
