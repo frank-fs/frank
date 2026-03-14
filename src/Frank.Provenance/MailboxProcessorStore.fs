@@ -18,6 +18,10 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
     let mutable disposed = false
 
+    let ensureNotDisposed () =
+        if disposed then
+            raise (ObjectDisposedException(nameof MailboxProcessorProvenanceStore))
+
     let rebuildIndexes (records: ResizeArray<ProvenanceRecord>) =
         let resourceIndex = Dictionary<string, ResizeArray<int>>()
         let agentIndex = Dictionary<string, ResizeArray<int>>()
@@ -128,31 +132,26 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
     interface IProvenanceStore with
         member _.Append(record) =
-            if disposed then
-                logger.LogWarning("Attempted to append to disposed provenance store")
-            else
-                agent.Post(Append record)
+            ensureNotDisposed ()
+            agent.Post(Append record)
 
         member _.QueryByResource(resourceUri) =
-            if disposed then
-                Task.FromResult(List.empty<ProvenanceRecord>)
-            else
-                agent.PostAndAsyncReply(fun reply -> QueryByResource(resourceUri, reply))
-                |> Async.StartAsTask
+            ensureNotDisposed ()
+
+            agent.PostAndAsyncReply(fun reply -> QueryByResource(resourceUri, reply))
+            |> Async.StartAsTask
 
         member _.QueryByAgent(agentId) =
-            if disposed then
-                Task.FromResult(List.empty<ProvenanceRecord>)
-            else
-                agent.PostAndAsyncReply(fun reply -> QueryByAgent(agentId, reply))
-                |> Async.StartAsTask
+            ensureNotDisposed ()
+
+            agent.PostAndAsyncReply(fun reply -> QueryByAgent(agentId, reply))
+            |> Async.StartAsTask
 
         member _.QueryByTimeRange(start, end_) =
-            if disposed then
-                Task.FromResult(List.empty<ProvenanceRecord>)
-            else
-                agent.PostAndAsyncReply(fun reply -> QueryByTimeRange(start, end_, reply))
-                |> Async.StartAsTask
+            ensureNotDisposed ()
+
+            agent.PostAndAsyncReply(fun reply -> QueryByTimeRange(start, end_, reply))
+            |> Async.StartAsTask
 
     interface IDisposable with
         member _.Dispose() =
