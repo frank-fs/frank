@@ -4,6 +4,14 @@ open Frank.Statecharts.Wsd.Types
 
 // T018: Core parser infrastructure
 
+// WP06: Unsupported construct keywords (recognized to emit warnings, then skipped)
+let private unsupportedConstructs =
+    set [ "activate"; "deactivate"; "destroy"; "box"; "theme"; "skin"; "skinparam" ]
+
+// WP06: Corrective examples catalog for common errors
+let private arrowCorrectives =
+    "Valid arrow forms: '->' (solid), '-->' (dashed), '->-' (solid deactivating), '-->-' (dashed deactivating)"
+
 type ParserState =
     { Tokens: Token array
       mutable Position: int
@@ -13,6 +21,8 @@ type ParserState =
       mutable Warnings: ParseWarning list
       mutable Title: string option
       mutable AutoNumber: bool
+      mutable ErrorLimitReached: bool
+      mutable ImplicitWarned: Set<string>
       MaxErrors: int }
 
 let private eofToken =
@@ -61,6 +71,18 @@ let private addError
               CorrectiveExample = example }
 
         state.Errors <- failure :: state.Errors
+
+        // WP06: Check if error limit reached after adding
+        if state.Errors.Length >= state.MaxErrors then
+            let limitFailure =
+                { Position = pos
+                  Description = "Error limit reached; further errors suppressed"
+                  Expected = ""
+                  Found = ""
+                  CorrectiveExample = "" }
+
+            state.Errors <- limitFailure :: state.Errors
+            state.ErrorLimitReached <- true
 
 let private addWarning (state: ParserState) (pos: SourcePosition) (desc: string) (suggestion: string option) : unit =
     let warning =
@@ -132,15 +154,19 @@ let private registerParticipant
 
         state.Participants <- Map.add name participant state.Participants
 
+// WP06: Emit implicit-participant warning only once per name
 let private ensureParticipant (state: ParserState) (name: string) (pos: SourcePosition) : unit =
     if not (Map.containsKey name state.Participants) then
         registerParticipant state name None false pos
 
-        addWarning
-            state
-            pos
-            (sprintf "Implicit participant '%s' (no prior 'participant' declaration)" name)
-            (Some(sprintf "participant %s" name))
+        if not (state.ImplicitWarned.Contains name) then
+            state.ImplicitWarned <- state.ImplicitWarned.Add name
+
+            addWarning
+                state
+                pos
+                (sprintf "Implicit participant '%s' (no prior 'participant' declaration)" name)
+                (Some(sprintf "participant %s" name))
 
 // T019: Participant declarations
 let private parseParticipant (state: ParserState) : unit =
@@ -276,16 +302,27 @@ let private parseMessage (state: ParserState) : unit =
 
             skipToNewline state
     | None ->
-        // Not a message -- bare identifier is an error
-        addError
-            state
-            senderToken.Position
-            "Unexpected identifier"
-            "message arrow (->), participant, note, or directive"
-            (tokenDescription senderToken)
-            ""
+        // WP06: Check if identifier is an unsupported construct
+        match senderToken.Kind with
+        | Identifier name when unsupportedConstructs.Contains(name.ToLowerInvariant()) ->
+            addWarning
+                state
+                senderToken.Position
+                (sprintf "Unsupported construct '%s' (ignored)" name)
+                (Some(sprintf "Remove '%s' or use a supported construct" name))
 
-        skipToNewline state
+            skipToNewline state
+        | _ ->
+            // Not a message -- bare identifier or unrecognized arrow
+            addError
+                state
+                senderToken.Position
+                "Unexpected identifier"
+                "message arrow (->), participant, note, or directive"
+                (tokenDescription senderToken)
+                arrowCorrectives
+
+            skipToNewline state
 
 // T021: Directive parsing
 let private parseTitleDirective (state: ParserState) : unit =
@@ -332,7 +369,7 @@ let private parseAutoNumberDirective (state: ParserState) : unit =
     state.Elements <- AutoNumberDirective startToken.Position :: state.Elements
     skipToNewline state
 
-// T022: Note parsing
+// T022: Note parsing with WP06 guard parser integration
 let private parseNote (state: ParserState) : unit =
     let startToken = advance state // consume Note keyword
 
@@ -390,11 +427,42 @@ let private parseNote (state: ParserState) : unit =
 
                     ""
 
+            // WP06: Guard parser integration — parse guard annotation from note content
+            let (guard, remainingContent, guardErrors, guardWarnings) =
+                GuardParser.tryParseGuard content startToken.Position
+
+            // Merge guard parser errors/warnings into parser state
+            for ge in guardErrors do
+                if not state.ErrorLimitReached then
+                    state.Errors <- ge :: state.Errors
+
+                    if state.Errors.Length >= state.MaxErrors then
+                        let limitFailure =
+                            { Position = ge.Position
+                              Description = "Error limit reached; further errors suppressed"
+                              Expected = ""
+                              Found = ""
+                              CorrectiveExample = "" }
+
+                        state.Errors <- limitFailure :: state.Errors
+                        state.ErrorLimitReached <- true
+
+            for gw in guardWarnings do
+                state.Warnings <- gw :: state.Warnings
+
+            let finalContent =
+                if guard.IsSome && remainingContent.Length > 0 then
+                    remainingContent
+                elif guard.IsSome then
+                    ""
+                else
+                    content
+
             let note =
                 { NotePosition = position
                   Target = target
-                  Content = content
-                  Guard = None
+                  Content = finalContent
+                  Guard = guard
                   Position = startToken.Position }
 
             state.Elements <- NoteElement note :: state.Elements
@@ -451,6 +519,28 @@ let private parseConditionText (state: ParserState) : string option =
         collect ()
         Some(System.String.Join(" ", parts))
     | _ -> None
+
+// WP06: Skip tokens until a matching 'end' for group error recovery
+let private skipToMatchingEnd (state: ParserState) : unit =
+    let mutable depth = 1
+
+    while depth > 0 && (peek state).Kind <> Eof do
+        let token = peek state
+
+        match token.Kind with
+        | TokenKind.Alt
+        | TokenKind.Opt
+        | TokenKind.Loop
+        | TokenKind.Par
+        | TokenKind.Break
+        | TokenKind.Critical
+        | TokenKind.Ref ->
+            depth <- depth + 1
+            advance state |> ignore
+        | TokenKind.End ->
+            depth <- depth - 1
+            advance state |> ignore
+        | _ -> advance state |> ignore
 
 // WP05: Group parsing with full branch support and recursive nesting
 // parseGroup and parseElements are mutually recursive
@@ -562,114 +652,124 @@ and private parseBranchBody (state: ParserState) (depth: int) : DiagramElement l
     branchElements
 
 // WP05: Parse elements within a branch body — stops at Else, End, or Eof
+// WP06: Checks ErrorLimitReached to stop parsing on error limit
 and private parseBranchElements (state: ParserState) (depth: int) : unit =
-    skipNewlines state
-    let token = peek state
+    if state.ErrorLimitReached then
+        ()
+    else
 
-    match token.Kind with
-    | Eof -> ()
-    | TokenKind.Else -> () // branch terminator — let caller handle
-    | TokenKind.End -> () // block terminator — let caller handle
-    | TokenKind.Participant ->
-        parseParticipant state
-        parseBranchElements state depth
-    | TokenKind.Title ->
-        parseTitleDirective state
-        parseBranchElements state depth
-    | TokenKind.AutoNumber ->
-        parseAutoNumberDirective state
-        parseBranchElements state depth
-    | TokenKind.Note ->
-        parseNote state
-        parseBranchElements state depth
-    | TokenKind.Alt
-    | TokenKind.Opt
-    | TokenKind.Loop
-    | TokenKind.Par
-    | TokenKind.Break
-    | TokenKind.Critical
-    | TokenKind.Ref ->
-        parseGroup state (depth + 1)
-        parseBranchElements state depth
-    | Identifier _ ->
-        parseMessage state
-        parseBranchElements state depth
-    | _ ->
-        addError
-            state
-            token.Position
-            "Unexpected token"
-            "participant, message, note, or directive"
-            (tokenDescription token)
-            ""
+        skipNewlines state
+        let token = peek state
 
-        skipToNewline state
-        parseBranchElements state depth
+        match token.Kind with
+        | Eof -> ()
+        | TokenKind.Else -> () // branch terminator — let caller handle
+        | TokenKind.End -> () // block terminator — let caller handle
+        | TokenKind.Participant ->
+            parseParticipant state
+            parseBranchElements state depth
+        | TokenKind.Title ->
+            parseTitleDirective state
+            parseBranchElements state depth
+        | TokenKind.AutoNumber ->
+            parseAutoNumberDirective state
+            parseBranchElements state depth
+        | TokenKind.Note ->
+            parseNote state
+            parseBranchElements state depth
+        | TokenKind.Alt
+        | TokenKind.Opt
+        | TokenKind.Loop
+        | TokenKind.Par
+        | TokenKind.Break
+        | TokenKind.Critical
+        | TokenKind.Ref ->
+            parseGroup state (depth + 1)
+            parseBranchElements state depth
+        | Identifier _ ->
+            parseMessage state
+            parseBranchElements state depth
+        | _ ->
+            addError
+                state
+                token.Position
+                "Unexpected token"
+                "participant, message, note, or directive"
+                (tokenDescription token)
+                ""
+
+            skipToNewline state
+            parseBranchElements state depth
 
 // Main parse loop
+// WP06: Checks ErrorLimitReached to stop parsing on error limit
 and private parseElements (state: ParserState) : unit =
-    skipNewlines state
-    let token = peek state
+    if state.ErrorLimitReached then
+        ()
+    else
 
-    match token.Kind with
-    | Eof -> ()
-    | TokenKind.Participant ->
-        parseParticipant state
-        parseElements state
-    | TokenKind.Title ->
-        parseTitleDirective state
-        parseElements state
-    | TokenKind.AutoNumber ->
-        parseAutoNumberDirective state
-        parseElements state
-    | TokenKind.Note ->
-        parseNote state
-        parseElements state
-    | TokenKind.Alt
-    | TokenKind.Opt
-    | TokenKind.Loop
-    | TokenKind.Par
-    | TokenKind.Break
-    | TokenKind.Critical
-    | TokenKind.Ref ->
-        parseGroup state 0
-        parseElements state
-    | Identifier _ ->
-        parseMessage state
-        parseElements state
-    | TokenKind.End ->
-        addError
-            state
-            token.Position
-            "'end' without matching grouping block"
-            "participant, message, note, or directive"
-            (tokenDescription token)
-            ""
+        skipNewlines state
+        let token = peek state
 
-        skipToNewline state
-        parseElements state
-    | TokenKind.Else ->
-        addError
-            state
-            token.Position
-            "'else' without matching grouping block"
-            "participant, message, note, or directive"
-            (tokenDescription token)
-            ""
+        match token.Kind with
+        | Eof -> ()
+        | TokenKind.Participant ->
+            parseParticipant state
+            parseElements state
+        | TokenKind.Title ->
+            parseTitleDirective state
+            parseElements state
+        | TokenKind.AutoNumber ->
+            parseAutoNumberDirective state
+            parseElements state
+        | TokenKind.Note ->
+            parseNote state
+            parseElements state
+        | TokenKind.Alt
+        | TokenKind.Opt
+        | TokenKind.Loop
+        | TokenKind.Par
+        | TokenKind.Break
+        | TokenKind.Critical
+        | TokenKind.Ref ->
+            parseGroup state 0
+            parseElements state
+        | Identifier _ ->
+            parseMessage state
+            parseElements state
+        | TokenKind.End ->
+            addError
+                state
+                token.Position
+                "'end' without matching grouping block"
+                "participant, message, note, or directive"
+                (tokenDescription token)
+                ""
 
-        skipToNewline state
-        parseElements state
-    | _ ->
-        addError
-            state
-            token.Position
-            "Unexpected token"
-            "participant, message, note, or directive"
-            (tokenDescription token)
-            ""
+            skipToNewline state
+            parseElements state
+        | TokenKind.Else ->
+            addError
+                state
+                token.Position
+                "'else' without matching grouping block"
+                "participant, message, note, or directive"
+                (tokenDescription token)
+                ""
 
-        skipToNewline state
-        parseElements state
+            skipToNewline state
+            parseElements state
+        | _ ->
+            addError
+                state
+                token.Position
+                "Unexpected token"
+                "participant, message, note, or directive"
+                (tokenDescription token)
+                ""
+
+            skipToNewline state
+            parseElements state
 
 // Top-level API
 let parse (tokens: Token list) (maxErrors: int) : ParseResult =
@@ -684,6 +784,8 @@ let parse (tokens: Token list) (maxErrors: int) : ParseResult =
           Warnings = []
           Title = None
           AutoNumber = false
+          ErrorLimitReached = false
+          ImplicitWarned = Set.empty
           MaxErrors = maxErrors }
 
     parseElements state
