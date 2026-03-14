@@ -40,11 +40,9 @@ let makeCache () =
     new ETagCache(1000, logger)
 
 let makeProvider (store: MailboxProcessorStore<TestState, TestContext>) =
-    let cache = makeCache ()
-
     let iface = store :> IStateMachineStore<TestState, TestContext>
 
-    StatechartETagProvider<TestState, TestContext>(iface, contextSerializer, cache) :> IETagProvider
+    StatechartETagProvider<TestState, TestContext>(iface, contextSerializer) :> IETagProvider
 
 let makeFactory (store: MailboxProcessorStore<TestState, TestContext>) =
     let cache = makeCache ()
@@ -119,7 +117,7 @@ let deterministicHashingTests =
               Expect.notEqual etag1 etag2 "different context should produce different ETag"
           }
 
-          testAsync "ETag format is quoted string with 32 hex chars inside quotes" {
+          testAsync "ETag format is raw 32 hex char string (no quotes)" {
               let store = makeStore ()
               use _s = store :> IDisposable
 
@@ -132,15 +130,12 @@ let deterministicHashingTests =
               let! etag = provider.ComputeETag("inst1") |> Async.AwaitTask
 
               let value = Expect.wantSome etag "ETag should be Some"
-              // Quoted format: "xxxx...xxxx"
-              Expect.isTrue (value.StartsWith("\"")) "ETag should start with quote"
-              Expect.isTrue (value.EndsWith("\"")) "ETag should end with quote"
-              let inner = value.Substring(1, value.Length - 2)
-              Expect.equal inner.Length 32 "inner ETag should be 32 hex chars (128 bits)"
+              // Raw format: 32 hex chars, no surrounding quotes
+              Expect.equal value.Length 32 "ETag should be 32 hex chars (128 bits)"
 
-              let isHex = inner |> Seq.forall (fun c -> Char.IsAsciiHexDigit c)
+              let isHex = value |> Seq.forall (fun c -> Char.IsAsciiHexDigit c)
 
-              Expect.isTrue isHex "inner ETag should be hex characters only"
+              Expect.isTrue isHex "ETag should be hex characters only"
           }
 
           test "string DUCase produces expected case name" {

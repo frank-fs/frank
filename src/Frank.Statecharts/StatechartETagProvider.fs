@@ -10,7 +10,7 @@ open Frank
 
 /// Computes ETags for statechart-managed resources by hashing (state, context) pairs.
 type StatechartETagProvider<'State, 'Context when 'State: equality>
-    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[], cache: ETagCache) =
+    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
 
     let computeETagFromState (state: 'State) (context: 'Context) : string =
         let stateBytes = Encoding.UTF8.GetBytes(string state)
@@ -20,7 +20,7 @@ type StatechartETagProvider<'State, 'Context when 'State: equality>
         let hash = sha256.ComputeHash(combined)
         let truncated = hash.[0..15] // 16 bytes = 128 bits
         let hex = Convert.ToHexString(truncated).ToLowerInvariant()
-        ETagFormat.quote hex
+        hex
 
     interface IETagProvider with
         member _.ComputeETag(instanceId: string) : Task<string option> =
@@ -39,7 +39,7 @@ type StatechartETagProviderFactory<'State, 'Context when 'State: equality>
     (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[], cache: ETagCache) =
 
     let provider =
-        StatechartETagProvider<'State, 'Context>(store, contextSerializer, cache) :> IETagProvider
+        StatechartETagProvider<'State, 'Context>(store, contextSerializer) :> IETagProvider
 
     interface IETagProviderFactory with
         member _.CreateProvider(endpoint: Microsoft.AspNetCore.Http.Endpoint) : IETagProvider option =
