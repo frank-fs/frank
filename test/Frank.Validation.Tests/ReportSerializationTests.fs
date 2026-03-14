@@ -202,19 +202,6 @@ let nestedFieldPathTests =
         "ReportSerializer - nested field path"
         [ testCase "nested field path uses dot notation in Problem Details"
           <| fun _ ->
-              // Build a report manually with a nested path to test the dot-notation conversion
-              let report =
-                  { Conforms = false
-                    Results =
-                      [ { FocusNode = "urn:frank:validation:request"
-                          ResultPath = "urn:frank:property:Address"
-                          Value = None
-                          SourceConstraint = "http://www.w3.org/ns/shacl#minCount"
-                          Message = "Address is required."
-                          Severity = Violation } ]
-                    ShapeUri = Uri("urn:frank:shape:test:UserWithAddress") }
-
-              // Use ReportSerializer directly to write Problem Details
               let counter, client =
                   buildTestHost (fun c ep -> mapValidatedPost<UserWithAddress> "/users-address" c ep)
 

@@ -39,7 +39,7 @@ module ReportSerializer =
     let private uriNode (g: IGraph) (uri: string) = g.CreateUriNode(UriFactory.Create(uri))
 
     /// Build an IGraph containing a SHACL ValidationReport from our F# ValidationReport.
-    let buildReportGraph (report: ValidationReport) : IGraph =
+    let private buildReportGraph (report: ValidationReport) : IGraph =
         let g = new Graph()
         let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
         g.NamespaceMap.AddNamespace("sh", UriFactory.Create(sh))
@@ -117,7 +117,7 @@ module ReportSerializer =
     /// in the format indicated by contentType. Uses a MemoryStream buffer to
     /// avoid synchronous writes on the response stream (required by TestHost
     /// and Kestrel when AllowSynchronousIO is false).
-    let writeShaclReport (ctx: HttpContext) (report: ValidationReport) (contentType: string) =
+    let private writeShaclReport (ctx: HttpContext) (report: ValidationReport) (contentType: string) =
         task {
             use graph = buildReportGraph report
             ctx.Response.ContentType <- contentType
@@ -139,7 +139,7 @@ module ReportSerializer =
         JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase)
 
     /// Write an RFC 9457 Problem Details JSON response for validation failures.
-    let writeProblemDetails (ctx: HttpContext) (report: ValidationReport) =
+    let private writeProblemDetails (ctx: HttpContext) (report: ValidationReport) =
         task {
             ctx.Response.ContentType <- "application/problem+json"
 
