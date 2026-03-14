@@ -11,6 +11,7 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 
 // -- Test helpers --
 
@@ -76,10 +77,12 @@ let private createTestServer (store: IProvenanceStore) =
             .ConfigureServices(fun services ->
                 services.AddSingleton<IProvenanceStore>(store) |> ignore
                 services.AddLogging() |> ignore)
-            .Configure(fun app ->
+            .Configure(fun (app: IApplicationBuilder) ->
+                let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+
                 app.Use(
-                    Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
-                        ProvenanceMiddleware.provenanceMiddleware next ctx)
+                    Func<RequestDelegate, RequestDelegate>(fun next ->
+                        ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
                 )
                 |> ignore
 
@@ -95,40 +98,40 @@ let middlewareTests =
               "Accept header matching"
               [ test "tryMatchProvenanceAccept returns None for null" {
                     let result = ProvenanceMiddleware.tryMatchProvenanceAccept null
-                    Expect.isNone result "null Accept header should return None"
+                    Expect.equal result ValueNone "null Accept header should return ValueNone"
                 }
 
                 test "tryMatchProvenanceAccept returns None for standard Accept" {
                     let result = ProvenanceMiddleware.tryMatchProvenanceAccept "application/json"
-                    Expect.isNone result "Standard Accept should return None"
+                    Expect.equal result ValueNone "Standard Accept should return ValueNone"
                 }
 
                 test "tryMatchProvenanceAccept matches +turtle" {
                     let result =
                         ProvenanceMiddleware.tryMatchProvenanceAccept ProvenanceMediaTypes.ProvenanceTurtle
 
-                    Expect.equal result (Some ProvenanceMediaTypes.ProvenanceTurtle) "Should match Turtle"
+                    Expect.equal result (ValueSome ProvenanceMediaTypes.ProvenanceTurtle) "Should match Turtle"
                 }
 
                 test "tryMatchProvenanceAccept matches +ld+json" {
                     let result =
                         ProvenanceMiddleware.tryMatchProvenanceAccept ProvenanceMediaTypes.ProvenanceLdJson
 
-                    Expect.equal result (Some ProvenanceMediaTypes.ProvenanceLdJson) "Should match LD+JSON"
+                    Expect.equal result (ValueSome ProvenanceMediaTypes.ProvenanceLdJson) "Should match LD+JSON"
                 }
 
                 test "tryMatchProvenanceAccept matches +json" {
                     let result =
                         ProvenanceMiddleware.tryMatchProvenanceAccept ProvenanceMediaTypes.ProvenanceJson
 
-                    Expect.equal result (Some ProvenanceMediaTypes.ProvenanceJson) "Should match JSON"
+                    Expect.equal result (ValueSome ProvenanceMediaTypes.ProvenanceJson) "Should match JSON"
                 }
 
                 test "tryMatchProvenanceAccept matches +rdf+xml" {
                     let result =
                         ProvenanceMiddleware.tryMatchProvenanceAccept ProvenanceMediaTypes.ProvenanceRdfXml
 
-                    Expect.equal result (Some ProvenanceMediaTypes.ProvenanceRdfXml) "Should match RDF+XML"
+                    Expect.equal result (ValueSome ProvenanceMediaTypes.ProvenanceRdfXml) "Should match RDF+XML"
                 }
 
                 test "tryMatchProvenanceAccept prefers +ld+json over +json in mixed header" {
@@ -139,7 +142,7 @@ let middlewareTests =
                             ProvenanceMediaTypes.ProvenanceJson
 
                     let result = ProvenanceMiddleware.tryMatchProvenanceAccept header
-                    Expect.equal result (Some ProvenanceMediaTypes.ProvenanceLdJson) "Should prefer +ld+json"
+                    Expect.equal result (ValueSome ProvenanceMediaTypes.ProvenanceLdJson) "Should prefer +ld+json"
                 }
 
                 test "tryMatchProvenanceAccept finds provenance type in mixed Accept header" {
@@ -148,7 +151,7 @@ let middlewareTests =
 
                     Expect.equal
                         result
-                        (Some ProvenanceMediaTypes.ProvenanceTurtle)
+                        (ValueSome ProvenanceMediaTypes.ProvenanceTurtle)
                         "Should find turtle in mixed header"
                 } ]
 

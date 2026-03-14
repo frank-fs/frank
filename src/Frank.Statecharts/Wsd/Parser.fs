@@ -304,7 +304,20 @@ let private parseTitleDirective (state: ParserState) : unit =
         | TextContent text ->
             advance state |> ignore
             text.Trim()
-        | _ -> ""
+        | _ ->
+            // Collect identifier tokens until newline (e.g., "title My Diagram")
+            let parts = ResizeArray<string>()
+
+            let rec collect () =
+                match (peek state).Kind with
+                | Identifier word ->
+                    advance state |> ignore
+                    parts.Add(word)
+                    collect ()
+                | _ -> ()
+
+            collect ()
+            System.String.Join(" ", parts)
 
     if state.Title.IsSome then
         addWarning state startToken.Position "Duplicate title directive" (Some "Remove the duplicate title")
