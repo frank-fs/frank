@@ -12,6 +12,7 @@
     <Compile Include="ETagTests.fs" />
     <Compile Include="MiddlewareOrderingTests.fs" />
     <Compile Include="MetadataTests.fs" />
+    <Compile Include="ETagCacheTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
