@@ -11,6 +11,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="MailboxProcessorStore.fs" />
+    <Compile Include="GraphBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>
