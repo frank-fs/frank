@@ -20,6 +20,8 @@ module ShapeDerivation =
     let DefaultMaxDepth = 5
 
     /// Thread-safe cache of derived shapes, keyed by System.Type.
+    /// Cache assumes consistent maxDepth configuration per application lifetime.
+    /// Different maxDepth values for the same type will return the first-cached result.
     let private shapeCache = ConcurrentDictionary<Type, ShaclShape>()
 
     /// Clear the shape cache. Useful for testing.
@@ -188,7 +190,10 @@ module ShapeDerivation =
                 // Primitive type: no node reference needed
                 None, None, None
             | None ->
-                if FSharpType.IsUnion(elementType, true) then
+                if not (isDerivableType elementType) then
+                    // Excluded framework/infrastructure type: treat as opaque, skip derivation
+                    None, None, None
+                elif FSharpType.IsUnion(elementType, true) then
                     // DU type: derive constraints
                     let duResult = deriveDuConstraint maxDepth stack elementType
 
@@ -327,7 +332,10 @@ module ShapeDerivation =
                               Closed = true
                               Description = Some(sprintf "Enum DU: %s" typ.Name) }
                         | OrShapes _uris ->
-                            // Payload DU: shape with reference to case shapes
+                            // Payload DU: OrShapes URIs from deriveDuConstraint are intentionally
+                            // not stored here — ShaclShape has no field for them. Payload DUs are
+                            // expected as field types where PropertyShape.OrShapes carries the data.
+                            // Top-level DU shapes are valid but won't reference case shapes directly.
                             { TargetType = typ
                               NodeShapeUri = uri
                               Properties = []
