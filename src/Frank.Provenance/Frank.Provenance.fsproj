@@ -12,6 +12,7 @@
     <Compile Include="Store.fs" />
     <Compile Include="MailboxProcessorStore.fs" />
     <Compile Include="GraphBuilder.fs" />
+    <Compile Include="TransitionObserver.fs" />
     <Compile Include="Middleware.fs" />
   </ItemGroup>
 
