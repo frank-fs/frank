@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Provenance Middleware (Content Negotiation)
-lane: planned
+lane: done
 dependencies:
 - WP02
 subtasks: [T017, T018, T019, T020, T021]

@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Core ETag Types & Interface
-lane: "for_review"
+lane: done
 dependencies: []
 base_branch: master
 base_commit: c08cbedce71702e173699650bcc6a50b87fa9ff3

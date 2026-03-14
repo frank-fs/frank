@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP03"
 title: "Core parser"
-lane: "planned"
+lane: done
 dependencies: ["WP02"]
 requirement_refs: ["FR-002", "FR-003", "FR-005", "FR-009", "FR-012", "FR-013"]
 subtasks: ["T018", "T019", "T020", "T021", "T022", "T023"]

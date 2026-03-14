@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: StatechartETagProvider
-lane: planned
+lane: done
 dependencies:
 - WP01
 - WP02

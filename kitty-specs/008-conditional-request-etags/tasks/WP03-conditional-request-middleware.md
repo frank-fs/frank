@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Conditional Request Middleware
-lane: planned
+lane: done
 dependencies:
 - WP01
 - WP02

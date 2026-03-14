@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "IProvenanceStore + MailboxProcessorStore"
-lane: "planned"
+lane: done
 dependencies: ["WP01"]
 requirement_refs: ["FR-007", "FR-008", "FR-009", "FR-015"]
 subtasks: ["T007", "T008", "T009", "T010", "T011"]

@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: TransitionObserver
-lane: planned
+lane: done
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]

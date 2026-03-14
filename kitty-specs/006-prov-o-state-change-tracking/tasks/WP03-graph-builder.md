@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP03"
 title: "GraphBuilder (dotNetRdf)"
-lane: "planned"
+lane: done
 dependencies: ["WP01"]
 requirement_refs: ["FR-004", "FR-005", "FR-006", "FR-014"]
 subtasks: ["T012", "T013", "T014", "T015", "T016"]

@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP04"
 title: "Guard extension parser"
-lane: "planned"
+lane: done
 dependencies: ["WP01"]
 requirement_refs: ["FR-004"]
 subtasks: ["T024", "T025", "T026", "T027"]

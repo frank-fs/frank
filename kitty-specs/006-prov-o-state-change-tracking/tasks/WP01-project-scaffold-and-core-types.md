@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold + ProvVocabulary + Core Types
-lane: "for_review"
+lane: done
 dependencies: []
 base_branch: master
 base_commit: 9aa38215ad756a6530526dcd467907c32819df36

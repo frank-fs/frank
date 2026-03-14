@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "MailboxProcessor ETag Cache"
-lane: "planned"
+lane: done
 dependencies: ["WP01"]
 requirement_refs: ["FR-009", "FR-015"]
 subtasks: ["T006", "T007", "T008", "T009", "T010"]

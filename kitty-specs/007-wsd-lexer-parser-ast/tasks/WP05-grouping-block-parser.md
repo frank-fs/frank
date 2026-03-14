@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP05"
 title: "Grouping block parser"
-lane: "planned"
+lane: done
 dependencies: ["WP03"]
 requirement_refs: ["FR-006"]
 subtasks: ["T028", "T029", "T030", "T031"]

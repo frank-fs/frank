@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "Lexer (tokenizer)"
-lane: "planned"
+lane: done
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-003", "FR-010", "FR-011"]
 subtasks: ["T012", "T013", "T014", "T015", "T016", "T017"]
