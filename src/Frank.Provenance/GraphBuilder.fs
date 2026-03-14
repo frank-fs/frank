@@ -22,9 +22,8 @@ module GraphBuilder =
         graph.NamespaceMap.AddNamespace("frank", UriFactory.Create(ProvVocabulary.FrankNamespace))
         graph.NamespaceMap.AddNamespace("xsd", UriFactory.Create(ProvVocabulary.XsdNamespace))
 
-        graph.NamespaceMap.AddNamespace("rdf", UriFactory.Create("http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
-
-        graph.NamespaceMap.AddNamespace("rdfs", UriFactory.Create("http://www.w3.org/2000/01/rdf-schema#"))
+        graph.NamespaceMap.AddNamespace("rdf", UriFactory.Create(ProvVocabulary.RdfNamespace))
+        graph.NamespaceMap.AddNamespace("rdfs", UriFactory.Create(ProvVocabulary.RdfsNamespace))
 
     let private addAgent (graph: IGraph) (agent: ProvenanceAgent) =
         let agentNode = uriNode graph agent.Id
