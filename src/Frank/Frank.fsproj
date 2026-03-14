@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="ETag.fs" />
+    <Compile Include="ETagCache.fs" />
     <Compile Include="ContentNegotiation.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>
