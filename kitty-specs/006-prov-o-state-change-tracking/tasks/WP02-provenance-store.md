@@ -8,6 +8,7 @@ base_commit: ca27c22e3ea773ca6ec966f20e47fd50b6dec564
 created_at: '2026-03-14T15:36:13.722820+00:00'
 subtasks: [T007, T008, T009, T010, T011]
 shell_pid: "814"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -340,3 +341,4 @@ let makeRecord resourceUri agentId stateBefore stateAfter =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-14T15:36:13Z – claude-opus – shell_pid=814 – lane=doing – Assigned agent via workflow command
