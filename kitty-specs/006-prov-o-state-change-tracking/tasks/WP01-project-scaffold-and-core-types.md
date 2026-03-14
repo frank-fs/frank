@@ -459,3 +459,4 @@ let main args =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:50Z – claude-opus – shell_pid=97922 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:56:53Z – claude-opus – shell_pid=97922 – lane=for_review – T001-T006 complete: Vocabulary.fs, Types.fs, project scaffold. Builds clean.
+- 2026-03-14T15:29:05Z – claude-opus – shell_pid=97922 – lane=for_review – Rework complete: All 7 review issues fixed. Types rewritten as Frank-specific domain model. ProvVocabulary with Frank extensions. Test project with 31 passing tests. [claude-opus]
