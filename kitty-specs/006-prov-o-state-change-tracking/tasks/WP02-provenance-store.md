@@ -1,16 +1,20 @@
 ---
-work_package_id: "WP02"
-title: "IProvenanceStore + MailboxProcessorStore"
-lane: "planned"
-dependencies: ["WP01"]
-requirement_refs: ["FR-007", "FR-008", "FR-009", "FR-015"]
-subtasks: ["T007", "T008", "T009", "T010", "T011"]
+work_package_id: WP02
+title: IProvenanceStore + MailboxProcessorStore
+lane: "doing"
+dependencies: [WP01]
+base_branch: 006-prov-o-state-change-tracking-WP01
+base_commit: ca27c22e3ea773ca6ec966f20e47fd50b6dec564
+created_at: '2026-03-14T15:36:13.722820+00:00'
+subtasks: [T007, T008, T009, T010, T011]
+shell_pid: "814"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-007, FR-008, FR-009, FR-015]
 ---
 
 # Work Package Prompt: WP02 -- IProvenanceStore + MailboxProcessorStore

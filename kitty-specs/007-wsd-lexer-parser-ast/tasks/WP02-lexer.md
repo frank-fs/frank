@@ -1,16 +1,21 @@
 ---
-work_package_id: "WP02"
-title: "Lexer (tokenizer)"
-lane: "planned"
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-003", "FR-010", "FR-011"]
-subtasks: ["T012", "T013", "T014", "T015", "T016", "T017"]
+work_package_id: WP02
+title: Lexer (tokenizer)
+lane: "doing"
+dependencies: [WP01]
+base_branch: 007-wsd-lexer-parser-ast-WP01
+base_commit: 48c67df080b71baa278940e8b9c960a161564cfc
+created_at: '2026-03-14T15:36:13.721821+00:00'
+subtasks: [T012, T013, T014, T015, T016, T017]
+shell_pid: "814"
+agent: "claude-opus"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-003, FR-010, FR-011]
 ---
 
 # WP02: Lexer (Tokenizer)
@@ -242,3 +247,4 @@ Write at least 30 test cases covering the categories above. Focus on correctness
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-14T15:36:13Z – claude-opus – shell_pid=814 – lane=doing – Assigned agent via workflow command
