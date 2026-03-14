@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="ProvVocabulary.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Store.fs" />
+    <Compile Include="MailboxProcessorStore.fs" />
   </ItemGroup>
 
   <ItemGroup>
