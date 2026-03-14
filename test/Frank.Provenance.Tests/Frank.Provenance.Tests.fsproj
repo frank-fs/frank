@@ -12,6 +12,7 @@
     <Compile Include="VocabularyTests.fs" />
     <Compile Include="TypeTests.fs" />
     <Compile Include="StoreTests.fs" />
+    <Compile Include="GraphBuilderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
