@@ -108,7 +108,9 @@ type ConditionalRequestMiddleware
                                 shortCircuited <- true
 
                         if not shortCircuited then
-                            // Set ETag header before handler for GET/HEAD if we have it
+                            // Set ETag header before handler for GET/HEAD if we have it.
+                            // NOTE: The ETag header must be set before the response body is written,
+                            // because ASP.NET Core sends headers on the first body write (or flush).
                             if isGetOrHead then
                                 match currentETag with
                                 | Some etag -> ctx.Response.Headers.ETag <- etag

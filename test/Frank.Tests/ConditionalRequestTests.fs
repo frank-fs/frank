@@ -23,6 +23,11 @@ type MockETagProvider(etagByInstanceId: Map<string, string>) =
         member _.ComputeETag(instanceId) =
             task { return Map.tryFind instanceId etagByInstanceId }
 
+/// Mock ETag provider that always throws, for error propagation tests.
+type ThrowingETagProvider(ex: exn) =
+    interface IETagProvider with
+        member _.ComputeETag(_instanceId) = raise ex
+
 /// Mutable mock provider that allows changing ETags between requests (for mutation tests).
 type MutableMockETagProvider(initialEtags: Map<string, string>) =
     let mutable currentEtags = initialEtags
@@ -307,4 +312,22 @@ let conditionalRequestTests =
 
               let! (response: HttpResponseMessage) = client.SendAsync(request)
               Expect.equal response.StatusCode HttpStatusCode.NotModified "Should match one of the multiple ETags"
+          }
+
+          // -- Error propagation --
+          testTask "Exception from ETag provider propagates through middleware" {
+              let expectedEx = InvalidOperationException("provider failure")
+              let provider = ThrowingETagProvider(expectedEx)
+              let (client, _cache) = createTestServer provider
+
+              let! threw =
+                  task {
+                      try
+                          let! (_response: HttpResponseMessage) = client.GetAsync("/resource/42")
+                          return false
+                      with :? InvalidOperationException as ex when ex.Message = "provider failure" ->
+                          return true
+                  }
+
+              Expect.isTrue threw "Exception from ETag provider should propagate through middleware"
           } ]
