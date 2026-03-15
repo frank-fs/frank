@@ -47,19 +47,18 @@ A Frank developer's stateful resource correctly handles concurrent requests from
 
 ### User Story 3 - Guard Access to Event Context (Priority: P2)
 
-A Frank developer defines guards that need to inspect the incoming event to make authorization decisions. Currently, guards run before the handler sets the event, so they receive a default/null event value. The developer needs a way to write guards that can evaluate both access-control concerns (pre-handler, no event needed) and event-specific validation (post-event, event available).
+A Frank developer defines guards that need to inspect the incoming event to make authorization decisions. Currently, guards run before the handler sets the event, so they receive `Unchecked.defaultof<'E>` — a null/default value that is a footgun. The fix is simple: change the guard's event parameter to `'Event option`. Guards receive `None` before the handler runs and `Some event` after. Guards that don't need the event ignore the option; guards that need it pattern match on `Some`.
 
-**Why this priority**: This is an API correctness issue that affects guard expressiveness, but most common guards (authentication, turn checking) only need user identity and current state, which are already available. Event-specific guards are a secondary use case. However, the current behavior of passing a default/null event value is a footgun that could cause runtime errors in guards that naively try to use the event.
+**Why this priority**: This is an API correctness issue. The current `Unchecked.defaultof<'E>` behavior can cause runtime errors in guards that access the event. Since this is a pre-1.0 library, backward compatibility is not a constraint — the guard signature can change freely.
 
-**Independent Test**: Define a guard that inspects the event value. Trigger a request that sets an event. Verify the guard can see the actual event (not a default value). Separately, verify that access-control guards (which only check `User` and `CurrentState`) continue to work in the pre-handler phase.
+**Independent Test**: Define a guard that pattern matches on the event option. Trigger a request that sets an event. Verify the guard receives `Some event`. For a GET request (no event), verify the guard receives `None`.
 
 **Acceptance Scenarios**:
 
-1. **Given** a guard that checks only `User` and `CurrentState` (access-control guard), **When** the guard is evaluated before the handler runs, **Then** it correctly allows or blocks based on claims and state, without needing event context.
-2. **Given** a guard that needs to inspect the event for validation, **When** the guard is evaluated after the handler sets the event, **Then** it receives the actual event value (not a default/null).
-3. **Given** a stateful resource with both access-control guards and event-validation guards, **When** a request arrives, **Then** access-control guards run first (pre-handler) and event-validation guards run after the handler sets the event.
-4. **Given** a guard that inspects the event, **When** no event is set by the handler (e.g., a GET request), **Then** the event-validation guard is not evaluated (it is skipped for read-only operations).
-5. **Given** the current guard API, **When** upgrading to the new two-phase model, **Then** existing guards that only check `User` and `CurrentState` continue to work without modification (backward compatible).
+1. **Given** a guard that ignores the event parameter, **When** the guard is evaluated (pre- or post-handler), **Then** it works correctly regardless of whether the event is `None` or `Some`.
+2. **Given** a guard that pattern matches on `Some event`, **When** evaluated after the handler sets the event, **Then** it receives `Some` with the actual event value.
+3. **Given** a guard that pattern matches on `Some event`, **When** evaluated before the handler runs (or on a GET request), **Then** it receives `None`.
+4. **Given** the guard signature change from `'Event` to `'Event option`, **When** existing guard code is updated, **Then** guards that only check `User` and `CurrentState` need only add `_` for the event parameter.
 
 ---
 
@@ -100,22 +99,21 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **FR-002**: System MUST preserve backward compatibility for simple (non-parameterized) DU cases -- existing `inState` registrations must work without modification
 - **FR-003**: System MUST require that all `IStateMachineStore` implementations serialize state access through an actor (e.g., `MailboxProcessor`), ensuring no concurrent reads or writes to the backing store
 - **FR-004**: System MUST ensure that persistence (for durable stores) goes through the actor — external code never reads or writes the backing store directly
-- **FR-005**: System MUST separate guard evaluation into two phases: access-control guards (pre-handler, no event context) and event-validation guards (post-handler, with event context)
-- **FR-006**: System MUST not evaluate event-validation guards when no event is set by the handler (read-only operations)
+- **FR-005**: System MUST change the guard event parameter from `'Event` to `'Event option`, passing `None` before the handler runs and `Some event` after
+- **FR-006**: System MUST eliminate the use of `Unchecked.defaultof<'E>` in guard evaluation
 - **FR-007**: System MUST provide a SQLite-backed `IStateMachineStore` implementation that persists state durably across application restarts
 - **FR-008**: System MUST auto-create the SQLite schema on first use (no manual migration step required)
 - **FR-009**: System MUST serialize all SQLite store access through an actor, eliminating the need for database-level concurrency control
 - **FR-010**: System MUST support the `Subscribe` (observable) interface on the SQLite store with the same behavioral semantics as the in-memory store
 - **FR-011**: System MUST allow the SQLite store to be registered via dependency injection as a drop-in replacement for the in-memory store
-- **FR-012**: System MUST preserve backward compatibility for existing guards that only inspect `User` and `CurrentState` (no code changes required for existing guard predicates)
+- **FR-012**: System MUST update the guard signature to use `'Event option` — this is a breaking change (acceptable for pre-1.0)
 - **FR-013**: System MUST handle the case where `ToString()` has been overridden on a state type without producing incorrect key collisions
 
 ### Key Entities
 
 - **State Key**: The identifier derived from a DU state value used to look up handlers. Currently `state.ToString()`; will be replaced with a mechanism that groups parameterized cases by DU case name.
 - **State Actor**: An actor (e.g., `MailboxProcessor`) that serializes all state reads and writes for a given store instance. The actor is the concurrency mechanism — no version tokens or compare-and-swap needed. How the actor persists state (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail, not a public interface.
-- **Access-Control Guard**: A guard predicate that evaluates before the handler runs, using only `User`, `CurrentState`, and `Context` (no event). Used for authentication and authorization checks.
-- **Event-Validation Guard**: A guard predicate that evaluates after the handler sets an event, using the full `GuardContext` including the actual event. Used for transition-specific validation.
+- **Guard**: A guard predicate that receives `'Event option` — `None` before the handler runs, `Some event` after. Guards that only need user identity and state ignore the event option; guards that need event context pattern match on `Some`.
 - **SQLite Store**: A durable `IStateMachineStore` implementation backed by an actor wrapping a SQLite database file, supporting persistent state and observable subscriptions.
 
 ## Success Criteria
@@ -125,7 +123,7 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **SC-001**: Developers can register a single handler for a parameterized DU case and have it match all parameter values without additional registrations
 - **SC-002**: Two concurrent requests to the same stateful resource instance are processed sequentially by the actor -- no lost updates occur
 - **SC-003**: Existing stateful resource definitions (from spec 004) compile and pass all tests without modification after the changes (backward compatibility)
-- **SC-004**: Guards that check only user identity and current state continue to function identically without code changes
+- **SC-004**: Guards receive `'Event option` — `None` pre-handler, `Some event` post-handler — eliminating all uses of `Unchecked.defaultof`
 - **SC-005**: State persisted via the SQLite store survives application restart and is correctly restored on the next request
 - **SC-006**: The SQLite store serializes all access through its actor -- no concurrent database operations occur
 - **SC-007**: The SQLite store can be swapped in for the in-memory store with a single DI registration change and no handler modifications
@@ -137,5 +135,5 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - SQLite serialization of `'State` and `'Context` types will use JSON. The serializer will be configurable but default to `System.Text.Json`.
 - Concurrency is handled by actor serialization, not version tokens. The `IStateMachineStore` contract assumes all implementations serialize access through an actor. No compare-and-swap or optimistic concurrency tokens are needed at the interface level.
 - Durable stores are actor implementations that happen to persist state. There is no public persistence interface — how an actor persists (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail.
-- The two-phase guard model will be opt-in: guards default to access-control (pre-handler) phase. Developers explicitly mark guards as event-validation guards. This ensures backward compatibility.
+- The guard signature changes from `'Event` to `'Event option`. This is a breaking change, acceptable for pre-1.0. No two-phase split — one guard type, one field.
 - The SQLite store will live in a separate project/package (`Frank.Statecharts.Sqlite` or similar) to avoid adding a SQLite dependency to the core library.
