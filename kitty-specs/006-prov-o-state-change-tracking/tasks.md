@@ -163,7 +163,7 @@
 **Requirement Refs**: FR-001, FR-011
 
 ### Included Subtasks
-- [ ] T030 Create `src/Frank.Provenance/WebHostBuilderExtensions.fs` with `useProvenance` custom operation
+- [x] T030 Create `src/Frank.Provenance/WebHostBuilderExtensions.fs` with `useProvenance` custom operation
 - [ ] T031 Implement DI registration (IProvenanceStore singleton, TransitionObserver, ProvenanceSubscriptionManager)
 - [ ] T032 Implement `ProvenanceSubscriptionManager` as `IHostedService` (iterate all registered stateful resource endpoints and inject observer via per-resource `onTransition` on start, dispose subscriptions on stop)
 - [ ] T033 Implement optional `ProvenanceStoreConfig` passthrough (`useProvenance { maxRecords 50_000 }`)
