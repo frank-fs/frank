@@ -27,6 +27,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp (latest) (001-datastar-support)
 
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.x (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Data.Sqlite (for SQLite project only), FSharp.Reflection (in FSharp.Core) (010-statecharts-production-readiness)
+- SQLite via Microsoft.Data.Sqlite (new `Frank.Statecharts.Sqlite` project); in-memory MailboxProcessor (existing, unchanged) (010-statecharts-production-readiness)
 ## Project Structure
 
 ```text
@@ -43,10 +45,8 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 010-statecharts-production-readiness: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.x (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Data.Sqlite (for SQLite project only), FSharp.Reflection (in FSharp.Core)
 - 016-openapi: Added F# 8.0+ targeting .NET 9.0 and .NET 10.0 (multi-targeting) + Frank 7.1.0 (project reference), FSharp.Data.JsonSchema.OpenApi 3.0.0 (NuGet), Microsoft.AspNetCore.OpenApi (9.0.x / 10.0.x conditional), Microsoft.AspNetCore.App (framework reference)
 - 015-datastar-streaming-html: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool)
-- 014-datastar-native-sse: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting: `net8.0;net9.0;net10.0`)
-
-
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
