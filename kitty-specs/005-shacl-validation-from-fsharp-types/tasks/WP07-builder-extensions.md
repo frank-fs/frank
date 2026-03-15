@@ -11,6 +11,7 @@ base_commit: 00905c3c3ce2493efc8ec85dff2edefea3d47770
 created_at: '2026-03-15T19:14:01.335107+00:00'
 subtasks: [T037, T038, T039, T040, T041, T042]
 shell_pid: "27778"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -337,3 +338,4 @@ type ValidationOptions() =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:14:01Z – claude-opus – shell_pid=27778 – lane=doing – Assigned agent via workflow command
