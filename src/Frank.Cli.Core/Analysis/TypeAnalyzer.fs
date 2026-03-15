@@ -6,30 +6,49 @@ open FSharp.Compiler.Text
 
 type FieldKind =
     | Primitive of xsdType: string
+    | Guid
     | Optional of inner: FieldKind
     | Collection of element: FieldKind
     | Reference of typeName: string
 
-type AnalyzedField = { Name: string; Kind: FieldKind; IsRequired: bool }
-type DuCase = { Name: string; Fields: AnalyzedField list }
+type ConstraintAttribute =
+    | PatternAttr of regex: string
+    | MinInclusiveAttr of value: obj
+    | MaxInclusiveAttr of value: obj
+    | MinLengthAttr of length: int
+    | MaxLengthAttr of length: int
+
+type AnalyzedField =
+    { Name: string
+      Kind: FieldKind
+      IsRequired: bool
+      IsScalar: bool
+      Constraints: ConstraintAttribute list }
+
+type DuCase =
+    { Name: string
+      Fields: AnalyzedField list }
 
 type TypeKind =
     | Record of fields: AnalyzedField list
     | DiscriminatedUnion of cases: DuCase list
     | Enum of values: string list
 
-type AnalyzedType = {
-    FullName: string
-    ShortName: string
-    Kind: TypeKind
-    GenericParameters: string list
-    SourceLocation: SourceLocation option
-}
+type AnalyzedType =
+    { FullName: string
+      ShortName: string
+      Kind: TypeKind
+      GenericParameters: string list
+      SourceLocation: SourceLocation option
+      IsClosed: bool }
 
 module TypeAnalyzer =
 
     let private tryGetFullName (td: FSharpEntity) =
-        try Some td.FullName with _ -> None
+        try
+            Some td.FullName
+        with _ ->
+            None
 
     let rec mapFieldType (fsharpType: FSharpType) : FieldKind =
         if fsharpType.HasTypeDefinition then
@@ -37,11 +56,19 @@ module TypeAnalyzer =
             let fullNameOpt = tryGetFullName td
             // Check generic wrapper types by DisplayName first (works for abbreviations like option, list)
             match td.DisplayName with
-            | "option" | "Option" when fsharpType.GenericArguments.Count > 0 ->
+            | "option"
+            | "Option" when fsharpType.GenericArguments.Count > 0 ->
                 Optional(mapFieldType fsharpType.GenericArguments.[0])
-            | "list" | "List" when (fullNameOpt |> Option.exists (fun n -> n.Contains("FSharp"))) && fsharpType.GenericArguments.Count > 0 ->
+            | "list"
+            | "List" when
+                (fullNameOpt |> Option.exists (fun n -> n.Contains("FSharp")))
+                && fsharpType.GenericArguments.Count > 0
+                ->
                 Collection(mapFieldType fsharpType.GenericArguments.[0])
-            | "Set" when (fullNameOpt |> Option.exists (fun n -> n.Contains("FSharp"))) && fsharpType.GenericArguments.Count > 0 ->
+            | "Set" when
+                (fullNameOpt |> Option.exists (fun n -> n.Contains("FSharp")))
+                && fsharpType.GenericArguments.Count > 0
+                ->
                 Collection(mapFieldType fsharpType.GenericArguments.[0])
             | "seq" when fsharpType.GenericArguments.Count > 0 ->
                 Collection(mapFieldType fsharpType.GenericArguments.[0])
@@ -55,11 +82,24 @@ module TypeAnalyzer =
                     | "System.Double" -> Primitive "xsd:double"
                     | "System.Single" -> Primitive "xsd:float"
                     | "System.Boolean" -> Primitive "xsd:boolean"
-                    | "System.DateTime" | "System.DateTimeOffset" -> Primitive "xsd:dateTime"
-                    | "System.Guid" -> Primitive "xsd:string"
-                    | "System.Decimal" -> Primitive "xsd:double"
+                    | "System.DateTime"
+                    | "System.DateTimeOffset" -> Primitive "xsd:dateTime"
+                    | "System.DateOnly" -> Primitive "xsd:date"
+                    | "System.TimeOnly" -> Primitive "xsd:time"
+                    | "System.TimeSpan" -> Primitive "xsd:duration"
+                    | "System.Uri" -> Primitive "xsd:anyURI"
+                    | "System.Guid" -> Guid
+                    | "System.Decimal" -> Primitive "xsd:decimal"
                     | _ when td.IsArrayType && fsharpType.GenericArguments.Count > 0 ->
-                        Collection(mapFieldType fsharpType.GenericArguments.[0])
+                        let elemFullName =
+                            try
+                                Some fsharpType.GenericArguments.[0].TypeDefinition.FullName
+                            with _ ->
+                                None
+
+                        match elemFullName with
+                        | Some "System.Byte" -> Primitive "xsd:base64Binary"
+                        | _ -> Collection(mapFieldType fsharpType.GenericArguments.[0])
                     | _ -> Reference td.DisplayName
                 | None ->
                     // FullName not available -- try resolving abbreviation
@@ -72,28 +112,90 @@ module TypeAnalyzer =
         else
             Reference(fsharpType.Format(FSharpDisplayContext.Empty))
 
+    let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
+        try
+            field.FieldAttributes
+            |> Seq.choose (fun attr ->
+                let attrName =
+                    try
+                        attr.AttributeType.DisplayName
+                    with _ ->
+                        ""
+
+                match attrName with
+                | "PatternAttribute"
+                | "Pattern" ->
+                    match attr.ConstructorArguments |> Seq.tryHead with
+                    | Some(_, (:? string as regex)) -> Some(PatternAttr regex)
+                    | _ -> None
+                | "MinInclusiveAttribute"
+                | "MinInclusive" ->
+                    match attr.ConstructorArguments |> Seq.tryHead with
+                    | Some(_, value) -> Some(MinInclusiveAttr value)
+                    | _ -> None
+                | "MaxInclusiveAttribute"
+                | "MaxInclusive" ->
+                    match attr.ConstructorArguments |> Seq.tryHead with
+                    | Some(_, value) -> Some(MaxInclusiveAttr value)
+                    | _ -> None
+                | "MinLengthAttribute"
+                | "MinLength" ->
+                    match attr.ConstructorArguments |> Seq.tryHead with
+                    | Some(_, (:? int as n)) -> Some(MinLengthAttr n)
+                    | _ -> None
+                | "MaxLengthAttribute"
+                | "MaxLength" ->
+                    match attr.ConstructorArguments |> Seq.tryHead with
+                    | Some(_, (:? int as n)) -> Some(MaxLengthAttr n)
+                    | _ -> None
+                | _ -> None)
+            |> Seq.toList
+        with _ ->
+            []
+
     let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
         let kind = mapFieldType fsharpType
+
         let isRequired =
             match kind with
             | Optional _ -> false
             | _ -> true
-        { Name = name; Kind = kind; IsRequired = isRequired }
+
+        let isScalar =
+            match kind with
+            | Collection _ -> false
+            | _ -> true
+
+        { Name = name
+          Kind = kind
+          IsRequired = isRequired
+          IsScalar = isScalar
+          Constraints = [] }
+
+    let private makeFieldFromFSharpField (field: FSharpField) : AnalyzedField =
+        let baseField = makeField field.Name field.FieldType
+        let constraints = extractConstraintAttributes field
+
+        { baseField with
+            Constraints = constraints }
 
     let private entityToSourceLocation (entity: FSharpEntity) : SourceLocation option =
         try
             let r = entity.DeclarationLocation
-            Some { File = r.FileName; Line = r.StartLine; Column = r.StartColumn }
+
+            Some
+                { File = r.FileName
+                  Line = r.StartLine
+                  Column = r.StartColumn }
         with _ ->
             None
 
     let rec collectEntities (entity: FSharpEntity) : AnalyzedType list =
         let nested =
             try
-                entity.NestedEntities
-                |> Seq.collect collectEntities
-                |> Seq.toList
-            with _ -> []
+                entity.NestedEntities |> Seq.collect collectEntities |> Seq.toList
+            with _ ->
+                []
 
         let entityFullName = tryGetFullName entity |> Option.defaultValue entity.DisplayName
 
@@ -104,33 +206,25 @@ module TypeAnalyzer =
                 entity.UnionCases
                 |> Seq.map (fun uc ->
                     { Name = uc.Name
-                      Fields =
-                        uc.Fields
-                        |> Seq.map (fun f -> makeField f.Name f.FieldType)
-                        |> Seq.toList })
+                      Fields = uc.Fields |> Seq.map (fun f -> makeField f.Name f.FieldType) |> Seq.toList })
                 |> Seq.toList
+
             { FullName = entityFullName
               ShortName = entity.DisplayName
               Kind = DiscriminatedUnion cases
-              GenericParameters =
-                entity.GenericParameters
-                |> Seq.map (fun p -> p.Name)
-                |> Seq.toList
-              SourceLocation = entityToSourceLocation entity }
+              GenericParameters = entity.GenericParameters |> Seq.map (fun p -> p.Name) |> Seq.toList
+              SourceLocation = entityToSourceLocation entity
+              IsClosed = false }
             :: nested
         elif entity.IsFSharpRecord then
-            let fields =
-                entity.FSharpFields
-                |> Seq.map (fun f -> makeField f.Name f.FieldType)
-                |> Seq.toList
+            let fields = entity.FSharpFields |> Seq.map makeFieldFromFSharpField |> Seq.toList
+
             { FullName = entityFullName
               ShortName = entity.DisplayName
               Kind = Record fields
-              GenericParameters =
-                entity.GenericParameters
-                |> Seq.map (fun p -> p.Name)
-                |> Seq.toList
-              SourceLocation = entityToSourceLocation entity }
+              GenericParameters = entity.GenericParameters |> Seq.map (fun p -> p.Name) |> Seq.toList
+              SourceLocation = entityToSourceLocation entity
+              IsClosed = true }
             :: nested
         elif entity.IsEnum then
             let values =
@@ -138,11 +232,13 @@ module TypeAnalyzer =
                 |> Seq.filter (fun f -> f.Name <> "value__")
                 |> Seq.map (fun f -> f.Name)
                 |> Seq.toList
+
             { FullName = entityFullName
               ShortName = entity.DisplayName
               Kind = Enum values
               GenericParameters = []
-              SourceLocation = entityToSourceLocation entity }
+              SourceLocation = entityToSourceLocation entity
+              IsClosed = false }
             :: nested
         else
             nested

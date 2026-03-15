@@ -40,6 +40,7 @@ module UriHelpers =
                 | _ -> Uri Xsd.String
 
             rangeUri, false
+        | Guid -> Uri Xsd.String, false
         | Optional inner -> fieldKindToRange baseUri inner
         | Collection element -> fieldKindToRange baseUri element
         | Reference typeName -> classUri baseUri typeName, true
