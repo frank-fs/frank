@@ -1,10 +1,12 @@
 ---
 work_package_id: "WP03"
 title: "GraphBuilder (dotNetRdf)"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP01"]
 requirement_refs: ["FR-004", "FR-005", "FR-006", "FR-014"]
 subtasks: ["T012", "T013", "T014", "T015", "T016"]
+agent: "claude-opus-reviewer"
+shell_pid: "41078"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -365,3 +367,4 @@ let hasLiteralTriple (graph: IGraph) (s: string) (p: string) (value: string) =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:31:58Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:42:45Z – claude-opus-reviewer – shell_pid=41078 – lane=doing – Started review via workflow command
