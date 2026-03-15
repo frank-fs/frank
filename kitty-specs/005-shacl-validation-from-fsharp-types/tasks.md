@@ -135,7 +135,7 @@
 **Requirement Refs**: FR-010, FR-011, FR-012
 
 ### Included Subtasks
-- [ ] T022 Create `src/Frank.Validation/ReportSerializer.fs` with content-negotiation dispatch
+- [x] T022 Create `src/Frank.Validation/ReportSerializer.fs` with content-negotiation dispatch
 - [ ] T023 Implement SHACL ValidationReport -> dotNetRdf `IGraph` conversion for semantic serialization via Frank.LinkedData
 - [ ] T024 Implement ValidationReport -> RFC 9457 Problem Details JSON mapping
 - [ ] T025 Implement nested field path serialization (e.g., `customer.address.zipCode` -> `sh:resultPath`)
