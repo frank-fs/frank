@@ -248,7 +248,7 @@
 - [x] T039 Implement `validateWithCapabilities` custom operation for capability-dependent shapes
 - [x] T040 Create `src/Frank.Validation/WebHostBuilderExtensions.fs` with `useValidation` extension
 - [x] T041 Implement shape cache initialization at startup (derive all shapes from ValidationMarker metadata)
-- [ ] T042 Implement response validation opt-in (diagnostic mode: validate handler return types, log violations, do not block)
+- [x] T042 Implement response validation opt-in (diagnostic mode: validate handler return types, log violations, do not block)
 - [ ] T042b Create test verifying response validation logs warning but does not block response when output shape is violated
 
 ### Implementation Notes
