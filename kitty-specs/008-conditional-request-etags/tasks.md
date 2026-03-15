@@ -162,7 +162,7 @@
 - [x] T024 Test User Story 1: GET responses include ETag headers, ETag changes on state transition, initial state has ETag
 - [x] T025 Test User Story 2: conditional GET with matching If-None-Match returns 304, changed state returns 200 with new ETag, multiple ETags, wildcard
 - [x] T026 Test User Story 3: If-Match on mutations -- matching proceeds, non-matching returns 412, wildcard, no If-Match proceeds normally
-- [ ] T027 Test User Story 4: custom IETagProvider on plain resource -- ETags generated, conditional requests work identically
+- [x] T027 Test User Story 4: custom IETagProvider on plain resource -- ETags generated, conditional requests work identically
 - [ ] T028 Test edge cases: resource without IETagProvider unaffected, DELETE responses, concurrent clients (optimistic concurrency scenario)
 - [ ] T028b Benchmark ETag overhead via BenchmarkDotNet — verify <1ms for typical state sizes
 
