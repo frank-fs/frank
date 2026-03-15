@@ -109,12 +109,64 @@ module ShapeGraphBuilder =
             g.Assert(propNode, shOr, listNode)
         | None -> ()
 
-        // sh:pattern
+        // sh:pattern (primary)
         match prop.Pattern with
         | Some pattern ->
             let shPattern = uriNode g (sh + "pattern")
             g.Assert(propNode, shPattern, g.CreateLiteralNode(pattern))
         | None -> ()
+
+        // sh:pattern (additional — each is a separate assertion, SHACL AND semantics)
+        for additionalPattern in prop.AdditionalPatterns do
+            let shPattern = uriNode g (sh + "pattern")
+            g.Assert(propNode, shPattern, g.CreateLiteralNode(additionalPattern))
+
+        // sh:minInclusive
+        match prop.MinInclusive with
+        | Some value ->
+            let shMinInclusive = uriNode g (sh + "minInclusive")
+            g.Assert(propNode, shMinInclusive, g.CreateLiteralNode(string value))
+        | None -> ()
+
+        // sh:maxInclusive
+        match prop.MaxInclusive with
+        | Some value ->
+            let shMaxInclusive = uriNode g (sh + "maxInclusive")
+            g.Assert(propNode, shMaxInclusive, g.CreateLiteralNode(string value))
+        | None -> ()
+
+        // sh:minExclusive
+        match prop.MinExclusive with
+        | Some value ->
+            let shMinExclusive = uriNode g (sh + "minExclusive")
+            g.Assert(propNode, shMinExclusive, g.CreateLiteralNode(string value))
+        | None -> ()
+
+        // sh:maxExclusive
+        match prop.MaxExclusive with
+        | Some value ->
+            let shMaxExclusive = uriNode g (sh + "maxExclusive")
+            g.Assert(propNode, shMaxExclusive, g.CreateLiteralNode(string value))
+        | None -> ()
+
+        // sh:minLength
+        match prop.MinLength with
+        | Some len ->
+            let shMinLength = uriNode g (sh + "minLength")
+            g.Assert(propNode, shMinLength, intLiteral g len)
+        | None -> ()
+
+        // sh:maxLength
+        match prop.MaxLength with
+        | Some len ->
+            let shMaxLength = uriNode g (sh + "maxLength")
+            g.Assert(propNode, shMaxLength, intLiteral g len)
+        | None -> ()
+
+        // Custom raw predicate/value pairs
+        for pair in prop.AdditionalConstraints do
+            let predNode = uriNode g (pair.PredicateUri.ToString())
+            g.Assert(propNode, predNode, g.CreateLiteralNode(string pair.Value))
 
     /// Build a dotNetRdf ShapesGraph from an F# ShaclShape.
     /// This is intended to be called once at startup and cached.
@@ -144,5 +196,13 @@ module ShapeGraphBuilder =
         // Add property shapes
         for prop in shape.Properties do
             addPropertyShape g (shapeNode :> INode) prop
+
+        // sh:sparql — attach SPARQL constraints directly to the NodeShape
+        for sparql in shape.SparqlConstraints do
+            let shSparql = uriNode g (sh + "sparql")
+            let sparqlNode = g.CreateBlankNode()
+            g.Assert(shapeNode :> INode, shSparql, sparqlNode)
+            let shSelect = uriNode g (sh + "select")
+            g.Assert(sparqlNode, shSelect, g.CreateLiteralNode(sparql.Query))
 
         new ShapesGraph(g)

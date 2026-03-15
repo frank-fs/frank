@@ -153,8 +153,10 @@ module ShapeBuilder =
         let xsdDatatype = mapType elementType
 
         let pattern =
-            if elementType = typeof<Guid> then Some UuidPattern
-            else None
+            if elementType = typeof<Guid> then
+                Some UuidPattern
+            else
+                None
 
         let nodeRef, inValues, orShapes =
             match xsdDatatype with
@@ -187,8 +189,14 @@ module ShapeBuilder =
           InValues = inValues
           OrShapes = orShapes
           Pattern = pattern
+          AdditionalPatterns = []
           MinInclusive = None
           MaxInclusive = None
+          MinExclusive = None
+          MaxExclusive = None
+          MinLength = None
+          MaxLength = None
+          AdditionalConstraints = []
           Description = None }
 
     /// Derive DU constraints: sh:in for simple DUs, sh:or for payload DUs.
@@ -224,8 +232,10 @@ module ShapeBuilder =
                 "Unknown"
 
         let parentName =
-            if parentDuType.FullName <> null then parentDuType.FullName
-            else parentDuType.Name
+            if parentDuType.FullName <> null then
+                parentDuType.FullName
+            else
+                parentDuType.Name
 
         let caseUri =
             let encoded = Uri.EscapeDataString(sprintf "%s.%s" parentName caseInfo.Name)
@@ -238,7 +248,8 @@ module ShapeBuilder =
           NodeShapeUri = caseUri
           Properties = properties
           Closed = true
-          Description = Some(sprintf "DU case: %s" caseInfo.Name) }
+          Description = Some(sprintf "DU case: %s" caseInfo.Name)
+          SparqlConstraints = [] }
 
     /// Derive a ShaclShape from an F# type. Handles records, DUs, option types,
     /// collections, nested types, and recursive types (with cycle detection).
@@ -254,13 +265,15 @@ module ShapeBuilder =
                   NodeShapeUri = UriConventions.buildNodeShapeUriFromType typ
                   Properties = []
                   Closed = false
-                  Description = Some "Recursive reference (cycle detected)" }
+                  Description = Some "Recursive reference (cycle detected)"
+                  SparqlConstraints = [] }
             elif stack.Count >= maxDepth then
                 { TargetType = Some typ
                   NodeShapeUri = UriConventions.buildNodeShapeUriFromType typ
                   Properties = []
                   Closed = false
-                  Description = Some(sprintf "Depth limit reached (%d)" maxDepth) }
+                  Description = Some(sprintf "Depth limit reached (%d)" maxDepth)
+                  SparqlConstraints = [] }
             else
                 let stack' = stack |> Set.add key
                 let uri = UriConventions.buildNodeShapeUriFromType typ
@@ -276,7 +289,8 @@ module ShapeBuilder =
                           NodeShapeUri = uri
                           Properties = properties
                           Closed = true
-                          Description = None }
+                          Description = None
+                          SparqlConstraints = [] }
                     elif FSharpType.IsUnion(typ, true) then
                         let duResult = deriveDuConstraint maxDepth stack' typ
 
@@ -286,19 +300,22 @@ module ShapeBuilder =
                               NodeShapeUri = uri
                               Properties = []
                               Closed = true
-                              Description = Some(sprintf "Enum DU: %s" typ.Name) }
+                              Description = Some(sprintf "Enum DU: %s" typ.Name)
+                              SparqlConstraints = [] }
                         | OrShapes _uris ->
                             { TargetType = Some typ
                               NodeShapeUri = uri
                               Properties = []
                               Closed = false
-                              Description = Some(sprintf "Payload DU: %s" typ.Name) }
+                              Description = Some(sprintf "Payload DU: %s" typ.Name)
+                              SparqlConstraints = [] }
                     else
                         { TargetType = Some typ
                           NodeShapeUri = uri
                           Properties = []
                           Closed = false
-                          Description = Some "Non-derivable type" }
+                          Description = Some "Non-derivable type"
+                          SparqlConstraints = [] }
 
                 shapeCache.TryAdd(typ, shape) |> ignore
                 shape
