@@ -20,8 +20,6 @@
   <Target Name="EmbedFrankSemanticDefinitions"
           AfterTargets="GenerateFrankSemanticDefinitions"
           BeforeTargets="CoreCompile"
-          Inputs="$(FrankCliOutputPath)ontology.owl.xml;$(FrankCliOutputPath)shapes.shacl.ttl;$(FrankCliOutputPath)manifest.json"
-          Outputs="@(EmbeddedResource)"
           Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
     <ItemGroup>
       <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"

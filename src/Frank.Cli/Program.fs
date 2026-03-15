@@ -50,6 +50,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -88,6 +90,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -126,6 +130,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -174,6 +180,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -247,6 +255,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -258,4 +268,6 @@ let main args =
     root.Subcommands.Add(compileCmd)
 
     let parseResult = root.Parse(args)
-    parseResult.Invoke()
+    let exitCode = parseResult.Invoke()
+
+    if exitCode <> 0 then exitCode else Environment.ExitCode

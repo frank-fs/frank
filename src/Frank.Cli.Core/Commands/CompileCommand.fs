@@ -83,7 +83,7 @@ module CompileCommand =
 
     /// Unified entrypoint for MSBuild auto-invoke: runs extraction and emits artifacts in one shot.
     /// Accepts the project path, base URI, vocabularies, and optional output directory.
-    /// Internally calls ExtractCommand.execute to obtain the state, then writes artifacts.
+    /// Uses a capturing pipeline to avoid a redundant disk round-trip for the ExtractionState.
     let compileFromProject
         (projectPath: string)
         (baseUri: Uri)
@@ -91,33 +91,36 @@ module CompileCommand =
         (outputDir: string option)
         : Async<Result<CompileResult, string>> =
         async {
-            // Step 1: Extract — runs full pipeline and persists state
-            let! extractResult = ExtractCommand.execute projectPath baseUri vocabularies
+            // Capture the ExtractionState in memory via the pipeline's SaveState hook,
+            // avoiding the need to re-load it from disk after extraction.
+            let capturedState = ref None
+
+            let capturingPipeline =
+                { ExtractCommand.defaultPipeline with
+                    SaveState =
+                        fun path state ->
+                            capturedState.Value <- Some state
+                            ExtractCommand.defaultPipeline.SaveState path state }
+
+            let! extractResult = ExtractCommand.executeWithPipeline capturingPipeline projectPath baseUri vocabularies
 
             match extractResult with
             | Error e -> return Error $"Extraction failed: {e}"
-            | Ok extractedState ->
+            | Ok _ ->
 
-                let projectDir = Path.GetDirectoryName projectPath
-                let statePath = extractedState.StateFilePath
+                match capturedState.Value with
+                | None -> return Error "Internal error: extraction succeeded but state was not captured"
+                | Some state ->
 
-                try
-                    let outDir =
-                        outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
+                    try
+                        let projectDir = Path.GetDirectoryName projectPath
 
-                    // Step 2: Load the just-persisted state and emit artifacts
-                    match ExtractionState.load statePath with
-                    | Error e -> return Error $"Failed to load state after extraction: {e}"
-                    | Ok state ->
+                        let outDir =
+                            outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
 
-                        // Back up existing state before overwriting
-                        backupState statePath
-
-                        // Write all three artifacts via shared serializer
                         let (ontologyPath, shapesPath, manifestPath) =
                             ArtifactSerializer.writeArtifacts state outDir
 
-                        // Round-trip verification: re-parse each file to confirm validity
                         verifyRoundTrip ontologyPath shapesPath manifestPath
 
                         return
@@ -129,6 +132,6 @@ module CompileCommand =
                                     [ "Frank.Semantic.ontology.owl.xml"
                                       "Frank.Semantic.shapes.shacl.ttl"
                                       "Frank.Semantic.manifest.json" ] }
-                with ex ->
-                    return Error $"Compile failed: {ex.Message}"
+                    with ex ->
+                        return Error $"Compile failed: {ex.Message}"
         }
