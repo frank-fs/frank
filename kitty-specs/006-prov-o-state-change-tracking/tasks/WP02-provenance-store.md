@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "IProvenanceStore + MailboxProcessorStore"
-lane: done
+lane: "for_review"
 dependencies: ["WP01"]
 requirement_refs: ["FR-007", "FR-008", "FR-009", "FR-015"]
 subtasks: ["T007", "T008", "T009", "T010", "T011"]
@@ -336,3 +336,4 @@ let makeRecord resourceUri agentId stateBefore stateAfter =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:31:57Z – unknown – lane=for_review – Moved to for_review
