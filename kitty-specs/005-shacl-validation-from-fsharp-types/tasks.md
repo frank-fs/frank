@@ -206,11 +206,11 @@
 **Requirement Refs**: FR-015, FR-016
 
 ### Included Subtasks
-- [ ] T032 Create `src/Frank.Validation/ShapeMerger.fs` with `merge : ShaclShape -> CustomConstraint list -> ShaclShape`
-- [ ] T033 Implement additive constraint merging (Pattern, MinInclusive, MaxInclusive, MinLength, MaxLength, InValues)
-- [ ] T034 Implement conflict detection: custom minCount 0 on required field, contradictory InValues, etc.
-- [ ] T035 Implement SPARQL-based cross-field constraint support (delegating to dotNetRdf SPARQL engine)
-- [ ] T036 Create `test/Frank.Validation.Tests/ShapeMergerTests.fs` with merge/conflict tests
+- [x] T032 Create `src/Frank.Validation/ShapeMerger.fs` with `merge : ShaclShape -> CustomConstraint list -> ShaclShape`
+- [x] T033 Implement additive constraint merging (Pattern, MinInclusive, MaxInclusive, MinLength, MaxLength, InValues)
+- [x] T034 Implement conflict detection: custom minCount 0 on required field, contradictory InValues, etc.
+- [x] T035 Implement SPARQL-based cross-field constraint support (delegating to dotNetRdf SPARQL engine)
+- [x] T036 Create `test/Frank.Validation.Tests/ShapeMergerTests.fs` with merge/conflict tests
 
 ### Implementation Notes
 - Merge runs once at startup, not per request
