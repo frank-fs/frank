@@ -10,6 +10,7 @@ base_commit: c0a8102670d8a4b4a3a7b2e7d6071ad5cab8f18c
 created_at: '2026-03-15T13:53:25.695367+00:00'
 subtasks: [T060, T061, T062, T063]
 shell_pid: "8654"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-14T00:00:00Z'
   lane: planned
@@ -196,3 +197,4 @@ Depends on WP09 + WP10 (enriched extraction pipeline). Can be developed in paral
 ## Activity Log
 
 - 2026-03-14T00:00:00Z -- system -- lane=planned -- Prompt created from build-time SHACL unification design.
+- 2026-03-15T13:53:26Z – claude-opus – shell_pid=8654 – lane=doing – Assigned agent via workflow command
