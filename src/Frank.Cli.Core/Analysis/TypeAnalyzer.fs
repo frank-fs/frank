@@ -146,7 +146,7 @@ module TypeAnalyzer =
 
     let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
         try
-            field.FieldAttributes
+            Seq.append field.FieldAttributes field.PropertyAttributes
             |> Seq.choose (fun attr ->
                 let attrName =
                     try

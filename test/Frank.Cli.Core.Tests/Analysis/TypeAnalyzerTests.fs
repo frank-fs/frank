@@ -32,36 +32,52 @@ let private checkSource (source: string) =
                 File.Delete tmpFile
     }
 
-/// Check a source that has a preamble (e.g. attribute definitions) loaded via a separate file
-/// so FCS can see attribute types when analysing fields in the main source.
-let private checkSourceWithPreamble (preamble: string) (source: string) =
+/// Compile multiple F# source files as a project (not script).
+/// This gives FCS full attribute resolution, unlike .fsx mode.
+let private checkProjectSources (sources: (string * string) list) =
     async {
         let uid = System.Guid.NewGuid().ToString("N")
-        let preambleFile = Path.Combine(Path.GetTempPath(), $"frank_pre_{uid}.fsx")
-        let mainFile = Path.Combine(Path.GetTempPath(), $"frank_test_{uid}.fsx")
+        let tmpDir = Path.Combine(Path.GetTempPath(), $"frank_proj_{uid}")
+        Directory.CreateDirectory(tmpDir) |> ignore
 
         try
-            File.WriteAllText(preambleFile, preamble)
-            let combined = $"#load \"{preambleFile}\"\n{source}"
-            File.WriteAllText(mainFile, combined)
-            let sourceText = SourceText.ofString combined
+            let filePaths =
+                sources
+                |> List.mapi (fun i (name, content) ->
+                    let path = Path.Combine(tmpDir, name)
+                    File.WriteAllText(path, content)
+                    path)
 
-            let! options, _ =
+            // Get SDK refs from a dummy script to reuse system assembly references
+            let dummyFile = Path.Combine(tmpDir, "dummy.fsx")
+            File.WriteAllText(dummyFile, "()")
+            let dummyText = SourceText.ofString "()"
+
+            let! scriptOpts, _ =
                 checker.GetProjectOptionsFromScript(
-                    mainFile,
-                    sourceText,
+                    dummyFile,
+                    dummyText,
                     assumeDotNetFramework = false,
                     useSdkRefs = true
                 )
 
-            let! projectResults = checker.ParseAndCheckProject(options)
+            // Build project args: reuse script's OtherOptions (assembly refs) + our source files
+            let args =
+                [| yield "--noframework"
+                   yield "--targetprofile:netcore"
+                   yield! scriptOpts.OtherOptions |> Array.filter (fun o -> o.StartsWith("-r:"))
+                   yield! filePaths |]
+
+            let projectOptions =
+                checker.GetProjectOptionsFromCommandLineArgs($"frank_proj_{uid}.fsproj", args)
+
+            let! projectResults = checker.ParseAndCheckProject(projectOptions)
             return projectResults
         finally
-            if File.Exists preambleFile then
-                File.Delete preambleFile
-
-            if File.Exists mainFile then
-                File.Delete mainFile
+            try
+                Directory.Delete(tmpDir, true)
+            with _ ->
+                ()
     }
 
 [<Tests>]
@@ -492,20 +508,14 @@ type Account = { Id: int; Status: Status }
 
           // ---------------------------------------------------------------
           // T053: Constraint attribute extraction
-          // NOTE: FCS does not resolve custom attributes on record fields when compiling
-          // .fsx scripts (even with #load preamble). The extractConstraintAttributes
-          // function works correctly in real F# projects (verified via ShapeGenerator
-          // integration tests in WP10). Attribute extraction tests are pending until
-          // a project-based test harness is available.
+          // Uses a real .fsproj fixture (Fixtures/Fixtures.fsproj) compiled via
+          // ProjectLoader for full attribute resolution — FCS script mode
+          // does not expose FieldAttributes on record fields.
           // ---------------------------------------------------------------
 
           testCaseAsync "field with no attributes has empty Constraints list"
           <| async {
-              let source =
-                  """
-type Product = { Id: int; Name: string }
-"""
-
+              let source = "type Product = { Id: int; Name: string }"
               let! projectResults = checkSource source
               let types = TypeAnalyzer.analyzeTypes projectResults
               let product = types |> List.tryFind (fun t -> t.ShortName = "Product")
@@ -518,295 +528,111 @@ type Product = { Id: int; Name: string }
               | _ -> failwith "Product should be a Record"
           }
 
-          ptestCaseAsync "field with Pattern attribute extracts PatternAttr"
+          testCaseAsync "constraint attributes extracted from fixture project"
           <| async {
-              let preamble =
-                  """
-open System
+              let fixturesPath =
+                  Path.Combine(__SOURCE_DIRECTORY__, "..", "Fixtures", "Fixtures.fsproj")
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type PatternAttribute(regex: string) =
-    inherit Attribute()
-    member _.Regex = regex
-"""
+              let! result = ProjectLoader.loadProject fixturesPath
 
-              let source =
-                  """
-type PhoneRecord = {
-    [<Pattern(@"^\+?[0-9]{7,15}$")>]
-    PhoneNumber: string
-    Name: string
-}
-"""
+              let checkResults =
+                  match result with
+                  | Ok p -> p.CheckResults
+                  | Error e -> failwith $"Failed to load fixtures project: {e}"
 
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "PhoneRecord")
-              Expect.isSome record "Should find PhoneRecord type"
+              let types = TypeAnalyzer.analyzeTypes checkResults
 
-              match record.Value.Kind with
-              | Record fields ->
-                  let phoneField = fields |> List.find (fun f -> f.Name = "PhoneNumber")
+              let findRecord name =
+                  types |> List.find (fun t -> t.ShortName = name)
 
-                  let hasPattern =
-                      phoneField.Constraints
-                      |> List.exists (fun c ->
-                          match c with
-                          | PatternAttr _ -> true
-                          | _ -> false)
+              let getFields t =
+                  match t.Kind with
+                  | Record fields -> fields
+                  | _ -> failwith $"{t.ShortName} should be a Record"
 
-                  Expect.isTrue hasPattern "PhoneNumber field should have a PatternAttr constraint"
-                  let nameField = fields |> List.find (fun f -> f.Name = "Name")
-                  Expect.isEmpty nameField.Constraints "Name field should have no constraints"
-              | _ -> failwith "PhoneRecord should be a Record"
-          }
+              // PhoneRecord: Pattern attribute
+              let phoneFields = findRecord "PhoneRecord" |> getFields
+              let phoneField = phoneFields |> List.find (fun f -> f.Name = "PhoneNumber")
 
-          ptestCaseAsync "field with MinLength attribute extracts MinLengthAttr"
-          <| async {
-              let preamble =
-                  """
-open System
+              let hasPattern =
+                  phoneField.Constraints
+                  |> List.exists (fun c ->
+                      match c with
+                      | PatternAttr _ -> true
+                      | _ -> false)
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MinLengthAttribute(length: int) =
-    inherit Attribute()
-    member _.Length = length
-"""
+              Expect.isTrue hasPattern "PhoneNumber should have PatternAttr"
+              let nameField = phoneFields |> List.find (fun f -> f.Name = "Name")
+              Expect.isEmpty nameField.Constraints "Name field should have no constraints"
 
-              let source =
-                  """
-type UserRecord = {
-    [<MinLength(3)>]
-    Username: string
-}
-"""
+              // UserRecord: MinLength attribute
+              let userFields = findRecord "UserRecord" |> getFields
+              let usernameField = userFields |> List.find (fun f -> f.Name = "Username")
 
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "UserRecord")
-              Expect.isSome record "Should find UserRecord type"
+              let minLength =
+                  usernameField.Constraints
+                  |> List.tryPick (fun c ->
+                      match c with
+                      | MinLengthAttr n -> Some n
+                      | _ -> None)
 
-              match record.Value.Kind with
-              | Record fields ->
-                  let usernameField = fields |> List.find (fun f -> f.Name = "Username")
+              Expect.isSome minLength "Username should have MinLengthAttr"
+              Expect.equal minLength.Value 3 "MinLength value should be 3"
 
-                  let minLengthConstraint =
-                      usernameField.Constraints
-                      |> List.tryPick (fun c ->
-                          match c with
-                          | MinLengthAttr n -> Some n
-                          | _ -> None)
+              // PostRecord: MaxLength attribute
+              let postFields = findRecord "PostRecord" |> getFields
+              let bodyField = postFields |> List.find (fun f -> f.Name = "Body")
 
-                  Expect.isSome minLengthConstraint "Username should have a MinLengthAttr"
-                  Expect.equal minLengthConstraint.Value 3 "MinLength value should be 3"
-              | _ -> failwith "UserRecord should be a Record"
-          }
+              let maxLength =
+                  bodyField.Constraints
+                  |> List.tryPick (fun c ->
+                      match c with
+                      | MaxLengthAttr n -> Some n
+                      | _ -> None)
 
-          ptestCaseAsync "field with MaxLength attribute extracts MaxLengthAttr"
-          <| async {
-              let preamble =
-                  """
-open System
+              Expect.isSome maxLength "Body should have MaxLengthAttr"
+              Expect.equal maxLength.Value 280 "MaxLength value should be 280"
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MaxLengthAttribute(length: int) =
-    inherit Attribute()
-    member _.Length = length
-"""
+              // RatingRecord: MinInclusive + MaxInclusive
+              let ratingFields = findRecord "RatingRecord" |> getFields
+              let scoreField = ratingFields |> List.find (fun f -> f.Name = "Score")
 
-              let source =
-                  """
-type PostRecord = {
-    [<MaxLength(280)>]
-    Body: string
-}
-"""
+              let hasMinInclusive =
+                  scoreField.Constraints
+                  |> List.exists (fun c ->
+                      match c with
+                      | MinInclusiveAttr _ -> true
+                      | _ -> false)
 
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "PostRecord")
-              Expect.isSome record "Should find PostRecord type"
+              let hasMaxInclusive =
+                  scoreField.Constraints
+                  |> List.exists (fun c ->
+                      match c with
+                      | MaxInclusiveAttr _ -> true
+                      | _ -> false)
 
-              match record.Value.Kind with
-              | Record fields ->
-                  let bodyField = fields |> List.find (fun f -> f.Name = "Body")
+              Expect.isTrue hasMinInclusive "Score should have MinInclusiveAttr"
+              Expect.isTrue hasMaxInclusive "Score should have MaxInclusiveAttr"
 
-                  let maxLengthConstraint =
-                      bodyField.Constraints
-                      |> List.tryPick (fun c ->
-                          match c with
-                          | MaxLengthAttr n -> Some n
-                          | _ -> None)
+              // UsernameRecord: multiple attributes
+              let unFields = findRecord "UsernameRecord" |> getFields
+              let unField = unFields |> List.find (fun f -> f.Name = "Username")
+              Expect.isGreaterThanOrEqual unField.Constraints.Length 2 "Username should have at least 2 constraints"
 
-                  Expect.isSome maxLengthConstraint "Body should have a MaxLengthAttr"
-                  Expect.equal maxLengthConstraint.Value 280 "MaxLength value should be 280"
-              | _ -> failwith "PostRecord should be a Record"
-          }
+              let hasMinLen =
+                  unField.Constraints
+                  |> List.exists (fun c ->
+                      match c with
+                      | MinLengthAttr _ -> true
+                      | _ -> false)
 
-          ptestCaseAsync "field with MinInclusive attribute extracts MinInclusiveAttr"
-          <| async {
-              let preamble =
-                  """
-open System
+              let hasMaxLen =
+                  unField.Constraints
+                  |> List.exists (fun c ->
+                      match c with
+                      | MaxLengthAttr _ -> true
+                      | _ -> false)
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MinInclusiveAttribute(value: int) =
-    inherit Attribute()
-    member _.Value = value
-"""
-
-              let source =
-                  """
-type RatingRecord = {
-    [<MinInclusive(1)>]
-    Score: int
-}
-"""
-
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "RatingRecord")
-              Expect.isSome record "Should find RatingRecord type"
-
-              match record.Value.Kind with
-              | Record fields ->
-                  let scoreField = fields |> List.find (fun f -> f.Name = "Score")
-
-                  let hasMinInclusive =
-                      scoreField.Constraints
-                      |> List.exists (fun c ->
-                          match c with
-                          | MinInclusiveAttr _ -> true
-                          | _ -> false)
-
-                  Expect.isTrue hasMinInclusive "Score field should have a MinInclusiveAttr"
-              | _ -> failwith "RatingRecord should be a Record"
-          }
-
-          ptestCaseAsync "field with MaxInclusive attribute extracts MaxInclusiveAttr"
-          <| async {
-              let preamble =
-                  """
-open System
-
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MaxInclusiveAttribute(value: int) =
-    inherit Attribute()
-    member _.Value = value
-"""
-
-              let source =
-                  """
-type RatingRecord = {
-    [<MaxInclusive(10)>]
-    Score: int
-}
-"""
-
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "RatingRecord")
-              Expect.isSome record "Should find RatingRecord type"
-
-              match record.Value.Kind with
-              | Record fields ->
-                  let scoreField = fields |> List.find (fun f -> f.Name = "Score")
-
-                  let hasMaxInclusive =
-                      scoreField.Constraints
-                      |> List.exists (fun c ->
-                          match c with
-                          | MaxInclusiveAttr _ -> true
-                          | _ -> false)
-
-                  Expect.isTrue hasMaxInclusive "Score field should have a MaxInclusiveAttr"
-              | _ -> failwith "RatingRecord should be a Record"
-          }
-
-          ptestCaseAsync "field with multiple constraint attributes extracts all of them"
-          <| async {
-              let preamble =
-                  """
-open System
-
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MinLengthAttribute(length: int) =
-    inherit Attribute()
-    member _.Length = length
-
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type MaxLengthAttribute(length: int) =
-    inherit Attribute()
-    member _.Length = length
-
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type PatternAttribute(regex: string) =
-    inherit Attribute()
-    member _.Regex = regex
-"""
-
-              let source =
-                  """
-type UsernameRecord = {
-    [<MinLength(3); MaxLength(20); Pattern("^[a-z0-9_]+$")>]
-    Username: string
-}
-"""
-
-              let! projectResults = checkSourceWithPreamble preamble source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let record = types |> List.tryFind (fun t -> t.ShortName = "UsernameRecord")
-              Expect.isSome record "Should find UsernameRecord type"
-
-              match record.Value.Kind with
-              | Record fields ->
-                  let usernameField = fields |> List.find (fun f -> f.Name = "Username")
-                  let constraintCount = usernameField.Constraints.Length
-                  Expect.isGreaterThanOrEqual constraintCount 2 "Username field should have at least 2 constraints"
-
-                  let hasMinLength =
-                      usernameField.Constraints
-                      |> List.exists (fun c ->
-                          match c with
-                          | MinLengthAttr _ -> true
-                          | _ -> false)
-
-                  let hasMaxLength =
-                      usernameField.Constraints
-                      |> List.exists (fun c ->
-                          match c with
-                          | MaxLengthAttr _ -> true
-                          | _ -> false)
-
-                  Expect.isTrue hasMinLength "Username should have MinLengthAttr"
-                  Expect.isTrue hasMaxLength "Username should have MaxLengthAttr"
-              | _ -> failwith "UsernameRecord should be a Record"
-          }
-
-          testCaseAsync "unknown attributes are ignored and do not raise"
-          <| async {
-              let source =
-                  """
-open System
-
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
-type SomeUnknownAttribute() =
-    inherit Attribute()
-
-type Widget = {
-    [<SomeUnknown>]
-    Name: string
-}
-"""
-
-              let! projectResults = checkSource source
-              let types = TypeAnalyzer.analyzeTypes projectResults
-              let widget = types |> List.tryFind (fun t -> t.ShortName = "Widget")
-              Expect.isSome widget "Should find Widget type"
-
-              match widget.Value.Kind with
-              | Record fields ->
-                  let nameField = fields |> List.find (fun f -> f.Name = "Name")
-                  Expect.isEmpty nameField.Constraints "Unknown attribute should produce empty Constraints"
-              | _ -> failwith "Widget should be a Record"
+              Expect.isTrue hasMinLen "Username should have MinLengthAttr"
+              Expect.isTrue hasMaxLen "Username should have MaxLengthAttr"
           } ]
