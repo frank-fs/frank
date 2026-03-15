@@ -1,12 +1,16 @@
 ---
 work_package_id: WP06
 title: Custom Constraints & Conflict Detection
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
 - WP10
 - WP12
+base_branch: 005-shacl-validation-from-fsharp-types-WP06-merge-base
+base_commit: 39b0e2a28d58f68b80d0bddd9ae9ff078308c98d
+created_at: '2026-03-15T18:49:25.775068+00:00'
 subtasks: [T032, T033, T034, T035, T036]
+shell_pid: "24783"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -18,8 +22,8 @@ history:
   agent: system
   shell_pid: ''
   action: Amended per build-time SHACL unification design
-requirement_refs: [FR-015, FR-016]
 amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
+requirement_refs: [FR-015, FR-016]
 ---
 
 # Work Package Prompt: WP06 -- Custom Constraints & Conflict Detection
