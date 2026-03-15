@@ -1,10 +1,12 @@
 ---
 work_package_id: "WP03"
 title: "Core parser"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP02"]
 requirement_refs: ["FR-002", "FR-003", "FR-005", "FR-009", "FR-012", "FR-013"]
 subtasks: ["T018", "T019", "T020", "T021", "T022", "T023"]
+agent: "claude-opus-reviewer"
+shell_pid: "42094"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -327,3 +329,4 @@ Write at least 25 test cases covering the categories above.
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:35:45Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:44:26Z – claude-opus-reviewer – shell_pid=42094 – lane=doing – Started review via workflow command
