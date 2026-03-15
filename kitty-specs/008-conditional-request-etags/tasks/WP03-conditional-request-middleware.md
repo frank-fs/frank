@@ -1,11 +1,13 @@
 ---
 work_package_id: WP03
 title: Conditional Request Middleware
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP02
 subtasks: [T011, T012, T013, T014, T015, T016, T017]
+agent: "claude-opus-reviewer"
+shell_pid: "41469"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -410,3 +412,4 @@ type MockETagProvider(etagByInstanceId: Map<string, string>) =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:46Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:43:25Z – claude-opus-reviewer – shell_pid=41469 – lane=doing – Started review via workflow command
