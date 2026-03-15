@@ -1,7 +1,7 @@
 ---
 work_package_id: WP12
 title: ShapeLoader and Internal Refactoring in Frank.Validation
-lane: "done"
+lane: "for_review"
 dependencies:
 - WP10
 base_branch: 005-shacl-validation-from-fsharp-types-WP10
@@ -427,3 +427,4 @@ module ShapeLoader =
 - 2026-03-15T19:08:53Z – claude-opus – shell_pid=8753 – lane=for_review – Re-running through spec-kitty review workflow for constitution check
 - 2026-03-15T19:08:59Z – claude-opus – shell_pid=26738 – lane=doing – Started review via workflow command
 - 2026-03-15T19:12:50Z – claude-opus – shell_pid=26738 – lane=done – Review passed: All 7 subtasks (T064-T070) verified. UriConventions extracted, ShapeLoader fully implemented with all constraint types, ShaclShape.TargetType changed to Type option, ValidationMarker.ShapeUri is Uri-keyed, ShapeCache pre-populated at startup, ShapeDerivation.fs deleted, TypeMapping.fs trimmed. 118 tests pass. Constitution compliance verified (all 8 principles). Previous review feedback addressed (stale comments, test rename, Obsolete attribute).
+- 2026-03-15T19:19:56Z – claude-opus – shell_pid=26738 – lane=for_review – Moved to for_review
