@@ -168,7 +168,7 @@
 - [x] T032 Implement `ProvenanceSubscriptionManager` as `IHostedService` (iterate all registered stateful resource endpoints and inject observer via per-resource `onTransition` on start, dispose subscriptions on stop)
 - [x] T033 Implement optional `ProvenanceStoreConfig` passthrough (`useProvenance { maxRecords 50_000 }`)
 - [x] T034 Create `test/Frank.Provenance.Tests/IntegrationTests.fs` with full-pipeline TestHost tests
-- [ ] T035 Create `test/Frank.Provenance.Tests/CustomStoreTests.fs` with DI replacement tests
+- [x] T035 Create `test/Frank.Provenance.Tests/CustomStoreTests.fs` with DI replacement tests
 
 ### Dependencies
 - Depends on WP04 (middleware), WP05 (observer), WP06 (agent types)
