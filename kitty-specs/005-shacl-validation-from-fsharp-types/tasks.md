@@ -288,7 +288,7 @@
 - [x] T047 Test capability-dependent shapes: admin vs. regular user with same request body
 - [x] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
 - [x] T049 Test edge cases: recursive types, nested records, empty body, generic types, non-derivable handler types
-- [ ] T049b Integration test: handler returns invalid response data with response validation enabled — warning logged, response delivered unmodified
+- [x] T049b Integration test: handler returns invalid response data with response validation enabled — warning logged, response delivered unmodified
 - [ ] T049c Benchmark validation overhead via BenchmarkDotNet — verify <1ms for shapes with 20 properties
 
 ### Implementation Notes
