@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Core ETag Types & Interface
-lane: "for_review"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: c08cbedce71702e173699650bcc6a50b87fa9ff3
@@ -9,6 +9,8 @@ created_at: '2026-03-08T17:30:59.293617+00:00'
 subtasks: [T001, T002, T003, T004, T005]
 shell_pid: "98096"
 agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -387,3 +389,5 @@ let etagComparisonTests =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:59Z – claude-opus – shell_pid=98096 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:57:54Z – claude-opus – shell_pid=98096 – lane=for_review – T001-T005 complete: IETagProvider, IETagProviderFactory, ETagMetadata, ETagFormat, ETagComparison. Builds clean.
+- 2026-03-14T15:33:57Z – claude-opus – shell_pid=98096 – lane=for_review – Rework complete: ETagMetadata with ctor params, CreateProvider(Endpoint), spec-matching function names, anyMatch with option, computeFromBytes, 36 passing tests. [claude-opus]
+- 2026-03-14T15:35:00Z – claude-opus – shell_pid=98096 – lane=done – Re-review passed: All 5 issues fixed. ETagMetadata with ctor params, CreateProvider(Endpoint), spec function names, 36 tests pass. [claude-opus-reviewer]
