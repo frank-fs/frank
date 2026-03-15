@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "MailboxProcessor ETag Cache"
-lane: done
+lane: "for_review"
 dependencies: ["WP01"]
 requirement_refs: ["FR-009", "FR-015"]
 subtasks: ["T006", "T007", "T008", "T009", "T010"]
@@ -398,3 +398,4 @@ let cacheTests =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:34:33Z – unknown – lane=for_review – Moved to for_review
