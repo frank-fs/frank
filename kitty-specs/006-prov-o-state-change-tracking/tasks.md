@@ -97,7 +97,7 @@
 - [x] T017 Create `src/Frank.Provenance/Middleware.fs` with Accept header parsing for `vnd.frank.provenance+*` media types
 - [x] T018 Implement media type mapping (`vnd.frank.provenance+turtle` -> `text/turtle`, etc.) and response serialization
 - [x] T019 Implement resource URI extraction from request path and store query
-- [ ] T020 Implement empty graph handling (200 with empty collection, not 404)
+- [x] T020 Implement empty graph handling (200 with empty collection, not 404)
 - [ ] T021 Create `test/Frank.Provenance.Tests/MiddlewareTests.fs` with TestHost integration tests
 
 ### Dependencies
