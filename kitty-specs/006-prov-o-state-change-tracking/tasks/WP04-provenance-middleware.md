@@ -1,12 +1,14 @@
 ---
 work_package_id: WP04
 title: Provenance Middleware (Content Negotiation)
-lane: "doing"
+lane: "done"
 dependencies:
 - WP02
 subtasks: [T017, T018, T019, T020, T021]
 agent: "claude-opus-reviewer"
 shell_pid: "42428"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -351,3 +353,4 @@ let createTestHost (store: IProvenanceStore) =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:37:21Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:45:02Z – claude-opus-reviewer – shell_pid=42428 – lane=doing – Started review via workflow command
+- 2026-03-15T19:46:37Z – claude-opus-reviewer – shell_pid=42428 – lane=done – Review passed: Middleware correctly intercepts GET with provenance Accept, queries store, builds graph, serializes via writeRdf. 4 media types supported. Empty graph returns 200 per T020. Non-GET passes through. 16 new tests. 83 total pass.
