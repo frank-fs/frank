@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Core ETag Types & Interface
-lane: done
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: c08cbedce71702e173699650bcc6a50b87fa9ff3
@@ -387,3 +387,4 @@ let etagComparisonTests =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:59Z – claude-opus – shell_pid=98096 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:57:54Z – claude-opus – shell_pid=98096 – lane=for_review – T001-T005 complete: IETagProvider, IETagProviderFactory, ETagMetadata, ETagFormat, ETagComparison. Builds clean.
+- 2026-03-15T19:21:13Z – claude-opus – shell_pid=98096 – lane=for_review – Moved to for_review
