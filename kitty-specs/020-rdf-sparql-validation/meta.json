@@ -1,9 +1,0 @@
-{
-  "feature_number": "020",
-  "slug": "020-rdf-sparql-validation",
-  "feature_slug": "020-rdf-sparql-validation",
-  "friendly_name": "rdf sparql validation",
-  "mission": "software-dev",
-  "target_branch": "master",
-  "created_at": "2026-03-15T22:48:02.645848+00:00"
-}
