@@ -16,6 +16,8 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="TransitionObserverTests.fs" />
     <Compile Include="AgentTypeTests.fs" />
+    <Compile Include="CustomStoreTests.fs" />
+    <Compile Include="IntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
