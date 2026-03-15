@@ -1,10 +1,12 @@
 ---
 work_package_id: WP05
 title: TransitionObserver
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]
+agent: "claude-opus-reviewer"
+shell_pid: "41801"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -397,3 +399,4 @@ type MockProvenanceStore() =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:44Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:43:48Z – claude-opus-reviewer – shell_pid=41801 – lane=doing – Started review via workflow command
