@@ -173,7 +173,7 @@
 ### Included Subtasks
 - [x] T027 Create `src/Frank.Validation/ShapeResolver.fs` with `resolve : ShapeResolverConfig -> ClaimsPrincipal -> ShaclShape`
 - [x] T028 Implement claim-based override matching (iterate overrides, first match wins)
-- [ ] T029 Implement base shape fallback when no override matches
+- [x] T029 Implement base shape fallback when no override matches
 - [ ] T030 Integrate ShapeResolver into ValidationMiddleware (read principal from HttpContext.User)
 - [ ] T031 Create `test/Frank.Validation.Tests/CapabilityTests.fs` with capability-dependent validation tests
 
