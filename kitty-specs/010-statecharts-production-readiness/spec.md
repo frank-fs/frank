@@ -101,6 +101,7 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **FR-004**: System MUST ensure that persistence (for durable stores) goes through the actor — external code never reads or writes the backing store directly
 - **FR-005**: System MUST change the guard event parameter from `'Event` to `'Event option`, passing `None` before the handler runs and `Some event` after
 - **FR-006**: System MUST eliminate the use of `Unchecked.defaultof<'E>` in guard evaluation
+- **FR-006b**: System MUST support a guard phase marker to designate when a guard runs (pre-handler or post-handler), making developer intent explicit
 - **FR-007**: System MUST provide a SQLite-backed `IStateMachineStore` implementation that persists state durably across application restarts
 - **FR-008**: System MUST auto-create the SQLite schema on first use (no manual migration step required)
 - **FR-009**: System MUST serialize all SQLite store access through an actor, eliminating the need for database-level concurrency control
@@ -113,7 +114,7 @@ A Frank developer deploys a stateful resource to production and needs state to s
 
 - **State Key**: The identifier derived from a DU state value used to look up handlers. Currently `state.ToString()`; will be replaced with a mechanism that groups parameterized cases by DU case name.
 - **State Actor**: An actor (e.g., `MailboxProcessor`) that serializes all state reads and writes for a given store instance. The actor is the concurrency mechanism — no version tokens or compare-and-swap needed. How the actor persists state (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail, not a public interface.
-- **Guard**: A guard predicate that receives `'Event option` — `None` before the handler runs, `Some event` after. Guards that only need user identity and state ignore the event option; guards that need event context pattern match on `Some`.
+- **Guard**: A guard predicate that receives `'Event option` — `None` before the handler runs, `Some event` after. A phase marker designates when the guard runs: pre-handler guards (access control, always receive `None`) vs post-handler guards (event validation, receive `Some event`). Guards that only need user identity and state ignore the event option; guards that need event context pattern match on `Some`.
 - **SQLite Store**: A durable `IStateMachineStore` implementation backed by an actor wrapping a SQLite database file, supporting persistent state and observable subscriptions.
 
 ## Success Criteria
@@ -135,5 +136,5 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - SQLite serialization of `'State` and `'Context` types will use JSON. The serializer will be configurable but default to `System.Text.Json`.
 - Concurrency is handled by actor serialization, not version tokens. The `IStateMachineStore` contract assumes all implementations serialize access through an actor. No compare-and-swap or optimistic concurrency tokens are needed at the interface level.
 - Durable stores are actor implementations that happen to persist state. There is no public persistence interface — how an actor persists (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail.
-- The guard signature changes from `'Event` to `'Event option`. This is a breaking change, acceptable for pre-1.0. No two-phase split — one guard type, one field.
+- The guard signature changes from `'Event` to `'Event option`. This is a breaking change, acceptable for pre-1.0. One guard type with a phase marker to control execution timing (pre-handler vs post-handler).
 - The SQLite store will live in a separate project/package (`Frank.Statecharts.Sqlite` or similar) to avoid adding a SQLite dependency to the core library.
