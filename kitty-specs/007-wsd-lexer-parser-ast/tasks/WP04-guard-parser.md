@@ -1,16 +1,23 @@
 ---
-work_package_id: "WP04"
-title: "Guard extension parser"
-lane: "planned"
-dependencies: ["WP01"]
-requirement_refs: ["FR-004"]
-subtasks: ["T024", "T025", "T026", "T027"]
+work_package_id: WP04
+title: Guard extension parser
+lane: "done"
+dependencies: [WP01]
+base_branch: 007-wsd-lexer-parser-ast-WP01
+base_commit: 48c67df080b71baa278940e8b9c960a161564cfc
+created_at: '2026-03-14T15:36:13.722747+00:00'
+subtasks: [T024, T025, T026, T027]
+shell_pid: "814"
+agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-004]
 ---
 
 # WP04: Guard Extension Parser
@@ -254,3 +261,5 @@ Write at least 20 test cases covering all categories.
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-14T15:36:13Z – claude-opus – shell_pid=814 – lane=doing – Assigned agent via workflow command
+- 2026-03-14T16:19:39Z – claude-opus – shell_pid=814 – lane=done – Review passed: whitespace, Trim, multiple guards test
