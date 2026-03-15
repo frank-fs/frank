@@ -86,6 +86,36 @@ module Vocabularies =
         [<Literal>]
         let Property = "http://www.w3.org/ns/shacl#property"
 
+        [<Literal>]
+        let Pattern = "http://www.w3.org/ns/shacl#pattern"
+
+        [<Literal>]
+        let Closed = "http://www.w3.org/ns/shacl#closed"
+
+        [<Literal>]
+        let TargetNode = "http://www.w3.org/ns/shacl#targetNode"
+
+        [<Literal>]
+        let In = "http://www.w3.org/ns/shacl#in"
+
+        [<Literal>]
+        let Or = "http://www.w3.org/ns/shacl#or"
+
+        [<Literal>]
+        let Node = "http://www.w3.org/ns/shacl#node"
+
+        [<Literal>]
+        let MinInclusive = "http://www.w3.org/ns/shacl#minInclusive"
+
+        [<Literal>]
+        let MaxInclusive = "http://www.w3.org/ns/shacl#maxInclusive"
+
+        [<Literal>]
+        let MinLength = "http://www.w3.org/ns/shacl#minLength"
+
+        [<Literal>]
+        let MaxLength = "http://www.w3.org/ns/shacl#maxLength"
+
     module Hydra =
         [<Literal>]
         let ns = "http://www.w3.org/ns/hydra/core#"
@@ -175,3 +205,6 @@ module Vocabularies =
 
         [<Literal>]
         let DateTime = "http://www.w3.org/2001/XMLSchema#dateTime"
+
+        [<Literal>]
+        let Decimal = "http://www.w3.org/2001/XMLSchema#decimal"

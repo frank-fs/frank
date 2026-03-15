@@ -91,7 +91,7 @@ let tests =
 
             let graph = generateShapes config [person]
 
-            let shapeUri = Uri "http://example.org/api/shapes/PersonShape"
+            let shapeUri = Uri(sprintf "urn:frank:shape:%s" (Uri.EscapeDataString "MyApp.Person"))
             let classUri = Uri "http://example.org/api/types/Person"
 
             // rdf:type sh:NodeShape
@@ -99,10 +99,10 @@ let tests =
                 (hasTriple graph shapeUri (Uri Rdf.Type) (Uri Shacl.NodeShape))
                 "Shape should be sh:NodeShape"
 
-            // sh:targetClass
+            // sh:targetNode
             Expect.isTrue
-                (hasTriple graph shapeUri (Uri Shacl.TargetClass) classUri)
-                "Shape should target Person class"
+                (hasTriple graph shapeUri (Uri Shacl.TargetNode) (Uri "urn:frank:validation:request"))
+                "Shape should target validation request node"
 
             assertValidTurtle graph
 
@@ -120,8 +120,8 @@ let tests =
 
             let graph = generateShapes config [person]
 
-            let shapeUri = Uri "http://example.org/api/shapes/PersonShape"
-            let namePropUri = Uri "http://example.org/api/properties/Person/Name"
+            let shapeUri = Uri(sprintf "urn:frank:shape:%s" (Uri.EscapeDataString "MyApp.Person"))
+            let namePropUri = Uri "urn:frank:property:Name"
 
             // Shape has sh:property blank node
             Expect.isTrue
@@ -159,7 +159,7 @@ let tests =
 
             let graph = generateShapes config [person]
 
-            let shapeUri = Uri "http://example.org/api/shapes/PersonShape"
+            let shapeUri = Uri(sprintf "urn:frank:shape:%s" (Uri.EscapeDataString "MyApp.Person"))
 
             // sh:minCount 0
             Expect.isTrue
@@ -182,7 +182,7 @@ let tests =
 
             let graph = generateShapes config [order]
 
-            let shapeUri = Uri "http://example.org/api/shapes/OrderShape"
+            let shapeUri = Uri(sprintf "urn:frank:shape:%s" (Uri.EscapeDataString "MyApp.Order"))
             let customerClassUri = Uri "http://example.org/api/types/Customer"
 
             // Property shape has sh:class pointing to Customer
