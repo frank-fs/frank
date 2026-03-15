@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: MSBuild Auto-Invoke Target
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP09
 - WP10
@@ -198,3 +198,4 @@ Depends on WP09 + WP10 (enriched extraction pipeline). Can be developed in paral
 
 - 2026-03-14T00:00:00Z -- system -- lane=planned -- Prompt created from build-time SHACL unification design.
 - 2026-03-15T13:53:26Z – claude-opus – shell_pid=8654 – lane=doing – Assigned agent via workflow command
+- 2026-03-15T14:09:57Z – claude-opus – shell_pid=8654 – lane=for_review – Ready for review: MSBuild auto-invoke via compile --project, ArtifactSerializer shared module, incremental build, graceful degradation
