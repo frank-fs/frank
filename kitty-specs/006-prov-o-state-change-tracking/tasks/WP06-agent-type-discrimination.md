@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Agent Type Discrimination
-lane: done
+lane: planned
 dependencies:
 - WP03
 subtasks: [T027, T028, T029, T030]

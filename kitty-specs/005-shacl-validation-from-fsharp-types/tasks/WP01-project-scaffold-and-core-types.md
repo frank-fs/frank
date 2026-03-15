@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold & Core Types
-lane: done
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: eb3ec1d134df7f725105e1203a7aaaf2a9a6b507
