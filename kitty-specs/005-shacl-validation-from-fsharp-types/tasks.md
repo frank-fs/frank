@@ -139,7 +139,7 @@
 - [x] T023 Implement SHACL ValidationReport -> dotNetRdf `IGraph` conversion for semantic serialization via Frank.LinkedData
 - [x] T024 Implement ValidationReport -> RFC 9457 Problem Details JSON mapping
 - [x] T025 Implement nested field path serialization (e.g., `customer.address.zipCode` -> `sh:resultPath`)
-- [ ] T026 Create `test/Frank.Validation.Tests/ReportSerializationTests.fs` with content-negotiation tests (JSON-LD, Turtle, Problem Details)
+- [x] T026 Create `test/Frank.Validation.Tests/ReportSerializationTests.fs` with content-negotiation tests (JSON-LD, Turtle, Problem Details)
 
 ### Implementation Notes
 - Semantic path: `ValidationReport` -> `IGraph` with SHACL triples -> delegate to Frank.LinkedData's negotiation infrastructure
