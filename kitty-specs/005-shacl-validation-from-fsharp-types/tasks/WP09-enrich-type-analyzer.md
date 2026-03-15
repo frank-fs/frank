@@ -1,7 +1,7 @@
 ---
 work_package_id: WP09
 title: Enrich TypeAnalyzer with Validation-Grade Metadata
-lane: "doing"
+lane: "for_review"
 dependencies: []
 subtasks: [T050, T051, T052, T053, T054]
 agent: "claude-opus-implementer"
@@ -345,3 +345,4 @@ let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribu
 - 2026-03-15T20:18:56Z – claude-opus-reviewer – shell_pid=52290 – lane=done – Review passed: 22 new tests for enriched TypeAnalyzer (primitives, IsScalar, IsClosed, byte[] fix). 6 attribute tests pending due to FCS .fsx limitation (optional per original review). All deliverables T050-T054 verified.
 - 2026-03-15T20:19:12Z – claude-opus-reviewer – shell_pid=52290 – lane=done – Review passed: All 5 subtasks (T050-T054) correctly implemented. FieldKind.Guid variant added with all pattern matches updated across ShapeGenerator/UriHelpers. All 7 new primitive mappings (DateOnly, TimeOnly, TimeSpan, Uri, Guid, Decimal, byte[]) verified. IsScalar/IsClosed flags correct. Constraint attribute extraction defensive and well-structured. 22 new tests added (99 pass, 6 pending ptestCaseAsync for FCS .fsx attribute limitation -- acceptable). byte[] detection robust with DisplayName fallback. Backwards compatibility confirmed across TypeMapper, ShapeGenerator, RouteMapper test suites.
 - 2026-03-15T20:21:38Z – claude-opus-implementer – shell_pid=53721 – lane=doing – Started implementation via workflow command
+- 2026-03-15T20:36:08Z – claude-opus-implementer – shell_pid=53721 – lane=for_review – Ready for review: attribute tests now use real fsproj fixture via ProjectLoader, fixed PropertyAttributes bug, all 22 tests pass with 0 skipped
