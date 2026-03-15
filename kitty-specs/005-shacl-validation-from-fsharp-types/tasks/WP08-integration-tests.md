@@ -2,8 +2,7 @@
 work_package_id: WP08
 title: Integration Tests & End-to-End Validation
 lane: planned
-dependencies:
-- WP07
+dependencies: []
 subtasks: [T043, T044, T045, T046, T047, T048, T049]
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -11,13 +10,7 @@ history:
   agent: system
   shell_pid: ''
   action: Prompt generated via /spec-kitty.tasks
-- timestamp: '2026-03-14T00:00:00Z'
-  lane: planned
-  agent: system
-  shell_pid: ''
-  action: Amended per build-time SHACL unification design
 requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019]
-amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
 ---
 
 # Work Package Prompt: WP08 -- Integration Tests & End-to-End Validation
@@ -40,25 +33,13 @@ amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-de
 
 ---
 
-## Amendment (2026-03-14): Build-Time SHACL Unification
-
-> This WP is amended per the [build-time SHACL unification design](../../../docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md). Scope expands to include:
->
-> - **Build-time pipeline tests**: verify a sample project's embedded resource contains expected validation-grade shapes
-> - **ShapeLoader tests**: verify deserialization from Turtle to ShaclShape domain values (covered in WP12 but integration-tested here)
-> - **End-to-end with Frank.Cli.MSBuild**: build sample project with auto-generation, run it, send requests, verify validation behavior
-> - **Missing resource test**: verify Frank.Validation fails fast with clear error when embedded resource is absent
-> - **Test projects include Frank.Cli.MSBuild** to exercise the auto-generation pipeline
-
----
-
 ## Implementation Command
 
 ```bash
 spec-kitty implement WP08 --base WP07
 ```
 
-Depends on all prior WPs (WP01-WP07, WP09-WP12).
+Depends on all prior WPs (WP01-WP07).
 
 ---
 
