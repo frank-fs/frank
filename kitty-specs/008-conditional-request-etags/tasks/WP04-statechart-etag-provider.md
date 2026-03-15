@@ -1,11 +1,13 @@
 ---
 work_package_id: WP04
 title: StatechartETagProvider
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP02
 subtasks: [T018, T019, T020, T021, T022]
+agent: "claude-opus-reviewer"
+shell_pid: "42154"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -292,3 +294,4 @@ type IServiceCollection with
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:37:48Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:44:32Z – claude-opus-reviewer – shell_pid=42154 – lane=doing – Started review via workflow command
