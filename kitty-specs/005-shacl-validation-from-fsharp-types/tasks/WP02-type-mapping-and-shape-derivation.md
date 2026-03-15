@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "Type Mapping & Shape Derivation Engine"
-lane: done
+lane: "for_review"
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-017", "FR-020"]
 subtasks: ["T006", "T007", "T008", "T009", "T010", "T011", "T012", "T013", "T014", "T014b"]
@@ -401,3 +401,4 @@ type PagedResult<'T> = { Items: 'T list; TotalCount: int; Page: int }
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:37:21Z – unknown – lane=for_review – Moved to for_review
