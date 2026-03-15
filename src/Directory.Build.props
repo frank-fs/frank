@@ -17,9 +17,6 @@
     <DebugType>portable</DebugType>
     <OutputType>Library</OutputType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <!-- NU1608: FSharp.Compiler.Service and FSharp.Analyzers.SDK have exact FSharp.Core
-         constraints that vary by SDK version. Keep as warning, not error. -->
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1608</WarningsNotAsErrors>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
