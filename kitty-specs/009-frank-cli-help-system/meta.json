@@ -1,0 +1,9 @@
+{
+  "feature_number": "009",
+  "slug": "009-frank-cli-help-system",
+  "feature_slug": "009-frank-cli-help-system",
+  "friendly_name": "frank cli help system",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-15T22:24:10.523346+00:00"
+}
