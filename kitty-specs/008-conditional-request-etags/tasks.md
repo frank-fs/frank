@@ -158,7 +158,7 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015
 
 ### Included Subtasks
-- [ ] T023 Create test fixture: simplified statechart resource (2-3 states) with ETag middleware in TestHost
+- [x] T023 Create test fixture: simplified statechart resource (2-3 states) with ETag middleware in TestHost
 - [ ] T024 Test User Story 1: GET responses include ETag headers, ETag changes on state transition, initial state has ETag
 - [ ] T025 Test User Story 2: conditional GET with matching If-None-Match returns 304, changed state returns 200 with new ETag, multiple ETags, wildcard
 - [ ] T026 Test User Story 3: If-Match on mutations -- matching proceeds, non-matching returns 412, wildcard, no If-Match proceeds normally
