@@ -142,7 +142,7 @@
 **Requirement Refs**: FR-003, FR-012
 
 ### Included Subtasks
-- [ ] T027 X-Agent-Type header detection, X-Agent-Model extraction, and LLM subclass annotation
+- [x] T027 X-Agent-Type header detection, X-Agent-Model extraction, and LLM subclass annotation
 - [ ] T028 Implement `AgentType.LlmAgent` graph builder support (dual `prov:SoftwareAgent` + `frank:LlmAgent` typing)
 - [ ] T029 Create `test/Frank.Provenance.Tests/AgentTypeTests.fs` with discrimination tests for all three agent types
 
