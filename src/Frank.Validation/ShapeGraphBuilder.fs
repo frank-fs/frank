@@ -56,7 +56,7 @@ module ShapeGraphBuilder =
 
         // sh:path
         let shPath = uriNode g (sh + "path")
-        let pathUri = uriNode g (ShapeDerivation.buildPropertyPathUri prop.Path)
+        let pathUri = uriNode g (UriConventions.buildPropertyPathUri prop.Path)
         g.Assert(propNode, shPath, pathUri :> INode)
 
         // sh:datatype

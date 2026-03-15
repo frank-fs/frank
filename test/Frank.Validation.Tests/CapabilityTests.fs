@@ -6,7 +6,7 @@ open Expecto
 open Frank.Validation
 
 let private makeShape name =
-    { ShaclShape.TargetType = typeof<string>
+    { ShaclShape.TargetType = None
       NodeShapeUri = Uri($"urn:test:shape:{name}")
       Properties = []
       Closed = false
