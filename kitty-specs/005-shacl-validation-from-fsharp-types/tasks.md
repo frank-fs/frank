@@ -65,7 +65,7 @@
 - [x] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
 - [x] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
 - [x] T014 Create `test/Frank.Validation.Tests/ShapeDerivationTests.fs` with derivation tests for records, DUs, nested/recursive types
-- [ ] T014b Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype)
+- [x] T014b Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype)
 
 ### Implementation Notes
 - `TypeMapping.mapType` is a pure function: `Type -> XsdDatatype option` (None for non-primitive types that need sh:node)
