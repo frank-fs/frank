@@ -1,5 +1,24 @@
 <Project>
+  <!-- T061: Auto-invoke frank-cli compile --project before CoreCompile.
+       Runs after ResolveAssemblyReferences so the project's assembly list is stable.
+       Incremental: skipped if shapes.shacl.ttl is newer than all @(Compile) inputs (T062). -->
+  <Target Name="GenerateFrankSemanticDefinitions"
+          AfterTargets="ResolveAssemblyReferences"
+          BeforeTargets="CoreCompile"
+          Inputs="@(Compile)"
+          Outputs="$(FrankCliOutputPath)shapes.shacl.ttl"
+          Condition="'$(FrankCliSkipGeneration)' != 'true'">
+    <Exec Command="dotnet frank-cli compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot;"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="_FrankCliExitCode" />
+    </Exec>
+    <Warning Condition="'$(_FrankCliExitCode)' != '0'"
+             Text="Frank CLI shape generation failed (exit code $(_FrankCliExitCode)). Shapes may be stale. Run 'dotnet tool restore' if frank-cli is not installed." />
+  </Target>
+
   <Target Name="EmbedFrankSemanticDefinitions"
+          AfterTargets="GenerateFrankSemanticDefinitions"
           BeforeTargets="CoreCompile"
           Inputs="$(FrankCliOutputPath)ontology.owl.xml;$(FrankCliOutputPath)shapes.shacl.ttl;$(FrankCliOutputPath)manifest.json"
           Outputs="@(EmbeddedResource)"

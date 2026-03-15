@@ -7,6 +7,7 @@ open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Writing
 open Frank.Cli.Core.State
+open Frank.Cli.Core.Output
 
 /// Generates final OWL/XML and SHACL artifacts from extraction state.
 module CompileCommand =
@@ -59,53 +60,12 @@ module CompileCommand =
                 let outDir =
                     outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
 
-                if not (Directory.Exists outDir) then
-                    Directory.CreateDirectory outDir |> ignore
-
                 // Back up existing state before overwriting
                 backupState statePath
 
-                // Write ontology.owl.xml
-                let ontologyPath = Path.Combine(outDir, "ontology.owl.xml")
-
-                do
-                    let rdfXmlWriter = RdfXmlWriter()
-                    use ontologyStream = File.Create ontologyPath
-                    use ontologySw = new StreamWriter(ontologyStream)
-                    rdfXmlWriter.Save(state.Ontology, ontologySw :> TextWriter)
-
-                // Write shapes.shacl.ttl
-                let shapesPath = Path.Combine(outDir, "shapes.shacl.ttl")
-
-                do
-                    let turtleWriter = CompressingTurtleWriter()
-                    use shapesStream = File.Create shapesPath
-                    use shapesSw = new StreamWriter(shapesStream)
-                    turtleWriter.Save(state.Shapes, shapesSw :> TextWriter)
-
-                // Write manifest.json
-                let manifestPath = Path.Combine(outDir, "manifest.json")
-
-                do
-                    use manifestStream = File.Create manifestPath
-
-                    use writer = new Utf8JsonWriter(manifestStream, JsonWriterOptions(Indented = true))
-
-                    writer.WriteStartObject()
-                    writer.WriteString("version", state.Metadata.ToolVersion)
-                    writer.WriteString("baseUri", state.Metadata.BaseUri.AbsoluteUri)
-                    writer.WriteString("sourceHash", state.Metadata.SourceHash)
-
-                    writer.WriteStartArray("vocabularies")
-
-                    for v in state.Metadata.Vocabularies do
-                        writer.WriteStringValue v
-
-                    writer.WriteEndArray()
-
-                    writer.WriteString("generatedAt", DateTimeOffset.UtcNow)
-                    writer.WriteEndObject()
-                    writer.Flush()
+                // Write all three artifacts via shared serializer
+                let (ontologyPath, shapesPath, manifestPath) =
+                    ArtifactSerializer.writeArtifacts state outDir
 
                 // Round-trip verification: re-parse each file to confirm validity
                 verifyRoundTrip ontologyPath shapesPath manifestPath
@@ -120,3 +80,55 @@ module CompileCommand =
                           "Frank.Semantic.manifest.json" ] }
             with ex ->
                 Error $"Compile failed: {ex.Message}"
+
+    /// Unified entrypoint for MSBuild auto-invoke: runs extraction and emits artifacts in one shot.
+    /// Accepts the project path, base URI, vocabularies, and optional output directory.
+    /// Internally calls ExtractCommand.execute to obtain the state, then writes artifacts.
+    let compileFromProject
+        (projectPath: string)
+        (baseUri: Uri)
+        (vocabularies: string list)
+        (outputDir: string option)
+        : Async<Result<CompileResult, string>> =
+        async {
+            // Step 1: Extract — runs full pipeline and persists state
+            let! extractResult = ExtractCommand.execute projectPath baseUri vocabularies
+
+            match extractResult with
+            | Error e -> return Error $"Extraction failed: {e}"
+            | Ok extractedState ->
+
+                let projectDir = Path.GetDirectoryName projectPath
+                let statePath = extractedState.StateFilePath
+
+                try
+                    let outDir =
+                        outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
+
+                    // Step 2: Load the just-persisted state and emit artifacts
+                    match ExtractionState.load statePath with
+                    | Error e -> return Error $"Failed to load state after extraction: {e}"
+                    | Ok state ->
+
+                        // Back up existing state before overwriting
+                        backupState statePath
+
+                        // Write all three artifacts via shared serializer
+                        let (ontologyPath, shapesPath, manifestPath) =
+                            ArtifactSerializer.writeArtifacts state outDir
+
+                        // Round-trip verification: re-parse each file to confirm validity
+                        verifyRoundTrip ontologyPath shapesPath manifestPath
+
+                        return
+                            Ok
+                                { OntologyPath = ontologyPath
+                                  ShapesPath = shapesPath
+                                  ManifestPath = manifestPath
+                                  EmbeddedResourceNames =
+                                    [ "Frank.Semantic.ontology.owl.xml"
+                                      "Frank.Semantic.shapes.shacl.ttl"
+                                      "Frank.Semantic.manifest.json" ] }
+                with ex ->
+                    return Error $"Compile failed: {ex.Message}"
+        }

@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
     <FrankCliOutputPath Condition="'$(FrankCliOutputPath)' == ''">$(IntermediateOutputPath)frank-cli/</FrankCliOutputPath>
+    <!-- Set to 'true' to opt out of automatic shape generation during build. -->
+    <FrankCliSkipGeneration Condition="'$(FrankCliSkipGeneration)' == ''">false</FrankCliSkipGeneration>
   </PropertyGroup>
 </Project>
