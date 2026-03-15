@@ -1,10 +1,12 @@
 ---
 work_package_id: WP05
 title: Capability-Dependent Shape Resolution
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 subtasks: [T027, T028, T029, T030, T031]
+agent: "claude-opus-reviewer"
+shell_pid: "43269"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -267,3 +269,4 @@ type UpdateOrder = { Status: string; Notes: string option }
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:43Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:47:00Z – claude-opus-reviewer – shell_pid=43269 – lane=doing – Started review via workflow command
