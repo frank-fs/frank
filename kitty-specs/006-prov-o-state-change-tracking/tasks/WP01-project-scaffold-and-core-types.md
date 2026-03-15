@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold + ProvVocabulary + Core Types
-lane: done
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 9aa38215ad756a6530526dcd467907c32819df36
@@ -459,3 +459,4 @@ let main args =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:50Z – claude-opus – shell_pid=97922 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:56:53Z – claude-opus – shell_pid=97922 – lane=for_review – T001-T006 complete: Vocabulary.fs, Types.fs, project scaffold. Builds clean.
+- 2026-03-15T19:20:01Z – claude-opus – shell_pid=97922 – lane=for_review – Moved to for_review
