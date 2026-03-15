@@ -1,12 +1,14 @@
 ---
 work_package_id: WP04
 title: Violation Reporting & Content Negotiation
-lane: "doing"
+lane: "done"
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]
 agent: "claude-opus-reviewer"
 shell_pid: "42258"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -307,3 +309,4 @@ module ReportSerializer =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:43Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:44:44Z – claude-opus-reviewer – shell_pid=42258 – lane=doing – Started review via workflow command
+- 2026-03-15T19:45:52Z – claude-opus-reviewer – shell_pid=42258 – lane=done – Review passed: All subtasks T022-T026 verified. ReportSerializer.fs implements dual-path content negotiation: semantic clients (JSON-LD, Turtle, RDF/XML) get SHACL ValidationReport via Frank.LinkedData formatters; standard clients get RFC 9457 Problem Details (application/problem+json). Accept header parsing strips quality params, defaults to Problem Details for absent/wildcard. Report graph includes all 7 SHACL result properties (FR-010). IGraph disposed via use binding (Constitution VI). MemoryStream buffer for sync IO safety. ValidationMiddleware integrated with ReportSerializer.writeNegotiated. 106 tests pass (6 new). Build clean 0 errors.
