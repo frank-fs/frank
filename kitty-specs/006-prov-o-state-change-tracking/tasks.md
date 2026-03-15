@@ -94,7 +94,7 @@
 **Requirement Refs**: FR-010
 
 ### Included Subtasks
-- [ ] T017 Create `src/Frank.Provenance/Middleware.fs` with Accept header parsing for `vnd.frank.provenance+*` media types
+- [x] T017 Create `src/Frank.Provenance/Middleware.fs` with Accept header parsing for `vnd.frank.provenance+*` media types
 - [ ] T018 Implement media type mapping (`vnd.frank.provenance+turtle` -> `text/turtle`, etc.) and response serialization
 - [ ] T019 Implement resource URI extraction from request path and store query
 - [ ] T020 Implement empty graph handling (200 with empty collection, not 404)
