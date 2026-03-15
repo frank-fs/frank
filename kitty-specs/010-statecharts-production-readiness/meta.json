@@ -1,0 +1,11 @@
+{
+  "feature_number": "010",
+  "slug": "010-statecharts-production-readiness",
+  "feature_slug": "010-statecharts-production-readiness",
+  "friendly_name": "Statecharts Production Readiness",
+  "mission": "software-dev",
+  "source_description": "GitHub issue #95 — Frank.Statecharts: Production readiness gaps (state key fragility, concurrency, real-world validation)",
+  "created_at": "2026-03-15T22:44:44.938209+00:00",
+  "target_branch": "master",
+  "vcs": "git"
+}
