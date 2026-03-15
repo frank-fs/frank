@@ -1,14 +1,14 @@
 ---
 work_package_id: WP12
 title: ShapeLoader and Internal Refactoring in Frank.Validation
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP10
 base_branch: 005-shacl-validation-from-fsharp-types-WP10
 base_commit: c0a8102670d8a4b4a3a7b2e7d6071ad5cab8f18c
 created_at: '2026-03-15T13:53:26.954185+00:00'
 subtasks: [T064, T065, T066, T067, T068, T069, T070]
-shell_pid: "8753"
+shell_pid: "26738"
 agent: "claude-opus"
 reviewed_by: "Ryan Riley"
 review_status: "approved"
@@ -425,3 +425,4 @@ module ShapeLoader =
 - 2026-03-15T14:09:19Z – claude-opus – shell_pid=8753 – lane=for_review – Ready for review: ShapeLoader, UriConventions, Type->Uri refactoring, ShapeDerivation deleted
 - 2026-03-15T18:46:29Z – claude-opus – shell_pid=8753 – lane=done – Review feedback addressed: stale comments fixed, test renamed, GetOrAddDerived marked obsolete
 - 2026-03-15T19:08:53Z – claude-opus – shell_pid=8753 – lane=for_review – Re-running through spec-kitty review workflow for constitution check
+- 2026-03-15T19:08:59Z – claude-opus – shell_pid=26738 – lane=doing – Started review via workflow command
