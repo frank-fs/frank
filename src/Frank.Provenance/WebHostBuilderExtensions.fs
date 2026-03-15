@@ -65,7 +65,12 @@ module WebHostBuilderProvenanceExtensions =
         /// Registers IProvenanceStore (default MailboxProcessorProvenanceStore),
         /// TransitionObserver, ProvenanceSubscriptionManager, and provenance middleware.
         [<CustomOperation("useProvenance")>]
-        member _.UseProvenance(spec: WebHostSpec) : WebHostSpec =
+        member this.UseProvenance(spec: WebHostSpec) : WebHostSpec =
+            this.UseProvenanceWith(spec, ProvenanceStoreConfig.defaults)
+
+        /// Enable PROV-O provenance tracking with custom store configuration.
+        [<CustomOperation("useProvenanceWith")>]
+        member _.UseProvenanceWith(spec: WebHostSpec, config: ProvenanceStoreConfig) : WebHostSpec =
             { spec with
                 Services =
                     spec.Services
@@ -73,8 +78,7 @@ module WebHostBuilderProvenanceExtensions =
                         services.TryAddSingleton<IProvenanceStore>(fun sp ->
                             let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
 
-                            new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger)
-                            :> IProvenanceStore)
+                            new MailboxProcessorProvenanceStore(config, logger) :> IProvenanceStore)
 
                         services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore
                         services

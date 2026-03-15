@@ -482,6 +482,36 @@ note right of Client: right text
                     Expect.equal ns.[0].NotePosition NotePosition.Over "over"
                     Expect.equal ns.[1].NotePosition NotePosition.LeftOf "left of"
                     Expect.equal ns.[2].NotePosition NotePosition.RightOf "right of"
+                }
+
+                test "tabs and spaces both accepted" {
+                    let result =
+                        parseWsd "participant A\nparticipant B\n\tA->B: tabbed\n  A->B: spaced\n"
+
+                    Expect.isEmpty result.Errors "no errors"
+                    let msgs = messages result
+                    Expect.equal msgs.Length 2 "two messages"
+                }
+
+                test "mixed Windows and Unix line endings" {
+                    let result =
+                        parseWsd
+                            "participant A\r\nparticipant B\nA->B: hello\r\nB->A: world\n"
+
+                    Expect.isEmpty result.Errors "no errors"
+                    let ps = participants result
+                    Expect.equal ps.Length 2 "two participants"
+                    let msgs = messages result
+                    Expect.equal msgs.Length 2 "two messages"
+                }
+
+                test "message with empty parens has no parameters" {
+                    let result =
+                        parseWsd "participant A\nparticipant B\nA->B: getData()\n"
+
+                    Expect.isEmpty result.Errors "no errors"
+                    let msgs = messages result
+                    Expect.isEmpty msgs.[0].Parameters "empty parens = no params"
                 } ]
 
           // === T044: Multi-target build verification ===

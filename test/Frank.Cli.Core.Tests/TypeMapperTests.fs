@@ -112,7 +112,7 @@ let tests =
                 ]
                 GenericParameters = []
                 SourceLocation = None
-                IsClosed = true
+                IsClosed = false
             }
 
             let graph = mapTypes config [status]
@@ -157,7 +157,7 @@ let tests =
                 ]
                 GenericParameters = []
                 SourceLocation = None
-                IsClosed = true
+                IsClosed = false
             }
 
             let graph = mapTypes config [shape]
