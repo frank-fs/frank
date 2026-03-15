@@ -59,34 +59,42 @@ type ProvenanceSubscriptionManager(serviceProvider: IServiceProvider, logger: IL
 [<AutoOpen>]
 module WebHostBuilderProvenanceExtensions =
 
+    let private registerProvenance (config: ProvenanceStoreConfig) (spec: WebHostSpec) : WebHostSpec =
+        { spec with
+            Services =
+                spec.Services
+                >> fun services ->
+                    services.TryAddSingleton<IProvenanceStore>(fun sp ->
+                        let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
+                        new MailboxProcessorProvenanceStore(config, logger) :> IProvenanceStore)
+
+                    services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore
+                    services
+            Middleware =
+                spec.Middleware
+                >> fun app ->
+                    let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+
+                    app.Use(
+                        Func<RequestDelegate, RequestDelegate>(fun next ->
+                            ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
+                    )
+                    |> ignore
+
+                    app }
+
     type WebHostBuilder with
 
-        /// Enable PROV-O provenance tracking for all stateful resources.
-        /// Registers IProvenanceStore (default MailboxProcessorProvenanceStore),
-        /// TransitionObserver, ProvenanceSubscriptionManager, and provenance middleware.
+        /// Enable PROV-O provenance tracking for all stateful resources using default configuration.
+        /// Registers IProvenanceStore (default MailboxProcessorProvenanceStore with 10,000 max records),
+        /// ProvenanceSubscriptionManager, and provenance middleware.
         [<CustomOperation("useProvenance")>]
         member _.UseProvenance(spec: WebHostSpec) : WebHostSpec =
-            { spec with
-                Services =
-                    spec.Services
-                    >> fun services ->
-                        services.TryAddSingleton<IProvenanceStore>(fun sp ->
-                            let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
+            registerProvenance ProvenanceStoreConfig.defaults spec
 
-                            new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger)
-                            :> IProvenanceStore)
-
-                        services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore
-                        services
-                Middleware =
-                    spec.Middleware
-                    >> fun app ->
-                        let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-
-                        app.Use(
-                            Func<RequestDelegate, RequestDelegate>(fun next ->
-                                ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
-                        )
-                        |> ignore
-
-                        app }
+        /// Enable PROV-O provenance tracking with custom ProvenanceStoreConfig.
+        /// Registers IProvenanceStore (MailboxProcessorProvenanceStore using the given config),
+        /// ProvenanceSubscriptionManager, and provenance middleware.
+        [<CustomOperation("useProvenanceWith")>]
+        member _.UseProvenanceWith(spec: WebHostSpec, config: ProvenanceStoreConfig) : WebHostSpec =
+            registerProvenance config spec
