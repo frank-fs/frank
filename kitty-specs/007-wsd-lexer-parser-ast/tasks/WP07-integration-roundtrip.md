@@ -1,10 +1,12 @@
 ---
 work_package_id: "WP07"
 title: "Integration, round-trip tests + build verification"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP05", "WP06"]
 requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-008a", "FR-009", "FR-010", "FR-011", "FR-012", "FR-013"]
 subtasks: ["T039", "T040", "T041", "T042", "T043", "T044"]
+agent: "claude-opus-reviewer"
+shell_pid: "43539"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -297,3 +299,4 @@ Verify the library compiles under all three target frameworks (SC-006).
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:22Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:47:34Z – claude-opus-reviewer – shell_pid=43539 – lane=doing – Started review via workflow command
