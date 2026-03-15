@@ -1,10 +1,12 @@
 ---
 work_package_id: WP04
 title: Provenance Middleware (Content Negotiation)
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP02
 subtasks: [T017, T018, T019, T020, T021]
+agent: "claude-opus-reviewer"
+shell_pid: "42428"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -348,3 +350,4 @@ let createTestHost (store: IProvenanceStore) =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:37:21Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:45:02Z – claude-opus-reviewer – shell_pid=42428 – lane=doing – Started review via workflow command
