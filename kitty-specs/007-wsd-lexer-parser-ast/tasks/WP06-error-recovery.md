@@ -1,9 +1,11 @@
 ---
 work_package_id: WP06
 title: Error recovery + failure reports
-lane: "for_review"
+lane: "doing"
 dependencies: [WP03, WP04]
 subtasks: [T032, T033, T034, T035, T036, T037, T038]
+agent: "claude-opus-reviewer"
+shell_pid: "43003"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -311,3 +313,4 @@ Write at least 25 test cases covering all categories.
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:22Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:46:31Z – claude-opus-reviewer – shell_pid=43003 – lane=doing – Started review via workflow command
