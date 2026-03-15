@@ -81,6 +81,13 @@ module ShapeGenerator =
 
         if isObj then
             assertTriple graph (psNode, createUriNode graph (Uri Shacl.Class), createUriNode graph range)
+
+            // sh:node reference to the nested shape
+            match field.Kind with
+            | Reference refTypeName ->
+                let nestedShapeUri = validationShapeUri refTypeName
+                assertTriple graph (psNode, createUriNode graph (Uri Shacl.Node), createUriNode graph nestedShapeUri)
+            | _ -> ()
         else
             assertTriple graph (psNode, createUriNode graph (Uri Shacl.Datatype), createUriNode graph range)
 
@@ -145,8 +152,18 @@ module ShapeGenerator =
         (depth: int)
         (maxDepth: int)
         =
-        if (!visited).Contains(analyzedType.FullName) || depth > maxDepth then
-            ()
+        if (!visited).Contains(analyzedType.FullName) then
+            () // Already emitted — sh:node references point here
+        elif depth > maxDepth then
+            // Depth limit: emit minimal NodeShape with no properties
+            let sUri = validationShapeUri analyzedType.FullName
+            let sNode = createUriNode graph sUri
+            let rdfType = createUriNode graph (Uri Rdf.Type)
+            assertTriple graph (sNode, rdfType, createUriNode graph (Uri Shacl.NodeShape))
+
+            assertTriple
+                graph
+                (sNode, createUriNode graph (Uri Shacl.TargetNode), createUriNode graph validationRequestUri)
         else
             visited.Value <- Set.add analyzedType.FullName !visited
 
