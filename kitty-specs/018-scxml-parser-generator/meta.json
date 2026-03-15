@@ -1,0 +1,9 @@
+{
+  "feature_number": "018",
+  "slug": "018-scxml-parser-generator",
+  "feature_slug": "018-scxml-parser-generator",
+  "friendly_name": "scxml parser generator",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-15T22:47:53.364172+00:00"
+}
