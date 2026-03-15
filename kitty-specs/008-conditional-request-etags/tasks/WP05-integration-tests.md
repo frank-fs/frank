@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Integration Tests & End-to-End Validation
-lane: done
+lane: "for_review"
 dependencies:
 - WP03
 subtasks: [T023, T024, T025, T026, T027, T028]
@@ -383,3 +383,4 @@ type VersionedETagProvider() =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:37:57Z – unknown – lane=for_review – Moved to for_review
