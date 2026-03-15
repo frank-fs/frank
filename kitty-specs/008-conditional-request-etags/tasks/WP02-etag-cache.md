@@ -1,12 +1,14 @@
 ---
 work_package_id: "WP02"
 title: "MailboxProcessor ETag Cache"
-lane: "doing"
+lane: "done"
 dependencies: ["WP01"]
 requirement_refs: ["FR-009", "FR-015"]
 subtasks: ["T006", "T007", "T008", "T009", "T010"]
 agent: "claude-opus-reviewer"
 shell_pid: "40917"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -402,3 +404,4 @@ let cacheTests =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:34:33Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:42:29Z – claude-opus-reviewer – shell_pid=40917 – lane=doing – Started review via workflow command
+- 2026-03-15T19:43:19Z – claude-opus-reviewer – shell_pid=40917 – lane=done – Review passed: ETagCache with MailboxProcessor, LRU eviction, IDisposable, and error logging all correctly implemented. 9 new tests all pass (45 total). Struct records for CacheEntry/CacheStats reduce allocations. ensureNotDisposed guards on all public methods. Dictionary and counters as class fields is safe since MailboxProcessor serializes access. InvalidateAll resets stats (minor deviation, reasonable).
