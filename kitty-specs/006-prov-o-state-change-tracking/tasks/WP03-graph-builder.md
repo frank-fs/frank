@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP03"
 title: "GraphBuilder (dotNetRdf)"
-lane: done
+lane: "for_review"
 dependencies: ["WP01"]
 requirement_refs: ["FR-004", "FR-005", "FR-006", "FR-014"]
 subtasks: ["T012", "T013", "T014", "T015", "T016"]
@@ -364,3 +364,4 @@ let hasLiteralTriple (graph: IGraph) (s: string) (p: string) (value: string) =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:31:58Z – unknown – lane=for_review – Moved to for_review
