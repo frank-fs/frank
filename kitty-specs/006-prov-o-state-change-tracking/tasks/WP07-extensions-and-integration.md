@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: planned
+lane: done
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]

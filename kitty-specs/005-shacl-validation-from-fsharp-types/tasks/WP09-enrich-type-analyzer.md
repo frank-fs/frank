@@ -1,7 +1,7 @@
 ---
 work_package_id: WP09
 title: Enrich TypeAnalyzer with Validation-Grade Metadata
-lane: planned
+lane: done
 dependencies: []
 subtasks: [T050, T051, T052, T053, T054]
 history:
