@@ -1,19 +1,23 @@
 ---
 work_package_id: WP11
 title: MSBuild Auto-Invoke Target
-lane: planned
+lane: "doing"
 dependencies:
 - WP09
 - WP10
+base_branch: 005-shacl-validation-from-fsharp-types-WP11-merge-base
+base_commit: c0a8102670d8a4b4a3a7b2e7d6071ad5cab8f18c
+created_at: '2026-03-15T13:53:25.695367+00:00'
 subtasks: [T060, T061, T062, T063]
+shell_pid: "8654"
 history:
 - timestamp: '2026-03-14T00:00:00Z'
   lane: planned
   agent: system
   shell_pid: ''
   action: Prompt generated from build-time SHACL unification design spec
-requirement_refs: []
 design_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
+requirement_refs: []
 ---
 
 # Work Package Prompt: WP11 -- MSBuild Auto-Invoke Target
