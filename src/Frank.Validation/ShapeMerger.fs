@@ -136,7 +136,20 @@ module ShapeMerger =
                     | Some b, Some c -> if c > b then customVal else baseVal
                     | _ -> customVal
 
-            { prop with MinExclusive = Some merged }
+            let updated = { prop with MinExclusive = Some merged }
+
+            match updated.MaxExclusive with
+            | Some maxVal ->
+                match tryParseDecimal merged, tryParseDecimal maxVal with
+                | Some minD, Some maxD when minD >= maxD ->
+                    raiseConflict
+                        prop.Path
+                        "sh:minExclusive vs sh:maxExclusive"
+                        (sprintf "minExclusive (%O) >= maxExclusive (%O)" merged maxVal)
+                | _ -> ()
+            | None -> ()
+
+            updated
 
         | MaxExclusiveConstraint customVal ->
             let merged =
@@ -147,7 +160,20 @@ module ShapeMerger =
                     | Some b, Some c -> if c < b then customVal else baseVal
                     | _ -> customVal
 
-            { prop with MaxExclusive = Some merged }
+            let updated = { prop with MaxExclusive = Some merged }
+
+            match updated.MinExclusive with
+            | Some minVal ->
+                match tryParseDecimal minVal, tryParseDecimal merged with
+                | Some minD, Some maxD when minD >= maxD ->
+                    raiseConflict
+                        prop.Path
+                        "sh:minExclusive vs sh:maxExclusive"
+                        (sprintf "minExclusive (%O) >= maxExclusive (%O)" minVal merged)
+                | _ -> ()
+            | None -> ()
+
+            updated
 
         | MinLengthConstraint customLen ->
             let merged =

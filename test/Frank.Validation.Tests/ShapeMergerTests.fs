@@ -397,6 +397,20 @@ let conflictDetectionTests =
                   (fun () -> ShapeMerger.mergeConstraints shape constraints |> ignore)
                   "minLength > maxLength should raise"
 
+          testCase "MinExclusive >= MaxExclusive raises InvalidOperationException"
+          <| fun _ ->
+              let shape = shapeWithProps "urn:test:shape:ExclRange" [ "Score" ]
+
+              let constraints =
+                  [ { PropertyPath = "Score"
+                      Constraint = MinExclusiveConstraint(box 100) }
+                    { PropertyPath = "Score"
+                      Constraint = MaxExclusiveConstraint(box 50) } ]
+
+              Expect.throws
+                  (fun () -> ShapeMerger.mergeConstraints shape constraints |> ignore)
+                  "minExclusive >= maxExclusive should raise"
+
           testCase "T034f: non-existent property path raises InvalidOperationException"
           <| fun _ ->
               let shape = shapeWithProps "urn:test:shape:L" [ "Name" ]
