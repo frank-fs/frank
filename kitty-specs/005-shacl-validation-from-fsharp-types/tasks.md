@@ -286,7 +286,7 @@
 - [x] T045 Test invalid request (missing required field, wrong type, invalid DU value) returns 422 with ValidationReport
 - [x] T046 Test content negotiation: same violation returns JSON-LD for `Accept: application/ld+json` and Problem Details for `Accept: application/json`
 - [x] T047 Test capability-dependent shapes: admin vs. regular user with same request body
-- [ ] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
+- [x] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
 - [ ] T049 Test edge cases: recursive types, nested records, empty body, generic types, non-derivable handler types
 - [ ] T049b Integration test: handler returns invalid response data with response validation enabled — warning logged, response delivered unmodified
 - [ ] T049c Benchmark validation overhead via BenchmarkDotNet — verify <1ms for shapes with 20 properties
