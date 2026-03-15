@@ -1,10 +1,12 @@
 ---
 work_package_id: "WP05"
 title: "Grouping block parser"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP03"]
 requirement_refs: ["FR-006"]
 subtasks: ["T028", "T029", "T030", "T031"]
+agent: "claude-opus-reviewer"
+shell_pid: "42640"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -297,3 +299,4 @@ Write at least 20 test cases covering all categories.
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:21Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:45:29Z – claude-opus-reviewer – shell_pid=42640 – lane=doing – Started review via workflow command
