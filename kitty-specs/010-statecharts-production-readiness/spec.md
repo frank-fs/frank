@@ -113,8 +113,7 @@ A Frank developer deploys a stateful resource to production and needs state to s
 ### Key Entities
 
 - **State Key**: The identifier derived from a DU state value used to look up handlers. Currently `state.ToString()`; will be replaced with a mechanism that groups parameterized cases by DU case name.
-- **State Actor**: An actor (e.g., `MailboxProcessor`) that serializes all state reads and writes for a given store instance. The actor is the concurrency mechanism — no version tokens or compare-and-swap needed.
-- **Persistence Backend**: A simple internal interface (e.g., `IStatePersistence`) used by the actor to load and save state to a durable store. Only the actor calls this — it is not exposed externally.
+- **State Actor**: An actor (e.g., `MailboxProcessor`) that serializes all state reads and writes for a given store instance. The actor is the concurrency mechanism — no version tokens or compare-and-swap needed. How the actor persists state (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail, not a public interface.
 - **Access-Control Guard**: A guard predicate that evaluates before the handler runs, using only `User`, `CurrentState`, and `Context` (no event). Used for authentication and authorization checks.
 - **Event-Validation Guard**: A guard predicate that evaluates after the handler sets an event, using the full `GuardContext` including the actual event. Used for transition-specific validation.
 - **SQLite Store**: A durable `IStateMachineStore` implementation backed by an actor wrapping a SQLite database file, supporting persistent state and observable subscriptions.
@@ -137,6 +136,6 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - The state-key extraction mechanism will use F# reflection to extract the DU case name (tag) at registration time, avoiding runtime `ToString()` calls. The exact API (e.g., a `stateKey` function parameter vs. automatic reflection) will be determined during design.
 - SQLite serialization of `'State` and `'Context` types will use JSON. The serializer will be configurable but default to `System.Text.Json`.
 - Concurrency is handled by actor serialization, not version tokens. The `IStateMachineStore` contract assumes all implementations serialize access through an actor. No compare-and-swap or optimistic concurrency tokens are needed at the interface level.
-- Durable stores separate the actor (concurrency) from the persistence backend (storage). The persistence backend is a simple internal interface that only the actor calls — `Load` and `Save` with no concurrency concerns.
+- Durable stores are actor implementations that happen to persist state. There is no public persistence interface — how an actor persists (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail.
 - The two-phase guard model will be opt-in: guards default to access-control (pre-handler) phase. Developers explicitly mark guards as event-validation guards. This ensures backward compatibility.
 - The SQLite store will live in a separate project/package (`Frank.Statecharts.Sqlite` or similar) to avoid adding a SQLite dependency to the core library.
