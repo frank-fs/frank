@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: ResourceBuilder & WebHost Extensions
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP11
 - WP12
@@ -10,7 +10,7 @@ base_branch: 005-shacl-validation-from-fsharp-types-WP07-merge-base
 base_commit: 00905c3c3ce2493efc8ec85dff2edefea3d47770
 created_at: '2026-03-15T19:14:01.335107+00:00'
 subtasks: [T037, T038, T039, T040, T041, T042]
-shell_pid: "27778"
+shell_pid: "29942"
 agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -340,3 +340,4 @@ type ValidationOptions() =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:14:01Z – claude-opus – shell_pid=27778 – lane=doing – Assigned agent via workflow command
 - 2026-03-15T19:21:06Z – claude-opus – shell_pid=27778 – lane=for_review – Ready for review: ResourceBuilder validate/customConstraint/validateWithCapabilities + WebHost useValidation with ShapeLoader init
+- 2026-03-15T19:21:14Z – claude-opus – shell_pid=29942 – lane=doing – Started review via workflow command
