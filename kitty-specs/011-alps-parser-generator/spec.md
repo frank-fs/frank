@@ -4,7 +4,7 @@
 **Created**: 2026-03-15
 **Status**: Draft
 **GitHub Issue**: #97
-**Dependencies**: Frank.Statecharts (#87) core runtime is complete
+**Dependencies**: Frank.Statecharts (#87) core runtime is complete, Shared Statechart AST (spec 020) defines the unified AST all format parsers populate
 **Parallel With**: #98 (SCXML), #100 (smcat), #90 (WSD Parser)
 **Location**: Internal to `src/Frank.Statecharts/Alps/`, tests in `test/Frank.Statecharts.Tests/`
 **Input**: P2 component of the bidirectional spec pipeline (#57). Enables ALPS as both an input format (for LLM-assisted code scaffolding) and an output format (from compiled Frank.Statecharts assemblies).
@@ -26,7 +26,7 @@ This feature provides bidirectional ALPS support:
 - **Input direction**: Parse ALPS JSON or XML into a typed F# AST, then map descriptors to `StateMachineMetadata` (best-effort, lossy per research decision D-006)
 - **Output direction**: Generate ALPS JSON from `StateMachineMetadata` extracted from a running or compiled Frank application
 
-The parser and generator share a common set of AST types, ensuring structural consistency for roundtrip scenarios.
+The parser and generator use the shared statechart AST (defined in spec 020), which all format parsers populate. ALPS populates the portions of the shared AST it can represent: semantic descriptors, transition types (safe/unsafe/idempotent), and guard information from `ext` elements. Workflow ordering, which ALPS intentionally omits, is left unpopulated for other formats to contribute.
 
 ### Known Limitations (from D-006)
 

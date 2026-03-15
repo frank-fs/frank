@@ -4,7 +4,7 @@
 **Created**: 2026-03-15
 **Status**: Draft
 **GitHub Issue**: #100
-**Dependencies**: Frank.Statecharts (#87) core runtime is complete (merged via PR #96)
+**Dependencies**: Frank.Statecharts (#87) core runtime is complete (merged via PR #96), Shared Statechart AST (spec 020) defines the unified AST all format parsers populate
 **Location**: Internal to `src/Frank.Statecharts/` (Smcat parser namespace), tests in `test/Frank.Statecharts.Tests/`
 **Input**: GitHub issue #100 -- smcat Parser + Generator: bidirectional state-machine-cat support
 
@@ -20,7 +20,7 @@ smcat (state-machine-cat) is a lightweight text-based state machine notation wit
 
 This feature provides bidirectional support: parsing smcat text into a typed F# AST (and mapping that AST to `StateMachineMetadata` for cross-validation and LLM-assisted code scaffolding), and generating smcat text from `StateMachineMetadata` (for exporting compiled Frank.Statecharts assemblies back to a human-readable notation).
 
-The parser and generator share the same AST types. The implementation follows the same internal-module pattern established by the existing WSD parser in `src/Frank.Statecharts/Wsd/`.
+The parser and generator use the shared statechart AST (defined in spec 020), which all format parsers populate. smcat populates the portions of the shared AST it can represent: states (including pseudo-states), transitions with event/guard/action labels, and composite state hierarchy. Data model and semantic meaning, which smcat does not express, are left unpopulated for other formats to contribute. The implementation follows the same internal-module pattern established by the existing WSD parser in `src/Frank.Statecharts/Wsd/`.
 
 ### smcat Syntax Overview
 
