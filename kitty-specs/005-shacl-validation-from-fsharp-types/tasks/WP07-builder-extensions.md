@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: ResourceBuilder & WebHost Extensions
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP11
 - WP12
@@ -339,3 +339,4 @@ type ValidationOptions() =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:14:01Z – claude-opus – shell_pid=27778 – lane=doing – Assigned agent via workflow command
+- 2026-03-15T19:21:06Z – claude-opus – shell_pid=27778 – lane=for_review – Ready for review: ResourceBuilder validate/customConstraint/validateWithCapabilities + WebHost useValidation with ShapeLoader init
