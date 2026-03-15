@@ -1,12 +1,15 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: "doing"
+lane: "planned"
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]
 agent: "claude-opus-reviewer"
 shell_pid: "43669"
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/Users/ryanr/Code/frank/spec-kitty-review-feedback-WP07.md"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -18,15 +21,60 @@ requirement_refs: [FR-001, FR-011]
 
 # Work Package Prompt: WP07 -- WebHostBuilderExtensions + Integration Tests
 
-## Review Feedback Status
+## Review Feedback
 
-**Read this first if you are implementing this task!**
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-15
+**Feedback file**: `/Users/ryanr/Code/frank/spec-kitty-review-feedback-WP07.md`
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
-- **You must address all feedback** before your work is complete.
-- **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
+# WP07 Review Feedback
 
----
+## Summary
+
+WebHostBuilderExtensions.fs and ProvenanceSubscriptionManager are well-implemented and compile correctly on all 3 targets. However, WP07 is missing 3 of its 6 subtasks and has no new tests.
+
+## What was done well
+
+- useProvenance custom operation follows the correct Frank CE pattern (AutoOpen module, WebHostBuilder extension, CustomOperation attribute)
+- TryAddSingleton correctly used for IProvenanceStore to allow custom DI replacement
+- ProvenanceSubscriptionManager properly implements IHostedService with subscribe-on-start, dispose-on-stop lifecycle
+- StopAsync correctly continues disposing even when individual subscriptions throw
+- Compilation order is correct (WebHostBuilderExtensions.fs is last)
+- Build succeeds on all 3 targets (net8.0, net9.0, net10.0)
+
+## Issues requiring fixes
+
+### Critical: Missing IntegrationTests.fs (T035)
+
+The spec requires test/Frank.Provenance.Tests/IntegrationTests.fs with full-pipeline TestHost tests covering all 4 User Story acceptance scenarios:
+- US1-SC1 through US1-SC4 (automatic provenance recording)
+- US2-SC1 through US2-SC4 (content-negotiated responses)
+- US4-SC1 (custom store receives records)
+
+No integration tests exist. The existing 102 tests are all from prior WPs. WP07 adds zero new tests.
+
+### Critical: Missing CustomStoreTests.fs (T036)
+
+The spec requires test/Frank.Provenance.Tests/CustomStoreTests.fs verifying:
+- Custom IProvenanceStore registered in DI receives all records instead of default store
+- Default MailboxProcessorProvenanceStore is NOT created when custom store is registered
+- Default store is queryable by resource/agent/time range
+
+### Important: Missing ProvenanceStoreConfig passthrough (T034)
+
+The current useProvenance always uses ProvenanceStoreConfig.defaults (hardcoded). The spec requires support for custom configuration. If the CE nesting approach is not feasible with WebHostBuilder, an acceptable alternative would be a second custom operation or a useProvenance overload that accepts a ProvenanceStoreConfig parameter. At minimum, the config should be passable somehow.
+
+## Suggested approach for fixes
+
+1. Add a useProvenance overload or separate builder for config (could be a simple overload that takes ProvenanceStoreConfig as a parameter).
+
+2. Create IntegrationTests.fs with TestHost-based tests that set up a test server with useProvenance middleware and DI, manually trigger TransitionObserver.OnNext with test events, query provenance via HTTP with provenance Accept headers, and verify end-to-end pipeline works.
+
+3. Create CustomStoreTests.fs that registers a mock store BEFORE calling useProvenance, then verifies mock receives records (TryAddSingleton skips default).
+
+4. Add both test files to the test fsproj Compile item list.
+
 
 ## Review Feedback
 
@@ -428,3 +476,4 @@ type TestCustomStore() =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:45Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:47:50Z – claude-opus-reviewer – shell_pid=43669 – lane=doing – Started review via workflow command
+- 2026-03-15T19:50:38Z – claude-opus-reviewer – shell_pid=43669 – lane=planned – Moved to planned
