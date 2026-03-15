@@ -90,7 +90,7 @@
 - [x] T012 Implement If-None-Match evaluation: GET/HEAD with matching ETag returns 304 Not Modified
 - [x] T013 Implement If-Match evaluation: POST/PUT/DELETE with non-matching ETag returns 412 Precondition Failed
 - [x] T014 Implement wildcard `*` handling for both If-None-Match and If-Match per RFC 9110
-- [ ] T015 Implement ETag header setting on successful responses and cache invalidation after mutations. Cache invalidation triggers after observing a 2xx response status from the handler, not before handler execution
+- [x] T015 Implement ETag header setting on successful responses and cache invalidation after mutations. Cache invalidation triggers after observing a 2xx response status from the handler, not before handler execution
 - [ ] T016 Add `useConditionalRequests` plug registration and `AddETagCache` DI extension
 - [ ] T017 Create `test/Frank.Tests/ConditionalRequestTests.fs` with TestHost integration tests
 
