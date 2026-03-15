@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: MSBuild Auto-Invoke Target
-lane: "doing"
+lane: "done"
 dependencies:
 - WP09
 - WP10
@@ -207,3 +207,4 @@ Depends on WP09 + WP10 (enriched extraction pipeline). Can be developed in paral
 - 2026-03-15T19:12:00Z – claude-opus – shell_pid=26695 – lane=done – Review passed: Constitution check clean. MSBuild auto-invoke target correctly implements GenerateFrankSemanticDefinitions with incremental build, graceful degradation, and proper target ordering. ArtifactSerializer shared module satisfies Constitution VIII (no duplication). CompileCommand.compileFromProject capturing pipeline avoids redundant disk I/O. All previous review feedback items verified as addressed.
 - 2026-03-15T19:19:53Z – claude-opus – shell_pid=26695 – lane=for_review – Moved to for_review
 - 2026-03-15T19:50:58Z – claude-opus-reviewer – shell_pid=44929 – lane=doing – Started review via workflow command
+- 2026-03-15T19:52:18Z – claude-opus-reviewer – shell_pid=44929 – lane=done – Review passed: All 4 subtasks (T060-T063) verified. GenerateFrankSemanticDefinitions MSBuild target with correct ordering (AfterTargets=ResolveAssemblyReferences, BeforeTargets=CoreCompile), incremental build (Inputs/Outputs), graceful degradation (IgnoreExitCode+Warning). ArtifactSerializer shared module (Constitution VIII). compileFromProject unifies extract+compile with capturing pipeline. FrankCliSkipGeneration opt-out. buildTransitive targets match build targets. Exit codes correctly propagated. 89+6 tests pass.
