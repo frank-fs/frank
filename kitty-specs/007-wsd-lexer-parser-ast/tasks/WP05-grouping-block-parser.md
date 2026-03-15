@@ -1,12 +1,14 @@
 ---
 work_package_id: "WP05"
 title: "Grouping block parser"
-lane: "doing"
+lane: "done"
 dependencies: ["WP03"]
 requirement_refs: ["FR-006"]
 subtasks: ["T028", "T029", "T030", "T031"]
 agent: "claude-opus-reviewer"
 shell_pid: "42640"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -300,3 +302,4 @@ Write at least 20 test cases covering all categories.
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:21Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:45:29Z – claude-opus-reviewer – shell_pid=42640 – lane=doing – Started review via workflow command
+- 2026-03-15T19:46:25Z – claude-opus-reviewer – shell_pid=42640 – lane=done – Review passed: All 4 subtasks (T028-T031) implemented. All 7 group kinds parsed with recursive descent. Else branch handling with condition text. Arbitrary nesting via mutual recursion with depth warning at 50+. Branch body isolation via save/restore of state.Elements. 26 grouping tests covering all kinds, nesting 2-5 levels, multiple branches, empty branches, unclosed blocks, stray end. Builds clean, 170 tests pass.
