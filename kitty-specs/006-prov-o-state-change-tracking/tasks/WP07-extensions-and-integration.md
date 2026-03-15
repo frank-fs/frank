@@ -1,12 +1,12 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]
 agent: "claude-opus-reviewer"
-shell_pid: "43669"
+shell_pid: "52235"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 review_feedback_file: "/Users/ryanr/Code/frank/spec-kitty-review-feedback-WP07.md"
@@ -479,3 +479,4 @@ type TestCustomStore() =
 - 2026-03-15T19:50:38Z – claude-opus-reviewer – shell_pid=43669 – lane=planned – Moved to planned
 - 2026-03-15T20:02:55Z – claude-opus-reviewer – shell_pid=43669 – lane=doing – Moved to doing
 - 2026-03-15T20:08:47Z – claude-opus-reviewer – shell_pid=43669 – lane=for_review – Ready for review: added integration tests (IntegrationTests.fs), custom store tests (CustomStoreTests.fs), and useProvenanceWith config passthrough. All 119 tests pass.
+- 2026-03-15T20:16:02Z – claude-opus-reviewer – shell_pid=52235 – lane=doing – Started review via workflow command
