@@ -20,6 +20,7 @@
     <Compile Include="Analysis/ProjectLoader.fs" />
     <Compile Include="State/ExtractionState.fs" />
     <Compile Include="State/DiffEngine.fs" />
+    <Compile Include="Output/ArtifactSerializer.fs" />
     <Compile Include="Commands/ExtractCommand.fs" />
     <Compile Include="Commands/ClarifyCommand.fs" />
     <Compile Include="Commands/ValidateCommand.fs" />
@@ -30,7 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="10.0.103" />
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Ontology" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />

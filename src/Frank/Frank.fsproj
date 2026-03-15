@@ -5,6 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ETag.fs" />
+    <Compile Include="ETagCache.fs" />
+    <Compile Include="ConditionalRequestMiddleware.fs" />
     <Compile Include="ContentNegotiation.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>

@@ -18,7 +18,7 @@ description: "Work package task list template for feature implementation"
 - Include precise file paths or modules.
 
 ## Path Conventions
-- **Single project**: `src/`, `tests/`
+- **Single project**: `src/`, `test/`
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/`, `android/src/`
 - Adjust paths to match the implementation plan.

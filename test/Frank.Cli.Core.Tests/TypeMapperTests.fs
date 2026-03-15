@@ -47,12 +47,13 @@ let tests =
                 FullName = "MyApp.Product"
                 ShortName = "Product"
                 Kind = Record [
-                    { Name = "Id"; Kind = Primitive "xsd:integer"; IsRequired = true }
-                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true }
-                    { Name = "Price"; Kind = Optional (Primitive "xsd:double"); IsRequired = false }
+                    { Name = "Id"; Kind = Primitive "xsd:integer"; IsRequired = true; IsScalar = true; Constraints = [] }
+                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true; IsScalar = true; Constraints = [] }
+                    { Name = "Price"; Kind = Optional (Primitive "xsd:double"); IsRequired = false; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = mapTypes config [product]
@@ -111,6 +112,7 @@ let tests =
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = false
             }
 
             let graph = mapTypes config [status]
@@ -147,14 +149,15 @@ let tests =
                 FullName = "MyApp.Shape"
                 ShortName = "Shape"
                 Kind = DiscriminatedUnion [
-                    { Name = "Circle"; Fields = [{ Name = "Radius"; Kind = Primitive "xsd:double"; IsRequired = true }] }
+                    { Name = "Circle"; Fields = [{ Name = "Radius"; Kind = Primitive "xsd:double"; IsRequired = true; IsScalar = true; Constraints = [] }] }
                     { Name = "Rectangle"; Fields = [
-                        { Name = "Width"; Kind = Primitive "xsd:double"; IsRequired = true }
-                        { Name = "Height"; Kind = Primitive "xsd:double"; IsRequired = true }
+                        { Name = "Width"; Kind = Primitive "xsd:double"; IsRequired = true; IsScalar = true; Constraints = [] }
+                        { Name = "Height"; Kind = Primitive "xsd:double"; IsRequired = true; IsScalar = true; Constraints = [] }
                     ] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = false
             }
 
             let graph = mapTypes config [shape]
@@ -175,10 +178,11 @@ let tests =
                 FullName = "MyApp.Order"
                 ShortName = "Order"
                 Kind = Record [
-                    { Name = "Customer"; Kind = Reference "Customer"; IsRequired = true }
+                    { Name = "Customer"; Kind = Reference "Customer"; IsRequired = true; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = mapTypes config [order]
