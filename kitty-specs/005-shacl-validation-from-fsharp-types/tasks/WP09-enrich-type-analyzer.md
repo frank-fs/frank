@@ -1,7 +1,7 @@
 ---
 work_package_id: WP09
 title: Enrich TypeAnalyzer with Validation-Grade Metadata
-lane: done
+lane: "for_review"
 dependencies: []
 subtasks: [T050, T051, T052, T053, T054]
 history:
@@ -293,3 +293,4 @@ let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribu
 ## Activity Log
 
 - 2026-03-14T00:00:00Z -- system -- lane=planned -- Prompt created from build-time SHACL unification design.
+- 2026-03-15T19:31:48Z – unknown – lane=for_review – Moved to for_review
