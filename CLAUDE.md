@@ -39,6 +39,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 - N/A (stateless text parsing) (013-smcat-parser-generator)
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
 - N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + No new NuGet dependencies; reuses Wsd.Types from #90, FSharp.Reflection (in FSharp.Core) for boxed Machine inspection (017-wsd-generator-cross-validator)
+- N/A (pure function, stateless -- StateMachineMetadata in, WSD text out) (017-wsd-generator-cross-validator)
 ## Project Structure
 
 ```text
