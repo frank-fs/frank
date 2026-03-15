@@ -118,7 +118,7 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-013
 
 ### Included Subtasks
-- [ ] T022 Create `src/Frank.Provenance/TransitionObserver.fs` -- observer is injected per-resource via the `onTransition` CE operation on `StatefulResourceBuilder`, not subscribed to a global stream
+- [x] T022 Create `src/Frank.Provenance/TransitionObserver.fs` -- observer is injected per-resource via the `onTransition` CE operation on `StatefulResourceBuilder`, not subscribed to a global stream
 - [ ] T023 Implement agent extraction from `ClaimsPrincipal` (Person, SoftwareAgent, LlmAgent classification)
 - [ ] T024 Implement `ProvenanceRecord` construction from `TransitionEvent` (Activity, pre/post Entities, Agent)
 - [ ] T025 ObjectDisposedException and all other observer exceptions logged per Constitution VII — never silently discarded
