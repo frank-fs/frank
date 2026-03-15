@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Provenance Middleware (Content Negotiation)
-lane: done
+lane: "for_review"
 dependencies:
 - WP02
 subtasks: [T017, T018, T019, T020, T021]
@@ -347,3 +347,4 @@ let createTestHost (store: IProvenanceStore) =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:37:21Z – unknown – lane=for_review – Moved to for_review
