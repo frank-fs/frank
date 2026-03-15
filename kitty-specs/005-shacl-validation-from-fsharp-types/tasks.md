@@ -175,7 +175,7 @@
 - [x] T028 Implement claim-based override matching (iterate overrides, first match wins)
 - [x] T029 Implement base shape fallback when no override matches
 - [x] T030 Integrate ShapeResolver into ValidationMiddleware (read principal from HttpContext.User)
-- [ ] T031 Create `test/Frank.Validation.Tests/CapabilityTests.fs` with capability-dependent validation tests
+- [x] T031 Create `test/Frank.Validation.Tests/CapabilityTests.fs` with capability-dependent validation tests
 
 ### Implementation Notes
 - ShapeResolver is a pure function: `ShapeResolverConfig -> ClaimsPrincipal -> ShaclShape`
