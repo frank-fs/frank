@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Custom Constraints & Conflict Detection
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP10
@@ -10,7 +10,7 @@ base_branch: 005-shacl-validation-from-fsharp-types-WP06-merge-base
 base_commit: 39b0e2a28d58f68b80d0bddd9ae9ff078308c98d
 created_at: '2026-03-15T18:49:25.775068+00:00'
 subtasks: [T032, T033, T034, T035, T036]
-shell_pid: "24783"
+shell_pid: "26354"
 agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -370,3 +370,4 @@ customConstraint "DateRange" (SparqlConstraint """
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T18:49:26Z – claude-opus – shell_pid=24783 – lane=doing – Assigned agent via workflow command
 - 2026-03-15T19:06:52Z – claude-opus – shell_pid=24783 – lane=for_review – Ready for review: ShapeMerger with additive merging, conflict detection, SPARQL support
+- 2026-03-15T19:07:45Z – claude-opus – shell_pid=26354 – lane=doing – Started review via workflow command
