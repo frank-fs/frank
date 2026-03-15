@@ -1,13 +1,15 @@
 ---
 work_package_id: WP04
 title: StatechartETagProvider
-lane: "doing"
+lane: "done"
 dependencies:
 - WP01
 - WP02
 subtasks: [T018, T019, T020, T021, T022]
 agent: "claude-opus-reviewer"
 shell_pid: "42154"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -295,3 +297,4 @@ type IServiceCollection with
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:37:48Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:44:32Z – claude-opus-reviewer – shell_pid=42154 – lane=doing – Started review via workflow command
+- 2026-03-15T19:45:31Z – claude-opus-reviewer – shell_pid=42154 – lane=done – Review passed: StatechartETagProvider correctly hashes (state, context) pairs via SHA-256 truncated to 128 bits. Factory checks for StateMachineMetadata on endpoints. DI registration helper resolves store and cache from service provider. 9 new tests all pass (153 total in Statecharts project). Provider correctly omits cache parameter (middleware handles caching). Builds clean on all 3 targets.
