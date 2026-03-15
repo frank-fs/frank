@@ -1,10 +1,12 @@
 ---
 work_package_id: WP06
 title: Agent Type Discrimination
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP03
 subtasks: [T027, T028, T029, T030]
+agent: "claude-opus-reviewer"
+shell_pid: "43144"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -257,3 +259,4 @@ if isLlmAgent then
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:44Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:46:43Z – claude-opus-reviewer – shell_pid=43144 – lane=doing – Started review via workflow command
