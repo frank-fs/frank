@@ -3,7 +3,7 @@ namespace Frank.Validation
 open System
 
 /// Pure URI construction helpers for SHACL shapes and property paths.
-/// Extracted from ShapeDerivation so that ShapeLoader and ShapeGraphBuilder
+/// Extracted from ShapeBuilder so that ShapeLoader and ShapeGraphBuilder
 /// can use them without pulling in the reflection-heavy derivation logic.
 module UriConventions =
 
