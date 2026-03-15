@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: ResourceBuilder & WebHost Extensions
-lane: "doing"
+lane: "done"
 dependencies:
 - WP11
 - WP12
@@ -12,6 +12,8 @@ created_at: '2026-03-15T19:14:01.335107+00:00'
 subtasks: [T037, T038, T039, T040, T041, T042]
 shell_pid: "29942"
 agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -341,3 +343,4 @@ type ValidationOptions() =
 - 2026-03-15T19:14:01Z – claude-opus – shell_pid=27778 – lane=doing – Assigned agent via workflow command
 - 2026-03-15T19:21:06Z – claude-opus – shell_pid=27778 – lane=for_review – Ready for review: ResourceBuilder validate/customConstraint/validateWithCapabilities + WebHost useValidation with ShapeLoader init
 - 2026-03-15T19:21:14Z – claude-opus – shell_pid=29942 – lane=doing – Started review via workflow command
+- 2026-03-15T19:24:09Z – claude-opus – shell_pid=29942 – lane=done – Review passed: ResourceBuilder validate/customConstraint/validateWithCapabilities and WebHost useValidation/useValidationWith/useValidationAssembly extensions correctly follow Frank.Auth/LinkedData patterns. ValidationMarker metadata, ShapeCache singleton, ShapeLoader startup init, and diagnostic-only response validation all implemented per spec. Build clean (0 warnings, 0 errors), 144 tests pass.
