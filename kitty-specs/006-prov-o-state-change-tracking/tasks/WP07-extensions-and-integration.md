@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: "doing"
+lane: "done"
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]
@@ -480,3 +480,4 @@ type TestCustomStore() =
 - 2026-03-15T20:02:55Z – claude-opus-reviewer – shell_pid=43669 – lane=doing – Moved to doing
 - 2026-03-15T20:08:47Z – claude-opus-reviewer – shell_pid=43669 – lane=for_review – Ready for review: added integration tests (IntegrationTests.fs), custom store tests (CustomStoreTests.fs), and useProvenanceWith config passthrough. All 119 tests pass.
 - 2026-03-15T20:16:02Z – claude-opus-reviewer – shell_pid=52235 – lane=doing – Started review via workflow command
+- 2026-03-15T20:20:32Z – claude-opus-reviewer – shell_pid=52235 – lane=done – Review passed: All 3 previously-rejected items (T034 useProvenanceWith config overload, T035 IntegrationTests.fs, T036 CustomStoreTests.fs) are now properly implemented. Build succeeds on all targets (net8.0/9.0/10.0), all 119 provenance tests pass. Code follows established Frank CE patterns (consistent with useLinkedDataWith naming), TryAddSingleton correctly used for DI replacement, ProvenanceSubscriptionManager lifecycle is correct.
