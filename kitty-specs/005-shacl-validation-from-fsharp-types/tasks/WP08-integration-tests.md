@@ -9,6 +9,7 @@ base_commit: 7bcf170ba79f5514022908e832ca9f472cc51ce1
 created_at: '2026-03-15T19:42:55.103753+00:00'
 subtasks: [T043, T044, T045, T046, T047, T048, T049]
 shell_pid: "41173"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -465,3 +466,4 @@ let customers = createTestHost (fun builder ->
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:42:55Z – claude-opus – shell_pid=41173 – lane=doing – Assigned agent via workflow command
