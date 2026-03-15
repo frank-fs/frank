@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: AST types + token definitions
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: 17eb0dbfb272896d5ae71c74b9a65ce93d4ddd26
@@ -9,6 +9,8 @@ created_at: '2026-03-08T17:30:54.800354+00:00'
 subtasks: [T001, T002, T003, T004, T005, T006, T007, T008, T009, T010, T011]
 shell_pid: "39810"
 agent: "claude-opus-reviewer"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -314,3 +316,4 @@ type ParseResult = {
 - 2026-03-08T17:36:47Z – claude-opus – shell_pid=98012 – lane=for_review – All 11 subtasks (T001-T011) implemented: SourcePosition, TokenKind, ArrowStyle/Direction, Participant, Message, GuardAnnotation, Note/NotePosition, GroupKind/GroupBranch/Group, DiagramElement, Diagram, ParseFailure/ParseWarning/ParseResult. Builds clean on net8.0/net9.0/net10.0.
 - 2026-03-15T19:20:52Z – claude-opus – shell_pid=98012 – lane=for_review – Moved to for_review
 - 2026-03-15T19:39:45Z – claude-opus-reviewer – shell_pid=39810 – lane=doing – Started review via workflow command
+- 2026-03-15T19:42:28Z – claude-opus-reviewer – shell_pid=39810 – lane=done – Review passed: All 11 subtasks (T001-T011) implemented. Types match data-model.md exactly. [Struct] on SourcePosition/Token, internal visibility, mutual recursion with and-chains all correct. Builds clean on net8.0/net9.0/net10.0. .fsproj updated with correct compile ordering.
