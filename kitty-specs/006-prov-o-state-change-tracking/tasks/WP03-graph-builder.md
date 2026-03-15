@@ -1,12 +1,14 @@
 ---
 work_package_id: "WP03"
 title: "GraphBuilder (dotNetRdf)"
-lane: "doing"
+lane: "done"
 dependencies: ["WP01"]
 requirement_refs: ["FR-004", "FR-005", "FR-006", "FR-014"]
 subtasks: ["T012", "T013", "T014", "T015", "T016"]
 agent: "claude-opus-reviewer"
 shell_pid: "41078"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -368,3 +370,4 @@ let hasLiteralTriple (graph: IGraph) (s: string) (p: string) (value: string) =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:31:58Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:42:45Z – claude-opus-reviewer – shell_pid=41078 – lane=doing – Started review via workflow command
+- 2026-03-15T19:43:42Z – claude-opus-reviewer – shell_pid=41078 – lane=done – Review passed: GraphBuilder.toGraph correctly produces all PROV-O triples per data-model.md triple pattern. Activity (7 triples), Agent (Person/SoftwareAgent/LlmAgent with correct typing), UsedEntity (3 triples), GeneratedEntity (5 triples) all verified. LlmAgent dual-typing (prov:SoftwareAgent + frank:LlmAgent) tested explicitly. Namespace prefixes registered. 25 new graph builder tests, 67 total pass. Build succeeds on all targets. ProvVocabulary.fs enhanced with RdfNamespace/RdfsNamespace constants.
