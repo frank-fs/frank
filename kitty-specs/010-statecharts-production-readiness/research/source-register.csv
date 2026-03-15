@@ -1,0 +1,22 @@
+source_id,citation,url,accessed_date,relevance,status
+stateful-resource-builder,"Frank.Statecharts StatefulResourceBuilder.fs (src/Frank.Statecharts/StatefulResourceBuilder.fs)",https://github.com/frank-fs/frank/blob/master/src/Frank.Statecharts/StatefulResourceBuilder.fs,2026-03-15,high,reviewed
+store-interface,"Frank.Statecharts Store.fs (src/Frank.Statecharts/Store.fs)",https://github.com/frank-fs/frank/blob/master/src/Frank.Statecharts/Store.fs,2026-03-15,high,reviewed
+middleware-flow,"Frank.Statecharts Middleware.fs (src/Frank.Statecharts/Middleware.fs)",https://github.com/frank-fs/frank/blob/master/src/Frank.Statecharts/Middleware.fs,2026-03-15,high,reviewed
+types-definition,"Frank.Statecharts Types.fs (src/Frank.Statecharts/Types.fs)",https://github.com/frank-fs/frank/blob/master/src/Frank.Statecharts/Types.fs,2026-03-15,high,reviewed
+etag-provider,"Frank.Statecharts StatechartETagProvider.fs",https://github.com/frank-fs/frank/blob/master/src/Frank.Statecharts/StatechartETagProvider.fs,2026-03-15,high,reviewed
+instance-projector,"Frank.LinkedData InstanceProjector.fs (FSharpValue.PreComputeUnionTagReader usage)",https://github.com/frank-fs/frank/blob/master/src/Frank.LinkedData/Rdf/InstanceProjector.fs,2026-03-15,high,reviewed
+store-tests,"Frank.Statecharts.Tests StoreTests.fs",https://github.com/frank-fs/frank/blob/master/test/Frank.Statecharts.Tests/StoreTests.fs,2026-03-15,high,reviewed
+stateful-resource-tests,"Frank.Statecharts.Tests StatefulResourceTests.fs",https://github.com/frank-fs/frank/blob/master/test/Frank.Statecharts.Tests/StatefulResourceTests.fs,2026-03-15,high,reviewed
+spec-004-data-model,"Spec 004 data model (kitty-specs/004-frank-statecharts/data-model.md)",https://github.com/frank-fs/frank/blob/master/kitty-specs/004-frank-statecharts/data-model.md,2026-03-15,high,reviewed
+spec-008-research,"Spec 008 research - Conditional Request ETags (kitty-specs/008-conditional-request-etags/research.md)",https://github.com/frank-fs/frank/blob/master/kitty-specs/008-conditional-request-etags/research.md,2026-03-15,medium,reviewed
+fsharp-reflection-api,"FSharpValue.PreComputeUnionTagReader - Microsoft.FSharp.Reflection docs",https://github.com/MicrosoftDocs/visualfsharpdocs/blob/main/docs/conceptual/reflection.fsharpvalue-class-%5Bfsharp%5D.md,2026-03-15,high,reviewed
+union-case-info,"UnionCaseInfo - FSharp.Core docs",https://fsharp.github.io/fsharp-core-docs/reference/fsharp-reflection-unioncaseinfo.html,2026-03-15,high,reviewed
+fsharp-reflection-precompute,"PreComputeUnionTagReader C# examples",https://www.csharpcodi.com/csharp-examples/Microsoft.FSharp.Reflection.FSharpValue.PreComputeUnionTagReader(System.Type,%20Microsoft.FSharp.Core.FSharpOption)/,2026-03-15,medium,reviewed
+optimistic-concurrency-dotnet,"Optimistic vs Pessimistic Concurrency in .NET",https://mehdihadeli.com/blog/optimistic-vs-pessimistic-concurrency,2026-03-15,medium,reviewed
+sqlite-ef-concurrency,"SQLite and EF Core Concurrency Tokens",https://www.bricelam.net/2020/08/07/sqlite-and-efcore-concurrency-tokens.html,2026-03-15,high,reviewed
+optimistic-locking-version,"Optimistic Locking: Concurrency Control with a Version Column",https://medium.com/@sumit-s/optimistic-locking-concurrency-control-with-a-version-column-2e3db2a8120d,2026-03-15,high,reviewed
+microsoft-data-sqlite,"Microsoft.Data.Sqlite NuGet package (v10.0.3)",https://www.nuget.org/packages/Microsoft.Data.Sqlite/,2026-03-15,high,reviewed
+microsoft-data-sqlite-docs,"Microsoft.Data.Sqlite overview",https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/,2026-03-15,high,reviewed
+xstate-guards-docs,"XState v5 Guards documentation",https://stately.ai/docs/guards,2026-03-15,medium,reviewed
+xstate-action-before-guard,"XState discussion: How to make actions run before guard",https://github.com/statelyai/xstate/discussions/4727,2026-03-15,medium,reviewed
+python-statemachine-guards,"Python StateMachine: Conditions and Validators (guards vs validators pattern)",https://python-statemachine.readthedocs.io/en/latest/guards.html,2026-03-15,low,reviewed
