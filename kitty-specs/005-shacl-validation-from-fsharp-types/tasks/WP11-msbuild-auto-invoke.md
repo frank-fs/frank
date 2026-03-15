@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: MSBuild Auto-Invoke Target
-lane: "done"
+lane: "for_review"
 dependencies:
 - WP09
 - WP10
@@ -202,3 +202,4 @@ Depends on WP09 + WP10 (enriched extraction pipeline). Can be developed in paral
 - 2026-03-15T13:53:26Z – claude-opus – shell_pid=8654 – lane=doing – Assigned agent via workflow command
 - 2026-03-15T14:09:57Z – claude-opus – shell_pid=8654 – lane=for_review – Ready for review: MSBuild auto-invoke via compile --project, ArtifactSerializer shared module, incremental build, graceful degradation
 - 2026-03-15T18:46:28Z – claude-opus – shell_pid=8654 – lane=done – Review feedback addressed: exit codes, FrankCliBaseUri default, incremental build fix, capturing pipeline
+- 2026-03-15T19:08:53Z – claude-opus – shell_pid=8654 – lane=for_review – Re-running through spec-kitty review workflow for constitution check
