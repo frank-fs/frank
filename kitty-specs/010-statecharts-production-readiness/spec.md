@@ -99,22 +99,21 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **FR-002**: System MUST preserve backward compatibility for simple (non-parameterized) DU cases -- existing `inState` registrations must work without modification
 - **FR-003**: System MUST require that all `IStateMachineStore` implementations serialize state access through an actor (e.g., `MailboxProcessor`), ensuring no concurrent reads or writes to the backing store
 - **FR-004**: System MUST ensure that persistence (for durable stores) goes through the actor — external code never reads or writes the backing store directly
-- **FR-005**: System MUST change the guard event parameter from `'Event` to `'Event option`, passing `None` before the handler runs and `Some event` after
-- **FR-006**: System MUST eliminate the use of `Unchecked.defaultof<'E>` in guard evaluation
-- **FR-006b**: System MUST support a guard phase marker to designate when a guard runs (pre-handler or post-handler), making developer intent explicit
+- **FR-005**: System MUST replace the current guard type with a discriminated union: `AccessControl` (no event parameter) and `EventValidation` (with event parameter). The DU case determines both execution phase and type signature.
+- **FR-006**: System MUST eliminate the use of `Unchecked.defaultof<'E>` in guard evaluation — `AccessControl` guards have no event parameter, `EventValidation` guards receive the actual event
 - **FR-007**: System MUST provide a SQLite-backed `IStateMachineStore` implementation that persists state durably across application restarts
 - **FR-008**: System MUST auto-create the SQLite schema on first use (no manual migration step required)
 - **FR-009**: System MUST serialize all SQLite store access through an actor, eliminating the need for database-level concurrency control
 - **FR-010**: System MUST support the `Subscribe` (observable) interface on the SQLite store with the same behavioral semantics as the in-memory store
 - **FR-011**: System MUST allow the SQLite store to be registered via dependency injection as a drop-in replacement for the in-memory store
-- **FR-012**: System MUST update the guard signature to use `'Event option` — this is a breaking change (acceptable for pre-1.0)
+- **FR-012**: System MUST update the guard type to a DU with `AccessControl` and `EventValidation` cases — this is a breaking change (acceptable for pre-1.0)
 - **FR-013**: System MUST handle the case where `ToString()` has been overridden on a state type without producing incorrect key collisions
 
 ### Key Entities
 
 - **State Key**: The identifier derived from a DU state value used to look up handlers. Currently `state.ToString()`; will be replaced with a mechanism that groups parameterized cases by DU case name.
 - **State Actor**: An actor (e.g., `MailboxProcessor`) that serializes all state reads and writes for a given store instance. The actor is the concurrency mechanism — no version tokens or compare-and-swap needed. How the actor persists state (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail, not a public interface.
-- **Guard**: A guard predicate that receives `'Event option` — `None` before the handler runs, `Some event` after. A phase marker designates when the guard runs: pre-handler guards (access control, always receive `None`) vs post-handler guards (event validation, receive `Some event`). Guards that only need user identity and state ignore the event option; guards that need event context pattern match on `Some`.
+- **Guard**: A discriminated union with two cases: `AccessControl` (receives user, state, context — runs pre-handler, no event parameter) and `EventValidation` (receives user, state, event, context — runs post-handler with actual event). The DU case determines both execution timing and type signature. No `option`, no phase marker, no `Unchecked.defaultof`.
 - **SQLite Store**: A durable `IStateMachineStore` implementation backed by an actor wrapping a SQLite database file, supporting persistent state and observable subscriptions.
 
 ## Success Criteria
@@ -124,7 +123,7 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **SC-001**: Developers can register a single handler for a parameterized DU case and have it match all parameter values without additional registrations
 - **SC-002**: Two concurrent requests to the same stateful resource instance are processed sequentially by the actor -- no lost updates occur
 - **SC-003**: Existing stateful resource definitions (from spec 004) compile and pass all tests without modification after the changes (backward compatibility)
-- **SC-004**: Guards receive `'Event option` — `None` pre-handler, `Some event` post-handler — eliminating all uses of `Unchecked.defaultof`
+- **SC-004**: Guard DU eliminates all uses of `Unchecked.defaultof` — `AccessControl` guards have no event parameter, `EventValidation` guards receive the actual event
 - **SC-005**: State persisted via the SQLite store survives application restart and is correctly restored on the next request
 - **SC-006**: The SQLite store serializes all access through its actor -- no concurrent database operations occur
 - **SC-007**: The SQLite store can be swapped in for the in-memory store with a single DI registration change and no handler modifications
@@ -136,5 +135,5 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - SQLite serialization of `'State` and `'Context` types will use JSON. The serializer will be configurable but default to `System.Text.Json`.
 - Concurrency is handled by actor serialization, not version tokens. The `IStateMachineStore` contract assumes all implementations serialize access through an actor. No compare-and-swap or optimistic concurrency tokens are needed at the interface level.
 - Durable stores are actor implementations that happen to persist state. There is no public persistence interface — how an actor persists (SQLite, Akka.Persistence, event sourcing, etc.) is an internal implementation detail.
-- The guard signature changes from `'Event` to `'Event option`. This is a breaking change, acceptable for pre-1.0. One guard type with a phase marker to control execution timing (pre-handler vs post-handler).
+- The guard type changes from a single function to a DU with `AccessControl` and `EventValidation` cases. This is a breaking change, acceptable for pre-1.0. The DU case determines both execution phase and type signature — no `option`, no phase marker needed.
 - The SQLite store will live in a separate project/package (`Frank.Statecharts.Sqlite` or similar) to avoid adding a SQLite dependency to the core library.
