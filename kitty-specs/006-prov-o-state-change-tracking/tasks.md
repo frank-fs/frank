@@ -167,7 +167,7 @@
 - [x] T031 Implement DI registration (IProvenanceStore singleton, TransitionObserver, ProvenanceSubscriptionManager)
 - [x] T032 Implement `ProvenanceSubscriptionManager` as `IHostedService` (iterate all registered stateful resource endpoints and inject observer via per-resource `onTransition` on start, dispose subscriptions on stop)
 - [x] T033 Implement optional `ProvenanceStoreConfig` passthrough (`useProvenance { maxRecords 50_000 }`)
-- [ ] T034 Create `test/Frank.Provenance.Tests/IntegrationTests.fs` with full-pipeline TestHost tests
+- [x] T034 Create `test/Frank.Provenance.Tests/IntegrationTests.fs` with full-pipeline TestHost tests
 - [ ] T035 Create `test/Frank.Provenance.Tests/CustomStoreTests.fs` with DI replacement tests
 
 ### Dependencies
