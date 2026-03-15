@@ -50,6 +50,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -88,6 +90,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -126,6 +130,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -174,6 +180,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -186,22 +194,40 @@ let main args =
 
     // ── compile ──
     let compileCmd = Command("compile")
-    compileCmd.Description <- "Generate OWL/XML and SHACL artifacts from extraction state"
+
+    compileCmd.Description <-
+        "Generate OWL/XML and SHACL artifacts from extraction state, or run extraction + emit in one shot via --project"
+
     let compileProjectOpt = Option<string>("--project")
-    compileProjectOpt.Description <- "Path to .fsproj file"
+
+    compileProjectOpt.Description <-
+        "Path to .fsproj file. When provided together with --base-uri, runs extraction and artifact emission in one shot (used by MSBuild auto-invoke)."
+
     compileProjectOpt.Required <- true
-    let outputDirOpt = Option<string>("--output-dir")
-    outputDirOpt.Description <- "Output directory for compiled artifacts"
+    let compileBaseUriOpt = Option<string>("--base-uri")
+
+    compileBaseUriOpt.Description <-
+        "Base URI for the ontology (required when running unified extract+compile via --project)"
+
+    let compileVocabOpt = Option<string array>("--vocabularies")
+    compileVocabOpt.Description <- "Vocabulary namespaces to align (used with unified extract+compile path)"
+    compileVocabOpt.DefaultValueFactory <- (fun _ -> [| "schema.org" |])
+    let compileOutputOpt = Option<string>("--output")
+    compileOutputOpt.Description <- "Output directory for compiled artifacts"
     let compileFormatOpt = Option<string>("--format")
     compileFormatOpt.Description <- "Output format (text|json)"
     compileFormatOpt.DefaultValueFactory <- (fun _ -> "text")
     compileCmd.Options.Add(compileProjectOpt)
-    compileCmd.Options.Add(outputDirOpt)
+    compileCmd.Options.Add(compileBaseUriOpt)
+    compileCmd.Options.Add(compileVocabOpt)
+    compileCmd.Options.Add(compileOutputOpt)
     compileCmd.Options.Add(compileFormatOpt)
 
     compileCmd.SetAction(fun parseResult ->
         let project = parseResult.GetValue(compileProjectOpt)
-        let outputDir = parseResult.GetValue(outputDirOpt)
+        let baseUri = parseResult.GetValue(compileBaseUriOpt)
+        let vocabs = parseResult.GetValue(compileVocabOpt)
+        let outputDir = parseResult.GetValue(compileOutputOpt)
         let format = parseResult.GetValue(compileFormatOpt)
 
         let outDir =
@@ -210,7 +236,14 @@ let main args =
             else
                 Some outputDir
 
-        let result = CompileCommand.execute project outDir
+        // When --base-uri is supplied, run the unified extract+compile path.
+        // Otherwise fall back to the state-file-only compile path.
+        let result =
+            if not (String.IsNullOrEmpty baseUri) then
+                CompileCommand.compileFromProject project (Uri baseUri) (Array.toList vocabs) outDir
+                |> Async.RunSynchronously
+            else
+                CompileCommand.execute project outDir
 
         match result with
         | Ok r ->
@@ -222,6 +255,8 @@ let main args =
 
             Console.WriteLine(output)
         | Error e ->
+            Environment.ExitCode <- 1
+
             let output =
                 if format = "json" then
                     JsonOutput.formatError e
@@ -233,4 +268,6 @@ let main args =
     root.Subcommands.Add(compileCmd)
 
     let parseResult = root.Parse(args)
-    parseResult.Invoke()
+    let exitCode = parseResult.Invoke()
+
+    if exitCode <> 0 then exitCode else Environment.ExitCode
