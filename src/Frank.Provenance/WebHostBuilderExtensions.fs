@@ -80,7 +80,9 @@ module WebHostBuilderProvenanceExtensions =
 
                             new MailboxProcessorProvenanceStore(config, logger) :> IProvenanceStore)
 
-                        services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore
+                        services.TryAddEnumerable(
+                            ServiceDescriptor.Singleton<IHostedService, ProvenanceSubscriptionManager>())
+                        |> ignore
                         services
                 Middleware =
                     spec.Middleware

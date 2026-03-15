@@ -49,7 +49,7 @@ let makeFactory (store: MailboxProcessorStore<TestState, TestContext>) =
 
     let iface = store :> IStateMachineStore<TestState, TestContext>
 
-    StatechartETagProviderFactory<TestState, TestContext>(iface, contextSerializer, cache) :> IETagProviderFactory
+    StatechartETagProviderFactory<TestState, TestContext>(iface, contextSerializer) :> IETagProviderFactory
 
 // --- Tests ---
 

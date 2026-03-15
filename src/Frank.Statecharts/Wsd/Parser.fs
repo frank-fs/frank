@@ -251,7 +251,8 @@ let private parseMessage (state: ParserState) : unit =
 
     let senderName =
         match senderToken.Kind with
-        | Identifier name -> name
+        | Identifier name
+        | StringLiteral name -> name
         | _ -> ""
 
     let arrowToken = peek state
@@ -261,7 +262,8 @@ let private parseMessage (state: ParserState) : unit =
         advance state |> ignore // consume arrow
 
         match (peek state).Kind with
-        | Identifier receiverName ->
+        | Identifier receiverName
+        | StringLiteral receiverName ->
             let receiverToken = advance state // consume receiver
             ensureParticipant state senderName senderToken.Position
             ensureParticipant state receiverName receiverToken.Position
@@ -674,7 +676,8 @@ and private parseBranchElements (state: ParserState) (depth: int) : unit =
         | TokenKind.Ref ->
             parseGroup state (depth + 1)
             parseBranchElements state depth
-        | Identifier _ ->
+        | Identifier _
+        | StringLiteral _ ->
             parseMessage state
             parseBranchElements state depth
         | _ ->
@@ -722,7 +725,8 @@ and private parseElements (state: ParserState) : unit =
         | TokenKind.Ref ->
             parseGroup state 0
             parseElements state
-        | Identifier _ ->
+        | Identifier _
+        | StringLiteral _ ->
             parseMessage state
             parseElements state
         | TokenKind.End ->

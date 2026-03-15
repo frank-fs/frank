@@ -36,7 +36,7 @@ type StatechartETagProvider<'State, 'Context when 'State: equality>
 
 /// Factory that creates StatechartETagProvider instances for endpoints with StateMachineMetadata.
 type StatechartETagProviderFactory<'State, 'Context when 'State: equality>
-    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[], cache: ETagCache) =
+    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
 
     let provider =
         StatechartETagProvider<'State, 'Context>(store, contextSerializer) :> IETagProvider
@@ -59,7 +59,6 @@ module StatechartETagProviderExtensions =
             : IServiceCollection =
             services.AddSingleton<IETagProviderFactory>(fun sp ->
                 let store = sp.GetRequiredService<IStateMachineStore<'State, 'Context>>()
-                let cache = sp.GetRequiredService<ETagCache>()
 
-                StatechartETagProviderFactory<'State, 'Context>(store, contextSerializer, cache)
+                StatechartETagProviderFactory<'State, 'Context>(store, contextSerializer)
                 :> IETagProviderFactory)
