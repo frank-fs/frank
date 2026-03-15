@@ -1,9 +1,12 @@
 # Research: Statecharts Production Readiness
 
 **Feature**: 010-statecharts-production-readiness
-**Date**: 2026-03-15
+**Date**: 2026-03-15 (revised)
+**Revision**: 2 -- replaces stale research based on updated spec (actor-serialized model)
 
 ## Decision 1: State Key Extraction Mechanism (FR-001, FR-002, FR-013)
+
+**Status**: CARRIED FORWARD from revision 1 (unchanged)
 
 ### Problem
 
@@ -70,11 +73,26 @@ The `StateMachine` type has `StateMetadata: Map<'State, StateInfo>` which also u
 
 ---
 
-## Decision 2: Optimistic Concurrency Model (FR-003, FR-004)
+## Decision 2: Actor-Serialized Concurrency Model (FR-003, FR-004)
+
+**Status**: NEW -- replaces stale D-002 (optimistic concurrency / `VersionedState`)
 
 ### Problem
 
-The current `IStateMachineStore<'State, 'Context>` interface has no concurrency control:
+The spec requires that all state access (reads and writes) is serialized through an actor. The existing `MailboxProcessorStore` already does this correctly for the in-memory case. The architectural requirement is that the `IStateMachineStore` contract *assumes* actor-serialized access, so any store implementation (including durable stores) must go through an actor rather than allowing direct concurrent access to the backing store.
+
+### Why NOT optimistic concurrency
+
+The previous research (revision 1, D-002) proposed `VersionedState<'S,'C>` with version tokens and `UPDATE WHERE version = @expected`. The spec has been updated to REPLACE this with actor serialization because:
+
+1. **Simpler interface**: The `IStateMachineStore` interface does not need version parameters. `SetState` remains `Task<unit>` -- no `SetStateResult`, no `VersionConflict` case.
+2. **No lost updates by design**: Since the actor serializes all reads and writes, concurrent requests are queued and processed one at a time. The second request always sees the state left by the first -- no compare-and-swap needed.
+3. **Implementation consistency**: The in-memory store already uses a `MailboxProcessor`. Durable stores use the same pattern -- they wrap their backing store (SQLite, etc.) inside an actor. The concurrency model is uniform.
+4. **No 409 Conflict responses**: The middleware does not need a `VersionConflict` case in `TransitionAttemptResult`. Concurrent requests are simply serialized -- the second request may see a different state than expected and the transition function handles that (returning `Invalid` or `Blocked` as appropriate).
+
+### Decision: Actor-serialized access with UNCHANGED `IStateMachineStore` interface
+
+The `IStateMachineStore<'State, 'Context>` interface remains exactly as it is today:
 
 ```fsharp
 type IStateMachineStore<'State, 'Context when 'State: equality> =
@@ -83,80 +101,36 @@ type IStateMachineStore<'State, 'Context when 'State: equality> =
     abstract Subscribe: instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable
 ```
 
-`SetState` unconditionally overwrites. In the in-memory `MailboxProcessorStore`, this is safe because the MailboxProcessor serializes all operations. But for any durable store (SQLite, PostgreSQL, etc.), concurrent requests could both read the same state, both pass guards, and both attempt `SetState` -- the second write silently overwrites the first (lost update).
+**Contract assumption**: All implementations MUST serialize access through an actor (e.g., `MailboxProcessor`). This is a documented contract requirement, not an interface-level enforcement. The interface itself is simple; the serialization guarantee comes from the implementation.
 
-### Options Considered
+### How the Existing MailboxProcessorStore Already Satisfies This
 
-| Option | Mechanism | Interface Change | Breaking Change |
-|--------|-----------|-----------------|----------------|
-| A. Version integer on SetState | `SetState` takes and returns a version int | Yes -- signature change | Binary-breaking |
-| B. Version in state tuple | `GetState` returns `('State * 'Context * int64)` | Yes -- return type change | Binary-breaking |
-| C. Separate `VersionedState` record | New record wrapping state + version | Yes -- new type | Binary-breaking |
-| D. `ConcurrencyToken` opaque string | `SetState` takes/returns token | Yes -- signature change | Binary-breaking |
-| E. `TrySetState` new method | Add new method, keep old `SetState` | Yes -- new method | Source-compatible (additive) |
+Looking at `src/Frank.Statecharts/Store.fs`:
 
-### Decision: Option C -- `VersionedState` record with `TrySetState` replacing `SetState`
+- The `MailboxProcessorStore` wraps all state operations (`GetState`, `SetState`, `Subscribe`, `Unsubscribe`, `Stop`) in a `StoreMessage` DU and processes them sequentially in the agent loop.
+- `instances` is a mutable `Map` accessed only inside the agent -- no external concurrent access.
+- `PostAndAsyncReply` ensures the caller waits for the operation to complete before proceeding.
 
-**Rationale**:
+This is already the correct pattern. The key insight is: **no interface changes are needed**. Durable stores must simply follow the same pattern.
 
-1. **Clear semantics**: A `VersionedState<'State, 'Context>` record type bundles the state, context, and version together. This makes the version non-optional -- callers cannot accidentally forget to pass it.
+### Implications for Middleware and TransitionAttemptResult
 
-2. **Version as int64**: An integer version (not an opaque ETag string) is simpler and matches the spec assumption. The version is incremented atomically on each successful `SetState`. The middleware does not expose this as an HTTP ETag (that is spec 008's concern).
+- `TransitionAttemptResult` does NOT gain a `VersionConflict` case.
+- `Middleware.fs` does NOT need a 409 Conflict handler for concurrency.
+- The middleware's `executeTransition` closure calls `store.SetState` which is guaranteed to succeed (the actor serialized the operation).
+- If two concurrent requests both want to transition from state A, the actor processes them sequentially: the first transitions A->B and succeeds; the second reads state B (not A), and the transition function decides whether B->C is valid.
 
-3. **Explicit conflict signaling**: `SetState` currently returns `Task<unit>`. The new method should return `Task<Result<int64, ConcurrencyConflict>>` (or a similar DU) so the caller knows whether the write succeeded and what the new version is. Alternatively, returning `Task<bool>` (true = success, false = conflict) is simpler but less informative.
+### Impact Assessment
 
-4. **Binary-breaking is acceptable**: The spec note says the `IStateMachineStore` interface is being changed. Since Frank.Statecharts is pre-1.0, binary-breaking changes are expected. The version bump from 6.x to 7.x already set this precedent.
-
-### Proposed Interface
-
-```fsharp
-/// Versioned state snapshot returned by GetState.
-type VersionedState<'State, 'Context> =
-    { State: 'State
-      Context: 'Context
-      Version: int64 }
-
-/// Result of a versioned SetState attempt.
-[<RequireQualifiedAccess>]
-type SetStateResult =
-    | Success of newVersion: int64
-    | VersionConflict of currentVersion: int64
-
-type IStateMachineStore<'State, 'Context when 'State: equality> =
-    abstract GetState: instanceId: string -> Task<VersionedState<'State, 'Context> option>
-    abstract SetState: instanceId: string -> state: 'State -> context: 'Context -> expectedVersion: int64 -> Task<SetStateResult>
-    abstract Subscribe: instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable
-```
-
-For new instances (no prior state), the caller passes `expectedVersion = 0L` (or a sentinel value like `-1L`). The store initializes with version `1L`.
-
-### Impact on MailboxProcessorStore
-
-The existing `MailboxProcessorStore` must be updated to:
-- Store `int64` version alongside each instance's state
-- Increment version on each successful `SetState`
-- Check `expectedVersion` matches stored version before allowing the write
-- Return `VersionConflict` if versions mismatch
-
-Since the MailboxProcessor already serializes access, this adds no new concurrency primitives -- just a version check in the `SetState` handler.
-
-### Impact on Middleware (StatefulResourceBuilder.fs)
-
-The `executeTransition` closure (line 215) must:
-1. Read the version from `GetState` (or from `HttpContext.Items` where it was cached)
-2. Pass the version to `SetState`
-3. Handle `VersionConflict` by returning a new `TransitionAttemptResult.VersionConflict` case
-4. The middleware maps `VersionConflict` to HTTP 409 Conflict (FR-004)
-
-### Open Question: Retry Logic
-
-Should the middleware automatically retry on version conflict (re-read state, re-evaluate guards, re-run transition)? The spec says the second request "receives a conflict response" (409), implying no automatic retry. This keeps the middleware simple and lets the client decide whether to retry.
-
-**Decision**: No automatic retry in V1. Return 409 and let the client retry.
+- **No breaking changes** to `IStateMachineStore`, `MailboxProcessorStore`, `StateMachineMetadata`, `TransitionAttemptResult`, or the middleware flow.
+- The `MailboxProcessorStore` is already correct. No modifications needed.
+- New store implementations (SQLite) must wrap their backing store in an actor -- this is the implementation pattern, not an interface change.
 
 ---
 
 ## Decision 3: Two-Phase Guard Evaluation (FR-005, FR-006, FR-012)
+
+**Status**: CARRIED FORWARD from revision 1 (unchanged)
 
 ### Problem
 
@@ -236,24 +210,117 @@ EvaluateEventGuards: HttpContext -> GuardResult
 
 ---
 
-## Decision 4: SQLite Store Design (FR-007 through FR-011)
+## Decision 4: SQLite Store as Actor-Wrapped Persistence (FR-007 through FR-011)
+
+**Status**: NEW -- replaces stale D-004 (optimistic concurrency SQLite design)
+
+### Architectural Change from Revision 1
+
+The previous research designed the SQLite store with direct database access protected by `UPDATE WHERE version = @expected` for optimistic concurrency. The updated spec replaces this: the SQLite store is an **actor implementation that wraps SQLite internally**. Persistence goes through the actor, never directly. No database-level concurrency control is needed because the actor serializes all access.
 
 ### Package and Dependency
 
 The SQLite store lives in a separate project: `Frank.Statecharts.Sqlite`. This avoids adding a SQLite dependency to the core `Frank.Statecharts` package.
 
-**NuGet dependency**: `Microsoft.Data.Sqlite` (10.0.x for net10.0, version-matched for net8.0/net9.0). This is the lightweight ADO.NET provider maintained by the .NET team, distinct from the heavier `System.Data.SQLite` or Entity Framework Core.
+**NuGet dependency**: `Microsoft.Data.Sqlite` (10.0.x for net10.0, version-matched for net8.0/net9.0). This is the lightweight ADO.NET provider maintained by the .NET team.
 
-### Schema Design
+### Actor Architecture
+
+The SQLite store wraps a `MailboxProcessor` that serializes all reads, writes, and subscriptions -- exactly the same pattern as the in-memory `MailboxProcessorStore`, but with SQLite persistence inside the actor loop.
+
+```fsharp
+type SqliteStateMachineStore<'State, 'Context when 'State: equality>
+    (connectionString: string, logger: ILogger, ?jsonOptions: JsonSerializerOptions) =
+
+    // Internal actor -- all SQLite operations happen inside this loop
+    let agent = MailboxProcessor<StoreMessage<'State, 'Context>>.Start(fun inbox ->
+        // In-memory cache + subscriber list (same as MailboxProcessorStore)
+        let mutable instances = Map.empty<string, 'State * 'Context>
+        let mutable subscribers = Map.empty<string, IObserver<'State * 'Context> list>
+
+        let rec loop () = async {
+            let! msg = inbox.Receive()
+            match msg with
+            | GetState(id, reply) ->
+                // 1. Check in-memory cache
+                // 2. If miss, load from SQLite
+                // 3. Cache the result
+                // 4. Reply
+                ...
+            | SetState(id, state, ctx, reply) ->
+                // 1. Update in-memory cache
+                // 2. Persist to SQLite (INSERT or UPDATE, no version check needed)
+                // 3. Notify subscribers
+                // 4. Reply
+                ...
+            | Subscribe(id, observer, reply) -> ...
+            | Unsubscribe(id, observer) -> ...
+            | Stop(reply) -> ...
+        }
+        loop ()
+    )
+
+    interface IStateMachineStore<'State, 'Context> with
+        member _.GetState(instanceId) =
+            agent.PostAndAsyncReply(fun reply -> GetState(instanceId, reply))
+            |> Async.StartAsTask
+        member _.SetState instanceId state context =
+            agent.PostAndAsyncReply(fun reply -> SetState(instanceId, state, context, reply))
+            |> Async.StartAsTask
+        member _.Subscribe instanceId observer =
+            agent.PostAndAsyncReply(fun reply -> Subscribe(instanceId, observer, reply))
+            |> Async.RunSynchronously
+```
+
+### Why This Works Without Database-Level Concurrency Control
+
+Because the actor serializes all operations:
+
+1. **No concurrent reads/writes to SQLite**: The `MailboxProcessor` processes one message at a time. Two concurrent `SetState` requests are queued and executed sequentially.
+2. **No `UPDATE WHERE version = @expected`**: The actor is the sole writer. There is no race between reading a version and writing with that version.
+3. **No `VersionConflict` response**: Since operations are serialized, every write succeeds. The transition function (called in middleware *before* `SetState`) determines whether the transition is valid given the current state.
+4. **Matches the in-memory store exactly**: The SQLite store is architecturally identical to `MailboxProcessorStore` -- it just adds `INSERT/UPDATE` calls inside the `SetState` handler.
+
+### Rehydration Strategy: Lazy (Load on First Access)
+
+**Decision**: The SQLite store uses lazy rehydration -- state is loaded from SQLite into the in-memory cache on first access (first `GetState` call for a given `instanceId`), not eagerly on startup.
+
+**Rationale**:
+
+1. **Scalability**: An application may have thousands of persisted instances. Loading all of them at startup wastes memory for instances that may never be accessed again.
+2. **Startup time**: Eager loading adds startup latency proportional to the number of persisted instances. Lazy loading adds zero startup cost.
+3. **Consistency with Akka patterns**: Akka DurableStateBehavior loads state when the actor is first activated (on first message), not when the actor system starts. This is the established pattern for actor-based persistence.
+4. **Memory efficiency**: Only actively-accessed instances consume memory. The SQLite database serves as the authoritative store; the in-memory cache is a performance optimization.
+
+**Implementation**: In the `GetState` handler inside the actor loop:
+
+```fsharp
+| GetState(id, reply) ->
+    match Map.tryFind id instances with
+    | Some state ->
+        // Cache hit -- return immediately
+        reply.Reply(Some state)
+    | None ->
+        // Cache miss -- load from SQLite
+        let dbResult = loadFromSqlite id  // synchronous SQLite call inside actor
+        match dbResult with
+        | Some(state, ctx) ->
+            instances <- Map.add id (state, ctx) instances
+            reply.Reply(Some(state, ctx))
+        | None ->
+            reply.Reply(None)
+    return! loop ()
+```
+
+### SQLite Schema Design
 
 ```sql
 CREATE TABLE IF NOT EXISTS state_machine_instances (
-    instance_id TEXT NOT NULL,
-    state_type  TEXT NOT NULL,
-    state_json  TEXT NOT NULL,
+    instance_id  TEXT NOT NULL,
+    state_type   TEXT NOT NULL,
+    state_json   TEXT NOT NULL,
     context_json TEXT NOT NULL,
-    version     INTEGER NOT NULL DEFAULT 1,
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (instance_id, state_type)
 );
 ```
@@ -262,45 +329,66 @@ Key design decisions:
 
 1. **Composite primary key** (`instance_id`, `state_type`): A single SQLite database can store instances for multiple state machine types. The `state_type` column holds the fully qualified type name of `'State` (e.g., `"MyApp.TicTacToeState"`). This prevents collisions when multiple stateful resources share the same database file.
 
-2. **JSON serialization**: `state_json` and `context_json` hold `System.Text.Json`-serialized representations of `'State` and `'Context`. This is the simplest approach and aligns with the spec assumption. The serializer is configurable via the store constructor (`JsonSerializerOptions`).
+2. **No version column**: Unlike the previous research, there is no `version` column. The actor serializes all access, so there is no need for database-level concurrency control. The database is just a persistence sink.
 
-3. **Version column**: `INTEGER NOT NULL DEFAULT 1`. Incremented on every successful update. Used for optimistic concurrency via `UPDATE ... WHERE version = @expectedVersion`.
+3. **JSON serialization**: `state_json` and `context_json` hold `System.Text.Json`-serialized representations of `'State` and `'Context`. The serializer is configurable via the store constructor (`JsonSerializerOptions`).
 
-4. **Auto-schema creation** (FR-008): The store runs `CREATE TABLE IF NOT EXISTS` on first use (in the constructor or on the first `GetState`/`SetState` call). No migration tooling required.
+4. **Auto-schema creation** (FR-008): The store runs `CREATE TABLE IF NOT EXISTS` on initialization. No migration tooling required.
 
-### Optimistic Concurrency in SQLite (FR-009)
+### SQLite Persistence Operations (Inside Actor)
+
+Since all operations execute inside the actor loop (single-threaded), they use synchronous SQLite calls. This is correct because `Microsoft.Data.Sqlite`'s async methods are actually synchronous under the hood anyway (SQLite does not support true async I/O).
 
 ```sql
--- SetState with optimistic concurrency:
-UPDATE state_machine_instances
-SET state_json = @stateJson,
-    context_json = @contextJson,
-    version = @newVersion,
-    updated_at = datetime('now')
-WHERE instance_id = @instanceId
-  AND state_type = @stateType
-  AND version = @expectedVersion;
+-- UPSERT (Insert or Replace) on SetState:
+INSERT INTO state_machine_instances (instance_id, state_type, state_json, context_json, updated_at)
+VALUES (@instanceId, @stateType, @stateJson, @contextJson, datetime('now'))
+ON CONFLICT (instance_id, state_type)
+DO UPDATE SET
+    state_json = excluded.state_json,
+    context_json = excluded.context_json,
+    updated_at = excluded.updated_at;
 
--- Check rows affected:
--- 0 rows = version conflict
--- 1 row  = success
+-- Load on GetState (cache miss):
+SELECT state_json, context_json
+FROM state_machine_instances
+WHERE instance_id = @instanceId AND state_type = @stateType;
 ```
 
-For new instances (no existing row):
-```sql
-INSERT INTO state_machine_instances (instance_id, state_type, state_json, context_json, version)
-VALUES (@instanceId, @stateType, @stateJson, @contextJson, 1);
+### Microsoft.Data.Sqlite Async Limitations
+
+An important finding: SQLite does not support asynchronous I/O. The `Microsoft.Data.Sqlite` async methods (`ExecuteNonQueryAsync`, `ExecuteReaderAsync`, etc.) execute synchronously under the hood. This is a well-documented limitation.
+
+**Impact on our design**: Since all SQLite operations happen inside the `MailboxProcessor` agent loop (which runs on a thread pool thread via `async { }`), using synchronous SQLite calls is correct and avoids the false promise of async SQLite operations. The `MailboxProcessor` itself provides the asynchrony -- callers await the reply channel, not the SQLite call.
+
+### Connection Management
+
+```fsharp
+// Single connection, opened once, kept alive for the lifetime of the store.
+// This is safe because the actor serializes all access -- only one operation
+// at a time ever uses the connection.
+let connection = new SqliteConnection(connectionString)
+connection.Open()
+
+// Enable WAL mode for better behavior if external tools read the database.
+use cmd = connection.CreateCommand()
+cmd.CommandText <- "PRAGMA journal_mode=WAL;"
+cmd.ExecuteNonQuery() |> ignore
+
+// Set busy timeout for external lock contention.
+cmd.CommandText <- "PRAGMA busy_timeout=5000;"
+cmd.ExecuteNonQuery() |> ignore
 ```
 
-If the INSERT fails due to a PRIMARY KEY conflict (another request created the instance concurrently), it is treated as a version conflict.
+A single connection is sufficient because the actor is single-threaded. This avoids connection pool overhead and ensures the SQLite database file is never accessed concurrently from the store. WAL mode is still useful if external tools (e.g., DB Browser for SQLite) read the database while the application is running.
 
 ### Subscribe/Observable Pattern (FR-010)
 
-The SQLite store must implement `Subscribe` with the same behavioral semantics as the in-memory store:
-- New subscribers immediately receive the current state (BehaviorSubject semantics)
-- `SetState` calls notify all active subscribers
-
-Since SQLite has no built-in change notification mechanism, the store manages subscriptions in-memory (using the same `IObserver` list pattern as `MailboxProcessorStore`). The `SetState` method notifies subscribers after a successful database write. This means subscribers are only notified when the write is performed by the same process -- cross-process notifications are out of scope.
+The SQLite store manages subscriptions identically to the in-memory store:
+- In-memory subscriber list inside the actor (same `Map<string, IObserver list>` pattern)
+- `SetState` notifies subscribers after successful persistence
+- BehaviorSubject semantics: new subscribers receive current state immediately
+- Cross-process notifications are out of scope (same as in-memory store)
 
 ### DI Registration (FR-011)
 
@@ -310,19 +398,13 @@ type IServiceCollection with
         when 'State: equality and 'State: comparison>
         (connectionString: string, ?options: JsonSerializerOptions) =
         services.AddSingleton<IStateMachineStore<'State, 'Context>>(fun sp ->
-            new SqliteStateMachineStore<'State, 'Context>(connectionString, ?options = options)
+            let logger =
+                sp.GetRequiredService<ILogger<SqliteStateMachineStore<'State, 'Context>>>()
+            new SqliteStateMachineStore<'State, 'Context>(connectionString, logger, ?options = options)
             :> IStateMachineStore<'State, 'Context>)
 ```
 
 This replaces the default in-memory store registration. The handler code does not need to change.
-
-### Connection Management
-
-The store should use a connection pool internally. For SQLite with WAL mode, a single writer connection and multiple reader connections is the standard pattern. However, since the store already serializes writes (optimistic concurrency means only one write succeeds per version), a simple approach is:
-
-- Create a new `SqliteConnection` per operation (open, execute, close)
-- Enable WAL mode on first connection: `PRAGMA journal_mode=WAL;`
-- Use `PRAGMA busy_timeout=5000;` to handle lock contention gracefully (edge case: SQLite file locked by another process)
 
 ### F# DU Serialization with System.Text.Json
 
@@ -332,30 +414,70 @@ F# discriminated unions require special handling with `System.Text.Json`. By def
 
 2. **Custom `JsonConverter<'State>`**: Write a converter that uses `FSharpValue.GetUnionFields` / `FSharpValue.MakeUnion` for serialization/deserialization. More work but avoids the external dependency.
 
-3. **.NET 9+ `JsonDerivedType` approach**: Not applicable to F# DUs.
-
-**Decision**: Accept `JsonSerializerOptions` as a parameter and document that users should configure `FSharp.SystemTextJson` if their state/context types use F# idioms. The store does not take a hard dependency on `FSharp.SystemTextJson` -- users add it to their application project.
-
-For the test suite and samples, include `FSharp.SystemTextJson` as a test/sample dependency.
+**Decision**: Accept `JsonSerializerOptions` as a parameter and document that users should configure `FSharp.SystemTextJson` if their state/context types use F# idioms. The store does not take a hard dependency on `FSharp.SystemTextJson` -- users add it to their application project. For the test suite, include `FSharp.SystemTextJson` as a test dependency.
 
 ---
 
-## Decision 5: Version Bump and Breaking Changes
+## Decision 5: MailboxProcessor Backpressure and Queue Management
+
+**Status**: NEW
+
+### Problem
+
+F# `MailboxProcessor` has an unbounded internal message queue. Under extreme load (many concurrent state operations), the queue can grow without limit, potentially causing memory issues.
+
+### Research Findings
+
+1. **`CurrentQueueLength` property**: `MailboxProcessor` exposes `CurrentQueueLength: int` which returns the number of unprocessed messages. This can be used to implement backpressure.
+
+2. **No built-in bounded queue**: Unlike Akka's bounded mailbox configurations, F# `MailboxProcessor` does not natively support queue limits. Backpressure must be implemented by the application.
+
+3. **Bounded queue pattern**: A `BlockingQueueAgent<T>` can be implemented by checking `inbox.CurrentQueueLength > maxQueueSize` before accepting new messages. Tomas Petricek documented this pattern for F# agents.
+
+### Decision: Document as known limitation; do not implement backpressure in V1
+
+**Rationale**:
+
+1. **Scope**: Backpressure is an operational concern, not a correctness concern. The spec lists it as an edge case: "MailboxProcessor has unbounded queues by default; document as a known limitation with guidance on backpressure strategies."
+
+2. **Practical impact**: For a web application, the HTTP server itself provides implicit backpressure -- Kestrel limits concurrent connections and request queue depth. The MailboxProcessor queue would only grow if the application accepted more requests than the store can process, which is bounded by the HTTP pipeline.
+
+3. **Complexity**: Adding configurable backpressure (e.g., rejecting operations with 503 Service Unavailable when queue exceeds a threshold) would add API complexity for a scenario that is unlikely in typical Frank deployments.
+
+4. **Future work**: If monitoring reveals queue growth issues in production, backpressure can be added to the store interface as an opt-in feature (e.g., a `TrySetState` method that returns immediately if the queue is full). This does not require interface changes now.
+
+**Guidance for documentation**: Note that `MailboxProcessor` queues are unbounded. Recommend monitoring `CurrentQueueLength` in production and scaling horizontally if queue depth grows. Suggest Kestrel connection limits as the primary backpressure mechanism.
+
+---
+
+## Decision 6: Version Bump and Breaking Changes
 
 ### Summary of Breaking Changes
 
 | Change | Type | Affects |
 |--------|------|---------|
-| `IStateMachineStore.GetState` return type change | Binary-breaking | All store implementations |
-| `IStateMachineStore.SetState` signature change | Binary-breaking | All store implementations |
 | `StateMachine.EventGuards` new field | Source-breaking (record construction) | All `StateMachine` record literals |
-| `VersionedState` new type | Additive | None |
-| `SetStateResult` new type | Additive | None |
 | `StateMachineMetadata.EvaluateEventGuards` new field | Binary-breaking | Internal (metadata is constructed by builder) |
+| State key extraction (internal) | Behavioral change | State key strings change for parameterized DUs |
+
+### Changes REMOVED (vs. revision 1)
+
+| Change (removed) | Reason |
+|-------------------|--------|
+| `IStateMachineStore.GetState` return type -> `VersionedState` | Actor model eliminates need for versioning |
+| `IStateMachineStore.SetState` signature -> with version param | Actor model eliminates need for versioning |
+| `VersionedState<'S,'C>` new type | Not needed -- no version tokens |
+| `SetStateResult` new DU | Not needed -- no version conflict |
+| `TransitionAttemptResult.VersionConflict` new case | Not needed -- actor serialization prevents conflicts |
+| `MailboxProcessorStore` version tracking | Not needed |
 
 ### Version Strategy
 
-Since Frank.Statecharts is pre-1.0 and the spec 004 implementation has not shipped a stable release, these breaking changes are acceptable. The version should advance to reflect the interface changes. If the current version is 7.x (post spec 004), the next version with these changes should be 8.0.0 (or maintain 7.x with a minor bump, depending on the project's versioning policy for pre-1.0 packages).
+The breaking changes are limited to:
+- Adding `EventGuards` field to `StateMachine` (source-breaking for record construction)
+- Internal behavioral change to state key extraction (no API change)
+
+Since Frank.Statecharts is pre-1.0 and the spec 004 implementation has not shipped a stable release, these breaking changes are acceptable.
 
 ---
 
@@ -363,10 +485,14 @@ Since Frank.Statecharts is pre-1.0 and the spec 004 implementation has not shipp
 
 1. **State key for non-DU state types**: If `'State` is not a discriminated union (e.g., a string or record), `FSharpType.GetUnionCases` will fail. Should the key extraction fall back to `ToString()` for non-DU types? Or should the library require `'State` to be a DU? The spec focuses on DU cases, so a runtime check + fallback is reasonable.
 
-2. **ETag interaction with version**: The `StatechartETagProvider` (spec 008) currently hashes `(state, context)` to produce ETags. With versioning, should the ETag incorporate the version number? Probably not -- the version is an internal concurrency mechanism, while the ETag represents content equivalence. Two requests reading the same state but different versions should get the same ETag.
+2. **ETag interaction with state keys**: The `StatechartETagProvider` (spec 008) uses `string state` (which calls `ToString()`) for ETag computation (line 16 of `StatechartETagProvider.fs`). For ETags, the full state representation (including parameters) is correct -- different `Won "X"` and `Won "O"` should have different ETags. The ETag computation should NOT use the case-name key.
 
-3. **Cross-process SQLite subscribers**: The current design only notifies in-process subscribers. If multiple application instances share a SQLite database, state changes from one process are not visible to subscribers in another process. This is documented as a known limitation.
+3. **Cross-process SQLite access**: The SQLite store wraps persistence in an actor within one process. If multiple application instances share a SQLite database file, they each have their own actor, and concurrent writes could conflict. This is a deployment concern, not a design concern. Document that SQLite stores should not be shared across processes -- use a proper database (PostgreSQL, etc.) for multi-process deployments.
 
-4. **Guard evaluation when response has started**: If an event-validation guard blocks after the handler has already written to the response, the middleware cannot change the status code. The current approach (log a warning) is consistent with existing `TransitionAttemptResult.Blocked` handling. Should this be a stronger guarantee (e.g., buffering the response)? Deferred -- same trade-off as the existing design.
+4. **Guard evaluation when response has started**: If an event-validation guard blocks after the handler has already written to the response, the middleware cannot change the status code. The current approach (log a warning) is consistent with existing `TransitionAttemptResult.Blocked` handling. Deferred -- same trade-off as the existing design.
 
-5. **Multi-targeting for Frank.Statecharts.Sqlite**: Should the SQLite package target `net8.0;net9.0;net10.0` like the core package? `Microsoft.Data.Sqlite` is available for all three. The answer depends on whether the project wants to maintain multi-target consistency. Recommendation: match the core package's target frameworks.
+5. **Multi-targeting for Frank.Statecharts.Sqlite**: Should the SQLite package target `net8.0;net9.0;net10.0` like the core package? `Microsoft.Data.Sqlite` is available for all three. Recommendation: match the core package's target frameworks.
+
+6. **Actor cache eviction for SQLite store**: The lazy rehydration model caches state in memory indefinitely. For applications with many instances accessed infrequently, this could consume memory. Consider an LRU eviction strategy in a future version. For V1, document that all accessed instances remain in memory.
+
+7. **SQLite database file locking**: What happens when the SQLite database file is locked by another process? The `PRAGMA busy_timeout=5000` setting causes SQLite to retry for up to 5 seconds before returning SQLITE_BUSY. The store should catch this and surface a clear error rather than hanging indefinitely.

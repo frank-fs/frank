@@ -1,7 +1,8 @@
 # Data Model: Statecharts Production Readiness
 
 **Feature**: 010-statecharts-production-readiness
-**Date**: 2026-03-15
+**Date**: 2026-03-15 (revised)
+**Revision**: 2 -- replaces stale data model based on updated spec (actor-serialized model)
 
 ## Entity Relationship Overview
 
@@ -13,19 +14,20 @@ StateMachine<'S,'E,'C> (modified)
        |-- StateMetadata (keyed by case name, not 'State equality)
        |
        v
-IStateMachineStore<'S,'C> (modified)
+IStateMachineStore<'S,'C> (UNCHANGED)
        |
-       |-- GetState -> VersionedState<'S,'C> [CHANGED]
-       |-- SetState (with expectedVersion) -> SetStateResult [CHANGED]
-       |-- Subscribe -> IObserver<'S * 'C>
+       |-- GetState -> ('S * 'C) option        [UNCHANGED]
+       |-- SetState -> Task<unit>               [UNCHANGED]
+       |-- Subscribe -> IObserver<'S * 'C>      [UNCHANGED]
        |
        |-- implemented by
        |
-       +-------> MailboxProcessorStore<'S,'C> (modified for versioning)
+       +-------> MailboxProcessorStore<'S,'C> (UNCHANGED)
        |
        +-------> SqliteStateMachineStore<'S,'C> [NEW]
                     |
-                    |-- reads/writes
+                    |-- actor wraps SQLite access internally
+                    |-- same MailboxProcessor pattern as in-memory store
                     v
                  SQLite DB (state_machine_instances table) [NEW]
 
@@ -44,63 +46,32 @@ StateMachineMetadata (modified)
        v
 StateMachineMiddleware (modified flow)
        |
-       1. GetState (with version)
+       1. GetState
        2. Method check
        3. Access-control guards (pre-handler)
        4. Run handler
        5. Event-validation guards (post-handler) [NEW]
-       6. Execute transition (with version check) [MODIFIED]
-       7. Handle VersionConflict -> 409 [NEW]
+       6. Execute transition [UNCHANGED -- no version check]
 ```
+
+## Key Difference from Revision 1
+
+Revision 1 introduced `VersionedState<'S,'C>`, `SetStateResult`, and `TransitionAttemptResult.VersionConflict` for optimistic concurrency. All of these have been **REMOVED**. The actor-serialized model means:
+
+- `IStateMachineStore` interface is **UNCHANGED** from spec 004
+- `MailboxProcessorStore` is **UNCHANGED** -- it already serializes access
+- No version tokens, no compare-and-swap, no 409 Conflict responses
+- SQLite store uses the same actor pattern, wrapping SQLite internally
 
 ## New Entities
 
-### VersionedState<'State, 'Context>
-
-Versioned snapshot of a state machine instance, returned by `GetState`. Bundles the state value, extended context, and an integer concurrency version.
-
-```fsharp
-type VersionedState<'State, 'Context> =
-    { State: 'State
-      Context: 'Context
-      Version: int64 }
-```
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| State | `'State` | Current state value |
-| Context | `'Context` | Extended state / context data |
-| Version | `int64` | Monotonically increasing concurrency token |
-
-**Identity**: One per state machine instance per store.
-**Lifecycle**: Created on `GetState`, consumed by `SetState` for optimistic concurrency.
-**Key constraint**: `Version` starts at `1L` for new instances. Incremented by `1L` on each successful `SetState`. Value `0L` is reserved to signal "new instance, no prior state."
-
-### SetStateResult
-
-Discriminated union representing the outcome of a versioned `SetState` attempt.
-
-```fsharp
-[<RequireQualifiedAccess>]
-type SetStateResult =
-    | Success of newVersion: int64
-    | VersionConflict of currentVersion: int64
-```
-
-| Variant | Fields | Description |
-|---------|--------|-------------|
-| Success | `newVersion: int64` | Write succeeded; carries the new version number |
-| VersionConflict | `currentVersion: int64` | Write rejected; carries the version currently in the store |
-
-**HTTP mapping**: `VersionConflict` maps to `409 Conflict` in the middleware (FR-004).
-
 ### SqliteStateMachineStore<'State, 'Context>
 
-Durable `IStateMachineStore` implementation backed by a SQLite database file. Implements optimistic concurrency via `UPDATE ... WHERE version = @expected`.
+Durable `IStateMachineStore` implementation. Architecturally identical to `MailboxProcessorStore` but adds SQLite persistence inside the actor loop.
 
 ```fsharp
 type SqliteStateMachineStore<'State, 'Context when 'State: equality>
-    (connectionString: string, ?jsonOptions: JsonSerializerOptions) =
+    (connectionString: string, logger: ILogger, ?jsonOptions: JsonSerializerOptions) =
 
     interface IStateMachineStore<'State, 'Context>
     interface IDisposable
@@ -109,15 +80,24 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | connectionString | `string` | SQLite connection string (e.g., `"Data Source=statecharts.db"`) |
+| logger | `ILogger` | Logger for error/warning reporting |
 | jsonOptions | `JsonSerializerOptions option` | Serializer options for state/context (default: `JsonSerializerOptions.Default`) |
 
 **Identity**: One per stateful resource type registration in DI.
 **Lifecycle**: Singleton, disposed on application shutdown.
+**Internal architecture**:
+- `MailboxProcessor` agent serializes all operations (same as in-memory store)
+- In-memory cache (`Map<string, 'State * 'Context>`) for fast reads
+- SQLite database for durable persistence
+- Subscriber list (`Map<string, IObserver list>`) for observable notifications
+- Single `SqliteConnection` opened once, used for lifetime of store
+
 **Key behaviors**:
 - Auto-creates schema on first use (FR-008)
-- Enforces optimistic concurrency via version column (FR-009)
+- All access serialized through actor -- no concurrent database operations (FR-009)
 - Manages in-memory subscriber list for observable semantics (FR-010)
-- Enables WAL mode for concurrent read performance
+- Enables WAL mode for external read compatibility
+- Lazy rehydration: loads from SQLite on first `GetState` cache miss
 
 ### SQLite Table: state_machine_instances
 
@@ -129,25 +109,25 @@ Physical storage schema for durable state persistence.
 | state_type | TEXT | NOT NULL, PK (composite) | Fully qualified .NET type name of `'State` |
 | state_json | TEXT | NOT NULL | JSON-serialized state value |
 | context_json | TEXT | NOT NULL | JSON-serialized context value |
-| version | INTEGER | NOT NULL, DEFAULT 1 | Concurrency version token |
 | updated_at | TEXT | NOT NULL | ISO 8601 timestamp of last update |
 
 **Primary key**: `(instance_id, state_type)` -- allows multiple state machine types to coexist in one database.
-**Indexes**: Primary key provides lookup by instance. No additional indexes needed for typical access patterns.
+**Indexes**: Primary key provides lookup by instance. No additional indexes needed.
+**Note**: No `version` column -- the actor serializes all access, so database-level concurrency control is not needed.
+
+### StateKeyExtractor (internal)
+
+Not a standalone type -- a set of precomputed functions captured in closures at build time.
+
+| Component | Type | Description |
+|-----------|------|-------------|
+| tagReader | `obj -> int` | Precomputed DU tag reader from `FSharpValue.PreComputeUnionTagReader` |
+| caseNames | `string[]` | Array of DU case names from `FSharpType.GetUnionCases` |
+| stateKey | `'State -> string` | Composed function: `tagReader >> caseNames.[_]` |
+
+**Lifecycle**: Created once in `StatefulResourceBuilder.Run`, captured in closures used by `StateMachineMetadata`.
 
 ## Modified Entities
-
-### IStateMachineStore<'State, 'Context> (modified)
-
-Updated interface with versioned operations.
-
-| Method | Old Signature | New Signature |
-|--------|--------------|---------------|
-| GetState | `string -> Task<('State * 'Context) option>` | `string -> Task<VersionedState<'State, 'Context> option>` |
-| SetState | `string -> 'State -> 'Context -> Task<unit>` | `string -> 'State -> 'Context -> int64 -> Task<SetStateResult>` |
-| Subscribe | (unchanged) | `string -> IObserver<'State * 'Context> -> IDisposable` |
-
-**Breaking change**: Both `GetState` and `SetState` signatures change. All store implementations must update.
 
 ### StateMachine<'State, 'Event, 'Context> (modified)
 
@@ -175,78 +155,89 @@ Added event guard evaluation closure.
 | ResolveInstanceId | `HttpContext -> string` | Unchanged | Instance key extractor |
 | TransitionObservers | `(obj -> unit) list` | Unchanged | Boxed transition event handlers |
 | InitialStateKey | `string` | Unchanged (value semantics change) | Initial state key. Now uses DU case name |
-| GetCurrentStateKey | `IServiceProvider -> HttpContext -> string -> Task<string>` | Modified | Now caches version in HttpContext.Items |
+| GetCurrentStateKey | `IServiceProvider -> HttpContext -> string -> Task<string>` | Unchanged | Resolve state from store, cache in Items, return key |
 | EvaluateGuards | `HttpContext -> GuardResult` | Unchanged | Access-control guards (pre-handler) |
 | EvaluateEventGuards | `HttpContext -> GuardResult` | **NEW** | Event-validation guards (post-handler) |
-| ExecuteTransition | `IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>` | Modified | Now passes version for optimistic concurrency |
+| ExecuteTransition | `IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>` | Unchanged | Post-handler transition execution |
 
-### TransitionAttemptResult (modified)
+### IStateMachineStore<'State, 'Context> (UNCHANGED)
 
-Added `VersionConflict` case.
+The store interface is **not modified** in this spec. The actor-serialized model is a documented contract requirement, not an interface-level change.
 
-| Variant | Fields | Change | HTTP Mapping |
-|---------|--------|--------|-------------|
-| NoEvent | - | Unchanged | (no action) |
-| Succeeded | `transitionEvent: obj` | Unchanged | 200 (handler-determined) |
-| Blocked | `BlockReason` | Unchanged | Per BlockReason mapping |
-| Invalid | `message: string` | Unchanged | 400 Bad Request |
-| VersionConflict | - | **NEW** | 409 Conflict |
+| Method | Signature | Change |
+|--------|-----------|--------|
+| GetState | `string -> Task<('State * 'Context) option>` | UNCHANGED |
+| SetState | `string -> 'State -> 'Context -> Task<unit>` | UNCHANGED |
+| Subscribe | `string -> IObserver<'State * 'Context> -> IDisposable` | UNCHANGED |
 
-### MailboxProcessorStore<'State, 'Context> (modified)
+### MailboxProcessorStore<'State, 'Context> (UNCHANGED)
 
-Updated internal state to include version tracking.
+No modifications needed. Already implements actor-serialized access correctly.
 
-| Internal State | Old Type | New Type |
-|---------------|----------|----------|
-| instances | `Map<string, 'State * 'Context>` | `Map<string, 'State * 'Context * int64>` |
+### TransitionAttemptResult (UNCHANGED)
 
-Version is incremented on each successful `SetState`. Version mismatch returns `SetStateResult.VersionConflict`.
+No new cases added. The `VersionConflict` case proposed in revision 1 has been removed.
+
+| Variant | Fields | HTTP Mapping |
+|---------|--------|-------------|
+| NoEvent | - | (no action) |
+| Succeeded | `transitionEvent: obj` | 200 (handler-determined) |
+| Blocked | `BlockReason` | Per BlockReason mapping |
+| Invalid | `message: string` | 400 Bad Request |
 
 ## Relationships
 
-1. **VersionedState -> IStateMachineStore**: `GetState` now returns `VersionedState` wrapping state + version. The version is threaded through the middleware for use in `SetState`.
+1. **SqliteStateMachineStore -> MailboxProcessor**: The SQLite store contains a `MailboxProcessor` that serializes all operations. The actor owns both the in-memory cache and the SQLite connection.
 
-2. **SetStateResult -> Middleware**: The middleware pattern-matches on `SetStateResult` to determine whether to proceed (Success) or return 409 (VersionConflict).
+2. **SqliteStateMachineStore -> SQLite DB**: One-to-one relationship between store instance and database connection. Multiple state machine types can share one database via the composite primary key. The actor is the sole accessor.
 
-3. **SqliteStateMachineStore -> SQLite DB**: One-to-one relationship between store instance and database file. Multiple state machine types can share one database via the composite primary key.
+3. **StateMachine.Guards -> Middleware (pre-handler)**: Access-control guards evaluated at step 3, before the handler runs. No event context available.
 
-4. **StateMachine.Guards -> Middleware (pre-handler)**: Access-control guards evaluated at step 3, before the handler runs. No event context available.
+4. **StateMachine.EventGuards -> Middleware (post-handler)**: Event-validation guards evaluated at step 5, after the handler sets the event. Full `GuardContext` including the actual event value.
 
-5. **StateMachine.EventGuards -> Middleware (post-handler)**: Event-validation guards evaluated at step 5, after the handler sets the event. Full `GuardContext` including the actual event value.
+5. **StateKeyExtractor -> StateMachineMetadata**: The key extraction function (built from `FSharpValue.PreComputeUnionTagReader`) is captured in closures used by `StateMachineMetadata` fields. It replaces all `ToString()` calls for state-to-key conversion.
 
-6. **StateKeyExtractor -> StateMachineMetadata**: The key extraction function (built from `FSharpValue.PreComputeUnionTagReader`) is captured in closures used by `StateMachineMetadata` fields. It replaces all `ToString()` calls for state-to-key conversion.
+6. **SqliteStateMachineStore -> FSharp.SystemTextJson**: Soft dependency via `JsonSerializerOptions`. Users configure their serializer to handle F# types; the store does not mandate a specific serializer package.
 
-7. **SqliteStateMachineStore -> FSharp.SystemTextJson**: Soft dependency via `JsonSerializerOptions`. Users configure their serializer to handle F# types; the store does not mandate a specific serializer package.
-
-## Data Flow: Versioned State Transition
+## Data Flow: Actor-Serialized State Transition
 
 ```
-Request arrives
-    |
-    v
-Middleware reads version from store
-    GetState("game-42") -> Some { State=XTurn; Context=3; Version=5 }
-    |
-    v
-Cache (state, context, version) in HttpContext.Items
-    |
-    v
-Evaluate access-control guards (no event)
-    |
-    v
-Run handler (handler may call setEvent)
-    |
-    v
-Evaluate event-validation guards (with event, if set)
-    |
-    v
-Execute transition
-    transition XTurn (MakeMove 4) 3 -> Transitioned(OTurn, 4)
-    |
-    v
-SetState("game-42", OTurn, 4, expectedVersion=5)
-    |
-    +---> Success(6) -> notify subscribers, return Succeeded
-    |
-    +---> VersionConflict(6) -> return 409 Conflict
+Request A arrives         Request B arrives (concurrent)
+    |                         |
+    v                         v
+Middleware A                Middleware B
+reads state from store      reads state from store
+    |                         |
+    v                         |
+Actor processes             Actor queues B's GetState
+GetState("game-42")             |
+-> returns (XTurn, 3)           |
+    |                           |
+    v                           |
+A evaluates guards              |
+A runs handler                  |
+A executes transition           |
+A calls SetState("game-42", OTurn, 4)
+    |                           |
+    v                           |
+Actor processes A's SetState    |
+-> persists to SQLite           |
+-> notifies subscribers         |
+-> reply to A                   |
+    |                           |
+    |                           v
+    |                     Actor processes B's GetState
+    |                     -> returns (OTurn, 4)  <-- sees A's result
+    |                           |
+    v                           v
+A returns 200               B evaluates guards with OTurn
+                            B runs handler
+                            B calls SetState(...)
+                                |
+                                v
+                            Actor processes B's SetState
+                            -> persists to SQLite
+                            -> reply to B
 ```
+
+Note: Both requests succeed because they are serialized by the actor. No version conflict, no 409. B always sees the state left by A.
