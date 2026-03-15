@@ -289,7 +289,7 @@
 - [x] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
 - [x] T049 Test edge cases: recursive types, nested records, empty body, generic types, non-derivable handler types
 - [x] T049b Integration test: handler returns invalid response data with response validation enabled — warning logged, response delivered unmodified
-- [ ] T049c Benchmark validation overhead via BenchmarkDotNet — verify <1ms for shapes with 20 properties
+- [x] T049c Benchmark validation overhead via BenchmarkDotNet — verify <1ms for shapes with 20 properties
 
 ### Implementation Notes
 - Use ASP.NET Core TestHost (`Microsoft.AspNetCore.TestHost`) like existing Frank tests
