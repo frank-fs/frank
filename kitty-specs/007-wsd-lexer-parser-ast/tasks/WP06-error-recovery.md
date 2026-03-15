@@ -1,11 +1,13 @@
 ---
 work_package_id: WP06
 title: Error recovery + failure reports
-lane: "doing"
+lane: "done"
 dependencies: [WP03, WP04]
 subtasks: [T032, T033, T034, T035, T036, T037, T038]
 agent: "claude-opus-reviewer"
 shell_pid: "43003"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -314,3 +316,4 @@ Write at least 25 test cases covering all categories.
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:22Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:46:31Z – claude-opus-reviewer – shell_pid=43003 – lane=doing – Started review via workflow command
+- 2026-03-15T19:47:27Z – claude-opus-reviewer – shell_pid=43003 – lane=done – Review passed: All 7 subtasks (T032-T038) implemented. Skip-to-newline recovery, skip-to-end for groups, unclosed block recovery at EOF. Implicit participant warnings once per name via ImplicitWarned set. Error limit with ErrorLimitReached flag and sentinel message. Corrective example catalog for arrow errors. Unsupported construct handling (activate/deactivate/destroy/box/theme/skin/skinparam). Guard parser integration in parseNote with error/warning propagation. 30 error/warning tests. Builds clean, 209 tests pass.
