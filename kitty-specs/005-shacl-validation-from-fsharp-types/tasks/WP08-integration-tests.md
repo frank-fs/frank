@@ -1,10 +1,14 @@
 ---
 work_package_id: WP08
 title: Integration Tests & End-to-End Validation
-lane: planned
+lane: "doing"
 dependencies:
 - WP07
+base_branch: 005-shacl-validation-from-fsharp-types-WP07
+base_commit: 7bcf170ba79f5514022908e832ca9f472cc51ce1
+created_at: '2026-03-15T19:42:55.103753+00:00'
 subtasks: [T043, T044, T045, T046, T047, T048, T049]
+shell_pid: "41173"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -16,8 +20,8 @@ history:
   agent: system
   shell_pid: ''
   action: Amended per build-time SHACL unification design
-requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019]
 amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019]
 ---
 
 # Work Package Prompt: WP08 -- Integration Tests & End-to-End Validation
