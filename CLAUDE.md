@@ -29,6 +29,10 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.x (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Data.Sqlite (for SQLite project only), FSharp.Reflection (in FSharp.Core) (010-statecharts-production-readiness)
 - SQLite via Microsoft.Data.Sqlite (new `Frank.Statecharts.Sqlite` project); in-memory MailboxProcessor (existing, unchanged) (010-statecharts-production-readiness)
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
+- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
+- F# 8.0+ targeting .NET 10.0 (single target, matching existing test projects) + dotNetRdf.Core 3.5.1 (already a Frank dependency -- provides RDF parsing, in-memory SPARQL via `LeviathanQueryProcessor`/`InMemoryDataset`), Microsoft.AspNetCore.TestHost 10.0.0, Expecto 10.2.3, YoloDev.Expecto.TestSdk 0.14.3, Microsoft.NET.Test.Sdk 17.14.1 (015-rdf-sparql-validation)
+- N/A (in-memory dotNetRdf graphs only) (015-rdf-sparql-validation)
 ## Project Structure
 
 ```text
@@ -45,8 +49,8 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 015-rdf-sparql-validation: Added F# 8.0+ targeting .NET 10.0 (single target, matching existing test projects) + dotNetRdf.Core 3.5.1 (already a Frank dependency -- provides RDF parsing, in-memory SPARQL via `LeviathanQueryProcessor`/`InMemoryDataset`), Microsoft.AspNetCore.TestHost 10.0.0, Expecto 10.2.3, YoloDev.Expecto.TestSdk 0.14.3, Microsoft.NET.Test.Sdk 17.14.1
+- 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
 - 010-statecharts-production-readiness: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.x (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Data.Sqlite (for SQLite project only), FSharp.Reflection (in FSharp.Core)
-- 016-openapi: Added F# 8.0+ targeting .NET 9.0 and .NET 10.0 (multi-targeting) + Frank 7.1.0 (project reference), FSharp.Data.JsonSchema.OpenApi 3.0.0 (NuGet), Microsoft.AspNetCore.OpenApi (9.0.x / 10.0.x conditional), Microsoft.AspNetCore.App (framework reference)
-- 015-datastar-streaming-html: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool)
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
