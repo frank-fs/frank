@@ -1,4 +1,4 @@
-module Frank.Validation.Tests.ShapeDerivationTests
+module Frank.Validation.Tests.ShapeBuilderTests
 
 open System
 open Expecto

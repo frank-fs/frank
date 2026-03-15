@@ -5,7 +5,7 @@ open System.Collections.Concurrent
 open VDS.RDF.Shacl
 
 /// Thread-safe cache of compiled ShapesGraph instances, keyed by the shape's NodeShapeUri.
-/// Shapes are pre-populated at startup via LoadAll (from ShapeLoader or ShapeDerivation),
+/// Shapes are pre-populated at startup via LoadAll (from ShapeLoader or ShapeBuilder),
 /// then retrieved per-request via TryGet. No on-demand derivation occurs during request handling.
 type ShapeCache() =
 
@@ -28,6 +28,7 @@ type ShapeCache() =
     /// Get or add a ShapesGraph by deriving the shape at runtime from a System.Type.
     /// Kept for backwards-compat with middleware paths that still carry a Type.
     /// The derived shape is stored keyed by its NodeShapeUri.
+    [<System.Obsolete("Use TryGet with pre-populated shapes from ShapeLoader instead. Will be removed when all middleware paths use Uri-keyed lookup.")>]
     member _.GetOrAddDerived(shapeType: Type) : struct (ShapesGraph * ShaclShape) =
         let shape = ShapeBuilder.deriveShapeDefault shapeType
 
