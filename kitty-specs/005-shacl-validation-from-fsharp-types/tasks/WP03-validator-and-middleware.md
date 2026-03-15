@@ -1,11 +1,13 @@
 ---
 work_package_id: WP03
 title: Validator & Validation Middleware
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP02
 subtasks: [T015, T016, T017, T018, T019, T020, T021]
+agent: "claude-opus-reviewer"
+shell_pid: "41561"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -390,3 +392,4 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache) =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:42Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:43:30Z – claude-opus-reviewer – shell_pid=41561 – lane=doing – Started review via workflow command
