@@ -281,7 +281,7 @@
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019
 
 ### Included Subtasks
-- [ ] T043 Create `test/Frank.Validation.Tests/IntegrationTests.fs` with TestHost-based end-to-end tests
+- [x] T043 Create `test/Frank.Validation.Tests/IntegrationTests.fs` with TestHost-based end-to-end tests
 - [ ] T044 Test valid request passes through to handler and handler executes
 - [ ] T045 Test invalid request (missing required field, wrong type, invalid DU value) returns 422 with ValidationReport
 - [ ] T046 Test content negotiation: same violation returns JSON-LD for `Accept: application/ld+json` and Problem Details for `Accept: application/json`
