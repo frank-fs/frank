@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: "planned"
+lane: "doing"
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]
@@ -477,3 +477,4 @@ type TestCustomStore() =
 - 2026-03-15T19:35:45Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:47:50Z – claude-opus-reviewer – shell_pid=43669 – lane=doing – Started review via workflow command
 - 2026-03-15T19:50:38Z – claude-opus-reviewer – shell_pid=43669 – lane=planned – Moved to planned
+- 2026-03-15T20:02:55Z – claude-opus-reviewer – shell_pid=43669 – lane=doing – Moved to doing
