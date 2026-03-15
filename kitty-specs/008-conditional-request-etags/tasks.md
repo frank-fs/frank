@@ -127,7 +127,7 @@
 - [ ] T019b Unit test: same ('State * 'Context) pair produces identical ETag; different pairs produce different ETags
 - [x] T020 Implement `IETagProviderFactory` for statechart resources (resolves provider from endpoint StateMachineMetadata)
 - [x] T021 Implement middleware-driven cache invalidation: after the handler returns a 2xx response for a mutation (POST/PUT/DELETE), the middleware sends an `InvalidateETag` message to the `ETagCache` (consistent with T015 in WP03). Note: `IStateMachineStore.Subscribe` is per-instance only and cannot be used for global cache invalidation.
-- [ ] T022 Add DI registration helper: `IServiceCollection.AddStatechartETagProvider<'State, 'Context>(contextSerializer)`
+- [x] T022 Add DI registration helper: `IServiceCollection.AddStatechartETagProvider<'State, 'Context>(contextSerializer)`
 
 ### Implementation Notes
 - `StatechartETagProvider.fs` goes in `src/Frank.Statecharts/` (depends on `IStateMachineStore`)
