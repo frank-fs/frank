@@ -1,10 +1,12 @@
 ---
 work_package_id: WP04
 title: Violation Reporting & Content Negotiation
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]
+agent: "claude-opus-reviewer"
+shell_pid: "42258"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -304,3 +306,4 @@ module ReportSerializer =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:43Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:44:44Z – claude-opus-reviewer – shell_pid=42258 – lane=doing – Started review via workflow command
