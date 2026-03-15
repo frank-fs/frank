@@ -4,8 +4,6 @@ title: Custom Constraints & Conflict Detection
 lane: planned
 dependencies:
 - WP01
-- WP10
-- WP12
 subtasks: [T032, T033, T034, T035, T036]
 history:
 - timestamp: '2026-03-07T00:00:00Z'
@@ -13,13 +11,7 @@ history:
   agent: system
   shell_pid: ''
   action: Prompt generated via /spec-kitty.tasks
-- timestamp: '2026-03-14T00:00:00Z'
-  lane: planned
-  agent: system
-  shell_pid: ''
-  action: Amended per build-time SHACL unification design
 requirement_refs: [FR-015, FR-016]
-amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
 ---
 
 # Work Package Prompt: WP06 -- Custom Constraints & Conflict Detection
@@ -42,25 +34,13 @@ amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-de
 
 ---
 
-## Amendment (2026-03-14): Build-Time SHACL Unification
-
-> This WP is amended per the [build-time SHACL unification design](../../../docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md). Key changes:
->
-> - **Custom constraints are also expressible as F# attributes** on types/fields (e.g., `[<Pattern("...")>]`, `[<MinInclusive(0)>]`). These are extracted by FCS at build time (WP09) and emitted as SHACL triples (WP10).
-> - **Attribute types** are defined in a `Frank.Validation.Annotations` module (or lightweight assembly).
-> - **ShapeMerger receives pre-loaded shapes** from the embedded Turtle resource (via ShapeLoader, WP12) rather than reflection-derived shapes. Conflict detection and additive merging logic is unchanged.
-> - **Runtime API registration remains** as a secondary mechanism for SPARQL cross-field constraints and other constraints that cannot be expressed as attributes. ShapeMerger applies these on top of the pre-loaded shapes.
-> - **Dependencies updated**: now depends on WP10 (shapes include attribute-derived constraints) and WP12 (ShapeLoader provides pre-loaded shapes). WP01 dependency remains.
-
----
-
 ## Implementation Command
 
 ```bash
-spec-kitty implement WP06 --base WP12
+spec-kitty implement WP06 --base WP02
 ```
 
-Depends on WP01 (types), WP10 (attribute-derived constraints in shapes), WP12 (ShapeLoader provides pre-loaded shapes).
+Depends on WP01 (types), WP02 (shape derivation produces base shapes).
 
 ---
 
@@ -152,7 +132,7 @@ module ShapeMerger =
         | _ -> ...
 ```
 
-3. Add `ShapeMerger.fs` to the `.fsproj` compile list after `ShapeLoader.fs`.
+3. Add `ShapeMerger.fs` to the `.fsproj` compile list after `ShapeDerivation.fs`.
 
 **Files**: `src/Frank.Validation/ShapeMerger.fs`
 **Notes**: The merge produces a NEW immutable `ShaclShape` -- it does not mutate the base shape. The base shape is preserved for use as the default in capability-dependent resolution.
