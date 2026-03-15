@@ -1,12 +1,14 @@
 ---
 work_package_id: "WP07"
 title: "Integration, round-trip tests + build verification"
-lane: "doing"
+lane: "done"
 dependencies: ["WP05", "WP06"]
 requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-008a", "FR-009", "FR-010", "FR-011", "FR-012", "FR-013"]
 subtasks: ["T039", "T040", "T041", "T042", "T043", "T044"]
 agent: "claude-opus-reviewer"
 shell_pid: "43539"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -300,3 +302,4 @@ Verify the library compiles under all three target frameworks (SC-006).
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:34:22Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:47:34Z – claude-opus-reviewer – shell_pid=43539 – lane=doing – Started review via workflow command
+- 2026-03-15T19:48:30Z – claude-opus-reviewer – shell_pid=43539 – lane=done – Review passed: All 6 subtasks (T039-T044) implemented. Onboarding round-trip (SC-001): 10 tests covering title, autonumber, 3 participants, arrow styles, guard annotations. Tic-tac-toe round-trip (SC-002): 8 tests with multi-pair guards, alt branches, nested guards. Edge cases: Unicode, empty input, comments, self-messages, 5-level nesting (SC-004), all 4 arrows (SC-003), parameters, determinism. .fsproj compile order correct: Types.fs->Lexer.fs->GuardParser.fs->Parser.fs. Multi-target build clean (SC-006). Parser.fs refactored to use addError/addWarning for guard error merging. 243 tests pass.
