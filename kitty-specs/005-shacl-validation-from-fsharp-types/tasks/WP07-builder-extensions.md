@@ -1,12 +1,16 @@
 ---
 work_package_id: WP07
 title: ResourceBuilder & WebHost Extensions
-lane: planned
+lane: "doing"
 dependencies:
 - WP11
 - WP12
 - WP06
+base_branch: 005-shacl-validation-from-fsharp-types-WP07-merge-base
+base_commit: 00905c3c3ce2493efc8ec85dff2edefea3d47770
+created_at: '2026-03-15T19:14:01.335107+00:00'
 subtasks: [T037, T038, T039, T040, T041, T042]
+shell_pid: "27778"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -18,8 +22,8 @@ history:
   agent: system
   shell_pid: ''
   action: Amended per build-time SHACL unification design
-requirement_refs: [FR-017, FR-018, FR-019]
 amendment_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
+requirement_refs: [FR-017, FR-018, FR-019]
 ---
 
 # Work Package Prompt: WP07 -- ResourceBuilder & WebHost Extensions
