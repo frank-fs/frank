@@ -57,7 +57,7 @@
 
 ### Included Subtasks
 - [x] T006 Create `src/Frank.Validation/TypeMapping.fs` with `mapType : Type -> XsdDatatype option` and `xsdUri : XsdDatatype -> Uri`
-- [ ] T007 Implement record field derivation: `PropertyInfo -> PropertyShape` with datatype, minCount/maxCount
+- [x] T007 Implement record field derivation: `PropertyInfo -> PropertyShape` with datatype, minCount/maxCount
 - [ ] T008 Implement option type unwrapping (`option<T>` -> minCount 0, inner type mapping)
 - [ ] T009 Implement DU derivation: simple cases -> `sh:in`, payload cases -> `sh:or` with per-case NodeShapes
 - [ ] T010 Implement nested record handling: `sh:node` references to child NodeShapes
