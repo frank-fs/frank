@@ -1,11 +1,11 @@
 ---
 work_package_id: WP09
 title: Enrich TypeAnalyzer with Validation-Grade Metadata
-lane: "for_review"
+lane: "doing"
 dependencies: []
 subtasks: [T050, T051, T052, T053, T054]
 agent: "claude-opus-reviewer"
-shell_pid: "39920"
+shell_pid: "52290"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 review_feedback_file: "/Users/ryanr/Code/frank/review-feedback-WP09.md"
@@ -341,3 +341,4 @@ let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribu
 - 2026-03-15T19:46:55Z – claude-opus-reviewer – shell_pid=39920 – lane=planned – Moved to planned
 - 2026-03-15T20:02:53Z – claude-opus-reviewer – shell_pid=39920 – lane=doing – Moved to doing
 - 2026-03-15T20:15:36Z – claude-opus-reviewer – shell_pid=39920 – lane=for_review – Ready for review: added 22 new tests (T054) for enriched TypeAnalyzer, fixed byte[] mapping for FCS scripts
+- 2026-03-15T20:16:09Z – claude-opus-reviewer – shell_pid=52290 – lane=doing – Started review via workflow command
