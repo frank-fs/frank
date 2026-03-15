@@ -91,19 +91,51 @@ module TypeAnalyzer =
                     | "System.Guid" -> Guid
                     | "System.Decimal" -> Primitive "xsd:decimal"
                     | _ when td.IsArrayType && fsharpType.GenericArguments.Count > 0 ->
-                        let elemFullName =
-                            try
-                                Some fsharpType.GenericArguments.[0].TypeDefinition.FullName
-                            with _ ->
-                                None
+                        let elem = fsharpType.GenericArguments.[0]
 
-                        match elemFullName with
-                        | Some "System.Byte" -> Primitive "xsd:base64Binary"
-                        | _ -> Collection(mapFieldType fsharpType.GenericArguments.[0])
+                        let isByte =
+                            if elem.HasTypeDefinition then
+                                let dn = elem.TypeDefinition.DisplayName
+
+                                let fn =
+                                    try
+                                        elem.TypeDefinition.FullName
+                                    with _ ->
+                                        ""
+
+                                fn = "System.Byte" || dn = "Byte" || dn = "byte"
+                            else
+                                false
+
+                        if isByte then
+                            Primitive "xsd:base64Binary"
+                        else
+                            Collection(mapFieldType elem)
                     | _ -> Reference td.DisplayName
                 | None ->
-                    // FullName not available -- try resolving abbreviation
-                    if fsharpType.IsAbbreviation then
+                    // FullName not available -- check for array type before trying abbreviation
+                    if td.IsArrayType && fsharpType.GenericArguments.Count > 0 then
+                        let elem = fsharpType.GenericArguments.[0]
+
+                        let isByte =
+                            if elem.HasTypeDefinition then
+                                let dn = elem.TypeDefinition.DisplayName
+
+                                let fn =
+                                    try
+                                        elem.TypeDefinition.FullName
+                                    with _ ->
+                                        ""
+
+                                fn = "System.Byte" || dn = "Byte" || dn = "byte"
+                            else
+                                false
+
+                        if isByte then
+                            Primitive "xsd:base64Binary"
+                        else
+                            Collection(mapFieldType elem)
+                    elif fsharpType.IsAbbreviation then
                         mapFieldType fsharpType.AbbreviatedType
                     else
                         Reference td.DisplayName
