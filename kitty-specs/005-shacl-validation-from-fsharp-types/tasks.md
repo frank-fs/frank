@@ -103,7 +103,7 @@
 - [x] T018 Create `src/Frank.Validation/ValidationMiddleware.fs` with endpoint metadata check, deserialization, validation, and short-circuit
 - [x] T019 Implement query parameter validation for GET requests
 - [x] T020 Create `test/Frank.Validation.Tests/ValidatorTests.fs` with pass/fail validation tests using dotNetRdf
-- [ ] T021 Create `test/Frank.Validation.Tests/MiddlewareTests.fs` with TestHost-based pipeline tests
+- [x] T021 Create `test/Frank.Validation.Tests/MiddlewareTests.fs` with TestHost-based pipeline tests
 
 ### Implementation Notes
 - Use `VDS.RDF.Shacl.ShapesGraph` for validation: construct once at startup, reuse per request
