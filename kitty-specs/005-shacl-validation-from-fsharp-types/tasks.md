@@ -249,7 +249,7 @@
 - [x] T040 Create `src/Frank.Validation/WebHostBuilderExtensions.fs` with `useValidation` extension
 - [x] T041 Implement shape cache initialization at startup (derive all shapes from ValidationMarker metadata)
 - [x] T042 Implement response validation opt-in (diagnostic mode: validate handler return types, log violations, do not block)
-- [ ] T042b Create test verifying response validation logs warning but does not block response when output shape is violated
+- [x] T042b Create test verifying response validation logs warning but does not block response when output shape is violated
 
 ### Implementation Notes
 - Follow `Frank.Auth.ResourceBuilderExtensions` and `Frank.LinkedData.ResourceBuilderExtensions` patterns exactly
