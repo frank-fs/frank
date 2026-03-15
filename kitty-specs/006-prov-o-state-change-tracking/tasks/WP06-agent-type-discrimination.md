@@ -1,12 +1,14 @@
 ---
 work_package_id: WP06
 title: Agent Type Discrimination
-lane: "doing"
+lane: "done"
 dependencies:
 - WP03
 subtasks: [T027, T028, T029, T030]
 agent: "claude-opus-reviewer"
 shell_pid: "43144"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -260,3 +262,4 @@ if isLlmAgent then
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:44Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:46:43Z – claude-opus-reviewer – shell_pid=43144 – lane=doing – Started review via workflow command
+- 2026-03-15T19:47:45Z – claude-opus-reviewer – shell_pid=43144 – lane=done – Review passed: Agent extraction enhanced to check X-Agent-Type before auth. 8 end-to-end tests verify full pipeline (observer+graph builder) for all agent types: Person, SoftwareAgent, LlmAgent (with/without model), anonymous LLM, minimal claims, unknown header values. Dual-typing verified in RDF output. Build succeeds on all 3 targets. 102 total tests pass.
