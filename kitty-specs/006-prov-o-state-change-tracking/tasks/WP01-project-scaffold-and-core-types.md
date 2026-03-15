@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Scaffold + ProvVocabulary + Core Types
-lane: "for_review"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: 9aa38215ad756a6530526dcd467907c32819df36
@@ -9,6 +9,8 @@ created_at: '2026-03-08T17:30:50.626046+00:00'
 subtasks: [T001, T002, T003, T004, T005, T006]
 shell_pid: "97922"
 agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -459,3 +461,5 @@ let main args =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-08T17:30:50Z – claude-opus – shell_pid=97922 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:56:53Z – claude-opus – shell_pid=97922 – lane=for_review – T001-T006 complete: Vocabulary.fs, Types.fs, project scaffold. Builds clean.
+- 2026-03-14T15:29:05Z – claude-opus – shell_pid=97922 – lane=for_review – Rework complete: All 7 review issues fixed. Types rewritten as Frank-specific domain model. ProvVocabulary with Frank extensions. Test project with 31 passing tests. [claude-opus]
+- 2026-03-14T15:34:55Z – claude-opus – shell_pid=97922 – lane=done – Re-review passed: All 7 issues fixed. Domain types match spec. 31 tests pass. [claude-opus-reviewer]
