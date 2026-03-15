@@ -244,7 +244,7 @@
 ### Included Subtasks
 - [x] T037 Create `src/Frank.Validation/ResourceBuilderExtensions.fs` with `validate` custom operation
 - [x] T037b Create unit test verifying validate CE operation adds ValidationMarker to endpoint metadata
-- [ ] T038 Implement `customConstraint` custom operation on ResourceBuilder
+- [x] T038 Implement `customConstraint` custom operation on ResourceBuilder
 - [ ] T039 Implement `validateWithCapabilities` custom operation for capability-dependent shapes
 - [ ] T040 Create `src/Frank.Validation/WebHostBuilderExtensions.fs` with `useValidation` extension
 - [ ] T041 Implement shape cache initialization at startup (derive all shapes from ValidationMarker metadata)
