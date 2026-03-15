@@ -4,30 +4,44 @@ open System
 open System.Collections.Concurrent
 open VDS.RDF.Shacl
 
-/// Thread-safe cache of compiled ShapesGraph instances, keyed by the F# type
-/// that was used to derive the shape. ShapesGraph is constructed once at startup
-/// and reused for every request validation.
+/// Thread-safe cache of compiled ShapesGraph instances, keyed by the shape's NodeShapeUri.
+/// Shapes are pre-populated at startup via LoadAll (from ShapeLoader or ShapeDerivation),
+/// then retrieved per-request via TryGet. No on-demand derivation occurs during request handling.
 type ShapeCache() =
 
-    let cache = ConcurrentDictionary<Type, struct (ShapesGraph * ShaclShape)>()
-    let resolvedCache = ConcurrentDictionary<Uri, struct (ShapesGraph * ShaclShape)>()
+    let cache = ConcurrentDictionary<Uri, struct (ShapesGraph * ShaclShape)>()
 
-    /// Get or create a ShapesGraph for the given type. The shape is derived via
-    /// ShapeDerivation and converted via ShapeGraphBuilder. Thread-safe: concurrent
-    /// calls for the same type will use GetOrAdd semantics.
-    member _.GetOrAdd(shapeType: Type) : struct (ShapesGraph * ShaclShape) =
+    /// Pre-populate the cache from a list of ShaclShape values.
+    /// Idempotent: re-loading the same URI overwrites the previous entry.
+    member _.LoadAll(shapes: ShaclShape list) =
+        for shape in shapes do
+            let shapesGraph = ShapeGraphBuilder.buildShapesGraph shape
+            cache.[shape.NodeShapeUri] <- struct (shapesGraph, shape)
+
+    /// Try to retrieve a compiled ShapesGraph and its originating ShaclShape by URI.
+    /// Returns None if the URI has not been pre-loaded.
+    member _.TryGet(shapeUri: Uri) : struct (ShapesGraph * ShaclShape) voption =
+        match cache.TryGetValue(shapeUri) with
+        | true, entry -> ValueSome entry
+        | _ -> ValueNone
+
+    /// Get or add a ShapesGraph by deriving the shape at runtime from a System.Type.
+    /// Kept for backwards-compat with middleware paths that still carry a Type.
+    /// The derived shape is stored keyed by its NodeShapeUri.
+    member _.GetOrAddDerived(shapeType: Type) : struct (ShapesGraph * ShaclShape) =
+        let shape = ShapeBuilder.deriveShapeDefault shapeType
+
         cache.GetOrAdd(
-            shapeType,
-            fun t ->
-                let shape = ShapeDerivation.deriveShapeDefault t
+            shape.NodeShapeUri,
+            fun _ ->
                 let shapesGraph = ShapeGraphBuilder.buildShapesGraph shape
                 struct (shapesGraph, shape)
         )
 
-    /// Get or create a ShapesGraph for a resolved ShaclShape (capability-dependent).
+    /// Get or add a ShapesGraph for a resolved ShaclShape (capability-dependent).
     /// Keyed by the shape's NodeShapeUri to avoid rebuilding per-request.
     member _.GetOrAddResolved(shape: ShaclShape) : struct (ShapesGraph * ShaclShape) =
-        resolvedCache.GetOrAdd(
+        cache.GetOrAdd(
             shape.NodeShapeUri,
             fun _ ->
                 let shapesGraph = ShapeGraphBuilder.buildShapesGraph shape
@@ -35,6 +49,4 @@ type ShapeCache() =
         )
 
     /// Clear all cached shapes. Useful for testing.
-    member _.Clear() =
-        cache.Clear()
-        resolvedCache.Clear()
+    member _.Clear() = cache.Clear()

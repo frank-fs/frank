@@ -29,8 +29,8 @@ type OrderWithStatus = { OrderId: int; Status: StatusEnum }
 
 /// Build a shapes graph from a type.
 let private buildShapes<'T> () =
-    ShapeDerivation.clearCache ()
-    let shape = ShapeDerivation.deriveShapeDefault typeof<'T>
+    ShapeBuilder.clearCache ()
+    let shape = ShapeBuilder.deriveShapeDefault typeof<'T>
     let sg = ShapeGraphBuilder.buildShapesGraph shape
     sg, shape
 

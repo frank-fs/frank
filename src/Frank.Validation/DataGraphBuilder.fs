@@ -55,7 +55,7 @@ module DataGraphBuilder =
                 | JsonValueKind.Array ->
                     // Array values: create multiple triples for the same predicate
                     let predicate =
-                        g.CreateUriNode(UriFactory.Create(ShapeDerivation.buildPropertyPathUri prop.Path))
+                        g.CreateUriNode(UriFactory.Create(UriConventions.buildPropertyPathUri prop.Path))
 
                     for i in 0 .. value.GetArrayLength() - 1 do
                         let elem = value.[i]
@@ -63,7 +63,7 @@ module DataGraphBuilder =
                         g.Assert(focusNode, predicate, obj)
                 | _ ->
                     let predicate =
-                        g.CreateUriNode(UriFactory.Create(ShapeDerivation.buildPropertyPathUri prop.Path))
+                        g.CreateUriNode(UriFactory.Create(UriConventions.buildPropertyPathUri prop.Path))
 
                     let obj = jsonValueToNode g prop value
                     g.Assert(focusNode, predicate, obj)
@@ -81,7 +81,7 @@ module DataGraphBuilder =
             match query.TryGetValue(prop.Path) with
             | true, values ->
                 let predicate =
-                    g.CreateUriNode(UriFactory.Create(ShapeDerivation.buildPropertyPathUri prop.Path))
+                    g.CreateUriNode(UriFactory.Create(UriConventions.buildPropertyPathUri prop.Path))
 
                 for v in values do
                     let obj = stringValueToNode g prop (v.ToString())

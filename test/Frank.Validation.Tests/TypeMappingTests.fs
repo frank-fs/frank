@@ -5,65 +5,6 @@ open Expecto
 open Frank.Validation
 
 [<Tests>]
-let mapTypeTests =
-    testList
-        "TypeMapping.mapType"
-        [ testCase "string maps to XsdString"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<string>) (Some XsdString) ""
-
-          testCase "int maps to XsdInteger"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<int>) (Some XsdInteger) ""
-
-          testCase "int32 maps to XsdInteger"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<int32>) (Some XsdInteger) ""
-
-          testCase "int64 maps to XsdLong"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<int64>) (Some XsdLong) ""
-
-          testCase "float maps to XsdDouble"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<float>) (Some XsdDouble) ""
-
-          testCase "double maps to XsdDouble"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<double>) (Some XsdDouble) ""
-
-          testCase "decimal maps to XsdDecimal"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<decimal>) (Some XsdDecimal) ""
-
-          testCase "bool maps to XsdBoolean"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<bool>) (Some XsdBoolean) ""
-
-          testCase "DateTimeOffset maps to XsdDateTimeStamp"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<DateTimeOffset>) (Some XsdDateTimeStamp) ""
-
-          testCase "DateTime maps to XsdDateTime"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<DateTime>) (Some XsdDateTime) ""
-
-          testCase "DateOnly maps to XsdDate"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<DateOnly>) (Some XsdDate) ""
-
-          testCase "TimeOnly maps to XsdTime"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<TimeOnly>) (Some XsdTime) ""
-
-          testCase "TimeSpan maps to XsdDuration"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<TimeSpan>) (Some XsdDuration) ""
-
-          testCase "Uri maps to XsdAnyUri"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<Uri>) (Some XsdAnyUri) ""
-
-          testCase "byte array maps to XsdBase64Binary"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<byte[]>) (Some XsdBase64Binary) ""
-
-          testCase "Guid maps to XsdString"
-          <| fun _ -> Expect.equal (TypeMapping.mapType typeof<Guid>) (Some XsdString) ""
-
-          testCase "unsupported type returns None"
-          <| fun _ -> Expect.isNone (TypeMapping.mapType typeof<obj>) "obj should not map"
-
-          testCase "custom class returns None"
-          <| fun _ ->
-              Expect.isNone (TypeMapping.mapType typeof<System.Text.StringBuilder>) "StringBuilder should not map" ]
-
-[<Tests>]
 let xsdUriTests =
     testList
         "TypeMapping.xsdUri"

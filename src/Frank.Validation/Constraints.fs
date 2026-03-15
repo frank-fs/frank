@@ -32,7 +32,8 @@ type ShapeResolverConfig =
 
 /// Endpoint metadata marker placed by the `validate` CE custom operation.
 /// Read by ValidationMiddleware to determine if validation applies.
+/// ShapeUri identifies the pre-computed SHACL shape in the URI-keyed ShapeCache.
 type ValidationMarker =
-    { ShapeType: Type
+    { ShapeUri: Uri
       CustomConstraints: CustomConstraint list
       ResolverConfig: ShapeResolverConfig option }

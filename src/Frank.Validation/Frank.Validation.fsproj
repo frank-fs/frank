@@ -10,12 +10,14 @@
     <Compile Include="Types.fs" />
     <Compile Include="Constraints.fs" />
     <Compile Include="TypeMapping.fs" />
-    <Compile Include="ShapeDerivation.fs" />
+    <Compile Include="UriConventions.fs" />
+    <Compile Include="ShapeBuilder.fs" />
     <Compile Include="ShapeResolver.fs" />
     <Compile Include="ShapeGraphBuilder.fs" />
     <Compile Include="DataGraphBuilder.fs" />
     <Compile Include="Validator.fs" />
     <Compile Include="ReportSerializer.fs" />
+    <Compile Include="ShapeLoader.fs" />
     <Compile Include="ShapeCache.fs" />
     <Compile Include="ValidationMiddleware.fs" />
   </ItemGroup>
