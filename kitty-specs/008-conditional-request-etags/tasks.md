@@ -54,7 +54,7 @@
 **Requirement Refs**: FR-009, FR-015
 
 ### Included Subtasks
-- [ ] T006 Create `src/Frank/ETagCache.fs` with `ETagCacheMessage` DU and `CacheEntry` record
+- [x] T006 Create `src/Frank/ETagCache.fs` with `ETagCacheMessage` DU and `CacheEntry` record
 - [ ] T007 Implement `ETagCache` type with MailboxProcessor (GetETag, SetETag, Invalidate, InvalidateAll, GetStats)
 - [ ] T008 Implement LRU eviction when cache exceeds configurable maxEntries (default 10,000)
 - [ ] T009 Implement `IDisposable` on `ETagCache` with MailboxProcessor cleanup
