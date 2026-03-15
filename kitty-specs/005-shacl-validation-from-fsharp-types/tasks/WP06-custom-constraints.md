@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Custom Constraints & Conflict Detection
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 - WP10
@@ -369,3 +369,4 @@ customConstraint "DateRange" (SparqlConstraint """
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T18:49:26Z – claude-opus – shell_pid=24783 – lane=doing – Assigned agent via workflow command
+- 2026-03-15T19:06:52Z – claude-opus – shell_pid=24783 – lane=for_review – Ready for review: ShapeMerger with additive merging, conflict detection, SPARQL support
