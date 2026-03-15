@@ -60,7 +60,7 @@
 - [x] T007 Implement record field derivation: `PropertyInfo -> PropertyShape` with datatype, minCount/maxCount
 - [x] T008 Implement option type unwrapping (`option<T>` -> minCount 0, inner type mapping)
 - [x] T009 Implement DU derivation: simple cases -> `sh:in`, payload cases -> `sh:or` with per-case NodeShapes
-- [ ] T010 Implement nested record handling: `sh:node` references to child NodeShapes
+- [x] T010 Implement nested record handling: `sh:node` references to child NodeShapes
 - [ ] T011 Implement recursive type cycle detection with configurable depth limit (default 5)
 - [ ] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
 - [ ] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
