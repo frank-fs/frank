@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP05"
 title: "Grouping block parser"
-lane: done
+lane: "for_review"
 dependencies: ["WP03"]
 requirement_refs: ["FR-006"]
 subtasks: ["T028", "T029", "T030", "T031"]
@@ -296,3 +296,4 @@ Write at least 20 test cases covering all categories.
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-15T19:34:21Z – unknown – lane=for_review – Moved to for_review

@@ -83,6 +83,19 @@ WP01 (AST types)
 **Estimated Size**: ~400 lines
 **Requirement Refs**: FR-001, FR-002, FR-003, FR-004, FR-007, FR-008a
 
+### Included Subtasks
+- [x] T001 SourcePosition struct type
+- [x] T002 TokenKind DU and Token struct
+- [x] T003 ArrowStyle + Direction DUs
+- [x] T004 Participant record type
+- [x] T005 Message record type
+- [x] T006 GuardAnnotation record type
+- [x] T007 Note + NotePosition types
+- [x] T008 GroupKind, GroupBranch, Group types
+- [x] T009 DiagramElement DU
+- [x] T010 Diagram record type
+- [x] T011 ParseFailure, ParseWarning, ParseResult types
+
 ### Dependencies
 - None (foundation WP)
 
@@ -94,6 +107,14 @@ WP01 (AST types)
 **Prompt**: `tasks/WP02-lexer.md`
 **Estimated Size**: ~450 lines
 **Requirement Refs**: FR-001, FR-003, FR-010, FR-011
+
+### Included Subtasks
+- [x] T012 Lexer - line ending normalization + comment/blank line stripping
+- [x] T013 Lexer - keyword tokenization
+- [x] T014 Lexer - arrow tokenization (all four forms with longest-match)
+- [x] T015 Lexer - punctuation, identifiers, string literals, text content tokens
+- [x] T016 Lexer - source position tracking (line/column per token)
+- [x] T017 Lexer tests (all token types, edge cases, position accuracy)
 
 ### Dependencies
 - Depends on WP01
@@ -107,6 +128,14 @@ WP01 (AST types)
 **Estimated Size**: ~500 lines
 **Requirement Refs**: FR-002, FR-003, FR-005, FR-009, FR-012, FR-013
 
+### Included Subtasks
+- [x] T018 Core parser infrastructure (token stream cursor, peek/advance/expect helpers, error collection)
+- [x] T019 Parser - participant declarations
+- [x] T020 Parser - message parsing (all arrow styles, labels, parameter lists)
+- [x] T021 Parser - directive parsing (title, autonumber)
+- [x] T022 Parser - note parsing (over, left of, right of, content extraction)
+- [x] T023 Core parser tests (participants, messages, directives, notes)
+
 ### Dependencies
 - Depends on WP02
 
@@ -118,6 +147,12 @@ WP01 (AST types)
 **Prompt**: `tasks/WP04-guard-extension-parser.md`
 **Estimated Size**: ~300 lines
 **Requirement Refs**: FR-004
+
+### Included Subtasks
+- [x] T024 Guard parser - bracket detection + key-value pair extraction
+- [x] T025 Guard parser - mixed content handling
+- [x] T026 Guard parser - error cases (unclosed bracket, missing =, empty key, empty guard)
+- [x] T027 Guard parser tests
 
 ### Dependencies
 - Depends on WP01
@@ -131,6 +166,12 @@ WP01 (AST types)
 **Estimated Size**: ~350 lines
 **Requirement Refs**: FR-006
 
+### Included Subtasks
+- [x] T028 Grouping block parser - all seven block kinds
+- [x] T029 Grouping block parser - else branch handling
+- [x] T030 Grouping block parser - arbitrary nesting support
+- [x] T031 Grouping block tests (nesting, branches, all block kinds)
+
 ### Dependencies
 - Depends on WP03
 
@@ -143,6 +184,15 @@ WP01 (AST types)
 **Estimated Size**: ~500 lines
 **Requirement Refs**: FR-004, FR-007, FR-008, FR-008a, FR-009
 
+### Included Subtasks
+- [x] T032 Error recovery - skip-to-newline for unrecognized line-level syntax
+- [x] T033 Error recovery - skip-to-end for errors inside grouping blocks
+- [x] T034 Error recovery - unclosed block recovery (implicit close at EOF)
+- [x] T035 Error recovery - implicit participant warnings
+- [x] T036 Error limit configuration (configurable max errors, default 50)
+- [x] T037 Corrective example generation for each error type
+- [x] T038 Error/warning tests
+
 ### Dependencies
 - Depends on WP03, WP04
 
@@ -154,6 +204,14 @@ WP01 (AST types)
 **Prompt**: `tasks/WP07-integration-and-build-verification.md`
 **Estimated Size**: ~400 lines
 **Requirement Refs**: FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-010, FR-011, FR-012, FR-013
+
+### Included Subtasks
+- [x] T039 Convenience parseWsd function + .fsproj updates + multi-target build verification
+- [x] T040 Round-trip tests - Amundsen onboarding WSD example (SC-001)
+- [x] T041 Round-trip tests - tic-tac-toe WSD with guard extensions (SC-002)
+- [x] T042 Edge case tests (Unicode, empty input, deep nesting, etc.)
+- [x] T043 .fsproj Compile item ordering
+- [x] T044 Multi-target build verification (net8.0/net9.0/net10.0)
 
 ### Dependencies
 - Depends on WP05, WP06
