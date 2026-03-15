@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Error recovery + failure reports
-lane: done
+lane: "for_review"
 dependencies: [WP03, WP04]
 subtasks: [T032, T033, T034, T035, T036, T037, T038]
 history:
@@ -310,3 +310,4 @@ Write at least 25 test cases covering all categories.
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-15T19:34:22Z – unknown – lane=for_review – Moved to for_review
