@@ -51,8 +51,14 @@ let propertyShapeTests =
                     InValues = None
                     OrShapes = None
                     Pattern = None
+                    AdditionalPatterns = []
                     MinInclusive = None
                     MaxInclusive = None
+                    MinExclusive = None
+                    MaxExclusive = None
+                    MinLength = None
+                    MaxLength = None
+                    AdditionalConstraints = []
                     Description = None }
 
               Expect.equal ps.MinCount 1 "Required field should have MinCount 1"
@@ -69,8 +75,14 @@ let propertyShapeTests =
                     InValues = None
                     OrShapes = None
                     Pattern = None
+                    AdditionalPatterns = []
                     MinInclusive = None
                     MaxInclusive = None
+                    MinExclusive = None
+                    MaxExclusive = None
+                    MinLength = None
+                    MaxLength = None
+                    AdditionalConstraints = []
                     Description = None }
 
               Expect.equal ps.MinCount 0 "Optional field should have MinCount 0"
@@ -86,8 +98,14 @@ let propertyShapeTests =
                     InValues = Some [ "Active"; "Inactive"; "Pending" ]
                     OrShapes = None
                     Pattern = None
+                    AdditionalPatterns = []
                     MinInclusive = None
                     MaxInclusive = None
+                    MinExclusive = None
+                    MaxExclusive = None
+                    MinLength = None
+                    MaxLength = None
+                    AdditionalConstraints = []
                     Description = None }
 
               Expect.isSome ps.InValues "Should have InValues"
@@ -106,13 +124,39 @@ let propertyShapeTests =
                     InValues = None
                     OrShapes = None
                     Pattern = None
+                    AdditionalPatterns = []
                     MinInclusive = None
                     MaxInclusive = None
+                    MinExclusive = None
+                    MaxExclusive = None
+                    MinLength = None
+                    MaxLength = None
+                    AdditionalConstraints = []
                     Description = None }
 
               Expect.isNone ps.Datatype "Nested field should have no datatype"
               Expect.isSome ps.NodeReference "Should have a NodeReference"
               Expect.equal ps.NodeReference.Value nodeUri "NodeReference should match" ]
+
+/// Helper to build a minimal PropertyShape for use in ShaclShape constructions.
+let private minimalProp path datatype =
+    { Path = path
+      Datatype = datatype
+      MinCount = 1
+      MaxCount = Some 1
+      NodeReference = None
+      InValues = None
+      OrShapes = None
+      Pattern = None
+      AdditionalPatterns = []
+      MinInclusive = None
+      MaxInclusive = None
+      MinExclusive = None
+      MaxExclusive = None
+      MinLength = None
+      MaxLength = None
+      AdditionalConstraints = []
+      Description = None }
 
 [<Tests>]
 let shaclShapeTests =
@@ -123,31 +167,10 @@ let shaclShapeTests =
               let shape =
                   { TargetType = None
                     NodeShapeUri = Uri("urn:frank:shape:Customer")
-                    Properties =
-                      [ { Path = "name"
-                          Datatype = Some XsdString
-                          MinCount = 1
-                          MaxCount = Some 1
-                          NodeReference = None
-                          InValues = None
-                          OrShapes = None
-                          Pattern = None
-                          MinInclusive = None
-                          MaxInclusive = None
-                          Description = None }
-                        { Path = "age"
-                          Datatype = Some XsdInteger
-                          MinCount = 1
-                          MaxCount = Some 1
-                          NodeReference = None
-                          InValues = None
-                          OrShapes = None
-                          Pattern = None
-                          MinInclusive = None
-                          MaxInclusive = None
-                          Description = None } ]
+                    Properties = [ minimalProp "name" (Some XsdString); minimalProp "age" (Some XsdInteger) ]
                     Closed = true
-                    Description = Some "Customer shape" }
+                    Description = Some "Customer shape"
+                    SparqlConstraints = [] }
 
               Expect.equal (List.length shape.Properties) 2 "Should have 2 properties"
               Expect.isTrue shape.Closed "Records should be closed by default"
@@ -160,7 +183,8 @@ let shaclShapeTests =
                     NodeShapeUri = Uri("urn:frank:shape:Loaded")
                     Properties = []
                     Closed = false
-                    Description = None }
+                    Description = None
+                    SparqlConstraints = [] }
 
               Expect.isNone shape.TargetType "Loaded shapes should have TargetType = None"
 
@@ -171,7 +195,8 @@ let shaclShapeTests =
                     NodeShapeUri = Uri("urn:frank:shape:Derived")
                     Properties = []
                     Closed = false
-                    Description = None }
+                    Description = None
+                    SparqlConstraints = [] }
 
               Expect.isSome shape.TargetType "Derived shapes should have TargetType = Some _" ]
 
@@ -294,7 +319,8 @@ let validationMarkerTests =
                     NodeShapeUri = Uri("urn:frank:shape:Order")
                     Properties = []
                     Closed = true
-                    Description = None }
+                    Description = None
+                    SparqlConstraints = [] }
 
               let adminShape =
                   { baseShape with

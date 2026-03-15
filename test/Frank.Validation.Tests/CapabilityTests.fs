@@ -10,7 +10,8 @@ let private makeShape name =
       NodeShapeUri = Uri($"urn:test:shape:{name}")
       Properties = []
       Closed = false
-      Description = Some name }
+      Description = Some name
+      SparqlConstraints = [] }
 
 let private baseShape = makeShape "base"
 let private adminShape = makeShape "admin"

@@ -183,8 +183,14 @@ module ShapeLoader =
           InValues = inValues
           OrShapes = orShapes
           Pattern = pattern
+          AdditionalPatterns = []
           MinInclusive = None
           MaxInclusive = None
+          MinExclusive = None
+          MaxExclusive = None
+          MinLength = None
+          MaxLength = None
+          AdditionalConstraints = []
           Description = None }
 
     /// Deserialize a single NodeShape URI node into a ShaclShape record.
@@ -208,7 +214,8 @@ module ShapeLoader =
           NodeShapeUri = shapeNode.Uri
           Properties = properties
           Closed = closed
-          Description = None }
+          Description = None
+          SparqlConstraints = [] }
 
     /// Load all SHACL NodeShapes from an IGraph.
     /// Returns one ShaclShape per subject that has rdf:type sh:NodeShape.

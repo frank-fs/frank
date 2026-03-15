@@ -17,6 +17,7 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="ReportSerializationTests.fs" />
     <Compile Include="CapabilityTests.fs" />
+    <Compile Include="ShapeMergerTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
