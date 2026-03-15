@@ -128,9 +128,9 @@ This is already the correct pattern. The key insight is: **no interface changes 
 
 ---
 
-## Decision 3: Two-Phase Guard Evaluation (FR-005, FR-006, FR-012)
+## Decision 3: Guard DU with Phase-Typed Cases (FR-005, FR-006, FR-012)
 
-**Status**: CARRIED FORWARD from revision 1 (unchanged)
+**Status**: REVISED in revision 3 (replaces two-phase guard lists from revisions 1-2)
 
 ### Problem
 
@@ -144,32 +144,44 @@ let guardCtx =
       Context = context }
 ```
 
-This is because guards are evaluated *before* the handler runs (step 3 in middleware), but the handler is what sets the event (step 4). Guards that try to inspect the event get a default/null value.
+This is because guards are evaluated *before* the handler runs (step 3 in middleware), but the handler is what sets the event (step 4). Guards that try to inspect the event get a default/null value — a footgun.
 
 ### Options Considered
 
 | Option | Mechanism | Backward Compatible | Complexity |
 |--------|-----------|--------------------|----|
-| A. Two guard lists (access + validation) | Separate fields on `StateMachine` | Yes (existing guards default to access) | Medium |
-| B. Guard phase marker attribute | Tag each guard with `Pre` or `Post` | Yes (default to `Pre`) | Low |
-| C. GuardContext with `Event option` | Change `Event: 'E` to `Event: 'E option` | No (type change) | Low |
-| D. Two-pass evaluation in middleware | Run all guards twice (pre and post), skip event checks in pre-pass | No (double evaluation) | High |
+| A. Two guard lists (access + validation) | Separate fields on `StateMachine` | Yes | Medium |
+| B. Guard phase marker attribute | Tag each guard with `Pre` or `Post` | Yes | Low |
+| C. GuardContext with `Event option` | Change `Event: 'E` to `Event: 'E option` | No | Low |
+| D. Guard DU with phase-typed cases | DU determines phase AND type signature | No | Low |
 
-### Decision: Option A -- Two separate guard lists with phase discrimination
+### Decision: Option D -- Guard DU with phase-typed cases
 
 **Rationale**:
 
-1. **Explicit phases**: The `StateMachine` type gets two guard lists:
-   - `Guards: Guard<'State, 'Event, 'Context> list` -- access-control guards (pre-handler, no event context). Backward compatible with existing guards.
-   - `EventGuards: Guard<'State, 'Event, 'Context> list` -- event-validation guards (post-handler, event available). New field, defaults to empty list.
+Since this is a pre-1.0 library, backward compatibility is not a constraint. Option D is the cleanest approach — the DU case determines both execution timing and type signature:
 
-2. **Backward compatible** (FR-012): Existing guards that only check `User` and `CurrentState` continue to work in the pre-handler phase. The `Event` field remains `Unchecked.defaultof<'E>` for pre-handler guards (same as current behavior). This is not ideal but preserves backward compatibility. Developers who need event access register event-validation guards instead.
+```fsharp
+type Guard<'S, 'E, 'C> =
+    | AccessControl of (ClaimsPrincipal -> 'S -> 'C -> GuardResult)
+    | EventValidation of (ClaimsPrincipal -> 'S -> 'E -> 'C -> GuardResult)
+```
 
-3. **Skip for read-only operations** (FR-006): Event-validation guards are only evaluated when an event is set by the handler. If `StateMachineContext.tryGetEvent` returns `None`, event-validation guards are skipped entirely.
+1. **Type safety**: `AccessControl` guards literally cannot access the event — it's not in their signature. `EventValidation` guards are guaranteed to receive the actual event. No `option`, no `Unchecked.defaultof`.
+2. **Single guard list**: `StateMachine` keeps one `Guards` field (`Guard<'S,'E,'C> list`). The middleware pattern-matches on each case to determine when to evaluate it.
+3. **Eliminates `Unchecked.defaultof`** (FR-006): Impossible by construction.
+4. **Breaking change acceptable** (FR-012): Pre-1.0 library.
 
-### Alternative Considered: GuardContext with Event option
+### Why not Option A (two guard lists)?
 
-Changing `Event: 'E` to `Event: 'E option` in `GuardContext` would be cleaner semantically but is source-breaking for all existing guard predicates. Every guard function would need to change from `ctx.Event` to pattern matching on `ctx.Event`. Since this is a pre-1.0 library, this is more acceptable than it would be for a stable API, but the two-list approach avoids this breakage entirely.
+Revision 1 chose Option A for backward compatibility. Since backward compatibility is not a constraint (pre-1.0), Option D is strictly superior — one field instead of two, type safety enforced by the compiler, no `Unchecked.defaultof` anywhere.
+
+### Why not Option C (`'Event option`)?
+
+Option C would also eliminate `Unchecked.defaultof`, but the Guard DU is superior because:
+- Access control guards don't need to ignore an unused `_ : 'E option` parameter
+- The DU case makes developer intent explicit
+- The middleware can separate evaluation phases by pattern matching
 
 ### Middleware Flow Change
 
@@ -186,26 +198,24 @@ New flow:
 ```
 1. GetState
 2. Method check
-3. Evaluate access-control guards (pre-handler, no event)
+3. Evaluate AccessControl guards (pre-handler)
 4. Run handler
-5. Evaluate event-validation guards (post-handler, with event)
+5. Evaluate EventValidation guards (post-handler, with actual event)
 6. Execute transition
 ```
 
-If any event-validation guard returns `Blocked`, the transition is not executed. However, the handler has already run and may have written to the response. If the response has already started, the middleware logs a warning (same pattern as existing `TransitionAttemptResult.Blocked` handling on line 97-107 of `Middleware.fs`).
+If any `EventValidation` guard returns `Blocked`, the transition is not executed. However, the handler has already run and may have written to the response. If the response has already started, the middleware logs a warning (same pattern as existing `TransitionAttemptResult.Blocked` handling on line 97-107 of `Middleware.fs`).
 
 ### Impact on StatefulResourceBuilder
 
-The `InState` CE operation does not change. Guard registration uses the existing `machine` field plus a new `eventGuards` field on `StateMachine`. The builder's `evaluateGuards` closure splits into two closures:
+The `StateMachine` record keeps a single `Guards` field with the new DU type. The builder's guard evaluation splits by pattern matching:
 
 ```fsharp
-let evaluateAccessGuards (ctx: HttpContext) : GuardResult = ...  // uses machine.Guards
-let evaluateEventGuards (ctx: HttpContext) : GuardResult = ...   // uses machine.EventGuards
-```
+let evaluateAccessGuards guards ctx =
+    guards |> List.choose (function AccessControl f -> Some (f ...) | _ -> None)
 
-The `StateMachineMetadata` record gets a new field:
-```fsharp
-EvaluateEventGuards: HttpContext -> GuardResult
+let evaluateEventGuards guards ctx event =
+    guards |> List.choose (function EventValidation f -> Some (f ...) | _ -> None)
 ```
 
 ---
@@ -456,8 +466,7 @@ F# `MailboxProcessor` has an unbounded internal message queue. Under extreme loa
 
 | Change | Type | Affects |
 |--------|------|---------|
-| `StateMachine.EventGuards` new field | Source-breaking (record construction) | All `StateMachine` record literals |
-| `StateMachineMetadata.EvaluateEventGuards` new field | Binary-breaking | Internal (metadata is constructed by builder) |
+| `Guard` type becomes DU (`AccessControl` / `EventValidation`) | Source-breaking | All guard definitions |
 | State key extraction (internal) | Behavioral change | State key strings change for parameterized DUs |
 
 ### Changes REMOVED (vs. revision 1)
@@ -474,7 +483,7 @@ F# `MailboxProcessor` has an unbounded internal message queue. Under extreme loa
 ### Version Strategy
 
 The breaking changes are limited to:
-- Adding `EventGuards` field to `StateMachine` (source-breaking for record construction)
+- `Guard` type becomes a DU with `AccessControl` and `EventValidation` cases (source-breaking for all guard definitions)
 - Internal behavioral change to state key extraction (no API change)
 
 Since Frank.Statecharts is pre-1.0 and the spec 004 implementation has not shipped a stable release, these breaking changes are acceptable.
@@ -489,7 +498,7 @@ Since Frank.Statecharts is pre-1.0 and the spec 004 implementation has not shipp
 
 3. **Cross-process SQLite access**: The SQLite store wraps persistence in an actor within one process. If multiple application instances share a SQLite database file, they each have their own actor, and concurrent writes could conflict. This is a deployment concern, not a design concern. Document that SQLite stores should not be shared across processes -- use a proper database (PostgreSQL, etc.) for multi-process deployments.
 
-4. **Guard evaluation when response has started**: If an event-validation guard blocks after the handler has already written to the response, the middleware cannot change the status code. The current approach (log a warning) is consistent with existing `TransitionAttemptResult.Blocked` handling. Deferred -- same trade-off as the existing design.
+4. **EventValidation guard blocking after response started**: If an `EventValidation` guard blocks after the handler has already written to the response, the middleware cannot change the status code. The current approach (log a warning) is consistent with existing `TransitionAttemptResult.Blocked` handling. Deferred -- same trade-off as the existing design.
 
 5. **Multi-targeting for Frank.Statecharts.Sqlite**: Should the SQLite package target `net8.0;net9.0;net10.0` like the core package? `Microsoft.Data.Sqlite` is available for all three. Recommendation: match the core package's target frameworks.
 
