@@ -1,13 +1,15 @@
 ---
 work_package_id: WP03
 title: Validator & Validation Middleware
-lane: "doing"
+lane: "done"
 dependencies:
 - WP01
 - WP02
 subtasks: [T015, T016, T017, T018, T019, T020, T021]
 agent: "claude-opus-reviewer"
 shell_pid: "41561"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -393,3 +395,4 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache) =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:35:42Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:43:30Z – claude-opus-reviewer – shell_pid=41561 – lane=doing – Started review via workflow command
+- 2026-03-15T19:44:36Z – claude-opus-reviewer – shell_pid=41561 – lane=done – Review passed: All subtasks T015-T021 verified. Validator.fs wraps dotNetRdf SHACL API correctly with defensive null handling. ShapeGraphBuilder.fs constructs all SHACL triples including sh:targetNode, RDF lists for sh:in/sh:or. DataGraphBuilder.fs handles JSON body and query params with typed literals. ValidationMiddleware.fs checks metadata (null=pass through), differentiates POST/PUT/PATCH vs GET, returns 422, handles missing body. ShapeCache uses ConcurrentDictionary. Request buffering and position reset correct. 100 tests pass (20 new). Build clean 0 errors. Minor: 2 deprecation warnings in test code (WebHostBuilder) -- non-blocking.
