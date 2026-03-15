@@ -19,6 +19,7 @@ module ShapeGenerator =
     let private fieldMinCount (kind: FieldKind) : int =
         match kind with
         | Primitive _ -> 1
+        | Guid -> 1
         | Optional _ -> 0
         | Collection _ -> 0
         | Reference _ -> 1

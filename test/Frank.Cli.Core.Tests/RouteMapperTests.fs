@@ -104,9 +104,10 @@ let tests =
             let productType : AnalyzedType = {
                 FullName = "MyApp.Product"
                 ShortName = "Product"
-                Kind = Record [{ Name = "Id"; Kind = Primitive "xsd:integer"; IsRequired = true }]
+                Kind = Record [{ Name = "Id"; Kind = Primitive "xsd:integer"; IsRequired = true; IsScalar = true; Constraints = [] }]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = mapRoutes config [resource] [productType]

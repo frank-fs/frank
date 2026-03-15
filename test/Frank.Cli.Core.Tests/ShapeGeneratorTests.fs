@@ -81,11 +81,12 @@ let tests =
                 FullName = "MyApp.Person"
                 ShortName = "Person"
                 Kind = Record [
-                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true }
-                    { Name = "Email"; Kind = Optional (Primitive "xsd:string"); IsRequired = false }
+                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true; IsScalar = true; Constraints = [] }
+                    { Name = "Email"; Kind = Optional (Primitive "xsd:string"); IsRequired = false; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = generateShapes config [person]
@@ -110,10 +111,11 @@ let tests =
                 FullName = "MyApp.Person"
                 ShortName = "Person"
                 Kind = Record [
-                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true }
+                    { Name = "Name"; Kind = Primitive "xsd:string"; IsRequired = true; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = generateShapes config [person]
@@ -148,10 +150,11 @@ let tests =
                 FullName = "MyApp.Person"
                 ShortName = "Person"
                 Kind = Record [
-                    { Name = "Email"; Kind = Optional (Primitive "xsd:string"); IsRequired = false }
+                    { Name = "Email"; Kind = Optional (Primitive "xsd:string"); IsRequired = false; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = generateShapes config [person]
@@ -170,10 +173,11 @@ let tests =
                 FullName = "MyApp.Order"
                 ShortName = "Order"
                 Kind = Record [
-                    { Name = "Customer"; Kind = Reference "Customer"; IsRequired = true }
+                    { Name = "Customer"; Kind = Reference "Customer"; IsRequired = true; IsScalar = true; Constraints = [] }
                 ]
                 GenericParameters = []
                 SourceLocation = None
+                IsClosed = true
             }
 
             let graph = generateShapes config [order]
