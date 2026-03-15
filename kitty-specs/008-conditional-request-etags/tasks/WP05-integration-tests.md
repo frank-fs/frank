@@ -1,10 +1,12 @@
 ---
 work_package_id: WP05
 title: Integration Tests & End-to-End Validation
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP03
 subtasks: [T023, T024, T025, T026, T027, T028]
+agent: "claude-opus-reviewer"
+shell_pid: "42748"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -384,3 +386,4 @@ type VersionedETagProvider() =
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:37:57Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:45:39Z – claude-opus-reviewer – shell_pid=42748 – lane=doing – Started review via workflow command
