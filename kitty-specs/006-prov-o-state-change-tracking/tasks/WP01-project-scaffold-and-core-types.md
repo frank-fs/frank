@@ -1,14 +1,14 @@
 ---
 work_package_id: WP01
 title: Project Scaffold + ProvVocabulary + Core Types
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 9aa38215ad756a6530526dcd467907c32819df36
 created_at: '2026-03-08T17:30:50.626046+00:00'
 subtasks: [T001, T002, T003, T004, T005, T006]
-shell_pid: "97922"
-agent: "claude-opus"
+shell_pid: "39978"
+agent: "claude-opus-reviewer"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -460,3 +460,4 @@ let main args =
 - 2026-03-08T17:30:50Z – claude-opus – shell_pid=97922 – lane=doing – Assigned agent via workflow command
 - 2026-03-08T17:56:53Z – claude-opus – shell_pid=97922 – lane=for_review – T001-T006 complete: Vocabulary.fs, Types.fs, project scaffold. Builds clean.
 - 2026-03-15T19:20:01Z – claude-opus – shell_pid=97922 – lane=for_review – Moved to for_review
+- 2026-03-15T19:39:58Z – claude-opus-reviewer – shell_pid=39978 – lane=doing – Started review via workflow command
