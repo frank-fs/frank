@@ -122,7 +122,7 @@
 - [x] T023 Implement agent extraction from `ClaimsPrincipal` (Person, SoftwareAgent, LlmAgent classification)
 - [x] T024 Implement `ProvenanceRecord` construction from `TransitionEvent` (Activity, pre/post Entities, Agent)
 - [x] T025 ObjectDisposedException and all other observer exceptions logged per Constitution VII — never silently discarded
-- [ ] T026 Create `test/Frank.Provenance.Tests/TransitionObserverTests.fs` with agent classification and record creation tests
+- [x] T026 Create `test/Frank.Provenance.Tests/TransitionObserverTests.fs` with agent classification and record creation tests
 
 ### Dependencies
 - Depends on WP01 (types), WP02 (IProvenanceStore interface)
