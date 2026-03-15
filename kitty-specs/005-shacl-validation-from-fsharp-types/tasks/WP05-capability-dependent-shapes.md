@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Capability-Dependent Shape Resolution
-lane: done
+lane: planned
 dependencies:
 - WP01
 subtasks: [T027, T028, T029, T030, T031]

@@ -1,16 +1,23 @@
 ---
-work_package_id: "WP03"
-title: "GraphBuilder (dotNetRdf)"
-lane: done
-dependencies: ["WP01"]
-requirement_refs: ["FR-004", "FR-005", "FR-006", "FR-014"]
-subtasks: ["T012", "T013", "T014", "T015", "T016"]
+work_package_id: WP03
+title: GraphBuilder (dotNetRdf)
+lane: "done"
+dependencies: [WP01]
+base_branch: 006-prov-o-state-change-tracking-WP01
+base_commit: ca27c22e3ea773ca6ec966f20e47fd50b6dec564
+created_at: '2026-03-14T15:36:13.719202+00:00'
+subtasks: [T012, T013, T014, T015, T016]
+shell_pid: "814"
+agent: "claude-opus"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
-  - timestamp: "2026-03-07T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-07T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-004, FR-005, FR-006, FR-014]
 ---
 
 # Work Package Prompt: WP03 -- GraphBuilder (dotNetRdf)
@@ -364,3 +371,5 @@ let hasLiteralTriple (graph: IGraph) (s: string) (p: string) (value: string) =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-14T15:36:13Z – claude-opus – shell_pid=814 – lane=doing – Assigned agent via workflow command
+- 2026-03-14T16:19:36Z – claude-opus – shell_pid=814 – lane=done – Review passed: vocabulary constants fix applied
