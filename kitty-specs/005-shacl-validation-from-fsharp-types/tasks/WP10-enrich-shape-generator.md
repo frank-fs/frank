@@ -1,10 +1,12 @@
 ---
 work_package_id: WP10
 title: Enrich ShapeGenerator with Full SHACL Constraints
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP09
 subtasks: [T055, T056, T057, T058, T059]
+agent: "claude-opus-reviewer"
+shell_pid: "43307"
 history:
 - timestamp: '2026-03-14T00:00:00Z'
   lane: planned
@@ -306,3 +308,4 @@ if analyzedType.IsClosed then
 
 - 2026-03-14T00:00:00Z -- system -- lane=planned -- Prompt created from build-time SHACL unification design.
 - 2026-03-15T19:31:50Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:47:01Z – claude-opus-reviewer – shell_pid=43307 – lane=doing – Started review via workflow command
