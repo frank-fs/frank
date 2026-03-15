@@ -98,7 +98,7 @@
 - [x] T018 Implement media type mapping (`vnd.frank.provenance+turtle` -> `text/turtle`, etc.) and response serialization
 - [x] T019 Implement resource URI extraction from request path and store query
 - [x] T020 Implement empty graph handling (200 with empty collection, not 404)
-- [ ] T021 Create `test/Frank.Provenance.Tests/MiddlewareTests.fs` with TestHost integration tests
+- [x] T021 Create `test/Frank.Provenance.Tests/MiddlewareTests.fs` with TestHost integration tests
 
 ### Dependencies
 - Depends on WP02 (store for querying), WP03 (graph builder for serialization)
