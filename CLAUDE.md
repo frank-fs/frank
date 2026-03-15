@@ -57,6 +57,7 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 017-wsd-generator-cross-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + No new NuGet dependencies; reuses Wsd.Types from #90, FSharp.Reflection (in FSharp.Core) for boxed Machine inspection
 - 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
 - 013-smcat-parser-generator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project reference -- same project, internal modules)
 - 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
