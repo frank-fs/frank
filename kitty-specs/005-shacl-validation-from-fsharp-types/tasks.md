@@ -283,7 +283,7 @@
 ### Included Subtasks
 - [x] T043 Create `test/Frank.Validation.Tests/IntegrationTests.fs` with TestHost-based end-to-end tests
 - [x] T044 Test valid request passes through to handler and handler executes
-- [ ] T045 Test invalid request (missing required field, wrong type, invalid DU value) returns 422 with ValidationReport
+- [x] T045 Test invalid request (missing required field, wrong type, invalid DU value) returns 422 with ValidationReport
 - [ ] T046 Test content negotiation: same violation returns JSON-LD for `Accept: application/ld+json` and Problem Details for `Accept: application/json`
 - [ ] T047 Test capability-dependent shapes: admin vs. regular user with same request body
 - [ ] T048 Test custom constraints: sh:pattern, sh:minInclusive, cross-field SPARQL constraint
