@@ -1,11 +1,14 @@
 ---
 work_package_id: WP09
 title: Enrich TypeAnalyzer with Validation-Grade Metadata
-lane: "doing"
+lane: "planned"
 dependencies: []
 subtasks: [T050, T051, T052, T053, T054]
 agent: "claude-opus-reviewer"
 shell_pid: "39920"
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/Users/ryanr/Code/frank/review-feedback-WP09.md"
 history:
 - timestamp: '2026-03-14T00:00:00Z'
   lane: planned
@@ -18,15 +21,53 @@ design_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-desig
 
 # Work Package Prompt: WP09 -- Enrich TypeAnalyzer with Validation-Grade Metadata
 
-## Review Feedback Status
+## Review Feedback
 
-**Read this first if you are implementing this task!**
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-15
+**Feedback file**: `/Users/ryanr/Code/frank/review-feedback-WP09.md`
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
-- **You must address all feedback** before your work is complete.
-- **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
+# WP09 Review Feedback
 
----
+## What was done well
+
+- FieldKind.Guid variant correctly added and all pattern matches updated across Frank.Cli.Core (ShapeGenerator.fs, UriHelpers.fs)
+- All 13+ primitive type mappings from T051 are correctly implemented (DateOnly->xsd:date, TimeOnly->xsd:time, etc.)
+- Decimal mapping fixed from xsd:double to xsd:decimal as specified
+- byte[] special-cased to xsd:base64Binary instead of Collection(Primitive "xsd:integer")
+- AnalyzedField enriched with IsScalar and Constraints fields
+- AnalyzedType enriched with IsClosed flag (true for records, false for DUs/enums)
+- extractConstraintAttributes uses defensive coding with try/catch
+- All 81 existing tests pass (backwards compatibility confirmed)
+- Code compiles cleanly with 0 warnings
+
+## Issues
+
+### Critical: Missing tests for new functionality (T054)
+
+The existing TypeAnalyzerTests.fs file contains only 4 pre-existing tests and none were added for the new WP09 functionality. T054 explicitly requires tests for:
+
+**a. New primitive mappings** -- No tests verify that FCS correctly maps DateOnly, TimeOnly, TimeSpan, Uri, byte[], Guid, or Decimal through the enriched mapFieldType function. These are the core deliverables of T051.
+
+**b. IsScalar flag** -- No tests verify that IsScalar=true for scalar fields and IsScalar=false for collection fields.
+
+**c. IsClosed flag** -- No tests verify that IsClosed=true for records and IsClosed=false for DUs/enums.
+
+**d. Constraint attribute extraction** -- No tests verify that fields with [<Pattern("...")>], [<MinInclusive(0)>], etc. have their constraints extracted. This is the core deliverable of T053.
+
+The existing tests were only mechanically updated to add `IsScalar = true; Constraints = []` and `IsClosed = true` to existing test data, which confirms backwards compatibility but does not validate any new behavior.
+
+**Required action**: Add at least 4 new test cases to TypeAnalyzerTests.fs:
+1. A record with DateOnly, TimeOnly, TimeSpan, Uri, Guid, Decimal, and byte[] fields -- verify each maps to the correct FieldKind
+2. A record with scalar and collection fields -- verify IsScalar flag
+3. A record and DU type -- verify IsClosed flag
+4. (Optional, depends on attribute availability) A record with constraint attributes -- verify extraction
+
+### Suggestion: DU case fields should also extract constraint attributes
+
+Line 209 uses `makeField` instead of `makeFieldFromFSharpField` for DU case fields, meaning constraint attributes on DU case fields will be silently ignored. This is acceptable for now but should be documented as a known limitation.
+
 
 ## Review Feedback
 
@@ -297,3 +338,4 @@ let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribu
 - 2026-03-14T00:00:00Z -- system -- lane=planned -- Prompt created from build-time SHACL unification design.
 - 2026-03-15T19:31:48Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:39:52Z – claude-opus-reviewer – shell_pid=39920 – lane=doing – Started review via workflow command
+- 2026-03-15T19:46:55Z – claude-opus-reviewer – shell_pid=39920 – lane=planned – Moved to planned
