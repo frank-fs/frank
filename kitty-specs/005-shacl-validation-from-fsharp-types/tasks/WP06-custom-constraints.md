@@ -11,6 +11,7 @@ base_commit: 39b0e2a28d58f68b80d0bddd9ae9ff078308c98d
 created_at: '2026-03-15T18:49:25.775068+00:00'
 subtasks: [T032, T033, T034, T035, T036]
 shell_pid: "24783"
+agent: "claude-opus"
 history:
 - timestamp: '2026-03-07T00:00:00Z'
   lane: planned
@@ -367,3 +368,4 @@ customConstraint "DateRange" (SparqlConstraint """
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T18:49:26Z – claude-opus – shell_pid=24783 – lane=doing – Assigned agent via workflow command
