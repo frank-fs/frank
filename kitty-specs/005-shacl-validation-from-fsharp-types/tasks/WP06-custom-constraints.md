@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Custom Constraints & Conflict Detection
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP10
@@ -10,8 +10,8 @@ base_branch: 005-shacl-validation-from-fsharp-types-WP06-merge-base
 base_commit: 39b0e2a28d58f68b80d0bddd9ae9ff078308c98d
 created_at: '2026-03-15T18:49:25.775068+00:00'
 subtasks: [T032, T033, T034, T035, T036]
-shell_pid: "26354"
-agent: "claude-opus"
+shell_pid: "44581"
+agent: "claude-opus-reviewer"
 reviewed_by: "Ryan Riley"
 review_status: "approved"
 history:
@@ -375,3 +375,4 @@ customConstraint "DateRange" (SparqlConstraint """
 - 2026-03-15T19:07:45Z – claude-opus – shell_pid=26354 – lane=doing – Started review via workflow command
 - 2026-03-15T19:08:28Z – claude-opus – shell_pid=26354 – lane=done – Review passed: ShapeMerger correctly implements additive-only merging, conflict detection, SPARQL support. All 25 tests pass. Types cleanly extended. ShapeGraphBuilder emits all new fields.
 - 2026-03-15T19:19:48Z – claude-opus – shell_pid=26354 – lane=for_review – Moved to for_review
+- 2026-03-15T19:49:49Z – claude-opus-reviewer – shell_pid=44581 – lane=doing – Started review via workflow command
