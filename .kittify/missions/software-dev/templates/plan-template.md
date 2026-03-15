@@ -48,7 +48,7 @@ kitty-specs/[###-feature]/
 ├── research.md          # Phase 0 output (/spec-kitty.plan command)
 ├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
 ├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
+├── contracts/           # Phase 1 output (/spec-kitty.plan command, optional)
 └── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
 ```
 
@@ -68,7 +68,7 @@ src/
 ├── cli/
 └── lib/
 
-tests/
+test/
 ├── contract/
 ├── integration/
 └── unit/
@@ -79,14 +79,14 @@ backend/
 │   ├── models/
 │   ├── services/
 │   └── api/
-└── tests/
+└── test/
 
 frontend/
 ├── src/
 │   ├── components/
 │   ├── pages/
 │   └── services/
-└── tests/
+└── test/
 
 # [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
 api/
