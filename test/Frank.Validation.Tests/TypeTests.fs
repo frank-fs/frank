@@ -121,7 +121,7 @@ let shaclShapeTests =
         [ testCase "shape with multiple properties"
           <| fun _ ->
               let shape =
-                  { TargetType = typeof<string>
+                  { TargetType = None
                     NodeShapeUri = Uri("urn:frank:shape:Customer")
                     Properties =
                       [ { Path = "name"
@@ -151,7 +151,29 @@ let shaclShapeTests =
 
               Expect.equal (List.length shape.Properties) 2 "Should have 2 properties"
               Expect.isTrue shape.Closed "Records should be closed by default"
-              Expect.isSome shape.Description "Should have a description" ]
+              Expect.isSome shape.Description "Should have a description"
+
+          testCase "TargetType is None for loaded shapes"
+          <| fun _ ->
+              let shape =
+                  { TargetType = None
+                    NodeShapeUri = Uri("urn:frank:shape:Loaded")
+                    Properties = []
+                    Closed = false
+                    Description = None }
+
+              Expect.isNone shape.TargetType "Loaded shapes should have TargetType = None"
+
+          testCase "TargetType is Some for derived shapes"
+          <| fun _ ->
+              let shape =
+                  { TargetType = Some typeof<string>
+                    NodeShapeUri = Uri("urn:frank:shape:Derived")
+                    Properties = []
+                    Closed = false
+                    Description = None }
+
+              Expect.isSome shape.TargetType "Derived shapes should have TargetType = Some _" ]
 
 [<Tests>]
 let validationReportTests =
@@ -197,7 +219,6 @@ let validationReportTests =
               Expect.isFalse report.Conforms "Should not conform"
               Expect.equal (List.length report.Results) 3 "Should have 3 results"
 
-              // Verify each result has required fields
               for r in report.Results do
                   Expect.isNotEmpty r.FocusNode "FocusNode should not be empty"
                   Expect.isNotEmpty r.ResultPath "ResultPath should not be empty"
@@ -224,7 +245,6 @@ let constraintKindTests =
 
               Expect.equal (List.length constraints) 10 "Should have 10 constraint kinds"
 
-              // Verify pattern matching on each
               for c in constraints do
                   match c with
                   | PatternConstraint r -> Expect.isNotEmpty r "regex should not be empty"
@@ -247,7 +267,7 @@ let validationMarkerTests =
         [ testCase "marker with no custom constraints"
           <| fun _ ->
               let marker =
-                  { ShapeType = typeof<string>
+                  { ShapeUri = Uri("urn:test:shape:string")
                     CustomConstraints = []
                     ResolverConfig = None }
 
@@ -257,7 +277,7 @@ let validationMarkerTests =
           testCase "marker with custom constraints"
           <| fun _ ->
               let marker =
-                  { ShapeType = typeof<string>
+                  { ShapeUri = Uri("urn:test:shape:string")
                     CustomConstraints =
                       [ { PropertyPath = "email"
                           Constraint = PatternConstraint "^[^@]+@[^@]+$" }
@@ -270,7 +290,7 @@ let validationMarkerTests =
           testCase "marker with ShapeResolverConfig"
           <| fun _ ->
               let baseShape =
-                  { TargetType = typeof<string>
+                  { TargetType = None
                     NodeShapeUri = Uri("urn:frank:shape:Order")
                     Properties = []
                     Closed = true
@@ -287,7 +307,7 @@ let validationMarkerTests =
                           Shape = adminShape } ] }
 
               let marker =
-                  { ShapeType = typeof<string>
+                  { ShapeUri = Uri("urn:test:shape:order")
                     CustomConstraints = []
                     ResolverConfig = Some config }
 

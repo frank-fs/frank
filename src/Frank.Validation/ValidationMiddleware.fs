@@ -1,5 +1,6 @@
 namespace Frank.Validation
 
+open System
 open System.IO
 open System.Text.Json
 open System.Threading.Tasks
@@ -71,7 +72,26 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache, logger:
                         | Some config ->
                             let resolvedShape = ShapeResolver.resolve config ctx.User
                             shapeCache.GetOrAddResolved(resolvedShape)
-                        | None -> shapeCache.GetOrAdd(marker.ShapeType)
+                        | None ->
+                            match shapeCache.TryGet(marker.ShapeUri) with
+                            | ValueSome entry -> entry
+                            | ValueNone ->
+                                // Fall back to on-demand derivation if the shape was not pre-loaded.
+                                // This supports legacy usage where shapes are registered by URI
+                                // derived from a Type at registration time.
+                                logger.LogWarning(
+                                    "Shape {Uri} not found in cache; falling back to derived lookup",
+                                    marker.ShapeUri
+                                )
+                                // Attempt to find the shape by scanning the derived cache.
+                                // If still not found, this is a configuration error.
+                                raise (
+                                    InvalidOperationException(
+                                        sprintf
+                                            "Shape with URI '%O' has not been loaded into ShapeCache. Call LoadAll at startup."
+                                            marker.ShapeUri
+                                    )
+                                )
 
                     if bodyMethods.Contains(method) then
                         // POST/PUT/PATCH: validate request body

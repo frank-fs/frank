@@ -7,8 +7,8 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 
 /// Functions for deriving SHACL NodeShapes from F# record types and discriminated unions
-/// via .NET reflection.
-module ShapeDerivation =
+/// via .NET reflection. URI construction delegates to UriConventions.
+module ShapeBuilder =
 
     /// UUID regex pattern for Guid fields (RFC 4122).
     [<Literal>]
@@ -20,18 +20,15 @@ module ShapeDerivation =
     let DefaultMaxDepth = 5
 
     /// Thread-safe cache of derived shapes, keyed by System.Type.
-    /// Cache assumes consistent maxDepth configuration per application lifetime.
-    /// Different maxDepth values for the same type will return the first-cached result.
     let private shapeCache = ConcurrentDictionary<Type, ShaclShape>()
 
     /// Clear the shape cache. Useful for testing.
     let clearCache () = shapeCache.Clear()
 
     // ──────────────────────────────────────────────
-    // Type key helper (since System.Type doesn't support F# comparison)
+    // Type key helper
     // ──────────────────────────────────────────────
 
-    /// Get a stable string key for a type, used for the derivation stack.
     let private typeKey (t: Type) : string =
         if t.FullName <> null then
             t.FullName
@@ -102,47 +99,28 @@ module ShapeDerivation =
             false
 
     // ──────────────────────────────────────────────
-    // URI construction helpers
+    // Type-to-XSD mapping (private; only needed during derivation)
     // ──────────────────────────────────────────────
 
-    /// Build a NodeShape URI for a type.
-    /// Pattern: urn:frank:shape:{assembly-name}:{type-full-name}
-    /// Generic parameters are expanded (e.g., PagedResult_MyApp.Customer).
-    let buildNodeShapeUri (typ: Type) =
-        let assemblyName =
-            if typ.Assembly <> null && typ.Assembly.GetName() <> null then
-                typ.Assembly.GetName().Name
-            else
-                "Unknown"
-
-        let typeName =
-            if typ.IsGenericType && not (isOptionType typ) && not (isCollectionType typ) then
-                let baseName =
-                    let idx = typ.Name.IndexOf('`')
-                    if idx >= 0 then typ.Name.Substring(0, idx) else typ.Name
-
-                let argNames =
-                    typ.GetGenericArguments()
-                    |> Array.map (fun t ->
-                        if t.FullName <> null then t.FullName
-                        elif t.Name <> null then t.Name
-                        else "Unknown")
-                    |> String.concat ","
-
-                sprintf "%s_%s" baseName argNames
-            else if typ.FullName <> null then
-                typ.FullName
-            elif typ.Name <> null then
-                typ.Name
-            else
-                "Unknown"
-
-        let encoded = Uri.EscapeDataString(typeName)
-        Uri(sprintf "urn:frank:shape:%s:%s" assemblyName encoded)
-
-    /// Build a property path URI for a field name.
-    let buildPropertyPathUri (fieldName: string) =
-        sprintf "urn:frank:property:%s" fieldName
+    /// Map an F# CLR type to its XSD datatype. Returns None for types
+    /// that require sh:node references (records, collections).
+    let private mapType (typ: Type) : XsdDatatype option =
+        match typ with
+        | t when t = typeof<string> -> Some XsdString
+        | t when t = typeof<int> || t = typeof<int32> -> Some XsdInteger
+        | t when t = typeof<int64> -> Some XsdLong
+        | t when t = typeof<float> || t = typeof<double> -> Some XsdDouble
+        | t when t = typeof<decimal> -> Some XsdDecimal
+        | t when t = typeof<bool> -> Some XsdBoolean
+        | t when t = typeof<DateTimeOffset> -> Some XsdDateTimeStamp
+        | t when t = typeof<DateTime> -> Some XsdDateTime
+        | t when t = typeof<DateOnly> -> Some XsdDate
+        | t when t = typeof<TimeOnly> -> Some XsdTime
+        | t when t = typeof<TimeSpan> -> Some XsdDuration
+        | t when t = typeof<Uri> -> Some XsdAnyUri
+        | t when t = typeof<byte[]> -> Some XsdBase64Binary
+        | t when t = typeof<Guid> -> Some XsdString // + pattern constraint added by derivation
+        | _ -> None
 
     // ──────────────────────────────────────────────
     // Shape derivation
@@ -158,13 +136,11 @@ module ShapeDerivation =
     let rec deriveProperty (maxDepth: int) (stack: Set<string>) (field: PropertyInfo) : PropertyShape =
         let fieldType = field.PropertyType
 
-        // Step 1: Check for option type - unwrap and set minCount=0
         let isOption, unwrappedType =
             match unwrapOptionType fieldType with
             | Some inner -> true, inner
             | None -> false, fieldType
 
-        // Step 2: Check for collection type
         let isCollection, elementType =
             if isCollectionType unwrappedType then
                 true, getCollectionElementType unwrappedType
@@ -174,42 +150,30 @@ module ShapeDerivation =
         let minCount = if isOption then 0 else 1
         let maxCount = if isCollection then None else Some 1
 
-        // Step 3: Try XSD datatype mapping on the resolved element type
-        let xsdDatatype = TypeMapping.mapType elementType
+        let xsdDatatype = mapType elementType
 
-        // Step 4: Determine if Guid (needs pattern constraint)
         let pattern =
-            if elementType = typeof<Guid> then
-                Some UuidPattern
-            else
-                None
+            if elementType = typeof<Guid> then Some UuidPattern
+            else None
 
-        // Step 5: Handle node references for derivable complex types
         let nodeRef, inValues, orShapes =
             match xsdDatatype with
-            | Some _ ->
-                // Primitive type: no node reference needed
-                None, None, None
+            | Some _ -> None, None, None
             | None ->
                 if not (isDerivableType elementType) then
-                    // Excluded framework/infrastructure type: treat as opaque, skip derivation
                     None, None, None
                 elif FSharpType.IsUnion(elementType, true) then
-                    // DU type: derive constraints
                     let duResult = deriveDuConstraint maxDepth stack elementType
 
                     match duResult with
                     | InValues values -> None, Some values, None
                     | OrShapes uris -> None, None, Some uris
                 elif FSharpType.IsRecord(elementType, true) then
-                    // Nested record: derive shape and reference it
                     let nestedShape = deriveShape maxDepth stack elementType
                     Some nestedShape.NodeShapeUri, None, None
                 else
-                    // Unknown/non-derivable type: treat as no constraints
                     None, None, None
 
-        // For simple DU fields, set the datatype to XsdString for the sh:in values
         let finalDatatype =
             match inValues with
             | Some _ -> Some XsdString
@@ -230,14 +194,11 @@ module ShapeDerivation =
     /// Derive DU constraints: sh:in for simple DUs, sh:or for payload DUs.
     and deriveDuConstraint (maxDepth: int) (stack: Set<string>) (duType: Type) : DuConstraintResult =
         let cases = FSharpType.GetUnionCases(duType, true)
-
         let allSimple = cases |> Array.forall (fun c -> c.GetFields().Length = 0)
 
         if allSimple then
-            // Simple DU: sh:in with case names
             InValues(cases |> Array.map (fun c -> c.Name) |> Array.toList)
         else
-            // Payload DU: sh:or with per-case NodeShapes
             let caseUris =
                 cases
                 |> Array.map (fun c ->
@@ -263,10 +224,8 @@ module ShapeDerivation =
                 "Unknown"
 
         let parentName =
-            if parentDuType.FullName <> null then
-                parentDuType.FullName
-            else
-                parentDuType.Name
+            if parentDuType.FullName <> null then parentDuType.FullName
+            else parentDuType.Name
 
         let caseUri =
             let encoded = Uri.EscapeDataString(sprintf "%s.%s" parentName caseInfo.Name)
@@ -275,7 +234,7 @@ module ShapeDerivation =
         let properties =
             caseFields |> Array.map (deriveProperty maxDepth stack) |> Array.toList
 
-        { TargetType = parentDuType
+        { TargetType = Some parentDuType
           NodeShapeUri = caseUri
           Properties = properties
           Closed = true
@@ -286,28 +245,25 @@ module ShapeDerivation =
     and deriveShape (maxDepth: int) (stack: Set<string>) (typ: Type) : ShaclShape =
         let key = typeKey typ
 
-        // Check cache first
         match shapeCache.TryGetValue(typ) with
         | true, cached -> cached
         | _ ->
 
-            // Cycle detection: if this type is already being derived, emit reference-only shape
             if stack.Contains key then
-                { TargetType = typ
-                  NodeShapeUri = buildNodeShapeUri typ
+                { TargetType = Some typ
+                  NodeShapeUri = UriConventions.buildNodeShapeUriFromType typ
                   Properties = []
                   Closed = false
                   Description = Some "Recursive reference (cycle detected)" }
-            // Depth limit: safety net for deeply nested types
             elif stack.Count >= maxDepth then
-                { TargetType = typ
-                  NodeShapeUri = buildNodeShapeUri typ
+                { TargetType = Some typ
+                  NodeShapeUri = UriConventions.buildNodeShapeUriFromType typ
                   Properties = []
                   Closed = false
                   Description = Some(sprintf "Depth limit reached (%d)" maxDepth) }
             else
                 let stack' = stack |> Set.add key
-                let uri = buildNodeShapeUri typ
+                let uri = UriConventions.buildNodeShapeUriFromType typ
 
                 let shape =
                     if FSharpType.IsRecord(typ, true) then
@@ -316,7 +272,7 @@ module ShapeDerivation =
                         let properties =
                             fields |> Array.map (deriveProperty maxDepth stack') |> Array.toList
 
-                        { TargetType = typ
+                        { TargetType = Some typ
                           NodeShapeUri = uri
                           Properties = properties
                           Closed = true
@@ -326,31 +282,24 @@ module ShapeDerivation =
 
                         match duResult with
                         | InValues _values ->
-                            // Simple DU: shape representing the enum
-                            { TargetType = typ
+                            { TargetType = Some typ
                               NodeShapeUri = uri
                               Properties = []
                               Closed = true
                               Description = Some(sprintf "Enum DU: %s" typ.Name) }
                         | OrShapes _uris ->
-                            // Payload DU: OrShapes URIs from deriveDuConstraint are intentionally
-                            // not stored here — ShaclShape has no field for them. Payload DUs are
-                            // expected as field types where PropertyShape.OrShapes carries the data.
-                            // Top-level DU shapes are valid but won't reference case shapes directly.
-                            { TargetType = typ
+                            { TargetType = Some typ
                               NodeShapeUri = uri
                               Properties = []
                               Closed = false
                               Description = Some(sprintf "Payload DU: %s" typ.Name) }
                     else
-                        // Non-derivable type: minimal shape
-                        { TargetType = typ
+                        { TargetType = Some typ
                           NodeShapeUri = uri
                           Properties = []
                           Closed = false
                           Description = Some "Non-derivable type" }
 
-                // Cache and return
                 shapeCache.TryAdd(typ, shape) |> ignore
                 shape
 

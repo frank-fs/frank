@@ -40,8 +40,10 @@ type PropertyShape =
       Description: string option }
 
 /// A SHACL NodeShape derived from an F# type definition.
+/// TargetType is None for shapes loaded from serialized Turtle (ShapeLoader),
+/// and Some for shapes derived at runtime via reflection (ShapeDerivation).
 type ShaclShape =
-    { TargetType: Type
+    { TargetType: Type option
       NodeShapeUri: Uri
       Properties: PropertyShape list
       Closed: bool

@@ -39,10 +39,14 @@ type HandlerCounter() =
     member _.Count = count
 
 /// Build a test server with validation middleware and return (counter, client).
+/// preloadTypes are derived and loaded into ShapeCache at startup.
 let private buildTestHost
+    (preloadTypes: Type list)
     (configureEndpoints: HandlerCounter -> IEndpointRouteBuilder -> unit)
     : HandlerCounter * HttpClient =
     let counter = HandlerCounter()
+
+    let preloadedShapes = preloadTypes |> List.map ShapeBuilder.deriveShapeDefault
 
     let builder =
         WebHostBuilder()
@@ -52,10 +56,13 @@ let private buildTestHost
                 services.AddRouting() |> ignore
                 services.AddLogging() |> ignore)
             .Configure(fun (app: IApplicationBuilder) ->
+                let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
+                shapeCache.LoadAll(preloadedShapes)
+
                 app.UseRouting() |> ignore
 
                 app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                    let shapeCache = ctx.RequestServices.GetRequiredService<ShapeCache>()
+                    let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
 
                     let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
@@ -69,7 +76,7 @@ let private buildTestHost
                             member _.IsEnabled(logLevel) = logger.IsEnabled(logLevel)
                             member _.BeginScope(state) = logger.BeginScope(state) }
 
-                    let middleware = ValidationMiddleware(next, shapeCache, typedLogger)
+                    let middleware = ValidationMiddleware(next, sc, typedLogger)
                     middleware.InvokeAsync(ctx))
                 |> ignore
 
@@ -79,8 +86,10 @@ let private buildTestHost
     let server = new TestServer(builder)
     counter, server.CreateClient()
 
-/// Create a POST endpoint with ValidationMarker metadata.
+/// Create a POST endpoint with ValidationMarker metadata (keyed by shape URI).
 let private mapValidatedPost<'T> (pattern: string) (counter: HandlerCounter) (endpoints: IEndpointRouteBuilder) =
+    let uri = ShapeBuilder.deriveShapeDefault(typeof<'T>).NodeShapeUri
+
     endpoints
         .MapPost(
             pattern,
@@ -90,7 +99,7 @@ let private mapValidatedPost<'T> (pattern: string) (counter: HandlerCounter) (en
                 System.Threading.Tasks.Task.CompletedTask)
         )
         .WithMetadata(
-            { ShapeType = typeof<'T>
+            { ShapeUri = uri
               CustomConstraints = []
               ResolverConfig = None }
             : ValidationMarker
@@ -108,7 +117,7 @@ let problemDetailsForJsonAcceptTests =
         [ testCase "invalid POST with Accept: application/json returns Problem Details"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+                  buildTestHost [ typeof<CreateUser> ] (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
 
               let content = new StringContent("""{"Age":30}""", Encoding.UTF8, "application/json")
               use request = new HttpRequestMessage(HttpMethod.Post, "/users")
@@ -147,7 +156,7 @@ let jsonLdForSemanticAcceptTests =
         [ testCase "invalid POST with Accept: application/ld+json returns SHACL JSON-LD"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+                  buildTestHost [ typeof<CreateUser> ] (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
 
               let content = new StringContent("""{"Age":30}""", Encoding.UTF8, "application/json")
               use request = new HttpRequestMessage(HttpMethod.Post, "/users")
@@ -161,7 +170,6 @@ let jsonLdForSemanticAcceptTests =
               let contentType = response.Content.Headers.ContentType.MediaType
               Expect.equal contentType "application/ld+json" "Should be application/ld+json"
 
-              // JSON-LD body should parse as valid JSON and contain SHACL terms
               let doc = JsonDocument.Parse(body)
               let root = doc.RootElement
               let mutable contextEl = System.Text.Json.JsonElement()
@@ -174,10 +182,8 @@ let multipleViolationsTests =
         [ testCase "3 distinct violations appear in Problem Details errors array"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+                  buildTestHost [ typeof<CreateUser> ] (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
 
-              // Empty object: missing both Name (string, required) and Age (int, required)
-              // which should produce at least 2 violations. Let's also send wrong type to get more.
               let content = new StringContent("""{}""", Encoding.UTF8, "application/json")
               use request = new HttpRequestMessage(HttpMethod.Post, "/users")
               request.Content <- content
@@ -203,9 +209,9 @@ let nestedFieldPathTests =
         [ testCase "nested field path uses dot notation in Problem Details"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<UserWithAddress> "/users-address" c ep)
+                  buildTestHost [ typeof<UserWithAddress> ] (fun c ep ->
+                      mapValidatedPost<UserWithAddress> "/users-address" c ep)
 
-              // Missing the Address field entirely
               let content =
                   new StringContent("""{"Name":"Alice","Age":30}""", Encoding.UTF8, "application/json")
 
@@ -221,7 +227,6 @@ let nestedFieldPathTests =
               let errors = root.GetProperty("errors")
               Expect.isTrue (errors.GetArrayLength() > 0) "Should have at least one error"
 
-              // Check that at least one error path uses dot notation
               let paths =
                   [ for i in 0 .. errors.GetArrayLength() - 1 do
                         yield errors.[i].GetProperty("path").GetString() ]
@@ -237,12 +242,11 @@ let noAcceptHeaderDefaultsTests =
         [ testCase "no Accept header defaults to Problem Details JSON"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+                  buildTestHost [ typeof<CreateUser> ] (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
 
               let content = new StringContent("""{"Age":30}""", Encoding.UTF8, "application/json")
               use request = new HttpRequestMessage(HttpMethod.Post, "/users")
               request.Content <- content
-              // Explicitly do NOT set Accept header
               request.Headers.Accept.Clear()
               let response: HttpResponseMessage = client.SendAsync(request).Result
               Expect.equal (int response.StatusCode) 422 "Should return 422"
@@ -267,7 +271,7 @@ let turtleAcceptTests =
         [ testCase "invalid POST with Accept: text/turtle returns SHACL Turtle"
           <| fun _ ->
               let counter, client =
-                  buildTestHost (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
+                  buildTestHost [ typeof<CreateUser> ] (fun c ep -> mapValidatedPost<CreateUser> "/users" c ep)
 
               let content = new StringContent("""{"Age":30}""", Encoding.UTF8, "application/json")
               use request = new HttpRequestMessage(HttpMethod.Post, "/users")
@@ -281,7 +285,6 @@ let turtleAcceptTests =
               let contentType = response.Content.Headers.ContentType.MediaType
               Expect.equal contentType "text/turtle" "Should be text/turtle"
 
-              // Turtle body should contain SHACL vocabulary terms
               Expect.isTrue
                   (body.Contains("sh:") || body.Contains("shacl"))
                   "Should contain SHACL namespace prefix or terms" ]
