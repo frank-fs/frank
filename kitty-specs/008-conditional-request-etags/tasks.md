@@ -87,7 +87,7 @@
 
 ### Included Subtasks
 - [x] T011 Create `src/Frank/ConditionalRequestMiddleware.fs` with middleware skeleton (endpoint metadata discovery, pass-through for non-ETag resources)
-- [ ] T012 Implement If-None-Match evaluation: GET/HEAD with matching ETag returns 304 Not Modified
+- [x] T012 Implement If-None-Match evaluation: GET/HEAD with matching ETag returns 304 Not Modified
 - [ ] T013 Implement If-Match evaluation: POST/PUT/DELETE with non-matching ETag returns 412 Precondition Failed
 - [ ] T014 Implement wildcard `*` handling for both If-None-Match and If-Match per RFC 9110
 - [ ] T015 Implement ETag header setting on successful responses and cache invalidation after mutations. Cache invalidation triggers after observing a 2xx response status from the handler, not before handler execution
