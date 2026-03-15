@@ -8,7 +8,7 @@
 **Parallel with**: #97 (ALPS), #98 (SCXML), #100 (smcat) — each owns its own generator
 **Parent issue**: #57 (pipeline architecture, WSD mapping rules, examples)
 **Location**: Internal to `src/Frank.Statecharts/` (WSD generator namespace), tests in `test/Frank.Statecharts.Tests/`
-**Note**: The cross-format validator has been carved out into a separate spec (see cross-format validator spec). This spec covers only the WSD generator.
+**Note**: The cross-format validator has been carved out into spec 021 (cross-format validator, issue #112). This spec covers only the WSD generator.
 
 ## Clarifications
 
