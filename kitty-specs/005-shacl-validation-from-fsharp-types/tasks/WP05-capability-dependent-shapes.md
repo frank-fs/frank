@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Capability-Dependent Shape Resolution
-lane: done
+lane: "for_review"
 dependencies:
 - WP01
 subtasks: [T027, T028, T029, T030, T031]
@@ -266,3 +266,4 @@ type UpdateOrder = { Status: string; Notes: string option }
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:35:43Z – unknown – lane=for_review – Moved to for_review

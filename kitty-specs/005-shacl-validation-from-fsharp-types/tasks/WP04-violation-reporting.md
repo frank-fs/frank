@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Violation Reporting & Content Negotiation
-lane: done
+lane: "for_review"
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]
@@ -303,3 +303,4 @@ module ReportSerializer =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:35:43Z – unknown – lane=for_review – Moved to for_review

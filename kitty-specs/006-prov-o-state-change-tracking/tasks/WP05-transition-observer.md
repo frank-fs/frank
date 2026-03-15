@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: TransitionObserver
-lane: done
+lane: "for_review"
 dependencies:
 - WP01
 subtasks: [T022, T023, T024, T025, T026]
@@ -396,3 +396,4 @@ type MockProvenanceStore() =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:35:44Z – unknown – lane=for_review – Moved to for_review

@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Validator & Validation Middleware
-lane: done
+lane: "for_review"
 dependencies:
 - WP01
 - WP02
@@ -389,3 +389,4 @@ type ValidationMiddleware(next: RequestDelegate, shapeCache: ShapeCache) =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:35:42Z – unknown – lane=for_review – Moved to for_review

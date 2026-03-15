@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: WebHostBuilderExtensions + Integration Tests
-lane: done
+lane: "for_review"
 dependencies:
 - WP04
 subtasks: [T031, T032, T033, T034, T035, T036]
@@ -424,3 +424,4 @@ type TestCustomStore() =
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:35:45Z – unknown – lane=for_review – Moved to for_review

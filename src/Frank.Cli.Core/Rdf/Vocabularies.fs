@@ -105,6 +105,9 @@ module Vocabularies =
         let Node = "http://www.w3.org/ns/shacl#node"
 
         [<Literal>]
+        let NodeKind = "http://www.w3.org/ns/shacl#nodeKind"
+
+        [<Literal>]
         let MinInclusive = "http://www.w3.org/ns/shacl#minInclusive"
 
         [<Literal>]
