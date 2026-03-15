@@ -1,12 +1,14 @@
 ---
 work_package_id: "WP02"
 title: "IProvenanceStore + MailboxProcessorStore"
-lane: "doing"
+lane: "done"
 dependencies: ["WP01"]
 requirement_refs: ["FR-007", "FR-008", "FR-009", "FR-015"]
 subtasks: ["T007", "T008", "T009", "T010", "T011"]
 agent: "claude-opus-reviewer"
 shell_pid: "40502"
+reviewed_by: "Ryan Riley"
+review_status: "approved"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -340,3 +342,4 @@ let makeRecord resourceUri agentId stateBefore stateAfter =
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:31:57Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-15T19:41:40Z – claude-opus-reviewer – shell_pid=40502 – lane=doing – Started review via workflow command
+- 2026-03-15T19:42:35Z – claude-opus-reviewer – shell_pid=40502 – lane=done – Review passed: IProvenanceStore interface matches data-model.md exactly. MailboxProcessorProvenanceStore correctly serializes writes via MailboxProcessor, implements index-based queries, oldest-first batch eviction, and proper disposal with ObjectDisposedException per Constitution VII. 11 new tests covering append, all 3 query methods, retention policy, disposal behavior, concurrent appends (1000), and empty store edge cases. Build succeeds on all 3 targets. 42 total tests pass.
