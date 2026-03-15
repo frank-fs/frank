@@ -1,7 +1,7 @@
 ---
 work_package_id: WP10
 title: Enrich ShapeGenerator with Full SHACL Constraints
-lane: planned
+lane: done
 dependencies:
 - WP09
 subtasks: [T055, T056, T057, T058, T059]
