@@ -92,7 +92,7 @@
 - [x] T014 Implement wildcard `*` handling for both If-None-Match and If-Match per RFC 9110
 - [x] T015 Implement ETag header setting on successful responses and cache invalidation after mutations. Cache invalidation triggers after observing a 2xx response status from the handler, not before handler execution
 - [x] T016 Add `useConditionalRequests` plug registration and `AddETagCache` DI extension
-- [ ] T017 Create `test/Frank.Tests/ConditionalRequestTests.fs` with TestHost integration tests
+- [x] T017 Create `test/Frank.Tests/ConditionalRequestTests.fs` with TestHost integration tests
 
 ### Implementation Notes
 - Add `ConditionalRequestMiddleware.fs` to `Frank.fsproj` after `ETagCache.fs`
