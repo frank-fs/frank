@@ -1,14 +1,14 @@
 ---
 work_package_id: WP01
 title: Project Scaffold & Core Types
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: eb3ec1d134df7f725105e1203a7aaaf2a9a6b507
 created_at: '2026-03-08T17:30:46.117744+00:00'
 subtasks: [T001, T002, T003, T004, T005]
-shell_pid: "97836"
-agent: "claude-opus"
+shell_pid: "39715"
+agent: "claude-opus-reviewer"
 reviewed_by: "Ryan Riley"
 review_status: "approved"
 history:
@@ -404,3 +404,4 @@ let main args =
 - 2026-03-08T17:55:54Z – claude-opus – shell_pid=97836 – lane=for_review – T001-T005 complete. Builds clean. 13 tests pass.
 - 2026-03-08T18:03:48Z – claude-opus – shell_pid=97836 – lane=done – Review passed: All 13 checks pass. Types match data-model exactly. Build clean on all targets. 13 tests green. [claude-opus-reviewer]
 - 2026-03-15T19:19:42Z – claude-opus – shell_pid=97836 – lane=for_review – Moved to for_review
+- 2026-03-15T19:39:31Z – claude-opus-reviewer – shell_pid=39715 – lane=doing – Started review via workflow command
