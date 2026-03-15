@@ -21,6 +21,8 @@
     <Compile Include="ShapeMerger.fs" />
     <Compile Include="ShapeCache.fs" />
     <Compile Include="ValidationMiddleware.fs" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
   <ItemGroup>
