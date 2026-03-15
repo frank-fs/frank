@@ -171,7 +171,7 @@
 **Requirement Refs**: FR-013, FR-014
 
 ### Included Subtasks
-- [ ] T027 Create `src/Frank.Validation/ShapeResolver.fs` with `resolve : ShapeResolverConfig -> ClaimsPrincipal -> ShaclShape`
+- [x] T027 Create `src/Frank.Validation/ShapeResolver.fs` with `resolve : ShapeResolverConfig -> ClaimsPrincipal -> ShaclShape`
 - [ ] T028 Implement claim-based override matching (iterate overrides, first match wins)
 - [ ] T029 Implement base shape fallback when no override matches
 - [ ] T030 Integrate ShapeResolver into ValidationMiddleware (read principal from HttpContext.User)
