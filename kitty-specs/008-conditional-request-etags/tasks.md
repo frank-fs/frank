@@ -123,7 +123,7 @@
 
 ### Included Subtasks
 - [x] T018 Create `src/Frank.Statecharts/StatechartETagProvider.fs` implementing `IETagProvider`
-- [ ] T019 Implement SHA-256 hashing: serialize state via `string`, context via user-supplied `'Context -> byte[]`, concatenate, hash, truncate to 128 bits
+- [x] T019 Implement SHA-256 hashing: serialize state via `string`, context via user-supplied `'Context -> byte[]`, concatenate, hash, truncate to 128 bits
 - [ ] T019b Unit test: same ('State * 'Context) pair produces identical ETag; different pairs produce different ETags
 - [ ] T020 Implement `IETagProviderFactory` for statechart resources (resolves provider from endpoint StateMachineMetadata)
 - [ ] T021 Implement middleware-driven cache invalidation: after the handler returns a 2xx response for a mutation (POST/PUT/DELETE), the middleware sends an `InvalidateETag` message to the `ETagCache` (consistent with T015 in WP03). Note: `IStateMachineStore.Subscribe` is per-instance only and cannot be used for global cache invalidation.
