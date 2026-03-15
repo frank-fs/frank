@@ -50,7 +50,7 @@
 - [x] T008 Create `src/Frank.Provenance/MailboxProcessorStore.fs` with `StoreMessage` DU, `StoreState`, and `MailboxProcessorProvenanceStore` class
 - [x] T009 Implement retention policy (oldest-first eviction in configurable batches)
 - [x] T010 Implement `IDisposable` with drain of pending appends and graceful post-disposal behavior
-- [ ] T011 Create `test/Frank.Provenance.Tests/StoreTests.fs` with append, query, retention, disposal, and concurrency tests
+- [x] T011 Create `test/Frank.Provenance.Tests/StoreTests.fs` with append, query, retention, disposal, and concurrency tests
 
 ### Dependencies
 - Depends on WP01 (core types)
