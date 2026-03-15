@@ -41,6 +41,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 - N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + No new NuGet dependencies; reuses Wsd.Types from #90, FSharp.Reflection (in FSharp.Core) for boxed Machine inspection (017-wsd-generator-cross-validator)
 - N/A (pure function, stateless -- StateMachineMetadata in, WSD text out) (017-wsd-generator-cross-validator)
+- F# 8.0+ targeting .NET 10.0 (single target, matching Frank.Cli and Frank.Cli.Core) + System.CommandLine 2.0.3 (added to Frank.Cli.Core), existing Frank.Cli.Core infrastructure (016-frank-cli-help-system)
+- N/A -- reads existing `obj/frank-cli/state.json` (ExtractionState) for status command; no new persistence (016-frank-cli-help-system)
 ## Project Structure
 
 ```text
@@ -57,9 +59,8 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
+- 016-frank-cli-help-system: Added F# 8.0+ targeting .NET 10.0 (single target, matching Frank.Cli and Frank.Cli.Core) + System.CommandLine 2.0.3 (added to Frank.Cli.Core), existing Frank.Cli.Core infrastructure
 - 017-wsd-generator-cross-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + No new NuGet dependencies; reuses Wsd.Types from #90, FSharp.Reflection (in FSharp.Core) for boxed Machine inspection
-- 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
-- 013-smcat-parser-generator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project reference -- same project, internal modules)
 - 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
