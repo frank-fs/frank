@@ -1,10 +1,12 @@
 ---
 work_package_id: "WP04"
 title: "Guard extension parser"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP01"]
 requirement_refs: ["FR-004"]
 subtasks: ["T024", "T025", "T026", "T027"]
+agent: "claude-opus-reviewer"
+shell_pid: "41672"
 history:
   - timestamp: "2026-03-07T00:00:00Z"
     lane: "planned"
@@ -255,3 +257,4 @@ Write at least 20 test cases covering all categories.
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
 - 2026-03-15T19:20:55Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-15T19:43:38Z – claude-opus-reviewer – shell_pid=41672 – lane=doing – Started review via workflow command
