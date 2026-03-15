@@ -122,7 +122,7 @@
 **Requirement Refs**: FR-002, FR-008, FR-010, FR-015
 
 ### Included Subtasks
-- [ ] T018 Create `src/Frank.Statecharts/StatechartETagProvider.fs` implementing `IETagProvider`
+- [x] T018 Create `src/Frank.Statecharts/StatechartETagProvider.fs` implementing `IETagProvider`
 - [ ] T019 Implement SHA-256 hashing: serialize state via `string`, context via user-supplied `'Context -> byte[]`, concatenate, hash, truncate to 128 bits
 - [ ] T019b Unit test: same ('State * 'Context) pair produces identical ETag; different pairs produce different ETags
 - [ ] T020 Implement `IETagProviderFactory` for statechart resources (resolves provider from endpoint StateMachineMetadata)
