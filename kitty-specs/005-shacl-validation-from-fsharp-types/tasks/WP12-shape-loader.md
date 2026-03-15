@@ -1,7 +1,7 @@
 ---
 work_package_id: WP12
 title: ShapeLoader and Internal Refactoring in Frank.Validation
-lane: "doing"
+lane: "done"
 dependencies:
 - WP10
 base_branch: 005-shacl-validation-from-fsharp-types-WP10
@@ -429,3 +429,4 @@ module ShapeLoader =
 - 2026-03-15T19:12:50Z – claude-opus – shell_pid=26738 – lane=done – Review passed: All 7 subtasks (T064-T070) verified. UriConventions extracted, ShapeLoader fully implemented with all constraint types, ShaclShape.TargetType changed to Type option, ValidationMarker.ShapeUri is Uri-keyed, ShapeCache pre-populated at startup, ShapeDerivation.fs deleted, TypeMapping.fs trimmed. 118 tests pass. Constitution compliance verified (all 8 principles). Previous review feedback addressed (stale comments, test rename, Obsolete attribute).
 - 2026-03-15T19:19:56Z – claude-opus – shell_pid=26738 – lane=for_review – Moved to for_review
 - 2026-03-15T19:48:15Z – claude-opus-reviewer – shell_pid=43885 – lane=doing – Started review via workflow command
+- 2026-03-15T19:49:45Z – claude-opus-reviewer – shell_pid=43885 – lane=done – Review passed: All 7 subtasks (T064-T070) verified. UriConventions extracted with string and Type overloads. ShapeLoader fully implements Turtle deserialization with flattenRdfList, parseXsdDatatype, and all constraint types. ShaclShape.TargetType changed to Type option. ValidationMarker.ShapeUri is Uri-keyed. ShapeCache pre-populated at startup with LoadAll. ShapeDerivation renamed to ShapeBuilder (reasonable backwards-compat deviation from spec deletion). TypeMapping trimmed to xsdUri only. 118 tests pass including comprehensive round-trip tests.
