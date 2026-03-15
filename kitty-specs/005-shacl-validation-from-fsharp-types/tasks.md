@@ -62,7 +62,7 @@
 - [x] T009 Implement DU derivation: simple cases -> `sh:in`, payload cases -> `sh:or` with per-case NodeShapes
 - [x] T010 Implement nested record handling: `sh:node` references to child NodeShapes
 - [x] T011 Implement recursive type cycle detection with configurable depth limit (default 5)
-- [ ] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
+- [x] T012 Implement generic type expansion at point of use (e.g., `PagedResult<Customer>` -> concrete shape)
 - [ ] T013 Create `test/Frank.Validation.Tests/TypeMappingTests.fs` with mapping tests for all supported F# types
 - [ ] T014 Create `test/Frank.Validation.Tests/ShapeDerivationTests.fs` with derivation tests for records, DUs, nested/recursive types
 - [ ] T014b Collection type mapping (list/array/seq → sh:minCount/sh:maxCount with inner type datatype)
