@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP02"
 title: "Lexer (tokenizer)"
-lane: done
+lane: "for_review"
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-003", "FR-010", "FR-011"]
 subtasks: ["T012", "T013", "T014", "T015", "T016", "T017"]
@@ -242,3 +242,4 @@ Write at least 30 test cases covering the categories above. Focus on correctness
 | Timestamp | Agent | Action |
 |-----------|-------|--------|
 | 2026-03-07T00:00:00Z | system | Prompt generated via /spec-kitty.tasks |
+- 2026-03-15T19:20:53Z – unknown – lane=for_review – Moved to for_review
