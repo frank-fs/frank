@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="10.0.103" />
     <PackageReference Include="Hox" Version="3.1.0" />
   </ItemGroup>
 

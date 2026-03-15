@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="10.0.103" />
     <PackageReference Include="System.CommandLine" Version="2.0.3" />
   </ItemGroup>
 
