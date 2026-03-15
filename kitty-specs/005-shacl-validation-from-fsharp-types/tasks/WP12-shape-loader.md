@@ -1,18 +1,22 @@
 ---
 work_package_id: WP12
 title: ShapeLoader and Internal Refactoring in Frank.Validation
-lane: planned
+lane: "doing"
 dependencies:
 - WP10
+base_branch: 005-shacl-validation-from-fsharp-types-WP10
+base_commit: c0a8102670d8a4b4a3a7b2e7d6071ad5cab8f18c
+created_at: '2026-03-15T13:53:26.954185+00:00'
 subtasks: [T064, T065, T066, T067, T068, T069, T070]
+shell_pid: "8753"
 history:
 - timestamp: '2026-03-14T00:00:00Z'
   lane: planned
   agent: system
   shell_pid: ''
   action: Prompt generated from build-time SHACL unification design spec
-requirement_refs: [FR-001, FR-008, FR-009]
 design_ref: docs/superpowers/specs/2026-03-14-build-time-shacl-unification-design.md
+requirement_refs: [FR-001, FR-008, FR-009]
 ---
 
 # Work Package Prompt: WP12 -- ShapeLoader and Internal Refactoring in Frank.Validation
