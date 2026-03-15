@@ -1,7 +1,7 @@
 ---
 work_package_id: WP08
 title: Integration Tests & End-to-End Validation
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP07
 base_branch: 005-shacl-validation-from-fsharp-types-WP07
@@ -467,3 +467,4 @@ let customers = createTestHost (fun builder ->
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-15T19:42:55Z – claude-opus – shell_pid=41173 – lane=doing – Assigned agent via workflow command
+- 2026-03-15T19:49:36Z – claude-opus – shell_pid=41173 – lane=for_review – Ready for review: 25 integration tests covering valid/invalid flows, content negotiation, capabilities, custom constraints, edge cases
