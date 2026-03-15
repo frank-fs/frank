@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: MSBuild Auto-Invoke Target
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP09
 - WP10
@@ -9,8 +9,8 @@ base_branch: 005-shacl-validation-from-fsharp-types-WP11-merge-base
 base_commit: c0a8102670d8a4b4a3a7b2e7d6071ad5cab8f18c
 created_at: '2026-03-15T13:53:25.695367+00:00'
 subtasks: [T060, T061, T062, T063]
-shell_pid: "26695"
-agent: "claude-opus"
+shell_pid: "44929"
+agent: "claude-opus-reviewer"
 reviewed_by: "Ryan Riley"
 review_status: "approved"
 history:
@@ -206,3 +206,4 @@ Depends on WP09 + WP10 (enriched extraction pipeline). Can be developed in paral
 - 2026-03-15T19:08:58Z – claude-opus – shell_pid=26695 – lane=doing – Started review via workflow command
 - 2026-03-15T19:12:00Z – claude-opus – shell_pid=26695 – lane=done – Review passed: Constitution check clean. MSBuild auto-invoke target correctly implements GenerateFrankSemanticDefinitions with incremental build, graceful degradation, and proper target ordering. ArtifactSerializer shared module satisfies Constitution VIII (no duplication). CompileCommand.compileFromProject capturing pipeline avoids redundant disk I/O. All previous review feedback items verified as addressed.
 - 2026-03-15T19:19:53Z – claude-opus – shell_pid=26695 – lane=for_review – Moved to for_review
+- 2026-03-15T19:50:58Z – claude-opus-reviewer – shell_pid=44929 – lane=doing – Started review via workflow command
