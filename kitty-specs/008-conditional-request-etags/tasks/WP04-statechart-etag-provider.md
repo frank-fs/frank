@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: StatechartETagProvider
-lane: done
+lane: "for_review"
 dependencies:
 - WP01
 - WP02
@@ -291,3 +291,4 @@ type IServiceCollection with
 ## Activity Log
 
 - 2026-03-07T00:00:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-15T19:37:48Z – unknown – lane=for_review – Moved to for_review
