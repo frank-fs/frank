@@ -100,7 +100,7 @@
 - [x] T015 Create `src/Frank.Validation/Validator.fs` with `validate : ShaclShape -> IGraph -> ValidationReport`
 - [x] T016 Implement ShaclShape -> dotNetRdf `ShapesGraph` conversion (shapes graph construction)
 - [x] T017 Implement request data -> dotNetRdf `IGraph` conversion (data graph construction from JSON body / query params)
-- [ ] T018 Create `src/Frank.Validation/ValidationMiddleware.fs` with endpoint metadata check, deserialization, validation, and short-circuit
+- [x] T018 Create `src/Frank.Validation/ValidationMiddleware.fs` with endpoint metadata check, deserialization, validation, and short-circuit
 - [ ] T019 Implement query parameter validation for GET requests
 - [ ] T020 Create `test/Frank.Validation.Tests/ValidatorTests.fs` with pass/fail validation tests using dotNetRdf
 - [ ] T021 Create `test/Frank.Validation.Tests/MiddlewareTests.fs` with TestHost-based pipeline tests
