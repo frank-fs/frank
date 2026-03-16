@@ -2,9 +2,9 @@
 work_package_id: "WP04"
 title: "SQLite Durable Store Implementation"
 phase: "Phase 2 - Parallel Streams"
-lane: "planned"
+lane: "doing"
 assignee: ""
-agent: ""
+agent: "claude-opus"
 shell_pid: ""
 review_status: ""
 reviewed_by: ""
@@ -470,3 +470,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP04 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T04:03:27Z – claude-opus – lane=doing – Starting implementation - WP04 depends on IStateMachineStore which is unchanged, branching from master
