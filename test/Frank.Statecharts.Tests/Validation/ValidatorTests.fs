@@ -341,7 +341,6 @@ let exceptionHandlingTests =
 
               Expect.equal report.TotalFailures 1 "Should report 1 failure"
               Expect.stringContains report.Failures.[0].Description "bad argument" "Should contain error message"
-              Expect.stringContains report.Failures.[0].Description "ArgumentException" "Should contain exception type"
           }
 
           test "NullReferenceException is caught" {

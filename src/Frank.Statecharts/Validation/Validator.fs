@@ -2,7 +2,6 @@ namespace Frank.Statecharts.Validation
 
 open Frank.Statecharts.Ast
 
-<<<<<<< HEAD
 // ============================================================================
 // AST Helpers & Validator Orchestrator (Spec 021 - WP02)
 // Cross-Format Validation Rules (Spec 021 - WP04)
@@ -11,9 +10,6 @@ open Frank.Statecharts.Ast
 /// Shared AST traversal functions for extracting elements from
 /// StatechartDocument. Used by validation rules to avoid duplicating
 /// traversal logic.
-=======
-/// Shared traversal functions for extracting elements from StatechartDocument.
->>>>>>> 021-cross-format-validator-WP05
 module AstHelpers =
 
     /// Extract all StateNode values from a document, recursively including
@@ -24,7 +20,6 @@ module AstHelpers =
             |> List.collect (fun elem ->
                 match elem with
                 | StateDecl node ->
-<<<<<<< HEAD
                     node :: collectChildStates node
                 | GroupElement group ->
                     group.Branches
@@ -36,17 +31,6 @@ module AstHelpers =
         and collectChildStates (node: StateNode) =
             node.Children
             |> List.collect (fun child -> child :: collectChildStates child)
-=======
-                    node :: collectFromChildren node
-                | GroupElement group ->
-                    group.Branches
-                    |> List.collect (fun branch -> collectFromElements branch.Elements)
-                | _ -> [])
-
-        and collectFromChildren (node: StateNode) =
-            node.Children
-            |> List.collect (fun child -> child :: collectFromChildren child)
->>>>>>> 021-cross-format-validator-WP05
 
         collectFromElements doc.Elements
 
@@ -61,52 +45,33 @@ module AstHelpers =
                 | GroupElement group ->
                     group.Branches
                     |> List.collect (fun branch -> collectFromElements branch.Elements)
-<<<<<<< HEAD
                 | StateDecl _
                 | NoteElement _
                 | DirectiveElement _ -> [])
-=======
-                | _ -> [])
->>>>>>> 021-cross-format-validator-WP05
 
         collectFromElements doc.Elements
 
     /// Extract the set of all state identifiers from a document.
     let stateIdentifiers (doc: StatechartDocument) : string Set =
-<<<<<<< HEAD
         allStates doc
         |> List.map (fun s -> s.Identifier)
         |> Set.ofList
-=======
-        allStates doc |> List.map _.Identifier |> Set.ofList
->>>>>>> 021-cross-format-validator-WP05
 
     /// Extract the set of all event names from transitions in a document.
     /// Filters out None events.
     let eventNames (doc: StatechartDocument) : string Set =
         allTransitions doc
-<<<<<<< HEAD
         |> List.choose (fun t -> t.Event)
-=======
-        |> List.choose _.Event
->>>>>>> 021-cross-format-validator-WP05
         |> Set.ofList
 
     /// Extract the set of all transition target identifiers from a document.
     /// Filters out None (internal/completion) targets.
     let transitionTargets (doc: StatechartDocument) : string Set =
         allTransitions doc
-<<<<<<< HEAD
         |> List.choose (fun t -> t.Target)
         |> Set.ofList
 
 /// Validation orchestrator (FR-006, FR-007, FR-008, FR-009, FR-013).
-=======
-        |> List.choose _.Target
-        |> Set.ofList
-
-/// Validation orchestrator.
->>>>>>> 021-cross-format-validator-WP05
 module Validator =
 
     /// Validate statechart artifacts against registered rules.
@@ -114,7 +79,6 @@ module Validator =
     /// Catches exceptions from rules and reports them as failures.
     let validate (rules: ValidationRule list) (artifacts: FormatArtifact list) : ValidationReport =
         let availableTags =
-<<<<<<< HEAD
             artifacts |> List.map (fun a -> a.Format) |> Set.ofList
 
         let allChecks, allFailures =
@@ -170,70 +134,6 @@ module Validator =
 
         let checks = List.rev allChecks
         let failures = List.rev allFailures
-=======
-            artifacts |> List.map _.Format |> Set.ofList
-
-        let allChecks, allFailures =
-            rules
-            |> List.fold
-                (fun (checks, failures) rule ->
-                    if rule.RequiredFormats <> Set.empty
-                       && not (Set.isSubset rule.RequiredFormats availableTags)
-                    then
-                        let missingFormats =
-                            Set.difference rule.RequiredFormats availableTags
-                            |> Set.toList
-                            |> List.map (sprintf "%A")
-                            |> String.concat ", "
-
-                        let skipCheck =
-                            { Name = rule.Name
-                              Status = Skip
-                              Reason = Some(sprintf "Missing formats: %s" missingFormats) }
-
-                        (skipCheck :: checks, failures)
-                    else
-                        try
-                            let ruleChecks = rule.Check artifacts
-
-                            let ruleFailures =
-                                ruleChecks
-                                |> List.choose (fun c ->
-                                    if c.Status = Fail then
-                                        Some
-                                            { Formats = []
-                                              EntityType = "validation"
-                                              Expected = "pass"
-                                              Actual = "fail"
-                                              Description =
-                                                match c.Reason with
-                                                | Some reason ->
-                                                    sprintf "Rule '%s' failed: %s" rule.Name reason
-                                                | None -> sprintf "Rule '%s' failed" rule.Name }
-                                    else
-                                        None)
-
-                            (ruleChecks @ checks, ruleFailures @ failures)
-                        with ex ->
-                            let failCheck =
-                                { Name = rule.Name
-                                  Status = Fail
-                                  Reason = Some(sprintf "Exception: %s" ex.Message) }
-
-                            let failEntry =
-                                { Formats = []
-                                  EntityType = "validation"
-                                  Expected = "rule execution without exception"
-                                  Actual = sprintf "exception thrown: %s" ex.Message
-                                  Description =
-                                    sprintf "Rule '%s' threw %s: %s" rule.Name (ex.GetType().Name) ex.Message }
-
-                            (failCheck :: checks, failEntry :: failures))
-                ([], [])
-
-        let checks = allChecks |> List.rev
-        let failures = allFailures |> List.rev
->>>>>>> 021-cross-format-validator-WP05
 
         let totalChecks =
             checks
@@ -245,12 +145,154 @@ module Validator =
             |> List.filter (fun c -> c.Status = Skip)
             |> List.length
 
-<<<<<<< HEAD
         { TotalChecks = totalChecks
           TotalSkipped = totalSkipped
           TotalFailures = failures.Length
           Checks = checks
           Failures = failures }
+
+/// Universal self-consistency validation rules that check structural
+/// integrity of individual format artifacts. All rules use
+/// RequiredFormats = Set.empty (universal -- run on every artifact).
+module SelfConsistencyRules =
+
+    /// Check that all transition targets reference existing states within each artifact.
+    /// Orphan targets indicate broken transitions that reference non-existent states.
+    let orphanTransitionTargets: ValidationRule =
+        { Name = "Orphan transition targets"
+          RequiredFormats = Set.empty
+          Check = fun artifacts ->
+              artifacts
+              |> List.collect (fun artifact ->
+                  let stateIds = AstHelpers.stateIdentifiers artifact.Document
+                  let targets = AstHelpers.transitionTargets artifact.Document
+                  let orphans = targets - stateIds
+                  if Set.isEmpty orphans then
+                      [ { Name = sprintf "Orphan transition targets (%A)" artifact.Format
+                          Status = Pass
+                          Reason = None } ]
+                  else
+                      orphans
+                      |> Set.toList
+                      |> List.map (fun orphan ->
+                          { Name = sprintf "Orphan transition target '%s' (%A)" orphan artifact.Format
+                            Status = Fail
+                            Reason = Some (sprintf "Transition target '%s' does not reference any state in %A artifact. Available states: %s" orphan artifact.Format (stateIds |> Set.toList |> String.concat ", ")) })) }
+
+    /// Check that all state identifiers are unique within each artifact.
+    /// Duplicate identifiers cause ambiguity in transition resolution.
+    let duplicateStateIdentifiers: ValidationRule =
+        { Name = "Duplicate state identifiers"
+          RequiredFormats = Set.empty
+          Check = fun artifacts ->
+              artifacts
+              |> List.collect (fun artifact ->
+                  let allStates = AstHelpers.allStates artifact.Document
+                  let ids = allStates |> List.map (fun s -> s.Identifier)
+                  let duplicates =
+                      ids
+                      |> List.groupBy id
+                      |> List.filter (fun (_, group) -> group.Length > 1)
+                      |> List.map fst
+                  if List.isEmpty duplicates then
+                      [ { Name = sprintf "Duplicate state identifiers (%A)" artifact.Format
+                          Status = Pass
+                          Reason = None } ]
+                  else
+                      duplicates
+                      |> List.map (fun dup ->
+                          { Name = sprintf "Duplicate state identifier '%s' (%A)" dup artifact.Format
+                            Status = Fail
+                            Reason = Some (sprintf "State identifier '%s' appears multiple times in %A artifact" dup artifact.Format) })) }
+
+    /// Check that required AST fields are populated in each artifact.
+    /// State identifiers must be non-empty; transition sources must be non-empty.
+    let requiredAstFields: ValidationRule =
+        { Name = "Required AST fields"
+          RequiredFormats = Set.empty
+          Check = fun artifacts ->
+              artifacts
+              |> List.collect (fun artifact ->
+                  let states = AstHelpers.allStates artifact.Document
+                  let transitions = AstHelpers.allTransitions artifact.Document
+
+                  let emptyStateIds =
+                      states
+                      |> List.filter (fun s -> System.String.IsNullOrWhiteSpace s.Identifier)
+                      |> List.mapi (fun i _ ->
+                          { Name = sprintf "Empty state identifier #%d (%A)" (i + 1) artifact.Format
+                            Status = Fail
+                            Reason = Some (sprintf "State at index %d has empty identifier in %A artifact" i artifact.Format) })
+
+                  let emptyTransitionSources =
+                      transitions
+                      |> List.filter (fun t -> System.String.IsNullOrWhiteSpace t.Source)
+                      |> List.mapi (fun i _ ->
+                          { Name = sprintf "Empty transition source #%d (%A)" (i + 1) artifact.Format
+                            Status = Fail
+                            Reason = Some (sprintf "Transition at index %d has empty source in %A artifact" i artifact.Format) })
+
+                  let allIssues = emptyStateIds @ emptyTransitionSources
+                  if List.isEmpty allIssues then
+                      [ { Name = sprintf "Required AST fields (%A)" artifact.Format
+                          Status = Pass
+                          Reason = None } ]
+                  else
+                      allIssues) }
+
+    /// Warn about states with no incoming or outgoing transitions.
+    /// Isolated states may be intentional, so this is a warning (Pass with reason), not a failure.
+    let isolatedStates: ValidationRule =
+        { Name = "Isolated states"
+          RequiredFormats = Set.empty
+          Check = fun artifacts ->
+              artifacts
+              |> List.collect (fun artifact ->
+                  let stateIds = AstHelpers.stateIdentifiers artifact.Document
+                  let transitions = AstHelpers.allTransitions artifact.Document
+                  let sources = transitions |> List.map (fun t -> t.Source) |> Set.ofList
+                  let targets = transitions |> List.choose (fun t -> t.Target) |> Set.ofList
+                  let connected = Set.union sources targets
+                  let isolated = stateIds - connected
+
+                  if Set.isEmpty isolated then
+                      [ { Name = sprintf "Isolated states (%A)" artifact.Format
+                          Status = Pass
+                          Reason = None } ]
+                  else
+                      isolated
+                      |> Set.toList
+                      |> List.map (fun stateId ->
+                          { Name = sprintf "Isolated state '%s' (%A)" stateId artifact.Format
+                            Status = Pass  // WARNING, not failure
+                            Reason = Some (sprintf "State '%s' has no incoming or outgoing transitions in %A artifact (may be intentional)" stateId artifact.Format) })) }
+
+    /// Warn about artifacts with empty state machines (no states, no transitions).
+    /// An empty statechart passes structural validation but the warning alerts the developer.
+    let emptyStatechart: ValidationRule =
+        { Name = "Empty statechart"
+          RequiredFormats = Set.empty
+          Check = fun artifacts ->
+              artifacts
+              |> List.collect (fun artifact ->
+                  let states = AstHelpers.allStates artifact.Document
+                  let transitions = AstHelpers.allTransitions artifact.Document
+                  if List.isEmpty states && List.isEmpty transitions then
+                      [ { Name = sprintf "Empty statechart (%A)" artifact.Format
+                          Status = Pass  // WARNING, not failure
+                          Reason = Some (sprintf "%A artifact contains no states and no transitions" artifact.Format) } ]
+                  else
+                      [ { Name = sprintf "Empty statechart (%A)" artifact.Format
+                          Status = Pass
+                          Reason = None } ]) }
+
+    /// All universal self-consistency rules.
+    let rules: ValidationRule list =
+        [ orphanTransitionTargets
+          duplicateStateIdentifiers
+          requiredAstFields
+          isolatedStates
+          emptyStatechart ]
 
 /// Cross-format pairwise validation rules (Spec 021 - WP04).
 /// Implements state name agreement, event name agreement, and transition
@@ -431,12 +473,3 @@ module CrossFormatRules =
     /// Contains 30 rules (10 pairs x 3 check types).
     let rules : ValidationRule list =
         allPairwiseRules
-=======
-        let totalFailures = failures |> List.length
-
-        { TotalChecks = totalChecks
-          TotalSkipped = totalSkipped
-          TotalFailures = totalFailures
-          Checks = checks
-          Failures = failures }
->>>>>>> 021-cross-format-validator-WP05

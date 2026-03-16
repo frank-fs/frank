@@ -21,6 +21,11 @@
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Validation/TypeTests.fs" />
     <Compile Include="Validation/ValidatorTests.fs" />
+<<<<<<< HEAD
+=======
+    <Compile Include="Validation/SelfConsistencyTests.fs" />
+    <Compile Include="Validation/CrossFormatTests.fs" />
+>>>>>>> 021-wp06-tests-v2
     <Compile Include="Program.fs" />
   </ItemGroup>
 
