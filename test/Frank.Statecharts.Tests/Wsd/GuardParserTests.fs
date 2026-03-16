@@ -1,7 +1,7 @@
 module Frank.Statecharts.Tests.Wsd.GuardParserTests
 
 open Expecto
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.GuardParser
 
 let private pos line col : SourcePosition = { Line = line; Column = col }
@@ -168,7 +168,7 @@ let guardParserTests =
               Expect.hasLength errors 1 "one error"
               let err = List.head errors
               Expect.equal err.Description "Unclosed guard annotation bracket" "error description"
-              Expect.equal err.Position (pos 3 10) "error at base position"
+              Expect.equal err.Position (Some (pos 3 10)) "error at base position"
 
           testCase "empty key: =value"
           <| fun _ ->

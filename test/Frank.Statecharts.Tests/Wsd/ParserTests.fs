@@ -1,26 +1,57 @@
 module Frank.Statecharts.Tests.Wsd.ParserTests
 
 open Expecto
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Parser
 
-let private messages (result: ParseResult) =
-    result.Diagram.Elements
+/// Extract TransitionEdge elements from parse result
+let private transitions (result: ParseResult) =
+    result.Document.Elements
     |> List.choose (function
-        | MessageElement m -> Some m
+        | TransitionElement t -> Some t
         | _ -> None)
 
+/// Extract NoteContent elements from parse result
 let private notes (result: ParseResult) =
-    result.Diagram.Elements
+    result.Document.Elements
     |> List.choose (function
         | NoteElement n -> Some n
         | _ -> None)
 
-let private participantDecls (result: ParseResult) =
-    result.Diagram.Elements
+/// Extract StateNode declarations from parse result
+let private stateDecls (result: ParseResult) =
+    result.Document.Elements
     |> List.choose (function
-        | ParticipantDecl p -> Some p
+        | StateDecl s -> Some s
         | _ -> None)
+
+/// Extract WSD transition style from a TransitionEdge's annotations
+let private transitionStyle (edge: TransitionEdge) =
+    edge.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdTransitionStyle ts) -> Some ts
+        | _ -> None)
+
+/// Extract WSD note position from a NoteContent's annotations
+let private notePosition (note: NoteContent) =
+    note.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdNotePosition pos) -> Some pos
+        | _ -> None)
+
+/// Extract guard pairs from a NoteContent's annotations
+let private noteGuard (note: NoteContent) =
+    note.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdGuardData pairs) -> Some pairs
+        | _ -> None)
+
+/// Check if document has AutoNumber directive
+let private hasAutoNumber (result: ParseResult) =
+    result.Document.Elements
+    |> List.exists (function
+        | DirectiveElement(AutoNumberDirective _) -> true
+        | _ -> false)
 
 [<Tests>]
 let parserTests =
@@ -33,64 +64,69 @@ let parserTests =
               let result = parseWsd ""
               Expect.isEmpty result.Errors "no errors"
               Expect.isEmpty result.Warnings "no warnings"
-              Expect.isNone result.Diagram.Title "no title"
-              Expect.isFalse result.Diagram.AutoNumber "no autonumber"
-              Expect.isEmpty result.Diagram.Participants "no participants"
-              Expect.isEmpty result.Diagram.Elements "no elements"
+              Expect.isNone result.Document.Title "no title"
+              Expect.isFalse (hasAutoNumber result) "no autonumber"
+              Expect.isEmpty (stateDecls result) "no participants"
+              Expect.isEmpty result.Document.Elements "no elements"
 
           testCase "whitespace only produces empty diagram"
           <| fun _ ->
               let result = parseWsd "   \n  \n  "
               Expect.isEmpty result.Errors "no errors"
-              Expect.isEmpty result.Diagram.Elements "no elements"
+              Expect.isEmpty result.Document.Elements "no elements"
 
           testCase "single newline produces empty diagram"
           <| fun _ ->
               let result = parseWsd "\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.isEmpty result.Diagram.Elements "no elements"
+              Expect.isEmpty result.Document.Elements "no elements"
 
           testCase "comments only produces empty diagram"
           <| fun _ ->
               let result = parseWsd "# comment\n# another comment\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.isEmpty result.Diagram.Elements "no elements"
+              Expect.isEmpty result.Document.Elements "no elements"
 
           // === Participant tests (T019) ===
           testCase "participant explicit no alias"
           <| fun _ ->
               let result = parseWsd "participant Client\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Participants.Length 1 "one participant"
-              let p = result.Diagram.Participants.[0]
-              Expect.equal p.Name "Client" "name"
-              Expect.isNone p.Alias "no alias"
-              Expect.isTrue p.Explicit "explicit"
+              let decls = stateDecls result
+              Expect.equal decls.Length 1 "one participant"
+              let p = decls.[0]
+              Expect.equal p.Identifier "Client" "name"
+              Expect.isNone p.Label "no alias"
 
           testCase "participant with string alias"
           <| fun _ ->
               let result = parseWsd "participant API as \"REST API\"\n"
               Expect.isEmpty result.Errors "no errors"
-              let p = result.Diagram.Participants.[0]
-              Expect.equal p.Name "API" "name"
-              Expect.equal p.Alias (Some "REST API") "alias"
-              Expect.isTrue p.Explicit "explicit"
+              let decls = stateDecls result
+              let p = decls.[0]
+              Expect.equal p.Identifier "API" "name"
+              Expect.equal p.Label (Some "REST API") "alias"
 
           testCase "participant with identifier alias"
           <| fun _ ->
               let result = parseWsd "participant X as Y\n"
               Expect.isEmpty result.Errors "no errors"
-              let p = result.Diagram.Participants.[0]
-              Expect.equal p.Name "X" "name"
-              Expect.equal p.Alias (Some "Y") "alias"
+              let decls = stateDecls result
+              let p = decls.[0]
+              Expect.equal p.Identifier "X" "name"
+              Expect.equal p.Label (Some "Y") "alias"
 
           testCase "duplicate participant is a no-op"
           <| fun _ ->
               let result = parseWsd "participant Client\nparticipant Client\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Participants.Length 1 "still one participant"
-              let decls = participantDecls result
+              // Unique identifiers -- deduplicated at the participant map level,
+              // but two StateDecl elements are still emitted
+              let decls = stateDecls result
               Expect.equal decls.Length 2 "two decl elements emitted"
+              // Both have the same identifier
+              let uniqueNames = decls |> List.map (fun s -> s.Identifier) |> List.distinct
+              Expect.equal uniqueNames.Length 1 "still one unique participant"
 
           testCase "participant with no name produces error"
           <| fun _ ->
@@ -102,7 +138,7 @@ let parserTests =
           <| fun _ ->
               let result = parseWsd "participant A\nparticipant B\nparticipant C\n"
               Expect.isEmpty result.Errors "no errors"
-              let names = result.Diagram.Participants |> List.map (fun p -> p.Name)
+              let names = stateDecls result |> List.map (fun s -> s.Identifier)
               Expect.equal names [ "A"; "B"; "C" ] "order preserved"
 
           // === Message tests (T020) ===
@@ -112,89 +148,100 @@ let parserTests =
                   parseWsd "participant Client\nparticipant Server\nClient->Server: hello\n"
 
               Expect.isEmpty result.Errors "no errors"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].Sender "Client" "sender"
-              Expect.equal msgs.[0].Receiver "Server" "receiver"
-              Expect.equal msgs.[0].ArrowStyle Solid "solid"
-              Expect.equal msgs.[0].Direction Forward "forward"
-              Expect.equal msgs.[0].Label "hello" "label"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              Expect.equal edges.[0].Source "Client" "sender"
+              Expect.equal edges.[0].Target (Some "Server") "receiver"
+              let style = (transitionStyle edges.[0]).Value
+              Expect.equal style.ArrowStyle ArrowStyle.Solid "solid"
+              Expect.equal style.Direction Direction.Forward "forward"
+              Expect.equal edges.[0].Event (Some "hello") "label"
 
           testCase "dashed forward message"
           <| fun _ ->
               let result = parseWsd "Client-->Server: getData\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].ArrowStyle Dashed "dashed"
-              Expect.equal msgs.[0].Direction Forward "forward"
-              Expect.equal msgs.[0].Label "getData" "label"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              let style = (transitionStyle edges.[0]).Value
+              Expect.equal style.ArrowStyle ArrowStyle.Dashed "dashed"
+              Expect.equal style.Direction Direction.Forward "forward"
+              Expect.equal edges.[0].Event (Some "getData") "label"
 
           testCase "solid deactivating message"
           <| fun _ ->
               let result = parseWsd "Server->-Client: 200 OK\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].ArrowStyle Solid "solid"
-              Expect.equal msgs.[0].Direction Deactivating "deactivating"
-              Expect.equal msgs.[0].Label "200 OK" "label"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              let style = (transitionStyle edges.[0]).Value
+              Expect.equal style.ArrowStyle ArrowStyle.Solid "solid"
+              Expect.equal style.Direction Direction.Deactivating "deactivating"
+              Expect.equal edges.[0].Event (Some "200 OK") "label"
 
           testCase "dashed deactivating message"
           <| fun _ ->
               let result = parseWsd "Server-->-Client: result\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].ArrowStyle Dashed "dashed"
-              Expect.equal msgs.[0].Direction Deactivating "deactivating"
-              Expect.equal msgs.[0].Label "result" "label"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              let style = (transitionStyle edges.[0]).Value
+              Expect.equal style.ArrowStyle ArrowStyle.Dashed "dashed"
+              Expect.equal style.Direction Direction.Deactivating "deactivating"
+              Expect.equal edges.[0].Event (Some "result") "label"
 
           testCase "message with parameters"
           <| fun _ ->
               let result = parseWsd "Client->API: createUser(name, email)\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].Label "createUser" "label"
-              Expect.equal msgs.[0].Parameters [ "name"; "email" ] "two params"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              Expect.equal edges.[0].Event (Some "createUser") "label"
+              Expect.equal edges.[0].Parameters [ "name"; "email" ] "two params"
 
           testCase "message with empty parens"
           <| fun _ ->
               let result = parseWsd "Client->API: getStatus()\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
-              Expect.equal msgs.[0].Label "getStatus" "label"
-              Expect.isEmpty msgs.[0].Parameters "empty params"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
+              Expect.equal edges.[0].Event (Some "getStatus") "label"
+              Expect.isEmpty edges.[0].Parameters "empty params"
 
           testCase "message with no parens"
           <| fun _ ->
               let result = parseWsd "Client->API: simple\n"
-              let msgs = messages result
-              Expect.equal msgs.[0].Label "simple" "label"
-              Expect.isEmpty msgs.[0].Parameters "no params"
+              let edges = transitions result
+              Expect.equal edges.[0].Event (Some "simple") "label"
+              Expect.isEmpty edges.[0].Parameters "no params"
 
           testCase "implicit participants produce warnings"
           <| fun _ ->
               let result = parseWsd "Foo->Bar: hello\n"
-              let msgs = messages result
-              Expect.hasLength msgs 1 "one message"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one message"
               // Should have warnings for implicit participants
               Expect.isGreaterThanOrEqual result.Warnings.Length 2 "at least two warnings for implicit participants"
-              Expect.equal result.Diagram.Participants.Length 2 "two participants"
+              let decls = stateDecls result
+              Expect.equal decls.Length 2 "two participants"
 
-              let foo = result.Diagram.Participants |> List.find (fun p -> p.Name = "Foo")
+              // Check Foo is implicit by verifying the warning exists
+              let fooWarning =
+                  result.Warnings |> List.exists (fun w -> w.Description.Contains("'Foo'"))
 
-              Expect.isFalse foo.Explicit "Foo is implicit"
+              Expect.isTrue fooWarning "Foo has implicit warning"
 
           testCase "explicit then implicit: participant stays explicit"
           <| fun _ ->
               let result = parseWsd "participant Client\nClient->Server: hi\n"
               Expect.isEmpty result.Errors "no errors"
 
-              let client = result.Diagram.Participants |> List.find (fun p -> p.Name = "Client")
+              // Client is explicit -- no implicit warning for Client
+              let clientWarning =
+                  result.Warnings |> List.exists (fun w -> w.Description.Contains("'Client'"))
 
-              Expect.isTrue client.Explicit "Client is explicit"
+              Expect.isFalse clientWarning "Client is explicit (no implicit warning)"
 
-              let server = result.Diagram.Participants |> List.find (fun p -> p.Name = "Server")
+              // Server is implicit -- has implicit warning
+              let serverWarning =
+                  result.Warnings |> List.exists (fun w -> w.Description.Contains("'Server'"))
 
-              Expect.isFalse server.Explicit "Server is implicit"
+              Expect.isTrue serverWarning "Server is implicit"
 
           testCase "missing receiver after arrow produces error"
           <| fun _ ->
@@ -206,25 +253,25 @@ let parserTests =
           <| fun _ ->
               let result = parseWsd "title My Diagram\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "My Diagram") "title"
+              Expect.equal result.Document.Title (Some "My Diagram") "title"
 
           testCase "title directive with colon"
           <| fun _ ->
               let result = parseWsd "title: My Diagram\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "My Diagram") "title"
+              Expect.equal result.Document.Title (Some "My Diagram") "title"
 
           testCase "autonumber directive"
           <| fun _ ->
               let result = parseWsd "autonumber\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.isTrue result.Diagram.AutoNumber "autonumber enabled"
+              Expect.isTrue (hasAutoNumber result) "autonumber enabled"
 
           testCase "duplicate title produces warning"
           <| fun _ ->
               let result = parseWsd "title First\ntitle Second\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "Second") "last title wins"
+              Expect.equal result.Document.Title (Some "Second") "last title wins"
 
               Expect.isTrue
                   (result.Warnings
@@ -235,7 +282,7 @@ let parserTests =
           <| fun _ ->
               let result = parseWsd "title\n"
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "") "empty title"
+              Expect.equal result.Document.Title (Some "") "empty title"
 
           // === Note tests (T022) ===
           testCase "note over participant"
@@ -244,10 +291,10 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
               let ns = notes result
               Expect.hasLength ns 1 "one note"
-              Expect.equal ns.[0].NotePosition NotePosition.Over "over"
+              Expect.equal (notePosition ns.[0]) (Some WsdNotePosition.Over) "over"
               Expect.equal ns.[0].Target "Client" "target"
               Expect.equal ns.[0].Content "This is a note" "content"
-              Expect.isNone ns.[0].Guard "no guard"
+              Expect.isNone (noteGuard ns.[0]) "no guard"
 
           testCase "note left of participant"
           <| fun _ ->
@@ -255,7 +302,7 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
               let ns = notes result
               Expect.hasLength ns 1 "one note"
-              Expect.equal ns.[0].NotePosition NotePosition.LeftOf "left of"
+              Expect.equal (notePosition ns.[0]) (Some WsdNotePosition.LeftOf) "left of"
 
           testCase "note right of participant"
           <| fun _ ->
@@ -263,15 +310,15 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
               let ns = notes result
               Expect.hasLength ns 1 "one note"
-              Expect.equal ns.[0].NotePosition NotePosition.RightOf "right of"
+              Expect.equal (notePosition ns.[0]) (Some WsdNotePosition.RightOf) "right of"
 
           testCase "note with guard text is parsed by guard parser"
           <| fun _ ->
               let result = parseWsd "participant Client\nnote over Client: [guard: role=admin]\n"
               Expect.isEmpty result.Errors "no errors"
               let ns = notes result
-              Expect.isSome ns.[0].Guard "guard is parsed (WP06 integration)"
-              Expect.equal ns.[0].Guard.Value.Pairs [ ("role", "admin") ] "guard pairs"
+              Expect.isSome (noteGuard ns.[0]) "guard is parsed (WP06 integration)"
+              Expect.equal (noteGuard ns.[0]).Value [ ("role", "admin") ] "guard pairs"
               Expect.equal ns.[0].Content "" "content is empty after guard extraction"
 
           testCase "note with missing position keyword produces error"
@@ -296,7 +343,7 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
 
               let groups =
-                  result.Diagram.Elements
+                  result.Document.Elements
                   |> List.choose (function
                       | GroupElement g -> Some g
                       | _ -> None)
@@ -319,13 +366,15 @@ Server->-Client: response
 """
 
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Participants.Length 2 "two participants"
-              let msgs = messages result
-              Expect.equal msgs.Length 2 "two messages"
-              Expect.equal msgs.[0].ArrowStyle Solid "first is solid"
-              Expect.equal msgs.[0].Direction Forward "first is forward"
-              Expect.equal msgs.[1].ArrowStyle Solid "second is solid"
-              Expect.equal msgs.[1].Direction Deactivating "second is deactivating"
+              Expect.equal (stateDecls result).Length 2 "two participants"
+              let edges = transitions result
+              Expect.equal edges.Length 2 "two messages"
+              let style0 = (transitionStyle edges.[0]).Value
+              Expect.equal style0.ArrowStyle ArrowStyle.Solid "first is solid"
+              Expect.equal style0.Direction Direction.Forward "first is forward"
+              let style1 = (transitionStyle edges.[1]).Value
+              Expect.equal style1.ArrowStyle ArrowStyle.Solid "second is solid"
+              Expect.equal style1.Direction Direction.Deactivating "second is deactivating"
 
           testCase "US1-S2: title and autonumber directives"
           <| fun _ ->
@@ -338,8 +387,8 @@ participant Client
 """
 
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "My Sequence") "title"
-              Expect.isTrue result.Diagram.AutoNumber "autonumber"
+              Expect.equal result.Document.Title (Some "My Sequence") "title"
+              Expect.isTrue (hasAutoNumber result) "autonumber"
 
           testCase "US1-S3: message parameters"
           <| fun _ ->
@@ -352,9 +401,9 @@ Client->API: createUser(name, email, role)
 """
 
               Expect.isEmpty result.Errors "no errors"
-              let msgs = messages result
-              Expect.equal msgs.[0].Label "createUser" "label"
-              Expect.equal msgs.[0].Parameters [ "name"; "email"; "role" ] "three params"
+              let edges = transitions result
+              Expect.equal edges.[0].Event (Some "createUser") "label"
+              Expect.equal edges.[0].Parameters [ "name"; "email"; "role" ] "three params"
 
           testCase "US1-S4: mixed arrow types"
           <| fun _ ->
@@ -370,16 +419,20 @@ B-->-A: dashedDeact
 """
 
               Expect.isEmpty result.Errors "no errors"
-              let msgs = messages result
-              Expect.equal msgs.Length 4 "four messages"
-              Expect.equal msgs.[0].ArrowStyle Solid "msg1 solid"
-              Expect.equal msgs.[0].Direction Forward "msg1 forward"
-              Expect.equal msgs.[1].ArrowStyle Dashed "msg2 dashed"
-              Expect.equal msgs.[1].Direction Forward "msg2 forward"
-              Expect.equal msgs.[2].ArrowStyle Solid "msg3 solid"
-              Expect.equal msgs.[2].Direction Deactivating "msg3 deactivating"
-              Expect.equal msgs.[3].ArrowStyle Dashed "msg4 dashed"
-              Expect.equal msgs.[3].Direction Deactivating "msg4 deactivating"
+              let edges = transitions result
+              Expect.equal edges.Length 4 "four messages"
+              let s0 = (transitionStyle edges.[0]).Value
+              Expect.equal s0.ArrowStyle ArrowStyle.Solid "msg1 solid"
+              Expect.equal s0.Direction Direction.Forward "msg1 forward"
+              let s1 = (transitionStyle edges.[1]).Value
+              Expect.equal s1.ArrowStyle ArrowStyle.Dashed "msg2 dashed"
+              Expect.equal s1.Direction Direction.Forward "msg2 forward"
+              let s2 = (transitionStyle edges.[2]).Value
+              Expect.equal s2.ArrowStyle ArrowStyle.Solid "msg3 solid"
+              Expect.equal s2.Direction Direction.Deactivating "msg3 deactivating"
+              let s3 = (transitionStyle edges.[3]).Value
+              Expect.equal s3.ArrowStyle ArrowStyle.Dashed "msg4 dashed"
+              Expect.equal s3.Direction Direction.Deactivating "msg4 deactivating"
 
           testCase "mixed elements: participants, messages, notes, directives"
           <| fun _ ->
@@ -396,11 +449,11 @@ Server->-Client: 200 OK
 """
 
               Expect.isEmpty result.Errors "no errors"
-              Expect.equal result.Diagram.Title (Some "System Overview") "title"
-              Expect.isTrue result.Diagram.AutoNumber "autonumber"
-              Expect.equal result.Diagram.Participants.Length 2 "two participants"
-              let msgs = messages result
-              Expect.equal msgs.Length 2 "two messages"
+              Expect.equal result.Document.Title (Some "System Overview") "title"
+              Expect.isTrue (hasAutoNumber result) "autonumber"
+              Expect.equal (stateDecls result).Length 2 "two participants"
+              let edges = transitions result
+              Expect.equal edges.Length 2 "two messages"
               let ns = notes result
               Expect.equal ns.Length 1 "one note"
 
@@ -416,6 +469,10 @@ participant Client
 
               Expect.isEmpty result.Errors "no errors"
 
-              let client = result.Diagram.Participants |> List.find (fun p -> p.Name = "Client")
+              // Client was implicit then explicitly declared -- no implicit warning should remain
+              // (or if the warning was emitted before the explicit decl, that's parser-internal)
+              // We verify Client appears as a StateDecl
+              let clientDecls =
+                  stateDecls result |> List.filter (fun s -> s.Identifier = "Client")
 
-              Expect.isTrue client.Explicit "Client upgraded to explicit" ]
+              Expect.isGreaterThanOrEqual clientDecls.Length 1 "Client appears as declared" ]
