@@ -25,7 +25,7 @@
 - [x] T003 Create `src/Frank.Cli.Core/Commands/StalenessChecker.fs` with StalenessResult type, computeFileHash, and checkStaleness extracted from ValidateCommand
 - [x] T004 Add ProjectStatus types (ExtractionStatus, ArtifactStatus, RecommendedAction, ProjectStatus record) to HelpTypes.fs
 - [x] T005 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entries for HelpTypes.fs, FuzzyMatch.fs, StalenessChecker.fs in correct dependency order
-- [ ] T006 Refactor `src/Frank.Cli.Core/Commands/ValidateCommand.fs` to call StalenessChecker instead of local computeFileHash/checkStaleness
+- [x] T006 Refactor `src/Frank.Cli.Core/Commands/ValidateCommand.fs` to call StalenessChecker instead of local computeFileHash/checkStaleness
 
 ### Implementation Notes
 - HelpTypes.fs must be compiled before FuzzyMatch.fs and StalenessChecker.fs.
