@@ -526,10 +526,10 @@ module HelpRenderer =
 **Validation**:
 - [ ] `dotnet build src/Frank.Cli.Core/Frank.Cli.Core.fsproj` succeeds
 - [x] Text WORKFLOW section matches contracts format (uppercase header, 2-space indent, step/total/optional/prereqs/nextsteps)
-- [ ] Text EXAMPLES section matches contracts format (2-space invocation, 4-space description)
-- [ ] Text CONTEXT section matches contracts format (uppercase header, 2-space indent)
+- [x] Text EXAMPLES section matches contracts format (2-space invocation, 4-space description)
+- [x] Text CONTEXT section matches contracts format (uppercase header, 2-space indent)
 - [ ] JSON command help matches contracts structure
-- [ ] Text status output matches contracts for all states
+- [x] Text status output matches contracts for all states
 - [ ] JSON status output matches contracts for all states
 - [ ] Help index, topic, and "did you mean?" outputs match contracts
 
