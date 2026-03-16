@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Actor Concurrency Validation & Documentation
-lane: "doing"
+lane: "for_review"
 dependencies: [WP02]
 base_branch: 010-statecharts-production-readiness-WP01
 base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
@@ -252,3 +252,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:03:04Z – claude-opus-4-6 – shell_pid=98858 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:15:11Z – claude-opus-4-6 – shell_pid=98858 – lane=for_review – Moved to for_review
