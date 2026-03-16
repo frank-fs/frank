@@ -7,12 +7,12 @@ subtasks:
   - "T031"
 title: "ALPS Mapper -- Bidirectional Shared AST Mapping"
 phase: "Phase 3 - Shared AST Integration"
-lane: "planned"
+lane: "done"
 assignee: ""
-agent: ""
+agent: "claude-opus-4-6"
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01", "WP02"]
 requirement_refs: ["FR-009", "FR-010", "FR-011", "FR-012"]
 history:
@@ -347,3 +347,4 @@ val fromStatechartDocument : doc: StatechartDocument -> AlpsDocument
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
+- 2026-03-16T11:59:25Z – claude-opus-4-6 – lane=done – Review passed: All 4 subtasks (T028-T031) correctly implemented. Mapper depends only on ALPS types and spec 020 shared AST (AD-001). Guard extraction uses id=guard (FR-012). AlpsTransitionKind annotations preserve Safe/Unsafe/Idempotent classification (FR-010). Hash-prefix handling on rt values correct in both directions. Empty/minimal document edge cases handled. 355 tests pass (0 failures). Ast/Types.fs from spec 020 WP01 (approved) included as prerequisite.
