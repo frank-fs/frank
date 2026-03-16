@@ -2,12 +2,12 @@
 work_package_id: "WP04"
 title: "Migrate WSD Test Files"
 phase: "Phase 2 - Parser Migration"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP03"]
 requirement_refs:
   - "FR-011"
@@ -340,3 +340,4 @@ spec-kitty implement WP04 --base WP03
 ## Activity Log
 
 - 2026-03-15T23:59:08Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T11:45:28Z – unknown – lane=done – Moved to done
