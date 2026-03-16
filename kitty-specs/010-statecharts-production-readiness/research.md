@@ -4,7 +4,7 @@
 **Date**: 2026-03-15 (revised)
 **Revision**: 3 -- replaces stale D-003 (two separate guard lists) with Guard DU per updated spec
 
-## Decision 1: State Key Extraction Mechanism (FR-001, FR-002, FR-013)
+## Decision 1: State Key Extraction Mechanism (FR-001, FR-002, FR-012)
 
 **Status**: CARRIED FORWARD from revision 1 (unchanged)
 
@@ -38,7 +38,7 @@ For simple DU cases like `XTurn` or `Draw`, `ToString()` returns `"XTurn"` or `"
 
 3. **Existing precedent in the codebase**: `src/Frank.LinkedData/Rdf/InstanceProjector.fs` (line 94) already uses `FSharpValue.PreComputeUnionTagReader` for option type handling. This is not a new pattern for the project.
 
-4. **Immune to `ToString()` overrides** (FR-013): The tag reader bypasses `ToString()` entirely. Even if a developer overrides `ToString()` on their state type, the key extraction uses the compiler-generated tag discriminator.
+4. **Immune to `ToString()` overrides** (FR-012): The tag reader bypasses `ToString()` entirely. Even if a developer overrides `ToString()` on their state type, the key extraction uses the compiler-generated tag discriminator.
 
 5. **Backward compatible** (FR-002): Simple (non-parameterized) DU cases produce the same key as `ToString()` would -- the case name string. No existing code needs modification.
 
@@ -128,7 +128,7 @@ This is already the correct pattern. The key insight is: **no interface changes 
 
 ---
 
-## Decision 3: Guard DU with AccessControl and EventValidation Cases (FR-005, FR-006, FR-012)
+## Decision 3: Guard DU with AccessControl and EventValidation Cases (FR-005, FR-006)
 
 **Status**: NEW in revision 3 -- replaces stale D-003 (two separate guard lists with `Guards` and `EventGuards` fields)
 
@@ -151,7 +151,7 @@ This is because guards are evaluated *before* the handler runs (step 3 in middle
 Revision 1 and 2 of this research chose "Option A -- Two separate guard lists": adding `EventGuards: Guard<'S,'E,'C> list` as a new field on `StateMachine`, keeping the existing `Guards` field unchanged, and splitting guard evaluation into two closures. This was rejected by the spec update because:
 
 1. **It doesn't fix the type safety problem**: Access-control guards still receive `GuardContext` with `Event: 'E` containing `Unchecked.defaultof<'E>`. The dangerous footgun remains in the type system -- nothing prevents a developer from accidentally reading `ctx.Event` in an access-control guard.
-2. **Two separate lists is not a DU**: The spec explicitly requires "a discriminated union with two cases" (FR-005, FR-012). A DU is semantically cleaner -- the case name tells you what the guard does and what parameters it receives.
+2. **Two separate lists is not a DU**: The spec explicitly requires "a discriminated union with two cases" (FR-005). A DU is semantically cleaner -- the case name tells you what the guard does and what parameters it receives.
 3. **The DU case determines the type signature**: `AccessControl` guards have NO event parameter at all (not `Unchecked.defaultof`, not `option`, just absent). `EventValidation` guards receive the actual event value. This is only achievable with a DU where each case has a different function signature.
 
 ### Options Considered

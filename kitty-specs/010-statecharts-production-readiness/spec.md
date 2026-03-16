@@ -47,18 +47,18 @@ A Frank developer's stateful resource correctly handles concurrent requests from
 
 ### User Story 3 - Guard Access to Event Context (Priority: P2)
 
-A Frank developer defines guards that need to inspect the incoming event to make authorization decisions. Currently, guards run before the handler sets the event, so they receive `Unchecked.defaultof<'E>` — a null/default value that is a footgun. The fix is simple: change the guard's event parameter to `'Event option`. Guards receive `None` before the handler runs and `Some event` after. Guards that don't need the event ignore the option; guards that need it pattern match on `Some`.
+A Frank developer defines guards that need to inspect the incoming event to make authorization decisions. Currently, guards run before the handler sets the event, so they receive `Unchecked.defaultof<'E>` — a null/default value that is a footgun. The fix replaces the single guard function with a discriminated union containing two cases: `AccessControl` (receives user, state, context — runs pre-handler, no event parameter) and `EventValidation` (receives user, state, event, context — runs post-handler with the actual event). The DU case determines both execution timing and type signature, so guards that don't need the event use `AccessControl` and guards that do use `EventValidation`. This is a breaking change, acceptable for pre-1.0.
 
-**Why this priority**: This is an API correctness issue. The current `Unchecked.defaultof<'E>` behavior can cause runtime errors in guards that access the event. Since this is a pre-1.0 library, backward compatibility is not a constraint — the guard signature can change freely.
+**Why this priority**: This is an API correctness issue. The current `Unchecked.defaultof<'E>` behavior can cause runtime errors in guards that access the event. Since this is a pre-1.0 library, backward compatibility is not a constraint — the guard type can change freely.
 
-**Independent Test**: Define a guard that pattern matches on the event option. Trigger a request that sets an event. Verify the guard receives `Some event`. For a GET request (no event), verify the guard receives `None`.
+**Independent Test**: Define an `AccessControl` guard that checks user/state and an `EventValidation` guard that inspects the event. Trigger a POST request that sets an event. Verify the `EventValidation` guard receives the actual event value. For a GET request (no event), verify only the `AccessControl` guard runs.
 
 **Acceptance Scenarios**:
 
-1. **Given** a guard that ignores the event parameter, **When** the guard is evaluated (pre- or post-handler), **Then** it works correctly regardless of whether the event is `None` or `Some`.
-2. **Given** a guard that pattern matches on `Some event`, **When** evaluated after the handler sets the event, **Then** it receives `Some` with the actual event value.
-3. **Given** a guard that pattern matches on `Some event`, **When** evaluated before the handler runs (or on a GET request), **Then** it receives `None`.
-4. **Given** the guard signature change from `'Event` to `'Event option`, **When** existing guard code is updated, **Then** guards that only check `User` and `CurrentState` need only add `_` for the event parameter.
+1. **Given** an `AccessControl` guard that checks only user and state, **When** the guard is evaluated pre-handler, **Then** it works correctly without any event parameter.
+2. **Given** an `EventValidation` guard that inspects the event, **When** evaluated post-handler after the event is set, **Then** it receives the actual event value (not `Unchecked.defaultof`).
+3. **Given** a GET request (no event), **When** guards are evaluated, **Then** only `AccessControl` guards run; `EventValidation` guards are skipped.
+4. **Given** the guard type change from a single function to a DU with `AccessControl` and `EventValidation` cases, **When** existing guard code is updated, **Then** guards that only check user and state become `AccessControl` cases, and guards that need the event become `EventValidation` cases.
 
 ---
 
@@ -99,15 +99,14 @@ A Frank developer deploys a stateful resource to production and needs state to s
 - **FR-002**: System MUST preserve backward compatibility for simple (non-parameterized) DU cases -- existing `inState` registrations must work without modification
 - **FR-003**: System MUST require that all `IStateMachineStore` implementations serialize state access through an actor (e.g., `MailboxProcessor`), ensuring no concurrent reads or writes to the backing store
 - **FR-004**: System MUST ensure that persistence (for durable stores) goes through the actor — external code never reads or writes the backing store directly
-- **FR-005**: System MUST replace the current guard type with a discriminated union: `AccessControl` (no event parameter) and `EventValidation` (with event parameter). The DU case determines both execution phase and type signature.
+- **FR-005**: System MUST replace the current guard type with a discriminated union: `AccessControl` (no event parameter) and `EventValidation` (with event parameter). The DU case determines both execution phase and type signature. This is a breaking change (acceptable for pre-1.0).
 - **FR-006**: System MUST eliminate the use of `Unchecked.defaultof<'E>` in guard evaluation — `AccessControl` guards have no event parameter, `EventValidation` guards receive the actual event
 - **FR-007**: System MUST provide a SQLite-backed `IStateMachineStore` implementation that persists state durably across application restarts
 - **FR-008**: System MUST auto-create the SQLite schema on first use (no manual migration step required)
 - **FR-009**: System MUST serialize all SQLite store access through an actor, eliminating the need for database-level concurrency control
 - **FR-010**: System MUST support the `Subscribe` (observable) interface on the SQLite store with the same behavioral semantics as the in-memory store
 - **FR-011**: System MUST allow the SQLite store to be registered via dependency injection as a drop-in replacement for the in-memory store
-- **FR-012**: System MUST update the guard type to a DU with `AccessControl` and `EventValidation` cases — this is a breaking change (acceptable for pre-1.0)
-- **FR-013**: System MUST handle the case where `ToString()` has been overridden on a state type without producing incorrect key collisions
+- **FR-012**: System MUST handle the case where `ToString()` has been overridden on a state type without producing incorrect key collisions
 
 ### Key Entities
 

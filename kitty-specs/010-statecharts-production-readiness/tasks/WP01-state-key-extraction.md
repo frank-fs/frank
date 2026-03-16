@@ -12,7 +12,7 @@ dependencies: []
 requirement_refs:
   - "FR-001"
   - "FR-002"
-  - "FR-013"
+  - "FR-012"
 subtasks:
   - "T001"
   - "T002"

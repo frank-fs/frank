@@ -12,7 +12,6 @@ dependencies: ["WP01"]
 requirement_refs:
   - "FR-005"
   - "FR-006"
-  - "FR-012"
 subtasks:
   - "T008"
   - "T009"
@@ -78,7 +77,7 @@ Replace the current `Guard` record type and `GuardContext` record with a `Guard`
 
 ## Context & Constraints
 
-- **Spec**: `/kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 3 (Guard Access to Event Context), FR-005, FR-006, FR-012
+- **Spec**: `/kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 3 (Guard Access to Event Context), FR-005, FR-006
 - **Plan**: `/kitty-specs/010-statecharts-production-readiness/plan.md` -- Decision D-003
 - **Research**: `/kitty-specs/010-statecharts-production-readiness/research.md` -- Decision 3 (full rationale, builder closure sketches)
 - **Data Model**: `/kitty-specs/010-statecharts-production-readiness/data-model.md` -- Guard DU entity, AccessControlContext, EventValidationContext, StateMachineMetadata changes, middleware flow
