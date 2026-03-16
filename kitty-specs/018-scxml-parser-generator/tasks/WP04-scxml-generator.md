@@ -10,10 +10,10 @@ subtasks:
   - "T019"
 title: "SCXML Generator"
 phase: "Phase 2 - Implementation"
-lane: "for_review"
+lane: "doing"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus-review"
+shell_pid: "10320"
 review_status: ""
 reviewed_by: ""
 dependencies: ["WP01"]
@@ -442,3 +442,4 @@ Expected output:
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:21:37Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-16T04:26:53Z – claude-opus-review – shell_pid=10320 – lane=doing – Started review via workflow command
