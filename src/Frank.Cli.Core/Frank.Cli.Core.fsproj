@@ -20,9 +20,12 @@
     <Compile Include="Analysis/ProjectLoader.fs" />
     <Compile Include="State/ExtractionState.fs" />
     <Compile Include="State/DiffEngine.fs" />
+    <Compile Include="Help/HelpTypes.fs" />
+    <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Output/ArtifactSerializer.fs" />
     <Compile Include="Commands/ExtractCommand.fs" />
     <Compile Include="Commands/ClarifyCommand.fs" />
+    <Compile Include="Commands/StalenessChecker.fs" />
     <Compile Include="Commands/ValidateCommand.fs" />
     <Compile Include="Commands/DiffCommand.fs" />
     <Compile Include="Commands/CompileCommand.fs" />
