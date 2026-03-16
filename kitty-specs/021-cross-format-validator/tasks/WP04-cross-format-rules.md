@@ -15,7 +15,7 @@ subtasks:
 - T027
 phase: Phase 1 - Core Rules
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "4668"
 review_status: ''
 reviewed_by: ''
@@ -371,3 +371,4 @@ Can be developed in parallel with WP03 (both depend on WP02 only).
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:17:12Z – claude-opus – shell_pid=4668 – lane=doing – Assigned agent via workflow command
