@@ -19,6 +19,8 @@
     <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
+    <Compile Include="Alps/GoldenFiles.fs" />
+    <Compile Include="Alps/TypeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
