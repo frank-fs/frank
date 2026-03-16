@@ -64,9 +64,6 @@ let createTestOntology () : IGraph =
     let owlDatatypeProperty =
         ontology.CreateUriNode(UriFactory.Root.Create("http://www.w3.org/2002/07/owl#DatatypeProperty"))
 
-    let owlObjectProperty =
-        ontology.CreateUriNode(UriFactory.Root.Create("http://www.w3.org/2002/07/owl#ObjectProperty"))
-
     // Person properties
     let nameNode =
         ontology.CreateUriNode(UriFactory.Root.Create("http://example.org/api/properties/Person/Name"))
@@ -339,7 +336,7 @@ let getRdfResponse (client: HttpClient) (path: string) (accept: string) : Async<
 
 /// Execute a SPARQL SELECT query against a single graph and return the result set.
 let executeSparql (graph: IGraph) (sparql: string) : SparqlResultSet =
-    let store = new TripleStore()
+    use store = new TripleStore()
     store.Add(graph) |> ignore
     let dataset = new InMemoryDataset(store)
     let processor = new LeviathanQueryProcessor(dataset :> ISparqlDataset)
@@ -363,7 +360,7 @@ let executeSparqlOnDataset (store: TripleStore) (sparql: string) : SparqlResultS
 
 /// Execute a SPARQL ASK query and return the boolean result.
 let executeSparqlAsk (graph: IGraph) (sparql: string) : bool =
-    let store = new TripleStore()
+    use store = new TripleStore()
     store.Add(graph) |> ignore
     let dataset = new InMemoryDataset(store)
     let processor = new LeviathanQueryProcessor(dataset :> ISparqlDataset)
