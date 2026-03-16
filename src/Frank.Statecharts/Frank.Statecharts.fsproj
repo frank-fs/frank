@@ -26,6 +26,11 @@
     <Compile Include="Smcat/Lexer.fs" />
     <Compile Include="Smcat/LabelParser.fs" />
     <Compile Include="Smcat/Parser.fs" />
+    <!-- ALPS parser -->
+    <Compile Include="Alps/Types.fs" />
+    <Compile Include="Alps/JsonParser.fs" />
+    <Compile Include="Alps/JsonGenerator.fs" />
+    <Compile Include="Alps/Mapper.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->
     <Compile Include="StatefulResourceBuilder.fs" />
     <Compile Include="Smcat/Generator.fs" />
