@@ -18,6 +18,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
+    <Compile Include="Wsd/Generator.fs" />
     <Compile Include="Middleware.fs" />
     <Compile Include="StatechartETagProvider.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />
