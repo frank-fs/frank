@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: XState Serializer & Project Visibility
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 8c9e0df6d0e6825253965765f97d6fd8da81e27a
@@ -14,8 +14,8 @@ subtasks:
 - T005
 - T006
 assignee: ''
-agent: "claude-opus-4-6"
-shell_pid: "25918"
+agent: "claude-opus"
+shell_pid: "28836"
 review_status: ''
 reviewed_by: ''
 history:
@@ -236,3 +236,4 @@ spec-kitty implement WP01
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T22:51:41Z – claude-opus-4-6 – shell_pid=25918 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T22:58:32Z – claude-opus-4-6 – shell_pid=25918 – lane=for_review – Ready for review: XState Serializer.fs and Deserializer.fs created, Frank.Cli.Core project references added. T001/T005 were pre-applied by branch base. Build blocked by pre-existing Smcat/Parser.fs errors from spec 022 migration (out of scope).
+- 2026-03-16T23:01:24Z – claude-opus – shell_pid=28836 – lane=doing – Started review via workflow command
