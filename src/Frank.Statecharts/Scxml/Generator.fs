@@ -1,119 +1,205 @@
 module internal Frank.Statecharts.Scxml.Generator
 
 open System.Xml.Linq
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 
 let private scxmlNs = XNamespace.Get("http://www.w3.org/2005/07/scxml")
 
-let private generateTransition (t: ScxmlTransition) : XElement =
+let private buildTransitionMap (doc: StatechartDocument) : Map<string, TransitionEdge list> =
+    doc.Elements
+    |> List.choose (fun el ->
+        match el with
+        | TransitionElement t -> Some t
+        | _ -> None)
+    |> List.groupBy (fun t -> t.Source)
+    |> Map.ofList
+
+let private generateTransition (t: TransitionEdge) : XElement =
     let el = XElement(scxmlNs + "transition")
 
     t.Event |> Option.iter (fun ev -> el.SetAttributeValue(XName.Get "event", ev))
 
     t.Guard |> Option.iter (fun g -> el.SetAttributeValue(XName.Get "cond", g))
 
-    match t.Targets with
-    | [] -> ()
-    | targets ->
-        el.SetAttributeValue(XName.Get "target", System.String.Join(" ", targets))
+    let targets =
+        t.Annotations
+        |> List.tryPick (fun a ->
+            match a with
+            | ScxmlAnnotation(ScxmlMultiTarget(targets)) -> Some targets
+            | _ -> None)
+        |> Option.defaultWith (fun () ->
+            t.Target |> Option.toList)
 
-    match t.TransitionType with
-    | Internal -> el.SetAttributeValue(XName.Get "type", "internal")
-    | External -> ()
+    match targets with
+    | [] -> ()
+    | targets -> el.SetAttributeValue(XName.Get "target", System.String.Join(" ", targets))
+
+    t.Annotations
+    |> List.tryPick (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlTransitionType(isInternal)) -> Some isInternal
+        | _ -> None)
+    |> Option.iter (fun isInternal ->
+        if isInternal then
+            el.SetAttributeValue(XName.Get "type", "internal"))
 
     el
 
-let private generateDatamodel (entries: DataEntry list) : XElement option =
-    match entries with
-    | [] -> None
+let private generateHistory (h: StateNode) : XElement =
+    let el = XElement(scxmlNs + "history")
+
+    let historyMeta =
+        h.Annotations
+        |> List.tryPick (fun a ->
+            match a with
+            | ScxmlAnnotation(ScxmlHistory(id, kind, defaultTarget)) -> Some(id, kind, defaultTarget)
+            | _ -> None)
+
+    match historyMeta with
+    | Some(id, kind, defaultTarget) ->
+        el.SetAttributeValue(XName.Get "id", id)
+        let typeStr = match kind with | Deep -> "deep" | Shallow -> "shallow"
+        el.SetAttributeValue(XName.Get "type", typeStr)
+        defaultTarget |> Option.iter (fun target ->
+            let t = XElement(scxmlNs + "transition")
+            t.SetAttributeValue(XName.Get "target", target)
+            el.Add(t))
+    | None ->
+        // Fallback: use StateNode fields directly
+        if h.Identifier <> "" then
+            el.SetAttributeValue(XName.Get "id", h.Identifier)
+        let typeStr = match h.Kind with | DeepHistory -> "deep" | _ -> "shallow"
+        el.SetAttributeValue(XName.Get "type", typeStr)
+
+    el
+
+let rec private generateState
+    (transitionsBySource: Map<string, TransitionEdge list>)
+    (state: StateNode)
+    : XElement option =
+
+    let elementNameOpt =
+        match state.Kind with
+        | Final -> Some "final"
+        | Parallel -> Some "parallel"
+        | Regular | Initial -> Some "state"
+        | ShallowHistory | DeepHistory -> None  // handled separately by generateHistory
+        | Choice | ForkJoin | Terminate -> None  // no SCXML equivalent, skip
+
+    match elementNameOpt with
+    | None -> None
+    | Some elementName ->
+
+    let el = XElement(scxmlNs + elementName)
+    if state.Identifier <> "" then
+        el.SetAttributeValue(XName.Get "id", state.Identifier)
+
+    // Extract ScxmlInitial annotation for the initial attribute
+    state.Annotations
+    |> List.tryPick (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlInitial(id)) -> Some id
+        | _ -> None)
+    |> Option.iter (fun id -> el.SetAttributeValue(XName.Get "initial", id))
+
+    // Separate children into history nodes and regular nodes
+    let historyChildren, regularChildren =
+        state.Children
+        |> List.partition (fun c ->
+            match c.Kind with
+            | ShallowHistory | DeepHistory -> true
+            | _ -> false)
+
+    // Generate history elements
+    for h in historyChildren do
+        el.Add(generateHistory h)
+
+    // Generate transitions for this state
+    let ownTransitions =
+        transitionsBySource
+        |> Map.tryFind state.Identifier
+        |> Option.defaultValue []
+    for t in ownTransitions do
+        el.Add(generateTransition t)
+
+    // Generate invoke elements from ScxmlAnnotation(ScxmlInvoke(...))
+    state.Annotations
+    |> List.iter (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlInvoke(invokeType, src, id)) ->
+            let inv = XElement(scxmlNs + "invoke")
+            if invokeType <> "" then inv.SetAttributeValue(XName.Get "type", invokeType)
+            src |> Option.iter (fun s -> inv.SetAttributeValue(XName.Get "src", s))
+            id |> Option.iter (fun i -> inv.SetAttributeValue(XName.Get "id", i))
+            el.Add(inv)
+        | _ -> ())
+
+    // Recursively generate regular child states
+    for child in regularChildren do
+        match generateState transitionsBySource child with
+        | Some childEl -> el.Add(childEl)
+        | None -> ()  // skip non-SCXML state kinds
+
+    Some el
+
+let private generateRoot
+    (transitionsBySource: Map<string, TransitionEdge list>)
+    (doc: StatechartDocument)
+    : XElement =
+    let root = XElement(scxmlNs + "scxml")
+    root.SetAttributeValue(XName.Get "version", "1.0")
+    doc.InitialStateId |> Option.iter (fun id -> root.SetAttributeValue(XName.Get "initial", id))
+    doc.Title |> Option.iter (fun n -> root.SetAttributeValue(XName.Get "name", n))
+
+    // Extract document-level SCXML annotations
+    doc.Annotations
+    |> List.iter (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlDatamodelType(dm)) ->
+            root.SetAttributeValue(XName.Get "datamodel", dm)
+        | ScxmlAnnotation(ScxmlBinding(b)) ->
+            root.SetAttributeValue(XName.Get "binding", b)
+        | _ -> ())
+
+    // Generate datamodel from doc.DataEntries
+    match doc.DataEntries with
+    | [] -> ()
     | entries ->
         let dm = XElement(scxmlNs + "datamodel")
         for entry in entries do
             let data = XElement(scxmlNs + "data")
-            data.SetAttributeValue(XName.Get "id", entry.Id)
+            data.SetAttributeValue(XName.Get "id", entry.Name)
             entry.Expression |> Option.iter (fun expr ->
                 data.SetAttributeValue(XName.Get "expr", expr))
             dm.Add(data)
-        Some dm
+        root.Add(dm)
 
-let private generateHistory (h: ScxmlHistory) : XElement =
-    let el = XElement(scxmlNs + "history")
-    el.SetAttributeValue(XName.Get "id", h.Id)
+    // Extract top-level StateNode entries from doc.Elements and generate them
+    let stateNodes =
+        doc.Elements
+        |> List.choose (fun el ->
+            match el with
+            | StateDecl s -> Some s
+            | _ -> None)
 
-    let typeStr =
-        match h.Kind with
-        | Shallow -> "shallow"
-        | Deep -> "deep"
-    el.SetAttributeValue(XName.Get "type", typeStr)
-
-    h.DefaultTransition |> Option.iter (fun t ->
-        el.Add(generateTransition t))
-
-    el
-
-let private generateInvoke (inv: ScxmlInvoke) : XElement =
-    let el = XElement(scxmlNs + "invoke")
-    inv.InvokeType |> Option.iter (fun t -> el.SetAttributeValue(XName.Get "type", t))
-    inv.Src |> Option.iter (fun s -> el.SetAttributeValue(XName.Get "src", s))
-    inv.Id |> Option.iter (fun id -> el.SetAttributeValue(XName.Get "id", id))
-    el
-
-let rec private generateState (state: ScxmlState) : XElement =
-    let elementName =
-        match state.Kind with
-        | Final -> "final"
-        | Parallel -> "parallel"
-        | Simple | Compound -> "state"
-
-    let el = XElement(scxmlNs + elementName)
-
-    state.Id |> Option.iter (fun id -> el.SetAttributeValue(XName.Get "id", id))
-
-    state.InitialId |> Option.iter (fun id -> el.SetAttributeValue(XName.Get "initial", id))
-
-    generateDatamodel state.DataEntries
-    |> Option.iter (fun dm -> el.Add(dm))
-
-    for h in state.HistoryNodes do
-        el.Add(generateHistory h)
-
-    for t in state.Transitions do
-        el.Add(generateTransition t)
-
-    for inv in state.InvokeNodes do
-        el.Add(generateInvoke inv)
-
-    for child in state.Children do
-        el.Add(generateState child)
-
-    el
-
-let private generateRoot (doc: ScxmlDocument) : XElement =
-    let root = XElement(scxmlNs + "scxml")
-    root.SetAttributeValue(XName.Get "version", "1.0")
-    doc.InitialId |> Option.iter (fun id -> root.SetAttributeValue(XName.Get "initial", id))
-    doc.Name |> Option.iter (fun n -> root.SetAttributeValue(XName.Get "name", n))
-    doc.DatamodelType |> Option.iter (fun dm -> root.SetAttributeValue(XName.Get "datamodel", dm))
-    doc.Binding |> Option.iter (fun b -> root.SetAttributeValue(XName.Get "binding", b))
-
-    generateDatamodel doc.DataEntries
-    |> Option.iter (fun dm -> root.Add(dm))
-
-    for state in doc.States do
-        root.Add(generateState state)
+    for state in stateNodes do
+        match generateState transitionsBySource state with
+        | Some el -> root.Add(el)
+        | None -> ()
 
     root
 
-let private buildXDocument (doc: ScxmlDocument) : XDocument =
-    let root = generateRoot doc
+let private buildXDocument (doc: StatechartDocument) : XDocument =
+    let transitionsBySource = buildTransitionMap doc
+    let root = generateRoot transitionsBySource doc
     XDocument(XDeclaration("1.0", "utf-8", null), root :> obj)
 
-let generate (doc: ScxmlDocument) : string =
+let generate (doc: StatechartDocument) : string =
     let xdoc = buildXDocument doc
     use sw = new System.IO.StringWriter()
     xdoc.Save(sw)
     sw.ToString()
 
-let generateTo (writer: System.IO.TextWriter) (doc: ScxmlDocument) : unit =
+let generateTo (writer: System.IO.TextWriter) (doc: StatechartDocument) : unit =
     let xdoc = buildXDocument doc
     xdoc.Save(writer)
