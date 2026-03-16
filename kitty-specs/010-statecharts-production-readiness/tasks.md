@@ -175,13 +175,13 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T028 Create `Frank.Statecharts.Sqlite.Tests` project structure and `.fsproj`
-- [ ] T029 Implement DI registration extension method (`AddSqliteStateMachineStore`) in SQLite project
-- [ ] T030 Add CRUD tests (set state, get state, overwrite state)
-- [ ] T031 Add rehydration test (simulate restart by creating new store instance against same DB)
-- [ ] T032 Add subscription notification tests (verify subscribers notified on state change)
-- [ ] T033 Add concurrent access serialization test (verify actor serializes SQLite operations)
-- [ ] T034 Run full `dotnet build` and `dotnet test` across all targets, fix any regressions
+- [x] T028 Create `Frank.Statecharts.Sqlite.Tests` project structure and `.fsproj`
+- [x] T029 Implement DI registration extension method (`AddSqliteStateMachineStore`) in SQLite project
+- [x] T030 Add CRUD tests (set state, get state, overwrite state)
+- [x] T031 Add rehydration test (simulate restart by creating new store instance against same DB)
+- [x] T032 Add subscription notification tests (verify subscribers notified on state change)
+- [x] T033 Add concurrent access serialization test (verify actor serializes SQLite operations)
+- [x] T034 Run full `dotnet build` and `dotnet test` across all targets, fix any regressions
 
 ### Implementation Notes
 - Test project targets `net10.0` only (matching existing test project pattern)
