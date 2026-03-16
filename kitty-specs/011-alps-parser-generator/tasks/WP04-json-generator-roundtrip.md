@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: ALPS JSON Generator and Roundtrip Tests
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP02
 subtasks:
@@ -14,8 +14,8 @@ subtasks:
 - T027
 phase: Phase 2 - Generator & Validation
 assignee: ''
-agent: ''
-shell_pid: ''
+agent: "claude-opus"
+shell_pid: "60194"
 review_status: ''
 reviewed_by: ''
 history:
@@ -471,3 +471,4 @@ testList "Alps.RoundTrip cross-format" [
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
 - 2026-03-16T11:46:31Z – unknown – lane=for_review – Moved to for_review
+- 2026-03-16T11:46:34Z – claude-opus – shell_pid=60194 – lane=doing – Started review via workflow command
