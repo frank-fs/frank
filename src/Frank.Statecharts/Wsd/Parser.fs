@@ -168,6 +168,19 @@ let private ensureParticipant (state: ParserState) (name: string) (pos: SourcePo
     if not (Map.containsKey name state.Participants) then
         registerParticipant state name None false pos
 
+        // Emit a StateDecl element for the implicit participant so it
+        // appears in the shared AST's Elements list (same as explicit decls)
+        let stateNode =
+            { Identifier = name
+              Label = None
+              Kind = StateKind.Regular
+              Children = []
+              Activities = None
+              Position = Some pos
+              Annotations = [] }
+
+        state.Elements <- StateDecl stateNode :: state.Elements
+
         if not (state.ImplicitWarned.Contains name) then
             state.ImplicitWarned <- state.ImplicitWarned.Add name
 

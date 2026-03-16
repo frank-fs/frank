@@ -1,19 +1,19 @@
 module Frank.Statecharts.Tests.Wsd.GroupingTests
 
 open Expecto
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Parser
 
 let private groups (result: ParseResult) =
-    result.Diagram.Elements
+    result.Document.Elements
     |> List.choose (function
         | GroupElement g -> Some g
         | _ -> None)
 
-let private messages (result: ParseResult) =
-    result.Diagram.Elements
+let private transitions (result: ParseResult) =
+    result.Document.Elements
     |> List.choose (function
-        | MessageElement m -> Some m
+        | TransitionElement t -> Some t
         | _ -> None)
 
 /// Extract groups from a branch's elements
@@ -23,11 +23,11 @@ let private branchGroups (branch: GroupBranch) =
         | GroupElement g -> Some g
         | _ -> None)
 
-/// Extract messages from a branch's elements
-let private branchMessages (branch: GroupBranch) =
+/// Extract transitions from a branch's elements
+let private branchTransitions (branch: GroupBranch) =
     branch.Elements
     |> List.choose (function
-        | MessageElement m -> Some m
+        | TransitionElement t -> Some t
         | _ -> None)
 
 /// Extract notes from a branch's elements
@@ -60,8 +60,8 @@ end
               Expect.hasLength gs 1 "one group"
               Expect.equal gs.[0].Kind GroupKind.Alt "alt"
               Expect.hasLength gs.[0].Branches 1 "one branch"
-              let msgs = branchMessages gs.[0].Branches.[0]
-              Expect.hasLength msgs 1 "one message in branch"
+              let edges = branchTransitions gs.[0].Branches.[0]
+              Expect.hasLength edges 1 "one message in branch"
 
           testCase "opt block with simple body"
           <| fun _ ->
@@ -209,12 +209,12 @@ end
               Expect.hasLength gs.[0].Branches 2 "two branches"
               Expect.equal gs.[0].Branches.[0].Condition (Some "success") "first condition"
               Expect.equal gs.[0].Branches.[1].Condition (Some "failure") "second condition"
-              let msgs0 = branchMessages gs.[0].Branches.[0]
-              let msgs1 = branchMessages gs.[0].Branches.[1]
-              Expect.hasLength msgs0 1 "one message in first branch"
-              Expect.hasLength msgs1 1 "one message in second branch"
-              Expect.equal msgs0.[0].Label "ok" "first branch label"
-              Expect.equal msgs1.[0].Label "error" "second branch label"
+              let edges0 = branchTransitions gs.[0].Branches.[0]
+              let edges1 = branchTransitions gs.[0].Branches.[1]
+              Expect.hasLength edges0 1 "one message in first branch"
+              Expect.hasLength edges1 1 "one message in second branch"
+              Expect.equal edges0.[0].Event (Some "ok") "first branch label"
+              Expect.equal edges1.[0].Event (Some "error") "second branch label"
 
           // === 11. alt with 3 branches ===
           testCase "alt with three branches"
@@ -405,9 +405,9 @@ end
               Expect.equal l4.Kind GroupKind.Par "L4"
               let l5 = (branchGroups l4.Branches.[0]).[0]
               Expect.equal l5.Kind GroupKind.Critical "L5"
-              let deepMsgs = branchMessages l5.Branches.[0]
-              Expect.hasLength deepMsgs 1 "one message at deepest level"
-              Expect.equal deepMsgs.[0].Label "deepest" "deepest label"
+              let deepEdges = branchTransitions l5.Branches.[0]
+              Expect.hasLength deepEdges 1 "one message at deepest level"
+              Expect.equal deepEdges.[0].Event (Some "deepest") "deepest label"
 
           // === 19. Nested groups in different branches ===
           testCase "nested groups in different branches"
@@ -457,31 +457,31 @@ A->B: after
 
               Expect.isEmpty result.Errors "no errors"
               // Top-level elements: message, group, message
-              let topElements = result.Diagram.Elements
-              // Filter non-participant-decl elements
+              let topElements = result.Document.Elements
+              // Filter non-state-decl elements
               let nonDecl =
                   topElements
                   |> List.filter (function
-                      | ParticipantDecl _ -> false
+                      | StateDecl _ -> false
                       | _ -> true)
 
               Expect.hasLength nonDecl 3 "three non-decl elements"
 
               match nonDecl.[0] with
-              | MessageElement m -> Expect.equal m.Label "before" "before message"
+              | TransitionElement t -> Expect.equal t.Event (Some "before") "before message"
               | _ -> failtest "expected message"
 
               match nonDecl.[1] with
               | GroupElement g ->
                   Expect.equal g.Kind GroupKind.Alt "alt group"
-                  let brMsgs = branchMessages g.Branches.[0]
+                  let brEdges = branchTransitions g.Branches.[0]
                   let brNotes = branchNotes g.Branches.[0]
-                  Expect.hasLength brMsgs 1 "one message in branch"
+                  Expect.hasLength brEdges 1 "one message in branch"
                   Expect.hasLength brNotes 1 "one note in branch"
               | _ -> failtest "expected group"
 
               match nonDecl.[2] with
-              | MessageElement m -> Expect.equal m.Label "after" "after message"
+              | TransitionElement t -> Expect.equal t.Event (Some "after") "after message"
               | _ -> failtest "expected message"
 
           // === 21. Empty branch (no elements between else/end) ===
@@ -545,11 +545,11 @@ end
 
               Expect.isEmpty result.Errors "no errors"
               let gs = groups result
-              let msgs = branchMessages gs.[0].Branches.[0]
-              Expect.hasLength msgs 3 "three messages"
-              Expect.equal msgs.[0].Label "first" "msg 1"
-              Expect.equal msgs.[1].Label "second" "msg 2"
-              Expect.equal msgs.[2].Label "third" "msg 3"
+              let edges = branchTransitions gs.[0].Branches.[0]
+              Expect.hasLength edges 3 "three messages"
+              Expect.equal edges.[0].Event (Some "first") "msg 1"
+              Expect.equal edges.[1].Event (Some "second") "msg 2"
+              Expect.equal edges.[2].Event (Some "third") "msg 3"
 
           // === 25. Mixed content: messages, notes, groups within branches ===
           testCase "mixed content in branches"
@@ -583,10 +583,10 @@ end
               // First branch: message, note, opt group, 3 messages
               let b0 = alt.Branches.[0]
               Expect.equal b0.Condition (Some "authenticated") "first branch condition"
-              let b0msgs = branchMessages b0
+              let b0edges = branchTransitions b0
               let b0notes = branchNotes b0
               let b0groups = branchGroups b0
-              Expect.hasLength b0msgs 4 "four messages in first branch"
+              Expect.hasLength b0edges 4 "four messages in first branch"
               Expect.hasLength b0notes 1 "one note in first branch"
               Expect.hasLength b0groups 1 "one nested group in first branch"
               Expect.equal b0groups.[0].Kind GroupKind.Opt "nested opt"
@@ -594,9 +594,9 @@ end
               // Second branch: one message
               let b1 = alt.Branches.[1]
               Expect.equal b1.Condition (Some "unauthorized") "second branch condition"
-              let b1msgs = branchMessages b1
-              Expect.hasLength b1msgs 1 "one message in second branch"
-              Expect.equal b1msgs.[0].Label "401" "unauthorized response"
+              let b1edges = branchTransitions b1
+              Expect.hasLength b1edges 1 "one message in second branch"
+              Expect.equal b1edges.[0].Event (Some "401") "unauthorized response"
 
           // === 26. Extra 'end' with no open group ===
           testCase "extra end with no open group produces error"
