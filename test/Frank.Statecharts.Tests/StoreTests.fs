@@ -306,6 +306,125 @@ let concurrencyTests =
           } ]
 
 [<Tests>]
+let actorSerializationTests =
+    testList
+        "Store.ActorSerialization"
+        [ testAsync "Concurrent SetState to same instance are serialized" {
+              let store, _ = makeStore ()
+              use _s = store :> IDisposable
+              let iface = store :> IStateMachineStore<string, int>
+
+              // Fire 20 concurrent SetState operations to the same instance
+              let completionOrder = System.Collections.Concurrent.ConcurrentBag<int>()
+
+              let ops =
+                  [| for i in 0..19 ->
+                         async {
+                             do! iface.SetState "same-instance" (sprintf "State-%d" i) i |> Async.AwaitTask
+                             completionOrder.Add(i)
+                         } |]
+
+              do! Async.Parallel ops |> Async.Ignore
+
+              // All 20 operations should have completed
+              Expect.equal completionOrder.Count 20 "all operations should complete"
+
+              // The final state should be one of the 20 values (the last one processed)
+              let! result = iface.GetState("same-instance") |> Async.AwaitTask
+              Expect.isSome result "should have state after concurrent writes"
+          }
+
+          testAsync "Interleaved GetState and SetState on same instance produce no torn reads" {
+              let store, _ = makeStore ()
+              use _s = store :> IDisposable
+              let iface = store :> IStateMachineStore<string, int>
+
+              do! iface.SetState "inst1" "Initial" 0 |> Async.AwaitTask
+
+              // Interleave reads and writes to the same instance
+              let ops =
+                  [| for i in 0..49 ->
+                         if i % 2 = 0 then
+                             async {
+                                 do! iface.SetState "inst1" (sprintf "State-%d" i) i |> Async.AwaitTask
+                             }
+                         else
+                             async {
+                                 let! result = iface.GetState("inst1") |> Async.AwaitTask
+
+                                 // Every read must return a valid state (no torn reads)
+                                 Expect.isSome result "GetState should never return None for an existing instance"
+
+                                 let state, ctx = result.Value
+                                 // The state and context must be from the same SetState call
+                                 let expectedState = sprintf "State-%d" ctx
+                                 Expect.equal state expectedState "state and context must be consistent (no torn read)"
+                             } |]
+
+              do! Async.Parallel ops |> Async.Ignore
+          }
+
+          testAsync "All state changes are observed (no lost updates via subscriber)" {
+              let store, _ = makeStore ()
+              use _s = store :> IDisposable
+              let iface = store :> IStateMachineStore<string, int>
+
+              let received = System.Collections.Concurrent.ConcurrentBag<string * int>()
+
+              let observer =
+                  { new IObserver<string * int> with
+                      member _.OnNext(v) = received.Add(v)
+                      member _.OnError(_) = ()
+                      member _.OnCompleted() = () }
+
+              let sub = iface.Subscribe "tracked" observer
+
+              // 50 concurrent SetState calls
+              let ops =
+                  [| for i in 1..50 ->
+                         async { do! iface.SetState "tracked" (sprintf "S%d" i) i |> Async.AwaitTask } |]
+
+              do! Async.Parallel ops |> Async.Ignore
+
+              sub.Dispose()
+
+              // Every SetState should have triggered a subscriber notification
+              Expect.equal received.Count 50 "subscriber should receive all 50 state changes"
+          }
+
+          testAsync "Subscriber notifications preserve sequential consistency" {
+              let store, _ = makeStore ()
+              use _s = store :> IDisposable
+              let iface = store :> IStateMachineStore<string, int>
+
+              let received = System.Collections.Concurrent.ConcurrentQueue<string * int>()
+
+              let observer =
+                  { new IObserver<string * int> with
+                      member _.OnNext(v) = received.Enqueue(v)
+                      member _.OnError(_) = ()
+                      member _.OnCompleted() = () }
+
+              let sub = iface.Subscribe "ordered" observer
+
+              // Sequential SetState calls to verify ordering is preserved
+              for i in 1..20 do
+                  do! iface.SetState "ordered" (sprintf "S%d" i) i |> Async.AwaitTask
+
+              sub.Dispose()
+
+              let items = received |> Seq.toList
+              Expect.equal items.Length 20 "should have received all 20 notifications"
+
+              // Verify ordering: since these were sequential calls, notifications
+              // should arrive in the same order
+              for i in 0..19 do
+                  let state, ctx = items[i]
+                  Expect.equal state (sprintf "S%d" (i + 1)) (sprintf "notification %d should have correct state" i)
+                  Expect.equal ctx (i + 1) (sprintf "notification %d should have correct context" i)
+          } ]
+
+[<Tests>]
 let disposalLifecycleTests =
     testList
         "Store.DisposalLifecycle"
