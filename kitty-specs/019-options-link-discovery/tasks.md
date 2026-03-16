@@ -61,7 +61,7 @@
 ### Included Subtasks
 - [x] T006 Create `src/Frank.Discovery/OptionsDiscoveryMiddleware.fs` with full middleware implementation
 - [x] T007 Create `src/Frank.Discovery/WebHostBuilderExtensions.fs` with `useOptionsDiscovery` custom operation
-- [ ] T008 Create `test/Frank.Discovery.Tests/OptionsDiscoveryTests.fs` with acceptance tests for US1
+- [x] T008 Create `test/Frank.Discovery.Tests/OptionsDiscoveryTests.fs` with acceptance tests for US1
 
 ### Implementation Notes
 - Middleware injects `EndpointDataSource` via DI and `ILogger`.
