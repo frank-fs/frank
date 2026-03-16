@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Validation Domain Types
-lane: "doing"
+lane: "planned"
 dependencies: []
 base_branch: master
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
@@ -19,8 +19,9 @@ phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus"
 shell_pid: "97496"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/021-fix-feedback.md"
 history:
 - timestamp: '2026-03-15T23:59:11Z'
   lane: planned
@@ -44,11 +45,13 @@ requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005]
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/021-fix-feedback.md`
 
-*[This section is empty initially.]*
+**Issue**: WP01 was incorrectly moved to doing due to spec-kitty auto-selecting spec 021 when spec 020 was intended. No actual work was done on 021-WP01.
 
----
 
 ## Markdown Formatting
 Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
@@ -352,3 +355,4 @@ No dependencies -- this is the starting work package.
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:01:53Z – claude-opus – shell_pid=97496 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:11:30Z – claude-opus – shell_pid=97496 – lane=planned – Moved to planned
