@@ -18,6 +18,13 @@
     <Compile Include="Wsd/GroupingTests.fs" />
     <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
+    <!-- smcat tests -->
+    <Compile Include="Smcat/LexerTests.fs" />
+    <Compile Include="Smcat/LabelParserTests.fs" />
+    <Compile Include="Smcat/ParserTests.fs" />
+    <Compile Include="Smcat/ErrorTests.fs" />
+    <Compile Include="Smcat/GeneratorTests.fs" />
+    <Compile Include="Smcat/RoundTripTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
