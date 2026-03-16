@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Cross-Format Validation Rules
-lane: "planned"
+lane: "doing"
 dependencies: [WP02]
 base_branch: 021-cross-format-validator-WP02
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
@@ -16,7 +16,7 @@ subtasks:
 phase: Phase 1 - Core Rules
 assignee: ''
 agent: "claude-opus"
-shell_pid: "4668"
+shell_pid: "15686"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 review_feedback_file: "/private/tmp/021-fix-feedback.md"
@@ -376,3 +376,4 @@ Can be developed in parallel with WP03 (both depend on WP02 only).
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:17:12Z – claude-opus – shell_pid=4668 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:17:51Z – claude-opus – shell_pid=4668 – lane=planned – Moved to planned
+- 2026-03-16T04:32:23Z – claude-opus – shell_pid=15686 – lane=doing – Started implementation via workflow command
