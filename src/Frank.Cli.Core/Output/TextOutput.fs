@@ -2,6 +2,7 @@ namespace Frank.Cli.Core.Output
 
 open System
 open Frank.Cli.Core.Commands
+open Frank.Cli.Core.Help
 
 module TextOutput =
 
@@ -153,6 +154,84 @@ module TextOutput =
             sb.AppendLine(sprintf "  <EmbeddedResource Include=\"...\" LogicalName=\"%s\" />" name)
             |> ignore
 
+        sb.ToString()
+
+    let formatStatusResult (result: ProjectStatus) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine($"Project: {result.ProjectPath}") |> ignore
+        sb.AppendLine($"State directory: {result.StateDirectory}") |> ignore
+        sb.AppendLine() |> ignore
+
+        let extractionText =
+            match result.Extraction with
+            | ExtractionStatus.NotExtracted -> "not performed"
+            | ExtractionStatus.Current -> "current"
+            | ExtractionStatus.Stale -> "stale (source files changed since extraction)"
+            | ExtractionStatus.Unreadable reason -> $"unreadable ({reason})"
+        sb.AppendLine($"Extraction: {extractionText}") |> ignore
+
+        let artifactText =
+            match result.Artifacts with
+            | ArtifactStatus.Present ->
+                match result.Extraction with
+                | ExtractionStatus.Stale -> "present (may be outdated)"
+                | _ -> "present"
+            | ArtifactStatus.Missing _ -> "not present"
+        sb.AppendLine($"Artifacts: {artifactText}") |> ignore
+
+        let actionText =
+            match result.RecommendedAction with
+            | RecommendedAction.RunExtract ->
+                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>'"
+            | RecommendedAction.ReExtract ->
+                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>'"
+            | RecommendedAction.RunCompile ->
+                $"run 'frank-cli compile --project {result.ProjectPath}'"
+            | RecommendedAction.UpToDate -> "up to date (no action needed)"
+            | RecommendedAction.RecoverExtract _ ->
+                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>' to recover"
+        sb.AppendLine($"Recommended action: {actionText}") |> ignore
+
+        sb.ToString()
+
+    let formatHelpIndex (index: HelpSubcommand.HelpIndex) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine("frank-cli: Semantic resource extraction for Frank applications") |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("COMMANDS") |> ignore
+        for (name, summary) in index.Commands do
+            sb.AppendLine(sprintf "  %-12s%s" name summary) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("TOPICS") |> ignore
+        for (name, summary) in index.Topics do
+            sb.AppendLine(sprintf "  %-12s%s" name summary) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("Use 'frank-cli help <command>' for detailed help on a command.") |> ignore
+        sb.AppendLine("Use 'frank-cli help <topic>' for topic documentation.") |> ignore
+        sb.ToString()
+
+    let formatTopicText (topic: HelpTopic) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine(topic.Name.ToUpperInvariant()) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine(topic.Content) |> ignore
+        sb.ToString()
+
+    let formatNoMatch (query: string) (suggestions: string list) : string =
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine($"Unknown command or topic: '{query}'") |> ignore
+        if not suggestions.IsEmpty then
+            sb.AppendLine() |> ignore
+            sb.AppendLine("Did you mean?") |> ignore
+            for name in suggestions do
+                match HelpContent.findCommand name with
+                | Some cmd -> sb.AppendLine(sprintf "  %-12s%s" name cmd.Summary) |> ignore
+                | None ->
+                    match HelpContent.findTopic name with
+                    | Some topic -> sb.AppendLine(sprintf "  %-12s%s" name topic.Summary) |> ignore
+                    | None -> sb.AppendLine($"  {name}") |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("Use 'frank-cli help' to see all commands and topics.") |> ignore
         sb.ToString()
 
     let formatError (message: string) : string = red (sprintf "Error: %s" message)

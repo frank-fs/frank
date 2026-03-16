@@ -204,8 +204,11 @@ let factoryTests =
                     ResolveInstanceId = fun _ -> "dummy"
                     TransitionObservers = []
                     InitialStateKey = "Idle"
+                    GuardNames = []
+                    StateMetadataMap = Map.empty
                     GetCurrentStateKey = fun _ _ _ -> System.Threading.Tasks.Task.FromResult("Idle")
                     EvaluateGuards = fun _ -> Allowed
+                    EvaluateEventGuards = fun _ -> Allowed
                     ExecuteTransition =
                       fun _ _ _ -> System.Threading.Tasks.Task.FromResult(TransitionAttemptResult.NoEvent) }
 
@@ -215,4 +218,82 @@ let factoryTests =
               let result = factory.CreateProvider(endpoint)
 
               Expect.isSome result "should return Some provider for endpoint with StateMachineMetadata"
+          } ]
+
+// --- T007: Parameterized DU ETag sensitivity tests ---
+// Verify that ETag provider uses `string state` (ToString), NOT case-name keys.
+// Won "X" and Won "O" must produce DIFFERENT ETags despite having the same handler key.
+
+type ParameterizedState =
+    | Playing
+    | Won of winner: string
+
+type ParamContext = { MoveCount: int }
+
+let paramContextSerializer (ctx: ParamContext) : byte[] =
+    Encoding.UTF8.GetBytes(sprintf "%d" ctx.MoveCount)
+
+let makeParamStore () =
+    let logger = makeTestLogger<MailboxProcessorStore<ParameterizedState, ParamContext>> ()
+    new MailboxProcessorStore<ParameterizedState, ParamContext>(logger)
+
+let makeParamProvider (store: MailboxProcessorStore<ParameterizedState, ParamContext>) =
+    let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+
+    StatechartETagProvider<ParameterizedState, ParamContext>(iface, paramContextSerializer) :> IETagProvider
+
+[<Tests>]
+let etagParameterSensitivityTests =
+    testList
+        "StatechartETagProvider.ParameterSensitivity"
+        [ testAsync "Won 'X' and Won 'O' produce DIFFERENT ETags (parameter-sensitive)" {
+              let store = makeParamStore ()
+              use _s = store :> IDisposable
+
+              let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+
+              let ctx = { MoveCount = 5 }
+              do! iface.SetState "game1" (Won "X") ctx |> Async.AwaitTask
+              do! iface.SetState "game2" (Won "O") ctx |> Async.AwaitTask
+
+              let provider = makeParamProvider store
+
+              let! etag1 = provider.ComputeETag("game1") |> Async.AwaitTask
+              let! etag2 = provider.ComputeETag("game2") |> Async.AwaitTask
+
+              Expect.isSome etag1 "Won 'X' ETag should be Some"
+              Expect.isSome etag2 "Won 'O' ETag should be Some"
+
+              Expect.notEqual
+                  etag1
+                  etag2
+                  "Won 'X' and Won 'O' must have DIFFERENT ETags (ETag uses full ToString, not case name)"
+          }
+
+          testAsync "same parameterized state with same context produces same ETag" {
+              let store = makeParamStore ()
+              use _s = store :> IDisposable
+
+              let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+
+              let ctx = { MoveCount = 5 }
+              do! iface.SetState "game1" (Won "X") ctx |> Async.AwaitTask
+
+              let provider = makeParamProvider store
+
+              let! etag1 = provider.ComputeETag("game1") |> Async.AwaitTask
+              let! etag2 = provider.ComputeETag("game1") |> Async.AwaitTask
+
+              Expect.isSome etag1 "first ETag should be Some"
+              Expect.equal etag1 etag2 "same parameterized state should produce same ETag"
+          }
+
+          test "StatechartETagProvider uses 'string state' not case-name key" {
+              // Verify that the ETag provider code uses `string state` which calls ToString()
+              // Won "X" -> "Won \"X\"" via ToString(), Won "O" -> "Won \"O\"" via ToString()
+              // These are DIFFERENT strings, producing DIFFERENT ETags.
+              // This is correct: ETags must distinguish between parameter values.
+              let wonX = string (Won "X")
+              let wonO = string (Won "O")
+              Expect.notEqual wonX wonO "ToString() of Won 'X' and Won 'O' should be different"
           } ]

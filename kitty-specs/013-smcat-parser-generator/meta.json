@@ -1,0 +1,11 @@
+{
+  "feature_number": "013",
+  "slug": "013-smcat-parser-generator",
+  "feature_slug": "013-smcat-parser-generator",
+  "friendly_name": "smcat Parser and Generator",
+  "mission": "software-dev",
+  "source_description": "GitHub issue #100 -- smcat Parser + Generator: bidirectional state-machine-cat support",
+  "target_branch": "master",
+  "vcs": "git",
+  "created_at": "2026-03-15T22:38:02.252036+00:00"
+}

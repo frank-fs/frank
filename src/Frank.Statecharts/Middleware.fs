@@ -78,22 +78,11 @@ type StateMachineMiddleware(next: RequestDelegate) =
                         // Step 4: Invoke the state-specific handler
                         do! handler.Invoke(ctx)
 
-                        // Step 5: Try transition (event set by handler in HttpContext.Items)
-                        let! transResult = meta.ExecuteTransition ctx.RequestServices ctx instanceId
+                        // Step 5: Evaluate event-validation guards (post-handler)
+                        let eventGuardResult = meta.EvaluateEventGuards ctx
 
-                        match transResult with
-                        | TransitionAttemptResult.NoEvent -> ()
-                        | TransitionAttemptResult.Succeeded evt ->
-                            for observer in meta.TransitionObservers do
-                                try
-                                    observer evt
-                                with ex ->
-                                    logger.LogWarning(
-                                        ex,
-                                        "onTransition observer threw for instance {InstanceId}",
-                                        instanceId
-                                    )
-                        | TransitionAttemptResult.Blocked reason ->
+                        match eventGuardResult with
+                        | Blocked reason ->
                             if not ctx.Response.HasStarted then
                                 ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
 
@@ -102,18 +91,46 @@ type StateMachineMiddleware(next: RequestDelegate) =
                                 | None -> ()
                             else
                                 logger.LogWarning(
-                                    "Transition blocked for instance {InstanceId} but response already started",
+                                    "Event guard blocked for instance {InstanceId} but response already started",
                                     instanceId
                                 )
-                        | TransitionAttemptResult.Invalid msg ->
-                            if not ctx.Response.HasStarted then
-                                ctx.Response.StatusCode <- 400
-                                do! ctx.Response.WriteAsync(msg)
-                            else
-                                logger.LogWarning(
-                                    "Transition invalid for instance {InstanceId} but response already started: {Message}",
-                                    instanceId,
-                                    msg
-                                )
+                        | Allowed ->
+                            // Step 6: Try transition (event set by handler in HttpContext.Items)
+                            let! transResult = meta.ExecuteTransition ctx.RequestServices ctx instanceId
+
+                            match transResult with
+                            | TransitionAttemptResult.NoEvent -> ()
+                            | TransitionAttemptResult.Succeeded evt ->
+                                for observer in meta.TransitionObservers do
+                                    try
+                                        observer evt
+                                    with ex ->
+                                        logger.LogWarning(
+                                            ex,
+                                            "onTransition observer threw for instance {InstanceId}",
+                                            instanceId
+                                        )
+                            | TransitionAttemptResult.Blocked reason ->
+                                if not ctx.Response.HasStarted then
+                                    ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
+
+                                    match BlockReasonMapping.toMessage reason with
+                                    | Some msg -> do! ctx.Response.WriteAsync(msg)
+                                    | None -> ()
+                                else
+                                    logger.LogWarning(
+                                        "Transition blocked for instance {InstanceId} but response already started",
+                                        instanceId
+                                    )
+                            | TransitionAttemptResult.Invalid msg ->
+                                if not ctx.Response.HasStarted then
+                                    ctx.Response.StatusCode <- 400
+                                    do! ctx.Response.WriteAsync(msg)
+                                else
+                                    logger.LogWarning(
+                                        "Transition invalid for instance {InstanceId} but response already started: {Message}",
+                                        instanceId,
+                                        msg
+                                    )
         }
         :> Task

@@ -1,0 +1,22 @@
+ID,Type,Title,URL/Path,Accessed,Notes
+S-001,Codebase,WSD AST Types,src/Frank.Statecharts/Wsd/Types.fs,2026-03-15,Baseline types for migration - 150 lines defining 16 types
+S-002,Codebase,WSD Parser,src/Frank.Statecharts/Wsd/Parser.fs,2026-03-15,803 lines - produces ParseResult with Diagram root
+S-003,Codebase,WSD Lexer,src/Frank.Statecharts/Wsd/Lexer.fs,2026-03-15,297 lines - produces Token list with SourcePosition
+S-004,Codebase,WSD Guard Parser,src/Frank.Statecharts/Wsd/GuardParser.fs,2026-03-15,159 lines - parses [guard:] annotations from note content
+S-005,Codebase,Runtime Types,src/Frank.Statecharts/Types.fs,2026-03-15,StateMachine generic type - runtime state machine definition
+S-006,Codebase,StateMachineMetadata,src/Frank.Statecharts/StatefulResourceBuilder.fs,2026-03-15,Runtime endpoint metadata - completely separate from parse-time AST
+S-007,Codebase,WSD Parser Tests,test/Frank.Statecharts.Tests/Wsd/ParserTests.fs,2026-03-15,422 lines - 48 test cases referencing WSD-specific types
+S-008,Codebase,WSD Grouping Tests,test/Frank.Statecharts.Tests/Wsd/GroupingTests.fs,2026-03-15,612 lines - 26 test cases for grouping constructs
+S-009,Codebase,WSD Round-Trip Tests,test/Frank.Statecharts.Tests/Wsd/RoundTripTests.fs,2026-03-15,546 lines - Amundsen onboarding and tic-tac-toe examples
+S-010,Codebase,WSD Error Tests,test/Frank.Statecharts.Tests/Wsd/ErrorTests.fs,2026-03-15,395 lines - error recovery and structured failure tests
+S-011,Codebase,Project File,src/Frank.Statecharts/Frank.Statecharts.fsproj,2026-03-15,Multi-target net8.0/net9.0/net10.0 with compile order
+S-012,Specification,W3C SCXML,https://www.w3.org/TR/scxml/,2026-03-15,W3C Recommendation - definitive SCXML element reference
+S-013,Specification,ALPS Draft,http://alps.io/spec/drafts/draft-01.html,2026-03-15,ALPS profile semantics - descriptor types and transitions
+S-014,Documentation,smcat GitHub,https://github.com/sverweij/state-machine-cat,2026-03-15,State Machine Cat - syntax and state type support
+S-015,Documentation,smcat AST Schema,https://github.com/sverweij/state-machine-cat/blob/main/tools/smcat-ast.schema.json,2026-03-15,JSON schema defining smcat AST - state types enum
+S-016,Documentation,XState Docs,https://xstate.js.org/,2026-03-15,XState state machine library - JSON format reference
+S-017,Documentation,F# DU Reference,https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/discriminated-unions,2026-03-15,F# discriminated unions language reference
+S-018,Documentation,F# Compiler AST Guide,https://fsharp.github.io/fsharp-compiler-docs/changing-the-ast.html,2026-03-15,Trivia pattern for AST extension
+S-019,Documentation,F# SyntaxTree Source,https://github.com/dotnet/fsharp/blob/main/src/Compiler/SyntaxTree/SyntaxTree.fs,2026-03-15,F# compiler AST implementation - range and trivia design
+S-020,Documentation,F# for Fun and Profit DUs,https://fsharpforfunandprofit.com/posts/discriminated-unions/,2026-03-15,Community patterns for F# DU design
+S-021,Specification,Spec 020,kitty-specs/020-shared-statechart-ast/spec.md,2026-03-15,Feature specification with 22 functional requirements

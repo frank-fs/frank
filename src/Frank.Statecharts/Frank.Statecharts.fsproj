@@ -11,13 +11,41 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Shared AST types (spec 020) -->
+    <Compile Include="Ast/Types.fs" />
+    <!-- Core domain types -->
+    <Compile Include="Types.fs" />
+    <Compile Include="Store.fs" />
+    <!-- WSD parser -->
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
     <Compile Include="Wsd/Parser.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="Store.fs" />
+    <Compile Include="Wsd/Serializer.fs" />
+    <!-- smcat parser -->
+    <Compile Include="Smcat/Types.fs" />
+    <Compile Include="Smcat/Lexer.fs" />
+    <Compile Include="Smcat/LabelParser.fs" />
+    <Compile Include="Smcat/Parser.fs" />
+    <Compile Include="Smcat/Mapper.fs" />
+    <!-- ALPS parser -->
+    <Compile Include="Alps/Types.fs" />
+    <Compile Include="Alps/JsonParser.fs" />
+    <Compile Include="Alps/JsonGenerator.fs" />
+    <Compile Include="Alps/Mapper.fs" />
+    <!-- SCXML parser -->
+    <Compile Include="Scxml/Types.fs" />
+    <Compile Include="Scxml/Parser.fs" />
+    <Compile Include="Scxml/Mapper.fs" />
+    <Compile Include="Scxml/Generator.fs" />
+    <!-- Validation -->
+    <Compile Include="Validation/Types.fs" />
+    <Compile Include="Validation/Validator.fs" />
+    <!-- Builder and generators (depend on both core types and format types) -->
     <Compile Include="StatefulResourceBuilder.fs" />
+    <Compile Include="Wsd/Generator.fs" />
+    <Compile Include="Smcat/Generator.fs" />
+    <!-- Middleware and extensions -->
     <Compile Include="Middleware.fs" />
     <Compile Include="StatechartETagProvider.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />

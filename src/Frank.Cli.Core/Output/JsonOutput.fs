@@ -4,6 +4,7 @@ open System.IO
 open System.Text
 open System.Text.Json
 open Frank.Cli.Core.Commands
+open Frank.Cli.Core.Help
 open Frank.Cli.Core.State
 
 module JsonOutput =
@@ -222,6 +223,117 @@ module JsonOutput =
         writer.WriteEndObject()
         writer.Flush()
 
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatStatusResult (result: ProjectStatus) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+        writeString writer "projectPath" result.ProjectPath
+        writeString writer "stateDirectory" result.StateDirectory
+
+        writer.WriteStartObject("extraction")
+        let extractionState =
+            match result.Extraction with
+            | ExtractionStatus.NotExtracted -> "not_extracted"
+            | ExtractionStatus.Current -> "current"
+            | ExtractionStatus.Stale -> "stale"
+            | ExtractionStatus.Unreadable _ -> "unreadable"
+        writeString writer "state" extractionState
+        writer.WriteEndObject()
+
+        writer.WriteStartObject("artifacts")
+        let artifactState =
+            match result.Artifacts with
+            | ArtifactStatus.Present -> "present"
+            | ArtifactStatus.Missing _ -> "missing"
+        writeString writer "state" artifactState
+        match result.Artifacts with
+        | ArtifactStatus.Present ->
+            writer.WriteStartArray("files")
+            writer.WriteEndArray()
+        | ArtifactStatus.Missing missing ->
+            writer.WriteStartArray("missingFiles")
+            for f in missing do writer.WriteStringValue(f)
+            writer.WriteEndArray()
+        writer.WriteEndObject()
+
+        writer.WriteStartObject("recommendedAction")
+        let (action, message) =
+            match result.RecommendedAction with
+            | RecommendedAction.RunExtract -> ("run_extract", "Run extract to begin")
+            | RecommendedAction.ReExtract -> ("re_extract", "Re-run extract (source files changed)")
+            | RecommendedAction.RunCompile -> ("run_compile", "Run compile to generate artifacts")
+            | RecommendedAction.UpToDate -> ("up_to_date", "No action needed")
+            | RecommendedAction.RecoverExtract reason -> ("recover_extract", $"Re-extract to recover: {reason}")
+        writeString writer "action" action
+        writeString writer "message" message
+        writer.WriteEndObject()
+
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatHelpIndex (index: HelpSubcommand.HelpIndex) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writer.WriteStartArray("commands")
+        for (name, summary) in index.Commands do
+            writer.WriteStartObject()
+            writeString writer "name" name
+            writeString writer "summary" summary
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+        writer.WriteStartArray("topics")
+        for (name, summary) in index.Topics do
+            writer.WriteStartObject()
+            writeString writer "name" name
+            writeString writer "summary" summary
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatTopicJson (topic: HelpTopic) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "name" topic.Name
+        writeString writer "summary" topic.Summary
+        writeString writer "content" topic.Content
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatNoMatch (query: string) (suggestions: string list) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "status" "not_found"
+        writeString writer "query" query
+        writer.WriteStartArray("suggestions")
+        for name in suggestions do
+            writer.WriteStartObject()
+            writeString writer "name" name
+            // Look up summary and type
+            match HelpContent.findCommand name with
+            | Some cmd ->
+                writeString writer "summary" cmd.Summary
+                writeString writer "type" "command"
+            | None ->
+                match HelpContent.findTopic name with
+                | Some topic ->
+                    writeString writer "summary" topic.Summary
+                    writeString writer "type" "topic"
+                | None -> ()
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
         Encoding.UTF8.GetString(stream.ToArray())
 
     let formatError (message: string) : string =

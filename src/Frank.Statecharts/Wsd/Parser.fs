@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Wsd.Parser
 
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Types
 
 // T018: Core parser infrastructure
@@ -12,11 +13,19 @@ let private unsupportedConstructs =
 let private arrowCorrectives =
     "Valid arrow forms: '->' (solid), '-->' (dashed), '->-' (solid deactivating), '-->-' (dashed deactivating)"
 
+/// Internal parser tracking type -- NOT part of shared AST.
+/// Tracks explicit/implicit participant status for warning generation.
+type internal Participant =
+    { Name: string
+      Alias: string option
+      Explicit: bool
+      Position: SourcePosition }
+
 type ParserState =
     { Tokens: Token array
       mutable Position: int
       mutable Participants: Map<string, Participant>
-      mutable Elements: DiagramElement list
+      mutable Elements: StatechartElement list
       mutable Errors: ParseFailure list
       mutable Warnings: ParseWarning list
       mutable Title: string option
@@ -64,7 +73,7 @@ let private addError
     : unit =
     if state.Errors.Length < state.MaxErrors then
         let failure =
-            { Position = pos
+            { Position = Some pos
               Description = desc
               Expected = expected
               Found = found
@@ -75,7 +84,7 @@ let private addError
         // WP06: Check if error limit reached after adding
         if state.Errors.Length >= state.MaxErrors then
             let limitFailure =
-                { Position = pos
+                { Position = Some pos
                   Description = "Error limit reached; further errors suppressed"
                   Expected = ""
                   Found = ""
@@ -86,7 +95,7 @@ let private addError
 
 let private addWarning (state: ParserState) (pos: SourcePosition) (desc: string) (suggestion: string option) : unit =
     let warning =
-        { Position = pos
+        { Position = Some pos
           Description = desc
           Suggestion = suggestion }
 
@@ -159,6 +168,19 @@ let private ensureParticipant (state: ParserState) (name: string) (pos: SourcePo
     if not (Map.containsKey name state.Participants) then
         registerParticipant state name None false pos
 
+        // Emit a StateDecl element for the implicit participant so it
+        // appears in the shared AST's Elements list (same as explicit decls)
+        let stateNode =
+            { Identifier = name
+              Label = None
+              Kind = StateKind.Regular
+              Children = []
+              Activities = None
+              Position = Some pos
+              Annotations = [] }
+
+        state.Elements <- StateDecl stateNode :: state.Elements
+
         if not (state.ImplicitWarned.Contains name) then
             state.ImplicitWarned <- state.ImplicitWarned.Add name
 
@@ -201,14 +223,18 @@ let private parseParticipant (state: ParserState) : unit =
                     None
             | _ -> None
 
-        let participant =
-            { Name = name
-              Alias = alias
-              Explicit = true
-              Position = startToken.Position }
-
         registerParticipant state name alias true startToken.Position
-        state.Elements <- ParticipantDecl participant :: state.Elements
+
+        let stateNode =
+            { Identifier = name
+              Label = alias
+              Kind = StateKind.Regular
+              Children = []
+              Activities = None
+              Position = Some startToken.Position
+              Annotations = [] }
+
+        state.Elements <- StateDecl stateNode :: state.Elements
     | _ ->
         let t = peek state
         addError state t.Position "Expected participant name" "identifier" (tokenDescription t) "participant Client"
@@ -218,10 +244,10 @@ let private parseParticipant (state: ParserState) : unit =
 // T020: Message parsing
 let private mapArrow (kind: TokenKind) : (ArrowStyle * Direction) option =
     match kind with
-    | SolidArrow -> Some(Solid, Forward)
-    | DashedArrow -> Some(Dashed, Forward)
-    | SolidDeactivate -> Some(Solid, Deactivating)
-    | DashedDeactivate -> Some(Dashed, Deactivating)
+    | SolidArrow -> Some(ArrowStyle.Solid, Direction.Forward)
+    | DashedArrow -> Some(ArrowStyle.Dashed, Direction.Forward)
+    | SolidDeactivate -> Some(ArrowStyle.Solid, Direction.Deactivating)
+    | DashedDeactivate -> Some(ArrowStyle.Dashed, Direction.Deactivating)
     | _ -> None
 
 let private parseLabelAndParams (text: string) : (string * string list) =
@@ -280,16 +306,21 @@ let private parseMessage (state: ParserState) : unit =
                     | _ -> ("", [])
                 | _ -> ("", [])
 
-            let message =
-                { Sender = senderName
-                  Receiver = receiverName
-                  ArrowStyle = arrowStyle
-                  Direction = direction
-                  Label = label
+            let transitionEdge =
+                { Source = senderName
+                  Target = Some receiverName
+                  Event = if label.Length > 0 then Some label else None
+                  Guard = None
+                  Action = None
                   Parameters = parameters
-                  Position = senderToken.Position }
+                  Position = Some senderToken.Position
+                  Annotations =
+                      [ WsdAnnotation(
+                            WsdTransitionStyle
+                                { ArrowStyle = arrowStyle
+                                  Direction = direction }) ] }
 
-            state.Elements <- MessageElement message :: state.Elements
+            state.Elements <- TransitionElement transitionEdge :: state.Elements
             skipToNewline state
         | _ ->
             let t = peek state
@@ -362,13 +393,13 @@ let private parseTitleDirective (state: ParserState) : unit =
         addWarning state startToken.Position "Duplicate title directive" (Some "Remove the duplicate title")
 
     state.Title <- Some titleText
-    state.Elements <- TitleDirective(titleText, startToken.Position) :: state.Elements
+    state.Elements <- DirectiveElement(TitleDirective(titleText, Some startToken.Position)) :: state.Elements
     skipToNewline state
 
 let private parseAutoNumberDirective (state: ParserState) : unit =
     let startToken = advance state // consume AutoNumber keyword
     state.AutoNumber <- true
-    state.Elements <- AutoNumberDirective startToken.Position :: state.Elements
+    state.Elements <- DirectiveElement(AutoNumberDirective(Some startToken.Position)) :: state.Elements
     skipToNewline state
 
 // T022: Note parsing with WP06 guard parser integration
@@ -379,13 +410,13 @@ let private parseNote (state: ParserState) : unit =
         match (peek state).Kind with
         | TokenKind.Over ->
             advance state |> ignore
-            Some NotePosition.Over
+            Some WsdNotePosition.Over
         | TokenKind.LeftOf ->
             advance state |> ignore
-            Some NotePosition.LeftOf
+            Some WsdNotePosition.LeftOf
         | TokenKind.RightOf ->
             advance state |> ignore
-            Some NotePosition.RightOf
+            Some WsdNotePosition.RightOf
         | _ ->
             let t = peek state
 
@@ -435,10 +466,10 @@ let private parseNote (state: ParserState) : unit =
 
             // Merge guard parser errors/warnings into parser state via addError/addWarning
             for ge in guardErrors do
-                addError state ge.Position ge.Description ge.Expected ge.Found ge.CorrectiveExample
+                addError state ge.Position.Value ge.Description ge.Expected ge.Found ge.CorrectiveExample
 
             for gw in guardWarnings do
-                addWarning state gw.Position gw.Description gw.Suggestion
+                addWarning state gw.Position.Value gw.Description gw.Suggestion
 
             let finalContent =
                 if guard.IsSome && remainingContent.Length > 0 then
@@ -448,14 +479,21 @@ let private parseNote (state: ParserState) : unit =
                 else
                     content
 
-            let note =
-                { NotePosition = position
-                  Target = target
-                  Content = finalContent
-                  Guard = guard
-                  Position = startToken.Position }
+            // Build annotations: WSD note position + optional guard data
+            let positionAnnotation = WsdAnnotation(WsdNotePosition position)
 
-            state.Elements <- NoteElement note :: state.Elements
+            let guardAnnotations =
+                match guard with
+                | Some g -> [ WsdAnnotation(WsdGuardData(g.Pairs)) ]
+                | None -> []
+
+            let noteContent =
+                { Target = target
+                  Content = finalContent
+                  Position = Some startToken.Position
+                  Annotations = positionAnnotation :: guardAnnotations }
+
+            state.Elements <- NoteElement noteContent :: state.Elements
         | _ ->
             let t = peek state
 
@@ -618,15 +656,15 @@ let rec private parseGroup (state: ParserState) (depth: int) : unit =
             skipToNewline state
             finished <- true
 
-    let group =
+    let groupBlock =
         { Kind = groupKind
           Branches = branches |> Seq.toList
-          Position = startToken.Position }
+          Position = Some startToken.Position }
 
-    state.Elements <- GroupElement group :: state.Elements
+    state.Elements <- GroupElement groupBlock :: state.Elements
 
 // WP05: Parse branch body elements, isolating from parent state.Elements
-and private parseBranchBody (state: ParserState) (depth: int) : DiagramElement list =
+and private parseBranchBody (state: ParserState) (depth: int) : StatechartElement list =
     // Save parent elements
     let savedElements = state.Elements
     state.Elements <- []
@@ -782,18 +820,12 @@ let parse (tokens: Token list) (maxErrors: int) : ParseResult =
 
     parseElements state
 
-    // Build participants list ordered by first appearance
-    let participants =
-        state.Participants
-        |> Map.toList
-        |> List.map snd
-        |> List.sortBy (fun p -> p.Position.Line, p.Position.Column)
-
-    { Diagram =
+    { Document =
         { Title = state.Title
-          AutoNumber = state.AutoNumber
-          Participants = participants
-          Elements = List.rev state.Elements }
+          InitialStateId = None
+          Elements = List.rev state.Elements
+          DataEntries = []
+          Annotations = [] }
       Errors = List.rev state.Errors
       Warnings = List.rev state.Warnings }
 

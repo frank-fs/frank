@@ -156,46 +156,74 @@ let stateMachineTests =
 let guardTests =
     testList
         "Guard"
-        [ test "Guard evaluates ClaimsPrincipal - allowed" {
+        [ test "AccessControl guard evaluates ClaimsPrincipal - allowed" {
               let adminGuard: Guard<TurnstileState, TurnstileEvent, unit> =
-                  { Name = "isAdmin"
-                    Predicate =
+                  AccessControl(
+                      "isAdmin",
                       fun ctx ->
                           if ctx.User.IsInRole("Admin") then
                               Allowed
                           else
-                              Blocked(NotAllowed) }
+                              Blocked(NotAllowed)
+                  )
 
               let adminIdentity = ClaimsIdentity([ Claim(ClaimTypes.Role, "Admin") ], "test")
               let adminPrincipal = ClaimsPrincipal(adminIdentity)
 
-              let ctx =
+              let ctx: AccessControlContext<TurnstileState, unit> =
                   { User = adminPrincipal
                     CurrentState = Locked
-                    Event = Coin
                     Context = () }
 
-              Expect.equal (adminGuard.Predicate ctx) Allowed "admin should be allowed"
+              match adminGuard with
+              | AccessControl(_, pred) -> Expect.equal (pred ctx) Allowed "admin should be allowed"
+              | _ -> failtest "Expected AccessControl"
           }
 
-          test "Guard evaluates ClaimsPrincipal - blocked" {
+          test "AccessControl guard evaluates ClaimsPrincipal - blocked" {
               let adminGuard: Guard<TurnstileState, TurnstileEvent, unit> =
-                  { Name = "isAdmin"
-                    Predicate =
+                  AccessControl(
+                      "isAdmin",
                       fun ctx ->
                           if ctx.User.IsInRole("Admin") then
                               Allowed
                           else
-                              Blocked(NotAllowed) }
+                              Blocked(NotAllowed)
+                  )
 
               let userIdentity = ClaimsIdentity([ Claim(ClaimTypes.Role, "User") ], "test")
               let userPrincipal = ClaimsPrincipal(userIdentity)
 
-              let ctx =
+              let ctx: AccessControlContext<TurnstileState, unit> =
                   { User = userPrincipal
+                    CurrentState = Locked
+                    Context = () }
+
+              match adminGuard with
+              | AccessControl(_, pred) -> Expect.equal (pred ctx) (Blocked(NotAllowed)) "non-admin should be blocked"
+              | _ -> failtest "Expected AccessControl"
+          }
+
+          test "EventValidation guard receives event value" {
+              let eventGuard: Guard<TurnstileState, TurnstileEvent, unit> =
+                  EventValidation(
+                      "checkEvent",
+                      fun ctx ->
+                          match ctx.Event with
+                          | Coin -> Allowed
+                          | Push -> Blocked(InvalidTransition)
+                  )
+
+              let identity = ClaimsIdentity([ Claim(ClaimTypes.Role, "User") ], "test")
+              let principal = ClaimsPrincipal(identity)
+
+              let ctx: EventValidationContext<TurnstileState, TurnstileEvent, unit> =
+                  { User = principal
                     CurrentState = Locked
                     Event = Coin
                     Context = () }
 
-              Expect.equal (adminGuard.Predicate ctx) (Blocked(NotAllowed)) "non-admin should be blocked"
+              match eventGuard with
+              | EventValidation(_, pred) -> Expect.equal (pred ctx) Allowed "Coin should be allowed"
+              | _ -> failtest "Expected EventValidation"
           } ]

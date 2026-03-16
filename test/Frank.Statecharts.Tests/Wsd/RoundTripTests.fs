@@ -1,30 +1,62 @@
 module Frank.Statecharts.Tests.Wsd.RoundTripTests
 
 open Expecto
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Parser
 
 // === Helpers ===
 
-let private participants (r: ParseResult) = r.Diagram.Participants
-
-let private messages (r: ParseResult) =
-    r.Diagram.Elements
+let private stateDecls (r: ParseResult) =
+    r.Document.Elements
     |> List.choose (function
-        | MessageElement m -> Some m
+        | StateDecl s -> Some s
+        | _ -> None)
+
+let private transitions (r: ParseResult) =
+    r.Document.Elements
+    |> List.choose (function
+        | TransitionElement t -> Some t
         | _ -> None)
 
 let private notes (r: ParseResult) =
-    r.Diagram.Elements
+    r.Document.Elements
     |> List.choose (function
         | NoteElement n -> Some n
         | _ -> None)
 
 let private groups (r: ParseResult) =
-    r.Diagram.Elements
+    r.Document.Elements
     |> List.choose (function
         | GroupElement g -> Some g
         | _ -> None)
+
+/// Extract WSD transition style from a TransitionEdge's annotations
+let private transitionStyle (edge: TransitionEdge) =
+    edge.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdTransitionStyle ts) -> Some ts
+        | _ -> None)
+
+/// Extract WSD note position from a NoteContent's annotations
+let private notePosition (note: NoteContent) =
+    note.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdNotePosition pos) -> Some pos
+        | _ -> None)
+
+/// Extract guard pairs from a NoteContent's annotations
+let private noteGuard (note: NoteContent) =
+    note.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdGuardData pairs) -> Some pairs
+        | _ -> None)
+
+/// Check if document has AutoNumber directive
+let private hasAutoNumber (r: ParseResult) =
+    r.Document.Elements
+    |> List.exists (function
+        | DirectiveElement(AutoNumberDirective _) -> true
+        | _ -> false)
 
 // === T040: Amundsen Onboarding Round-Trip ===
 
@@ -90,59 +122,75 @@ let roundTripTests =
 
                 test "title is Onboarding Flow" {
                     let result = parseWsd onboardingWsd
-                    Expect.equal result.Diagram.Title (Some "Onboarding Flow") "title"
+                    Expect.equal result.Document.Title (Some "Onboarding Flow") "title"
                 }
 
                 test "autonumber is true" {
                     let result = parseWsd onboardingWsd
-                    Expect.isTrue result.Diagram.AutoNumber "autonumber"
+                    Expect.isTrue (hasAutoNumber result) "autonumber"
                 }
 
                 test "three explicit participants" {
                     let result = parseWsd onboardingWsd
-                    let ps = participants result
+                    let ps = stateDecls result
                     Expect.equal ps.Length 3 "three participants"
-                    Expect.equal ps.[0].Name "Client" "first"
-                    Expect.equal ps.[1].Name "API" "second"
-                    Expect.equal ps.[2].Name "DB" "third"
+                    Expect.equal ps.[0].Identifier "Client" "first"
+                    Expect.equal ps.[1].Identifier "API" "second"
+                    Expect.equal ps.[2].Identifier "DB" "third"
 
-                    for p in ps do
-                        Expect.isTrue p.Explicit "all explicit"
+                    // All participants are explicit -- no implicit warnings
+                    let implicitWarnings =
+                        result.Warnings
+                        |> List.filter (fun w -> w.Description.Contains("not explicitly declared"))
+
+                    Expect.isEmpty implicitWarnings "all explicit (no implicit warnings)"
                 }
 
                 test "first message: Client->API solid forward" {
                     let result = parseWsd onboardingWsd
-                    let msgs = messages result
-                    let m = msgs.[0]
-                    Expect.equal m.Sender "Client" "sender"
-                    Expect.equal m.Receiver "API" "receiver"
-                    Expect.equal m.ArrowStyle ArrowStyle.Solid "solid"
-                    Expect.equal m.Direction Direction.Forward "forward"
-                    Expect.stringContains m.Label "createAccount" "label"
+                    let edges = transitions result
+                    let t = edges.[0]
+                    Expect.equal t.Source "Client" "sender"
+                    Expect.equal t.Target (Some "API") "receiver"
+                    let style = (transitionStyle t).Value
+                    Expect.equal style.ArrowStyle ArrowStyle.Solid "solid"
+                    Expect.equal style.Direction Direction.Forward "forward"
+                    Expect.isTrue (t.Event.Value.Contains("createAccount")) "label"
                 }
 
                 test "guard on first note: auth=none" {
                     let result = parseWsd onboardingWsd
                     let ns = notes result
                     let n = ns.[0]
-                    Expect.isSome n.Guard "has guard"
-                    Expect.equal n.Guard.Value.Pairs [ ("auth", "none") ] "guard pairs"
+                    Expect.isSome (noteGuard n) "has guard"
+                    Expect.equal (noteGuard n).Value [ ("auth", "none") ] "guard pairs"
                 }
 
                 test "deactivating arrows have correct direction" {
                     let result = parseWsd onboardingWsd
-                    let msgs = messages result
+                    let edges = transitions result
 
                     let deactivating =
-                        msgs |> List.filter (fun m -> m.Direction = Direction.Deactivating)
+                        edges
+                        |> List.filter (fun t ->
+                            match transitionStyle t with
+                            | Some s -> s.Direction = Direction.Deactivating
+                            | None -> false)
 
                     Expect.isGreaterThanOrEqual deactivating.Length 4 "at least 4 deactivating arrows"
                 }
 
                 test "dashed messages have correct style" {
                     let result = parseWsd onboardingWsd
-                    let msgs = messages result
-                    let dashed = msgs |> List.filter (fun m -> m.ArrowStyle = ArrowStyle.Dashed)
+                    let edges = transitions result
+
+                    let dashed =
+                        edges
+                        |> List.filter (fun t ->
+                            match transitionStyle t with
+                            | Some s -> s.ArrowStyle = ArrowStyle.Dashed
+                            | None -> false)
+
                     Expect.isGreaterThanOrEqual dashed.Length 4 "at least 4 dashed arrows"
                 }
 
@@ -150,8 +198,8 @@ let roundTripTests =
                     let result = parseWsd onboardingWsd
                     let ns = notes result
                     let n = ns.[1]
-                    Expect.isSome n.Guard "has guard"
-                    Expect.equal n.Guard.Value.Pairs [ ("auth", "bearer") ] "guard pairs"
+                    Expect.isSome (noteGuard n) "has guard"
+                    Expect.equal (noteGuard n).Value [ ("auth", "bearer") ] "guard pairs"
                 }
 
                 test "no warnings (all participants declared)" {
@@ -174,25 +222,25 @@ let roundTripTests =
 
                 test "title is Tic-Tac-Toe Game" {
                     let result = parseWsd ticTacToeWsd
-                    Expect.equal result.Diagram.Title (Some "Tic-Tac-Toe Game") "title"
+                    Expect.equal result.Document.Title (Some "Tic-Tac-Toe Game") "title"
                 }
 
                 test "four participants" {
                     let result = parseWsd ticTacToeWsd
-                    let ps = participants result
+                    let ps = stateDecls result
                     Expect.equal ps.Length 4 "four participants"
-                    Expect.equal ps.[0].Name "PlayerX" "first"
-                    Expect.equal ps.[1].Name "PlayerO" "second"
-                    Expect.equal ps.[2].Name "Board" "third"
-                    Expect.equal ps.[3].Name "GameEngine" "fourth"
+                    Expect.equal ps.[0].Identifier "PlayerX" "first"
+                    Expect.equal ps.[1].Identifier "PlayerO" "second"
+                    Expect.equal ps.[2].Identifier "Board" "third"
+                    Expect.equal ps.[3].Identifier "GameEngine" "fourth"
                 }
 
                 test "first note guard: role=PlayerX, state=XTurn" {
                     let result = parseWsd ticTacToeWsd
                     let ns = notes result
-                    Expect.isSome ns.[0].Guard "has guard"
+                    Expect.isSome (noteGuard ns.[0]) "has guard"
 
-                    Expect.equal ns.[0].Guard.Value.Pairs [ ("role", "PlayerX"); ("state", "XTurn") ] "two guard pairs"
+                    Expect.equal (noteGuard ns.[0]).Value [ ("role", "PlayerX"); ("state", "XTurn") ] "two guard pairs"
                 }
 
                 test "alt block with two branches" {
@@ -217,18 +265,25 @@ let roundTripTests =
                             | _ -> None)
 
                     Expect.isGreaterThanOrEqual branchNotes.Length 1 "has note in else branch"
-                    Expect.isSome branchNotes.[0].Guard "guard in else branch note"
+                    Expect.isSome (noteGuard branchNotes.[0]) "guard in else branch note"
 
                     Expect.equal
-                        branchNotes.[0].Guard.Value.Pairs
+                        (noteGuard branchNotes.[0]).Value
                         [ ("role", "PlayerO"); ("state", "OTurn") ]
                         "guard pairs"
                 }
 
                 test "messages have correct arrow styles" {
                     let result = parseWsd ticTacToeWsd
-                    let msgs = messages result
-                    let solid = msgs |> List.filter (fun m -> m.ArrowStyle = ArrowStyle.Solid)
+                    let edges = transitions result
+
+                    let solid =
+                        edges
+                        |> List.filter (fun t ->
+                            match transitionStyle t with
+                            | Some s -> s.ArrowStyle = ArrowStyle.Solid
+                            | None -> false)
+
                     Expect.isGreaterThanOrEqual solid.Length 2 "solid arrows present"
                 }
 
@@ -254,17 +309,17 @@ Utilisateur->Serveur: requête
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (participants result).[0].Name "Utilisateur" "unicode name"
-                    Expect.equal (participants result).[1].Name "Serveur" "unicode name 2"
+                    Expect.equal (stateDecls result).[0].Identifier "Utilisateur" "unicode name"
+                    Expect.equal (stateDecls result).[1].Identifier "Serveur" "unicode name 2"
                 }
 
                 test "empty input produces empty diagram" {
                     let result = parseWsd ""
                     Expect.isEmpty result.Errors "no errors"
                     Expect.isEmpty result.Warnings "no warnings"
-                    Expect.isEmpty result.Diagram.Elements "no elements"
-                    Expect.isNone result.Diagram.Title "no title"
-                    Expect.isFalse result.Diagram.AutoNumber "no autonumber"
+                    Expect.isEmpty result.Document.Elements "no elements"
+                    Expect.isNone result.Document.Title "no title"
+                    Expect.isFalse (hasAutoNumber result) "no autonumber"
                 }
 
                 test "comments are ignored" {
@@ -277,8 +332,8 @@ Client->Client: self
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (participants result).Length 1 "one participant"
-                    Expect.equal (messages result).Length 1 "one message"
+                    Expect.equal (stateDecls result).Length 1 "one participant"
+                    Expect.equal (transitions result).Length 1 "one message"
                 }
 
                 test "whitespace-only lines ignored" {
@@ -292,7 +347,7 @@ A->B: hello
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (participants result).Length 2 "two participants"
+                    Expect.equal (stateDecls result).Length 2 "two participants"
                 }
 
                 test "duplicate participant declaration is no-op" {
@@ -304,16 +359,19 @@ Client->Client: self
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (participants result).Length 1 "still one participant"
+                    let uniqueNames = stateDecls result |> List.map (fun s -> s.Identifier) |> List.distinct
+                    Expect.equal uniqueNames.Length 1 "still one unique participant"
                 }
 
                 test "implicit participants registered on first use" {
                     let result = parseWsd "Foo->Bar: hello\n"
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (participants result).Length 2 "two participants"
+                    Expect.equal (stateDecls result).Length 2 "two participants"
 
-                    let foo = (participants result) |> List.find (fun p -> p.Name = "Foo")
-                    Expect.isFalse foo.Explicit "Foo is implicit"
+                    let fooWarning =
+                        result.Warnings |> List.exists (fun w -> w.Description.Contains("'Foo'"))
+
+                    Expect.isTrue fooWarning "Foo is implicit (has warning)"
                 }
 
                 test "self-message works" {
@@ -324,9 +382,9 @@ Client->Client: self
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.equal msgs.[0].Sender "Client" "sender"
-                    Expect.equal msgs.[0].Receiver "Client" "receiver"
+                    let edges = transitions result
+                    Expect.equal edges.[0].Source "Client" "sender"
+                    Expect.equal edges.[0].Target (Some "Client") "receiver"
                 }
 
                 test "all four arrow types produce correct AST" {
@@ -341,16 +399,20 @@ A-->-B: dashedDeactivate
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.equal msgs.Length 4 "four messages"
-                    Expect.equal msgs.[0].ArrowStyle ArrowStyle.Solid "solid"
-                    Expect.equal msgs.[0].Direction Direction.Forward "forward"
-                    Expect.equal msgs.[1].ArrowStyle ArrowStyle.Dashed "dashed"
-                    Expect.equal msgs.[1].Direction Direction.Forward "forward"
-                    Expect.equal msgs.[2].ArrowStyle ArrowStyle.Solid "solid deactivate"
-                    Expect.equal msgs.[2].Direction Direction.Deactivating "deactivating"
-                    Expect.equal msgs.[3].ArrowStyle ArrowStyle.Dashed "dashed deactivate"
-                    Expect.equal msgs.[3].Direction Direction.Deactivating "deactivating"
+                    let edges = transitions result
+                    Expect.equal edges.Length 4 "four messages"
+                    let s0 = (transitionStyle edges.[0]).Value
+                    Expect.equal s0.ArrowStyle ArrowStyle.Solid "solid"
+                    Expect.equal s0.Direction Direction.Forward "forward"
+                    let s1 = (transitionStyle edges.[1]).Value
+                    Expect.equal s1.ArrowStyle ArrowStyle.Dashed "dashed"
+                    Expect.equal s1.Direction Direction.Forward "forward"
+                    let s2 = (transitionStyle edges.[2]).Value
+                    Expect.equal s2.ArrowStyle ArrowStyle.Solid "solid deactivate"
+                    Expect.equal s2.Direction Direction.Deactivating "deactivating"
+                    let s3 = (transitionStyle edges.[3]).Value
+                    Expect.equal s3.ArrowStyle ArrowStyle.Dashed "dashed deactivate"
+                    Expect.equal s3.Direction Direction.Deactivating "deactivating"
                 }
 
                 test "mixed arrow styles within group" {
@@ -370,13 +432,13 @@ end
                     let gs = groups result
                     Expect.equal gs.Length 1 "one group"
 
-                    let branchMsgs =
+                    let branchEdges =
                         gs.[0].Branches.[0].Elements
                         |> List.choose (function
-                            | MessageElement m -> Some m
+                            | TransitionElement t -> Some t
                             | _ -> None)
 
-                    Expect.equal branchMsgs.Length 4 "four messages in branch"
+                    Expect.equal branchEdges.Length 4 "four messages in branch"
                 }
 
                 test "message with parameters" {
@@ -388,9 +450,9 @@ Client->Server: getData(a, b, c)
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.equal msgs.[0].Label "getData" "label"
-                    Expect.equal msgs.[0].Parameters [ "a"; "b"; "c" ] "three params"
+                    let edges = transitions result
+                    Expect.equal edges.[0].Event (Some "getData") "label"
+                    Expect.equal edges.[0].Parameters [ "a"; "b"; "c" ] "three params"
                 }
 
                 test "message with no parameters" {
@@ -402,8 +464,8 @@ Client->Server: getData
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.isEmpty msgs.[0].Parameters "no params"
+                    let edges = transitions result
+                    Expect.isEmpty edges.[0].Parameters "no params"
                 }
 
                 test "5-level nesting works" {
@@ -464,7 +526,7 @@ end
 
                 test "title with special characters" {
                     let result = parseWsd "title: My API v2\n"
-                    Expect.equal result.Diagram.Title (Some "My API v2") "special chars via colon syntax"
+                    Expect.equal result.Document.Title (Some "My API v2") "special chars via colon syntax"
                 }
 
                 test "note positions: over, left of, right of" {
@@ -479,9 +541,9 @@ note right of Client: right text
                     Expect.isEmpty result.Errors "no errors"
                     let ns = notes result
                     Expect.equal ns.Length 3 "three notes"
-                    Expect.equal ns.[0].NotePosition NotePosition.Over "over"
-                    Expect.equal ns.[1].NotePosition NotePosition.LeftOf "left of"
-                    Expect.equal ns.[2].NotePosition NotePosition.RightOf "right of"
+                    Expect.equal (notePosition ns.[0]) (Some WsdNotePosition.Over) "over"
+                    Expect.equal (notePosition ns.[1]) (Some WsdNotePosition.LeftOf) "left of"
+                    Expect.equal (notePosition ns.[2]) (Some WsdNotePosition.RightOf) "right of"
                 }
 
                 test "tabs and spaces both accepted" {
@@ -489,8 +551,8 @@ note right of Client: right text
                         parseWsd "participant A\nparticipant B\n\tA->B: tabbed\n  A->B: spaced\n"
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.equal msgs.Length 2 "two messages"
+                    let edges = transitions result
+                    Expect.equal edges.Length 2 "two messages"
                 }
 
                 test "mixed Windows and Unix line endings" {
@@ -499,10 +561,10 @@ note right of Client: right text
                             "participant A\r\nparticipant B\nA->B: hello\r\nB->A: world\n"
 
                     Expect.isEmpty result.Errors "no errors"
-                    let ps = participants result
+                    let ps = stateDecls result
                     Expect.equal ps.Length 2 "two participants"
-                    let msgs = messages result
-                    Expect.equal msgs.Length 2 "two messages"
+                    let edges = transitions result
+                    Expect.equal edges.Length 2 "two messages"
                 }
 
                 test "message with empty parens has no parameters" {
@@ -510,8 +572,8 @@ note right of Client: right text
                         parseWsd "participant A\nparticipant B\nA->B: getData()\n"
 
                     Expect.isEmpty result.Errors "no errors"
-                    let msgs = messages result
-                    Expect.isEmpty msgs.[0].Parameters "empty parens = no params"
+                    let edges = transitions result
+                    Expect.isEmpty edges.[0].Parameters "empty parens = no params"
                 } ]
 
           // === T044: Multi-target build verification ===
@@ -526,7 +588,7 @@ note right of Client: right text
               // Empty string is the canonical "no input"
               let result = parseWsd ""
               Expect.isEmpty result.Errors "empty string: no errors"
-              Expect.isEmpty result.Diagram.Elements "empty string: no elements"
+              Expect.isEmpty result.Document.Elements "empty string: no elements"
           }
 
           test "parseWsd is deterministic" {
@@ -538,8 +600,8 @@ A->B: hello
 
               let result1 = parseWsd source
               let result2 = parseWsd source
-              Expect.equal result1.Diagram.Title result2.Diagram.Title "title matches"
-              Expect.equal result1.Diagram.Participants.Length result2.Diagram.Participants.Length "participants match"
+              Expect.equal result1.Document.Title result2.Document.Title "title matches"
+              Expect.equal (stateDecls result1).Length (stateDecls result2).Length "participants match"
               Expect.equal result1.Errors.Length result2.Errors.Length "errors match"
-              Expect.equal (messages result1).Length (messages result2).Length "messages match"
+              Expect.equal (transitions result1).Length (transitions result2).Length "messages match"
           } ]

@@ -1,0 +1,11 @@
+{
+  "feature_number": "020",
+  "slug": "020-shared-statechart-ast",
+  "feature_slug": "020-shared-statechart-ast",
+  "friendly_name": "Shared Statechart AST",
+  "mission": "software-dev",
+  "source_description": "Cross-cutting architectural requirement -- unified AST for all statechart format parsers (WSD, ALPS, SCXML, smcat, XState JSON). NOT tied to an existing GitHub issue. Emerged from discovery across specs 011 (ALPS), 013 (smcat), 017 (WSD Generator), and 018 (SCXML).",
+  "target_branch": "master",
+  "vcs": "git",
+  "created_at": "2026-03-15T22:53:21.721820+00:00"
+}
