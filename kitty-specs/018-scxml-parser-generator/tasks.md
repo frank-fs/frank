@@ -126,7 +126,7 @@
 - [x] T016 Implement datamodel/data element generation: emit `<datamodel>` with `<data id="..." expr="..."/>` children; entries with no expression emit `<data id="..."/>`
 - [x] T017 Implement history and invoke element generation: emit `<history id="..." type="...">` with optional child `<transition>`, emit `<invoke>` with `type`, `src`, `id` attributes
 - [x] T018 Implement `generateTo : TextWriter -> ScxmlDocument -> unit` overload that writes directly to a `TextWriter`
-- [ ] T019 Update `Frank.Statecharts.fsproj` to add `Scxml/Generator.fs` compile entry after `Scxml/Parser.fs`
+- [x] T019 Update `Frank.Statecharts.fsproj` to add `Scxml/Generator.fs` compile entry after `Scxml/Parser.fs`
 
 ### Implementation Notes
 - Module: `module internal Frank.Statecharts.Scxml.Generator`
