@@ -13,4 +13,8 @@ module ResourceBuilderExtensions =
         /// when the useLinkedData middleware is active.
         [<CustomOperation("linkedData")>]
         member _.LinkedData(spec: ResourceSpec) : ResourceSpec =
-            ResourceBuilder.AddMetadata(spec, fun b -> b.Metadata.Add(LinkedDataMarker))
+            ResourceBuilder.AddMetadata(spec, fun b ->
+                b.Metadata.Add(LinkedDataMarker)
+                b.Metadata.Add({ MediaType = "application/ld+json"; Rel = "describedby" } : DiscoveryMediaType)
+                b.Metadata.Add({ MediaType = "text/turtle"; Rel = "describedby" } : DiscoveryMediaType)
+                b.Metadata.Add({ MediaType = "application/rdf+xml"; Rel = "describedby" } : DiscoveryMediaType))

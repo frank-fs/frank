@@ -11,4 +11,6 @@ module ResourceBuilderExtensions =
         /// statefulResource CE is not needed.
         [<CustomOperation("stateMachine")>]
         member _.StateMachine(spec: ResourceSpec, metadata: StateMachineMetadata) : ResourceSpec =
-            ResourceBuilder.AddMetadata(spec, fun builder -> builder.Metadata.Add(metadata))
+            ResourceBuilder.AddMetadata(spec, fun builder ->
+                builder.Metadata.Add(metadata)
+                builder.Metadata.Add({ MediaType = "application/scxml+xml"; Rel = "describedby" } : DiscoveryMediaType))
