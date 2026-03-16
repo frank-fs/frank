@@ -40,7 +40,7 @@ let makeArtifact format doc : FormatArtifact =
     { Format = format; Document = doc }
 
 let runRule (rule: ValidationRule) (artifacts: FormatArtifact list) =
-    rule.Check artifacts
+    rule.Check artifacts |> fst
 
 // ─────────────────────────────────────────────
 // T035: Orphan transition targets

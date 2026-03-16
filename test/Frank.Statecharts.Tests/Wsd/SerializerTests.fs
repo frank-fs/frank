@@ -1,49 +1,81 @@
 module Frank.Statecharts.Tests.Wsd.SerializerTests
 
 open Expecto
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Serializer
 open Frank.Statecharts.Wsd.Parser
 
 /// Synthetic position for generated AST nodes.
 let private pos = { Line = 0; Column = 0 }
 
-/// Helper to create a Participant.
+/// Helper to create a StateNode (was Participant).
 let private mkParticipant name alias =
-    { Name = name
-      Alias = alias
-      Explicit = true
-      Position = pos }
+    { Identifier = name
+      Label = alias
+      Kind = Regular
+      Children = []
+      Activities = None
+      Position = Some pos
+      Annotations = [] }
 
-/// Helper to create a Message.
+/// Helper to create a TransitionEdge (was Message).
 let private mkMessage sender receiver style dir label parameters =
-    { Sender = sender
-      Receiver = receiver
-      ArrowStyle = style
-      Direction = dir
-      Label = label
+    { Source = sender
+      Target = Some receiver
+      Event = Some label
+      Guard = None
+      Action = None
       Parameters = parameters
-      Position = pos }
+      Position = Some pos
+      Annotations = [ WsdAnnotation(WsdTransitionStyle { ArrowStyle = style; Direction = dir }) ] }
 
-/// Helper to create a Note.
-let private mkNote position target content guard =
-    { NotePosition = position
-      Target = target
+/// Helper to create a NoteContent (was Note).
+let private mkNote position target content guardPairs =
+    { Target = target
       Content = content
-      Guard = guard
-      Position = pos }
+      Position = Some pos
+      Annotations =
+        [ WsdAnnotation(WsdNotePosition position) ]
+        @ (match guardPairs with
+           | Some pairs -> [ WsdAnnotation(WsdGuardData pairs) ]
+           | None -> []) }
 
-/// Helper to create a GuardAnnotation.
-let private mkGuard pairs =
-    { Pairs = pairs
-      Position = pos }
+/// Helper to create guard pairs (was GuardAnnotation).
+let private mkGuard pairs = pairs
 
-/// Helper to create a simple Diagram.
+/// Helper to create a simple StatechartDocument (was Diagram).
 let private mkDiagram title autoNumber elements =
+    let directiveElements =
+        if autoNumber then [ DirectiveElement(AutoNumberDirective(Some pos)) ] else []
+
     { Title = title
-      AutoNumber = autoNumber
-      Participants = []
-      Elements = elements }
+      InitialStateId = None
+      Elements = directiveElements @ elements
+      DataEntries = []
+      Annotations = [] }
+
+/// Extract ArrowStyle from a TransitionEdge's annotations.
+let private extractArrowStyle (t: TransitionEdge) =
+    t.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdTransitionStyle s) -> Some s.ArrowStyle
+        | _ -> None)
+    |> Option.defaultValue Solid
+
+/// Extract Direction from a TransitionEdge's annotations.
+let private extractDirection (t: TransitionEdge) =
+    t.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdTransitionStyle s) -> Some s.Direction
+        | _ -> None)
+    |> Option.defaultValue Forward
+
+/// Extract WsdGuardData pairs from a NoteContent's annotations.
+let private extractGuardPairs (n: NoteContent) =
+    n.Annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdGuardData pairs) -> Some pairs
+        | _ -> None)
 
 [<Tests>]
 let serializerTests =
@@ -106,7 +138,7 @@ let serializerTests =
                 }
 
                 test "no title" {
-                    let d = mkDiagram None false [ ParticipantDecl(mkParticipant "A" None) ]
+                    let d = mkDiagram None false [ StateDecl(mkParticipant "A" None) ]
                     let result = serialize d
                     Expect.isFalse (result.Contains("title")) "no title in output"
                 } ]
@@ -119,8 +151,8 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ ParticipantDecl(mkParticipant "Client" None)
-                              ParticipantDecl(mkParticipant "Server" None) ]
+                            [ StateDecl(mkParticipant "Client" None)
+                              StateDecl(mkParticipant "Server" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "participant Client\n" "Client declared"
@@ -132,9 +164,9 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ ParticipantDecl(mkParticipant "First" None)
-                              ParticipantDecl(mkParticipant "Second" None)
-                              ParticipantDecl(mkParticipant "Third" None) ]
+                            [ StateDecl(mkParticipant "First" None)
+                              StateDecl(mkParticipant "Second" None)
+                              StateDecl(mkParticipant "Third" None) ]
 
                     let result = serialize d
                     let firstIdx = result.IndexOf("participant First")
@@ -146,7 +178,7 @@ let serializerTests =
 
                 test "participant with alias" {
                     let d =
-                        mkDiagram None false [ ParticipantDecl(mkParticipant "API" (Some "RestAPI")) ]
+                        mkDiagram None false [ StateDecl(mkParticipant "API" (Some "RestAPI")) ]
 
                     let result = serialize d
                     Expect.stringContains result "participant API as RestAPI\n" "alias present"
@@ -154,7 +186,7 @@ let serializerTests =
 
                 test "quoted participant name" {
                     let d =
-                        mkDiagram None false [ ParticipantDecl(mkParticipant "my state" None) ]
+                        mkDiagram None false [ StateDecl(mkParticipant "my state" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "participant \"my state\"\n" "quoted name"
@@ -168,7 +200,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Solid Forward "label" []) ]
+                            [ TransitionElement(mkMessage "A" "B" Solid Forward "label" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "A->B: label\n" "solid forward"
@@ -179,7 +211,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Dashed Forward "label" []) ]
+                            [ TransitionElement(mkMessage "A" "B" Dashed Forward "label" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "A-->B: label\n" "dashed forward"
@@ -190,7 +222,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Solid Deactivating "label" []) ]
+                            [ TransitionElement(mkMessage "A" "B" Solid Deactivating "label" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "A->-B: label\n" "solid deactivating"
@@ -201,7 +233,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Dashed Deactivating "label" []) ]
+                            [ TransitionElement(mkMessage "A" "B" Dashed Deactivating "label" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "A-->-B: label\n" "dashed deactivating"
@@ -215,7 +247,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Solid Forward "method" [ "p1"; "p2" ]) ]
+                            [ TransitionElement(mkMessage "A" "B" Solid Forward "method" [ "p1"; "p2" ]) ]
 
                     let result = serialize d
                     Expect.stringContains result "A->B: method(p1, p2)\n" "parameters present"
@@ -226,7 +258,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "A" "B" Solid Forward "" []) ]
+                            [ TransitionElement(mkMessage "A" "B" Solid Forward "" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "A->B\n" "no colon for empty label"
@@ -238,7 +270,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ MessageElement(mkMessage "X" "X" Solid Forward "label" []) ]
+                            [ TransitionElement(mkMessage "X" "X" Solid Forward "label" []) ]
 
                     let result = serialize d
                     Expect.stringContains result "X->X: label\n" "self-message"
@@ -252,7 +284,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.Over "X" "text" None) ]
+                            [ NoteElement(mkNote Over "X" "text" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "note over X: text\n" "note over"
@@ -263,7 +295,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.LeftOf "X" "text" None) ]
+                            [ NoteElement(mkNote LeftOf "X" "text" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "note left of X: text\n" "note left of"
@@ -274,7 +306,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.RightOf "X" "text" None) ]
+                            [ NoteElement(mkNote RightOf "X" "text" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "note right of X: text\n" "note right of"
@@ -287,7 +319,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.Over "X" "" (Some guard)) ]
+                            [ NoteElement(mkNote Over "X" "" (Some guard)) ]
 
                     let result = serialize d
                     Expect.stringContains result "note over X: [guard: role=admin]\n" "guard annotation"
@@ -300,7 +332,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.Over "X" "" (Some guard)) ]
+                            [ NoteElement(mkNote Over "X" "" (Some guard)) ]
 
                     let result = serialize d
 
@@ -317,7 +349,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ NoteElement(mkNote NotePosition.Over "X" "extra text" (Some guard)) ]
+                            [ NoteElement(mkNote Over "X" "extra text" (Some guard)) ]
 
                     let result = serialize d
 
@@ -335,7 +367,7 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ AutoNumberDirective pos ]
+                            [ DirectiveElement(AutoNumberDirective(Some pos)) ]
 
                     let result = serialize d
                     Expect.stringContains result "autonumber\n" "autonumber"
@@ -353,10 +385,10 @@ let serializerTests =
                                   { Kind = GroupKind.Alt
                                     Branches =
                                       [ { Condition = Some "condition1"
-                                          Elements = [ MessageElement(mkMessage "A" "B" Solid Forward "msg1" []) ] }
+                                          Elements = [ TransitionElement(mkMessage "A" "B" Solid Forward "msg1" []) ] }
                                         { Condition = Some "condition2"
-                                          Elements = [ MessageElement(mkMessage "B" "A" Solid Forward "msg2" []) ] } ]
-                                    Position = pos } ]
+                                          Elements = [ TransitionElement(mkMessage "B" "A" Solid Forward "msg2" []) ] } ]
+                                    Position = Some pos } ]
 
                     let result = serialize d
                     Expect.stringContains result "alt condition1\n" "alt with condition"
@@ -380,7 +412,7 @@ let serializerTests =
                         mkDiagram
                             (Some "Test")
                             false
-                            [ ParticipantDecl(mkParticipant "X" None) ]
+                            [ StateDecl(mkParticipant "X" None) ]
 
                     let result = serialize d
                     Expect.stringContains result "title Test\n" "has title"
@@ -398,9 +430,9 @@ let serializerTests =
                         mkDiagram
                             (Some "Test")
                             false
-                            [ ParticipantDecl(mkParticipant "A" None)
-                              ParticipantDecl(mkParticipant "B" None)
-                              MessageElement(mkMessage "A" "B" Solid Forward "msg" []) ]
+                            [ StateDecl(mkParticipant "A" None)
+                              StateDecl(mkParticipant "B" None)
+                              TransitionElement(mkMessage "A" "B" Solid Forward "msg" []) ]
 
                     let result = serialize d
                     Expect.isFalse (result.Contains("\r\n")) "no Windows line endings"
@@ -415,27 +447,27 @@ let serializerTests =
                         mkDiagram
                             (Some "Roundtrip Test")
                             false
-                            [ ParticipantDecl(mkParticipant "Client" None)
-                              ParticipantDecl(mkParticipant "Server" None)
-                              MessageElement(mkMessage "Client" "Server" Solid Forward "hello" [])
-                              MessageElement(mkMessage "Server" "Client" Dashed Forward "world" []) ]
+                            [ StateDecl(mkParticipant "Client" None)
+                              StateDecl(mkParticipant "Server" None)
+                              TransitionElement(mkMessage "Client" "Server" Solid Forward "hello" [])
+                              TransitionElement(mkMessage "Server" "Client" Dashed Forward "world" []) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
-                    Expect.equal result.Diagram.Title (Some "Roundtrip Test") "title preserved"
+                    Expect.equal result.Document.Title (Some "Roundtrip Test") "title preserved"
 
                     let msgs =
-                        result.Diagram.Elements
+                        result.Document.Elements
                         |> List.choose (function
-                            | MessageElement m -> Some m
+                            | TransitionElement t -> Some t
                             | _ -> None)
 
                     Expect.equal msgs.Length 2 "two messages"
-                    Expect.equal msgs.[0].Sender "Client" "first sender"
-                    Expect.equal msgs.[0].Receiver "Server" "first receiver"
-                    Expect.equal msgs.[1].Sender "Server" "second sender"
-                    Expect.equal msgs.[1].Receiver "Client" "second receiver"
+                    Expect.equal msgs.[0].Source "Client" "first sender"
+                    Expect.equal msgs.[0].Target (Some "Server") "first receiver"
+                    Expect.equal msgs.[1].Source "Server" "second sender"
+                    Expect.equal msgs.[1].Target (Some "Client") "second receiver"
                 }
 
                 test "roundtrip: diagram with guard parses back" {
@@ -445,24 +477,25 @@ let serializerTests =
                         mkDiagram
                             (Some "Guard Test")
                             false
-                            [ ParticipantDecl(mkParticipant "Client" None)
-                              ParticipantDecl(mkParticipant "Server" None)
-                              NoteElement(mkNote NotePosition.Over "Client" "" (Some guard))
-                              MessageElement(mkMessage "Client" "Server" Solid Forward "action" []) ]
+                            [ StateDecl(mkParticipant "Client" None)
+                              StateDecl(mkParticipant "Server" None)
+                              NoteElement(mkNote Over "Client" "" (Some guard))
+                              TransitionElement(mkMessage "Client" "Server" Solid Forward "action" []) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
 
                     let notes =
-                        result.Diagram.Elements
+                        result.Document.Elements
                         |> List.choose (function
                             | NoteElement n -> Some n
                             | _ -> None)
 
                     Expect.equal notes.Length 1 "one note"
-                    Expect.isSome notes.[0].Guard "has guard"
-                    Expect.equal notes.[0].Guard.Value.Pairs [ ("role", "admin") ] "guard preserved"
+                    let guardPairs = extractGuardPairs notes.[0]
+                    Expect.isSome guardPairs "has guard"
+                    Expect.equal guardPairs.Value [ ("role", "admin") ] "guard preserved"
                 }
 
                 test "roundtrip: all arrow styles parse back" {
@@ -470,32 +503,32 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ ParticipantDecl(mkParticipant "A" None)
-                              ParticipantDecl(mkParticipant "B" None)
-                              MessageElement(mkMessage "A" "B" Solid Forward "solid" [])
-                              MessageElement(mkMessage "A" "B" Dashed Forward "dashed" [])
-                              MessageElement(mkMessage "A" "B" Solid Deactivating "solidDeact" [])
-                              MessageElement(mkMessage "A" "B" Dashed Deactivating "dashedDeact" []) ]
+                            [ StateDecl(mkParticipant "A" None)
+                              StateDecl(mkParticipant "B" None)
+                              TransitionElement(mkMessage "A" "B" Solid Forward "solid" [])
+                              TransitionElement(mkMessage "A" "B" Dashed Forward "dashed" [])
+                              TransitionElement(mkMessage "A" "B" Solid Deactivating "solidDeact" [])
+                              TransitionElement(mkMessage "A" "B" Dashed Deactivating "dashedDeact" []) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
 
                     let msgs =
-                        result.Diagram.Elements
+                        result.Document.Elements
                         |> List.choose (function
-                            | MessageElement m -> Some m
+                            | TransitionElement t -> Some t
                             | _ -> None)
 
                     Expect.equal msgs.Length 4 "four messages"
-                    Expect.equal msgs.[0].ArrowStyle Solid "solid"
-                    Expect.equal msgs.[0].Direction Forward "forward"
-                    Expect.equal msgs.[1].ArrowStyle Dashed "dashed"
-                    Expect.equal msgs.[1].Direction Forward "forward"
-                    Expect.equal msgs.[2].ArrowStyle Solid "solid deact"
-                    Expect.equal msgs.[2].Direction Deactivating "deactivating"
-                    Expect.equal msgs.[3].ArrowStyle Dashed "dashed deact"
-                    Expect.equal msgs.[3].Direction Deactivating "deactivating"
+                    Expect.equal (extractArrowStyle msgs.[0]) Solid "solid"
+                    Expect.equal (extractDirection msgs.[0]) Forward "forward"
+                    Expect.equal (extractArrowStyle msgs.[1]) Dashed "dashed"
+                    Expect.equal (extractDirection msgs.[1]) Forward "forward"
+                    Expect.equal (extractArrowStyle msgs.[2]) Solid "solid deact"
+                    Expect.equal (extractDirection msgs.[2]) Deactivating "deactivating"
+                    Expect.equal (extractArrowStyle msgs.[3]) Dashed "dashed deact"
+                    Expect.equal (extractDirection msgs.[3]) Deactivating "deactivating"
                 }
 
                 test "roundtrip: message with parameters" {
@@ -503,21 +536,21 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ ParticipantDecl(mkParticipant "A" None)
-                              ParticipantDecl(mkParticipant "B" None)
-                              MessageElement(mkMessage "A" "B" Solid Forward "getData" [ "x"; "y"; "z" ]) ]
+                            [ StateDecl(mkParticipant "A" None)
+                              StateDecl(mkParticipant "B" None)
+                              TransitionElement(mkMessage "A" "B" Solid Forward "getData" [ "x"; "y"; "z" ]) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
 
                     let msgs =
-                        result.Diagram.Elements
+                        result.Document.Elements
                         |> List.choose (function
-                            | MessageElement m -> Some m
+                            | TransitionElement t -> Some t
                             | _ -> None)
 
-                    Expect.equal msgs.[0].Label "getData" "label preserved"
+                    Expect.equal msgs.[0].Event (Some "getData") "label preserved"
                     Expect.equal msgs.[0].Parameters [ "x"; "y"; "z" ] "parameters preserved"
                 }
 
@@ -526,15 +559,21 @@ let serializerTests =
                         mkDiagram
                             (Some "Auto")
                             true
-                            [ AutoNumberDirective pos
-                              ParticipantDecl(mkParticipant "A" None)
-                              ParticipantDecl(mkParticipant "B" None)
-                              MessageElement(mkMessage "A" "B" Solid Forward "msg" []) ]
+                            [ StateDecl(mkParticipant "A" None)
+                              StateDecl(mkParticipant "B" None)
+                              TransitionElement(mkMessage "A" "B" Solid Forward "msg" []) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
-                    Expect.isTrue result.Diagram.AutoNumber "autonumber preserved"
+
+                    let hasAutoNumber =
+                        result.Document.Elements
+                        |> List.exists (function
+                            | DirectiveElement(AutoNumberDirective _) -> true
+                            | _ -> false)
+
+                    Expect.isTrue hasAutoNumber "autonumber preserved"
                 }
 
                 test "roundtrip: multiple guard pairs" {
@@ -544,23 +583,24 @@ let serializerTests =
                         mkDiagram
                             None
                             false
-                            [ ParticipantDecl(mkParticipant "A" None)
-                              NoteElement(mkNote NotePosition.Over "A" "" (Some guard)) ]
+                            [ StateDecl(mkParticipant "A" None)
+                              NoteElement(mkNote Over "A" "" (Some guard)) ]
 
                     let wsd = serialize d
                     let result = parseWsd wsd
                     Expect.isEmpty result.Errors (sprintf "no parse errors, output was:\n%s" wsd)
 
                     let notes =
-                        result.Diagram.Elements
+                        result.Document.Elements
                         |> List.choose (function
                             | NoteElement n -> Some n
                             | _ -> None)
 
-                    Expect.isSome notes.[0].Guard "has guard"
+                    let guardPairs = extractGuardPairs notes.[0]
+                    Expect.isSome guardPairs "has guard"
 
                     Expect.equal
-                        notes.[0].Guard.Value.Pairs
+                        guardPairs.Value
                         [ ("role", "admin"); ("auth", "bearer") ]
                         "guard pairs preserved"
                 } ] ]

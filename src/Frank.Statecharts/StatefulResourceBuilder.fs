@@ -291,6 +291,18 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     | TransitionResult.Invalid msg -> return TransitionAttemptResult.Invalid msg
             }
 
+        let guardNames =
+            machine.Guards
+            |> List.map (function
+                | AccessControl(name, _) -> name
+                | EventValidation(name, _) -> name)
+
+        let stateMetadataMap =
+            machine.StateMetadata
+            |> Map.toList
+            |> List.map (fun (s, info) -> (string s, info))
+            |> Map.ofList
+
         let metadata: StateMachineMetadata =
             { Machine = box machine
               StateHandlerMap = spec.StateHandlerMap

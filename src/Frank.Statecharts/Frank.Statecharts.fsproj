@@ -27,6 +27,7 @@
     <Compile Include="Smcat/Lexer.fs" />
     <Compile Include="Smcat/LabelParser.fs" />
     <Compile Include="Smcat/Parser.fs" />
+    <Compile Include="Smcat/Mapper.fs" />
     <!-- ALPS parser -->
     <Compile Include="Alps/Types.fs" />
     <Compile Include="Alps/JsonParser.fs" />
@@ -35,6 +36,7 @@
     <!-- SCXML parser -->
     <Compile Include="Scxml/Types.fs" />
     <Compile Include="Scxml/Parser.fs" />
+    <Compile Include="Scxml/Mapper.fs" />
     <Compile Include="Scxml/Generator.fs" />
     <!-- Validation -->
     <Compile Include="Validation/Types.fs" />

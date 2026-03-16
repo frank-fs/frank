@@ -29,7 +29,12 @@ let private makeMetadata
     : StateMachineMetadata =
     let initialKey = string machine.Initial
 
-    let guardNames = machine.Guards |> List.map (fun g -> g.Name)
+    let guardNames =
+        machine.Guards
+        |> List.map (function
+            | AccessControl(name, _) -> name
+            | EventValidation(name, _) -> name)
+
     let stateMetadataMap =
         machine.StateMetadata |> Map.toList |> List.map (fun (s, info) -> (string s, info)) |> Map.ofList
 
@@ -42,6 +47,7 @@ let private makeMetadata
       StateMetadataMap = stateMetadataMap
       GetCurrentStateKey = fun _ _ _ -> Task.FromResult(initialKey)
       EvaluateGuards = fun _ -> Allowed
+      EvaluateEventGuards = fun _ -> Allowed
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }
 
 let private simpleMachine guards stateMetadata : StateMachine<TestState, TestEvent, unit> =

@@ -62,7 +62,7 @@ let stateNameAgreementTests =
               let artXState = makeArtifact XState doc
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               Expect.equal (List.length checks) 1 "Should produce one check"
               Expect.equal checks.[0].Status Pass "Matching states should pass"
@@ -75,7 +75,7 @@ let stateNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Should report missing state"
@@ -92,7 +92,7 @@ let stateNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Should report missing state"
@@ -109,7 +109,7 @@ let stateNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.equal (List.length failChecks) 2 "Should report both directions"
@@ -126,7 +126,7 @@ let stateNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Should have at least one failure"
@@ -161,7 +161,7 @@ let eventNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.eventNameAgreement Alps XState
 
-              let checks = rule.Check [ artAlps; artXState ]
+              let (checks, _) = rule.Check [ artAlps; artXState ]
 
               Expect.equal (List.length checks) 1 "Should produce one check"
               Expect.equal checks.[0].Status Pass "Matching events should pass"
@@ -183,7 +183,7 @@ let eventNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.eventNameAgreement Alps XState
 
-              let checks = rule.Check [ artAlps; artXState ]
+              let (checks, _) = rule.Check [ artAlps; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Should report missing event"
@@ -207,7 +207,7 @@ let eventNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.eventNameAgreement Alps XState
 
-              let checks = rule.Check [ artAlps; artXState ]
+              let (checks, _) = rule.Check [ artAlps; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Should report events missing from empty format"
@@ -223,7 +223,7 @@ let eventNameAgreementTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.eventNameAgreement Alps XState
 
-              let checks = rule.Check [ artAlps; artXState ]
+              let (checks, _) = rule.Check [ artAlps; artXState ]
 
               Expect.equal (List.length checks) 1 "Should produce one check"
               Expect.equal checks.[0].Status Pass "Both empty event sets should pass"
@@ -244,7 +244,7 @@ let casingMismatchTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Casing mismatch should be reported as failure"
@@ -265,7 +265,7 @@ let casingMismatchTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               Expect.equal (List.length checks) 1 "Should produce one check"
               Expect.equal checks.[0].Status Pass "Exact match should pass"
@@ -278,7 +278,7 @@ let casingMismatchTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.stateNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               // Should report Active/active and Done/done mismatches in both directions
@@ -314,7 +314,7 @@ let casingMismatchTests =
               let artXState = makeArtifact XState docXState
               let rule = CrossFormatRules.eventNameAgreement Scxml XState
 
-              let checks = rule.Check [ artScxml; artXState ]
+              let (checks, _) = rule.Check [ artScxml; artXState ]
 
               let failChecks = checks |> List.filter (fun c -> c.Status = Fail)
               Expect.isGreaterThan (List.length failChecks) 0 "Event casing mismatch should be reported"

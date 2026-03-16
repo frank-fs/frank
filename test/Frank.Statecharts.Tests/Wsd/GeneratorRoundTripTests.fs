@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Expecto
 open Frank.Statecharts
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Generator
 open Frank.Statecharts.Wsd.Serializer
 open Frank.Statecharts.Wsd.Parser
@@ -30,44 +30,60 @@ let private makeMetadata
     : StateMachineMetadata =
     let initialKey = machine.Initial.ToString()
 
+    let guardNames =
+        machine.Guards
+        |> List.map (function
+            | AccessControl(name, _) -> name
+            | EventValidation(name, _) -> name)
+
     { Machine = box machine
       StateHandlerMap = stateHandlerMap
       ResolveInstanceId = fun _ -> "test"
       TransitionObservers = []
       InitialStateKey = initialKey
+      GuardNames = guardNames
+      StateMetadataMap = Map.empty
       GetCurrentStateKey = fun _ _ _ -> Task.FromResult(initialKey)
       EvaluateGuards = fun _ -> Allowed
+      EvaluateEventGuards = fun _ -> Allowed
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }
 
 let private dummyHandler = RequestDelegate(fun _ -> Task.CompletedTask)
 
-/// Extract participant names from a ParseResult.
+/// Extract participant names (state identifiers) from a ParseResult.
 let private participantNames (r: ParseResult) =
-    r.Diagram.Participants |> List.map (fun p -> p.Name)
-
-/// Extract (sender, receiver, label) triples from messages in a ParseResult.
-let private messageTriples (r: ParseResult) =
-    r.Diagram.Elements
+    r.Document.Elements
     |> List.choose (function
-        | MessageElement m -> Some(m.Sender, m.Receiver, m.Label)
+        | StateDecl s -> Some s.Identifier
         | _ -> None)
 
-/// Extract guard pairs from notes in a ParseResult.
-let private guardPairs (r: ParseResult) =
-    r.Diagram.Elements
+/// Extract (source, target, event) triples from transitions in a ParseResult.
+let private messageTriples (r: ParseResult) =
+    r.Document.Elements
     |> List.choose (function
-        | NoteElement n when n.Guard.IsSome -> Some n.Guard.Value.Pairs
+        | TransitionElement t -> Some(t.Source, t.Target |> Option.defaultValue "", t.Event |> Option.defaultValue "")
+        | _ -> None)
+
+/// Extract guard pairs from note annotations in a ParseResult.
+let private guardPairs (r: ParseResult) =
+    r.Document.Elements
+    |> List.choose (function
+        | NoteElement n ->
+            n.Annotations
+            |> List.tryPick (function
+                | WsdAnnotation(WsdGuardData pairs) -> Some pairs
+                | _ -> None)
         | _ -> None)
     |> List.concat
 
-/// Run the full roundtrip pipeline and return the generated Diagram, serialized text, and ParseResult.
+/// Run the full roundtrip pipeline and return the generated StatechartDocument, serialized text, and ParseResult.
 let private roundtrip (options: GenerateOptions) (metadata: StateMachineMetadata) =
     match generate options metadata with
     | Error e -> failwithf "Generator failed: %A" e
-    | Ok diagram ->
-        let wsdText = serialize diagram
+    | Ok document ->
+        let wsdText = serialize document
         let parseResult = parseWsd wsdText
-        (diagram, wsdText, parseResult)
+        (document, wsdText, parseResult)
 
 // --- Test state machines ---
 
@@ -107,7 +123,7 @@ let generatorRoundTripTests =
                 test "title matches resource name" {
                     let metadata = makeMetadata turnstileMachine turnstileHandlerMap
                     let (_, _, result) = roundtrip { ResourceName = "turnstile" } metadata
-                    Expect.equal result.Diagram.Title (Some "turnstile") "title"
+                    Expect.equal result.Document.Title (Some "turnstile") "title"
                 }
 
                 test "three participants" {
@@ -161,12 +177,18 @@ let generatorRoundTripTests =
                     Expect.isEmpty pairs "no guard annotations"
                 }
 
-                test "all participants are explicit" {
+                test "all participants are regular states" {
                     let metadata = makeMetadata turnstileMachine turnstileHandlerMap
                     let (_, _, result) = roundtrip { ResourceName = "turnstile" } metadata
 
-                    for p in result.Diagram.Participants do
-                        Expect.isTrue p.Explicit $"participant {p.Name} is explicit"
+                    let states =
+                        result.Document.Elements
+                        |> List.choose (function
+                            | StateDecl s -> Some s
+                            | _ -> None)
+
+                    for s in states do
+                        Expect.equal s.Kind Regular $"participant {s.Identifier} is Regular"
                 }
 
                 test "no implicit-participant warnings" {
@@ -243,10 +265,8 @@ let generatorRoundTripTests =
 
                 test "guards roundtrip as wildcard annotations" {
                     let guards: Guard<TurnstileState, TurnstileEvent, unit> list =
-                        [ { Name = "role"
-                            Predicate = fun _ -> Allowed }
-                          { Name = "auth"
-                            Predicate = fun _ -> Allowed } ]
+                        [ AccessControl("role", fun _ -> Allowed)
+                          AccessControl("auth", fun _ -> Allowed) ]
 
                     let machine: StateMachine<TurnstileState, TurnstileEvent, unit> =
                         { Initial = Locked
@@ -315,8 +335,7 @@ let generatorRoundTripTests =
 
                 test "single guard roundtrips" {
                     let guards: Guard<TurnstileState, TurnstileEvent, unit> list =
-                        [ { Name = "admin"
-                            Predicate = fun _ -> Allowed } ]
+                        [ AccessControl("admin", fun _ -> Allowed) ]
 
                     let machine: StateMachine<TurnstileState, TurnstileEvent, unit> =
                         { Initial = Locked
@@ -348,7 +367,7 @@ let generatorRoundTripTests =
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
               let (_, wsdText1, result1) = roundtrip { ResourceName = "turnstile" } metadata
               // Re-serialize the parsed result
-              let wsdText2 = serialize result1.Diagram
+              let wsdText2 = serialize result1.Document
               // Both serialized forms should produce the same parse result
               let result2 = parseWsd wsdText2
               Expect.isEmpty result2.Errors "second parse has no errors"

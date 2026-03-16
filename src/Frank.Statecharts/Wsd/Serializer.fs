@@ -1,6 +1,6 @@
 module internal Frank.Statecharts.Wsd.Serializer
 
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
 
 /// Check if a participant name requires quoting in WSD output.
 /// Returns true if the name contains any character that is NOT alphanumeric, underscore, or hyphen.
@@ -27,12 +27,35 @@ let private arrowString (style: ArrowStyle) (direction: Direction) : string =
     | Solid, Deactivating -> "->-"
     | Dashed, Deactivating -> "-->-"
 
-/// Serialize note position to WSD syntax.
-let private notePositionString (pos: NotePosition) : string =
+/// Extract WsdNotePosition from annotations, defaulting to Over.
+let private extractNotePosition (annotations: Annotation list) : WsdNotePosition =
+    annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdNotePosition pos) -> Some pos
+        | _ -> None)
+    |> Option.defaultValue Over
+
+/// Serialize WSD note position to text.
+let private notePositionString (pos: WsdNotePosition) : string =
     match pos with
-    | NotePosition.Over -> "over"
-    | NotePosition.LeftOf -> "left of"
-    | NotePosition.RightOf -> "right of"
+    | Over -> "over"
+    | LeftOf -> "left of"
+    | RightOf -> "right of"
+
+/// Extract WsdGuardData pairs from annotations.
+let private extractGuardPairs (annotations: Annotation list) : (string * string) list option =
+    annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdGuardData pairs) -> Some pairs
+        | _ -> None)
+
+/// Extract TransitionStyle from annotations, defaulting to Solid Forward.
+let private extractTransitionStyle (annotations: Annotation list) : TransitionStyle =
+    annotations
+    |> List.tryPick (function
+        | WsdAnnotation(WsdTransitionStyle style) -> Some style
+        | _ -> None)
+    |> Option.defaultValue { ArrowStyle = Solid; Direction = Forward }
 
 /// Serialize group kind to WSD keyword.
 let private groupKindString (kind: GroupKind) : string =
@@ -45,42 +68,49 @@ let private groupKindString (kind: GroupKind) : string =
     | GroupKind.Critical -> "critical"
     | GroupKind.Ref -> "ref"
 
-/// Serialize a list of diagram elements to a StringBuilder.
-let rec private serializeElements (sb: System.Text.StringBuilder) (elements: DiagramElement list) : unit =
+/// Serialize a list of statechart elements to a StringBuilder.
+let rec private serializeElements (sb: System.Text.StringBuilder) (elements: StatechartElement list) : unit =
     for element in elements do
         match element with
-        | ParticipantDecl _ -> ()
-        | TitleDirective _ -> ()
-        | AutoNumberDirective _ ->
+        | StateDecl _ -> ()
+        | DirectiveElement(TitleDirective _) -> ()
+        | DirectiveElement(AutoNumberDirective _) ->
             sb.Append("autonumber\n") |> ignore
-        | MessageElement m ->
-            sb.Append(quoteName m.Sender) |> ignore
-            sb.Append(arrowString m.ArrowStyle m.Direction) |> ignore
-            sb.Append(quoteName m.Receiver) |> ignore
+        | TransitionElement t ->
+            let style = extractTransitionStyle t.Annotations
+            sb.Append(quoteName t.Source) |> ignore
+            sb.Append(arrowString style.ArrowStyle style.Direction) |> ignore
 
-            if m.Label.Length > 0 || m.Parameters.Length > 0 then
+            match t.Target with
+            | Some target -> sb.Append(quoteName target) |> ignore
+            | None -> ()
+
+            let label = t.Event |> Option.defaultValue ""
+
+            if label.Length > 0 || t.Parameters.Length > 0 then
                 sb.Append(": ") |> ignore
-                sb.Append(m.Label) |> ignore
+                sb.Append(label) |> ignore
 
-                if m.Parameters.Length > 0 then
+                if t.Parameters.Length > 0 then
                     sb.Append("(") |> ignore
-                    sb.Append(System.String.Join(", ", m.Parameters)) |> ignore
+                    sb.Append(System.String.Join(", ", t.Parameters)) |> ignore
                     sb.Append(")") |> ignore
 
             sb.Append("\n") |> ignore
         | NoteElement n ->
+            let notePos = extractNotePosition n.Annotations
             sb.Append("note ") |> ignore
-            sb.Append(notePositionString n.NotePosition) |> ignore
+            sb.Append(notePositionString notePos) |> ignore
             sb.Append(" ") |> ignore
             sb.Append(quoteName n.Target) |> ignore
             sb.Append(": ") |> ignore
 
-            match n.Guard with
-            | Some guard when guard.Pairs.Length > 0 ->
+            match extractGuardPairs n.Annotations with
+            | Some pairs when pairs.Length > 0 ->
                 sb.Append("[guard: ") |> ignore
 
                 let pairStrings =
-                    guard.Pairs
+                    pairs
                     |> List.map (fun (k, v) -> sprintf "%s=%s" k v)
 
                 sb.Append(System.String.Join(", ", pairStrings)) |> ignore
@@ -124,36 +154,42 @@ let rec private serializeElements (sb: System.Text.StringBuilder) (elements: Dia
 
                 sb.Append("end\n") |> ignore
 
-/// Serialize a Diagram AST to WSD text with Unix line endings.
-let serialize (diagram: Diagram) : string =
+/// Serialize a StatechartDocument AST to WSD text with Unix line endings.
+let serialize (document: StatechartDocument) : string =
     let sb = System.Text.StringBuilder()
 
     // Title
-    match diagram.Title with
+    match document.Title with
     | Some title ->
         sb.Append("title ") |> ignore
         sb.Append(title) |> ignore
         sb.Append("\n") |> ignore
     | None -> ()
 
-    // AutoNumber
-    if diagram.AutoNumber then
-        sb.Append("autonumber\n") |> ignore
-
-    // Participant declarations from Elements
-    let hasParticipants =
-        diagram.Elements
+    // AutoNumber (from directive elements)
+    let hasAutoNumber =
+        document.Elements
         |> List.exists (function
-            | ParticipantDecl _ -> true
+            | DirectiveElement(AutoNumberDirective _) -> true
             | _ -> false)
 
-    for element in diagram.Elements do
-        match element with
-        | ParticipantDecl p ->
-            sb.Append("participant ") |> ignore
-            sb.Append(quoteName p.Name) |> ignore
+    if hasAutoNumber then
+        sb.Append("autonumber\n") |> ignore
 
-            match p.Alias with
+    // State declarations (participant declarations in WSD)
+    let hasStates =
+        document.Elements
+        |> List.exists (function
+            | StateDecl _ -> true
+            | _ -> false)
+
+    for element in document.Elements do
+        match element with
+        | StateDecl s ->
+            sb.Append("participant ") |> ignore
+            sb.Append(quoteName s.Identifier) |> ignore
+
+            match s.Label with
             | Some alias ->
                 sb.Append(" as ") |> ignore
                 sb.Append(quoteName alias) |> ignore
@@ -162,19 +198,19 @@ let serialize (diagram: Diagram) : string =
             sb.Append("\n") |> ignore
         | _ -> ()
 
-    // Blank line after participant declarations (or title/autonumber) before body elements
+    // Blank line after state declarations (or title/autonumber) before body elements
     let hasBodyElements =
-        diagram.Elements
+        document.Elements
         |> List.exists (function
-            | ParticipantDecl _ -> false
-            | TitleDirective _ -> false
-            | AutoNumberDirective _ -> false
+            | StateDecl _ -> false
+            | DirectiveElement(TitleDirective _) -> false
+            | DirectiveElement(AutoNumberDirective _) -> false
             | _ -> true)
 
-    if (hasParticipants || diagram.Title.IsSome || diagram.AutoNumber) && hasBodyElements then
+    if (hasStates || document.Title.IsSome || hasAutoNumber) && hasBodyElements then
         sb.Append("\n") |> ignore
 
-    // Body elements (skip participants, title directives, autonumber directives -- already handled)
-    serializeElements sb diagram.Elements
+    // Body elements (skip state declarations, title directives, autonumber directives -- already handled)
+    serializeElements sb document.Elements
 
     sb.ToString()
