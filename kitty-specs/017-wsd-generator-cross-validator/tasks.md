@@ -26,12 +26,12 @@
 **Estimated Prompt Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 [P] Create `Wsd/Serializer.fs` module skeleton with `serialize`, `needsQuoting`, `quoteName` function signatures
-- [ ] T002 Implement `needsQuoting` — returns true for names with non-identifier characters (spaces, hyphens, special chars)
-- [ ] T003 Implement `quoteName` — wraps name in double quotes if `needsQuoting`, escaping internal quotes
-- [ ] T004 Implement `serialize` — emits title, participant declarations (initial state first), blank line separator, messages with `->` arrows, note annotations with `[guard: key=value]` syntax, Unix `\n` line endings
-- [ ] T005 Add `Wsd/Serializer.fs` to `Frank.Statecharts.fsproj` compile items after `Wsd/Parser.fs`
-- [ ] T006 [P] Create `Wsd/SerializerTests.fs` in test project with unit tests covering title emission, participant ordering, message formatting, guard note formatting, quoting, and edge cases (empty diagram, single participant, self-message)
+- [x] T001 [P] Create `Wsd/Serializer.fs` module skeleton with `serialize`, `needsQuoting`, `quoteName` function signatures
+- [x] T002 Implement `needsQuoting` — returns true for names with non-identifier characters (spaces, hyphens, special chars)
+- [x] T003 Implement `quoteName` — wraps name in double quotes if `needsQuoting`, escaping internal quotes
+- [x] T004 Implement `serialize` — emits title, participant declarations (initial state first), blank line separator, messages with `->` arrows, note annotations with `[guard: key=value]` syntax, Unix `\n` line endings
+- [x] T005 Add `Wsd/Serializer.fs` to `Frank.Statecharts.fsproj` compile items after `Wsd/Parser.fs`
+- [x] T006 [P] Create `Wsd/SerializerTests.fs` in test project with unit tests covering title emission, participant ordering, message formatting, guard note formatting, quoting, and edge cases (empty diagram, single participant, self-message)
 
 ### Implementation Notes
 - Serializer depends only on `Wsd.Types` (no dependency on Generator or Parser at runtime)
