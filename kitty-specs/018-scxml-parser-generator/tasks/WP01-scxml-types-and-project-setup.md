@@ -11,7 +11,7 @@ subtasks:
 - T002
 phase: Phase 1 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "98569"
 review_status: ''
 reviewed_by: ''
@@ -264,3 +264,4 @@ This must succeed for all three target frameworks (net8.0, net9.0, net10.0). Ver
 ## Activity Log
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:40Z – claude-opus – shell_pid=98569 – lane=doing – Assigned agent via workflow command
