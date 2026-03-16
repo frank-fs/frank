@@ -18,6 +18,9 @@
     <Compile Include="Wsd/GroupingTests.fs" />
     <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
+    <Compile Include="Scxml/TypeTests.fs" />
+    <Compile Include="Scxml/ParserTests.fs" />
+    <Compile Include="Scxml/ErrorTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
