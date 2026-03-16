@@ -5,6 +5,7 @@ open Frank.Statecharts.Smcat.LabelParser
 open Frank.Statecharts.Smcat.Lexer
 
 // T013: Core parser infrastructure
+// T020-T023: Structured error reporting enhancements
 
 type ParserState =
     { Tokens: Token array
@@ -13,6 +14,7 @@ type ParserState =
       mutable Errors: ParseFailure list
       mutable Warnings: ParseWarning list
       mutable ErrorLimitReached: bool
+      mutable DeclaredStates: Set<string>
       MaxErrors: int }
 
 let private eofToken =
@@ -82,6 +84,7 @@ let private createState (tokens: Token list) (maxErrors: int) : ParserState =
       Errors = []
       Warnings = []
       ErrorLimitReached = false
+      DeclaredStates = Set.empty
       MaxErrors = maxErrors }
 
 let private tokenDescription (token: Token) : string =
@@ -126,6 +129,33 @@ let private consumeTerminator (state: ParserState) : unit =
     let kind = (peek state).Kind
 
     if kind = Semicolon || kind = Comma then
+        advance state |> ignore
+
+// T020: Error recovery -- skip to next statement boundary and consume terminator.
+// Guarantees forward progress by advancing at least one token.
+
+/// Skip to the next clean statement boundary, consuming the terminator.
+/// Always advances at least one token to prevent infinite loops.
+let private skipToNextStatement (state: ParserState) : unit =
+    let startPos = state.Position
+    let mutable found = false
+
+    while not found && (peek state).Kind <> Eof do
+        match (peek state).Kind with
+        | Semicolon
+        | Comma ->
+            advance state |> ignore // consume the terminator
+            found <- true
+        | Newline ->
+            advance state |> ignore // consume newline
+            found <- true
+        | RightBrace ->
+            found <- true // don't consume -- let composite state handler deal with it
+        | _ ->
+            advance state |> ignore // skip unknown token
+
+    // Guarantee forward progress: if we didn't advance at all, force-advance
+    if state.Position = startPos && (peek state).Kind <> Eof then
         advance state |> ignore
 
 // T014: Attribute parsing
@@ -376,8 +406,10 @@ let rec private parseDocument (state: ParserState) (depth: int) : SmcatDocument 
     { Elements = elements |> Seq.toList }
 
 /// Parse a single element (state declaration or transition).
+/// T020: Uses skipToNextStatement for error recovery to ensure forward progress.
 and private parseElement (state: ParserState) (depth: int) (elements: ResizeArray<SmcatElement>) : unit =
     let tok = peek state
+    let posBeforeParse = state.Position
 
     match tok.Kind with
     | Identifier _
@@ -385,7 +417,6 @@ and private parseElement (state: ParserState) (depth: int) (elements: ResizeArra
     | Caret
     | CloseBracketPrefix ->
         let startPos = tok.Position
-        let savedPosition = state.Position
 
         match readStateName state with
         | Some name ->
@@ -403,8 +434,7 @@ and private parseElement (state: ParserState) (depth: int) (elements: ResizeArra
                 (tokenDescription tok)
                 "stateName => target: event;"
 
-            skipToTerminator state
-            consumeTerminator state
+            skipToNextStatement state
     | Semicolon
     | Comma ->
         // Empty statement, skip
@@ -416,10 +446,13 @@ and private parseElement (state: ParserState) (depth: int) (elements: ResizeArra
             "Unexpected token"
             "state name, transition, or end of input"
             (tokenDescription tok)
-            ""
+            "idle => running: start;"
 
-        skipToTerminator state
-        consumeTerminator state
+        skipToNextStatement state
+
+    // T020: Safety check -- guarantee forward progress even if no recovery occurred
+    if state.Position = posBeforeParse && (peek state).Kind <> Eof then
+        advance state |> ignore
 
 // T015: Transition parsing
 
@@ -455,84 +488,133 @@ and private parseTransition
 
         match readStateName state with
         | Some targetName ->
-            // Check for label (colon)
-            let label =
-                match (peek state).Kind with
-                | Colon ->
-                    advance state |> ignore
-                    // Collect label text from tokens until terminator or attribute bracket
-                    let labelParts = ResizeArray<string>()
-                    let labelStart = (peek state).Position
-                    let mutable collecting = true
+            // T021: Check for "missing colon" pattern -- identifier(s) after target without colon.
+            // e.g., "on => off switch flicked;" -- text without preceding colon
+            let nextTok = peek state
 
-                    while collecting do
-                        let next = peek state
+            match nextTok.Kind with
+            | Identifier _ | QuotedString _ ->
+                // There are extra tokens after the target that look like label text but no colon
+                addError
+                    state
+                    nextTok.Position
+                    "Missing colon before transition label"
+                    (sprintf "':' or ';' after target state '%s'" targetName)
+                    (tokenDescription nextTok)
+                    (sprintf "%s => %s: eventName;" sourceName targetName)
 
-                        match next.Kind with
-                        | Identifier text ->
-                            advance state |> ignore
-                            labelParts.Add(text)
-                        | QuotedString text ->
-                            advance state |> ignore
-                            labelParts.Add(text)
-                        | LeftBracket ->
-                            // This is the guard bracket inside the label
-                            advance state |> ignore
-                            labelParts.Add("[")
-                            // Collect until RightBracket
-                            let mutable inBracket = true
+                // Skip to terminator and emit the transition without a label
+                skipToNextStatement state
 
-                            while inBracket do
-                                let bt = peek state
+                let transition =
+                    { Source = sourceName
+                      Target = targetName
+                      Label = None
+                      Attributes = []
+                      Position = startPos }
 
-                                match bt.Kind with
-                                | RightBracket ->
-                                    advance state |> ignore
-                                    labelParts.Add("]")
-                                    inBracket <- false
-                                | Identifier text ->
-                                    advance state |> ignore
-                                    labelParts.Add(text)
-                                | QuotedString text ->
-                                    advance state |> ignore
-                                    labelParts.Add(text)
-                                | Eof ->
-                                    inBracket <- false
-                                | _ ->
-                                    advance state |> ignore
-                                    labelParts.Add(tokenToText bt)
-                        | ForwardSlash ->
-                            advance state |> ignore
-                            labelParts.Add("/")
-                        | _ -> collecting <- false
+                elements.Add(TransitionElement transition)
+            | _ ->
+                // Check for label (colon)
+                let label =
+                    match nextTok.Kind with
+                    | Colon ->
+                        advance state |> ignore
+                        // Collect label text from tokens until terminator or attribute bracket
+                        let labelParts = ResizeArray<string>()
+                        let labelStart = (peek state).Position
+                        let mutable collecting = true
 
-                    let labelText = System.String.Join(" ", labelParts)
-                    let (parsedLabel, labelWarnings) = parseLabel labelText labelStart
-                    state.Warnings <- state.Warnings @ labelWarnings
-                    Some parsedLabel
-                | _ -> None
+                        while collecting do
+                            let next = peek state
 
-            // Check for attributes
-            let attributes =
-                match (peek state).Kind with
-                | LeftBracket ->
-                    advance state |> ignore
-                    parseAttributes state
-                | _ -> []
+                            match next.Kind with
+                            | Identifier text ->
+                                advance state |> ignore
+                                labelParts.Add(text)
+                            | QuotedString text ->
+                                advance state |> ignore
+                                labelParts.Add(text)
+                            | LeftBracket ->
+                                // This is the guard bracket inside the label
+                                let bracketPos = next.Position
+                                advance state |> ignore
+                                labelParts.Add("[")
+                                // Collect until RightBracket
+                                let mutable inBracket = true
 
-            let transition =
-                { Source = sourceName
-                  Target = targetName
-                  Label = label
-                  Attributes = attributes
-                  Position = startPos }
+                                while inBracket do
+                                    let bt = peek state
 
-            elements.Add(TransitionElement transition)
+                                    match bt.Kind with
+                                    | RightBracket ->
+                                        advance state |> ignore
+                                        labelParts.Add("]")
+                                        inBracket <- false
+                                    | Identifier text ->
+                                        advance state |> ignore
+                                        labelParts.Add(text)
+                                    | QuotedString text ->
+                                        advance state |> ignore
+                                        labelParts.Add(text)
+                                    | Eof ->
+                                        // T021: Unclosed bracket in label
+                                        addError
+                                            state
+                                            bracketPos
+                                            "Unclosed bracket in transition label"
+                                            "']' to close guard bracket"
+                                            "end of input"
+                                            (sprintf "%s => %s: event [guard];" sourceName targetName)
 
-            consumeTerminator state
+                                        inBracket <- false
+                                    | Semicolon | Comma | Newline ->
+                                        // T021: Unclosed bracket terminated by statement end
+                                        addError
+                                            state
+                                            bracketPos
+                                            "Unclosed bracket in transition label"
+                                            "']' to close guard bracket"
+                                            (tokenDescription bt)
+                                            (sprintf "%s => %s: event [guard];" sourceName targetName)
+
+                                        inBracket <- false
+                                    | _ ->
+                                        advance state |> ignore
+                                        labelParts.Add(tokenToText bt)
+                            | ForwardSlash ->
+                                advance state |> ignore
+                                labelParts.Add("/")
+                            | _ -> collecting <- false
+
+                        let labelText = System.String.Join(" ", labelParts)
+                        let (parsedLabel, labelWarnings) = parseLabel labelText labelStart
+                        state.Warnings <- state.Warnings @ labelWarnings
+                        Some parsedLabel
+                    | _ -> None
+
+                // Check for attributes
+                let attributes =
+                    match (peek state).Kind with
+                    | LeftBracket ->
+                        advance state |> ignore
+                        parseAttributes state
+                    | _ -> []
+
+                let transition =
+                    { Source = sourceName
+                      Target = targetName
+                      Label = label
+                      Attributes = attributes
+                      Position = startPos }
+
+                elements.Add(TransitionElement transition)
+
+                consumeTerminator state
         | None ->
             let tok = peek state
 
+            // T021: Missing target state -- context-aware corrective example
             addError
                 state
                 tok.Position
@@ -541,8 +623,7 @@ and private parseTransition
                 (tokenDescription tok)
                 (sprintf "%s => target;" sourceName)
 
-            skipToTerminator state
-            consumeTerminator state
+            skipToNextStatement state
 
 /// Convert a token to its text representation (for label reconstruction).
 and private tokenToText (token: Token) : string =
@@ -569,6 +650,57 @@ and private tokenToText (token: Token) : string =
 
 // T014: State declaration parsing
 
+/// T021: Check for invalid arrow syntax (e.g., ==> instead of =>).
+/// Returns true if an invalid arrow was detected and handled.
+and private tryHandleInvalidArrow
+    (state: ParserState)
+    (name: string)
+    (startPos: SourcePosition)
+    (elements: ResizeArray<SmcatElement>)
+    : bool =
+    if (peek state).Kind = Equals then
+        let eqPos = (peek state).Position
+        let savedPos = state.Position
+        advance state |> ignore // consume Equals
+
+        let afterEq = (peek state).Kind
+
+        if afterEq = TransitionArrow then
+            // Pattern: name = => target  (user typed ==>)
+            advance state |> ignore // consume TransitionArrow
+            skipNewlines state
+
+            addError
+                state
+                eqPos
+                "Unrecognized arrow syntax '==>', expected '=>'"
+                "'=>'"
+                "'==>'"
+                (sprintf "%s => target;" name)
+
+            // Try to parse the rest as a transition (target + optional label)
+            match readStateName state with
+            | Some targetName ->
+                let transition =
+                    { Source = name
+                      Target = targetName
+                      Label = None
+                      Attributes = []
+                      Position = startPos }
+
+                elements.Add(TransitionElement transition)
+                consumeTerminator state
+            | None ->
+                skipToNextStatement state
+
+            true
+        else
+            // Not an invalid arrow pattern, restore position
+            state.Position <- savedPos
+            false
+    else
+        false
+
 /// Parse a state declaration: name [: activities] [attributes] [{ children }] ;
 and private parseStateDeclaration
     (state: ParserState)
@@ -577,6 +709,11 @@ and private parseStateDeclaration
     (elements: ResizeArray<SmcatElement>)
     (depth: int)
     : unit =
+    // T021: Check for invalid arrow syntax before normal state declaration parsing
+    if tryHandleInvalidArrow state name startPos elements then
+        () // Invalid arrow was detected and handled
+    else
+
     // Check for colon (activities or label)
     let activities =
         match (peek state).Kind with
@@ -637,6 +774,38 @@ and private parseStateDeclaration
 
     let stateType = inferStateType name attributes
 
+    // T023: Warning for pseudo-state naming convention vs explicit type attribute mismatch
+    let typeAttr =
+        attributes
+        |> List.tryFind (fun a ->
+            a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
+
+    match typeAttr with
+    | Some attr ->
+        let inferredFromName = inferStateType name []
+
+        if inferredFromName <> Regular && inferredFromName <> stateType then
+            addWarning
+                state
+                startPos
+                (sprintf
+                    "State name '%s' matches naming convention for %A state type, but explicit attribute overrides to %s"
+                    name
+                    inferredFromName
+                    attr.Value)
+                (Some "Consider renaming the state or removing the explicit type attribute")
+    | None -> ()
+
+    // T023: Warning for duplicate state declarations
+    if state.DeclaredStates.Contains(name) then
+        addWarning
+            state
+            startPos
+            (sprintf "State '%s' declared multiple times" name)
+            (Some "Combine state attributes into a single declaration")
+    else
+        state.DeclaredStates <- state.DeclaredStates.Add(name)
+
     let smcatState =
         { Name = name
           Label = label
@@ -649,14 +818,6 @@ and private parseStateDeclaration
     elements.Add(StateDeclaration smcatState)
 
     consumeTerminator state
-
-    // Check for comma-separated state list
-    // After consumeTerminator, if the consumed token was a comma and
-    // there's another identifier ahead (not a transition), parse additional states.
-    // However, the comma was already consumed. Instead, we handle this via
-    // the main loop -- multiple state declarations separated by commas each parse separately.
-
-    ()
 
 // T017: Public API
 
