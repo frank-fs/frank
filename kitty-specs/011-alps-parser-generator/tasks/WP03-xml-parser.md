@@ -9,7 +9,7 @@ subtasks:
   - "T020"
 title: "ALPS XML Parser"
 phase: "Phase 1 - Core Parsers"
-lane: "planned"
+lane: "for_review"
 assignee: ""
 agent: ""
 shell_pid: ""
@@ -395,3 +395,4 @@ testList "Alps.XmlParser edge cases and errors" [
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
+- 2026-03-16T04:28:10Z – unknown – lane=for_review – Ready for review: ALPS XML parser with 41 tests, all passing. Cross-format equivalence tests deferred until WP02 JSON parser merges.
