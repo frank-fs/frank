@@ -6,7 +6,7 @@ subtasks:
   - "T008"
 title: "OPTIONS Discovery Middleware"
 phase: "Phase 1 - Core Implementation"
-lane: "planned"
+lane: "for_review"
 assignee: ""
 agent: "claude-opus"
 shell_pid: "16154"
@@ -425,3 +425,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 - 2026-03-16T04:31:37Z – unknown – lane=for_review – Ready for review: OptionsDiscoveryMiddleware with Allow header and media type aggregation, useOptionsDiscovery custom operation, 8 passing tests covering US1 scenarios
 - 2026-03-16T04:32:56Z – claude-opus – shell_pid=16154 – lane=doing – Started review via workflow command
 - 2026-03-16T04:37:55Z – claude-opus – shell_pid=16154 – lane=planned – Moved to planned
+- 2026-03-16T11:49:04Z – claude-opus – shell_pid=16154 – lane=for_review – Moved to for_review
