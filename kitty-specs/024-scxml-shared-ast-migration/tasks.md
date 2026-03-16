@@ -23,24 +23,24 @@
 **Estimated Lines**: ~800
 
 ### Included Subtasks (Part A: ScxmlMeta Extension)
-- [ ] T001 Extend `ScxmlInvoke` case to carry `id: string option` (third field)
-- [ ] T002 Extend `ScxmlHistory` case to carry `defaultTarget: string option` (third field)
-- [ ] T003 Add `ScxmlTransitionType` case (`internal: bool`)
-- [ ] T004 Add `ScxmlMultiTarget` case (`targets: string list`)
-- [ ] T005 Add `ScxmlDatamodelType` case (`datamodel: string`)
-- [ ] T006 Add `ScxmlBinding` case (`binding: string`)
-- [ ] T007 Add `ScxmlInitial` case (`initialId: string`)
-- [ ] T008 Fix all existing pattern matches on `ScxmlMeta` in `Validation/` and test files (skip Mapper.fs -- it is deleted in T016)
+- [x] T001 Extend `ScxmlInvoke` case to carry `id: string option` (third field)
+- [x] T002 Extend `ScxmlHistory` case to carry `defaultTarget: string option` (third field)
+- [x] T003 Add `ScxmlTransitionType` case (`internal: bool`)
+- [x] T004 Add `ScxmlMultiTarget` case (`targets: string list`)
+- [x] T005 Add `ScxmlDatamodelType` case (`datamodel: string`)
+- [x] T006 Add `ScxmlBinding` case (`binding: string`)
+- [x] T007 Add `ScxmlInitial` case (`initialId: string`)
+- [x] T008 Fix all existing pattern matches on `ScxmlMeta` in `Validation/` and test files (skip Mapper.fs -- it is deleted in T016)
 
 ### Included Subtasks (Part B: Parser Migration)
-- [ ] T009 Change module opens: add `Frank.Statecharts.Ast`, remove dependency on `Scxml.Types` for document/state types (retain `ScxmlTransitionType`, `ScxmlHistoryKind` from `Scxml.Types` for internal parsing)
-- [ ] T010 Rewrite `parseState` to produce `StateNode` directly (map state kinds, build `Children`, attach `ScxmlAnnotation` for invoke/history/initial)
-- [ ] T011 Rewrite `parseTransition` to produce `TransitionEdge` directly (set `Source` from parent state id, populate `ScxmlAnnotation` for transition type and multi-target)
-- [ ] T012 Rewrite `parseHistory` to produce `StateNode` with `Kind = ShallowHistory/DeepHistory` and `ScxmlAnnotation(ScxmlHistory(...))` including default transition target
-- [ ] T013 Rewrite `parseDataEntries` to produce `Ast.DataEntry` (map `id` to `Name`, convert `SourcePosition`)
-- [ ] T014 Rewrite `parseDocument` to produce `Ast.ParseResult` with `StatechartDocument` (assemble elements list from state declarations + transition edges, set document-level annotations for datamodel/binding, convert errors/warnings to `Ast.ParseFailure`/`Ast.ParseWarning`)
-- [ ] T015 Update `tryParseWith`, `parseString`, `parseReader`, `parseStream` return types from `ScxmlParseResult` to `Ast.ParseResult`
-- [ ] T016 Delete `Scxml/Mapper.fs` and remove from fsproj
+- [x] T009 Change module opens: add `Frank.Statecharts.Ast`, remove dependency on `Scxml.Types` for document/state types (retain `ScxmlTransitionType`, `ScxmlHistoryKind` from `Scxml.Types` for internal parsing)
+- [x] T010 Rewrite `parseState` to produce `StateNode` directly (map state kinds, build `Children`, attach `ScxmlAnnotation` for invoke/history/initial)
+- [x] T011 Rewrite `parseTransition` to produce `TransitionEdge` directly (set `Source` from parent state id, populate `ScxmlAnnotation` for transition type and multi-target)
+- [x] T012 Rewrite `parseHistory` to produce `StateNode` with `Kind = ShallowHistory/DeepHistory` and `ScxmlAnnotation(ScxmlHistory(...))` including default transition target
+- [x] T013 Rewrite `parseDataEntries` to produce `Ast.DataEntry` (map `id` to `Name`, convert `SourcePosition`)
+- [x] T014 Rewrite `parseDocument` to produce `Ast.ParseResult` with `StatechartDocument` (assemble elements list from state declarations + transition edges, set document-level annotations for datamodel/binding, convert errors/warnings to `Ast.ParseFailure`/`Ast.ParseWarning`)
+- [x] T015 Update `tryParseWith`, `parseString`, `parseReader`, `parseStream` return types from `ScxmlParseResult` to `Ast.ParseResult`
+- [x] T016 Delete `Scxml/Mapper.fs` and remove from fsproj
 
 ### Implementation Notes
 - Modify `src/Frank.Statecharts/Ast/Types.fs` -- the `ScxmlMeta` DU.
