@@ -29,6 +29,8 @@ packages/
 *.log
 *.sql
 *.sqlite
+!*.Sqlite/
+!*.Sqlite.*
 
 # OS generated files #
 ######################
