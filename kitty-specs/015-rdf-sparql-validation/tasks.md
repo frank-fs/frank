@@ -28,12 +28,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T001 Create `test/Frank.RdfValidation.Tests/Frank.RdfValidation.Tests.fsproj` with dependencies (dotNetRdf.Core, Expecto, TestHost, project refs to Frank.LinkedData and Frank.Provenance)
-- [ ] T002 Create `test/Frank.RdfValidation.Tests/Program.fs` (Expecto entry point)
-- [ ] T003 Add project to `Frank.sln` under `test` solution folder
-- [ ] T004 Create `test/Frank.RdfValidation.Tests/TestHelpers.fs` with TestHost creation helper (LinkedData + Provenance middleware, ontology graph, sample resource endpoints)
-- [ ] T005 Add RDF graph loading helpers to `TestHelpers.fs` (parse Turtle, JSON-LD, RDF/XML from string into dotNetRdf `IGraph`)
-- [ ] T006 Add SPARQL execution helper to `TestHelpers.fs` (`executeSparql : IGraph -> string -> SparqlResultSet` and dataset variant for named graphs)
+- [x] T001 Create `test/Frank.RdfValidation.Tests/Frank.RdfValidation.Tests.fsproj` with dependencies (dotNetRdf.Core, Expecto, TestHost, project refs to Frank.LinkedData and Frank.Provenance)
+- [x] T002 Create `test/Frank.RdfValidation.Tests/Program.fs` (Expecto entry point)
+- [x] T003 Add project to `Frank.sln` under `test` solution folder
+- [x] T004 Create `test/Frank.RdfValidation.Tests/TestHelpers.fs` with TestHost creation helper (LinkedData + Provenance middleware, ontology graph, sample resource endpoints)
+- [x] T005 Add RDF graph loading helpers to `TestHelpers.fs` (parse Turtle, JSON-LD, RDF/XML from string into dotNetRdf `IGraph`)
+- [x] T006 Add SPARQL execution helper to `TestHelpers.fs` (`executeSparql : IGraph -> string -> SparqlResultSet` and dataset variant for named graphs)
 
 ### Implementation Notes
 - Follow the existing test project pattern from `Frank.LinkedData.Tests` (same .fsproj structure, Expecto setup, TestHost pattern)
