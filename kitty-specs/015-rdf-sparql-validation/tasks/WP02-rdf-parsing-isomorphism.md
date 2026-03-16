@@ -9,10 +9,10 @@ subtasks:
   - "T012"
 title: "US1 -- RDF Parsing and Cross-Format Isomorphism"
 phase: "Phase 1 - P1 User Stories"
-lane: "for_review"
+lane: "doing"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus"
+shell_pid: "60814"
 review_status: ""
 reviewed_by: ""
 dependencies: ["WP01"]
@@ -373,3 +373,4 @@ testAsync "US1-Edge: Minimal RDF content parses without errors" {
 
 - 2026-03-15T23:59:02Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T11:46:50Z – unknown – lane=for_review – Ready for review: All 6 US1 test cases implemented and passing
+- 2026-03-16T11:48:00Z – claude-opus – shell_pid=60814 – lane=doing – Started review via workflow command
