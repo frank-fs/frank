@@ -9,10 +9,10 @@ subtasks:
   - "T012"
 title: "Help Content and Status Command Logic"
 phase: "Phase 2 - Content and Logic"
-lane: "for_review"
+lane: "doing"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus-review"
+shell_pid: "12381"
 review_status: ""
 reviewed_by: ""
 dependencies: ["WP01"]
@@ -409,3 +409,4 @@ module StatusCommand =
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:27:06Z – unknown – lane=for_review – Ready for review: HelpContent.fs with all 7 command records, 2 topics, lookup functions; StatusCommand.fs with state/artifact detection; fsproj updated; build passes
+- 2026-03-16T04:28:28Z – claude-opus-review – shell_pid=12381 – lane=doing – Started review via workflow command
