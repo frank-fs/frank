@@ -316,6 +316,10 @@ let private parseDocument (xdoc: XDocument) : ScxmlParseResult =
           Errors = []
           Warnings = warnings |> Seq.toList }
 
+// SECURITY: XDocument.Parse/Load in .NET 8+ prohibits DTD processing by default
+// (DtdProcessing.Prohibit, XmlResolver = null). XXE and billion-laughs attacks
+// are mitigated without explicit configuration. See: https://learn.microsoft.com/en-us/dotnet/standard/linq/linq-xml-security
+
 // T010/T011: Shared error-handling wrapper for all parse entry points
 let private tryParseWith (loadFn: unit -> XDocument) : ScxmlParseResult =
     try
