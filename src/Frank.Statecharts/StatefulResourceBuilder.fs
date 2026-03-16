@@ -47,6 +47,12 @@ type StateMachineMetadata =
         TransitionObservers: (obj -> unit) list
         /// The initial state key (Initial.ToString())
         InitialStateKey: string
+        /// Precomputed guard names from the StateMachine's Guards list.
+        /// Avoids runtime reflection on the boxed Machine.
+        GuardNames: string list
+        /// Precomputed state metadata (IsFinal, AllowedMethods, Description) keyed by state string.
+        /// Avoids runtime reflection on the boxed Machine.
+        StateMetadataMap: Map<string, StateInfo>
         /// Resolve state from store, cache in HttpContext.Items, return state key string.
         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
         /// Evaluate guards using cached state from HttpContext.Items.
@@ -250,6 +256,15 @@ type StatefulResourceBuilder(routeTemplate: string) =
             |> List.map (fun (s, h) -> (s.ToString(), h))
             |> Map.ofList
 
+        let guardNames =
+            machineWithMetadata.Guards |> List.map (fun g -> g.Name)
+
+        let stateMetadataMap =
+            machineWithMetadata.StateMetadata
+            |> Map.toList
+            |> List.map (fun (s, info) -> (string s, info))
+            |> Map.ofList
+
         let metadata: StateMachineMetadata =
             { Machine = box machineWithMetadata
               StateHandlerMap = stateHandlerMap
@@ -258,6 +273,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 spec.TransitionObservers
                 |> List.map (fun h -> (fun (evt: obj) -> h (evt :?> TransitionEvent<'S, 'E, 'C>)))
               InitialStateKey = initialStateKey
+              GuardNames = guardNames
+              StateMetadataMap = stateMetadataMap
               GetCurrentStateKey = getCurrentStateKey
               EvaluateGuards = evaluateGuards
               ExecuteTransition = executeTransition }
