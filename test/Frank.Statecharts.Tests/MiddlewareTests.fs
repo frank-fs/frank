@@ -43,22 +43,24 @@ let testMachine: StateMachine<TestState, TestEvent, int> =
 let guardedMachine: StateMachine<TestState, TestEvent, int> =
     { testMachine with
         Guards =
-            [ { Name = "RequireAdmin"
-                Predicate =
+            [ AccessControl(
+                  "RequireAdmin",
                   fun ctx ->
                       if ctx.User.IsInRole("admin") then
                           Allowed
                       else
-                          Blocked NotAllowed }
-              { Name = "CheckOwner"
-                Predicate =
+                          Blocked NotAllowed
+              )
+              AccessControl(
+                  "CheckOwner",
                   fun ctx ->
                       let ownerClaim = ctx.User.FindFirst("owner")
 
                       if not (isNull ownerClaim) && ownerClaim.Value = "true" then
                           Allowed
                       else
-                          Blocked NotYourTurn } ] }
+                          Blocked NotYourTurn
+              ) ] }
 
 // --- Test infrastructure ---
 
@@ -185,15 +187,16 @@ let middlewareTests =
               let notYourTurnMachine =
                   { testMachine with
                       Guards =
-                          [ { Name = "CheckOwner"
-                              Predicate =
+                          [ AccessControl(
+                                "CheckOwner",
                                 fun ctx ->
                                     let ownerClaim = ctx.User.FindFirst("owner")
 
                                     if not (isNull ownerClaim) && ownerClaim.Value = "true" then
                                         Allowed
                                     else
-                                        Blocked NotYourTurn } ] }
+                                        Blocked NotYourTurn
+                            ) ] }
 
               let res =
                   statefulResource "/turn/{id}" {
@@ -374,8 +377,7 @@ let middlewareTests =
               let customGuardMachine =
                   { testMachine with
                       Guards =
-                          [ { Name = "CustomBlock"
-                              Predicate = fun _ -> Blocked(Custom(429, "Rate limited")) } ] }
+                          [ AccessControl("CustomBlock", fun _ -> Blocked(Custom(429, "Rate limited"))) ] }
 
               let res =
                   statefulResource "/custom/{id}" {
@@ -415,6 +417,236 @@ let middlewareTests =
                       let! (response: HttpResponseMessage) = client.GetAsync("/readonly/1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should succeed"
                       Expect.isFalse transitioned "onTransition should NOT have fired for GET"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let accessControlGuardTests =
+    testList
+        "AccessControl guards (pre-handler)"
+        [ testCase "AccessControl guard blocks before handler runs"
+          <| fun () ->
+              let mutable handlerRan = false
+
+              let blockedMachine =
+                  { testMachine with
+                      Guards = [ AccessControl("AlwaysBlock", fun _ -> Blocked NotAllowed) ] }
+
+              let res =
+                  statefulResource "/ac-block/{id}" {
+                      machine blockedMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    handlerRan <- true
+                                    ctx.Response.WriteAsync("should not reach")) ]
+                      )
+                  }
+
+              (withServer res addStore (Some(adminUser ())) (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/ac-block/1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.Forbidden "Should return 403"
+                      Expect.isFalse handlerRan "Handler should NOT have run when AccessControl guard blocks"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "AccessControl guard passes allows handler to proceed"
+          <| fun () ->
+              let mutable handlerRan = false
+
+              let allowedMachine =
+                  { testMachine with
+                      Guards = [ AccessControl("AlwaysAllow", fun _ -> Allowed) ] }
+
+              let res =
+                  statefulResource "/ac-allow/{id}" {
+                      machine allowedMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    handlerRan <- true
+                                    ctx.Response.WriteAsync("ok")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/ac-allow/1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                      Expect.isTrue handlerRan "Handler should have run when AccessControl guard allows"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let eventValidationGuardTests =
+    testList
+        "EventValidation guards (post-handler)"
+        [ testCase "EventValidation guard receives actual event value"
+          <| fun () ->
+              let mutable receivedEvent: TestEvent option = None
+
+              let evMachine =
+                  { testMachine with
+                      Guards =
+                          [ EventValidation(
+                                "CaptureEvent",
+                                fun ctx ->
+                                    receivedEvent <- Some ctx.Event
+                                    Allowed
+                            ) ] }
+
+              let res =
+                  statefulResource "/ev-capture/{id}" {
+                      machine evMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    StateMachineContext.setEvent ctx DoAction
+                                    ctx.Response.WriteAsync("ok")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/ev-capture/1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                      Expect.equal receivedEvent (Some DoAction) "EventValidation guard should receive actual event"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "EventValidation guard blocking suppresses transition"
+          <| fun () ->
+              let mutable transitioned = false
+
+              let evBlockMachine =
+                  { testMachine with
+                      Guards =
+                          [ EventValidation(
+                                "BlockEvent",
+                                fun _ -> Blocked PreconditionFailed
+                            ) ] }
+
+              let res =
+                  statefulResource "/ev-block/{id}" {
+                      machine evBlockMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    StateMachineContext.setEvent ctx Complete
+                                    Task.CompletedTask) ]
+                      )
+
+                      inState (
+                          forState Completed [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("done")) ]
+                      )
+
+                      onTransition (fun _ -> transitioned <- true)
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/ev-block/1", content)
+                      Expect.equal response.StatusCode (HttpStatusCode.PreconditionFailed) "Should return 412"
+                      Expect.isFalse transitioned "Transition should NOT have fired when event guard blocks"
+
+                      // State should still be Active (transition was suppressed)
+                      let! (getResponse: HttpResponseMessage) = client.GetAsync("/ev-block/1")
+                      Expect.equal getResponse.StatusCode HttpStatusCode.MethodNotAllowed "Should still be in Active state (no GET handler for Active)"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Mixed AccessControl and EventValidation guards in one list"
+          <| fun () ->
+              let mutable handlerRan = false
+              let mutable eventGuardCalled = false
+
+              let mixedMachine =
+                  { testMachine with
+                      Guards =
+                          [ AccessControl(
+                                "AllowAccess",
+                                fun _ -> Allowed
+                            )
+                            EventValidation(
+                                "CheckEvent",
+                                fun ctx ->
+                                    eventGuardCalled <- true
+                                    match ctx.Event with
+                                    | DoAction -> Allowed
+                                    | Complete -> Blocked PreconditionFailed
+                            ) ] }
+
+              let res =
+                  statefulResource "/mixed/{id}" {
+                      machine mixedMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    handlerRan <- true
+                                    StateMachineContext.setEvent ctx DoAction
+                                    ctx.Response.WriteAsync("ok")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/mixed/1", content)
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                      Expect.isTrue handlerRan "Handler should have run"
+                      Expect.isTrue eventGuardCalled "EventValidation guard should have been called"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "EventValidation guards are skipped on GET (no event set)"
+          <| fun () ->
+              let mutable eventGuardCalled = false
+
+              let evMachine =
+                  { testMachine with
+                      Guards =
+                          [ EventValidation(
+                                "ShouldNotRun",
+                                fun _ ->
+                                    eventGuardCalled <- true
+                                    Blocked PreconditionFailed
+                            ) ] }
+
+              let res =
+                  statefulResource "/ev-skip/{id}" {
+                      machine evMachine
+
+                      inState (
+                          forState Active [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("reading")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let! (response: HttpResponseMessage) = client.GetAsync("/ev-skip/1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "GET should succeed"
+                      Expect.isFalse eventGuardCalled "EventValidation guard should NOT be called on GET"
                   }))
                   .GetAwaiter()
                   .GetResult() ]
