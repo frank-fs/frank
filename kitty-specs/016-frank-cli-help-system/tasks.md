@@ -54,7 +54,7 @@
 **Estimated Prompt Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T007 [P] Create `src/Frank.Cli.Core/Help/HelpContent.fs` with hardcoded CommandHelp records for all 7 commands (extract, clarify, validate, diff, compile, help, status)
+- [x] T007 [P] Create `src/Frank.Cli.Core/Help/HelpContent.fs` with hardcoded CommandHelp records for all 7 commands (extract, clarify, validate, diff, compile, help, status)
 - [ ] T008 [P] Add hardcoded HelpTopic records for "workflows" and "concepts" topics in HelpContent.fs
 - [ ] T009 Add content lookup functions: `allCommands`, `allTopics`, `findCommand`, `findTopic` in HelpContent.fs
 - [ ] T010 Create `src/Frank.Cli.Core/Commands/StatusCommand.fs` with project status inspection logic
