@@ -24,6 +24,7 @@
     <Compile Include="Alps/JsonParserTests.fs" />
     <Compile Include="Alps/JsonGeneratorTests.fs" />
     <Compile Include="Alps/RoundTripTests.fs" />
+    <Compile Include="Alps/MapperTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

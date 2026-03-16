@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Ast/Types.fs" />
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
@@ -18,6 +19,7 @@
     <Compile Include="Alps/Types.fs" />
     <Compile Include="Alps/JsonParser.fs" />
     <Compile Include="Alps/JsonGenerator.fs" />
+    <Compile Include="Alps/Mapper.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
