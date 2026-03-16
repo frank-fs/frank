@@ -15,7 +15,7 @@ subtasks:
 - T006
 phase: Phase 1 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "98171"
 review_status: ''
 reviewed_by: ''
@@ -425,3 +425,4 @@ let stalenessIssues =
 ## Activity Log
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:27Z – claude-opus – shell_pid=98171 – lane=doing – Assigned agent via workflow command
