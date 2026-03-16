@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Validation Tests - Types & Orchestrator
-lane: "doing"
+lane: "planned"
 dependencies:
 - WP01
 base_branch: 021-cross-format-validator-WP01
@@ -19,8 +19,9 @@ phase: Phase 2 - Testing
 assignee: ''
 agent: "claude-opus"
 shell_pid: "59373"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/021-fix-feedback2.md"
 history:
 - timestamp: '2026-03-15T23:59:11Z'
   lane: planned
@@ -44,11 +45,13 @@ requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-00
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/021-fix-feedback2.md`
 
-*[This section is empty initially.]*
+**Issue**: WP05 was incorrectly moved to doing due to spec-kitty auto-selecting spec 021 when spec 018 was intended.
 
----
 
 ## Markdown Formatting
 Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
@@ -312,3 +315,4 @@ Can start in parallel with WP03/WP04 since it tests infrastructure, not rules.
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T11:46:04Z – claude-opus – shell_pid=59373 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T11:46:36Z – claude-opus – shell_pid=59373 – lane=planned – Moved to planned
