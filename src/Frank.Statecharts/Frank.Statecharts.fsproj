@@ -36,7 +36,6 @@
     <!-- SCXML parser -->
     <Compile Include="Scxml/Types.fs" />
     <Compile Include="Scxml/Parser.fs" />
-    <Compile Include="Scxml/Mapper.fs" />
     <Compile Include="Scxml/Generator.fs" />
     <!-- Validation -->
     <Compile Include="Validation/Types.fs" />
