@@ -20,10 +20,10 @@
     <Compile Include="Smcat/Lexer.fs" />
     <Compile Include="Smcat/LabelParser.fs" />
     <Compile Include="Smcat/Parser.fs" />
-    <Compile Include="Smcat/Generator.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
+    <Compile Include="Smcat/Generator.fs" />
     <Compile Include="Middleware.fs" />
     <Compile Include="StatechartETagProvider.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />

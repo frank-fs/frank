@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.Generator
 
+open Frank.Statecharts
 open Frank.Statecharts.Smcat.Types
 
 /// Determines whether an smcat name requires quoting (contains characters
@@ -39,66 +40,80 @@ let internal formatTransition (source: string) (target: string) (label: string o
     | Some l -> sprintf "%s => %s: %s;" (quoteName source) (quoteName target) l
     | None -> sprintf "%s => %s;" (quoteName source) (quoteName target)
 
-/// Information about a state for the generator. Provides the data the generator
-/// needs without depending on the StateMachine/StateInfo types (which compile
-/// after this module in the F# compilation order).
-type GeneratorStateInfo<'State> =
-    { State: 'State
-      IsFinal: bool }
+/// Options controlling smcat generation behavior.
+type GenerateOptions =
+    { ResourceName: string }
 
-/// Generate valid smcat text from state machine components.
-///
-/// Because StateMachine<'S,'E,'C> compiles after this module and stores its
-/// Transition function as a closure (not a declarative transition table),
-/// the caller must provide decomposed components:
-///
-/// - initialState: The initial state of the machine.
-/// - stateInfos: List of states with their IsFinal flag.
-/// - guardNames: Function mapping (source, event) to an optional guard name.
-/// - stateNames: Function converting a state value to its smcat name.
-/// - eventNames: Function converting an event value to its smcat name.
-/// - transitions: Explicit list of (source, event, target) triples to render.
+/// Extract guard names from the boxed StateMachine's Guards field via reflection.
+let private extractGuardNames (machine: obj) : string list =
+    let fields = FSharp.Reflection.FSharpValue.GetRecordFields(machine)
+    let guardsObj = fields.[3]
+
+    match guardsObj with
+    | :? System.Collections.IEnumerable as guards ->
+        [ for g in guards do
+              let nameField = g.GetType().GetProperty("Name")
+              yield nameField.GetValue(g) :?> string ]
+    | _ -> []
+
+/// Extract StateMetadata (Map<'State, StateInfo>) from the boxed StateMachine via reflection.
+let private extractStateMetadata (machine: obj) : Map<string, StateInfo> =
+    let fields = FSharp.Reflection.FSharpValue.GetRecordFields(machine)
+    let metadataObj = fields.[4]
+
+    match metadataObj with
+    | :? System.Collections.IEnumerable as entries ->
+        [ for kvp in entries do
+              let kvpType = kvp.GetType()
+              let key = kvpType.GetProperty("Key").GetValue(kvp)
+              let value = kvpType.GetProperty("Value").GetValue(kvp)
+              yield (string key, value :?> StateInfo) ]
+        |> Map.ofList
+    | _ -> Map.empty
+
+/// Generate valid smcat text from StateMachineMetadata.
 ///
 /// Output format:
 /// - One statement per line, semicolon terminators.
 /// - Initial transition emitted first: "initial => <state>;"
-/// - Regular transitions in provided order.
+/// - Self-messages for each (state, HTTP method) handler pair.
+/// - Guard annotations as note-style comments.
 /// - Final state transitions emitted last: "<state> => final;"
-let generate<'State, 'Event when 'State: equality and 'State: comparison>
-    (initialState: 'State)
-    (stateInfos: GeneratorStateInfo<'State> list)
-    (guardNames: 'State -> 'Event -> string option)
-    (stateNames: 'State -> string)
-    (eventNames: 'Event -> string)
-    (transitions: ('State * 'Event * 'State) list)
-    : string =
+let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : string =
     let lines = ResizeArray<string>()
 
-    // 1. Emit initial transition first.
-    let initialName = stateNames initialState
-    lines.Add(sprintf "initial => %s;" (quoteName initialName))
+    // Order states: initial first, others alphabetically
+    let stateNames = metadata.StateHandlerMap |> Map.toList |> List.map fst
 
-    // 2. Identify final states.
-    let finalStateSet =
-        stateInfos
-        |> List.filter (fun si -> si.IsFinal)
-        |> List.map (fun si -> si.State)
-        |> Set.ofList
+    let others =
+        stateNames
+        |> List.filter (fun s -> s <> metadata.InitialStateKey)
+        |> List.sort
 
-    // 3. Emit regular transitions in provided order.
-    for (source, event, target) in transitions do
-        let sourceName = stateNames source
-        let targetName = stateNames target
-        let evtName = eventNames event
-        let guard = guardNames source event
-        // Actions are not directly available from StateMachine metadata;
-        // the caller can encode action info in the guard name function if needed.
-        let label = formatLabel (Some evtName) guard None
-        lines.Add(formatTransition sourceName targetName label)
+    let orderedStates = metadata.InitialStateKey :: others
 
-    // 4. Emit final state transitions last.
-    for finalState in finalStateSet do
-        let finalStateName = stateNames finalState
-        lines.Add(formatTransition finalStateName "final" None)
+    // 1. Emit initial transition
+    lines.Add(sprintf "initial => %s;" (quoteName metadata.InitialStateKey))
+
+    // 2. Extract state metadata for IsFinal detection
+    let stateMetadata = extractStateMetadata metadata.Machine
+
+    // 3. Extract guard names
+    let guardNames = extractGuardNames metadata.Machine
+
+    // 4. Emit self-messages for each (state, httpMethod) handler pair
+    for stateName in orderedStates do
+        match Map.tryFind stateName metadata.StateHandlerMap with
+        | Some handlers ->
+            for (httpMethod, _) in handlers do
+                let label = formatLabel (Some httpMethod) None None
+                lines.Add(formatTransition stateName stateName label)
+        | None -> ()
+
+    // 5. Emit final state transitions last
+    for stateName in orderedStates do
+        match Map.tryFind stateName stateMetadata with
+        | Some info when info.IsFinal -> lines.Add(formatTransition stateName "final" None)
+        | _ -> ()
 
     lines |> String.concat "\n"
