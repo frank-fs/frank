@@ -321,3 +321,4 @@ let typeTests = testList "Alps.Types" [
 - 2026-03-16T04:02:23Z – claude-opus – shell_pid=97958 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:15:12Z – claude-opus – shell_pid=97958 – lane=for_review – Moved to for_review
 - 2026-03-16T04:18:55Z – claude-opus – shell_pid=97958 – lane=done – Review passed
+- 2026-03-16T14:33:11Z – claude-opus – shell_pid=97958 – lane=done – Moved to done

@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Cross-Format Validation Rules
-lane: "planned"
+lane: "done"
 dependencies: [WP02]
 base_branch: 021-cross-format-validator-WP02
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322

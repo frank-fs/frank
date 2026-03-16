@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: AST Helpers & Validator Orchestrator
-lane: "doing"
+lane: "done"
 dependencies: [WP01]
 base_branch: 021-cross-format-validator-WP01
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
@@ -18,8 +18,8 @@ phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus"
 shell_pid: "97995"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-15T23:59:11Z'
   lane: planned
@@ -406,3 +406,4 @@ This requires rules to encode enough info in `Reason` for the orchestrator to cr
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:02:24Z – claude-opus – shell_pid=97995 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T14:33:10Z – claude-opus – shell_pid=97995 – lane=done – Moved to done

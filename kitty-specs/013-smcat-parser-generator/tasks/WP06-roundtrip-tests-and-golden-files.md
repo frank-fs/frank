@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Roundtrip Tests & Golden Files
-lane: "planned"
+lane: "done"
 dependencies:
 - WP03
 subtasks:

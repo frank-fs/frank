@@ -369,3 +369,4 @@ Expected result: `ScxmlDocument` with `InitialId = Some "idle"`, 3 states (idle=
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:17:17Z – claude-opus – shell_pid=4865 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:29:39Z – claude-opus – shell_pid=4865 – lane=done – Review passed: All 6 subtasks (T003, T004, T005, T006, T009, T012) implemented correctly. Parser handles namespace resolution (both default and prefixed), space-separated transition targets, initial state inference per W3C 3.2, compound state detection, recursive state parsing. DataEntries/HistoryNodes/InvokeNodes correctly stubbed for WP03. Builds clean on all 3 TFMs with 0 warnings. All 246 existing tests pass. Internal parseDocument helper enables clean WP03 overload additions.
+- 2026-03-16T14:33:09Z – claude-opus – shell_pid=4865 – lane=done – Moved to done

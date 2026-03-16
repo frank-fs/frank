@@ -2,12 +2,12 @@
 work_package_id: "WP03"
 title: "Migrate WSD Parser & GuardParser"
 phase: "Phase 2 - Parser Migration"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP02"]
 requirement_refs:
   - "FR-008"
@@ -431,3 +431,4 @@ The internal `Participant` type serves all these purposes. Only the emitted elem
 ## Activity Log
 
 - 2026-03-15T23:59:08Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T14:33:09Z – unknown – lane=done – Moved to done

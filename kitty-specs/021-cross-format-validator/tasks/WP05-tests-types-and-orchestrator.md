@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Validation Tests - Types & Orchestrator
-lane: "doing"
+lane: "done"
 dependencies:
 - WP01
 base_branch: 021-cross-format-validator-WP01
@@ -317,3 +317,4 @@ Can start in parallel with WP03/WP04 since it tests infrastructure, not rules.
 - 2026-03-16T11:46:04Z – claude-opus – shell_pid=59373 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T11:46:36Z – claude-opus – shell_pid=59373 – lane=planned – Moved to planned
 - 2026-03-16T11:48:05Z – claude-opus – shell_pid=60893 – lane=doing – Started implementation via workflow command
+- 2026-03-16T14:33:10Z – claude-opus – shell_pid=60893 – lane=done – Moved to done
