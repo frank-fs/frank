@@ -2,7 +2,7 @@
 work_package_id: "WP02"
 title: "Guard Discriminated Union"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
@@ -418,3 +418,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T14:34:43Z – unknown – lane=planned – Moved to planned
+- 2026-03-16T14:35:33Z – unknown – lane=done – Moved to done
