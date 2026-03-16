@@ -13,7 +13,7 @@ subtasks:
 - T020
 phase: Phase 2 - Parallel Streams
 assignee: ''
-agent: ''
+agent: "claude-opus-4-6"
 shell_pid: "98858"
 review_status: ''
 reviewed_by: ''
@@ -251,3 +251,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP03 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T04:03:04Z – claude-opus-4-6 – shell_pid=98858 – lane=doing – Assigned agent via workflow command
