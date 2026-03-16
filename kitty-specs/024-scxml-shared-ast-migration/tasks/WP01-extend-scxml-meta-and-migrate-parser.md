@@ -1,6 +1,14 @@
 ---
-work_package_id: "WP02"
+work_package_id: "WP01"
 subtasks:
+  - "T001"
+  - "T002"
+  - "T003"
+  - "T004"
+  - "T005"
+  - "T006"
+  - "T007"
+  - "T008"
   - "T009"
   - "T010"
   - "T011"
@@ -8,39 +16,48 @@ subtasks:
   - "T013"
   - "T014"
   - "T015"
-title: "Migrate Parser to Shared AST"
-phase: "Phase 1 - Core Migration"
+  - "T016"
+title: "Extend ScxmlMeta DU + Migrate Parser to Shared AST"
+phase: "Phase 0+1 - Foundation & Parser Migration"
 lane: "planned"
 assignee: ""
 agent: ""
 shell_pid: ""
 review_status: ""
 reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016]
+dependencies: []
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-028]
 history:
   - timestamp: "2026-03-16T19:26:17Z"
     lane: "planned"
     agent: "system"
     shell_pid: ""
     action: "Prompt generated via /spec-kitty.tasks"
+  - timestamp: "2026-03-16T23:00:00Z"
+    lane: "planned"
+    agent: "system"
+    shell_pid: ""
+    action: "Merged old WP01 (extend ScxmlMeta) and old WP02 (migrate parser) into single atomic WP. Eliminates transitional Mapper.fs fix issue."
 ---
 
-# Work Package Prompt: WP02 -- Migrate Parser to Shared AST
+# Work Package Prompt: WP01 -- Extend ScxmlMeta DU + Migrate Parser to Shared AST
 
 ## Important: Review Feedback Status
 
 **Read this first if you are implementing this task!**
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
-- **You must address all feedback** before your work is complete.
-- **Mark as acknowledged**: Update `review_status: acknowledged` when you begin addressing feedback.
+- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately (right below this notice).
+- **You must address all feedback** before your work is complete. Feedback items are your implementation TODO list.
+- **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
+- **Report progress**: As you address each feedback item, update the Activity Log explaining what you changed.
 
 ---
 
 ## Review Feedback
 
-*[This section is empty initially. Reviewers will populate it if the work is returned from review.]*
+> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes. Implementation must address every item listed below before returning for re-review.
+
+*[This section is empty initially. Reviewers will populate it if the work is returned from review. If you see feedback here, treat each item as a must-do before completion.]*
 
 ---
 
@@ -52,31 +69,153 @@ Use language identifiers in code blocks: ````fsharp`, ````bash`
 
 ## Implementation Command
 
-This WP depends on WP01:
+No dependencies -- this is the starting package:
 ```bash
-spec-kitty implement WP02 --base WP01
+spec-kitty implement WP01
 ```
 
 ---
 
 ## Objectives & Success Criteria
 
+**Part A -- ScxmlMeta Extension (T001-T008)**:
+- Extend the `ScxmlMeta` discriminated union in `src/Frank.Statecharts/Ast/Types.fs` with 5 new cases and extend 2 existing cases with additional fields.
+- All existing code that pattern-matches on `ScxmlMeta` must be updated to handle the new cases and extended field signatures.
+- No behavioral changes to existing functionality -- this is purely additive type work.
+
+**Part B -- Parser Migration (T009-T016)**:
 - Rewrite `src/Frank.Statecharts/Scxml/Parser.fs` to produce `Ast.ParseResult` (containing `StatechartDocument`) directly, eliminating the need for the `Mapper.toStatechartDocument` direction.
 - All three entry points (`parseString`, `parseReader`, `parseStream`) return `Ast.ParseResult` instead of `ScxmlParseResult`.
 - The parser preserves all SCXML-specific data via `ScxmlAnnotation` entries on the appropriate AST nodes.
-- `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` succeeds (tests may not compile yet -- they are updated in WP04).
+- Delete `Scxml/Mapper.fs` (no longer needed once parser produces shared AST directly).
+
+**Combined Success Criteria**:
+- `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` succeeds across net8.0, net9.0, and net10.0 with zero errors.
+- The transitional Mapper.fs fix problem is eliminated -- ScxmlMeta extension and parser migration happen atomically, and Mapper.fs deletion occurs at the end of this WP.
 
 ## Context & Constraints
 
-- **Spec**: `kitty-specs/024-scxml-shared-ast-migration/spec.md` (FR-001 through FR-016)
-- **Plan**: `kitty-specs/024-scxml-shared-ast-migration/plan.md` (Migration Pattern Reference)
+- **Spec**: `kitty-specs/024-scxml-shared-ast-migration/spec.md` (FR-001 through FR-016, FR-028)
+- **Plan**: `kitty-specs/024-scxml-shared-ast-migration/plan.md` (D1: ScxmlMeta Extension Strategy, Migration Pattern Reference)
+- **Pattern**: Follow the existing `WsdMeta` and `AlpsMeta` patterns in `Ast/Types.fs` -- each case uses named fields.
 - **WSD Precedent**: `src/Frank.Statecharts/Wsd/Parser.fs` directly constructs `StatechartDocument`, `StateNode`, `TransitionEdge` from `Frank.Statecharts.Ast`. Follow this exact pattern.
 - **Mapper Logic**: `src/Frank.Statecharts/Scxml/Mapper.fs` (function `toStatechartDocument` and helpers) contains the conversion logic that must be absorbed into the parser. Read it carefully before starting.
 - **Key Architectural Decision**: The parser must now return `StateNode * TransitionEdge list` from recursive state parsing (same as `Mapper.toStateNodeAndTransitions`), because the shared AST separates states and transitions into different `StatechartElement` entries.
+- **Constraint**: All changes are within the `Frank.Statecharts` project. No public API changes (the project is `internal`).
 
 ---
 
 ## Subtasks & Detailed Guidance
+
+### Part A: ScxmlMeta Extension (T001-T008)
+
+### Subtask T001 -- Extend `ScxmlInvoke` with `id` field
+
+- **Purpose**: SCXML `<invoke>` elements have an `id` attribute that must survive round-trip. The current `ScxmlInvoke` case carries `invokeType: string * src: string option` but not `id`.
+- **Steps**:
+  1. Open `src/Frank.Statecharts/Ast/Types.fs`
+  2. Find the `ScxmlMeta` DU, locate the `ScxmlInvoke` case
+  3. Change from:
+     ```fsharp
+     | ScxmlInvoke of invokeType: string * src: string option
+     ```
+     To:
+     ```fsharp
+     | ScxmlInvoke of invokeType: string * src: string option * id: string option
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+- **Notes**: This is a breaking change for all existing call sites that construct or pattern-match `ScxmlInvoke`. These are fixed in T008.
+
+### Subtask T002 -- Extend `ScxmlHistory` with `defaultTarget` field
+
+- **Purpose**: SCXML `<history>` elements can contain a `<transition>` child for the default target. This must be preserved for round-trip fidelity. Storing it in the annotation avoids creating a separate `TransitionElement` for history defaults.
+- **Steps**:
+  1. In `src/Frank.Statecharts/Ast/Types.fs`, locate the `ScxmlHistory` case
+  2. Change from:
+     ```fsharp
+     | ScxmlHistory of id: string * historyKind: HistoryKind
+     ```
+     To:
+     ```fsharp
+     | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+- **Notes**: The `defaultTarget` is `None` when the `<history>` element has no child `<transition>`.
+
+### Subtask T003 -- Add `ScxmlTransitionType` case
+
+- **Purpose**: SCXML transitions have a `type` attribute that can be `internal` or `external` (default). This must be preserved as an annotation on `TransitionEdge` for round-trip fidelity.
+- **Steps**:
+  1. Add to the `ScxmlMeta` DU:
+     ```fsharp
+     | ScxmlTransitionType of internal: bool
+     ```
+  2. `true` means internal, `false` means external.
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+- **Notes**: We use a simple `bool` rather than referencing the `Scxml.Types.ScxmlTransitionType` DU, to avoid coupling the shared AST to format-internal types. The plan (D1) confirms this design.
+
+### Subtask T004 -- Add `ScxmlMultiTarget` case
+
+- **Purpose**: SCXML transitions can have space-separated multi-target `target` attributes (e.g., `target="s1 s2 s3"`). The shared AST `TransitionEdge.Target` only holds one target. The full list must be preserved via annotation.
+- **Steps**:
+  1. Add to the `ScxmlMeta` DU:
+     ```fsharp
+     | ScxmlMultiTarget of targets: string list
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+- **Notes**: When the transition has a single target, no `ScxmlMultiTarget` annotation is needed (the `TransitionEdge.Target` field suffices). The annotation is only added for multi-target transitions (2+ targets).
+
+### Subtask T005 -- Add `ScxmlDatamodelType` case
+
+- **Purpose**: The SCXML root `<scxml>` element can have a `datamodel` attribute (e.g., `datamodel="ecmascript"`). This document-level attribute must be preserved via annotation on `StatechartDocument`.
+- **Steps**:
+  1. Add to the `ScxmlMeta` DU:
+     ```fsharp
+     | ScxmlDatamodelType of datamodel: string
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+
+### Subtask T006 -- Add `ScxmlBinding` case
+
+- **Purpose**: The SCXML root `<scxml>` element can have a `binding` attribute (e.g., `binding="early"` or `binding="late"`). This must be preserved for round-trip fidelity.
+- **Steps**:
+  1. Add to the `ScxmlMeta` DU:
+     ```fsharp
+     | ScxmlBinding of binding: string
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+
+### Subtask T007 -- Add `ScxmlInitial` case
+
+- **Purpose**: SCXML compound `<state>` elements can have an `initial` attribute specifying the default child state. This state-level attribute must be preserved via annotation on `StateNode`.
+- **Steps**:
+  1. Add to the `ScxmlMeta` DU:
+     ```fsharp
+     | ScxmlInitial of initialId: string
+     ```
+- **Files**: `src/Frank.Statecharts/Ast/Types.fs`
+
+### Subtask T008 -- Fix all existing pattern matches on `ScxmlMeta`
+
+- **Purpose**: After extending `ScxmlInvoke`/`ScxmlHistory` and adding new cases, all existing code that pattern-matches on `ScxmlMeta` will fail to compile. These must be updated.
+- **Steps**:
+  1. Search for all pattern matches on `ScxmlMeta` cases across the project:
+     ```bash
+     grep -rn "ScxmlInvoke\|ScxmlHistory\|ScxmlNamespace" src/ test/ --include="*.fs"
+     ```
+  2. **`src/Frank.Statecharts/Scxml/Mapper.fs`**: No need for transitional fixes -- Mapper.fs will be deleted at the end of this WP (T016). Skip Mapper.fs fixes entirely.
+  3. **`src/Frank.Statecharts/Validation/`**: Check if any validator pattern-matches on `ScxmlMeta`. If so, add wildcard matches for new cases.
+  4. **`test/Frank.Statecharts.Tests/Ast/`**: Check AST test files for `ScxmlMeta` construction. Update field counts. Specifically, `test/Frank.Statecharts.Tests/Ast/TypeConstructionTests.fs` and `test/Frank.Statecharts.Tests/Ast/PartialPopulationTests.fs` construct `ScxmlHistory("h1", Deep)` with 2 args which will break when the DU gains a 3rd field (`defaultTarget`). These must be updated to `ScxmlHistory("h1", Deep, None)` (3 args). Similarly, any `ScxmlInvoke` constructions must gain the new `id` field.
+  5. The build does NOT need to pass after T008 alone -- Mapper.fs will have compile errors from the extended DU cases. This is intentional: the parser migration (T009-T015) and Mapper.fs deletion (T016) happen atomically within this same WP.
+- **Files**:
+  - `src/Frank.Statecharts/Validation/Validator.fs` (if applicable)
+  - `test/Frank.Statecharts.Tests/Ast/TypeConstructionTests.fs` (confirmed in scope -- constructs `ScxmlHistory` and `ScxmlInvoke` with old arg counts)
+  - `test/Frank.Statecharts.Tests/Ast/PartialPopulationTests.fs` (confirmed in scope -- constructs `ScxmlHistory` with old arg count)
+- **Notes**: The AST test file fixes are permanent -- they update test construction to use the new field counts. Mapper.fs fixes are NOT needed because Mapper.fs is deleted at the end of this WP (T016).
+
+---
+
+### Part B: Parser Migration (T009-T016)
 
 ### Subtask T009 -- Change module opens
 
@@ -354,20 +493,37 @@ spec-kitty implement WP02 --base WP01
      ```
   3. Note: the function bodies do not change -- they just call `tryParseWith`.
 - **Files**: `src/Frank.Statecharts/Scxml/Parser.fs`
-- **Notes**: After this change, any code calling `parseString` will get `Ast.ParseResult` instead of `ScxmlParseResult`. This will break test files (fixed in WP04) but should not break `Mapper.fs` calls to the parser (Mapper.fs calls the parser internally -- but after this change, the Mapper's `toStatechartDocument` function is no longer needed since the parser returns the shared AST directly).
+- **Notes**: After this change, any code calling `parseString` will get `Ast.ParseResult` instead of `ScxmlParseResult`. This will break test files (fixed in WP03) and Mapper.fs (deleted in T016).
+
+### Subtask T016 -- Delete Mapper.fs and remove from fsproj
+
+- **Purpose**: With the parser now producing `Ast.ParseResult` directly, `Mapper.fs` is no longer needed. The `toStatechartDocument` direction has been absorbed into the parser. The `fromStatechartDocument` direction is absorbed into Generator.fs in WP02.
+- **Steps**:
+  1. Delete `src/Frank.Statecharts/Scxml/Mapper.fs`
+  2. Remove `<Compile Include="Scxml/Mapper.fs" />` from `src/Frank.Statecharts/Frank.Statecharts.fsproj`
+  3. Verify that no other source file (besides tests, which are updated in WP03) references `Scxml.Mapper`. The generator (`Generator.fs`) currently calls `Mapper.fromStatechartDocument` -- if it does, that call must be temporarily commented out or the generator's WP02 migration must account for the mapper's absence.
+  4. Run `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` to confirm the build passes.
+- **Files**: `src/Frank.Statecharts/Scxml/Mapper.fs` (deleted), `src/Frank.Statecharts/Frank.Statecharts.fsproj`
+- **Notes**: This subtask completes the atomic merge. By combining ScxmlMeta extension + parser migration + Mapper deletion into one WP, we avoid the transitional state where Mapper.fs has compile errors from the extended DU cases.
 
 ---
 
 ## Risks & Mitigations
 
+- **Breaking existing call sites**: Extending `ScxmlInvoke` from 2 to 3 fields and `ScxmlHistory` from 2 to 3 fields breaks all existing construction and pattern-match sites. Mitigation: T008 fixes non-Mapper sites; Mapper.fs is deleted in T016 (no transitional fixes needed).
+- **Missing pattern matches**: New `ScxmlMeta` cases added in T003-T007 will cause incomplete pattern match warnings. Mitigation: check for exhaustive matches in validation code; add wildcard branches where needed.
 - **State-scoped data entry collection**: The current parser stores state-scoped data in `ScxmlState.DataEntries`. The shared AST has no per-state data -- it's all flattened into `StatechartDocument.DataEntries`. The parser must collect data entries from the state hierarchy during recursive parsing. Mitigation: return data entries alongside transitions from `parseState`, or do a separate collection pass.
 - **Position type collision**: Both `Scxml.Types.SourcePosition` and `Ast.SourcePosition` are `[<Struct>]` with identical fields. Consider changing `extractPosition` to return `Ast.SourcePosition` directly, eliminating the need for a conversion helper.
-- **Mapper dependency**: After this WP, `Mapper.toStatechartDocument` becomes dead code but `Mapper.fromStatechartDocument` is still used by the generator (until WP03). The Mapper file must still compile. This should be fine since we are not changing Mapper.fs in this WP.
 
 ---
 
 ## Review Guidance
 
+**Part A (ScxmlMeta)**:
+- Verify the `ScxmlMeta` DU in `Ast/Types.fs` has exactly 8 cases after changes (3 original + 5 new, with 2 originals extended).
+- Verify field names match the plan (D1): `invokeType`, `src`, `id`, `historyKind`, `defaultTarget`, `internal`, `targets`, `datamodel`, `binding`, `initialId`.
+
+**Part B (Parser)**:
 - Verify all three parse entry points return `Ast.ParseResult`.
 - Verify the parser no longer constructs any `ScxmlDocument`, `ScxmlState`, `ScxmlTransition`, or `ScxmlParseResult` values.
 - Verify all SCXML-specific data is preserved via `ScxmlAnnotation` entries:
@@ -379,7 +535,11 @@ spec-kitty implement WP02 --base WP01
   - Document datamodel -> `ScxmlAnnotation(ScxmlDatamodelType(dm))`
   - Document binding -> `ScxmlAnnotation(ScxmlBinding(b))`
 - Verify error cases return an empty `StatechartDocument` (not `None`/`null`).
-- Verify `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` passes.
+- Verify `Mapper.fs` is deleted and removed from fsproj.
+
+**Combined**:
+- Verify `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` passes on all 3 TFMs.
+- Verify no incomplete pattern match warnings related to `ScxmlMeta`.
 
 ---
 
@@ -388,6 +548,7 @@ spec-kitty implement WP02 --base WP01
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-16T19:26:17Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T23:00:00Z -- system -- lane=planned -- Merged old WP01 (extend ScxmlMeta) and old WP02 (migrate parser) into single atomic WP.
 
 ---
 
@@ -396,6 +557,6 @@ spec-kitty implement WP02 --base WP01
 To change a work package's lane, either:
 
 1. **Edit directly**: Change the `lane:` field in frontmatter AND append activity log entry (at the end)
-2. **Use CLI**: `spec-kitty agent tasks move-task WP02 --to <lane> --note "message"` (recommended)
+2. **Use CLI**: `spec-kitty agent tasks move-task WP01 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`

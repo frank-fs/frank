@@ -15,14 +15,14 @@
 
 ---
 
-## Work Package WP01: Extend Shared AST ScxmlMeta Cases (Priority: P0)
+## Work Package WP01: Extend ScxmlMeta DU + Migrate Parser to Shared AST (Priority: P0)
 
-**Goal**: Add the 6 new `ScxmlMeta` DU cases to `Ast/Types.fs` and extend the existing `ScxmlInvoke` and `ScxmlHistory` cases with additional fields. This is the foundational type change that all other work packages depend on.
-**Independent Test**: `dotnet build` succeeds across all TFMs after changes (existing consumers remain compatible).
-**Prompt**: `/tasks/WP01-extend-scxml-meta.md`
-**Estimated Lines**: ~300
+**Goal**: Atomic merge of ScxmlMeta extension and parser migration. Add the 6 new `ScxmlMeta` DU cases to `Ast/Types.fs`, extend the existing `ScxmlInvoke` and `ScxmlHistory` cases with additional fields, rewrite `Scxml/Parser.fs` to produce `Ast.ParseResult` (with `StatechartDocument`) directly, and delete `Scxml/Mapper.fs`. This eliminates the transitional Mapper.fs fix issue -- ScxmlMeta extension and parser migration happen atomically, Mapper.fs deletion happens at the end of this WP.
+**Independent Test**: `dotnet build` succeeds across all TFMs after changes. Parser returns `Ast.ParseResult`. Mapper.fs is deleted.
+**Prompt**: `/tasks/WP01-extend-scxml-meta-and-migrate-parser.md`
+**Estimated Lines**: ~800
 
-### Included Subtasks
+### Included Subtasks (Part A: ScxmlMeta Extension)
 - [ ] T001 Extend `ScxmlInvoke` case to carry `id: string option` (third field)
 - [ ] T002 Extend `ScxmlHistory` case to carry `defaultTarget: string option` (third field)
 - [ ] T003 Add `ScxmlTransitionType` case (`internal: bool`)
@@ -30,34 +30,9 @@
 - [ ] T005 Add `ScxmlDatamodelType` case (`datamodel: string`)
 - [ ] T006 Add `ScxmlBinding` case (`binding: string`)
 - [ ] T007 Add `ScxmlInitial` case (`initialId: string`)
-- [ ] T008 Fix all existing pattern matches on `ScxmlMeta` in `Mapper.fs` and `Validation/` to handle new cases
+- [ ] T008 Fix all existing pattern matches on `ScxmlMeta` in `Validation/` and test files (skip Mapper.fs -- it is deleted in T016)
 
-### Implementation Notes
-- Modify `src/Frank.Statecharts/Ast/Types.fs` -- the `ScxmlMeta` DU.
-- Extending existing cases (`ScxmlInvoke`, `ScxmlHistory`) with new fields is a binary-breaking change within the same project but acceptable as all consumers are internal.
-- All existing pattern matches on `ScxmlMeta` must be updated (Mapper.fs, any validation code). These are temporary fixes that will be superseded when Mapper.fs is deleted in WP05.
-- Build must pass on all 3 TFMs after this WP.
-
-### Parallel Opportunities
-- T001-T007 are independent field/case additions to the same DU, but must be done atomically.
-- T008 depends on T001-T007.
-
-### Dependencies
-- None (starting package).
-
-### Risks & Mitigations
-- Extending `ScxmlInvoke` and `ScxmlHistory` with new positional fields may break existing call sites. Mitigation: use named fields and update all call sites in T008.
-
----
-
-## Work Package WP02: Migrate Parser to Shared AST (Priority: P1)
-
-**Goal**: Rewrite `Scxml/Parser.fs` to produce `Ast.ParseResult` (with `StatechartDocument`) directly, absorbing the mapping logic from `Mapper.toStatechartDocument`. The parser no longer produces format-specific `ScxmlParseResult`/`ScxmlDocument`/`ScxmlState` types.
-**Independent Test**: Parser compiles and all parsing logic works against shared AST types. Existing test assertions will need updating (done in WP04), but the parser module itself is self-contained.
-**Prompt**: `/tasks/WP02-migrate-parser.md`
-**Estimated Lines**: ~500
-
-### Included Subtasks
+### Included Subtasks (Part B: Parser Migration)
 - [ ] T009 Change module opens: add `Frank.Statecharts.Ast`, remove dependency on `Scxml.Types` for document/state types (retain `ScxmlTransitionType`, `ScxmlHistoryKind` from `Scxml.Types` for internal parsing)
 - [ ] T010 Rewrite `parseState` to produce `StateNode` directly (map state kinds, build `Children`, attach `ScxmlAnnotation` for invoke/history/initial)
 - [ ] T011 Rewrite `parseTransition` to produce `TransitionEdge` directly (set `Source` from parent state id, populate `ScxmlAnnotation` for transition type and multi-target)
@@ -65,43 +40,47 @@
 - [ ] T013 Rewrite `parseDataEntries` to produce `Ast.DataEntry` (map `id` to `Name`, convert `SourcePosition`)
 - [ ] T014 Rewrite `parseDocument` to produce `Ast.ParseResult` with `StatechartDocument` (assemble elements list from state declarations + transition edges, set document-level annotations for datamodel/binding, convert errors/warnings to `Ast.ParseFailure`/`Ast.ParseWarning`)
 - [ ] T015 Update `tryParseWith`, `parseString`, `parseReader`, `parseStream` return types from `ScxmlParseResult` to `Ast.ParseResult`
+- [ ] T016 Delete `Scxml/Mapper.fs` and remove from fsproj
 
 ### Implementation Notes
-- This WP absorbs the `toStatechartDocument` direction of `Mapper.fs` directly into the parser.
-- The parser must collect `TransitionEdge` entries separately (they come from inside recursive state parsing) and emit them as `TransitionElement` entries in the document's `Elements` list.
+- Modify `src/Frank.Statecharts/Ast/Types.fs` -- the `ScxmlMeta` DU.
+- Extending existing cases (`ScxmlInvoke`, `ScxmlHistory`) with new fields is a binary-breaking change within the same project but acceptable as all consumers are internal.
+- Mapper.fs fixes are NOT needed because Mapper.fs is deleted at the end of this WP (T016). The build does not need to pass after T008 alone.
+- The parser absorbs the `toStatechartDocument` direction of `Mapper.fs` directly.
+- The parser must collect `TransitionEdge` entries separately and emit them as `TransitionElement` entries.
 - The approach mirrors how the WSD parser (`Wsd/Parser.fs`) directly constructs shared AST types.
-- `StateNode.Children` now includes history pseudo-states as child entries (matching existing Mapper behavior).
 - Error case: when XML is invalid or root is not `<scxml>`, return an empty `StatechartDocument` with error entries (replacing `Document = None`).
-- Invoke nodes on a state become `ScxmlAnnotation(ScxmlInvoke(...))` on the `StateNode`.
-- State-level `initial` attributes become `ScxmlAnnotation(ScxmlInitial(...))` on the `StateNode`.
-- Document-level `datamodel` and `binding` attributes become `ScxmlAnnotation(ScxmlDatamodelType(...))` and `ScxmlAnnotation(ScxmlBinding(...))` on the `StatechartDocument`.
 
 ### Parallel Opportunities
-- T009 must come first. T010-T014 touch different helper functions and can be done in sequence within a single pass.
+- T001-T007 are independent field/case additions to the same DU, but must be done atomically.
+- T008 depends on T001-T007.
+- T009 must come first in Part B. T010-T014 touch different helper functions and can be done in sequence within a single pass.
+- T016 must be last.
 
 ### Dependencies
-- Depends on WP01 (ScxmlMeta cases must exist).
+- None (starting package).
 
 ### Risks & Mitigations
-- Recursive `parseState` now returns `StateNode * TransitionEdge list` (state node + collected transitions from subtree). This is the same pattern used by the Mapper. Risk: missing transitions in deeply nested states. Mitigation: follow the exact Mapper recursion pattern.
-- Position conversion: `Scxml.Types.SourcePosition` to `Ast.SourcePosition`. The structs have identical fields (`Line`, `Column`), so conversion is a direct field copy.
+- Extending `ScxmlInvoke` and `ScxmlHistory` with new positional fields breaks existing call sites. Mitigation: T008 fixes non-Mapper sites; Mapper.fs is deleted in T016.
+- Recursive `parseState` now returns `StateNode * TransitionEdge list`. Risk: missing transitions in deeply nested states. Mitigation: follow the exact Mapper recursion pattern.
+- Position conversion: `Scxml.Types.SourcePosition` to `Ast.SourcePosition`. The structs have identical fields.
 
 ---
 
-## Work Package WP03: Migrate Generator to Shared AST (Priority: P1)
+## Work Package WP02: Migrate Generator to Shared AST (Priority: P1)
 
 **Goal**: Rewrite `Scxml/Generator.fs` to consume `StatechartDocument` instead of `ScxmlDocument`, absorbing the mapping logic from `Mapper.fromStatechartDocument`. The generator reads shared AST types and extracts SCXML-specific data from `ScxmlAnnotation` entries.
-**Independent Test**: Generator compiles and produces valid SCXML from `StatechartDocument` values. Test assertions need updating (done in WP04).
-**Prompt**: `/tasks/WP03-migrate-generator.md`
+**Independent Test**: Generator compiles and produces valid SCXML from `StatechartDocument` values. Test assertions need updating (done in WP03).
+**Prompt**: `/tasks/WP02-migrate-generator.md` (formerly WP03)
 **Estimated Lines**: ~450
 
 ### Included Subtasks
-- [ ] T016 Change module opens: add `Frank.Statecharts.Ast`, remove dependency on `Scxml.Types` for document/state types
-- [ ] T017 Rewrite `generateState` to accept `StateNode`, read `Kind` for element name, iterate `Children` (skipping history/non-SCXML kinds), extract `ScxmlAnnotation` for invoke/initial
-- [ ] T018 Write `generateTransition` to accept `TransitionEdge`, extract `ScxmlAnnotation(ScxmlTransitionType)` for type attribute, extract `ScxmlAnnotation(ScxmlMultiTarget)` for multi-target
-- [ ] T019 Rewrite `generateHistory` to accept `StateNode` (with `Kind = ShallowHistory/DeepHistory`), extract `ScxmlAnnotation(ScxmlHistory)` for id/kind/defaultTarget
-- [ ] T020 Rewrite `generateRoot` to accept `StatechartDocument`, extract `ScxmlAnnotation(ScxmlDatamodelType)` and `ScxmlAnnotation(ScxmlBinding)` from document annotations, generate `DataEntries`
-- [ ] T021 Rewrite `generate` and `generateTo` signatures to accept `StatechartDocument`; handle transition lookup (group `TransitionElement` entries by source, pass to state generation)
+- [ ] T017 Change module opens: add `Frank.Statecharts.Ast`, remove dependency on `Scxml.Types` for document/state types
+- [ ] T018 Rewrite `generateState` to accept `StateNode`, read `Kind` for element name, iterate `Children` (skipping history/non-SCXML kinds), extract `ScxmlAnnotation` for invoke/initial
+- [ ] T019 Write `generateTransition` to accept `TransitionEdge`, extract `ScxmlAnnotation(ScxmlTransitionType)` for type attribute, extract `ScxmlAnnotation(ScxmlMultiTarget)` for multi-target
+- [ ] T020 Rewrite `generateHistory` to accept `StateNode` (with `Kind = ShallowHistory/DeepHistory`), extract `ScxmlAnnotation(ScxmlHistory)` for id/kind/defaultTarget
+- [ ] T021 Rewrite `generateRoot` to accept `StatechartDocument`, extract `ScxmlAnnotation(ScxmlDatamodelType)` and `ScxmlAnnotation(ScxmlBinding)` from document annotations, generate `DataEntries`
+- [ ] T022 Rewrite `generate` and `generateTo` signatures to accept `StatechartDocument`; handle transition lookup (group `TransitionElement` entries by source, pass to state generation)
 
 ### Implementation Notes
 - The generator must extract `TransitionElement` entries from `StatechartDocument.Elements` and group them by `Source` to look up transitions per state (same pattern as `Mapper.fromStatechartDocument`).
@@ -111,30 +90,29 @@
 - `DataEntries` on the document become `<datamodel>/<data>` via the existing `generateDatamodel` helper (updated to use `Ast.DataEntry.Name` instead of `ScxmlDataE.Id`).
 
 ### Parallel Opportunities
-- T017-T020 touch different helper functions. T021 ties them together.
+- T018-T021 touch different helper functions. T022 ties them together.
 
 ### Dependencies
 - Depends on WP01 (ScxmlMeta cases must exist).
-- Can proceed in parallel with WP02 (parser migration).
 
 ### Risks & Mitigations
 - Missing annotation extraction: if a `ScxmlAnnotation` is not present, the generator must use sensible defaults (external transition type, no invoke, no history, etc.). Mitigation: match with `List.tryPick` and fall back to defaults.
 
 ---
 
-## Work Package WP04: Update All Test Files (Priority: P1)
+## Work Package WP03: Update All Test Files (Priority: P1)
 
 **Goal**: Update all 5 SCXML test files to use shared AST types (`Ast.ParseResult`, `StatechartDocument`, `StateNode`, `TransitionEdge`, `Ast.DataEntry`) instead of format-specific types. All tests must pass.
 **Independent Test**: `dotnet test` on `Frank.Statecharts.Tests` passes with zero failures for all SCXML test modules.
-**Prompt**: `/tasks/WP04-update-tests.md`
+**Prompt**: `/tasks/WP03-update-tests.md` (formerly WP04)
 **Estimated Lines**: ~500
 
 ### Included Subtasks
-- [ ] T022 Update `ParserTests.fs`: change opens to `Frank.Statecharts.Ast`, update all assertions (`.Document.Value` becomes `.Document`, `.States` becomes element extraction from `.Elements`, `.Transitions` becomes annotation/element lookup, `.Id` becomes `.Identifier`, `.DataEntries[].Id` becomes `.Name`)
-- [ ] T023 Update `GeneratorTests.fs`: change opens to `Frank.Statecharts.Ast`, rewrite all `ScxmlDocument`/`ScxmlState`/`ScxmlTransition` literals to `StatechartDocument`/`StateNode`/`TransitionEdge` construction with appropriate `ScxmlAnnotation` entries
-- [ ] T024 Update `RoundTripTests.fs`: change opens, rewrite `stripPositions`/`stripDocPositions` for `StateNode`/`StatechartDocument`/`TransitionEdge`, update round-trip comparison logic
-- [ ] T025 Update `ErrorTests.fs`: change opens, update assertions (`.Document` is always present on error -- check for empty elements; errors use `Ast.ParseFailure`)
-- [ ] T026 Update `TypeTests.fs`: remove tests for deleted types (`ScxmlDocument`, `ScxmlState`, `ScxmlTransition`, `ScxmlStateKind`, `DataEntry`), keep tests for retained types (`ScxmlTransitionType`, `ScxmlHistoryKind`), add tests for new `ScxmlMeta` cases
+- [ ] T023 Update `ParserTests.fs`: change opens to `Frank.Statecharts.Ast`, update all assertions (`.Document.Value` becomes `.Document`, `.States` becomes element extraction from `.Elements`, `.Transitions` becomes annotation/element lookup, `.Id` becomes `.Identifier`, `.DataEntries[].Id` becomes `.Name`)
+- [ ] T024 Update `GeneratorTests.fs`: change opens to `Frank.Statecharts.Ast`, rewrite all `ScxmlDocument`/`ScxmlState`/`ScxmlTransition` literals to `StatechartDocument`/`StateNode`/`TransitionEdge` construction with appropriate `ScxmlAnnotation` entries
+- [ ] T025 Update `RoundTripTests.fs`: change opens, rewrite `stripPositions`/`stripDocPositions` for `StateNode`/`StatechartDocument`/`TransitionEdge`, update round-trip comparison logic
+- [ ] T026 Update `ErrorTests.fs`: change opens, update assertions (`.Document` is always present on error -- check for empty elements; errors use `Ast.ParseFailure`)
+- [ ] T027 Update `TypeTests.fs`: remove tests for deleted types (`ScxmlDocument`, `ScxmlState`, `ScxmlTransition`, `ScxmlStateKind`, `DataEntry`), keep tests for retained types (`ScxmlTransitionType`, `ScxmlHistoryKind`), add tests for new `ScxmlMeta` cases
 
 ### Implementation Notes
 - **ParserTests key mapping**: `result.Document.Value.States.[0]` (ScxmlDocument) becomes extracting `StateDecl` entries from `result.Document.Elements`. Helper function recommended: `let stateDecls doc = doc.Elements |> List.choose (function StateDecl s -> Some s | _ -> None)`.
@@ -144,57 +122,57 @@
 - **RoundTripTests**: `stripPositions` must walk `StateNode` and `TransitionEdge` recursively. The comparison is on `StatechartDocument` not `ScxmlDocument`.
 
 ### Parallel Opportunities
-- [P] T022-T026 modify different test files and can proceed in parallel.
+- [P] T023-T027 modify different test files and can proceed in parallel.
 
 ### Dependencies
-- Depends on WP02 (parser migration) and WP03 (generator migration).
+- Depends on WP01 (parser migration) and WP02 (generator migration).
 
 ### Risks & Mitigations
 - Test count: 40+ test cases across 5 files. Risk of missing an assertion update. Mitigation: run `dotnet test` after each file update.
-- Round-trip tests depend on both parser and generator being migrated. If either WP02 or WP03 has issues, round-trip tests will fail.
+- Round-trip tests depend on both parser and generator being migrated. If either WP01 or WP02 has issues, round-trip tests will fail.
 
 ---
 
-## Work Package WP05: Type Cleanup, Mapper Deletion, and Build Verification (Priority: P2)
+## Work Package WP04: Type Cleanup and Build Verification (Priority: P2)
 
-**Goal**: Delete format-specific types from `Scxml/Types.fs`, delete `Scxml/Mapper.fs`, update `Frank.Statecharts.fsproj`, and verify clean build + all tests pass across all TFMs.
+**Goal**: Delete format-specific types from `Scxml/Types.fs`, verify `Scxml/Mapper.fs` was deleted (in WP01), update `Frank.Statecharts.fsproj`, and verify clean build + all tests pass across all TFMs.
 **Independent Test**: `dotnet build` with zero errors across net8.0/net9.0/net10.0; `dotnet test` with zero failures; `grep` confirms zero references to deleted types.
-**Prompt**: `/tasks/WP05-cleanup-and-verify.md`
+**Prompt**: `/tasks/WP04-cleanup-and-verify.md` (formerly WP05)
 **Estimated Lines**: ~350
 
 ### Included Subtasks
-- [ ] T027 Delete format-specific types from `Scxml/Types.fs`: remove `ScxmlDocument`, `ScxmlState`, `ScxmlTransition`, `ScxmlParseResult`, `ScxmlStateKind`, `DataEntry`, `ParseError`, `ParseWarning`. Retain `ScxmlTransitionType`, `ScxmlHistoryKind`, `SourcePosition` (if needed by parser internals).
-- [ ] T028 Delete `Scxml/Mapper.fs` from the filesystem
-- [ ] T029 Remove `<Compile Include="Scxml/Mapper.fs" />` from `Frank.Statecharts.fsproj`
-- [ ] T030 Verify no remaining references to deleted types via text search across entire `src/` and `test/` directories
-- [ ] T031 Run `dotnet build` on `Frank.Statecharts` across all 3 TFMs and verify zero errors
-- [ ] T032 Run `dotnet test` on `Frank.Statecharts.Tests` and verify zero failures
-- [ ] T033 Verify cross-format validator tests pass (validation test files that reference SCXML artifacts)
+- [ ] T028 Delete format-specific types from `Scxml/Types.fs`: remove `ScxmlDocument`, `ScxmlState`, `ScxmlTransition`, `ScxmlParseResult`, `ScxmlStateKind`, `DataEntry`, `ParseError`, `ParseWarning`. Retain `ScxmlTransitionType`, `ScxmlHistoryKind`, `SourcePosition` (if needed by parser internals).
+- [ ] T029 (Moved to WP01 as T016) -- verify Mapper.fs was deleted
+- [ ] T030 Verify `<Compile Include="Scxml/Mapper.fs" />` was removed from `Frank.Statecharts.fsproj` (done in WP01 T016)
+- [ ] T031 Verify no remaining references to deleted types via text search across entire `src/` and `test/` directories
+- [ ] T032 Run `dotnet build` on `Frank.Statecharts` across all 3 TFMs and verify zero errors
+- [ ] T033 Run `dotnet test` on `Frank.Statecharts.Tests` and verify zero failures
+- [ ] T034 Verify cross-format validator tests pass (validation test files that reference SCXML artifacts)
 
 ### Implementation Notes
 - `Scxml/Types.fs` should retain only the types needed for parser internals: `ScxmlTransitionType` (Internal/External), `ScxmlHistoryKind` (Shallow/Deep), and `SourcePosition` (struct used by parser for XML line info before converting to `Ast.SourcePosition`).
-- After deleting types from `Scxml/Types.fs`, check if `Parser.fs` still references any of the deleted types. It should not after WP02.
-- The `Mapper.fs` file should have zero references after WP02 (parser) and WP03 (generator) absorb its logic.
+- After deleting types from `Scxml/Types.fs`, check if `Parser.fs` still references any of the deleted types. It should not after WP01.
+- The `Mapper.fs` file was deleted in WP01. Verify it has zero references.
 - Text search patterns: `ScxmlDocument`, `ScxmlState `, `ScxmlTransition `, `ScxmlParseResult`, `ScxmlStateKind`, `Mapper\.toStatechartDocument`, `Mapper\.fromStatechartDocument`.
 - Cross-format validator (`Validation/Validator.fs`, `Validation/Types.fs`) references `Scxml` only as a `FormatTag` enum case -- this is unaffected.
 
 ### Parallel Opportunities
-- T027-T029 can be done together. T030-T033 are sequential verification steps.
+- T028-T030 can be done together. T031-T034 are sequential verification steps.
 
 ### Dependencies
-- Depends on WP02, WP03, and WP04 (all code must be migrated before types/files can be deleted).
+- Depends on WP01, WP02, and WP03 (all code must be migrated before types/files can be deleted).
 
 ### Risks & Mitigations
-- Deleting types that are still referenced will cause build failures. Mitigation: T030 text search before T031 build verification.
+- Deleting types that are still referenced will cause build failures. Mitigation: T031 text search before T032 build verification.
 - `SourcePosition` in `Scxml/Types.fs` conflicts with `Ast.SourcePosition`. After migration, if parser no longer needs the SCXML-specific `SourcePosition`, it can be deleted too. Check parser references.
 
 ---
 
 ## Dependency & Execution Summary
 
-- **Sequence**: WP01 -> WP02 + WP03 (parallel) -> WP04 -> WP05
-- **Parallelization**: WP02 (parser) and WP03 (generator) can proceed in parallel after WP01 completes.
-- **MVP Scope**: WP01 + WP02 + WP03 (core migration). WP04 + WP05 are required for completion but the migration logic is proven by WP02/WP03.
+- **Sequence**: WP01 -> WP02 -> WP03 -> WP04
+- **Parallelization**: WP02 (generator) can start as soon as WP01 completes. WP03 (tests) requires both WP01 and WP02. WP04 requires WP01+WP02+WP03.
+- **MVP Scope**: WP01 + WP02 (core migration). WP03 + WP04 are required for completion but the migration logic is proven by WP01/WP02.
 
 ---
 
@@ -209,29 +187,30 @@
 | T005 | Add ScxmlDatamodelType case | WP01 | P0 | No |
 | T006 | Add ScxmlBinding case | WP01 | P0 | No |
 | T007 | Add ScxmlInitial case | WP01 | P0 | No |
-| T008 | Fix existing pattern matches for new cases | WP01 | P0 | No |
-| T009 | Change Parser.fs module opens | WP02 | P1 | No |
-| T010 | Rewrite parseState for StateNode | WP02 | P1 | No |
-| T011 | Rewrite parseTransition for TransitionEdge | WP02 | P1 | No |
-| T012 | Rewrite parseHistory for StateNode | WP02 | P1 | No |
-| T013 | Rewrite parseDataEntries for Ast.DataEntry | WP02 | P1 | No |
-| T014 | Rewrite parseDocument for Ast.ParseResult | WP02 | P1 | No |
-| T015 | Update entry point return types | WP02 | P1 | No |
-| T016 | Change Generator.fs module opens | WP03 | P1 | No |
-| T017 | Rewrite generateState for StateNode | WP03 | P1 | No |
-| T018 | Rewrite generateTransition for TransitionEdge | WP03 | P1 | No |
-| T019 | Rewrite generateHistory for StateNode | WP03 | P1 | No |
-| T020 | Rewrite generateRoot for StatechartDocument | WP03 | P1 | No |
-| T021 | Rewrite generate/generateTo signatures | WP03 | P1 | No |
-| T022 | Update ParserTests.fs | WP04 | P1 | Yes |
-| T023 | Update GeneratorTests.fs | WP04 | P1 | Yes |
-| T024 | Update RoundTripTests.fs | WP04 | P1 | Yes |
-| T025 | Update ErrorTests.fs | WP04 | P1 | Yes |
-| T026 | Update TypeTests.fs | WP04 | P1 | Yes |
-| T027 | Delete format-specific types from Scxml/Types.fs | WP05 | P2 | No |
-| T028 | Delete Scxml/Mapper.fs | WP05 | P2 | No |
-| T029 | Remove Mapper.fs from fsproj | WP05 | P2 | No |
-| T030 | Verify no references to deleted types | WP05 | P2 | No |
-| T031 | Verify build across all TFMs | WP05 | P2 | No |
-| T032 | Verify all tests pass | WP05 | P2 | No |
-| T033 | Verify cross-format validator tests | WP05 | P2 | No |
+| T008 | Fix existing pattern matches for new cases (skip Mapper.fs) | WP01 | P0 | No |
+| T009 | Change Parser.fs module opens | WP01 | P0 | No |
+| T010 | Rewrite parseState for StateNode | WP01 | P0 | No |
+| T011 | Rewrite parseTransition for TransitionEdge | WP01 | P0 | No |
+| T012 | Rewrite parseHistory for StateNode | WP01 | P0 | No |
+| T013 | Rewrite parseDataEntries for Ast.DataEntry | WP01 | P0 | No |
+| T014 | Rewrite parseDocument for Ast.ParseResult | WP01 | P0 | No |
+| T015 | Update entry point return types | WP01 | P0 | No |
+| T016 | Delete Mapper.fs and remove from fsproj | WP01 | P0 | No |
+| T017 | Change Generator.fs module opens | WP02 | P1 | No |
+| T018 | Rewrite generateState for StateNode | WP02 | P1 | No |
+| T019 | Rewrite generateTransition for TransitionEdge | WP02 | P1 | No |
+| T020 | Rewrite generateHistory for StateNode | WP02 | P1 | No |
+| T021 | Rewrite generateRoot for StatechartDocument | WP02 | P1 | No |
+| T022 | Rewrite generate/generateTo signatures | WP02 | P1 | No |
+| T023 | Update ParserTests.fs | WP03 | P1 | Yes |
+| T024 | Update GeneratorTests.fs | WP03 | P1 | Yes |
+| T025 | Update RoundTripTests.fs | WP03 | P1 | Yes |
+| T026 | Update ErrorTests.fs | WP03 | P1 | Yes |
+| T027 | Update TypeTests.fs | WP03 | P1 | Yes |
+| T028 | Delete format-specific types from Scxml/Types.fs | WP04 | P2 | No |
+| T029 | (Moved to WP01 as T016) -- verify Mapper.fs deleted | WP04 | P2 | No |
+| T030 | Verify Mapper.fs removed from fsproj | WP04 | P2 | No |
+| T031 | Verify no references to deleted types | WP04 | P2 | No |
+| T032 | Verify build across all TFMs | WP04 | P2 | No |
+| T033 | Verify all tests pass | WP04 | P2 | No |
+| T034 | Verify cross-format validator tests | WP04 | P2 | No |

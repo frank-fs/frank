@@ -18,7 +18,7 @@ type ScxmlMeta =
 **New definition** (8 cases):
 ```fsharp
 type ScxmlMeta =
-    | ScxmlInvoke of invokeType: string * src: string option * id: string option
+    | ScxmlInvoke of invokeType: string option * src: string option * id: string option
     | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option
     | ScxmlNamespace of string
     | ScxmlTransitionType of internal: bool
@@ -29,7 +29,7 @@ type ScxmlMeta =
 ```
 
 **Migration impact on existing consumers**:
-- `ScxmlInvoke` gains a third parameter (`id`) -- existing pattern matches `ScxmlInvoke(t, s)` must be updated to `ScxmlInvoke(t, s, _)` or `ScxmlInvoke(t, s, id)`
+- `ScxmlInvoke` gains a third parameter (`id`) and `invokeType` changes from `string` to `string option` for source fidelity (matching `ScxmlInvoke.InvokeType` in `Scxml/Types.fs`) -- existing pattern matches `ScxmlInvoke(t, s)` must be updated to `ScxmlInvoke(t, s, _)` or `ScxmlInvoke(t, s, id)`
 - `ScxmlHistory` gains a third parameter (`defaultTarget`) -- existing pattern matches `ScxmlHistory(id, kind)` must be updated to `ScxmlHistory(id, kind, _)` or `ScxmlHistory(id, kind, dt)`
 - Affected files: `Scxml/Mapper.fs` (being deleted), any tests that pattern-match on these cases
 
@@ -53,6 +53,8 @@ type ScxmlMeta =
 | `SourcePosition` (struct) | Parser-internal use during XML parsing, before conversion to `Ast.SourcePosition` |
 | `ScxmlTransitionType` (DU: Internal/External) | Parser-internal: used during XML attribute parsing before converting to `ScxmlMeta.ScxmlTransitionType` annotation |
 | `ScxmlHistoryKind` (DU: Shallow/Deep) | Parser-internal: used during XML attribute parsing before converting to `Ast.HistoryKind` |
+
+**Naming note**: The `ScxmlMeta.ScxmlTransitionType` DU case (in `Ast/Types.fs`, carrying `internal: bool`) and the retained `Scxml.Types.ScxmlTransitionType` DU (Internal/External) may shadow each other when both `Frank.Statecharts.Ast` and `Frank.Statecharts.Scxml.Types` are open in the same file. When both are in scope, qualify references explicitly (e.g., `ScxmlMeta.ScxmlTransitionType` vs `Types.ScxmlTransitionType`). Alternatively, if convenient during implementation, consider renaming the `ScxmlMeta` case to `ScxmlInternalTransition` to avoid the ambiguity.
 
 ### Deleted Module
 
@@ -84,7 +86,7 @@ type ScxmlMeta =
 | `<transition type="external">` | -- | (no annotation, external is default) |
 | `<history id="..." type="deep">` | `StateNode.Kind = DeepHistory`, child of parent | `ScxmlAnnotation(ScxmlHistory("id", Deep, defaultTarget))` |
 | `<history id="..." type="shallow">` | `StateNode.Kind = ShallowHistory`, child of parent | `ScxmlAnnotation(ScxmlHistory("id", Shallow, defaultTarget))` |
-| `<invoke type="..." src="..." id="...">` | -- | `ScxmlAnnotation(ScxmlInvoke(type, src, id))` on parent state |
+| `<invoke type="..." src="..." id="...">` | -- | `ScxmlAnnotation(ScxmlInvoke(type option, src, id))` on parent state |
 | `<data id="..." expr="...">` | `DataEntry.Name`, `DataEntry.Expression` | -- |
 
 ### Generator: shared AST to SCXML elements

@@ -1,15 +1,16 @@
 ---
-work_package_id: WP04
+work_package_id: WP03
 title: Update All Test Files
 lane: planned
 dependencies:
+- WP01
 - WP02
 subtasks:
-- T022
 - T023
 - T024
 - T025
 - T026
+- T027
 phase: Phase 2 - Test Migration
 assignee: ''
 agent: ''
@@ -25,7 +26,7 @@ history:
 requirement_refs: [FR-029]
 ---
 
-# Work Package Prompt: WP04 -- Update All Test Files
+# Work Package Prompt: WP03 -- Update All Test Files
 
 ## Important: Review Feedback Status
 
@@ -51,12 +52,12 @@ Use language identifiers in code blocks: ````fsharp`, ````bash`
 
 ## Implementation Command
 
-This WP depends on both WP02 and WP03. Use the later WP as the base (or whichever was merged last):
+This WP depends on both WP01 and WP02. Use the later WP as the base (or whichever was merged last):
 ```bash
-spec-kitty implement WP04 --base WP03
+spec-kitty implement WP03 --base WP02
 ```
 
-If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is that both parser and generator migrations are complete before starting this WP.
+The key requirement is that both parser migration (in WP01) and generator migration (WP02) are complete before starting this WP.
 
 ---
 
@@ -95,7 +96,7 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T022 -- Update `ParserTests.fs`
+### Subtask T023 -- Update `ParserTests.fs`
 
 - **Purpose**: Migrate all parser test assertions from SCXML-specific types to shared AST types.
 - **Steps**:
@@ -146,7 +147,7 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
 - **Files**: `test/Frank.Statecharts.Tests/Scxml/ParserTests.fs`
 - **Notes**: This is the largest test file update (~35 test cases). Work through methodically. Run `dotnet build` after updating each test list to catch issues early.
 
-### Subtask T023 -- Update `GeneratorTests.fs`
+### Subtask T024 -- Update `GeneratorTests.fs`
 
 - **Purpose**: Migrate all generator test cases from constructing `ScxmlDocument`/`ScxmlState`/`ScxmlTransition` to constructing `StatechartDocument`/`StateNode`/`TransitionEdge`.
 - **Steps**:
@@ -157,7 +158,7 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
      open Frank.Statecharts.Scxml.Parser
      // Remove: open Frank.Statecharts.Scxml.Types
      ```
-  2. Add the same helper functions as in T022 (or reference a shared test utilities module if one exists).
+  2. Add the same helper functions as in T023 (or reference a shared test utilities module if one exists).
   3. Rewrite each test case's `ScxmlDocument` construction to `StatechartDocument` construction.
 
      **Example transformation** (US2-S1: generate basic states):
@@ -208,11 +209,11 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
   7. For tests with history nodes: history becomes a child `StateNode` with `Kind = DeepHistory/ShallowHistory` and `ScxmlAnnotation(ScxmlHistory(...))`.
   8. For tests with invoke nodes: invoke becomes `ScxmlAnnotation(ScxmlInvoke(...))` on the parent `StateNode`.
   9. For tests with data entries: use `Ast.DataEntry` with `.Name` instead of `.Id`.
-  10. Update assertions on re-parsed output (many tests do `generate doc |> parseString`): use the same helper functions from T022.
+  10. Update assertions on re-parsed output (many tests do `generate doc |> parseString`): use the same helper functions from T023.
 - **Files**: `test/Frank.Statecharts.Tests/Scxml/GeneratorTests.fs`
 - **Notes**: This file has ~14 test cases, each constructing a full document. The transformation is mechanical but verbose.
 
-### Subtask T024 -- Update `RoundTripTests.fs`
+### Subtask T025 -- Update `RoundTripTests.fs`
 
 - **Purpose**: Migrate round-trip tests to work with shared AST types.
 - **Steps**:
@@ -254,7 +255,7 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
 - **Files**: `test/Frank.Statecharts.Tests/Scxml/RoundTripTests.fs`
 - **Notes**: The round-trip tests are the strongest validation of the migration. If these pass, the migration is correct.
 
-### Subtask T025 -- Update `ErrorTests.fs`
+### Subtask T026 -- Update `ErrorTests.fs`
 
 - **Purpose**: Migrate error/warning test assertions from `ScxmlParseResult` to `Ast.ParseResult`.
 - **Steps**:
@@ -278,7 +279,7 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
 - **Files**: `test/Frank.Statecharts.Tests/Scxml/ErrorTests.fs`
 - **Notes**: Add the `stateDecls` helper or use inline extraction.
 
-### Subtask T026 -- Update `TypeTests.fs`
+### Subtask T027 -- Update `TypeTests.fs`
 
 - **Purpose**: Remove tests for deleted types, keep tests for retained types, add tests for new `ScxmlMeta` cases.
 - **Steps**:
@@ -366,6 +367,6 @@ If WP02 was merged after WP03, use `--base WP02` instead. The key requirement is
 To change a work package's lane, either:
 
 1. **Edit directly**: Change the `lane:` field in frontmatter AND append activity log entry (at the end)
-2. **Use CLI**: `spec-kitty agent tasks move-task WP04 --to <lane> --note "message"` (recommended)
+2. **Use CLI**: `spec-kitty agent tasks move-task WP03 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`

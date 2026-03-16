@@ -123,7 +123,7 @@ The cross-format validator works with SCXML artifacts that are now `StatechartDo
 - **FR-006**: Parser MUST preserve the transition `type` attribute (internal/external) as a `ScxmlAnnotation(ScxmlTransitionType(...))` on the `TransitionEdge`.
 - **FR-007**: Parser MUST preserve multi-target transitions by setting `TransitionEdge.Target` to the first target and attaching `ScxmlAnnotation(ScxmlMultiTarget(targets))` with the full target list.
 - **FR-008**: Parser MUST map `<history>` elements to child `StateNode` entries with `Kind = ShallowHistory` or `Kind = DeepHistory` and a `ScxmlAnnotation(ScxmlHistory(id, kind))` annotation.
-- **FR-009**: Parser MUST map `<invoke>` elements to `ScxmlAnnotation(ScxmlInvoke(type, src))` annotations on the parent `StateNode`, preserving invoke `id` via an extended `ScxmlInvoke` payload.
+- **FR-009**: Parser MUST map `<invoke>` elements to `ScxmlAnnotation(ScxmlInvoke(type, src, id))` annotations on the parent `StateNode`, preserving invoke `id` via the extended `ScxmlInvoke` payload. Note: the `invokeType` field changes from `string` to `string option` because the SCXML `type` attribute is optional (defaults to the platform-specific SCXML processor's default invocation type when omitted).
 - **FR-010**: Parser MUST map `<datamodel>/<data>` entries to `Ast.DataEntry` records with `Name` (from SCXML `id`), `Expression`, and `Position`.
 - **FR-011**: Parser MUST set `StatechartDocument.Title` from the SCXML `name` attribute and `StatechartDocument.InitialStateId` from the SCXML `initial` attribute (with fallback to first child state).
 - **FR-012**: Parser MUST preserve the SCXML `datamodel` attribute as `ScxmlAnnotation(ScxmlDatamodelType(...))` on the `StatechartDocument`.

@@ -107,7 +107,7 @@ Add 6 new cases to the existing `ScxmlMeta` DU in `Ast/Types.fs`:
 
 ```fsharp
 type ScxmlMeta =
-    | ScxmlInvoke of invokeType: string * src: string option * id: string option  // extended with id
+    | ScxmlInvoke of invokeType: string option * src: string option * id: string option  // extended with id, invokeType changed to option for source fidelity
     | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option  // extended with default transition
     | ScxmlNamespace of string  // existing, unchanged
     | ScxmlTransitionType of internal: bool  // NEW: true=internal, false=external

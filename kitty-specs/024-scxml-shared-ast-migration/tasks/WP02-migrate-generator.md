@@ -1,12 +1,12 @@
 ---
-work_package_id: "WP03"
+work_package_id: "WP02"
 subtasks:
-  - "T016"
   - "T017"
   - "T018"
   - "T019"
   - "T020"
   - "T021"
+  - "T022"
 title: "Migrate Generator to Shared AST"
 phase: "Phase 1 - Core Migration"
 lane: "planned"
@@ -25,7 +25,7 @@ history:
     action: "Prompt generated via /spec-kitty.tasks"
 ---
 
-# Work Package Prompt: WP03 -- Migrate Generator to Shared AST
+# Work Package Prompt: WP02 -- Migrate Generator to Shared AST
 
 ## Important: Review Feedback Status
 
@@ -51,9 +51,9 @@ Use language identifiers in code blocks: ````fsharp`, ````bash`
 
 ## Implementation Command
 
-This WP depends on WP01 (can proceed in parallel with WP02):
+This WP depends on WP01:
 ```bash
-spec-kitty implement WP03 --base WP01
+spec-kitty implement WP02 --base WP01
 ```
 
 ---
@@ -77,7 +77,7 @@ spec-kitty implement WP03 --base WP01
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T016 -- Change module opens
+### Subtask T017 -- Change module opens
 
 - **Purpose**: The generator must work with shared AST types.
 - **Steps**:
@@ -96,7 +96,7 @@ spec-kitty implement WP03 --base WP01
      ```
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
 
-### Subtask T017 -- Rewrite `generateState` for `StateNode`
+### Subtask T018 -- Rewrite `generateState` for `StateNode`
 
 - **Purpose**: The recursive state generator must accept `StateNode` and a transition lookup map, producing XML `<state>`, `<parallel>`, or `<final>` elements.
 - **Steps**:
@@ -182,7 +182,7 @@ spec-kitty implement WP03 --base WP01
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
 - **Notes**: The order of child elements matters for valid SCXML: datamodel, history, transitions, invoke, child states. Follow the existing generator's ordering.
 
-### Subtask T018 -- Rewrite `generateTransition` for `TransitionEdge`
+### Subtask T019 -- Rewrite `generateTransition` for `TransitionEdge`
 
 - **Purpose**: Generate a `<transition>` XML element from a `TransitionEdge`, extracting SCXML-specific data from annotations.
 - **Steps**:
@@ -226,7 +226,7 @@ spec-kitty implement WP03 --base WP01
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
 - **Notes**: The default transition type is external (no `type` attribute emitted). Only emit `type="internal"` when the annotation is present and `isInternal = true`.
 
-### Subtask T019 -- Rewrite `generateHistory` for `StateNode`
+### Subtask T020 -- Rewrite `generateHistory` for `StateNode`
 
 - **Purpose**: Generate a `<history>` XML element from a `StateNode` that has `Kind = ShallowHistory` or `Kind = DeepHistory`.
 - **Steps**:
@@ -269,7 +269,7 @@ spec-kitty implement WP03 --base WP01
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
 - **Notes**: The fallback path (no `ScxmlHistory` annotation) should be defensive. In normal round-trip flow, the annotation is always present.
 
-### Subtask T020 -- Rewrite `generateRoot` for `StatechartDocument`
+### Subtask T021 -- Rewrite `generateRoot` for `StatechartDocument`
 
 - **Purpose**: Generate the root `<scxml>` XML element from a `StatechartDocument`.
 - **Steps**:
@@ -330,7 +330,7 @@ spec-kitty implement WP03 --base WP01
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
 - **Notes**: The data entry field is `entry.Name` (shared AST) instead of `entry.Id` (SCXML-specific). This maps to the SCXML `<data id="...">` attribute.
 
-### Subtask T021 -- Rewrite `generate` and `generateTo` signatures
+### Subtask T022 -- Rewrite `generate` and `generateTo` signatures
 
 - **Purpose**: Update the public API to accept `StatechartDocument` and wire up the transition lookup.
 - **Steps**:
@@ -367,7 +367,7 @@ spec-kitty implement WP03 --base WP01
          xdoc.Save(writer)
      ```
 - **Files**: `src/Frank.Statecharts/Scxml/Generator.fs`
-- **Notes**: The function signatures are the only externally visible change. Test files will need updating (WP04) because they construct `ScxmlDocument` values to pass to `generate`.
+- **Notes**: The function signatures are the only externally visible change. Test files will need updating (WP03) because they construct `ScxmlDocument` values to pass to `generate`.
 
 ---
 
@@ -403,6 +403,6 @@ spec-kitty implement WP03 --base WP01
 To change a work package's lane, either:
 
 1. **Edit directly**: Change the `lane:` field in frontmatter AND append activity log entry (at the end)
-2. **Use CLI**: `spec-kitty agent tasks move-task WP03 --to <lane> --note "message"` (recommended)
+2. **Use CLI**: `spec-kitty agent tasks move-task WP02 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
