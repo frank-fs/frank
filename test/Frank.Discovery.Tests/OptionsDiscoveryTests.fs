@@ -20,6 +20,17 @@ type TestEndpointDataSource(endpoints: Endpoint[]) =
     override _.Endpoints = endpoints :> _
     override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
+/// Test extension to add DiscoveryMediaType metadata to a resource via the builder.
+[<AutoOpen>]
+module TestResourceBuilderExtensions =
+    type ResourceBuilder with
+        [<CustomOperation("discoveryMediaType")>]
+        member _.DiscoveryMediaType(spec: ResourceSpec, mediaType: string, rel: string) : ResourceSpec =
+            ResourceBuilder.AddMetadata(
+                spec,
+                fun b -> b.Metadata.Add({ MediaType = mediaType; Rel = rel }: DiscoveryMediaType)
+            )
+
 let simpleHandler : RequestDelegate =
     RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
 
@@ -169,12 +180,13 @@ let us1Tests =
                 "Without discovery middleware, OPTIONS should not return 200"
         }
 
-        testTask "resource with GET and POST and DiscoveryMediaType metadata returns correct response" {
+        testTask "resource with DiscoveryMediaType metadata returns Link headers" {
             let itemsResource =
                 resource "/items" {
                     name "Items"
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
                     post (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("created")))
+                    discoveryMediaType "application/ld+json" "describedby"
                 }
 
             let client = createDiscoveryTestServer [ itemsResource ]
@@ -187,6 +199,14 @@ let us1Tests =
             Expect.contains allowHeader "GET" "Allow header should contain GET"
             Expect.contains allowHeader "POST" "Allow header should contain POST"
             Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
+
+            // Verify Link header is emitted for the DiscoveryMediaType
+            let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
+            Expect.isNonEmpty linkHeaders "Link headers should be present"
+            let linkValue = linkHeaders |> String.concat ", "
+            Expect.stringContains linkValue "</items>" "Link header should contain the resource path"
+            Expect.stringContains linkValue "rel=\"describedby\"" "Link header should contain rel=describedby"
+            Expect.stringContains linkValue "type=\"application/ld+json\"" "Link header should contain media type"
 
             let! body = response.Content.ReadAsStringAsync()
             Expect.equal body "" "Response body should be empty (FR-013)"
