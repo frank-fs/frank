@@ -2,12 +2,12 @@
 work_package_id: "WP05"
 title: "New Shared AST Tests"
 phase: "Phase 3 - Validation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs:
   - "FR-001"
@@ -439,3 +439,4 @@ open Frank.Statecharts.Ast
 ## Activity Log
 
 - 2026-03-15T23:59:08Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T11:45:29Z – unknown – lane=done – Moved to done
