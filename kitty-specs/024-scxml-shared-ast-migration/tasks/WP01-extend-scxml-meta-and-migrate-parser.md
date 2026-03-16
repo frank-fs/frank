@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Extend ScxmlMeta DU + Migrate Parser to Shared AST
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 2c8d91f0f1fe2b6bc3c8f334aa5d366779bd4ec9
@@ -564,3 +564,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T22:51:46Z – claude-opus – shell_pid=26098 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T22:57:38Z – claude-opus – shell_pid=26098 – lane=for_review – Ready for review: Extended ScxmlMeta DU with 5 new cases and 2 extended cases, migrated SCXML parser to produce Ast.ParseResult directly, deleted Mapper.fs. Build passes on all 3 TFMs with 0 warnings/errors.
