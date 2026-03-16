@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Self-Consistency Validation Rules
-lane: doing
+lane: "planned"
 dependencies: [WP02]
 base_branch: 021-cross-format-validator-WP02
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
@@ -17,8 +17,9 @@ phase: Phase 1 - Core Rules
 assignee: ''
 agent: claude-opus
 shell_pid: '14982'
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/fix-lane.md"
 history:
 - timestamp: '2026-03-15T23:59:11Z'
   lane: planned
@@ -42,11 +43,13 @@ requirement_refs: [FR-010, FR-011, FR-014, FR-017]
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/fix-lane.md`
 
-*[This section is empty initially.]*
+**Issue**: Manually correcting lane status to done
 
----
 
 ## Markdown Formatting
 Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
@@ -352,3 +355,4 @@ Depends on WP02 (AstHelpers and Validator.validate must exist).
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:31:44Z – claude-opus – shell_pid=14982 – lane=doing – Started implementation via workflow command
+- 2026-03-16T14:34:44Z – claude-opus – shell_pid=14982 – lane=planned – Moved to planned
