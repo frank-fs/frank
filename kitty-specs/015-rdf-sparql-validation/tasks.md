@@ -70,7 +70,7 @@
 - [x] T009 Implement US1-SC2: Turtle parsing test (load `text/turtle` response into graph, verify isomorphism with JSON-LD graph) -- FR-002, FR-004
 - [x] T010 Implement US1-SC3: RDF/XML parsing test (load `application/rdf+xml` response into graph, verify isomorphism with JSON-LD and Turtle graphs) -- FR-003, FR-004
 - [x] T011 Implement US1-SC4: Namespace prefix resolution test (verify all prefixed namespaces resolve to valid URIs, no undefined-prefix errors) -- FR-012
-- [ ] T012 Edge case: empty resource definition produces parseable (empty/minimal) graph without errors
+- [x] T012 Edge case: empty resource definition produces parseable (empty/minimal) graph without errors
 
 ### Implementation Notes
 - Use `GraphDiff` (`graph1.Difference(graph2)`) for isomorphism checks -- handles blank node renaming (Research R2)
