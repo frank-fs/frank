@@ -169,6 +169,6 @@ A developer receives a validation failure and can immediately understand what we
 - The validator is a library component. It does not provide a CLI interface; `frank-cli validate` (#94) consumes the `ValidationReport` and handles presentation.
 - Format artifacts are produced by `frank-cli compile` (#94) at build time. The validator receives pre-parsed `StatechartDocument` instances, not raw format text.
 - The `ValidationRule` contract is a simple function signature, not an interface or class hierarchy. This keeps the design idiomatic to F# and minimizes ceremony for rule authors.
-- Cross-format checks are defined per format pair (e.g., ALPS-vs-XState, SCXML-vs-smcat). There are no three-way or higher-order checks; complex invariants decompose into pairwise checks.
+- Cross-format checks are defined per format pair. The 10 pairwise combinations from 5 formats (5 choose 2) are: Wsd-Alps, Wsd-Scxml, Wsd-Smcat, Wsd-XState, Alps-Scxml, Alps-Smcat, Alps-XState, Scxml-Smcat, Scxml-XState, Smcat-XState. There are no three-way or higher-order checks; complex invariants decompose into pairwise checks.
 - State name, event name, and identifier comparisons are case-sensitive. Different casing between formats is treated as a mismatch.
 - The validator does not modify artifacts. It is a pure read-only operation that produces a report.

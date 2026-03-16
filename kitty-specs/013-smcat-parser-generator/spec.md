@@ -129,7 +129,7 @@ A developer submits malformed smcat text. Instead of a generic error, the parser
 - Transition labels with only an event (no guard, no action) are parsed correctly
 - Transition labels with only a guard (no event, no action) are parsed correctly
 - Transition labels with only an action (no event, no guard) are parsed correctly
-- Pseudo-state detection by naming convention: `initial`, `final`, `history`, `deep.history`, names starting with `^` (choice), names starting with `]` (fork/join)
+- Pseudo-state detection by naming convention: `initial`, `final`, `history`, `deep.history`, `terminate`, names starting with `^` (choice), names starting with `]` (fork/join)
 - Composite states with nested state machines parse recursively
 - Parallel composite states (name contains "parallel") with comma-separated regions
 - State activities (`entry/`, `exit/`, `...`) are preserved in the AST
@@ -149,7 +149,7 @@ A developer submits malformed smcat text. Instead of a generic error, the parser
 - **FR-001**: System MUST tokenize all smcat syntax elements into a flat token stream: state identifiers (plain and quoted), transition arrows (`=>`), colons, semicolons, commas, square brackets, forward slashes, curly braces, hash comments, attribute key-value pairs, and newlines
 - **FR-002**: System MUST parse the token stream into a typed F# AST using discriminated unions, producing an `SmcatDocument` record containing an ordered list of `SmcatElement` nodes
 - **FR-003**: System MUST parse transition labels in the format `event [guard] / action`, where each component (event, guard, action) is optional
-- **FR-004**: System MUST recognize pseudo-states by naming convention: states named or containing `initial` are initial states; states named or containing `final` are final states; states containing `history` are history states; states starting with `^` are choice pseudo-states; states starting with `]` are fork/join/junction pseudo-states
+- **FR-004**: System MUST recognize pseudo-states by naming convention: states named or containing `initial` are initial states; states named or containing `final` are final states; states containing `history` are history states; states starting with `^` are choice pseudo-states; states starting with `]` are fork/join/junction pseudo-states; states named or containing `terminate` are terminate pseudo-states
 - **FR-005**: System MUST parse composite (nested) state declarations containing inner state machines within `{ ... }` blocks, supporting arbitrary nesting depth
 - **FR-006**: System MUST parse state activities (`entry/`, `exit/`, and `...` do activities) from explicit state declarations into structured fields on the AST node
 - **FR-007**: System MUST parse state and transition attributes in `[key=value key2=value2]` format, preserving them as ordered key-value pairs on the AST node

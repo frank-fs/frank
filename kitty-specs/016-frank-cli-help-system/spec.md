@@ -32,7 +32,7 @@ An LLM coding agent is given `frank-cli` as a tool and needs to determine the co
 
 1. **Given** a fresh installation of frank-cli, **When** `frank-cli help workflows` is invoked, **Then** the output describes the end-to-end pipeline (extract -> clarify -> validate -> compile) with clear sequencing and prerequisite information.
 2. **Given** an LLM agent with no prior knowledge of frank-cli, **When** the agent reads the `help workflows` output, **Then** the agent can determine that `extract` must be run before `compile` and that `clarify` is optional.
-3. **Given** `frank-cli help workflows` is invoked with `--format json`, **When** the output is parsed, **Then** each command entry includes its step number, prerequisites list, next steps list, and whether it is optional.
+3. **Given** `frank-cli help workflows` is invoked with `--format json`, **When** the output is parsed, **Then** each command entry includes its step number, prerequisites list, next steps list, and whether it is optional, and the output includes a `totalSteps` field derived from the count of commands with `StepNumber > 0`.
 
 ---
 
@@ -161,7 +161,7 @@ Every command registered in frank-cli has complete help metadata: a summary, at 
 ### Key Entities
 
 - **CommandHelp**: A structured record associating a command name with its summary, examples, workflow position, and contextual explanation. One record per registered command.
-- **WorkflowPosition**: Metadata describing where a command sits in the pipeline -- its step number, prerequisite commands, next-step commands, and whether it is optional.
+- **WorkflowPosition**: Metadata describing where a command sits in the pipeline -- its step number, prerequisite commands, next-step commands, and whether it is optional. Note: `TotalSteps` is not stored in this record; it is derived at render time from the count of commands with `StepNumber > 0` (i.e., commands that are part of the pipeline workflow, excluding utility commands like `help` and `status`).
 - **HelpTopic**: A named documentation article (e.g., "workflows", "concepts") with a summary and body content. Discoverable via `frank-cli help`.
 - **ProjectStatus**: The result of inspecting a project's state, including extraction presence, staleness, artifact presence, and recommended next action.
 
