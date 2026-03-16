@@ -6,7 +6,7 @@ subtasks:
   - "T008"
 title: "OPTIONS Discovery Middleware"
 phase: "Phase 1 - Core Implementation"
-lane: "doing"
+lane: "done"
 assignee: ""
 agent: "claude-opus"
 shell_pid: "61472"
@@ -427,3 +427,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 - 2026-03-16T04:37:55Z – claude-opus – shell_pid=16154 – lane=planned – Moved to planned
 - 2026-03-16T11:49:04Z – claude-opus – shell_pid=16154 – lane=for_review – Moved to for_review
 - 2026-03-16T11:49:09Z – claude-opus – shell_pid=61472 – lane=doing – Started review via workflow command
+- 2026-03-16T11:52:28Z – claude-opus – shell_pid=61472 – lane=done – Review passed: All 3 prior issues resolved. Link headers now emitted from DiscoveryMediaType metadata (FR-002). Path-based matching kept with documented design decision (ctx.GetEndpoint() returns null for implicit OPTIONS). Test properly adds DiscoveryMediaType metadata and verifies Link headers. Build succeeds, all 8 tests pass. FR-001/002/006/007/008/009/013 all covered.
