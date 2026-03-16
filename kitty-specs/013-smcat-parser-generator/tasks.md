@@ -64,7 +64,7 @@
 - [x] T008 Implement punctuation and arrow tokenization (=>, :, ;, ,, [, ], {, }, /, =)
 - [x] T009 Implement comment handling (# lines), whitespace skipping, and newline handling (\r\n and \n)
 - [x] T010 Implement activity keyword detection (entry/, exit/, ...) and caret/close-bracket prefix tokens
-- [ ] T011 [P] Create `test/Frank.Statecharts.Tests/Smcat/LexerTests.fs` with comprehensive token tests
+- [x] T011 [P] Create `test/Frank.Statecharts.Tests/Smcat/LexerTests.fs` with comprehensive token tests
 
 ### Implementation Notes
 - Follow WSD Lexer.fs mutable scanning pattern: `pos`, `line`, `col` variables, `peek()`, `advance()`, `newline()`, `makeToken()` inline helpers
