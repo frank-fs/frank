@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Rendering and Output
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 base_branch: 016-frank-cli-help-system-WP01
@@ -555,3 +555,4 @@ module HelpRenderer =
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T11:46:56Z – claude-opus – shell_pid=60524 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T11:50:46Z – claude-opus – shell_pid=60524 – lane=for_review – Ready for review: HelpRenderer.fs created with text/JSON rendering for enriched --help sections. TextOutput.fs and JsonOutput.fs extended with formatStatusResult, formatHelpIndex, formatTopicText/Json, formatNoMatch. Build succeeds with 0 warnings.
