@@ -1,6 +1,11 @@
 module internal Frank.Statecharts.Wsd.GuardParser
 
-open Frank.Statecharts.Wsd.Types
+open Frank.Statecharts.Ast
+
+/// Internal WSD parse helper -- NOT part of the shared AST.
+type GuardAnnotation =
+    { Pairs: (string * string) list
+      Position: SourcePosition }
 
 /// Try to parse a guard annotation from the beginning of content.
 /// Returns (guard option, remaining text, errors, warnings).
@@ -47,8 +52,9 @@ let tryParseGuard
                 // Unclosed bracket
                 let failure =
                     { Position =
-                        { Line = position.Line
-                          Column = baseCol }
+                        Some
+                            { Line = position.Line
+                              Column = baseCol }
                       Description = "Unclosed guard annotation bracket"
                       Expected = "Closing ']' bracket"
                       Found = trimmed
@@ -68,8 +74,9 @@ let tryParseGuard
                     // Empty guard
                     let warning =
                         { Position =
-                            { Line = position.Line
-                              Column = baseCol + prefixLen }
+                            Some
+                                { Line = position.Line
+                                  Column = baseCol + prefixLen }
                           Description = "Empty guard annotation"
                           Suggestion = Some "Add key=value pairs or remove the guard annotation" }
 
@@ -110,8 +117,9 @@ let tryParseGuard
                                 // Missing equals
                                 let failure =
                                     { Position =
-                                        { Line = position.Line
-                                          Column = partCol }
+                                        Some
+                                            { Line = position.Line
+                                              Column = partCol }
                                       Description = "Missing '=' in guard pair"
                                       Expected = "key=value"
                                       Found = partTrimmed
@@ -122,8 +130,9 @@ let tryParseGuard
                                 // Empty key
                                 let failure =
                                     { Position =
-                                        { Line = position.Line
-                                          Column = partCol }
+                                        Some
+                                            { Line = position.Line
+                                              Column = partCol }
                                       Description = "Empty key in guard annotation"
                                       Expected = "key=value"
                                       Found = partTrimmed
@@ -137,8 +146,9 @@ let tryParseGuard
                                 if value.Length = 0 then
                                     let warning =
                                         { Position =
-                                            { Line = position.Line
-                                              Column = partCol + eqIdx + 1 }
+                                            Some
+                                                { Line = position.Line
+                                                  Column = partCol + eqIdx + 1 }
                                           Description = "Empty value in guard annotation"
                                           Suggestion = Some("Provide a value for key '" + key + "'") }
 

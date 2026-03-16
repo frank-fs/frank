@@ -63,6 +63,7 @@ type WsdNotePosition =
 type WsdMeta =
     | WsdTransitionStyle of TransitionStyle
     | WsdNotePosition of WsdNotePosition
+    | WsdGuardData of pairs: (string * string) list
 
 // -- ALPS annotation stub (D-010) --
 
