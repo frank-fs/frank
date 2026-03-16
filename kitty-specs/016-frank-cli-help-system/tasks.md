@@ -20,8 +20,8 @@
 **Estimated Prompt Size**: ~350 lines
 
 ### Included Subtasks
-- [x] T001 Create `src/Frank.Cli.Core/Help/HelpTypes.fs` with CommandExample, WorkflowPosition, CommandHelp, HelpTopic, HelpLookupResult types
-- [ ] T002 Create `src/Frank.Cli.Core/Help/FuzzyMatch.fs` with Levenshtein distance and suggestion ranking
+- [ ] T001 Create `src/Frank.Cli.Core/Help/HelpTypes.fs` with CommandExample, WorkflowPosition, CommandHelp, HelpTopic, HelpLookupResult types
+- [x] T002 Create `src/Frank.Cli.Core/Help/FuzzyMatch.fs` with Levenshtein distance and suggestion ranking
 - [ ] T003 Create `src/Frank.Cli.Core/Commands/StalenessChecker.fs` with StalenessResult type, computeFileHash, and checkStaleness extracted from ValidateCommand
 - [ ] T004 Add ProjectStatus types (ExtractionStatus, ArtifactStatus, RecommendedAction, ProjectStatus record) to HelpTypes.fs
 - [ ] T005 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entries for HelpTypes.fs, FuzzyMatch.fs, StalenessChecker.fs in correct dependency order
