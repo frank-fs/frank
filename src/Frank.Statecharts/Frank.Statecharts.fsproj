@@ -36,6 +36,9 @@
     <Compile Include="Scxml/Types.fs" />
     <Compile Include="Scxml/Parser.fs" />
     <Compile Include="Scxml/Generator.fs" />
+    <!-- Validation -->
+    <Compile Include="Validation/Types.fs" />
+    <Compile Include="Validation/Validator.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->
     <Compile Include="StatefulResourceBuilder.fs" />
     <Compile Include="Wsd/Generator.fs" />
