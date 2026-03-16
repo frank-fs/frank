@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Setup & Test Infrastructure
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: d0ed8bb62575e9d52e9fe9de644a04f0b45a5b20
@@ -15,8 +15,8 @@ subtasks:
 - T006
 phase: Phase 0 - Foundation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "98946"
+agent: "claude-opus-reviewer"
+shell_pid: "6455"
 review_status: ''
 reviewed_by: ''
 history:
@@ -415,3 +415,4 @@ This ensures the project compiles even before the test modules are implemented.
 - 2026-03-15T23:59:02Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:03:06Z – claude-opus – shell_pid=98946 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:16:59Z – claude-opus – shell_pid=98946 – lane=for_review – Ready for review: Project compiles with 0 warnings/errors, Expecto entry point runs, TestHelpers.fs provides createTestHost, RDF loading (Turtle/RDF-XML/JSON-LD), and SPARQL execution helpers
+- 2026-03-16T04:18:47Z – claude-opus-reviewer – shell_pid=6455 – lane=doing – Started review via workflow command
