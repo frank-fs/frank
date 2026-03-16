@@ -65,8 +65,8 @@
 - [x] T008 Implement top-level parseAlpsJson function in `src/Frank.Statecharts/Alps/JsonParser.fs` -- parse root `alps` object, `version`, `doc` element
 - [x] T009 Implement descriptor parsing in JsonParser.fs -- `id`, `type` (defaulting to Semantic), `href`, `rt`, nested `descriptor` array, `ext` array, `link` array, `doc` element
 - [x] T010 Implement error handling in JsonParser.fs -- wrap `JsonDocument.Parse` in try/catch for `JsonException`, collect schema errors for missing fields, return `Result<AlpsDocument, AlpsParseError list>`
-- [ ] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
-- [ ] T012 Create `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` -- tic-tac-toe golden file test, onboarding golden file test
+- [x] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
+- [x] T012 Create `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` -- tic-tac-toe golden file test, onboarding golden file test
 - [ ] T013 [P] Add edge case tests in JsonParserTests.fs -- empty document, missing type defaults to semantic, forward-compatible unknown properties, unicode characters, large documents
 - [ ] T014 [P] Add error case tests in JsonParserTests.fs -- malformed JSON, missing alps root, invalid structure
 
