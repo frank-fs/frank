@@ -60,7 +60,7 @@
 - [x] T005 Implement `<state>`, `<final>`, `<parallel>` element parsing with `ScxmlStateKind` derivation (Simple/Compound/Parallel/Final), recursive child state parsing
 - [x] T006 Implement `<transition>` parsing: extract `event`, `cond`, `target` (space-split into list), `type` (default External) attributes
 - [x] T009 Implement initial state inference (when `<scxml>` has no `initial` attribute, use first child state ID per W3C section 3.2) and compound state detection (state with child states -> Compound)
-- [ ] T012 Update `Frank.Statecharts.fsproj` to add `Scxml/Parser.fs` compile entry after `Scxml/Types.fs`
+- [x] T012 Update `Frank.Statecharts.fsproj` to add `Scxml/Parser.fs` compile entry after `Scxml/Types.fs`
 
 ### Implementation Notes
 - Module: `module internal Frank.Statecharts.Scxml.Parser`
