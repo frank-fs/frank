@@ -6,8 +6,8 @@ lane: "planned"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs:
   - "FR-005"
@@ -22,6 +22,7 @@ subtasks:
   - "T014"
   - "T015"
   - "T016"
+review_feedback_file: "/private/tmp/fix-lane.md"
 history:
   - timestamp: "2026-03-16T00:05:00Z"
     lane: "planned"
@@ -44,11 +45,13 @@ history:
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/fix-lane.md`
 
-*[This section is empty initially. Reviewers will populate it if the work is returned from review.]*
+**Issue**: Manually correcting lane status to done
 
----
 
 ## Implementation Command
 
@@ -414,3 +417,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP02 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T14:34:43Z – unknown – lane=planned – Moved to planned
