@@ -15,7 +15,7 @@ subtasks:
 - T012
 phase: Phase 1b - Generator
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "98705"
 review_status: ''
 reviewed_by: ''
@@ -411,3 +411,4 @@ let turnstileHandlerMap =
 ## Activity Log
 
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:51Z – claude-opus – shell_pid=98705 – lane=doing – Assigned agent via workflow command
