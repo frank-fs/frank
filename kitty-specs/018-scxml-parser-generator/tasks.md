@@ -28,7 +28,7 @@
 
 ### Included Subtasks
 - [x] T001 Create `src/Frank.Statecharts/Scxml/Types.fs` with all SCXML-specific parse types (SourcePosition, ScxmlTransitionType, ScxmlHistoryKind, ScxmlStateKind, DataEntry, ScxmlTransition, ScxmlHistory, ScxmlInvoke, ScxmlState, ScxmlDocument, ParseError, ParseWarning, ScxmlParseResult)
-- [ ] T002 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to add `Scxml/Types.fs` compile entry (before Wsd entries)
+- [x] T002 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to add `Scxml/Types.fs` compile entry (before Wsd entries)
 
 ### Implementation Notes
 - Follow the existing `Wsd/Types.fs` pattern: `module internal Frank.Statecharts.Scxml.Types`
