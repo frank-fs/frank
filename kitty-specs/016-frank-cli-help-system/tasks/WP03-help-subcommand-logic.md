@@ -15,7 +15,7 @@ subtasks:
 - T017
 phase: Phase 2 - Content and Logic
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "16238"
 review_status: ''
 reviewed_by: ''
@@ -263,3 +263,4 @@ module HelpSubcommand =
 ## Activity Log
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:33:01Z – claude-opus – shell_pid=16238 – lane=doing – Assigned agent via workflow command
