@@ -47,6 +47,10 @@ Auto-generated from all feature plans. Last updated: 2026-01-25
 - N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
 - F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + `System.Xml.Linq` (in-framework), `System.Xml` (for `IXmlLineInfo`, `XmlException`) (018-scxml-parser-generator)
 - N/A (stateless parser/generator library) (018-scxml-parser-generator)
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
+- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
+- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank core (project reference), Microsoft.AspNetCore.App (framework reference) (019-options-link-discovery)
+- N/A (metadata is compile-time/startup-time configuration) (019-options-link-discovery)
 ## Project Structure
 
 ```text
@@ -63,8 +67,8 @@ tests/
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
 ## Recent Changes
-- 018-scxml-parser-generator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + `System.Xml.Linq` (in-framework), `System.Xml` (for `IXmlLineInfo`, `XmlException`)
+- 019-options-link-discovery: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank core (project reference), Microsoft.AspNetCore.App (framework reference)
 - 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
-- 016-frank-cli-help-system: Added F# 8.0+ targeting .NET 10.0 (single target, matching Frank.Cli and Frank.Cli.Core) + System.CommandLine 2.0.3 (added to Frank.Cli.Core), existing Frank.Cli.Core infrastructure
+- 018-scxml-parser-generator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + `System.Xml.Linq` (in-framework), `System.Xml` (for `IXmlLineInfo`, `XmlException`)
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
