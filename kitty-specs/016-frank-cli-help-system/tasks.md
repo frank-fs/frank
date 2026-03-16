@@ -119,13 +119,13 @@
 **Estimated Prompt Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T018 Create `src/Frank.Cli.Core/Help/HelpRenderer.fs` with text rendering for WORKFLOW, EXAMPLES, and CONTEXT sections
-- [ ] T019 [P] Add JSON rendering to HelpRenderer.fs for enriched help sections
-- [ ] T020 Extend `src/Frank.Cli.Core/Output/TextOutput.fs` with `formatStatusResult` and `formatHelpOutput` functions
-- [ ] T021 [P] Extend `src/Frank.Cli.Core/Output/JsonOutput.fs` with `formatStatusResult` and `formatHelpOutput` functions
-- [ ] T022 Add text rendering for help index (no-argument case), topic display, and "did you mean?" output in HelpRenderer.fs
-- [ ] T023 Add JSON rendering for help index, topic display, and "did you mean?" output in HelpRenderer.fs
-- [ ] T024 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entry for HelpRenderer.fs
+- [x] T018 Create `src/Frank.Cli.Core/Help/HelpRenderer.fs` with text rendering for WORKFLOW, EXAMPLES, and CONTEXT sections
+- [x] T019 [P] Add JSON rendering to HelpRenderer.fs for enriched help sections
+- [x] T020 Extend `src/Frank.Cli.Core/Output/TextOutput.fs` with `formatStatusResult` and `formatHelpOutput` functions
+- [x] T021 [P] Extend `src/Frank.Cli.Core/Output/JsonOutput.fs` with `formatStatusResult` and `formatHelpOutput` functions
+- [x] T022 Add text rendering for help index (no-argument case), topic display, and "did you mean?" output in HelpRenderer.fs
+- [x] T023 Add JSON rendering for help index, topic display, and "did you mean?" output in HelpRenderer.fs
+- [x] T024 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entry for HelpRenderer.fs
 
 ### Implementation Notes
 - Output format must exactly match `contracts/cli-outputs.md` (section headers uppercase, spacing, indentation).
