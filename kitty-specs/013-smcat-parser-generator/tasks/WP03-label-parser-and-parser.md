@@ -1,30 +1,33 @@
 ---
-work_package_id: "WP03"
+work_package_id: WP03
+title: LabelParser & Parser
+lane: "doing"
+dependencies: [WP02]
+base_branch: 013-smcat-parser-generator-WP02
+base_commit: 60c578d302419ad1e2329f103e71ed6539970372
+created_at: '2026-03-16T04:31:54.360856+00:00'
 subtasks:
-  - "T012"
-  - "T013"
-  - "T014"
-  - "T015"
-  - "T016"
-  - "T017"
-  - "T018"
-  - "T019"
-title: "LabelParser & Parser"
-phase: "Phase 1 - Core Parsing"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02"]
-requirement_refs: ["FR-002", "FR-003", "FR-005", "FR-006", "FR-007", "FR-008"]
+- T012
+- T013
+- T014
+- T015
+- T016
+- T017
+- T018
+- T019
+phase: Phase 1 - Core Parsing
+assignee: ''
+agent: ''
+shell_pid: "15237"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:14Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:14Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-002, FR-003, FR-005, FR-006, FR-007, FR-008]
 ---
 
 # Work Package Prompt: WP03 -- LabelParser & Parser
