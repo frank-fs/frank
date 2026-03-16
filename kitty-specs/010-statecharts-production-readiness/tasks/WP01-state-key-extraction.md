@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: State Key Extraction
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
@@ -290,3 +290,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:02:08Z – claude-opus – shell_pid=97668 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:15:43Z – claude-opus – shell_pid=97668 – lane=for_review – Ready for review: StateKeyExtractor with PreComputeUnionTagReader replaces ToString(). All 262 tests pass across net8.0/net9.0/net10.0.
