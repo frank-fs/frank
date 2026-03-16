@@ -137,10 +137,10 @@
 ### Included Subtasks
 - [ ] T018 Create `test/Frank.RdfValidation.Tests/ProvenanceGraphTests.fs` with module structure and test list
 - [ ] T019 Implement US3-SC1: Load resource and provenance RDF into named graphs, verify SPARQL against provenance graph returns only PROV-O triples -- FR-009, FR-010
-- [ ] T020 Implement US3-SC2: SPARQL query for `prov:Activity` instances with agents and timestamps in provenance named graph -- FR-010
-- [ ] T021 Implement US3-SC3: Multiple resources' provenance scoped to own named graphs (no cross-resource leakage) -- FR-009
-- [ ] T022 Implement US3-SC4: SPARQL GRAPH clause targets specific provenance named graph, returns only that graph's triples -- FR-010
-- [ ] T023 Edge case: provenance enabled but no state transitions -- provenance named graph exists but is empty, SPARQL returns empty results (not errors)
+- [x] T020 Implement US3-SC2: SPARQL query for `prov:Activity` instances with agents and timestamps in provenance named graph -- FR-010
+- [x] T021 Implement US3-SC3: Multiple resources' provenance scoped to own named graphs (no cross-resource leakage) -- FR-009
+- [x] T022 Implement US3-SC4: SPARQL GRAPH clause targets specific provenance named graph, returns only that graph's triples -- FR-010
+- [x] T023 Edge case: provenance enabled but no state transitions -- provenance named graph exists but is empty, SPARQL returns empty results (not errors)
 
 ### Implementation Notes
 - Use `TripleStore` with named graphs and `InMemoryDataset` for SPARQL execution (Research R1, R4)
@@ -171,7 +171,7 @@
 **Dependencies**: Depends on WP01
 
 ### Included Subtasks
-- [ ] T024 Create `test/Frank.RdfValidation.Tests/GraphCoherenceTests.fs` with module structure and test list
+- [x] T024 Create `test/Frank.RdfValidation.Tests/GraphCoherenceTests.fs` with module structure and test list
 - [ ] T025 Implement US4-SC1: Cross-resource link traversal -- SPARQL query traverses link relation from resource A to resource B, target URI matches subject URI -- FR-008
 - [ ] T026 Implement US4-SC2: Orphaned blank node detection -- SPARQL query finds blank nodes not referenced by named resources, expects zero results -- FR-011
 - [ ] T027 Implement US4-SC3: Consistent namespace predicates -- SPARQL query checks all distinct predicates use consistent namespace prefixes -- FR-012
