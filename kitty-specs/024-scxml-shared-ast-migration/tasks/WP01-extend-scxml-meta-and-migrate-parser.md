@@ -1,43 +1,46 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-  - "T014"
-  - "T015"
-  - "T016"
-title: "Extend ScxmlMeta DU + Migrate Parser to Shared AST"
-phase: "Phase 0+1 - Foundation & Parser Migration"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Extend ScxmlMeta DU + Migrate Parser to Shared AST
+lane: "doing"
 dependencies: []
-requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-028]
+base_branch: master
+base_commit: 2c8d91f0f1fe2b6bc3c8f334aa5d366779bd4ec9
+created_at: '2026-03-16T22:51:46.152807+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+- T008
+- T009
+- T010
+- T011
+- T012
+- T013
+- T014
+- T015
+- T016
+phase: Phase 0+1 - Foundation & Parser Migration
+assignee: ''
+agent: ''
+shell_pid: "26098"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:26:17Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
-  - timestamp: "2026-03-16T23:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Merged old WP01 (extend ScxmlMeta) and old WP02 (migrate parser) into single atomic WP. Eliminates transitional Mapper.fs fix issue."
+- timestamp: '2026-03-16T19:26:17Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+- timestamp: '2026-03-16T23:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Merged old WP01 (extend ScxmlMeta) and old WP02 (migrate parser) into single atomic WP. Eliminates transitional Mapper.fs fix issue.
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-028]
 ---
 
 # Work Package Prompt: WP01 -- Extend ScxmlMeta DU + Migrate Parser to Shared AST
