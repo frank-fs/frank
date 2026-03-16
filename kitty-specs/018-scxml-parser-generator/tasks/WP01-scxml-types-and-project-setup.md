@@ -1,24 +1,27 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-title: "SCXML Types and Project Setup"
-phase: "Phase 1 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: SCXML Types and Project Setup
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-024"]
+base_branch: master
+base_commit: 64a2cc78c24e4febcd6631dd8f37f8405a4269d8
+created_at: '2026-03-16T04:02:40.398390+00:00'
+subtasks:
+- T001
+- T002
+phase: Phase 1 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "98569"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T01:17:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T01:17:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-024]
 ---
 
 # Work Package Prompt: WP01 -- SCXML Types and Project Setup
