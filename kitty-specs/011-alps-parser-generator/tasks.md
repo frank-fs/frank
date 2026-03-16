@@ -174,7 +174,7 @@
 - [x] T028 Implement `toStatechartDocument` in `src/Frank.Statecharts/Alps/Mapper.fs` -- map semantic descriptors to StateNodes, transition descriptors to TransitionEdges, extract guards from ext elements, derive HTTP method hints
 - [x] T029 Implement `fromStatechartDocument` in `src/Frank.Statecharts/Alps/Mapper.fs` -- map StateNodes to semantic descriptors, TransitionEdges to transition descriptors with correct ALPS types, generate ext elements for guards
 - [x] T030 Add `Alps/Mapper.fs` to `Frank.Statecharts.fsproj` compile order (last in Alps group, after Alps/JsonGenerator.fs)
-- [ ] T031 Create `test/Frank.Statecharts.Tests/Alps/MapperTests.fs` -- state extraction, transition mapping with rt targets, guard label extraction from ext, HTTP method hints (safe->GET, unsafe->POST, idempotent->PUT), empty/minimal document handling
+- [x] T031 Create `test/Frank.Statecharts.Tests/Alps/MapperTests.fs` -- state extraction, transition mapping with rt targets, guard label extraction from ext, HTTP method hints (safe->GET, unsafe->POST, idempotent->PUT), empty/minimal document handling
 
 ### Implementation Notes
 - Mapper is the ONLY component depending on spec 020's shared AST types (AD-001, R-006).
