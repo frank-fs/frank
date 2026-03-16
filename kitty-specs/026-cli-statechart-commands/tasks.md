@@ -32,7 +32,7 @@
 - [x] T003 [P] Create `src/Frank.Statecharts/XState/Serializer.fs` — `StatechartDocument -> XState v5 JSON`
 - [x] T004 [P] Create `src/Frank.Statecharts/XState/Deserializer.fs` — `XState v5 JSON -> Ast.ParseResult`
 - [x] T005 Add XState compile entries to `Frank.Statecharts.fsproj` (before `StatefulResourceBuilder.fs`)
-- [ ] T006 Verify solution builds with `dotnet build`
+- [x] T006 Verify solution builds with `dotnet build`
 
 ### Implementation Notes
 - XState v5 JSON schema: `{ id, initial, states: { [name]: { on: { [event]: target }, meta: {} } } }`
