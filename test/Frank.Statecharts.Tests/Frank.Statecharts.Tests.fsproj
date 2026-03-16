@@ -21,6 +21,7 @@
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Alps/GoldenFiles.fs" />
     <Compile Include="Alps/TypeTests.fs" />
+    <Compile Include="Alps/JsonParserTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
