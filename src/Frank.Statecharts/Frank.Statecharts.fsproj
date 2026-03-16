@@ -21,6 +21,7 @@
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
     <Compile Include="Wsd/Parser.fs" />
+    <Compile Include="Wsd/Serializer.fs" />
     <!-- smcat parser -->
     <Compile Include="Smcat/Types.fs" />
     <Compile Include="Smcat/Lexer.fs" />
@@ -33,6 +34,7 @@
     <Compile Include="Alps/Mapper.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->
     <Compile Include="StatefulResourceBuilder.fs" />
+    <Compile Include="Wsd/Generator.fs" />
     <Compile Include="Smcat/Generator.fs" />
     <!-- Middleware and extensions -->
     <Compile Include="Middleware.fs" />

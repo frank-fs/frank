@@ -19,7 +19,10 @@
     <Compile Include="Wsd/ParserTests.fs" />
     <Compile Include="Wsd/GroupingTests.fs" />
     <Compile Include="Wsd/ErrorTests.fs" />
+    <Compile Include="Wsd/SerializerTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
+    <Compile Include="Wsd/GeneratorTests.fs" />
+    <Compile Include="Wsd/GeneratorRoundTripTests.fs" />
     <!-- smcat tests -->
     <Compile Include="Smcat/LexerTests.fs" />
     <Compile Include="Smcat/LabelParserTests.fs" />
