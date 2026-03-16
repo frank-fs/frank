@@ -59,7 +59,7 @@
 **Estimated Prompt Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T006 Create `src/Frank.Statecharts/Smcat/Lexer.fs` with mutable scanning pattern (matching WSD Lexer)
+- [x] T006 Create `src/Frank.Statecharts/Smcat/Lexer.fs` with mutable scanning pattern (matching WSD Lexer)
 - [x] T007 Implement identifier and quoted string tokenization (plain identifiers, dot-separated identifiers, quoted `"strings"`)
 - [x] T008 Implement punctuation and arrow tokenization (=>, :, ;, ,, [, ], {, }, /, =)
 - [x] T009 Implement comment handling (# lines), whitespace skipping, and newline handling (\r\n and \n)

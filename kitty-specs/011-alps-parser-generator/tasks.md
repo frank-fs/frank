@@ -103,7 +103,7 @@
 - [x] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
 - [x] T018 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/JsonParser.fs)
 - [x] T019 Create `test/Frank.Statecharts.Tests/Alps/XmlParserTests.fs` -- tic-tac-toe golden file test, cross-format equivalence test (JSON AST vs XML AST)
-- [x] T020 [P] Add edge case and error tests in XmlParserTests.fs -- empty document, namespace handling, forward-compatible unknown elements, malformed XML, missing attributes
+- [ ] T020 [P] Add edge case and error tests in XmlParserTests.fs -- empty document, namespace handling, forward-compatible unknown elements, malformed XML, missing attributes
 
 ### Implementation Notes
 - Use `System.Xml.Linq.XDocument` (R-004). NOT IDisposable -- no `use` binding needed.

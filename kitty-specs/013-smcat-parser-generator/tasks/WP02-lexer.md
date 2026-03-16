@@ -9,7 +9,7 @@ subtasks:
   - "T011"
 title: "Lexer"
 phase: "Phase 0 - Foundation"
-lane: "planned"
+lane: "for_review"
 assignee: ""
 agent: ""
 shell_pid: ""
@@ -375,3 +375,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP02 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T04:28:05Z – unknown – lane=for_review – Ready for review: smcat lexer with 52 passing tests, all token types covered
