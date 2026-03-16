@@ -1,12 +1,15 @@
 ---
 work_package_id: WP05
 title: SQLite Store Tests + DI Registration + Integration
-lane: planned
+lane: "doing"
 dependencies:
 - WP04
 - WP01
 - WP02
 - WP03
+base_branch: 010-statecharts-production-readiness-WP04
+base_commit: 6369cfaa9dca489be0aaf038af9989f1a14722c2
+created_at: '2026-03-16T04:25:02.849964+00:00'
 subtasks:
 - T028
 - T029
@@ -18,7 +21,7 @@ subtasks:
 phase: Phase 3 - Integration
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "9464"
 review_status: ''
 reviewed_by: ''
 history:
