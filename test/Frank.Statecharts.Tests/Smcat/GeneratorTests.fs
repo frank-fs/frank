@@ -29,11 +29,17 @@ let private makeMetadata
     : StateMachineMetadata =
     let initialKey = string machine.Initial
 
+    let guardNames = machine.Guards |> List.map (fun g -> g.Name)
+    let stateMetadataMap =
+        machine.StateMetadata |> Map.toList |> List.map (fun (s, info) -> (string s, info)) |> Map.ofList
+
     { Machine = box machine
       StateHandlerMap = stateHandlerMap
       ResolveInstanceId = fun _ -> "test"
       TransitionObservers = []
       InitialStateKey = initialKey
+      GuardNames = guardNames
+      StateMetadataMap = stateMetadataMap
       GetCurrentStateKey = fun _ _ _ -> Task.FromResult(initialKey)
       EvaluateGuards = fun _ -> Allowed
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }

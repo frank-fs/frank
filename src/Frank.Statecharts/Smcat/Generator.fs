@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.Generator
 
+open System.IO
 open Frank.Statecharts
 open Frank.Statecharts.Smcat.Types
 
@@ -9,10 +10,11 @@ let private needsQuoting (name: string) =
     name
     |> Seq.exists (fun c -> not (System.Char.IsLetterOrDigit c || c = '_' || c = '.' || c = '-'))
 
-/// Wraps a name in double quotes if it contains special characters.
+/// Wraps a name in double quotes if it contains special characters,
+/// escaping any embedded double quotes.
 let private quoteName (name: string) =
     if needsQuoting name then
-        sprintf "\"%s\"" name
+        sprintf "\"%s\"" (name.Replace("\"", "\\\""))
     else
         name
 
@@ -44,43 +46,16 @@ let internal formatTransition (source: string) (target: string) (label: string o
 type GenerateOptions =
     { ResourceName: string }
 
-/// Extract guard names from the boxed StateMachine's Guards field via reflection.
-let private extractGuardNames (machine: obj) : string list =
-    let fields = FSharp.Reflection.FSharpValue.GetRecordFields(machine)
-    let guardsObj = fields.[3]
-
-    match guardsObj with
-    | :? System.Collections.IEnumerable as guards ->
-        [ for g in guards do
-              let nameField = g.GetType().GetProperty("Name")
-              yield nameField.GetValue(g) :?> string ]
-    | _ -> []
-
-/// Extract StateMetadata (Map<'State, StateInfo>) from the boxed StateMachine via reflection.
-let private extractStateMetadata (machine: obj) : Map<string, StateInfo> =
-    let fields = FSharp.Reflection.FSharpValue.GetRecordFields(machine)
-    let metadataObj = fields.[4]
-
-    match metadataObj with
-    | :? System.Collections.IEnumerable as entries ->
-        [ for kvp in entries do
-              let kvpType = kvp.GetType()
-              let key = kvpType.GetProperty("Key").GetValue(kvp)
-              let value = kvpType.GetProperty("Value").GetValue(kvp)
-              yield (string key, value :?> StateInfo) ]
-        |> Map.ofList
-    | _ -> Map.empty
-
 /// Generate valid smcat text from StateMachineMetadata.
+/// Uses precomputed GuardNames and StateMetadataMap — no reflection needed.
 ///
 /// Output format:
 /// - One statement per line, semicolon terminators.
 /// - Initial transition emitted first: "initial => <state>;"
 /// - Self-messages for each (state, HTTP method) handler pair.
-/// - Guard annotations as note-style comments.
 /// - Final state transitions emitted last: "<state> => final;"
 let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : string =
-    let lines = ResizeArray<string>()
+    let sb = System.Text.StringBuilder()
 
     // Order states: initial first, others alphabetically
     let stateNames = metadata.StateHandlerMap |> Map.toList |> List.map fst
@@ -93,27 +68,29 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : strin
     let orderedStates = metadata.InitialStateKey :: others
 
     // 1. Emit initial transition
-    lines.Add(sprintf "initial => %s;" (quoteName metadata.InitialStateKey))
+    sb.Append(sprintf "initial => %s;" (quoteName metadata.InitialStateKey)) |> ignore
 
-    // 2. Extract state metadata for IsFinal detection
-    let stateMetadata = extractStateMetadata metadata.Machine
-
-    // 3. Extract guard names
-    let guardNames = extractGuardNames metadata.Machine
-
-    // 4. Emit self-messages for each (state, httpMethod) handler pair
+    // 2. Emit self-messages for each (state, httpMethod) handler pair
     for stateName in orderedStates do
         match Map.tryFind stateName metadata.StateHandlerMap with
         | Some handlers ->
             for (httpMethod, _) in handlers do
+                sb.Append('\n') |> ignore
                 let label = formatLabel (Some httpMethod) None None
-                lines.Add(formatTransition stateName stateName label)
+                sb.Append(formatTransition stateName stateName label) |> ignore
         | None -> ()
 
-    // 5. Emit final state transitions last
+    // 3. Emit final state transitions last (using precomputed StateMetadataMap)
     for stateName in orderedStates do
-        match Map.tryFind stateName stateMetadata with
-        | Some info when info.IsFinal -> lines.Add(formatTransition stateName "final" None)
+        match Map.tryFind stateName metadata.StateMetadataMap with
+        | Some info when info.IsFinal ->
+            sb.Append('\n') |> ignore
+            sb.Append(formatTransition stateName "final" None) |> ignore
         | _ -> ()
 
-    lines |> String.concat "\n"
+    sb.ToString()
+
+/// Generate valid smcat text and write directly to a TextWriter.
+/// The caller owns the writer lifecycle.
+let generateTo (writer: TextWriter) (options: GenerateOptions) (metadata: StateMachineMetadata) : unit =
+    writer.Write(generate options metadata)
