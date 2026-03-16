@@ -98,7 +98,7 @@
 **Estimated Prompt Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T015 Implement top-level parseAlpsXml function in `src/Frank.Statecharts/Alps/XmlParser.fs` -- parse root `<alps>` element, `version` attribute, `<doc>` child element
+- [x] T015 Implement top-level parseAlpsXml function in `src/Frank.Statecharts/Alps/XmlParser.fs` -- parse root `<alps>` element, `version` attribute, `<doc>` child element
 - [ ] T016 Implement descriptor parsing in XmlParser.fs -- `id`, `type`, `href`, `rt` as XML attributes; nested `<descriptor>`, `<ext>`, `<link>`, `<doc>` as child elements
 - [ ] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
 - [ ] T018 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/JsonParser.fs)
