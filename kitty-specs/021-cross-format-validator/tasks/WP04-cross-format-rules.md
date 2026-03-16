@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Cross-Format Validation Rules
-lane: "doing"
+lane: "planned"
 dependencies: [WP02]
 base_branch: 021-cross-format-validator-WP02
 base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
@@ -19,7 +19,7 @@ agent: "claude-opus-4-6"
 shell_pid: "62414"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
-review_feedback_file: "/private/tmp/021-fix-feedback.md"
+review_feedback_file: "/private/tmp/fix-lane.md"
 history:
 - timestamp: '2026-03-15T23:59:11Z'
   lane: planned
@@ -46,9 +46,9 @@ requirement_refs: [FR-012, FR-014, FR-015, FR-017]
 **Reviewed by**: Ryan Riley
 **Status**: ❌ Changes Requested
 **Date**: 2026-03-16
-**Feedback file**: `/private/tmp/021-fix-feedback.md`
+**Feedback file**: `/private/tmp/fix-lane.md`
 
-**Issue**: WP01 was incorrectly moved to doing due to spec-kitty auto-selecting spec 021 when spec 020 was intended. No actual work was done on 021-WP01.
+**Issue**: Manually correcting lane status to done
 
 
 ## Markdown Formatting
@@ -379,3 +379,4 @@ Can be developed in parallel with WP03 (both depend on WP02 only).
 - 2026-03-16T04:32:23Z – claude-opus – shell_pid=15686 – lane=doing – Started implementation via workflow command
 - 2026-03-16T11:50:00Z – claude-opus – shell_pid=15686 – lane=for_review – Ready for review: All 6 subtasks (T022-T027) implemented. Cross-format rules for state name, event name, and transition target agreement across all 10 pairwise format combinations (30 rules total). Casing mismatch detection included. Build succeeds on net8.0/net9.0/net10.0 with 0 warnings.
 - 2026-03-16T11:51:44Z – claude-opus-4-6 – shell_pid=62414 – lane=doing – Started review via workflow command
+- 2026-03-16T14:34:45Z – claude-opus-4-6 – shell_pid=62414 – lane=planned – Moved to planned
