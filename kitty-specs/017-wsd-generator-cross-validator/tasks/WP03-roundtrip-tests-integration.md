@@ -4,6 +4,7 @@ title: Roundtrip Tests and Integration
 lane: planned
 dependencies:
 - WP01
+- WP02
 subtasks:
 - T013
 - T014
