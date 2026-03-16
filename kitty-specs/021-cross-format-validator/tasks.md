@@ -24,12 +24,12 @@
 **Estimated size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Statecharts/Validation/` directory
-- [ ] T002 Define `FormatTag` discriminated union in `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T003 Define `FormatArtifact` record in `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T004 Define `CheckStatus` DU and `ValidationCheck` record in `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T005 Define `ValidationFailure` record in `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T006 Define `ValidationReport` record in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T001 Create `src/Frank.Statecharts/Validation/` directory
+- [x] T002 Define `FormatTag` discriminated union in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T003 Define `FormatArtifact` record in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T004 Define `CheckStatus` DU and `ValidationCheck` record in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T005 Define `ValidationFailure` record in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T006 Define `ValidationReport` record in `src/Frank.Statecharts/Validation/Types.fs`
 - [ ] T007 Define `ValidationRule` record in `src/Frank.Statecharts/Validation/Types.fs`
 - [ ] T008 Update `Frank.Statecharts.fsproj` compile order to include `Validation/Types.fs` after `Ast/Types.fs` (or after existing WSD files if Ast/ does not yet exist)
 
