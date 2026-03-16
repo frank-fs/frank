@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="Ast/Types.fs" />
     <Compile Include="Validation/Types.fs" />
+    <Compile Include="Validation/Validator.fs" />
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />

@@ -19,6 +19,10 @@
     <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
+    <Compile Include="Validation/TypeTests.fs" />
+    <Compile Include="Validation/ValidatorTests.fs" />
+    <Compile Include="Validation/SelfConsistencyTests.fs" />
+    <Compile Include="Validation/CrossFormatTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
