@@ -137,13 +137,13 @@
 **Estimated Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T021 Create `Frank.Statecharts.Sqlite` project structure and `.fsproj` (multi-target net8.0;net9.0;net10.0)
-- [ ] T022 Add project to `Frank.sln`, set up project references and NuGet dependencies (`Microsoft.Data.Sqlite`)
-- [ ] T023 Implement `SqliteStateMachineStore` actor core: `MailboxProcessor` with `StoreMessage` DU, in-memory cache, subscriber list
-- [ ] T024 Implement SQLite persistence: schema auto-creation, connection management (single connection, WAL mode, busy_timeout), UPSERT on `SetState`, SELECT on cache miss
-- [ ] T025 Implement lazy rehydration: `GetState` checks in-memory cache first, loads from SQLite on miss
-- [ ] T026 Implement Subscribe/observable pattern (in-memory subscriber list, notify after persist, BehaviorSubject semantics)
-- [ ] T027 Implement `IDisposable` for connection and actor cleanup
+- [x] T021 Create `Frank.Statecharts.Sqlite` project structure and `.fsproj` (multi-target net8.0;net9.0;net10.0)
+- [x] T022 Add project to `Frank.sln`, set up project references and NuGet dependencies (`Microsoft.Data.Sqlite`)
+- [x] T023 Implement `SqliteStateMachineStore` actor core: `MailboxProcessor` with `StoreMessage` DU, in-memory cache, subscriber list
+- [x] T024 Implement SQLite persistence: schema auto-creation, connection management (single connection, WAL mode, busy_timeout), UPSERT on `SetState`, SELECT on cache miss
+- [x] T025 Implement lazy rehydration: `GetState` checks in-memory cache first, loads from SQLite on miss
+- [x] T026 Implement Subscribe/observable pattern (in-memory subscriber list, notify after persist, BehaviorSubject semantics)
+- [x] T027 Implement `IDisposable` for connection and actor cleanup
 
 ### Implementation Notes
 - Architecturally identical to `MailboxProcessorStore` but with SQLite persistence inside actor loop
