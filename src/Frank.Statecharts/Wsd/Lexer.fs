@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Wsd.Lexer
 
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Wsd.Types
 
 /// Keywords that trigger "rest of line as TextContent" after them.
