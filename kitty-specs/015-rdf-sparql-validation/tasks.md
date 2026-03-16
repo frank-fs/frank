@@ -175,8 +175,8 @@
 - [ ] T025 Implement US4-SC1: Cross-resource link traversal -- SPARQL query traverses link relation from resource A to resource B, target URI matches subject URI -- FR-008
 - [ ] T026 Implement US4-SC2: Orphaned blank node detection -- SPARQL query finds blank nodes not referenced by named resources, expects zero results -- FR-011
 - [ ] T027 Implement US4-SC3: Consistent namespace predicates -- SPARQL query checks all distinct predicates use consistent namespace prefixes -- FR-012
-- [ ] T028 Edge case: resource URI with special characters (percent-encoded path segments) -- RDF URIs properly encoded, SPARQL matches them
-- [ ] T029 Update .fsproj `<Compile>` items to ensure correct file ordering for all test modules
+- [x] T028 Edge case: resource URI with special characters (percent-encoded path segments) -- RDF URIs properly encoded, SPARQL matches them
+- [x] T029 Update .fsproj `<Compile>` items to ensure correct file ordering for all test modules
 
 ### Implementation Notes
 - Tests load RDF from multiple endpoints into a single combined `IGraph`
