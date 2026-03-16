@@ -65,7 +65,7 @@
 **Dependencies**: Depends on WP01
 
 ### Included Subtasks
-- [ ] T007 Create `test/Frank.RdfValidation.Tests/RdfParsingTests.fs` with module structure and test list
+- [x] T007 Create `test/Frank.RdfValidation.Tests/RdfParsingTests.fs` with module structure and test list
 - [ ] T008 Implement US1-SC1: JSON-LD parsing test (load `application/ld+json` response into graph, verify triple count and no parse errors) -- FR-001
 - [ ] T009 Implement US1-SC2: Turtle parsing test (load `text/turtle` response into graph, verify isomorphism with JSON-LD graph) -- FR-002, FR-004
 - [ ] T010 Implement US1-SC3: RDF/XML parsing test (load `application/rdf+xml` response into graph, verify isomorphism with JSON-LD and Turtle graphs) -- FR-003, FR-004
