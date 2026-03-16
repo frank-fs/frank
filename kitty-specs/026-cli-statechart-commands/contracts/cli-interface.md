@@ -17,7 +17,7 @@ Description: "Statechart pipeline commands: extract, generate, validate, and imp
 ## Subcommand: extract
 
 ```
-frank-cli statechart extract <assembly> [--format text|json]
+frank-cli statechart extract <assembly> [--output-format text|json]
 ```
 
 ### Arguments
@@ -25,7 +25,7 @@ frank-cli statechart extract <assembly> [--format text|json]
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `assembly` | `string` (positional) | Yes | - | Path to compiled .NET assembly (.dll) |
-| `--format` | `string` (option) | No | `text` | Output format: `text` or `json` |
+| `--output-format` | `string` (option) | No | `text` | Output format: `text` or `json` |
 
 ### Exit Codes
 
@@ -159,7 +159,7 @@ Files written to the output directory using naming convention:
 ## Subcommand: validate
 
 ```
-frank-cli statechart validate <spec-file> [<spec-file>...] <assembly> [--format text|json]
+frank-cli statechart validate <spec-file> [<spec-file>...] <assembly> [--output-format text|json]
 ```
 
 ### Arguments
@@ -168,7 +168,7 @@ frank-cli statechart validate <spec-file> [<spec-file>...] <assembly> [--format 
 |------|------|----------|---------|-------------|
 | `spec-file(s)` | `string[]` (positional) | Yes | - | One or more spec files to validate |
 | `assembly` | `string` (positional, last) | Yes | - | Path to compiled .NET assembly (.dll) |
-| `--format` | `string` (option) | No | `text` | Output format: `text` or `json` |
+| `--output-format` | `string` (option) | No | `text` | Output format: `text` or `json` |
 
 Note: The last positional argument is treated as the assembly path (must end in `.dll`). All preceding positional arguments are spec files.
 
@@ -257,7 +257,7 @@ Failures:
 ## Subcommand: import
 
 ```
-frank-cli statechart import <spec-file> [--format text|json] [--spec-format wsd|alps|scxml|smcat|xstate]
+frank-cli statechart import <spec-file> [--format wsd|alps|scxml|smcat|xstate] [--output-format text|json]
 ```
 
 ### Arguments
@@ -265,8 +265,8 @@ frank-cli statechart import <spec-file> [--format text|json] [--spec-format wsd|
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `spec-file` | `string` (positional) | Yes | - | Path to spec file to parse |
-| `--format` | `string` (option) | No | `json` | Output format: `text` or `json` (default json for LLM consumption) |
-| `--spec-format` | `string` (option) | No | - | Explicit format override (for ambiguous `.json` files) |
+| `--format` | `string` (option) | No | - | Notation format override (for ambiguous `.json` files): `wsd`, `alps`, `scxml`, `smcat`, `xstate` |
+| `--output-format` | `string` (option) | No | `json` | Output format: `text` or `json` (default json for LLM consumption) |
 
 ### Exit Codes
 
@@ -357,5 +357,5 @@ Error: Failed to load assembly: Could not find file '/path/to/missing.dll'
 | `.scxml` | SCXML | Single extension |
 | `.smcat` | smcat | Single extension |
 | `.xstate.json` | XState JSON | Compound extension (checked before `.json`) |
-| `.json` | Ambiguous | Requires `--spec-format` flag |
+| `.json` | Ambiguous | Requires `--format` flag |
 | `.dll` | Assembly | Used to distinguish assembly from spec files in validate |

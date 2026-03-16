@@ -24,7 +24,7 @@ This produces a compiled assembly at `bin/Debug/net10.0/MyApp.dll`.
 frank-cli statechart extract bin/Debug/net10.0/MyApp.dll
 
 # JSON output for programmatic use
-frank-cli statechart extract bin/Debug/net10.0/MyApp.dll --format json
+frank-cli statechart extract bin/Debug/net10.0/MyApp.dll --output-format json
 ```
 
 ## Generate Spec Artifacts
@@ -50,7 +50,7 @@ frank-cli statechart validate specs/games.wsd bin/Debug/net10.0/MyApp.dll
 frank-cli statechart validate specs/games.wsd specs/games.alps.json bin/Debug/net10.0/MyApp.dll
 
 # JSON output for CI integration
-frank-cli statechart validate specs/games.wsd bin/Debug/net10.0/MyApp.dll --format json
+frank-cli statechart validate specs/games.wsd bin/Debug/net10.0/MyApp.dll --output-format json
 ```
 
 ## Import a Spec File
@@ -63,7 +63,7 @@ frank-cli statechart import game.xstate.json
 frank-cli statechart import onboarding.wsd
 
 # Handle ambiguous .json files
-frank-cli statechart import game.json --spec-format xstate
+frank-cli statechart import game.json --format xstate
 ```
 
 ## Typical Workflows
@@ -79,14 +79,14 @@ git add specs/
 ### Design-First (import spec, scaffold code)
 ```bash
 # Parse the design spec
-frank-cli statechart import game.xstate.json --format json
+frank-cli statechart import game.xstate.json --output-format json
 # Feed the JSON output to an LLM for F# code scaffolding
 ```
 
 ### Validation in CI
 ```bash
 dotnet build
-frank-cli statechart validate specs/*.wsd specs/*.alps.json bin/Debug/net10.0/MyApp.dll --format json
+frank-cli statechart validate specs/*.wsd specs/*.alps.json bin/Debug/net10.0/MyApp.dll --output-format json
 # Non-zero exit code on validation failures
 ```
 

@@ -1,0 +1,34 @@
+ID,Type,Title,URL/Path,Accessed,Notes
+S-001,Codebase,CLI Entrypoint,src/Frank.Cli/Program.fs,2026-03-16,System.CommandLine 2.0.3 command registration pattern - 274 lines
+S-002,Codebase,CLI Project File,src/Frank.Cli/Frank.Cli.fsproj,2026-03-16,Exe targeting net10.0; references Frank.Cli.Core and System.CommandLine 2.0.3
+S-003,Codebase,CLI Core Project File,src/Frank.Cli.Core/Frank.Cli.Core.fsproj,2026-03-16,Library targeting net10.0; no Frank.Statecharts reference (needs adding)
+S-004,Codebase,ExtractCommand,src/Frank.Cli.Core/Commands/ExtractCommand.fs,2026-03-16,DI pipeline pattern for testability; Result-based return
+S-005,Codebase,ValidateCommand,src/Frank.Cli.Core/Commands/ValidateCommand.fs,2026-03-16,Existing semantic validation (not statechart validation)
+S-006,Codebase,JsonOutput,src/Frank.Cli.Core/Output/JsonOutput.fs,2026-03-16,Utf8JsonWriter with camelCase convention; status field first
+S-007,Codebase,TextOutput,src/Frank.Cli.Core/Output/TextOutput.fs,2026-03-16,StringBuilder with NO_COLOR support; bold/yellow/red/green helpers
+S-008,Codebase,HelpContent,src/Frank.Cli.Core/Help/HelpContent.fs,2026-03-16,Hardcoded CommandHelp records; allCommands list as source of truth
+S-009,Codebase,StateMachineMetadata,src/Frank.Statecharts/StatefulResourceBuilder.fs:59-85,2026-03-16,Endpoint metadata type with StateHandlerMap StateMetadataMap GuardNames InitialStateKey
+S-010,Codebase,StatefulResourceBuilder.Run,src/Frank.Statecharts/StatefulResourceBuilder.fs:175-339,2026-03-16,CE runner that populates StateMachineMetadata and attaches to endpoints
+S-011,Codebase,Resource Type,src/Frank/Builder.fs:16,2026-03-16,Struct with Endpoint[] array; created by ResourceSpec.Build
+S-012,Codebase,ResourceSpec.Build,src/Frank/Builder.fs:37-60,2026-03-16,Creates RouteEndpoint array with metadata conventions applied
+S-013,Codebase,WebHostBuilder.Run,src/Frank/Builder.fs:305-353,2026-03-16,Creates WebApplication and adds ResourceEndpointDataSource
+S-014,Codebase,ResourceEndpointDataSource,src/Frank/Builder.fs:275,2026-03-16,Internal class - cannot be used from CLI
+S-015,Codebase,WSD Generator,src/Frank.Statecharts/Wsd/Generator.fs,2026-03-16,StateMachineMetadata -> StatechartDocument AST; central metadata-to-AST converter
+S-016,Codebase,WSD Serializer,src/Frank.Statecharts/Wsd/Serializer.fs,2026-03-16,StatechartDocument -> WSD text
+S-017,Codebase,smcat Generator,src/Frank.Statecharts/Smcat/Generator.fs,2026-03-16,StateMachineMetadata -> smcat text directly (no AST intermediate)
+S-018,Codebase,ALPS Mapper,src/Frank.Statecharts/Alps/Mapper.fs,2026-03-16,Bidirectional StatechartDocument <-> AlpsDocument conversion
+S-019,Codebase,ALPS JSON Generator,src/Frank.Statecharts/Alps/JsonGenerator.fs,2026-03-16,AlpsDocument -> ALPS JSON string
+S-020,Codebase,SCXML Mapper,src/Frank.Statecharts/Scxml/Mapper.fs,2026-03-16,Bidirectional StatechartDocument <-> ScxmlDocument conversion
+S-021,Codebase,SCXML Generator,src/Frank.Statecharts/Scxml/Generator.fs,2026-03-16,ScxmlDocument -> SCXML XML string
+S-022,Codebase,WSD Parser,src/Frank.Statecharts/Wsd/Parser.fs,2026-03-16,parseWsd: string -> Ast.ParseResult (shared AST directly)
+S-023,Codebase,ALPS JSON Parser,src/Frank.Statecharts/Alps/JsonParser.fs,2026-03-16,parseAlpsJson: string -> Result<AlpsDocument AlpsParseError list>
+S-024,Codebase,SCXML Parser,src/Frank.Statecharts/Scxml/Parser.fs,2026-03-16,parseString: string -> ScxmlParseResult
+S-025,Codebase,smcat Parser,src/Frank.Statecharts/Smcat/Parser.fs,2026-03-16,parseSmcat: string -> Smcat.Types.ParseResult
+S-026,Codebase,smcat Mapper,src/Frank.Statecharts/Smcat/Mapper.fs,2026-03-16,Bidirectional StatechartDocument <-> SmcatDocument conversion
+S-027,Codebase,Validation Types,src/Frank.Statecharts/Validation/Types.fs,2026-03-16,FormatTag FormatArtifact ValidationReport ValidationRule (public)
+S-028,Codebase,Validator,src/Frank.Statecharts/Validation/Validator.fs,2026-03-16,validate function plus SelfConsistencyRules and CrossFormatRules
+S-029,Codebase,Shared AST Types,src/Frank.Statecharts/Ast/Types.fs,2026-03-16,StatechartDocument StateNode TransitionEdge ParseResult (public)
+S-030,Codebase,XStateMeta Annotation,src/Frank.Statecharts/Ast/Types.fs:105-108,2026-03-16,XStateAction and XStateService stubs already defined
+S-031,Codebase,Statecharts Project File,src/Frank.Statecharts/Frank.Statecharts.fsproj,2026-03-16,Multi-target net8.0/9.0/10.0; InternalsVisibleTo only Tests
+S-032,Codebase,Types.fs (core domain),src/Frank.Statecharts/Types.fs,2026-03-16,StateMachine Guard StateInfo BlockReason types (public)
+S-033,Codebase,StatefulResourceTests,test/Frank.Statecharts.Tests/StatefulResourceTests.fs,2026-03-16,Tic-tac-toe example showing CE usage pattern
