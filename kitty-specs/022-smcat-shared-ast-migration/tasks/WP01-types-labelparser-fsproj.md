@@ -2,9 +2,9 @@
 work_package_id: "WP01"
 title: "Types, LabelParser, and fsproj Updates"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "for_review"
 assignee: ""
-agent: ""
+agent: "claude-opus"
 shell_pid: ""
 review_status: ""
 reviewed_by: ""
@@ -207,3 +207,4 @@ The resulting order should be:
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T22:56:11Z – claude-opus – lane=for_review – Ready for review: Types.fs reduced to lexer-only types (TokenKind, Token, SmcatAttribute, TransitionLabel, inferStateType). LabelParser.fs updated to use Ast.SourcePosition and Ast.ParseWarning. Lexer.fs updated with open Ast. fsproj updated Mapper->Serializer. Stub Serializer.fs created. All build errors are in downstream Parser.fs/Generator.fs as expected per WP scope.
