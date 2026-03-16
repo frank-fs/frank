@@ -31,7 +31,7 @@
 - [x] T002 Implement `inferStateType` function in Types.fs for pseudo-state detection by naming convention
 - [ ] T003 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to include Smcat/*.fs entries in correct compile order (after Wsd, before Types.fs)
 - [x] T004 Create Smcat/ directory under `test/Frank.Statecharts.Tests/` and update test .fsproj with placeholder test file entries
-- [ ] T005 Verify multi-target build succeeds (`dotnet build` for net8.0/net9.0/net10.0)
+- [x] T005 Verify multi-target build succeeds (`dotnet build` for net8.0/net9.0/net10.0)
 
 ### Implementation Notes
 - All types are defined in `module internal Frank.Statecharts.Smcat.Types`
