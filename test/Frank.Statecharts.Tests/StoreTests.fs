@@ -339,7 +339,7 @@ let actorSerializationTests =
               use _s = store :> IDisposable
               let iface = store :> IStateMachineStore<string, int>
 
-              do! iface.SetState "inst1" "Initial" 0 |> Async.AwaitTask
+              do! iface.SetState "inst1" "State-0" 0 |> Async.AwaitTask
 
               // Interleave reads and writes to the same instance
               let ops =
