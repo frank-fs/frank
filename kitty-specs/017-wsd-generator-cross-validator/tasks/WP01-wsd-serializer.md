@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: WSD Serializer
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: c25f06152554a9fee69211eb7ba68098b454cc7f
@@ -301,3 +301,4 @@ let quoteName (name: string) : string =
 
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:02:32Z – claude-opus – shell_pid=98343 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:09:31Z – claude-opus – shell_pid=98343 – lane=for_review – Ready for review: Serializer.fs with needsQuoting, quoteName, serialize + 41 tests (all pass, including roundtrip)
