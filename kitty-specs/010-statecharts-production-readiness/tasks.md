@@ -19,13 +19,13 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T001 Create `stateKey` function using `FSharpValue.PreComputeUnionTagReader` + `FSharpType.GetUnionCases` in `StatefulResourceBuilder.Run`
-- [ ] T002 Add non-DU type fallback with `FSharpType.IsUnion` guard (falls back to `ToString()`)
-- [ ] T003 Replace `state.ToString()` with `stateKey` at three call sites in `StatefulResourceBuilder.fs` (lines 176, 189, 250)
-- [ ] T004 Change `InState` CE operation to use string keys (case names) instead of `'State` equality for `StateHandlerMap`
-- [ ] T005 [P] Add tests for parameterized DU state matching in `StatefulResourceTests.fs`
-- [ ] T006 [P] Add tests for simple DU backward compatibility (no regressions)
-- [ ] T007 [P] Verify `StatechartETagProvider` is NOT affected (still uses `string state` for parameter-sensitive hashing)
+- [x] T001 Create `stateKey` function using `FSharpValue.PreComputeUnionTagReader` + `FSharpType.GetUnionCases` in `StatefulResourceBuilder.Run`
+- [x] T002 Add non-DU type fallback with `FSharpType.IsUnion` guard (falls back to `ToString()`)
+- [x] T003 Replace `state.ToString()` with `stateKey` at three call sites in `StatefulResourceBuilder.fs` (lines 176, 189, 250)
+- [x] T004 Change `InState` CE operation to use string keys (case names) instead of `'State` equality for `StateHandlerMap`
+- [x] T005 [P] Add tests for parameterized DU state matching in `StatefulResourceTests.fs`
+- [x] T006 [P] Add tests for simple DU backward compatibility (no regressions)
+- [x] T007 [P] Verify `StatechartETagProvider` is NOT affected (still uses `string state` for parameter-sensitive hashing)
 
 ### Implementation Notes
 - The `stateKey` function is built once in `StatefulResourceBuilder.Run` and captured in closures
