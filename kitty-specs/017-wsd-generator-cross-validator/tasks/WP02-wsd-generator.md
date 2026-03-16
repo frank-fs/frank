@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: WSD Generator
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 26152db61a6bfc6f2f54b873ecb7e6522997e677
@@ -15,8 +15,8 @@ subtasks:
 - T012
 phase: Phase 1b - Generator
 assignee: ''
-agent: "claude-opus"
-shell_pid: "98705"
+agent: "claude-opus-reviewer"
+shell_pid: "1848"
 review_status: ''
 reviewed_by: ''
 history:
@@ -413,3 +413,4 @@ let turnstileHandlerMap =
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:02:51Z – claude-opus – shell_pid=98705 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:11:37Z – claude-opus – shell_pid=98705 – lane=for_review – Ready for review: Generator.fs implements pure function StateMachineMetadata -> Result<Diagram, GeneratorError>. 18 tests pass. Builds across all TFMs.
+- 2026-03-16T04:13:40Z – claude-opus-reviewer – shell_pid=1848 – lane=doing – Started review via workflow command
