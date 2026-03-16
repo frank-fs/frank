@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP03"
-title: "Actor Concurrency Validation & Documentation"
-phase: "Phase 2 - Parallel Streams"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02"]
-requirement_refs:
-  - "FR-003"
-  - "FR-004"
+work_package_id: WP03
+title: Actor Concurrency Validation & Documentation
+lane: "doing"
+dependencies: [WP02]
+base_branch: 010-statecharts-production-readiness-WP01
+base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
+created_at: '2026-03-16T04:03:04.598916+00:00'
 subtasks:
-  - "T017"
-  - "T018"
-  - "T019"
-  - "T020"
+- T017
+- T018
+- T019
+- T020
+phase: Phase 2 - Parallel Streams
+assignee: ''
+agent: ''
+shell_pid: "98858"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T00:05:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T00:05:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-003
+- FR-004
 ---
 
 # Work Package Prompt: WP03 -- Actor Concurrency Validation & Documentation
