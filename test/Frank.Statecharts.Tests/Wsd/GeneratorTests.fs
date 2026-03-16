@@ -31,11 +31,21 @@ let private makeMetadata
     : StateMachineMetadata =
     let initialKey = machine.Initial.ToString()
 
+    let guardNames = machine.Guards |> List.map (fun g -> g.Name)
+
+    let stateMetadataMap =
+        machine.StateMetadata
+        |> Map.toList
+        |> List.map (fun (s, info) -> (string s, info))
+        |> Map.ofList
+
     { Machine = box machine
       StateHandlerMap = stateHandlerMap
       ResolveInstanceId = fun _ -> "test"
       TransitionObservers = []
       InitialStateKey = initialKey
+      GuardNames = guardNames
+      StateMetadataMap = stateMetadataMap
       GetCurrentStateKey = fun _ _ _ -> Task.FromResult(initialKey)
       EvaluateGuards = fun _ -> Allowed
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }
@@ -88,13 +98,6 @@ let private singleGuardMachine: StateMachine<TurnstileState, TurnstileEvent, uni
             Predicate = fun _ -> Allowed } ]
       StateMetadata = Map.empty }
 
-// --- Helper to unwrap Result or fail with error message ---
-
-let private unwrap (result: Result<'T, GeneratorError>) : 'T =
-    match result with
-    | Ok value -> value
-    | Error err -> failtest $"Expected Ok but got Error: %A{err}"
-
 // --- Helper to extract elements by type ---
 
 let private messages (diagram: Diagram) =
@@ -123,28 +126,28 @@ let generatorTests =
         "Generator"
         [
           // === Happy path: turnstile ===
-          testCase "generate turnstile produces Ok"
+          testCase "generate turnstile produces diagram"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let result = generate { ResourceName = "turnstile" } metadata
-              Expect.isOk result "should produce Ok"
+              let diagram = generate { ResourceName = "turnstile" } metadata
+              Expect.isSome diagram.Title "should produce a diagram with a title"
 
           testCase "title is resource name"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               Expect.equal diagram.Title (Some "turnstile") "title matches resource name"
 
           testCase "initial state is first participant"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               Expect.equal diagram.Participants.[0].Name "Locked" "Locked is first"
 
           testCase "all states present as participants"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               Expect.equal diagram.Participants.Length 3 "3 participants"
 
               let names = diagram.Participants |> List.map (fun p -> p.Name)
@@ -155,7 +158,7 @@ let generatorTests =
           testCase "participants ordered: initial first then alphabetical"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               let names = diagram.Participants |> List.map (fun p -> p.Name)
               // Locked first (initial), then Broken, Unlocked (alphabetical)
               Expect.equal names [ "Locked"; "Broken"; "Unlocked" ] "correct order"
@@ -163,7 +166,7 @@ let generatorTests =
           testCase "messages for each handler"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               let msgs = messages diagram
               // Locked: GET, POST; Broken: GET; Unlocked: GET, POST = 5 total
               Expect.equal msgs.Length 5 "5 messages total"
@@ -186,7 +189,7 @@ let generatorTests =
           testCase "all arrows are solid forward"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               let msgs = messages diagram
 
               for m in msgs do
@@ -196,7 +199,7 @@ let generatorTests =
           testCase "self-messages: sender equals receiver"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               let msgs = messages diagram
 
               for m in msgs do
@@ -205,21 +208,20 @@ let generatorTests =
           testCase "participants are explicit"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
-
+              let diagram = generate { ResourceName = "turnstile" } metadata
               for p in diagram.Participants do
                   Expect.isTrue p.Explicit $"participant {p.Name} is explicit"
 
           testCase "autoNumber is false"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               Expect.isFalse diagram.AutoNumber "autoNumber should be false"
 
           testCase "all positions are synthetic (0,0)"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "turnstile" } metadata |> unwrap
+              let diagram = generate { ResourceName = "turnstile" } metadata
               let synth = { Line = 0; Column = 0 }
 
               for p in diagram.Participants do
@@ -232,7 +234,7 @@ let generatorTests =
           testCase "single state no transitions"
           <| fun _ ->
               let metadata = makeMetadata singleStateMachine (Map.ofList [ "Only", [] ])
-              let diagram = generate { ResourceName = "single" } metadata |> unwrap
+              let diagram = generate { ResourceName = "single" } metadata
               Expect.equal diagram.Participants.Length 1 "1 participant"
               Expect.equal diagram.Participants.[0].Name "Only" "participant is Only"
               let msgs = messages diagram
@@ -242,7 +244,7 @@ let generatorTests =
           testCase "empty handler map: initial state as sole participant"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine Map.empty
-              let diagram = generate { ResourceName = "empty" } metadata |> unwrap
+              let diagram = generate { ResourceName = "empty" } metadata
               Expect.equal diagram.Participants.Length 1 "1 participant (initial state only)"
               Expect.equal diagram.Participants.[0].Name "Locked" "participant is initial state"
               let msgs = messages diagram
@@ -252,7 +254,7 @@ let generatorTests =
           testCase "machine with guards emits note"
           <| fun _ ->
               let metadata = makeMetadata singleGuardMachine (Map.ofList [ "Locked", [] ])
-              let diagram = generate { ResourceName = "guarded" } metadata |> unwrap
+              let diagram = generate { ResourceName = "guarded" } metadata
               let noteElems = notes diagram
               Expect.hasLength noteElems 1 "one note element"
               let note = noteElems.[0]
@@ -264,7 +266,7 @@ let generatorTests =
           testCase "multiple guards combined in single note"
           <| fun _ ->
               let metadata = makeMetadata guardedMachine (Map.ofList [ "Locked", [] ])
-              let diagram = generate { ResourceName = "multi-guard" } metadata |> unwrap
+              let diagram = generate { ResourceName = "multi-guard" } metadata
               let noteElems = notes diagram
               Expect.hasLength noteElems 1 "one note element"
               let guard = noteElems.[0].Guard.Value
@@ -273,36 +275,15 @@ let generatorTests =
           testCase "machine with no guards emits no notes"
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "no-guards" } metadata |> unwrap
+              let diagram = generate { ResourceName = "no-guards" } metadata
               let noteElems = notes diagram
               Expect.isEmpty noteElems "no note elements"
-
-          // === Error cases ===
-          testCase "unrecognized machine type returns error"
-          <| fun _ ->
-              let metadata =
-                  { Machine = box "not a machine"
-                    StateHandlerMap = Map.empty
-                    ResolveInstanceId = fun _ -> "test"
-                    TransitionObservers = []
-                    InitialStateKey = "test"
-                    GetCurrentStateKey = fun _ _ _ -> Task.FromResult("test")
-                    EvaluateGuards = fun _ -> Allowed
-                    ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }
-
-              let result = generate { ResourceName = "bad" } metadata
-
-              match result with
-              | Error(UnrecognizedMachineType typeName) ->
-                  Expect.stringContains typeName "String" "type name includes String"
-              | _ -> failtest "expected UnrecognizedMachineType error"
 
           // === Element ordering ===
           testCase "element order: participants, then guards, then messages"
           <| fun _ ->
               let metadata = makeMetadata guardedMachine turnstileHandlerMap
-              let diagram = generate { ResourceName = "ordered" } metadata |> unwrap
-
+              let diagram = generate { ResourceName = "ordered" } metadata
               // Verify: all ParticipantDecls come first, then NoteElements, then MessageElements
               let mutable phase = 0 // 0=participants, 1=notes, 2=messages
 
