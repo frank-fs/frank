@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <Compile Include="OptionsDiscoveryTests.fs" />
-    <Compile Include="LinkHeaderTests.fs" />
+    <Compile Include="EdgeCaseTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
