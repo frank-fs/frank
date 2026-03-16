@@ -2,7 +2,6 @@ namespace Frank.Cli.Core.Commands
 
 open System
 open System.IO
-open System.Security.Cryptography
 open VDS.RDF
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
@@ -121,48 +120,6 @@ module ValidateCommand =
                 $"Type '%s{ut.TypeName}' was not mapped: %s{ut.Reason} (at %s{ut.Location.File}:%d{ut.Location.Line})"
               Uri = None })
 
-    let private computeFileHash (filePath: string) : string =
-        use sha256 = SHA256.Create()
-        use stream = File.OpenRead(filePath)
-        let hash = sha256.ComputeHash(stream)
-        BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant()
-
-    let private checkStaleness (state: ExtractionState) : ValidationIssue list =
-        // Collect unique source files from the SourceMap
-        let sourceFiles =
-            state.SourceMap
-            |> Map.values
-            |> Seq.map (fun loc -> loc.File)
-            |> Seq.distinct
-            |> Seq.toList
-
-        if sourceFiles.IsEmpty then
-            []
-        else
-            // Compute current combined hash and compare to stored SourceHash
-            let currentHashes =
-                sourceFiles
-                |> List.choose (fun f -> if File.Exists f then Some(computeFileHash f) else None)
-                |> String.concat ""
-
-            let currentCombinedHash =
-                if currentHashes.Length > 0 then
-                    use sha256 = SHA256.Create()
-                    let bytes = System.Text.Encoding.UTF8.GetBytes(currentHashes)
-                    BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant()
-                else
-                    ""
-
-            if
-                currentCombinedHash <> state.Metadata.SourceHash
-                && state.Metadata.SourceHash <> ""
-            then
-                [ { Severity = Warning
-                    Message = "Source files have changed since last extraction. Run 'frank-cli extract' to update."
-                    Uri = None } ]
-            else
-                []
-
     let execute (projectPath: string) : Result<ValidateResult, string> =
         let statePath = ExtractionState.defaultStatePath (Path.GetDirectoryName projectPath)
 
@@ -174,7 +131,14 @@ module ValidateCommand =
             let propertyIssues = checkClassesHaveProperties state.Ontology owlClasses
             let shapeIssues = checkShapeTargetClasses state.Ontology state.Shapes
             let unmappedIssues = checkUnmappedTypes state.UnmappedTypes
-            let stalenessIssues = checkStaleness state
+            let stalenessIssues =
+                match StalenessChecker.checkStaleness state with
+                | Stale ->
+                    [ { Severity = Warning
+                        Message = "Source files have changed since last extraction. Run 'frank-cli extract' to update."
+                        Uri = None } ]
+                | Fresh
+                | Indeterminate -> []
 
             let allIssues = propertyIssues @ shapeIssues @ unmappedIssues @ stalenessIssues
 

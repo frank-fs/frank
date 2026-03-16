@@ -59,12 +59,12 @@
 **Estimated Prompt Size**: ~450 lines
 
 ### Included Subtasks
-- [x] T006 Create `src/Frank.Statecharts/Smcat/Lexer.fs` with mutable scanning pattern (matching WSD Lexer)
-- [x] T007 Implement identifier and quoted string tokenization (plain identifiers, dot-separated identifiers, quoted `"strings"`)
-- [x] T008 Implement punctuation and arrow tokenization (=>, :, ;, ,, [, ], {, }, /, =)
-- [x] T009 Implement comment handling (# lines), whitespace skipping, and newline handling (\r\n and \n)
-- [x] T010 Implement activity keyword detection (entry/, exit/, ...) and caret/close-bracket prefix tokens
-- [x] T011 [P] Create `test/Frank.Statecharts.Tests/Smcat/LexerTests.fs` with comprehensive token tests
+- [ ] T006 Create `src/Frank.Statecharts/Smcat/Lexer.fs` with mutable scanning pattern (matching WSD Lexer)
+- [ ] T007 Implement identifier and quoted string tokenization (plain identifiers, dot-separated identifiers, quoted `"strings"`)
+- [ ] T008 Implement punctuation and arrow tokenization (=>, :, ;, ,, [, ], {, }, /, =)
+- [ ] T009 Implement comment handling (# lines), whitespace skipping, and newline handling (\r\n and \n)
+- [ ] T010 Implement activity keyword detection (entry/, exit/, ...) and caret/close-bracket prefix tokens
+- [ ] T011 [P] Create `test/Frank.Statecharts.Tests/Smcat/LexerTests.fs` with comprehensive token tests
 
 ### Implementation Notes
 - Follow WSD Lexer.fs mutable scanning pattern: `pos`, `line`, `col` variables, `peek()`, `advance()`, `newline()`, `makeToken()` inline helpers
@@ -165,11 +165,11 @@
 **Estimated Prompt Size**: ~400 lines
 
 ### Included Subtasks
-- [x] T025 Create `src/Frank.Statecharts/Smcat/Generator.fs` implementing the `generate` function with the API from contracts/api-signatures.md
-- [x] T026 Implement initial state handling: emit `initial => <first_state>;` as first transition when initial state exists
-- [x] T027 Implement transition label formatting: `event [guard] / action` with optional components omitted cleanly
-- [x] T028 Implement final state handling: emit `<source> => final;` transitions for states with IsFinal flag
-- [x] T029 [P] Create `test/Frank.Statecharts.Tests/Smcat/GeneratorTests.fs` with tests covering all User Story 3 acceptance scenarios
+- [ ] T025 Create `src/Frank.Statecharts/Smcat/Generator.fs` implementing the `generate` function with the API from contracts/api-signatures.md
+- [ ] T026 Implement initial state handling: emit `initial => <first_state>;` as first transition when initial state exists
+- [ ] T027 Implement transition label formatting: `event [guard] / action` with optional components omitted cleanly
+- [ ] T028 Implement final state handling: emit `<source> => final;` transitions for states with IsFinal flag
+- [ ] T029 [P] Create `test/Frank.Statecharts.Tests/Smcat/GeneratorTests.fs` with tests covering all User Story 3 acceptance scenarios
 
 ### Implementation Notes
 - Generator API takes `StateMachineMetadata<'State, 'Event, 'Context>` plus helper functions (`stateNames`, `eventNames`) and an explicit `transitions` list (since metadata stores transitions as closures)

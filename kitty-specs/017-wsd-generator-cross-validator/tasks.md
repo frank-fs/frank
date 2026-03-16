@@ -96,11 +96,11 @@
 **Estimated Prompt Size**: ~350 lines
 
 ### Included Subtasks
-- [x] T013 Create `Wsd/GeneratorRoundTripTests.fs` in test project with roundtrip test infrastructure (helper functions for AST comparison)
-- [x] T014 Implement turnstile roundtrip test: construct 3-state metadata, generate WSD via `Generator.generate` + `Serializer.serialize`, parse back via `parseWsd`, verify participant names, message labels, and title match
-- [x] T015 Implement edge case roundtrip tests: single state (no transitions), self-transition, state names with special characters (quoting), metadata with guards (verify guard annotations survive roundtrip)
-- [x] T016 Add `Wsd/SerializerTests.fs`, `Wsd/GeneratorTests.fs`, `Wsd/GeneratorRoundTripTests.fs` to test project `.fsproj` compile items (before `Program.fs`)
-- [x] T017 Verify `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` succeeds for all TFMs (net8.0, net9.0, net10.0) and `dotnet test test/Frank.Statecharts.Tests/` passes all tests including new ones
+- [ ] T013 Create `Wsd/GeneratorRoundTripTests.fs` in test project with roundtrip test infrastructure (helper functions for AST comparison)
+- [ ] T014 Implement turnstile roundtrip test: construct 3-state metadata, generate WSD via `Generator.generate` + `Serializer.serialize`, parse back via `parseWsd`, verify participant names, message labels, and title match
+- [ ] T015 Implement edge case roundtrip tests: single state (no transitions), self-transition, state names with special characters (quoting), metadata with guards (verify guard annotations survive roundtrip)
+- [ ] T016 Add `Wsd/SerializerTests.fs`, `Wsd/GeneratorTests.fs`, `Wsd/GeneratorRoundTripTests.fs` to test project `.fsproj` compile items (before `Program.fs`)
+- [ ] T017 Verify `dotnet build src/Frank.Statecharts/Frank.Statecharts.fsproj` succeeds for all TFMs (net8.0, net9.0, net10.0) and `dotnet test test/Frank.Statecharts.Tests/` passes all tests including new ones
 
 ### Implementation Notes
 - Roundtrip tests use `Generator.generate` + `Serializer.serialize` + `Parser.parseWsd` — the full pipeline

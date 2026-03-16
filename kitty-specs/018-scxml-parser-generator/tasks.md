@@ -55,12 +55,12 @@
 **Estimated prompt size**: ~450 lines
 
 ### Included Subtasks
-- [x] T003 Create `src/Frank.Statecharts/Scxml/Parser.fs` with SCXML namespace constant, `XDocument` loading helper (`LoadOptions.SetLineInfo`), and `extractPosition` helper (via `IXmlLineInfo` cast)
-- [x] T004 Implement `<scxml>` root element parsing: extract `initial`, `name`, `datamodel`, `binding` attributes, validate root element namespace
-- [x] T005 Implement `<state>`, `<final>`, `<parallel>` element parsing with `ScxmlStateKind` derivation (Simple/Compound/Parallel/Final), recursive child state parsing
-- [x] T006 Implement `<transition>` parsing: extract `event`, `cond`, `target` (space-split into list), `type` (default External) attributes
-- [x] T009 Implement initial state inference (when `<scxml>` has no `initial` attribute, use first child state ID per W3C section 3.2) and compound state detection (state with child states -> Compound)
-- [x] T012 Update `Frank.Statecharts.fsproj` to add `Scxml/Parser.fs` compile entry after `Scxml/Types.fs`
+- [ ] T003 Create `src/Frank.Statecharts/Scxml/Parser.fs` with SCXML namespace constant, `XDocument` loading helper (`LoadOptions.SetLineInfo`), and `extractPosition` helper (via `IXmlLineInfo` cast)
+- [ ] T004 Implement `<scxml>` root element parsing: extract `initial`, `name`, `datamodel`, `binding` attributes, validate root element namespace
+- [ ] T005 Implement `<state>`, `<final>`, `<parallel>` element parsing with `ScxmlStateKind` derivation (Simple/Compound/Parallel/Final), recursive child state parsing
+- [ ] T006 Implement `<transition>` parsing: extract `event`, `cond`, `target` (space-split into list), `type` (default External) attributes
+- [ ] T009 Implement initial state inference (when `<scxml>` has no `initial` attribute, use first child state ID per W3C section 3.2) and compound state detection (state with child states -> Compound)
+- [ ] T012 Update `Frank.Statecharts.fsproj` to add `Scxml/Parser.fs` compile entry after `Scxml/Types.fs`
 
 ### Implementation Notes
 - Module: `module internal Frank.Statecharts.Scxml.Parser`
@@ -120,13 +120,13 @@
 **Estimated prompt size**: ~450 lines
 
 ### Included Subtasks
-- [x] T013 Create `src/Frank.Statecharts/Scxml/Generator.fs` with module declaration, SCXML namespace/version constants, and `generate` function scaffolding using `XDocument`/`XElement`
-- [x] T014 Implement state element generation: emit `<state>`, `<final>`, or `<parallel>` based on `ScxmlStateKind`, with `id` and `initial` attributes, recursive child state generation for compound/parallel states
-- [x] T015 Implement transition element generation: emit `<transition>` with `event`, `cond`, `target` (joined with spaces for multi-target), and `type` attributes (omit `type` when External/default)
-- [x] T016 Implement datamodel/data element generation: emit `<datamodel>` with `<data id="..." expr="..."/>` children; entries with no expression emit `<data id="..."/>`
-- [x] T017 Implement history and invoke element generation: emit `<history id="..." type="...">` with optional child `<transition>`, emit `<invoke>` with `type`, `src`, `id` attributes
-- [x] T018 Implement `generateTo : TextWriter -> ScxmlDocument -> unit` overload that writes directly to a `TextWriter`
-- [x] T019 Update `Frank.Statecharts.fsproj` to add `Scxml/Generator.fs` compile entry after `Scxml/Parser.fs`
+- [ ] T013 Create `src/Frank.Statecharts/Scxml/Generator.fs` with module declaration, SCXML namespace/version constants, and `generate` function scaffolding using `XDocument`/`XElement`
+- [ ] T014 Implement state element generation: emit `<state>`, `<final>`, or `<parallel>` based on `ScxmlStateKind`, with `id` and `initial` attributes, recursive child state generation for compound/parallel states
+- [ ] T015 Implement transition element generation: emit `<transition>` with `event`, `cond`, `target` (joined with spaces for multi-target), and `type` attributes (omit `type` when External/default)
+- [ ] T016 Implement datamodel/data element generation: emit `<datamodel>` with `<data id="..." expr="..."/>` children; entries with no expression emit `<data id="..."/>`
+- [ ] T017 Implement history and invoke element generation: emit `<history id="..." type="...">` with optional child `<transition>`, emit `<invoke>` with `type`, `src`, `id` attributes
+- [ ] T018 Implement `generateTo : TextWriter -> ScxmlDocument -> unit` overload that writes directly to a `TextWriter`
+- [ ] T019 Update `Frank.Statecharts.fsproj` to add `Scxml/Generator.fs` compile entry after `Scxml/Parser.fs`
 
 ### Implementation Notes
 - Module: `module internal Frank.Statecharts.Scxml.Generator`
