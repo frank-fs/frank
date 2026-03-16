@@ -23,6 +23,7 @@
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
+    <Compile Include="Help/HelpSubcommand.fs" />
     <Compile Include="Output/ArtifactSerializer.fs" />
     <Compile Include="Commands/ExtractCommand.fs" />
     <Compile Include="Commands/ClarifyCommand.fs" />
