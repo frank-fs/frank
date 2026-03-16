@@ -52,19 +52,19 @@ An agent sends a GET request to a Frank resource and receives the normal respons
 
 ---
 
-### User Story 3 - Developer Enables Discovery Per-Resource (Priority: P2)
+### User Story 3 - Developer Controls Discovery Per-Resource (Priority: P2)
 
-A Frank developer wants discovery on some resources but not others. They use a per-resource opt-in mechanism (e.g., a custom operation on the `ResourceBuilder`) to enable Link header emission for specific resources, while leaving others without discovery headers.
+A Frank developer wants discovery on some resources but not others. Per-resource control is achieved implicitly by choosing which resources receive semantic markers (e.g., `linkedData`, statechart spec types). Resources with `DiscoveryMediaType` metadata entries get Link headers; resources without them do not. No dedicated `discoverable` operation is needed.
 
 **Why this priority**: Per-resource granularity gives developers control over which resources advertise themselves. Some resources may be internal or not meaningful for agent discovery.
 
-**Independent Test**: Register two resources: one with Link header discovery enabled, one without. Send GET requests to both. Verify only the opted-in resource includes Link headers.
+**Independent Test**: Register two resources: one with a semantic marker (e.g., `linkedData`) that adds `DiscoveryMediaType` metadata, one without any semantic markers. Enable Link header discovery globally. Send GET requests to both. Verify only the semantically-marked resource includes Link headers.
 
 **Acceptance Scenarios**:
 
-1. **Given** a resource with per-resource Link header discovery enabled, **When** a GET request is sent, **Then** the response includes appropriate `Link` headers.
-2. **Given** a resource *without* per-resource Link header discovery, and no global opt-in, **When** a GET request is sent, **Then** no `Link` headers are emitted.
-3. **Given** global Link header discovery is enabled, **When** a GET is sent to any resource with semantic markers, **Then** Link headers are included regardless of per-resource settings.
+1. **Given** a resource with semantic markers (e.g., `linkedData`) that add `DiscoveryMediaType` metadata, and Link header discovery is enabled, **When** a GET request is sent, **Then** the response includes appropriate `Link` headers.
+2. **Given** a resource *without* any semantic markers (no `DiscoveryMediaType` metadata), **When** a GET request is sent, **Then** no `Link` headers are emitted, even if Link header discovery is enabled globally.
+3. **Given** global Link header discovery is enabled, **When** a GET is sent to any resource with `DiscoveryMediaType` metadata from any extension, **Then** Link headers are included automatically.
 
 ---
 
@@ -103,7 +103,7 @@ A Frank developer wants all semantically-marked resources to automatically inclu
 - **FR-002**: System MUST aggregate media type information from endpoint metadata contributed by registered extensions (e.g., Frank.LinkedData, Frank.Statecharts) and include them in the OPTIONS response
 - **FR-003**: System MUST define a standard endpoint metadata type for media type discovery that any extension can use to register its supported media types on a per-resource basis
 - **FR-004**: System MUST include `Link` headers with `rel="describedby"` on responses from semantically-marked resources when Link header discovery is enabled, following RFC 8288 (Web Linking)
-- **FR-005**: System MUST support opt-in for Link header discovery both per-resource (via a resource builder operation) and globally (via a WebHostBuilder operation)
+- **FR-005**: System MUST support opt-in for Link header discovery both per-resource (implicitly, by whether an extension adds `DiscoveryMediaType` metadata to a resource -- e.g., via the `linkedData` custom operation) and globally (via `useLinkHeaders`/`useDiscovery` WebHostBuilder operations that register the `LinkHeaderMiddleware`)
 - **FR-006**: System MUST NOT alter behavior of resources without semantic metadata markers -- no Link headers added, no media types listed beyond the resource's registered HTTP methods in the Allow header
 - **FR-007**: System MUST NOT interfere with existing explicit `options` handlers defined by the developer on a resource -- explicit handlers take precedence over the implicit discovery handler
 - **FR-008**: System MUST NOT interfere with CORS middleware -- CORS preflight handling and `Access-Control-*` headers remain unaffected
@@ -117,8 +117,7 @@ A Frank developer wants all semantically-marked resources to automatically inclu
 ### Key Entities
 
 - **DiscoveryMediaType**: Endpoint metadata type that represents a media type available for content negotiation on a resource. Extensions add instances of this to endpoint metadata during resource registration. Contains at minimum the media type string (e.g., `application/ld+json`) and optionally a `rel` value for Link header generation.
-- **DiscoveryMiddleware**: Middleware that handles implicit OPTIONS responses by inspecting endpoint metadata for registered HTTP methods and `DiscoveryMediaType` entries. Also responsible for appending Link headers to non-OPTIONS responses when Link discovery is enabled.
-- **DiscoveryMarker**: Endpoint metadata marker indicating that Link header discovery is enabled for a specific resource (per-resource opt-in). Presence of this marker (or global enablement) triggers Link header emission.
+- **DiscoveryMiddleware**: Middleware that handles implicit OPTIONS responses by inspecting endpoint metadata for registered HTTP methods and `DiscoveryMediaType` entries. Also responsible for appending Link headers to non-OPTIONS responses when Link discovery is enabled. Per-resource Link header emission is triggered implicitly by the presence of any `DiscoveryMediaType` entries in an endpoint's metadata (no separate marker needed).
 
 ## Success Criteria
 
