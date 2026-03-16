@@ -1,9 +1,12 @@
 ---
 work_package_id: WP03
 title: Help Subcommand Logic
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 016-frank-cli-help-system-WP01
+base_commit: 7c2fcc4753732433dcf675b8b2222356cf6af603
+created_at: '2026-03-16T04:33:01.289374+00:00'
 subtasks:
 - T013
 - T014
@@ -13,7 +16,7 @@ subtasks:
 phase: Phase 2 - Content and Logic
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "16238"
 review_status: ''
 reviewed_by: ''
 history:
