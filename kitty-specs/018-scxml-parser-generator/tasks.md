@@ -125,7 +125,7 @@
 - [x] T015 Implement transition element generation: emit `<transition>` with `event`, `cond`, `target` (joined with spaces for multi-target), and `type` attributes (omit `type` when External/default)
 - [x] T016 Implement datamodel/data element generation: emit `<datamodel>` with `<data id="..." expr="..."/>` children; entries with no expression emit `<data id="..."/>`
 - [x] T017 Implement history and invoke element generation: emit `<history id="..." type="...">` with optional child `<transition>`, emit `<invoke>` with `type`, `src`, `id` attributes
-- [ ] T018 Implement `generateTo : TextWriter -> ScxmlDocument -> unit` overload that writes directly to a `TextWriter`
+- [x] T018 Implement `generateTo : TextWriter -> ScxmlDocument -> unit` overload that writes directly to a `TextWriter`
 - [ ] T019 Update `Frank.Statecharts.fsproj` to add `Scxml/Generator.fs` compile entry after `Scxml/Parser.fs`
 
 ### Implementation Notes
