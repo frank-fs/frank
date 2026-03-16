@@ -15,6 +15,15 @@ module Builder =
     [<Struct>]
     type Resource = { Endpoints: Endpoint[] }
 
+    /// Media type metadata for HTTP discovery (OPTIONS + Link headers).
+    /// Extensions add instances to endpoint metadata to advertise supported content types.
+    [<Struct>]
+    type DiscoveryMediaType =
+        { /// The content type string (e.g., "application/ld+json", "text/turtle").
+          MediaType: string
+          /// The link relation type for Link header generation (e.g., "describedby").
+          Rel: string }
+
     type ResourceSpec =
         { Name: string
           Handlers: (string * RequestDelegate) list
