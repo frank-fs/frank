@@ -2,12 +2,12 @@
 work_package_id: "WP01"
 title: "Shared AST Type Definitions"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: []
 requirement_refs:
   - "FR-001"
@@ -394,3 +394,4 @@ type StatechartDocument =
 ## Activity Log
 
 - 2026-03-15T23:59:08Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:25:01Z – unknown – lane=done – Moved to done

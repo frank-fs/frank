@@ -10,10 +10,10 @@ subtasks:
   - "T014"
 title: "ALPS JSON Parser"
 phase: "Phase 1 - Core Parsers"
-lane: "planned"
+lane: "doing"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus-reviewer"
+shell_pid: "12759"
 review_status: ""
 reviewed_by: ""
 dependencies: ["WP01"]
@@ -407,3 +407,5 @@ testList "Alps.JsonParser errors" [
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
+- 2026-03-16T04:28:10Z – unknown – lane=for_review – Ready for review: ALPS JSON parser with full test coverage (295 tests pass, multi-target build succeeds)
+- 2026-03-16T04:29:05Z – claude-opus-reviewer – shell_pid=12759 – lane=doing – Started review via workflow command

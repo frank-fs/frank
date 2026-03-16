@@ -62,9 +62,9 @@
 - [ ] T010 Implement `AstHelpers.allTransitions` function in `src/Frank.Statecharts/Validation/Validator.fs`
 - [ ] T011 Implement `AstHelpers.stateIdentifiers` function in `src/Frank.Statecharts/Validation/Validator.fs`
 - [ ] T012 Implement `AstHelpers.eventNames` function in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T013 Implement `AstHelpers.transitionTargets` function in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T014 Implement `Validator.validate` orchestrator function with skip logic, exception handling, and report aggregation
-- [ ] T015 Update `Frank.Statecharts.fsproj` to include `Validation/Validator.fs` after `Validation/Types.fs`
+- [x] T013 Implement `AstHelpers.transitionTargets` function in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T014 Implement `Validator.validate` orchestrator function with skip logic, exception handling, and report aggregation
+- [x] T015 Update `Frank.Statecharts.fsproj` to include `Validation/Validator.fs` after `Validation/Types.fs`
 
 ### Implementation Notes
 - `AstHelpers` must recursively traverse `StatechartDocument.Elements`, descending into `GroupBlock.Branches` and `StateNode.Children`.
@@ -90,8 +90,8 @@
 **Estimated size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T016 Implement orphan transition target rule (all transition targets reference existing states) in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T017 Implement duplicate state identifier rule in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T016 Implement orphan transition target rule (all transition targets reference existing states) in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T017 Implement duplicate state identifier rule in `src/Frank.Statecharts/Validation/Validator.fs`
 - [ ] T018 Implement required AST fields rule (non-empty state identifiers, non-empty transition sources) in `src/Frank.Statecharts/Validation/Validator.fs`
 - [ ] T019 Implement isolated state warning rule (states with no incoming/outgoing transitions) in `src/Frank.Statecharts/Validation/Validator.fs`
 - [ ] T020 Implement empty statechart warning rule (no states, no transitions) in `src/Frank.Statecharts/Validation/Validator.fs`

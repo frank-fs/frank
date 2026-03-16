@@ -62,13 +62,13 @@
 **Estimated Prompt Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T008 Implement top-level parseAlpsJson function in `src/Frank.Statecharts/Alps/JsonParser.fs` -- parse root `alps` object, `version`, `doc` element
-- [ ] T009 Implement descriptor parsing in JsonParser.fs -- `id`, `type` (defaulting to Semantic), `href`, `rt`, nested `descriptor` array, `ext` array, `link` array, `doc` element
-- [ ] T010 Implement error handling in JsonParser.fs -- wrap `JsonDocument.Parse` in try/catch for `JsonException`, collect schema errors for missing fields, return `Result<AlpsDocument, AlpsParseError list>`
-- [ ] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
-- [ ] T012 Create `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` -- tic-tac-toe golden file test, onboarding golden file test
-- [ ] T013 [P] Add edge case tests in JsonParserTests.fs -- empty document, missing type defaults to semantic, forward-compatible unknown properties, unicode characters, large documents
-- [ ] T014 [P] Add error case tests in JsonParserTests.fs -- malformed JSON, missing alps root, invalid structure
+- [x] T008 Implement top-level parseAlpsJson function in `src/Frank.Statecharts/Alps/JsonParser.fs` -- parse root `alps` object, `version`, `doc` element
+- [x] T009 Implement descriptor parsing in JsonParser.fs -- `id`, `type` (defaulting to Semantic), `href`, `rt`, nested `descriptor` array, `ext` array, `link` array, `doc` element
+- [x] T010 Implement error handling in JsonParser.fs -- wrap `JsonDocument.Parse` in try/catch for `JsonException`, collect schema errors for missing fields, return `Result<AlpsDocument, AlpsParseError list>`
+- [x] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
+- [x] T012 Create `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` -- tic-tac-toe golden file test, onboarding golden file test
+- [x] T013 [P] Add edge case tests in JsonParserTests.fs -- empty document, missing type defaults to semantic, forward-compatible unknown properties, unicode characters, large documents
+- [x] T014 [P] Add error case tests in JsonParserTests.fs -- malformed JSON, missing alps root, invalid structure
 
 ### Implementation Notes
 - Use `System.Text.Json.JsonDocument` with `use` binding (constitution principle VI, R-003).
@@ -98,11 +98,11 @@
 **Estimated Prompt Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T015 Implement top-level parseAlpsXml function in `src/Frank.Statecharts/Alps/XmlParser.fs` -- parse root `<alps>` element, `version` attribute, `<doc>` child element
-- [ ] T016 Implement descriptor parsing in XmlParser.fs -- `id`, `type`, `href`, `rt` as XML attributes; nested `<descriptor>`, `<ext>`, `<link>`, `<doc>` as child elements
-- [ ] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
-- [ ] T018 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/JsonParser.fs)
-- [ ] T019 Create `test/Frank.Statecharts.Tests/Alps/XmlParserTests.fs` -- tic-tac-toe golden file test, cross-format equivalence test (JSON AST vs XML AST)
+- [x] T015 Implement top-level parseAlpsXml function in `src/Frank.Statecharts/Alps/XmlParser.fs` -- parse root `<alps>` element, `version` attribute, `<doc>` child element
+- [x] T016 Implement descriptor parsing in XmlParser.fs -- `id`, `type`, `href`, `rt` as XML attributes; nested `<descriptor>`, `<ext>`, `<link>`, `<doc>` as child elements
+- [x] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
+- [x] T018 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/JsonParser.fs)
+- [x] T019 Create `test/Frank.Statecharts.Tests/Alps/XmlParserTests.fs` -- tic-tac-toe golden file test, cross-format equivalence test (JSON AST vs XML AST)
 - [ ] T020 [P] Add edge case and error tests in XmlParserTests.fs -- empty document, namespace handling, forward-compatible unknown elements, malformed XML, missing attributes
 
 ### Implementation Notes

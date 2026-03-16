@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Actor Concurrency Validation & Documentation
-lane: "doing"
+lane: "planned"
 dependencies: [WP02]
 base_branch: 010-statecharts-production-readiness-WP01
 base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
@@ -15,8 +15,9 @@ phase: Phase 2 - Parallel Streams
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "3584"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/wp03-review-feedback.md"
 history:
 - timestamp: '2026-03-16T00:05:00Z'
   lane: planned
@@ -42,11 +43,87 @@ requirement_refs:
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/wp03-review-feedback.md`
 
-*[This section is empty initially. Reviewers will populate it if the work is returned from review.]*
+## Review Feedback for WP03 -- Actor Concurrency Validation & Documentation
+
+### Reviewer: claude-opus-reviewer
+### Date: 2026-03-16
 
 ---
+
+### Overall Assessment: CHANGES REQUESTED
+
+The documentation work (T017, T020) is excellent -- thorough, accurate, and well-structured XML docs on `IStateMachineStore`, its members, `StoreMessage`, and `MailboxProcessorStore`. The interface signature and implementation are confirmed unchanged (documentation-only changes). Three of the four new tests are solid.
+
+However, there is one flaky test that must be fixed before approval.
+
+---
+
+### Issue 1: Flaky test -- "Interleaved GetState and SetState on same instance produce no torn reads" (MUST FIX)
+
+**File**: `test/Frank.Statecharts.Tests/StoreTests.fs`, lines 337-364
+**Severity**: Bug -- causes intermittent test failures (~50% failure rate in testing)
+
+**Root cause**: The test sets an initial state of `("Initial", 0)` before the interleaved loop, but the assertion always expects `sprintf "State-%d" ctx`. When a read operation returns the initial state where `ctx = 0`, the assertion expects `"State-0"` but gets `"Initial"`, causing the test to fail.
+
+The write operations in the loop start at `i = 0`, producing `("State-0", 0)`. But the initial `SetState "inst1" "Initial" 0` creates a state where `ctx = 0` maps to `"Initial"`, not `"State-0"`. If any read is processed before write `i=0`, it sees `("Initial", 0)` and the consistency check fails because `sprintf "State-%d" 0` = `"State-0"` != `"Initial"`.
+
+**Fix**: Change the initial SetState to use the same naming convention as the loop:
+
+```fsharp
+// Before (line 342):
+do! iface.SetState "inst1" "Initial" 0 |> Async.AwaitTask
+
+// After:
+do! iface.SetState "inst1" "State-0" 0 |> Async.AwaitTask
+```
+
+Alternatively, change the initial state context to `-1` so it never collides with the loop's naming:
+
+```fsharp
+do! iface.SetState "inst1" "Initial" -1 |> Async.AwaitTask
+```
+
+And then adjust the assertion to handle the initial state case:
+
+```fsharp
+let expectedState = if ctx = -1 then "Initial" else sprintf "State-%d" ctx
+```
+
+The simplest fix is the first option (`"State-0"` with context `0`).
+
+---
+
+### Dependency Check
+
+- **WP03 declares dependency on WP02**: WP02 is still in `planned` lane (not started). However, after code review, WP03 does NOT actually depend on WP02's changes. The implementation only adds XML docs to `Store.fs` and concurrency tests to `StoreTests.fs` -- neither references Guard DU types from WP02. The declared dependency appears to be overly conservative. This is not a blocker but should be noted for the dependency graph.
+- **WP05 depends on WP03**: WP05 is in `planned` lane, no rebase concern.
+
+---
+
+### Subtask-Level Review
+
+| Subtask | Status | Notes |
+|---------|--------|-------|
+| T017 | PASS | XML docs on `IStateMachineStore`, its members, and `StoreMessage` are accurate and comprehensive |
+| T018 | NEEDS FIX | "Concurrent SetState to same instance are serialized" test is fine, but "Interleaved GetState and SetState" has the flaky bug described above |
+| T019 | PASS | "All state changes are observed (no lost updates via subscriber)" test is correct and reliable |
+| T020 | PASS | Backpressure documentation on `MailboxProcessorStore` is well-written with actionable mitigation guidance |
+
+---
+
+### Additional Observations (non-blocking)
+
+1. The "Subscriber notifications preserve sequential consistency" test uses sequential `SetState` calls rather than concurrent ones (intentionally), which is a good complementary test to the concurrent subscriber test in T019.
+
+2. The existing `concurrencyTests` test list (pre-WP03) already tests 100 concurrent operations across 10 instances. The new `actorSerializationTests` correctly focuses on same-instance contention, which is the novel contribution.
+
+3. All documentation accurately describes the actor-serialization contract and backpressure limitation as specified in the WP03 prompt.
+
 
 ## Implementation Command
 
@@ -254,3 +331,4 @@ To change a work package's lane, either:
 - 2026-03-16T04:03:04Z – claude-opus-4-6 – shell_pid=98858 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:15:11Z – claude-opus-4-6 – shell_pid=98858 – lane=for_review – Moved to for_review
 - 2026-03-16T04:15:48Z – claude-opus-reviewer – shell_pid=3584 – lane=doing – Started review via workflow command
+- 2026-03-16T04:20:47Z – claude-opus-reviewer – shell_pid=3584 – lane=planned – Moved to planned

@@ -1,10 +1,13 @@
 ---
 work_package_id: WP05
 title: Generator
-lane: planned
+lane: "for_review"
 dependencies:
 - WP01
 - WP02
+base_branch: 013-smcat-parser-generator-WP05-merge-base
+base_commit: 8129dd5d9159bf6609e884a7f65a3050b2f1c4b6
+created_at: '2026-03-16T04:25:25.875918+00:00'
 subtasks:
 - T025
 - T026
@@ -13,8 +16,8 @@ subtasks:
 - T029
 phase: Phase 2 - Generation
 assignee: ''
-agent: ''
-shell_pid: ''
+agent: "claude-opus-4-6"
+shell_pid: "9648"
 review_status: ''
 reviewed_by: ''
 history:
@@ -340,3 +343,5 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP05 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T04:25:26Z – claude-opus-4-6 – shell_pid=9648 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:30:11Z – claude-opus-4-6 – shell_pid=9648 – lane=for_review – Ready for review: Generator.fs and GeneratorTests.fs implemented. All 24 generator tests pass, all 270 tests pass with no regressions. API uses decomposed parameters instead of StateMachineMetadata<T> due to F# compilation ordering constraints.
