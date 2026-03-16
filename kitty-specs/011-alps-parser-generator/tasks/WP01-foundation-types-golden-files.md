@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Foundation -- ALPS Types, Golden Files, and Project Wiring
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 8b416b1f0b9492cefcb4f0b2099722a5835a76ce
@@ -319,3 +319,4 @@ let typeTests = testList "Alps.Types" [
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
 - 2026-03-16T04:02:23Z – claude-opus – shell_pid=97958 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:15:12Z – claude-opus – shell_pid=97958 – lane=for_review – Moved to for_review
