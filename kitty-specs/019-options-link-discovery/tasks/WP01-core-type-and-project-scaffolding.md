@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Core Type and Project Scaffolding
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 7b7d58d7a253edee23d92878e00801326a122534
@@ -235,3 +235,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 
 - 2026-03-16T01:20:58Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:02:38Z – claude-opus-4-6 – shell_pid=98469 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:14:36Z – claude-opus-4-6 – shell_pid=98469 – lane=for_review – Ready for review: DiscoveryMediaType struct added to Builder.fs, Frank.Discovery project scaffolded with multi-targeting, Frank.Discovery.Tests scaffolded with Expecto, both added to Frank.sln. Solution builds successfully.
