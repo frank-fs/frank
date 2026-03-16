@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP01"
-title: "XState Serializer & Project Visibility"
-lane: "planned"
+work_package_id: WP01
+title: XState Serializer & Project Visibility
+lane: "doing"
 dependencies: []
+base_branch: master
+base_commit: 8c9e0df6d0e6825253965765f97d6fd8da81e27a
+created_at: '2026-03-16T22:51:41.142113+00:00'
 subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+assignee: ''
+agent: ''
+shell_pid: "25918"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP01 -- XState Serializer & Project Visibility
