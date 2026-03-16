@@ -1,108 +1,170 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Validation Pipeline End-to-End Wiring
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `025-validation-pipeline-wiring` | **Date**: 2026-03-16 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `kitty-specs/025-validation-pipeline-wiring/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Add a thin orchestration module (`Pipeline.fs`) to `Frank.Statecharts.Validation` that accepts raw format source text as `(FormatTag * string)` pairs, dispatches to the correct parser per format, wraps results as `FormatArtifact` records, runs both self-consistency and cross-format validation rules, and returns a unified `PipelineResult`. This closes the gap between individual parsers and the existing cross-format validator engine (spec 021), enabling external consumers like frank-cli (#94) to validate statechart sources with a single function call. End-to-end integration tests verify the pipeline using real tic-tac-toe format text in all four formats.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts)
+**Primary Dependencies**: Frank.Statecharts (same project -- Pipeline is a new module in the existing assembly), Frank.Statecharts.Ast (shared AST types), Frank.Statecharts.Validation (existing Types.fs and Validator.fs)
+**Storage**: N/A (stateless -- pure functions, no persistence)
+**Testing**: Expecto 10.2.3 + YoloDev.Expecto.TestSdk 0.14.3 + Microsoft.NET.Test.Sdk 17.14.1 (matching existing `Frank.Statecharts.Tests`)
+**Target Platform**: .NET 8.0/9.0/10.0 (multi-targeting)
+**Project Type**: Single library project with co-located test project
+**Performance Goals**: Parse-and-validate of 4 format sources (~50 lines each) in under 2 seconds (SC-004)
+**Constraints**: Pipeline must be public (FR-013) for frank-cli consumption. BLOCKED on #113, #114, #115 completing parser migrations to uniform `string -> Ast.ParseResult` interface.
+**Scale/Scope**: One new source file (~100-150 lines), three new types added to existing Types.fs, one new test file (~300-400 lines)
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Resource-Oriented Design | N/A | Statechart tooling, not HTTP resource definition |
+| II. Idiomatic F# | PASS | Pipeline uses discriminated unions (`PipelineError`, `FormatTag`), option types, pure functions, pipeline-friendly signature `(FormatTag * string) list -> PipelineResult` |
+| III. Library, Not Framework | PASS | Adds a composable function, no opinions beyond orchestration. Callers handle I/O and presentation. |
+| IV. ASP.NET Core Native | N/A | No ASP.NET Core interaction -- pure library function |
+| V. Performance Parity | PASS | Delegates to existing parsers and validator; no new allocations in hot paths. Performance test (SC-004) validates <2s for 4-format validation. |
+| VI. Resource Disposal Discipline | PASS | No IDisposable resources created. All parsers are `string -> ParseResult` (post-migration), no streams or readers. |
+| VII. No Silent Exception Swallowing | PASS | Parse errors are surfaced in `FormatParseResult.Errors`. Pipeline-level errors (duplicate format, unsupported format) returned as `PipelineError` in the result, not swallowed. Existing `Validator.validate` already catches rule exceptions and reports them as failures. |
+| VIII. No Duplicated Logic | PASS | Reuses existing `SelfConsistencyRules.rules`, `CrossFormatRules.rules`, and `Validator.validate`. No logic duplication. Parser dispatch is a simple match expression with one case per format -- not duplicable. |
+
+**Post-design re-check**: No new concerns. The Pipeline module is a thin dispatcher that composes existing pieces.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/025-validation-pipeline-wiring/
+├── plan.md              # This file
+├── spec.md              # Feature specification
+├── data-model.md        # Phase 1: type definitions
+└── quickstart.md        # Phase 1: usage examples
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+src/Frank.Statecharts/
+├── Validation/
+│   ├── Types.fs              # MODIFY: Add PipelineResult, FormatParseResult, PipelineError types
+│   ├── Validator.fs           # UNCHANGED: Existing validator engine
+│   └── Pipeline.fs            # NEW: Pipeline module with validateSources function
+├── Frank.Statecharts.fsproj   # MODIFY: Add Compile Include for Pipeline.fs
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+test/Frank.Statecharts.Tests/
+├── Validation/
+│   ├── PipelineTests.fs       # NEW: Unit tests for Pipeline module (dispatch, edge cases)
+│   └── PipelineIntegrationTests.fs  # NEW: End-to-end tests with real format text
+├── Frank.Statecharts.Tests.fsproj   # MODIFY: Add Compile Includes for new test files
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Pipeline module is added to the existing `Frank.Statecharts` project alongside existing `Validation/` files. No new projects needed. The module lives in the same assembly as the parsers, so it can call internal parser functions directly. Tests go in the existing test project under the `Validation/` subdirectory, matching the established pattern.
 
 ## Complexity Tracking
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+No constitution violations. No additional complexity beyond what the spec requires.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+---
+
+## Phase 0: Research
+
+No research required. The user confirmed this is a low-risk thin orchestration layer. All dependencies are internal to the project:
+
+- **Parser interfaces**: WSD already returns `Ast.ParseResult` directly via `Wsd.Parser.parseWsd : string -> ParseResult`. The other three parsers (smcat, SCXML, ALPS) currently return format-specific types with separate Mapper modules. The spec is BLOCKED on #113/#114/#115 completing the migration to uniform `string -> Ast.ParseResult`. The Pipeline assumes the post-migration interface.
+- **Validator engine**: `Validator.validate : ValidationRule list -> FormatArtifact list -> ValidationReport` is the existing entry point (spec 021, complete).
+- **Validation rules**: `SelfConsistencyRules.rules` and `CrossFormatRules.rules` are the built-in rule sets. FR-014 adds optional custom rules via a parameter.
+- **Types**: `FormatTag`, `FormatArtifact`, `ValidationReport`, `ValidationRule` are all defined in `Validation/Types.fs`.
+
+**Decision**: No `research.md` needed -- all unknowns are resolved.
+
+---
+
+## Phase 1: Design
+
+### Data Model
+
+See `kitty-specs/025-validation-pipeline-wiring/data-model.md` for full type definitions.
+
+**New types added to `Validation/Types.fs`**:
+
+1. **`PipelineError`** -- Discriminated union for input validation errors:
+   - `DuplicateFormat of FormatTag` -- same format tag appears twice in input
+   - `UnsupportedFormat of FormatTag` -- no parser registered for this format tag
+
+2. **`FormatParseResult`** -- Per-format parse outcome:
+   - `Format: FormatTag` -- which format this result is for
+   - `Errors: ParseFailure list` -- parse errors from the format parser
+   - `Warnings: ParseWarning list` -- parse warnings from the format parser
+   - `Succeeded: bool` -- convenience: true when `Errors` is empty
+
+3. **`PipelineResult`** -- Top-level result from `validateSources`:
+   - `ParseResults: FormatParseResult list` -- one per input format
+   - `Report: ValidationReport` -- unified validation report from all rules
+   - `Errors: PipelineError list` -- pipeline-level errors (empty on success)
+
+**No changes to existing types.**
+
+### Pipeline Module Design
+
+`Pipeline.fs` -- a public module `Frank.Statecharts.Validation.Pipeline` containing:
+
+1. **`parserFor`** (private): `FormatTag -> (string -> Ast.ParseResult) option`
+   - Match on `FormatTag` and return the corresponding parser function
+   - `Wsd -> Some Wsd.Parser.parseWsd`
+   - `Smcat -> Some Smcat.Parser.parseSmcat` (post-migration)
+   - `Scxml -> Some (fun s -> Scxml.Parser.parseString s)` (post-migration, returns `Ast.ParseResult` directly)
+   - `Alps -> Some Alps.JsonParser.parseAlps` (post-migration, returns `Ast.ParseResult` directly)
+   - `XState -> None` (no parser exists)
+
+2. **`validateSources`** (public): `(FormatTag * string) list -> PipelineResult`
+   - Validate input: check for empty list (return empty result), duplicate formats (return error)
+   - For each `(tag, source)` pair:
+     - Look up parser via `parserFor`
+     - If no parser: add `UnsupportedFormat tag` to pipeline errors, skip
+     - If parser found: call `parser source`, collect `FormatParseResult`, wrap `Document` as `FormatArtifact`
+   - Assemble all `FormatArtifact` records
+   - Run `Validator.validate (SelfConsistencyRules.rules @ CrossFormatRules.rules) artifacts`
+   - Return `PipelineResult`
+
+3. **`validateSourcesWithRules`** (public): `ValidationRule list -> (FormatTag * string) list -> PipelineResult`
+   - Same as `validateSources` but prepends custom rules to the built-in rules (FR-014)
+   - `validateSources` is implemented as `validateSourcesWithRules []`
+
+### File Ordering in .fsproj
+
+`Pipeline.fs` must appear after `Validation/Validator.fs` in the compile order (it depends on `Validator`, `SelfConsistencyRules`, `CrossFormatRules`). It must also appear after all parser files since it dispatches to them.
+
+Insert after the existing `<!-- Validation -->` section:
+```xml
+<Compile Include="Validation/Types.fs" />
+<Compile Include="Validation/Validator.fs" />
+<Compile Include="Validation/Pipeline.fs" />    <!-- NEW -->
+```
+
+### Test Design
+
+**`PipelineTests.fs`** (unit tests):
+- Empty input returns empty result (FR-011)
+- Duplicate format tags return `DuplicateFormat` error (FR-010)
+- Unsupported format tag returns `UnsupportedFormat` error (FR-012)
+- Single format runs self-consistency only, cross-format skipped (User Story 3)
+- Parse errors included in `FormatParseResult.Errors` (FR-008)
+- Custom rules via `validateSourcesWithRules` (FR-014)
+
+**`PipelineIntegrationTests.fs`** (end-to-end with real format text):
+- Consistent tic-tac-toe in all 4 formats produces zero failures (SC-001, User Story 5 scenario 1)
+- State name mismatch detected across formats (SC-002, User Story 5 scenario 2)
+- Missing event detected across formats (User Story 5 scenario 3)
+- Parse error in one format still validates others (User Story 2)
+- Performance: 4 formats in under 2 seconds (SC-004)
+
+### Quickstart
+
+See `kitty-specs/025-validation-pipeline-wiring/quickstart.md` for usage examples.
