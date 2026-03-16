@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Help Subcommand Logic
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 base_branch: 016-frank-cli-help-system-WP01
@@ -264,3 +264,4 @@ module HelpSubcommand =
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:33:01Z – claude-opus – shell_pid=16238 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:36:22Z – claude-opus – shell_pid=16238 – lane=for_review – Ready for review: HelpSubcommand.fs with resolve and listAll functions, build verified
