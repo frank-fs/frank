@@ -1,32 +1,35 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-title: "Foundation Types and Utilities"
-phase: "Phase 1 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Foundation Types and Utilities
+lane: "doing"
 dependencies: []
-requirement_refs:
-  - "FR-001"
-  - "FR-002"
-  - "FR-003"
-  - "FR-006"
+base_branch: master
+base_commit: 68071d57fe1b9f4a7609eff52c062f851c88d506
+created_at: '2026-03-16T04:02:27.447120+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+phase: Phase 1 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "98171"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:04Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:04Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-001
+- FR-002
+- FR-003
+- FR-006
 ---
 
 # Work Package Prompt: WP01 -- Foundation Types and Utilities
