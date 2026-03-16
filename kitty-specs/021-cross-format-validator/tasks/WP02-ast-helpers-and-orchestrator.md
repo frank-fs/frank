@@ -16,7 +16,7 @@ subtasks:
 - T015
 phase: Phase 0 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "97995"
 review_status: ''
 reviewed_by: ''
@@ -405,3 +405,4 @@ This requires rules to encode enough info in `Reason` for the orchestrator to cr
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:24Z – claude-opus – shell_pid=97995 – lane=doing – Assigned agent via workflow command
