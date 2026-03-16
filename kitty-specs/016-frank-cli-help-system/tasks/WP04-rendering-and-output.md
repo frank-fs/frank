@@ -17,7 +17,7 @@ subtasks:
 - T024
 phase: Phase 3 - Rendering and Integration
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "60524"
 review_status: ''
 reviewed_by: ''
@@ -554,3 +554,4 @@ module HelpRenderer =
 ## Activity Log
 
 - 2026-03-15T23:59:04Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T11:46:56Z – claude-opus – shell_pid=60524 – lane=doing – Assigned agent via workflow command
