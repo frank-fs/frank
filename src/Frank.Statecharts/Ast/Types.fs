@@ -74,11 +74,14 @@ type AlpsTransitionKind =
     | Idempotent
 
 /// ALPS-specific annotation metadata.
-/// To be fleshed out by ALPS parser spec.
 type AlpsMeta =
     | AlpsTransitionType of AlpsTransitionKind
     | AlpsDescriptorHref of string
-    | AlpsExtension of name: string * value: string
+    | AlpsExtension of id: string * href: string option * value: string option
+    | AlpsDocumentation of format: string option * value: string
+    | AlpsLink of rel: string * href: string
+    | AlpsDataDescriptor of id: string * doc: (string option * string) option
+    | AlpsVersion of string
 
 // -- SCXML annotation stub --
 
