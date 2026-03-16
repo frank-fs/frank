@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: State Key Extraction
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
@@ -18,8 +18,8 @@ phase: Phase 1 - Foundation
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "4671"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-16T00:05:00Z'
   lane: planned
@@ -292,3 +292,4 @@ To change a work package's lane, either:
 - 2026-03-16T04:02:08Z – claude-opus – shell_pid=97668 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:15:43Z – claude-opus – shell_pid=97668 – lane=for_review – Ready for review: StateKeyExtractor with PreComputeUnionTagReader replaces ToString(). All 262 tests pass across net8.0/net9.0/net10.0.
 - 2026-03-16T04:17:12Z – claude-opus-reviewer – shell_pid=4671 – lane=doing – Started review via workflow command
+- 2026-03-16T04:20:54Z – claude-opus-reviewer – shell_pid=4671 – lane=done – Review passed: StateKeyExtractor implementation is correct and complete. All 7 subtasks (T001-T007) verified. PreComputeUnionTagReader + GetUnionCases properly cached in ConcurrentDictionary, StateHandlerMap correctly changed from Map<'State,...> to Map<string,...>, 3 ToString() call sites replaced, ETag provider unchanged, non-DU fallback to ToString() present, parameterized DU tests comprehensive (merged handlers, full lifecycle, nested DUs), backward compat tests cover simple cases and non-DU types. Build passes across net8.0/net9.0/net10.0 with 0 warnings, 262 tests pass.
