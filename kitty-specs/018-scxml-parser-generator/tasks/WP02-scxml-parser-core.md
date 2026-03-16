@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: SCXML Parser -- Core Parsing
+lane: "doing"
+dependencies: [WP01]
+base_branch: 018-scxml-parser-generator-WP01
+base_commit: 54eb41bfafff5aa8654f91de8815a1f2e2a99c0d
+created_at: '2026-03-16T04:17:17.394788+00:00'
 subtasks:
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T009"
-  - "T012"
-title: "SCXML Parser -- Core Parsing"
-phase: "Phase 2 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-012", "FR-013", "FR-014"]
+- T003
+- T004
+- T005
+- T006
+- T009
+- T012
+phase: Phase 2 - Implementation
+assignee: ''
+agent: "claude-opus"
+shell_pid: "4865"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T01:17:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T01:17:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-012, FR-013, FR-014]
 ---
 
 # Work Package Prompt: WP02 -- SCXML Parser -- Core Parsing
@@ -364,3 +367,4 @@ Expected result: `ScxmlDocument` with `InitialId = Some "idle"`, 3 states (idle=
 ## Activity Log
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:17:17Z – claude-opus – shell_pid=4865 – lane=doing – Assigned agent via workflow command
