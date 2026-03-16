@@ -6,14 +6,15 @@ subtasks:
   - "T008"
 title: "OPTIONS Discovery Middleware"
 phase: "Phase 1 - Core Implementation"
-lane: "doing"
+lane: "planned"
 assignee: ""
 agent: "claude-opus"
 shell_pid: "16154"
-review_status: ""
-reviewed_by: ""
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-002", "FR-006", "FR-007", "FR-008", "FR-009", "FR-013"]
+review_feedback_file: "/private/tmp/spec-kitty-review-feedback-WP02.md"
 history:
   - timestamp: "2026-03-16T01:20:58Z"
     lane: "planned"
@@ -24,15 +25,118 @@ history:
 
 # Work Package Prompt: WP02 -- OPTIONS Discovery Middleware
 
-## Review Feedback Status
+## Review Feedback
 
-**Read this first if you are implementing this task!**
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/spec-kitty-review-feedback-WP02.md`
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
-- **You must address all feedback** before your work is complete.
-- **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
+# Review Feedback for WP02: OPTIONS Discovery Middleware
 
----
+**Reviewer**: claude-opus
+**Date**: 2026-03-16
+**Verdict**: CHANGES REQUESTED
+
+## Summary
+
+The implementation is well-structured and follows established Frank patterns. The build succeeds, all 8 tests pass. However, there are two correctness issues that must be addressed before approval.
+
+## Issue 1 (Major): Missing Link headers on OPTIONS response -- FR-002 violation
+
+**Location**: `src/Frank.Discovery/OptionsDiscoveryMiddleware.fs`, lines 75-94
+
+FR-002 states: "System MUST aggregate media type information from endpoint metadata contributed by registered extensions and communicate them on the OPTIONS response via `Link` headers with `rel="describedby"`. The OPTIONS response therefore returns: an `Allow` header (listing HTTP methods), `Link` headers (listing available media types), and an empty body."
+
+The middleware currently collects `DiscoveryMediaType` entries into `_mediaTypes` (underscore prefix = unused) but never emits them as Link headers on the response. The collected media types must be written as RFC 8288 Link headers.
+
+**Fix**: After setting the `Allow` header (line 91), iterate over the deduplicated media types and add Link headers:
+
+```fsharp
+// Rename _mediaTypes to mediaTypes (remove underscore)
+let mediaTypes = ...
+
+// After setting Allow header:
+for mt in mediaTypes do
+    ctx.Response.Headers.Append(
+        "Link",
+        sprintf "<%s>; rel=\"%s\"; type=\"%s\"" (string ctx.Request.Path) mt.Rel mt.MediaType)
+```
+
+Also add a test that registers a resource with `DiscoveryMediaType` metadata and verifies the OPTIONS response includes the expected Link headers.
+
+## Issue 2 (Major): Path-based matching instead of RoutePattern-based matching
+
+**Location**: `src/Frank.Discovery/OptionsDiscoveryMiddleware.fs`, lines 17-30
+
+The `findSiblingEndpoints` function matches by comparing the HTTP request path (`ctx.Request.Path.Value`) against `RoutePattern.RawText`. This is a deviation from AD-03 and the data-model.md, which specify:
+
+1. Get the matched endpoint via `ctx.GetEndpoint()`
+2. Cast to `RouteEndpoint`, extract `RoutePattern.RawText`
+3. Find siblings by matching `RoutePattern.RawText` against all endpoints
+
+The current approach breaks for parameterized routes. For example, with route pattern `/items/{id}`, a request to `/items/42` would have `ctx.Request.Path.Value = "/items/42"` but `RoutePattern.RawText = "/items/{id}"` -- they would not match.
+
+**Fix**: Replace the path-based lookup with the spec's approach:
+
+```fsharp
+member _.Invoke(ctx: HttpContext) : Task =
+    if not (HttpMethods.IsOptions(ctx.Request.Method)) then
+        next.Invoke(ctx)
+    elif ctx.Request.Headers.ContainsKey("Access-Control-Request-Method") then
+        logger.LogDebug("CORS preflight detected for {Path}, passing through", ctx.Request.Path)
+        next.Invoke(ctx)
+    else
+        let endpoint = ctx.GetEndpoint()
+        if isNull endpoint then
+            next.Invoke(ctx)
+        else
+            match endpoint with
+            | :? RouteEndpoint as re ->
+                let pattern = re.RoutePattern.RawText
+                let matchedMeta = re.Metadata.GetMetadata<HttpMethodMetadata>()
+                if not (isNull matchedMeta) && matchedMeta.HttpMethods |> Seq.exists ((=) "OPTIONS") then
+                    next.Invoke(ctx)
+                else
+                    let siblings = findSiblingsByPattern pattern
+                    // ... rest of existing logic for method/media type collection
+            | _ -> next.Invoke(ctx)
+```
+
+And change `findSiblingEndpoints` to match by pattern string:
+
+```fsharp
+let findSiblingsByPattern (pattern: string) =
+    dataSource.Endpoints
+    |> Seq.choose (fun ep ->
+        match ep with
+        | :? RouteEndpoint as re when re.RoutePattern.RawText = pattern -> Some re
+        | _ -> None)
+    |> Seq.toList
+```
+
+## Issue 3 (Minor): Misleading test name at line 172
+
+**Location**: `test/Frank.Discovery.Tests/OptionsDiscoveryTests.fs`, lines 172-193
+
+The test "resource with GET and POST and DiscoveryMediaType metadata returns correct response" does not actually add any `DiscoveryMediaType` metadata to the resource. It is nearly identical to the first test. Either:
+- Add actual `DiscoveryMediaType` metadata to the resource and verify Link headers in the response (preferred -- this would also cover Issue 1), or
+- Remove this test as it is a duplicate
+
+## What's Working Well
+
+- The CORS preflight detection logic is correct (checking `Access-Control-Request-Method`).
+- The explicit OPTIONS handler detection is well-implemented.
+- The `Allow` header uses `Set.ofSeq` which provides deterministic alphabetical ordering.
+- The `WebHostBuilderExtensions.fs` follows the established Frank.Auth pattern perfectly.
+- The `TestEndpointDataSource` pattern matches Frank.Auth.Tests correctly.
+- Test coverage is solid for the pass-through conditions (CORS, unmatched route, no middleware, explicit handler).
+- The `_mediaTypes` collection uses the correct `Seq.choose` pattern for struct metadata.
+
+## Dependency Impact
+
+WP03 and WP04 depend on this WP. If changes are requested, those agents should be aware but do not need to rebase yet since they have not started (both are in planned lane). The changes above are internal to this WP's files and do not alter the public API surface that WP03 extends (`WebHostBuilderExtensions.fs` signature is unchanged).
+
 
 ## Review Feedback
 
@@ -320,3 +424,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 - 2026-03-16T01:20:58Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:31:37Z – unknown – lane=for_review – Ready for review: OptionsDiscoveryMiddleware with Allow header and media type aggregation, useOptionsDiscovery custom operation, 8 passing tests covering US1 scenarios
 - 2026-03-16T04:32:56Z – claude-opus – shell_pid=16154 – lane=doing – Started review via workflow command
+- 2026-03-16T04:37:55Z – claude-opus – shell_pid=16154 – lane=planned – Moved to planned
