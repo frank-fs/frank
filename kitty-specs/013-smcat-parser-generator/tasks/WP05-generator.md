@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Generator
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP02
@@ -16,8 +16,8 @@ subtasks:
 - T029
 phase: Phase 2 - Generation
 assignee: ''
-agent: "claude-opus-4-6"
-shell_pid: "9648"
+agent: "claude-opus-reviewer"
+shell_pid: "15816"
 review_status: ''
 reviewed_by: ''
 history:
@@ -345,3 +345,4 @@ To change a work package's lane, either:
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:25:26Z – claude-opus-4-6 – shell_pid=9648 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:30:11Z – claude-opus-4-6 – shell_pid=9648 – lane=for_review – Ready for review: Generator.fs and GeneratorTests.fs implemented. All 24 generator tests pass, all 270 tests pass with no regressions. API uses decomposed parameters instead of StateMachineMetadata<T> due to F# compilation ordering constraints.
+- 2026-03-16T04:32:29Z – claude-opus-reviewer – shell_pid=15816 – lane=doing – Started review via workflow command
