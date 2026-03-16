@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: SQLite Store Tests + DI Registration + Integration
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP04
 - WP01
@@ -20,8 +20,8 @@ subtasks:
 - T034
 phase: Phase 3 - Integration
 assignee: ''
-agent: "claude-opus"
-shell_pid: "9464"
+agent: "claude-opus-reviewer"
+shell_pid: "16549"
 review_status: ''
 reviewed_by: ''
 history:
@@ -393,3 +393,4 @@ To change a work package's lane, either:
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:25:03Z – claude-opus – shell_pid=9464 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:32:48Z – claude-opus – shell_pid=9464 – lane=for_review – Ready for review: SQLite store test project with 25 tests covering CRUD, rehydration, subscriptions, concurrency, disposal, DI registration, and schema auto-creation. Full solution builds and all 888 tests pass.
+- 2026-03-16T04:33:32Z – claude-opus-reviewer – shell_pid=16549 – lane=doing – Started review via workflow command
