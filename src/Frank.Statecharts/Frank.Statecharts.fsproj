@@ -17,6 +17,7 @@
     <Compile Include="Wsd/Parser.fs" />
     <Compile Include="Alps/Types.fs" />
     <Compile Include="Alps/JsonParser.fs" />
+    <Compile Include="Alps/JsonGenerator.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
