@@ -68,7 +68,7 @@ let rec private writeDescriptor (writer: Utf8JsonWriter) (d: Descriptor) =
     writer.WriteEndObject()
 
 /// Generate an ALPS JSON string from an AlpsDocument AST.
-let generateAlpsJson (doc: AlpsDocument) : string =
+let generate (doc: AlpsDocument) : string =
     use stream = new MemoryStream()
     use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
 

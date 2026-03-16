@@ -24,7 +24,7 @@ let roundTripTests =
                   parseAlpsJson ticTacToeAlpsJson
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
-              let generated = generateAlpsJson original
+              let generated = generate original
 
               let roundTripped =
                   parseAlpsJson generated
@@ -38,7 +38,7 @@ let roundTripTests =
                   parseAlpsJson onboardingAlpsJson
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
-              let generated = generateAlpsJson original
+              let generated = generate original
 
               let roundTripped =
                   parseAlpsJson generated
@@ -53,7 +53,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               let originalIds =
@@ -71,7 +71,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               let originalExts = collectAllExts original
@@ -85,7 +85,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               Expect.equal roundTripped.Links original.Links "links preserved"
@@ -97,7 +97,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               Expect.equal roundTripped.Version original.Version "version preserved"
@@ -109,7 +109,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               Expect.equal roundTripped.Documentation original.Documentation "documentation preserved"
@@ -121,7 +121,7 @@ let roundTripTests =
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               // Check XTurn's nested descriptors specifically
@@ -148,7 +148,7 @@ let roundTripTests =
                     Extensions = [] }
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               Expect.equal roundTripped original "empty document roundtrips"
@@ -163,7 +163,7 @@ let roundTripTests =
                     Extensions = [] }
 
               let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
+                  parseAlpsJson (generate original)
                   |> Result.defaultWith (fun _ -> failwith "re-parse failed")
 
               Expect.equal roundTripped original "version-only document roundtrips" ]

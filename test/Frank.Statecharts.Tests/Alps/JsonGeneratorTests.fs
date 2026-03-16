@@ -17,7 +17,7 @@ let jsonGeneratorTests =
                   parseAlpsJson ticTacToeAlpsJson
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
-              let generatedJson = generateAlpsJson originalDoc
+              let generatedJson = generate originalDoc
 
               let reparsedDoc =
                   parseAlpsJson generatedJson
@@ -31,7 +31,7 @@ let jsonGeneratorTests =
                   parseAlpsJson onboardingAlpsJson
                   |> Result.defaultWith (fun _ -> failwith "parse failed")
 
-              let generatedJson = generateAlpsJson originalDoc
+              let generatedJson = generate originalDoc
 
               let reparsedDoc =
                   parseAlpsJson generatedJson
@@ -48,7 +48,7 @@ let jsonGeneratorTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let hasAlps = parsed.RootElement.TryGetProperty("alps") |> fst
               Expect.isTrue hasAlps "should have alps root"
@@ -62,7 +62,7 @@ let jsonGeneratorTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let alps = parsed.RootElement.GetProperty("alps")
               let version = alps.GetProperty("version").GetString()
@@ -81,7 +81,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let alps = parsed.RootElement.GetProperty("alps")
               Expect.isFalse (alps.TryGetProperty("version") |> fst) "no version"
@@ -109,7 +109,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let descriptor =
@@ -136,7 +136,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let descriptors = parsed.RootElement.GetProperty("alps").GetProperty("descriptor")
               Expect.equal (descriptors.[0].GetProperty("type").GetString()) "semantic" "semantic"
@@ -173,7 +173,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let parentDesc =
@@ -206,7 +206,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let extElem =
@@ -242,7 +242,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let extElem =
@@ -264,7 +264,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               Expect.isTrue (json.Contains("\n")) "should contain newlines (indented)"
 
           testCase "documentation with format is written correctly"
@@ -280,7 +280,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let alpsDoc = parsed.RootElement.GetProperty("alps").GetProperty("doc")
               Expect.equal (alpsDoc.GetProperty("format").GetString()) "html" "doc format"
@@ -301,7 +301,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let alpsDoc = parsed.RootElement.GetProperty("alps").GetProperty("doc")
               Expect.isFalse (alpsDoc.TryGetProperty("format") |> fst) "no format property"
@@ -318,7 +318,7 @@ let jsonGeneratorStructureTests =
                             Href = "http://example.com/alps/test" } ]
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let link = parsed.RootElement.GetProperty("alps").GetProperty("link").[0]
               Expect.equal (link.GetProperty("rel").GetString()) "self" "link rel"
@@ -336,7 +336,7 @@ let jsonGeneratorStructureTests =
                             Href = None
                             Value = Some "data" } ] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
               let ext = parsed.RootElement.GetProperty("alps").GetProperty("ext").[0]
               Expect.equal (ext.GetProperty("id").GetString()) "custom" "ext id"
@@ -361,7 +361,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let descriptor =
@@ -393,7 +393,7 @@ let jsonGeneratorStructureTests =
                     Links = []
                     Extensions = [] }
 
-              let json = generateAlpsJson doc
+              let json = generate doc
               use parsed = JsonDocument.Parse(json)
 
               let descriptor =
