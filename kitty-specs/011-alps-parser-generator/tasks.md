@@ -68,7 +68,7 @@
 - [x] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
 - [x] T012 Create `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` -- tic-tac-toe golden file test, onboarding golden file test
 - [x] T013 [P] Add edge case tests in JsonParserTests.fs -- empty document, missing type defaults to semantic, forward-compatible unknown properties, unicode characters, large documents
-- [ ] T014 [P] Add error case tests in JsonParserTests.fs -- malformed JSON, missing alps root, invalid structure
+- [x] T014 [P] Add error case tests in JsonParserTests.fs -- malformed JSON, missing alps root, invalid structure
 
 ### Implementation Notes
 - Use `System.Text.Json.JsonDocument` with `use` binding (constitution principle VI, R-003).
