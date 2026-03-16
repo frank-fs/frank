@@ -63,7 +63,7 @@
 - [x] T007 Implement identifier and quoted string tokenization (plain identifiers, dot-separated identifiers, quoted `"strings"`)
 - [x] T008 Implement punctuation and arrow tokenization (=>, :, ;, ,, [, ], {, }, /, =)
 - [x] T009 Implement comment handling (# lines), whitespace skipping, and newline handling (\r\n and \n)
-- [ ] T010 Implement activity keyword detection (entry/, exit/, ...) and caret/close-bracket prefix tokens
+- [x] T010 Implement activity keyword detection (entry/, exit/, ...) and caret/close-bracket prefix tokens
 - [ ] T011 [P] Create `test/Frank.Statecharts.Tests/Smcat/LexerTests.fs` with comprehensive token tests
 
 ### Implementation Notes
