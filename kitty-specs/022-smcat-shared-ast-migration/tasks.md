@@ -24,9 +24,9 @@
 **Estimated Prompt Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Modify `src/Frank.Statecharts/Smcat/Types.fs`: delete `SourcePosition`, `StateType`, `StateActivity`, `SmcatState`, `SmcatTransition`, `SmcatElement`, `SmcatDocument`, `ParseResult`, `ParseFailure`, `ParseWarning`; update `Token` to use `Ast.SourcePosition`; update `inferStateType` to return `Ast.StateKind`
-- [ ] T002 Modify `src/Frank.Statecharts/Smcat/LabelParser.fs`: update `parseLabel` signature to accept `Ast.SourcePosition` and return `TransitionLabel * Ast.ParseWarning list`
-- [ ] T003 Modify `src/Frank.Statecharts/Frank.Statecharts.fsproj`: remove `Smcat/Mapper.fs` compile entry, add `Smcat/Serializer.fs` compile entry after `Parser.fs`
+- [x] T001 Modify `src/Frank.Statecharts/Smcat/Types.fs`: delete `SourcePosition`, `StateType`, `StateActivity`, `SmcatState`, `SmcatTransition`, `SmcatElement`, `SmcatDocument`, `ParseResult`, `ParseFailure`, `ParseWarning`; update `Token` to use `Ast.SourcePosition`; update `inferStateType` to return `Ast.StateKind`
+- [x] T002 Modify `src/Frank.Statecharts/Smcat/LabelParser.fs`: update `parseLabel` signature to accept `Ast.SourcePosition` and return `TransitionLabel * Ast.ParseWarning list`
+- [x] T003 Modify `src/Frank.Statecharts/Frank.Statecharts.fsproj`: remove `Smcat/Mapper.fs` compile entry, add `Smcat/Serializer.fs` compile entry after `Parser.fs`
 
 ### Implementation Notes
 - `Types.fs` retains: `TokenKind`, `Token` (with `Ast.SourcePosition`), `TransitionLabel`, `SmcatAttribute`, `inferStateType` (returning `Ast.StateKind`)
