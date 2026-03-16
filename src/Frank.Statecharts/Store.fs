@@ -5,20 +5,69 @@ open System.Threading.Tasks
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 
+/// <summary>
 /// Abstraction for state machine instance persistence.
+/// </summary>
+/// <remarks>
+/// <para>
+/// All implementations MUST serialize state access through an actor (e.g., <c>MailboxProcessor</c>).
+/// This ensures concurrent requests to the same instance are processed sequentially,
+/// preventing lost updates without requiring optimistic concurrency tokens.
+/// </para>
+/// <para>
+/// The actor is the sole accessor of the backing store. External code never reads or writes
+/// the backing store directly -- all operations go through <c>GetState</c>/<c>SetState</c>.
+/// </para>
+/// <para>
+/// For durable implementations (e.g., SQLite), persistence operations occur inside the actor loop.
+/// The actor wraps the backing store, not the other way around.
+/// </para>
+/// </remarks>
 type IStateMachineStore<'State, 'Context when 'State: equality> =
+    /// <summary>
     /// Retrieve the current state and context for an instance.
-    /// Returns None if the instance doesn't exist yet.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
+    /// <returns>The current state and context, or <c>None</c> if the instance does not exist.</returns>
+    /// <remarks>
+    /// This operation is serialized through the actor. Concurrent calls to <c>GetState</c>
+    /// are queued and processed one at a time, ensuring consistent reads.
+    /// </remarks>
     abstract GetState: instanceId: string -> Task<('State * 'Context) option>
 
+    /// <summary>
     /// Persist a state change for an instance.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
+    /// <param name="state">The new state value.</param>
+    /// <param name="context">The new context value.</param>
+    /// <remarks>
+    /// This operation is serialized through the actor. Concurrent calls to <c>SetState</c>
+    /// for the same instance are queued and applied sequentially, guaranteeing no lost updates.
+    /// Subscribers are notified after each state change within the actor loop.
+    /// </remarks>
     abstract SetState: instanceId: string -> state: 'State -> context: 'Context -> Task<unit>
 
+    /// <summary>
     /// Subscribe to state changes for an instance.
-    /// Returns an IDisposable that unsubscribes when disposed.
-    /// BehaviorSubject semantics: new subscribers immediately receive current state.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
+    /// <param name="observer">The observer to receive state change notifications.</param>
+    /// <returns>An <see cref="IDisposable"/> that unsubscribes when disposed.</returns>
+    /// <remarks>
+    /// BehaviorSubject semantics: new subscribers immediately receive current state if it exists.
+    /// Subscription management is serialized through the actor alongside state operations.
+    /// </remarks>
     abstract Subscribe: instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable
 
+/// <summary>
+/// Internal message type for the <c>MailboxProcessor</c> actor loop.
+/// </summary>
+/// <remarks>
+/// These messages are private to the store implementation. All state operations
+/// are encoded as messages and processed sequentially by the actor, ensuring
+/// thread-safe access to the in-memory state map and subscriber list.
+/// </remarks>
 type private StoreMessage<'State, 'Context when 'State: equality> =
     | GetState of instanceId: string * replyChannel: AsyncReplyChannel<('State * 'Context) option>
     | SetState of instanceId: string * state: 'State * context: 'Context * replyChannel: AsyncReplyChannel<unit>
@@ -29,6 +78,23 @@ type private StoreMessage<'State, 'Context when 'State: equality> =
     | Unsubscribe of instanceId: string * observer: IObserver<'State * 'Context>
     | Stop of replyChannel: AsyncReplyChannel<unit>
 
+/// <summary>
+/// In-memory <see cref="IStateMachineStore{TState, TContext}"/> backed by a <c>MailboxProcessor</c>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// All state operations are serialized through the <c>MailboxProcessor</c> agent.
+/// Concurrent requests are queued and processed sequentially.
+/// </para>
+/// <para>
+/// <strong>Known limitation</strong>: The <c>MailboxProcessor</c> message queue is unbounded.
+/// Under extreme load, the queue can grow without limit. In practice, the HTTP server
+/// (Kestrel) provides implicit backpressure via connection limits.
+/// Monitor <c>CurrentQueueLength</c> in production for queue depth visibility.
+/// For bounded queue behavior, consider a custom store implementation with
+/// <c>inbox.CurrentQueueLength</c> checks.
+/// </para>
+/// </remarks>
 type MailboxProcessorStore<'State, 'Context when 'State: equality>
     (logger: ILogger<MailboxProcessorStore<'State, 'Context>>) =
 
