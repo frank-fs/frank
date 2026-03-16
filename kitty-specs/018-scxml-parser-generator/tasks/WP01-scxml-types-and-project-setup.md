@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: SCXML Types and Project Setup
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 64a2cc78c24e4febcd6631dd8f37f8405a4269d8
@@ -11,8 +11,8 @@ subtasks:
 - T002
 phase: Phase 1 - Foundation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "98569"
+agent: "claude-opus-reviewer"
+shell_pid: "2674"
 review_status: ''
 reviewed_by: ''
 history:
@@ -266,3 +266,4 @@ This must succeed for all three target frameworks (net8.0, net9.0, net10.0). Ver
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:02:40Z – claude-opus – shell_pid=98569 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:14:32Z – claude-opus – shell_pid=98569 – lane=for_review – Moved to for_review
+- 2026-03-16T04:14:53Z – claude-opus-reviewer – shell_pid=2674 – lane=doing – Started review via workflow command
