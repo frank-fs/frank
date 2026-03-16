@@ -62,7 +62,7 @@
 **Estimated Prompt Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T008 Implement top-level parseAlpsJson function in `src/Frank.Statecharts/Alps/JsonParser.fs` -- parse root `alps` object, `version`, `doc` element
+- [x] T008 Implement top-level parseAlpsJson function in `src/Frank.Statecharts/Alps/JsonParser.fs` -- parse root `alps` object, `version`, `doc` element
 - [ ] T009 Implement descriptor parsing in JsonParser.fs -- `id`, `type` (defaulting to Semantic), `href`, `rt`, nested `descriptor` array, `ext` array, `link` array, `doc` element
 - [ ] T010 Implement error handling in JsonParser.fs -- wrap `JsonDocument.Parse` in try/catch for `JsonException`, collect schema errors for missing fields, return `Result<AlpsDocument, AlpsParseError list>`
 - [ ] T011 Add `Alps/JsonParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/Types.fs)
