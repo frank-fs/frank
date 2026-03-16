@@ -1,9 +1,12 @@
 ---
 work_package_id: WP04
 title: Rendering and Output
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 016-frank-cli-help-system-WP01
+base_commit: 7c2fcc4753732433dcf675b8b2222356cf6af603
+created_at: '2026-03-16T11:46:56.261391+00:00'
 subtasks:
 - T018
 - T019
@@ -15,7 +18,7 @@ subtasks:
 phase: Phase 3 - Rendering and Integration
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "60524"
 review_status: ''
 reviewed_by: ''
 history:
