@@ -1,10 +1,13 @@
 ---
 work_package_id: WP03
 title: Roundtrip Tests and Integration
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
 - WP02
+base_branch: 017-wsd-generator-cross-validator-WP03-merge-base
+base_commit: 8755d025fe79eba4740de371b6404b9438371827
+created_at: '2026-03-16T04:26:02.994072+00:00'
 subtasks:
 - T013
 - T014
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 2 - Integration
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "9914"
 review_status: ''
 reviewed_by: ''
 history:
