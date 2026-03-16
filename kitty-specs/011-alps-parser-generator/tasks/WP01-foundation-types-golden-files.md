@@ -16,7 +16,7 @@ subtasks:
 - T007
 phase: Phase 0 - Setup & Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "97958"
 review_status: ''
 reviewed_by: ''
@@ -318,3 +318,4 @@ let typeTests = testList "Alps.Types" [
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
+- 2026-03-16T04:02:23Z – claude-opus – shell_pid=97958 – lane=doing – Assigned agent via workflow command
