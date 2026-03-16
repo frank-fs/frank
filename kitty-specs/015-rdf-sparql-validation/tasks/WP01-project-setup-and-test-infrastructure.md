@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Setup & Test Infrastructure
-lane: "doing"
+lane: "planned"
 dependencies: []
 base_branch: master
 base_commit: d0ed8bb62575e9d52e9fe9de644a04f0b45a5b20
@@ -17,8 +17,9 @@ phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "6455"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/spec-kitty-review-feedback-WP01.md"
 history:
 - timestamp: '2026-03-15T23:59:02Z'
   lane: planned
@@ -42,11 +43,75 @@ requirement_refs: [FR-013]
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/spec-kitty-review-feedback-WP01.md`
 
-*[This section is empty initially.]*
+# WP01 Review Feedback
 
----
+**Reviewer**: claude-opus-reviewer
+**Verdict**: Changes requested
+
+## Issues Found
+
+### 1. Out-of-scope task file modifications in commit (Medium)
+
+The commit includes lane/agent/status changes to 11 unrelated task files across specs 010, 011, 013, 016, 017, 018, 019, and 021. These are state changes to other work packages that should not be in this WP's commit.
+
+Affected files to remove from the commit:
+- `kitty-specs/010-statecharts-production-readiness/tasks/WP01-state-key-extraction.md`
+- `kitty-specs/011-alps-parser-generator/tasks/WP01-foundation-types-golden-files.md`
+- `kitty-specs/013-smcat-parser-generator/tasks.md`
+- `kitty-specs/013-smcat-parser-generator/tasks/WP01-types-and-project-setup.md`
+- `kitty-specs/016-frank-cli-help-system/tasks.md`
+- `kitty-specs/016-frank-cli-help-system/tasks/WP01-foundation-types-and-utilities.md`
+- `kitty-specs/017-wsd-generator-cross-validator/tasks/WP02-wsd-generator.md`
+- `kitty-specs/018-scxml-parser-generator/tasks/WP02-scxml-parser-core.md`
+- `kitty-specs/019-options-link-discovery/tasks/WP01-core-type-and-project-scaffolding.md`
+- `kitty-specs/021-cross-format-validator/tasks/WP04-cross-format-rules.md`
+
+**Fix**: Create a new commit that only includes the WP01 source files (`test/Frank.RdfValidation.Tests/` and `Frank.sln`) and the WP01 task file (`kitty-specs/015-rdf-sparql-validation/tasks/WP01-project-setup-and-test-infrastructure.md`). Restore the unrelated task files to their master versions.
+
+### 2. Dead code: `owlObjectProperty` declared but never used (Low)
+
+In `TestHelpers.fs` lines 67-68, `owlObjectProperty` is declared but never referenced in any triple assertion:
+
+```fsharp
+let owlObjectProperty =
+    ontology.CreateUriNode(UriFactory.Root.Create("http://www.w3.org/2002/07/owl#ObjectProperty"))
+```
+
+**Fix**: Remove the unused `owlObjectProperty` declaration. If it is intended for future WPs, leave a comment explaining the intent -- but dead code should not ship.
+
+### 3. `executeSparqlOnDataset` parameter type should be `ITripleStore` not `TripleStore` (Low)
+
+The WP prompt specifies `(store: ITripleStore)` but the implementation uses `(store: TripleStore)`. Using the interface type provides more flexibility for callers who may have different `ITripleStore` implementations.
+
+**Fix**: Change `(store: TripleStore)` to `(store: ITripleStore)` in the `executeSparqlOnDataset` function signature. The `InMemoryDataset` constructor accepts `ITripleStore`.
+
+### 4. Constitution VI: `TripleStore` created without `use` bindings in SPARQL helpers (Low)
+
+In `executeSparql` (line 342) and `executeSparqlAsk` (line 366), new `TripleStore()` instances are created with `let` instead of `use`. The Constitution says "All `IGraph`, `TripleStore`, `HttpClient`, `TestServer`, `StreamReader` values must use `use` bindings." While these are short-lived helper function scopes, the constitution is explicit.
+
+**Fix**: Change `let store = new TripleStore()` to `use store = new TripleStore()` in both `executeSparql` and `executeSparqlAsk`. Note: this may require restructuring the functions slightly since the returned `SparqlResultSet` must be evaluated before the store is disposed.
+
+## What Looks Good
+
+- `.fsproj` exactly matches the specified template and follows the `Frank.LinkedData.Tests.fsproj` pattern
+- `TestHelpers.fs` is correctly listed first in `<Compile>` items
+- `Program.fs` matches the convention used by all other Frank test projects (`module Program`)
+- `TransitionSubject` pattern correctly reuses the Provenance tests pattern
+- `createTestHost` properly configures both LinkedData and Provenance middleware with correct ordering (routing -> LinkedData -> Provenance -> endpoints)
+- All three required endpoints are present (GET /person/1, GET /order/42, POST /person)
+- `loadJsonLdGraph` provides a pragmatic custom parser since dotNetRdf.Core does not ship `JsonLdParser` -- good adaptation to the risk noted in the WP prompt
+- `loadTurtleGraph` and `loadRdfXmlGraph` correctly use `use` bindings for `StringReader` (Constitution VI)
+- `getRdfResponse` correctly uses `use` binding for `HttpRequestMessage`
+- Ontology graph creation properly defines OWL property declarations matching the JSON response keys
+- Solution file correctly places the project under the `test` solution folder
+- Build succeeds with 0 warnings, Expecto entry point runs successfully
+- All four stub test modules are present and compile correctly
+
 
 ## Markdown Formatting
 Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
@@ -416,3 +481,4 @@ This ensures the project compiles even before the test modules are implemented.
 - 2026-03-16T04:03:06Z – claude-opus – shell_pid=98946 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:16:59Z – claude-opus – shell_pid=98946 – lane=for_review – Ready for review: Project compiles with 0 warnings/errors, Expecto entry point runs, TestHelpers.fs provides createTestHost, RDF loading (Turtle/RDF-XML/JSON-LD), and SPARQL execution helpers
 - 2026-03-16T04:18:47Z – claude-opus-reviewer – shell_pid=6455 – lane=doing – Started review via workflow command
+- 2026-03-16T04:23:47Z – claude-opus-reviewer – shell_pid=6455 – lane=planned – Moved to planned
