@@ -19,6 +19,7 @@
     <Compile Include="Wsd/ErrorTests.fs" />
     <Compile Include="Wsd/SerializerTests.fs" />
     <Compile Include="Wsd/RoundTripTests.fs" />
+    <Compile Include="Wsd/GeneratorTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
