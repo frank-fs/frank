@@ -15,6 +15,7 @@
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
     <Compile Include="Wsd/Parser.fs" />
+    <Compile Include="Alps/Types.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
