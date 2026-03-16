@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP03"
+work_package_id: WP03
+title: SCXML Parser -- Data Model, History, Invoke, Errors, and Overloads
+lane: "doing"
+dependencies: [WP02]
+base_branch: 018-scxml-parser-generator-WP02
+base_commit: a586f2fc55d542f912d187f67b5779360c6b8b48
+created_at: '2026-03-16T04:31:57.107511+00:00'
 subtasks:
-  - "T007"
-  - "T008"
-  - "T010"
-  - "T011"
-title: "SCXML Parser -- Data Model, History, Invoke, Errors, and Overloads"
-phase: "Phase 2 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02"]
-requirement_refs: ["FR-008", "FR-009", "FR-010", "FR-011", "FR-015"]
+- T007
+- T008
+- T010
+- T011
+phase: Phase 2 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "15369"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T01:17:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T01:17:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-008, FR-009, FR-010, FR-011, FR-015]
 ---
 
 # Work Package Prompt: WP03 -- SCXML Parser -- Data Model, History, Invoke, Errors, and Overloads
