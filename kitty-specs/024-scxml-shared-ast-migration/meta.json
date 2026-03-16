@@ -1,0 +1,10 @@
+{
+  "feature_number": "024",
+  "slug": "024-scxml-shared-ast-migration",
+  "friendly_name": "SCXML Shared AST Migration",
+  "mission": "software-dev",
+  "source_description": "Issue #114 - SCXML: migrate parser and generator to shared StatechartDocument AST",
+  "created_at": "2026-03-16T14:00:00Z",
+  "target_branch": "master",
+  "vcs": "git"
+}
