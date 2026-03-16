@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: ALPS JSON Generator and Roundtrip Tests
-lane: planned
+lane: "for_review"
 dependencies:
 - WP02
 subtasks:
@@ -470,3 +470,4 @@ testList "Alps.RoundTrip cross-format" [
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
+- 2026-03-16T11:46:31Z – unknown – lane=for_review – Moved to for_review
