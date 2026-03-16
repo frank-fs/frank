@@ -17,17 +17,26 @@ type GuardResult =
     | Allowed
     | Blocked of reason: BlockReason
 
-/// Context passed to guard predicates for evaluation.
-type GuardContext<'State, 'Event, 'Context> =
+/// Context for access-control guards (pre-handler). No event available.
+type AccessControlContext<'State, 'Context> =
+    { User: ClaimsPrincipal
+      CurrentState: 'State
+      Context: 'Context }
+
+/// Context for event-validation guards (post-handler). Event is the actual value set by the handler.
+type EventValidationContext<'State, 'Event, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
       Event: 'Event
       Context: 'Context }
 
-/// A named guard predicate.
+/// A guard that controls access to state transitions.
+/// The DU case determines both execution phase and type signature.
 type Guard<'State, 'Event, 'Context> =
-    { Name: string
-      Predicate: GuardContext<'State, 'Event, 'Context> -> GuardResult }
+    /// Runs pre-handler. Cannot access the event (AccessControlContext has no Event field).
+    | AccessControl of name: string * predicate: (AccessControlContext<'State, 'Context> -> GuardResult)
+    /// Runs post-handler. Receives the actual event set by the handler.
+    | EventValidation of name: string * predicate: (EventValidationContext<'State, 'Event, 'Context> -> GuardResult)
 
 /// Metadata about a single state (HTTP configuration).
 type StateInfo =

@@ -54,8 +54,8 @@ let gameTransition (state: TicTacToeState) (_event: TicTacToeEvent) (moveCount: 
     | Draw -> TransitionResult.Invalid "Game already over"
 
 let turnGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
-    { Name = "TurnGuard"
-      Predicate =
+    AccessControl(
+        "TurnGuard",
         fun ctx ->
             match ctx.CurrentState with
             | XTurn ->
@@ -73,7 +73,8 @@ let turnGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
                 else
                     Blocked NotAllowed
             | Won _
-            | Draw -> Allowed }
+            | Draw -> Allowed
+    )
 
 let gameMachine: StateMachine<TicTacToeState, TicTacToeEvent, int> =
     { Initial = XTurn
@@ -360,13 +361,14 @@ let guardTests =
               let moveCountLimitMachine =
                   { gameMachine with
                       Guards =
-                          [ { Name = "MoveCountLimit"
-                              Predicate =
+                          [ AccessControl(
+                                "MoveCountLimit",
                                 fun ctx ->
                                     if ctx.Context >= 4 then
                                         Blocked(Custom(429, "Too many moves"))
                                     else
-                                        Allowed } ] }
+                                        Allowed
+                            ) ] }
 
               let res = buildGameResource moveCountLimitMachine
 
@@ -387,13 +389,14 @@ let guardTests =
               let moveCountLimitMachine =
                   { gameMachine with
                       Guards =
-                          [ { Name = "MoveCountLimit"
-                              Predicate =
+                          [ AccessControl(
+                                "MoveCountLimit",
                                 fun ctx ->
                                     if ctx.Context >= 4 then
                                         Blocked(Custom(429, "Too many moves"))
                                     else
-                                        Allowed } ] }
+                                        Allowed
+                            ) ] }
 
               let res = buildGameResource moveCountLimitMachine
 
@@ -718,15 +721,15 @@ let multipleGuardTests =
               let mutable secondGuardCalled = false
 
               let firstGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
-                  { Name = "AlwaysBlocks"
-                    Predicate = fun _ -> Blocked NotAllowed }
+                  AccessControl("AlwaysBlocks", fun _ -> Blocked NotAllowed)
 
               let secondGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
-                  { Name = "NeverReached"
-                    Predicate =
+                  AccessControl(
+                      "NeverReached",
                       fun _ ->
                           secondGuardCalled <- true
-                          Allowed }
+                          Allowed
+                  )
 
               let multiGuardMachine =
                   { gameMachine with
@@ -749,18 +752,20 @@ let multipleGuardTests =
               let mutable bothCalled = 0
 
               let guard1: Guard<TicTacToeState, TicTacToeEvent, int> =
-                  { Name = "PassOne"
-                    Predicate =
+                  AccessControl(
+                      "PassOne",
                       fun _ ->
                           bothCalled <- bothCalled + 1
-                          Allowed }
+                          Allowed
+                  )
 
               let guard2: Guard<TicTacToeState, TicTacToeEvent, int> =
-                  { Name = "PassTwo"
-                    Predicate =
+                  AccessControl(
+                      "PassTwo",
                       fun _ ->
                           bothCalled <- bothCalled + 1
-                          Allowed }
+                          Allowed
+                  )
 
               let multiGuardMachine =
                   { gameMachine with
@@ -911,8 +916,8 @@ let hierarchicalTransition (state: HierarchicalGameState) (event: HierarchicalGa
     | Disposed, _ -> TransitionResult.Invalid "Game disposed"
 
 let hierarchicalTurnGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
-    { Name = "HierarchicalTurnGuard"
-      Predicate =
+    AccessControl(
+        "HierarchicalTurnGuard",
         fun ctx ->
             match ctx.CurrentState with
             | Playing XTurn ->
@@ -929,12 +934,13 @@ let hierarchicalTurnGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, H
                     Blocked NotYourTurn
                 else
                     Blocked NotAllowed
-            | _ -> Allowed }
+            | _ -> Allowed
+    )
 
 /// Guard that checks player assignment from context (parallel region data)
 let participantGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
-    { Name = "ParticipantGuard"
-      Predicate =
+    AccessControl(
+        "ParticipantGuard",
         fun ctx ->
             match ctx.CurrentState with
             | Playing(Won _)
@@ -950,7 +956,8 @@ let participantGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, Hierar
 
                     if isNull userId then Blocked NotAllowed
                     elif userId.Value = xId || userId.Value = oId then Allowed
-                    else Blocked(Custom(403, "Game is full")) }
+                    else Blocked(Custom(403, "Game is full"))
+    )
 
 let hierarchicalMachine: StateMachine<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext> =
     { Initial = Playing XTurn

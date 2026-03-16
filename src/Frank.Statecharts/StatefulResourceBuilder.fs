@@ -70,8 +70,10 @@ type StateMachineMetadata =
         InitialStateKey: string
         /// Resolve state from store, cache in HttpContext.Items, return state key string.
         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
-        /// Evaluate guards using cached state from HttpContext.Items.
+        /// Evaluate access-control guards using cached state from HttpContext.Items (pre-handler).
         EvaluateGuards: HttpContext -> GuardResult
+        /// Evaluate event-validation guards after the handler has set the event (post-handler).
+        EvaluateEventGuards: HttpContext -> GuardResult
         /// Post-handler: get event from HttpContext.Items, run transition, persist, return result.
         ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>
     }
@@ -199,23 +201,56 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
-        // Closure: evaluate guards using cached typed state and context
+        // Partition guards by DU case for two-phase evaluation
+        let accessGuards =
+            machine.Guards
+            |> List.choose (function
+                | AccessControl(name, pred) -> Some(name, pred)
+                | _ -> None)
+
+        let eventGuards =
+            machine.Guards
+            |> List.choose (function
+                | EventValidation(name, pred) -> Some(name, pred)
+                | _ -> None)
+
+        // Closure: evaluate access-control guards using cached typed state and context (pre-handler)
         let evaluateGuards (ctx: HttpContext) : GuardResult =
             let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
             let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
 
-            let guardCtx =
+            let guardCtx: AccessControlContext<'S, 'C> =
                 { User = ctx.User
                   CurrentState = state
-                  Event = Unchecked.defaultof<'E>
                   Context = context }
 
-            machine.Guards
-            |> List.tryPick (fun g ->
-                match g.Predicate guardCtx with
+            accessGuards
+            |> List.tryPick (fun (_, pred) ->
+                match pred guardCtx with
                 | Allowed -> None
                 | Blocked reason -> Some(Blocked reason))
             |> Option.defaultValue Allowed
+
+        // Closure: evaluate event-validation guards after handler has set the event (post-handler)
+        let evaluateEventGuards (ctx: HttpContext) : GuardResult =
+            let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+            let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+
+            match StateMachineContext.tryGetEvent<'E> ctx with
+            | None -> Allowed // No event set -- skip event guards
+            | Some event ->
+                let guardCtx: EventValidationContext<'S, 'E, 'C> =
+                    { User = ctx.User
+                      CurrentState = state
+                      Event = event
+                      Context = context }
+
+                eventGuards
+                |> List.tryPick (fun (_, pred) ->
+                    match pred guardCtx with
+                    | Allowed -> None
+                    | Blocked reason -> Some(Blocked reason))
+                |> Option.defaultValue Allowed
 
         // Closure: get event from Items, run transition, persist, return result
         let executeTransition
@@ -260,6 +295,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
               InitialStateKey = initialStateKey
               GetCurrentStateKey = getCurrentStateKey
               EvaluateGuards = evaluateGuards
+              EvaluateEventGuards = evaluateEventGuards
               ExecuteTransition = executeTransition }
 
         // Collect distinct HTTP methods across all states.

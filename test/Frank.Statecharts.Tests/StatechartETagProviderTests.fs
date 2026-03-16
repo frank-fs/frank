@@ -206,6 +206,7 @@ let factoryTests =
                     InitialStateKey = "Idle"
                     GetCurrentStateKey = fun _ _ _ -> System.Threading.Tasks.Task.FromResult("Idle")
                     EvaluateGuards = fun _ -> Allowed
+                    EvaluateEventGuards = fun _ -> Allowed
                     ExecuteTransition =
                       fun _ _ _ -> System.Threading.Tasks.Task.FromResult(TransitionAttemptResult.NoEvent) }
 
