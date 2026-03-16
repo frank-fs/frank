@@ -2,7 +2,7 @@
 work_package_id: "WP04"
 title: "SQLite Durable Store Implementation"
 phase: "Phase 2 - Parallel Streams"
-lane: "doing"
+lane: "for_review"
 assignee: ""
 agent: "claude-opus"
 shell_pid: ""
@@ -471,3 +471,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:03:27Z – claude-opus – lane=doing – Starting implementation - WP04 depends on IStateMachineStore which is unchanged, branching from master
+- 2026-03-16T04:10:14Z – claude-opus – lane=for_review – Ready for review: SQLite durable store implementation with all 7 subtasks (T021-T027) complete. Builds across all 3 targets with 0 errors, all existing tests pass.
