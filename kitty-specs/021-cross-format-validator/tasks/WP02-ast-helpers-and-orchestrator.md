@@ -1,29 +1,32 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: AST Helpers & Validator Orchestrator
+lane: "doing"
+dependencies: [WP01]
+base_branch: 021-cross-format-validator-WP01
+base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
+created_at: '2026-03-16T04:02:24.037386+00:00'
 subtasks:
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-  - "T014"
-  - "T015"
-title: "AST Helpers & Validator Orchestrator"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-006", "FR-007", "FR-008", "FR-009", "FR-013", "FR-016"]
+- T009
+- T010
+- T011
+- T012
+- T013
+- T014
+- T015
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "97995"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:11Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:11Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-006, FR-007, FR-008, FR-009, FR-013, FR-016]
 ---
 
 # Work Package Prompt: WP02 -- AST Helpers & Validator Orchestrator
