@@ -29,7 +29,7 @@
 ### Included Subtasks
 - [x] T001 Create `src/Frank.Statecharts/Smcat/Types.fs` with all smcat AST types (SourcePosition, TokenKind, Token, StateType, StateActivity, SmcatAttribute, SmcatState, SmcatTransition, TransitionLabel, SmcatElement, SmcatDocument, ParseFailure, ParseWarning, ParseResult)
 - [x] T002 Implement `inferStateType` function in Types.fs for pseudo-state detection by naming convention
-- [ ] T003 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to include Smcat/*.fs entries in correct compile order (after Wsd, before Types.fs)
+- [x] T003 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to include Smcat/*.fs entries in correct compile order (after Wsd, before Types.fs)
 - [x] T004 Create Smcat/ directory under `test/Frank.Statecharts.Tests/` and update test .fsproj with placeholder test file entries
 - [x] T005 Verify multi-target build succeeds (`dotnet build` for net8.0/net9.0/net10.0)
 
