@@ -21,7 +21,7 @@
 
 ### Included Subtasks
 - [x] T001 Extend `AlpsMeta` DU in `src/Frank.Statecharts/Ast/Types.fs` -- add `AlpsDocumentation`, `AlpsLink`, `AlpsDataDescriptor`, `AlpsVersion` cases; expand `AlpsExtension` from `name * value` to `id * href option * value option`
-- [ ] T002 Update existing `AlpsExtension` pattern matches in `src/Frank.Statecharts/Alps/Mapper.fs` (line 38, `extractGuard`) and `src/Frank.Statecharts/Alps/JsonGenerator.fs` (line 25, `writeExtension`) to use new 3-field signature
+- [x] T002 Update existing `AlpsExtension` pattern matches in `src/Frank.Statecharts/Alps/Mapper.fs` (line 38, `extractGuard`) and `src/Frank.Statecharts/Alps/JsonGenerator.fs` (line 25, `writeExtension`) to use new 3-field signature
 - [ ] T003 Verify no other code outside Alps/ references `AlpsExtension` pattern -- confirmed by grep (WSD Generator, Validation modules do not reference it)
 
 ### Implementation Notes
