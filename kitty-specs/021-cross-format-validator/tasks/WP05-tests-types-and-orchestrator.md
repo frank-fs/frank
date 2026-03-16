@@ -17,7 +17,7 @@ subtasks:
 - T034
 phase: Phase 2 - Testing
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "59373"
 review_status: ''
 reviewed_by: ''
@@ -311,3 +311,4 @@ Can start in parallel with WP03/WP04 since it tests infrastructure, not rules.
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-15T23:59:11Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T11:46:04Z – claude-opus – shell_pid=59373 – lane=doing – Assigned agent via workflow command
