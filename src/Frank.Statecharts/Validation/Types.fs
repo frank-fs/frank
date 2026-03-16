@@ -2,14 +2,7 @@ namespace Frank.Statecharts.Validation
 
 open Frank.Statecharts.Ast
 
-// ============================================================================
-// Validation Domain Types (Spec 021 - WP01)
-//
-// All types match the contract in contracts/validation-api.fsi exactly.
-// Namespace: Frank.Statecharts.Validation
-// ============================================================================
-
-/// Identifies which parser produced an artifact (FR-002, FR-014).
+/// Identifies which parser produced an artifact.
 type FormatTag =
     | Wsd
     | Alps
@@ -17,24 +10,24 @@ type FormatTag =
     | Smcat
     | XState
 
-/// A format-tagged wrapper around a parsed StatechartDocument (FR-002).
+/// A format-tagged wrapper around a parsed StatechartDocument.
 type FormatArtifact =
     { Format: FormatTag
       Document: StatechartDocument }
 
-/// Status of a single validation check (FR-004).
+/// Status of a single validation check.
 type CheckStatus =
     | Pass
     | Fail
     | Skip
 
-/// A named invariant result from a validation rule (FR-004).
+/// A named invariant result from a validation rule.
 type ValidationCheck =
     { Name: string
       Status: CheckStatus
       Reason: string option }
 
-/// Detailed diagnostic information for a single validation failure (FR-005, FR-015).
+/// Detailed diagnostic information for a single validation failure.
 type ValidationFailure =
     { Formats: FormatTag list
       EntityType: string
@@ -42,9 +35,7 @@ type ValidationFailure =
       Actual: string
       Description: string }
 
-/// Top-level result of a validation run (FR-003, FR-009).
-/// TotalChecks counts only Pass + Fail (not Skip).
-/// TotalFailures equals Failures.Length.
+/// Top-level result of a validation run.
 type ValidationReport =
     { TotalChecks: int
       TotalSkipped: int
@@ -52,8 +43,7 @@ type ValidationReport =
       Checks: ValidationCheck list
       Failures: ValidationFailure list }
 
-/// A validation rule defined by a format module (FR-001, FR-017).
-/// Note: structural equality is not supported due to function field.
+/// A validation rule defined by a format module.
 type ValidationRule =
     { Name: string
       RequiredFormats: FormatTag Set
