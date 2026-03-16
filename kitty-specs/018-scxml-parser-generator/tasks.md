@@ -58,7 +58,7 @@
 - [x] T003 Create `src/Frank.Statecharts/Scxml/Parser.fs` with SCXML namespace constant, `XDocument` loading helper (`LoadOptions.SetLineInfo`), and `extractPosition` helper (via `IXmlLineInfo` cast)
 - [x] T004 Implement `<scxml>` root element parsing: extract `initial`, `name`, `datamodel`, `binding` attributes, validate root element namespace
 - [x] T005 Implement `<state>`, `<final>`, `<parallel>` element parsing with `ScxmlStateKind` derivation (Simple/Compound/Parallel/Final), recursive child state parsing
-- [ ] T006 Implement `<transition>` parsing: extract `event`, `cond`, `target` (space-split into list), `type` (default External) attributes
+- [x] T006 Implement `<transition>` parsing: extract `event`, `cond`, `target` (space-split into list), `type` (default External) attributes
 - [ ] T009 Implement initial state inference (when `<scxml>` has no `initial` attribute, use first child state ID per W3C section 3.2) and compound state detection (state with child states -> Compound)
 - [ ] T012 Update `Frank.Statecharts.fsproj` to add `Scxml/Parser.fs` compile entry after `Scxml/Types.fs`
 
