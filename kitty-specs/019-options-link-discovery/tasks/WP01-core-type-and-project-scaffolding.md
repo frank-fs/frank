@@ -14,7 +14,7 @@ subtasks:
 - T005
 phase: Phase 0 - Setup
 assignee: ''
-agent: ''
+agent: "claude-opus-4-6"
 shell_pid: "98469"
 review_status: ''
 reviewed_by: ''
@@ -234,3 +234,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 ## Activity Log
 
 - 2026-03-16T01:20:58Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:38Z – claude-opus-4-6 – shell_pid=98469 – lane=doing – Assigned agent via workflow command
