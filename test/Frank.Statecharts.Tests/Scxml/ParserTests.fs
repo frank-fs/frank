@@ -364,3 +364,163 @@ let edgeCaseTests =
               Expect.isSome result.Document "should parse without namespace"
               Expect.equal result.Document.Value.States.Length 1 "one state"
               Expect.equal result.Document.Value.States.[0].Id (Some "s1") "state id" ]
+
+// === User Story 3: Data Model Parsing (T022) ===
+
+[<Tests>]
+let dataModelTests =
+    testList
+        "Scxml.Parser.DataModel"
+        [
+          testCase "US3-S1: data entries with expr attribute"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <datamodel>
+    <data id="count" expr="0"/>
+    <data id="name" expr="'default'"/>
+  </datamodel>
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let doc = result.Document.Value
+              Expect.equal doc.DataEntries.Length 2 "should have 2 data entries"
+              Expect.equal doc.DataEntries.[0].Id "count" "first entry id"
+              Expect.equal doc.DataEntries.[0].Expression (Some "0") "first entry expr"
+              Expect.equal doc.DataEntries.[1].Id "name" "second entry id"
+              Expect.equal doc.DataEntries.[1].Expression (Some "'default'") "second entry expr"
+
+          testCase "US3-S2: data entry with no expr"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <datamodel>
+    <data id="items"/>
+  </datamodel>
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let entry = result.Document.Value.DataEntries.[0]
+              Expect.equal entry.Id "items" "entry id"
+              Expect.isNone entry.Expression "expression should be None"
+
+          testCase "US3-S3: state-scoped datamodel"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <state id="s1">
+    <datamodel>
+      <data id="localVar" expr="42"/>
+    </datamodel>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = result.Document.Value.States.[0]
+              Expect.equal state.DataEntries.Length 1 "state should have 1 data entry"
+              Expect.equal state.DataEntries.[0].Id "localVar" "entry id"
+              Expect.equal state.DataEntries.[0].Expression (Some "42") "entry expr"
+
+          testCase "data with child text content"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <datamodel>
+    <data id="config">some content</data>
+  </datamodel>
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let entry = result.Document.Value.DataEntries.[0]
+              Expect.equal entry.Id "config" "entry id"
+              Expect.equal entry.Expression (Some "some content") "expression from child content" ]
+
+// === User Story 4: Parallel, History, and Invoke Parsing (T023) ===
+
+[<Tests>]
+let advancedParserTests =
+    testList
+        "Scxml.Parser.Advanced"
+        [
+          testCase "US4-S1: parallel state with children"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="p1">
+  <parallel id="p1">
+    <state id="region1"/>
+    <state id="region2"/>
+  </parallel>
+</scxml>"""
+
+              let result = parseString xml
+              let p = result.Document.Value.States.[0]
+              Expect.equal p.Kind Parallel "kind is Parallel"
+              Expect.equal p.Id (Some "p1") "id is p1"
+              Expect.equal p.Children.Length 2 "has 2 child states"
+
+          testCase "US4-S2: history with type deep"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <state id="s1">
+    <history id="h1" type="deep"/>
+    <state id="child1"/>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = result.Document.Value.States.[0]
+              Expect.equal state.HistoryNodes.Length 1 "has 1 history node"
+              let h = state.HistoryNodes.[0]
+              Expect.equal h.Id "h1" "history id"
+              Expect.equal h.Kind Deep "history kind is Deep"
+
+          testCase "US4-S3: history defaults to shallow"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <state id="s1">
+    <history id="h2"/>
+    <state id="child1"/>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let h = result.Document.Value.States.[0].HistoryNodes.[0]
+              Expect.equal h.Kind Shallow "history kind defaults to Shallow"
+
+          testCase "US4-S4: invoke with attributes"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <state id="s1">
+    <invoke type="http" src="https://example.com/service"/>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = result.Document.Value.States.[0]
+              Expect.equal state.InvokeNodes.Length 1 "has 1 invoke node"
+              let inv = state.InvokeNodes.[0]
+              Expect.equal inv.InvokeType (Some "http") "invoke type"
+              Expect.equal inv.Src (Some "https://example.com/service") "invoke src"
+
+          testCase "history with default transition"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s1">
+  <state id="s1">
+    <history id="h1" type="shallow">
+      <transition target="child1"/>
+    </history>
+    <state id="child1"/>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let h = result.Document.Value.States.[0].HistoryNodes.[0]
+              Expect.isSome h.DefaultTransition "should have default transition"
+              Expect.equal h.DefaultTransition.Value.Targets [ "child1" ] "default target" ]
