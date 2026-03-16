@@ -1,29 +1,32 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
-title: "Foundation -- ALPS Types, Golden Files, and Project Wiring"
-phase: "Phase 0 - Setup & Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Foundation -- ALPS Types, Golden Files, and Project Wiring
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-018"]
+base_branch: master
+base_commit: 8b416b1f0b9492cefcb4f0b2099722a5835a76ce
+created_at: '2026-03-16T04:02:23.565644+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+phase: Phase 0 - Setup & Foundation
+assignee: ''
+agent: ''
+shell_pid: "97958"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T00:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T00:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-018]
 ---
 
 # Work Package Prompt: WP01 -- Foundation -- ALPS Types, Golden Files, and Project Wiring
