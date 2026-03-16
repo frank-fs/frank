@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Roundtrip Tests and Integration
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP01
 - WP02
@@ -16,8 +16,8 @@ subtasks:
 - T017
 phase: Phase 2 - Integration
 assignee: ''
-agent: "claude-opus"
-shell_pid: "9914"
+agent: "claude-opus-reviewer"
+shell_pid: "15742"
 review_status: ''
 reviewed_by: ''
 history:
@@ -358,3 +358,4 @@ test "20+ states roundtrip without error" {
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:26:03Z – claude-opus – shell_pid=9914 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:30:31Z – claude-opus – shell_pid=9914 – lane=for_review – Ready for review: roundtrip tests validate generate->serialize->parse pipeline. 20 tests all passing. Build succeeds for all 3 TFMs. 325/325 total tests pass.
+- 2026-03-16T04:32:25Z – claude-opus-reviewer – shell_pid=15742 – lane=doing – Started review via workflow command
