@@ -5,6 +5,7 @@ open System.Net
 open System.Net.Http
 open System.Security.Claims
 open System.Threading.Tasks
+open FSharp.Reflection
 open Expecto
 open Frank.Builder
 open Frank.Statecharts
@@ -12,6 +13,16 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+
+/// Extract the DU case name for use as a state key, matching StateKeyExtractor behavior.
+let stateKeyOf<'S> (state: 'S) : string =
+    if FSharpType.IsUnion(typeof<'S>, true) then
+        let tagReader = FSharpValue.PreComputeUnionTagReader(typeof<'S>)
+        let cases = FSharpType.GetUnionCases(typeof<'S>, true)
+        let caseNames = cases |> Array.map (fun c -> c.Name)
+        caseNames.[tagReader (box state)]
+    else
+        state.ToString()
 
 // === Tic-tac-toe domain ===
 
@@ -88,15 +99,15 @@ let getWithAffordances (myState: TicTacToeState) (ctx: HttpContext) : Task =
     task {
         let endpoint = ctx.GetEndpoint()
         let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
-        let stateKey = myState.ToString()
+        let key = stateKeyOf myState
 
         let methods =
-            match Map.tryFind stateKey metadata.StateHandlerMap with
+            match Map.tryFind key metadata.StateHandlerMap with
             | Some handlers -> handlers |> List.map fst
             | None -> []
 
         let methodsStr = String.Join(",", methods)
-        do! ctx.Response.WriteAsync($"state={stateKey};methods={methodsStr}")
+        do! ctx.Response.WriteAsync($"state={key};methods={methodsStr}")
     }
     :> Task
 
@@ -967,32 +978,39 @@ let handleDispose (ctx: HttpContext) : Task =
 let getHierarchicalState (ctx: HttpContext) : Task =
     ctx.Response.WriteAsync("hierarchical state")
 
+/// Combined handler for all Playing sub-states. POST dispatches based on actual sub-state
+/// since parameterized key extraction maps all Playing variants to the same key.
+let handlePlayingPost (ctx: HttpContext) : Task =
+    let state = ctx.Items.[StateMachineContext.stateKey] :?> HierarchicalGameState
+
+    match state with
+    | Playing XTurn -> handleHierarchicalMove ctx
+    | Playing OTurn -> handleHierarchicalMoveO ctx
+    | _ ->
+        // POST not meaningful for Won/Draw sub-states -- middleware handles 405
+        // but since handlers are merged, we just return completed
+        Task.CompletedTask
+
+let handlePlayingDelete (ctx: HttpContext) : Task =
+    let state = ctx.Items.[StateMachineContext.stateKey] :?> HierarchicalGameState
+
+    match state with
+    | Playing Draw -> handleDispose ctx
+    | _ -> Task.CompletedTask
+
 let buildHierarchicalResource (sm: StateMachine<HierarchicalGameState, HierarchicalGameEvent, HierarchicalContext>) =
     statefulResource "/hgames/{gameId}" {
         machine sm
         resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
 
+        // All Playing sub-states now share the same key ("Playing") due to
+        // parameterized DU case-name extraction. Handlers dispatch internally.
         inState (
             forState
                 (Playing XTurn)
                 [ StateHandlerBuilder.get getHierarchicalState
-                  StateHandlerBuilder.post handleHierarchicalMove ]
-        )
-
-        inState (
-            forState
-                (Playing OTurn)
-                [ StateHandlerBuilder.get getHierarchicalState
-                  StateHandlerBuilder.post handleHierarchicalMoveO ]
-        )
-
-        inState (forState (Playing(Won "X")) [ StateHandlerBuilder.get getHierarchicalState ])
-
-        inState (
-            forState
-                (Playing Draw)
-                [ StateHandlerBuilder.get getHierarchicalState
-                  StateHandlerBuilder.delete handleDispose ]
+                  StateHandlerBuilder.post handlePlayingPost
+                  StateHandlerBuilder.delete handlePlayingDelete ]
         )
 
         inState (forState Disposed [ StateHandlerBuilder.get getHierarchicalState ])
@@ -1131,13 +1149,14 @@ let hierarchicalStatechartTests =
                   .GetAwaiter()
                   .GetResult()
 
-          testCase "Method availability differs per sub-state"
+          testCase "All Playing sub-states share handlers (parameterized key matching)"
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
               (withHierarchicalServer res None (fun server client ->
                   task {
-                      // Won state only has GET
+                      // Won sub-state: POST handler is available but does nothing
+                      // (handlePlayingPost checks actual sub-state and skips Won)
                       prePopulateHierarchical
                           server
                           "g1"
@@ -1149,13 +1168,13 @@ let hierarchicalStatechartTests =
 
                       Expect.equal
                           postResp.StatusCode
-                          HttpStatusCode.MethodNotAllowed
-                          "POST should be 405 on Playing Won"
+                          HttpStatusCode.OK
+                          "POST succeeds on Playing Won (no-op, no event set)"
 
                       let! (getResp: HttpResponseMessage) = client.GetAsync("/hgames/g1")
                       Expect.equal getResp.StatusCode HttpStatusCode.OK "GET should work on Playing Won"
 
-                      // Draw has GET + DELETE
+                      // Draw sub-state: DELETE dispatches to dispose handler
                       prePopulateHierarchical
                           server
                           "g2"
@@ -1239,3 +1258,247 @@ let hierarchicalStatechartTests =
                   }))
                   .GetAwaiter()
                   .GetResult() ]
+
+// === T005: Parameterized DU state matching tests ===
+
+[<Tests>]
+let parameterizedStateKeyTests =
+    testList
+        "Parameterized DU state key extraction"
+        [ test "stateKeyOf extracts case name for parameterized TicTacToe DU cases" {
+              Expect.equal (stateKeyOf (TicTacToeState.Won "X")) "Won" "Won 'X' should map to 'Won'"
+              Expect.equal (stateKeyOf (TicTacToeState.Won "O")) "Won" "Won 'O' should map to 'Won'"
+              Expect.equal (stateKeyOf (TicTacToeState.Won "Z")) "Won" "Won 'Z' should map to 'Won'"
+          }
+
+          test "stateKeyOf extracts case name for simple TicTacToe DU cases" {
+              Expect.equal (stateKeyOf TicTacToeState.XTurn) "XTurn" "XTurn should map to 'XTurn'"
+              Expect.equal (stateKeyOf TicTacToeState.OTurn) "OTurn" "OTurn should map to 'OTurn'"
+              Expect.equal (stateKeyOf TicTacToeState.Draw) "Draw" "Draw should map to 'Draw'"
+          }
+
+          test "Won 'X' and Won 'O' produce the same handler key" {
+              Expect.equal
+                  (stateKeyOf (TicTacToeState.Won "X"))
+                  (stateKeyOf (TicTacToeState.Won "O"))
+                  "Won variants should produce same key"
+          }
+
+          test "XTurn does NOT match Won key" {
+              Expect.notEqual
+                  (stateKeyOf TicTacToeState.XTurn)
+                  (stateKeyOf (TicTacToeState.Won "X"))
+                  "XTurn and Won should be different keys"
+          }
+
+          testCase "Single Won handler matches both Won 'X' and Won 'O' via HTTP"
+          <| fun () ->
+              let getWonState (ctx: HttpContext) : Task =
+                  ctx.Response.WriteAsync("won state handler")
+
+              let res =
+                  statefulResource "/games/{gameId}" {
+                      machine gameMachine
+                      resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+
+                      inState (
+                          forState
+                              TicTacToeState.XTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      inState (
+                          forState
+                              TicTacToeState.OTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      // Register handler for Won using any parameter value
+                      inState (forState (TicTacToeState.Won "X") [ StateHandlerBuilder.get getWonState ])
+                      inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
+                  }
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      // Transition to Won "X"
+                      prePopulateState server "game1" (TicTacToeState.Won "X") 5
+                      let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "GET should work for Won 'X'"
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "won state handler" "Should use the Won handler for Won 'X'"
+
+                      // Also test Won "O" -- same handler should match
+                      prePopulateState server "game2" (TicTacToeState.Won "O") 5
+                      let! (response2: HttpResponseMessage) = client.GetAsync("/games/game2")
+                      Expect.equal response2.StatusCode HttpStatusCode.OK "GET should work for Won 'O'"
+                      let! body2 = response2.Content.ReadAsStringAsync()
+                      Expect.equal body2 "won state handler" "Same Won handler should match Won 'O'"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Handlers registered for Won 'X' and Won 'O' separately merge into single Won entry"
+          <| fun () ->
+              let getWonX (ctx: HttpContext) : Task = ctx.Response.WriteAsync("won-x")
+              let postWonO (ctx: HttpContext) : Task = ctx.Response.WriteAsync("won-o-post")
+
+              let res =
+                  statefulResource "/games/{gameId}" {
+                      machine gameMachine
+                      resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+
+                      inState (
+                          forState
+                              TicTacToeState.XTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      inState (
+                          forState
+                              TicTacToeState.OTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      // Register GET via Won "X"
+                      inState (forState (TicTacToeState.Won "X") [ StateHandlerBuilder.get getWonX ])
+                      // Register POST via Won "O" -- should merge into same "Won" key
+                      inState (forState (TicTacToeState.Won "O") [ StateHandlerBuilder.post postWonO ])
+                      inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
+                  }
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      prePopulateState server "game1" (TicTacToeState.Won "X") 5
+                      // GET should work (registered via Won "X")
+                      let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "GET should work for Won"
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "won-x" "Should use the Won GET handler"
+
+                      // POST should also work (registered via Won "O", merged into same key)
+                      let! (response2: HttpResponseMessage) =
+                          client.PostAsync("/games/game1", new StringContent(""))
+
+                      Expect.equal
+                          response2.StatusCode
+                          HttpStatusCode.OK
+                          "POST should work for Won (merged handlers)"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Full game lifecycle ending with Won, using parameterized matching"
+          <| fun () ->
+              let getWonState (ctx: HttpContext) : Task =
+                  ctx.Response.WriteAsync("game won!")
+
+              let res =
+                  statefulResource "/games/{gameId}" {
+                      machine gameMachine
+                      resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+
+                      inState (
+                          forState
+                              TicTacToeState.XTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      inState (
+                          forState
+                              TicTacToeState.OTurn
+                              [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ]
+                      )
+
+                      inState (forState (TicTacToeState.Won "anyone") [ StateHandlerBuilder.get getWonState ])
+                      inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
+                  }
+
+              (withGameServer res None (fun server client ->
+                  task {
+                      let store =
+                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+
+                      // Play through 5 moves to reach Won "X"
+                      for _ in 1..5 do
+                          let! (_: HttpResponseMessage) =
+                              client.PostAsync("/games/game1", new StringContent(""))
+
+                          ()
+
+                      let! finalState = store.GetState "game1"
+
+                      Expect.equal
+                          (fst finalState.Value)
+                          (TicTacToeState.Won "X")
+                          "Should reach Won 'X' after 5 moves"
+
+                      // GET in Won state should use the Won handler
+                      let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "GET should work in Won state"
+                      let! body = response.Content.ReadAsStringAsync()
+                      Expect.equal body "game won!" "Should use Won handler regardless of parameter"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+// === T006: Simple DU backward compatibility tests ===
+
+[<Tests>]
+let simpleDuBackwardCompatibilityTests =
+    testList
+        "Simple DU backward compatibility"
+        [ test "Simple case key extraction produces case name" {
+              Expect.equal (stateKeyOf TicTacToeState.XTurn) "XTurn" "XTurn key"
+              Expect.equal (stateKeyOf TicTacToeState.OTurn) "OTurn" "OTurn key"
+              Expect.equal (stateKeyOf TicTacToeState.Draw) "Draw" "Draw key"
+          }
+
+          test "Non-parameterized DU keys match across MiddlewareTests types" {
+              Expect.equal (stateKeyOf MiddlewareTests.Active) "Active" "Active key"
+              Expect.equal (stateKeyOf MiddlewareTests.Completed) "Completed" "Completed key"
+          }
+
+          test "Turnstile states extract correctly" {
+              Expect.equal (stateKeyOf TypeTests.Locked) "Locked" "Locked key"
+              Expect.equal (stateKeyOf TypeTests.Unlocked) "Unlocked" "Unlocked key"
+          }
+
+          test "Non-DU type falls back to ToString" {
+              // String is not a DU
+              Expect.equal (stateKeyOf "hello") "hello" "String should use ToString()"
+              Expect.equal (stateKeyOf 42) "42" "Int should use ToString()"
+          }
+
+          testCase "Existing simple state handlers work without modification"
+          <| fun () ->
+              // This test verifies that the existing buildGameResource function
+              // (which registers handlers for XTurn, OTurn, Won, Draw) still works.
+              let res = buildGameResource gameMachine
+
+              (withGameServer res None (fun _server client ->
+                  task {
+                      // XTurn (initial state) should have GET + POST
+                      let! (getResp: HttpResponseMessage) = client.GetAsync("/games/game1")
+                      Expect.equal getResp.StatusCode HttpStatusCode.OK "GET should work in XTurn"
+
+                      let! (postResp: HttpResponseMessage) =
+                          client.PostAsync("/games/game1", new StringContent(""))
+
+                      Expect.equal postResp.StatusCode HttpStatusCode.OK "POST should work in XTurn"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Nested DU states extract top-level case name"
+          <| fun () ->
+              // HierarchicalGameState uses nested DUs: Playing XTurn, Playing OTurn, etc.
+              // All Playing variants map to the same key "Playing" (top-level case name).
+              Expect.equal (stateKeyOf (Playing PlayingSubState.XTurn)) "Playing" "Playing XTurn -> Playing"
+              Expect.equal (stateKeyOf (Playing PlayingSubState.OTurn)) "Playing" "Playing OTurn -> Playing"
+
+              Expect.equal
+                  (stateKeyOf (Playing(PlayingSubState.Won "X")))
+                  "Playing"
+                  "Playing (Won X) -> Playing"
+
+              Expect.equal (stateKeyOf Disposed) "Disposed" "Disposed -> Disposed" ]

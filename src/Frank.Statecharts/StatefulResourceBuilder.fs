@@ -3,11 +3,32 @@ namespace Frank.Statecharts
 open System
 open System.Security.Claims
 open System.Threading.Tasks
+open FSharp.Reflection
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
+
+/// Cached, thread-safe state key extraction using FSharpValue.PreComputeUnionTagReader.
+/// For DU types, extracts the case name (e.g., Won "X" -> "Won").
+/// For non-DU types, falls back to ToString().
+[<RequireQualifiedAccess>]
+module internal StateKeyExtractor =
+    let private cache = System.Collections.Concurrent.ConcurrentDictionary<System.Type, obj -> string>()
+
+    let private buildExtractor (t: System.Type) : obj -> string =
+        if FSharpType.IsUnion(t, true) then
+            let tagReader = FSharpValue.PreComputeUnionTagReader(t)
+            let cases = FSharpType.GetUnionCases(t, true)
+            let caseNames = cases |> Array.map (fun c -> c.Name)
+            fun (o: obj) -> caseNames.[tagReader o]
+        else
+            fun (o: obj) -> o.ToString()
+
+    let keyOf<'S> (state: 'S) : string =
+        let extractor = cache.GetOrAdd(typeof<'S>, System.Func<_, _>(buildExtractor))
+        extractor (box state)
 
 /// The outcome of a post-handler transition attempt evaluated by middleware.
 [<RequireQualifiedAccess>]
@@ -39,13 +60,13 @@ type StateMachineMetadata =
     {
         /// Boxed StateMachine<'S,'E,'C>
         Machine: obj
-        /// state.ToString() -> (httpMethod, handler) list
+        /// DU case name -> (httpMethod, handler) list; uses StateKeyExtractor for key derivation
         StateHandlerMap: Map<string, (string * RequestDelegate) list>
         /// Extracts the instance key from the request
         ResolveInstanceId: HttpContext -> string
         /// Boxed transition event handlers
         TransitionObservers: (obj -> unit) list
-        /// The initial state key (Initial.ToString())
+        /// The initial state key (DU case name via StateKeyExtractor)
         InitialStateKey: string
         /// Resolve state from store, cache in HttpContext.Items, return state key string.
         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
@@ -74,7 +95,7 @@ type TransitionEvent<'State, 'Event, 'Context> =
 type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
     { RouteTemplate: string
       Machine: StateMachine<'State, 'Event, 'Context> option
-      StateHandlerMap: Map<'State, (string * RequestDelegate) list>
+      StateHandlerMap: Map<string, (string * RequestDelegate) list>
       TransitionObservers: (TransitionEvent<'State, 'Event, 'Context> -> unit) list
       ResolveInstanceId: (HttpContext -> string) option
       Metadata: (EndpointBuilder -> unit) list }
@@ -121,13 +142,14 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with Machine = Some machine }
 
     /// Register handlers for a specific state using forState helper.
+    /// Parameterized DU cases (e.g., Won "X", Won "O") map to the same key ("Won").
     [<CustomOperation("inState")>]
     member _.InState(spec: StatefulResourceSpec<'S, 'E, 'C>, stateHandlers: StateHandlers<'S>) =
-        let existing =
-            Map.tryFind stateHandlers.State spec.StateHandlerMap |> Option.defaultValue []
+        let key = StateKeyExtractor.keyOf stateHandlers.State
+        let existing = Map.tryFind key spec.StateHandlerMap |> Option.defaultValue []
 
         { spec with
-            StateHandlerMap = Map.add stateHandlers.State (existing @ stateHandlers.Handlers) spec.StateHandlerMap }
+            StateHandlerMap = Map.add key (existing @ stateHandlers.Handlers) spec.StateHandlerMap }
 
     /// Register a transition observer hook. Multiple observers can be registered.
     [<CustomOperation("onTransition")>]
@@ -154,26 +176,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     let routeData = ctx.GetRouteData()
                     routeData.Values.Values |> Seq.head |> string)
 
-        // Build StateMetadata from inState registrations.
-        let stateMetadata =
-            spec.StateHandlerMap
-            |> Map.map (fun _state handlers ->
-                let methods = handlers |> List.map fst |> List.distinct
+        // Precomputed state key extractor: DU case name for unions, ToString() for others.
+        let stateKey (state: 'S) = StateKeyExtractor.keyOf state
 
-                let hasNonGetHandler =
-                    methods
-                    |> List.exists (fun m ->
-                        not (String.Equals(m, HttpMethods.Get, StringComparison.OrdinalIgnoreCase)))
-
-                { AllowedMethods = methods
-                  IsFinal = not hasNonGetHandler
-                  Description = None })
-
-        let machineWithMetadata =
-            { machine with
-                StateMetadata = stateMetadata }
-
-        let initialStateKey = machineWithMetadata.Initial.ToString()
+        let initialStateKey = stateKey machine.Initial
 
         // Closure: resolve state from store, cache typed values in HttpContext.Items
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
@@ -186,10 +192,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 | Some(state, context) ->
                     ctx.Items[StateMachineContext.stateKey] <- box state
                     ctx.Items[StateMachineContext.contextKey] <- box context
-                    return state.ToString()
+                    return stateKey state
                 | None ->
-                    ctx.Items[StateMachineContext.stateKey] <- box machineWithMetadata.Initial
-                    ctx.Items[StateMachineContext.contextKey] <- box machineWithMetadata.InitialContext
+                    ctx.Items[StateMachineContext.stateKey] <- box machine.Initial
+                    ctx.Items[StateMachineContext.contextKey] <- box machine.InitialContext
                     return initialStateKey
             }
 
@@ -204,7 +210,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                   Event = Unchecked.defaultof<'E>
                   Context = context }
 
-            machineWithMetadata.Guards
+            machine.Guards
             |> List.tryPick (fun g ->
                 match g.Predicate guardCtx with
                 | Allowed -> None
@@ -223,7 +229,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 | Some event ->
                     let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
                     let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
-                    let result = machineWithMetadata.Transition state event context
+                    let result = machine.Transition state event context
 
                     match result with
                     | TransitionResult.Transitioned(newState, newContext) ->
@@ -244,15 +250,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     | TransitionResult.Invalid msg -> return TransitionAttemptResult.Invalid msg
             }
 
-        let stateHandlerMap =
-            spec.StateHandlerMap
-            |> Map.toList
-            |> List.map (fun (s, h) -> (s.ToString(), h))
-            |> Map.ofList
-
         let metadata: StateMachineMetadata =
-            { Machine = box machineWithMetadata
-              StateHandlerMap = stateHandlerMap
+            { Machine = box machine
+              StateHandlerMap = spec.StateHandlerMap
               ResolveInstanceId = resolveId
               TransitionObservers =
                 spec.TransitionObservers
