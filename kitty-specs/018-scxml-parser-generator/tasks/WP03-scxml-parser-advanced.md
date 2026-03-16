@@ -13,7 +13,7 @@ subtasks:
 - T011
 phase: Phase 2 - Implementation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "15369"
 review_status: ''
 reviewed_by: ''
@@ -340,3 +340,4 @@ Verify that:
 ## Activity Log
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:31:57Z – claude-opus – shell_pid=15369 – lane=doing – Assigned agent via workflow command
