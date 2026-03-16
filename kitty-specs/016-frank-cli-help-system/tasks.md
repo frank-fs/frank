@@ -88,11 +88,11 @@
 **Estimated Prompt Size**: ~300 lines
 
 ### Included Subtasks
-- [ ] T013 Create `src/Frank.Cli.Core/Help/HelpSubcommand.fs` with help argument resolution logic
-- [ ] T014 Implement `resolve` function: given a string argument, return HelpLookupResult (CommandMatch, TopicMatch, or NoMatch with suggestions)
-- [ ] T015 Implement "did you mean?" suggestion logic using FuzzyMatch (threshold: distance <= 3 or <= 50% of input length, plus prefix matching)
-- [ ] T016 Implement `listAll` function: return all commands and topics for the no-argument case
-- [ ] T017 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entry for HelpSubcommand.fs
+- [x] T013 Create `src/Frank.Cli.Core/Help/HelpSubcommand.fs` with help argument resolution logic
+- [x] T014 Implement `resolve` function: given a string argument, return HelpLookupResult (CommandMatch, TopicMatch, or NoMatch with suggestions)
+- [x] T015 Implement "did you mean?" suggestion logic using FuzzyMatch (threshold: distance <= 3 or <= 50% of input length, plus prefix matching)
+- [x] T016 Implement `listAll` function: return all commands and topics for the no-argument case
+- [x] T017 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entry for HelpSubcommand.fs
 
 ### Implementation Notes
 - Commands take priority over topics when a name matches both (edge case from spec).
