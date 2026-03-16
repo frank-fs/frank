@@ -1,5 +1,4 @@
 module internal Frank.Statecharts.Smcat.Generator
-<<<<<<< HEAD
 
 open Frank.Statecharts.Smcat.Types
 
@@ -103,6 +102,3 @@ let generate<'State, 'Event when 'State: equality and 'State: comparison>
         lines.Add(formatTransition finalStateName "final" None)
 
     lines |> String.concat "\n"
-=======
-// Implementation in WP05
->>>>>>> 013-smcat-parser-generator-WP03

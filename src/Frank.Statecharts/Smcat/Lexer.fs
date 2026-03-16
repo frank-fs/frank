@@ -1,7 +1,4 @@
 module internal Frank.Statecharts.Smcat.Lexer
-<<<<<<< HEAD
-// Implementation in WP02
-=======
 
 open Frank.Statecharts.Smcat.Types
 
@@ -209,4 +206,3 @@ let tokenize (source: string) : Token list =
 
     tokens.Add(makeToken Eof line col)
     tokens |> Seq.toList
->>>>>>> 013-smcat-parser-generator-WP03

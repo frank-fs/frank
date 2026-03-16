@@ -1,7 +1,4 @@
 module internal Frank.Statecharts.Smcat.LabelParser
-<<<<<<< HEAD
-// Implementation in WP03
-=======
 
 open Frank.Statecharts.Smcat.Types
 
@@ -97,4 +94,3 @@ let parseLabel (label: string) (position: SourcePosition) : TransitionLabel * Pa
            Guard = guardText
            Action = actionText },
          warnings |> Seq.toList)
->>>>>>> 013-smcat-parser-generator-WP03
