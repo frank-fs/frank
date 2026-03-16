@@ -16,7 +16,7 @@ subtasks:
 - T017
 phase: Phase 2 - Integration
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "9914"
 review_status: ''
 reviewed_by: ''
@@ -356,3 +356,4 @@ test "20+ states roundtrip without error" {
 ## Activity Log
 
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:26:03Z – claude-opus – shell_pid=9914 – lane=doing – Assigned agent via workflow command
