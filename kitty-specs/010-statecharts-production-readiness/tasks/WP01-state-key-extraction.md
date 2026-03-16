@@ -1,32 +1,35 @@
 ---
-work_package_id: "WP01"
-title: "State Key Extraction"
-phase: "Phase 1 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: State Key Extraction
+lane: "doing"
 dependencies: []
-requirement_refs:
-  - "FR-001"
-  - "FR-002"
-  - "FR-012"
+base_branch: master
+base_commit: 7d5b7cdd35e1b13fb514c7646148835ae04c087f
+created_at: '2026-03-16T04:02:08.636514+00:00'
 subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+phase: Phase 1 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "97668"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T00:05:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T00:05:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-001
+- FR-002
+- FR-012
 ---
 
 # Work Package Prompt: WP01 -- State Key Extraction
