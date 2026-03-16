@@ -28,11 +28,11 @@
 **Estimated Prompt Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Add `DiscoveryMediaType` struct record to `src/Frank/Builder.fs`
-- [ ] T002 Create `src/Frank.Discovery/Frank.Discovery.fsproj` (multi-target net8.0;net9.0;net10.0, project ref to Frank)
-- [ ] T003 Create `test/Frank.Discovery.Tests/Frank.Discovery.Tests.fsproj` (net10.0, project ref to Frank.Discovery, Expecto + TestHost)
-- [ ] T004 Create `test/Frank.Discovery.Tests/Program.fs` (Expecto entry point)
-- [ ] T005 Add Frank.Discovery and Frank.Discovery.Tests projects to `Frank.sln`
+- [x] T001 Add `DiscoveryMediaType` struct record to `src/Frank/Builder.fs`
+- [x] T002 Create `src/Frank.Discovery/Frank.Discovery.fsproj` (multi-target net8.0;net9.0;net10.0, project ref to Frank)
+- [x] T003 Create `test/Frank.Discovery.Tests/Frank.Discovery.Tests.fsproj` (net10.0, project ref to Frank.Discovery, Expecto + TestHost)
+- [x] T004 Create `test/Frank.Discovery.Tests/Program.fs` (Expecto entry point)
+- [x] T005 Add Frank.Discovery and Frank.Discovery.Tests projects to `Frank.sln`
 
 ### Implementation Notes
 - `DiscoveryMediaType` is a `[<Struct>]` record with `MediaType: string` and `Rel: string` fields, placed alongside `ResourceSpec` in `Builder.fs`.
