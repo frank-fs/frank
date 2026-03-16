@@ -1,15 +1,12 @@
 ---
 work_package_id: WP05
 title: SQLite Store Tests + DI Registration + Integration
-lane: "done"
+lane: planned
 dependencies:
 - WP04
 - WP01
 - WP02
 - WP03
-base_branch: 010-statecharts-production-readiness-WP04
-base_commit: 6369cfaa9dca489be0aaf038af9989f1a14722c2
-created_at: '2026-03-16T04:25:02.849964+00:00'
 subtasks:
 - T028
 - T029
@@ -20,10 +17,10 @@ subtasks:
 - T034
 phase: Phase 3 - Integration
 assignee: ''
-agent: "claude-opus-reviewer"
-shell_pid: "16549"
-review_status: "approved"
-reviewed_by: "Ryan Riley"
+agent: ''
+shell_pid: ''
+review_status: ''
+reviewed_by: ''
 history:
 - timestamp: '2026-03-16T00:05:00Z'
   lane: planned
@@ -391,7 +388,3 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP05 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
-- 2026-03-16T04:25:03Z – claude-opus – shell_pid=9464 – lane=doing – Assigned agent via workflow command
-- 2026-03-16T04:32:48Z – claude-opus – shell_pid=9464 – lane=for_review – Ready for review: SQLite store test project with 25 tests covering CRUD, rehydration, subscriptions, concurrency, disposal, DI registration, and schema auto-creation. Full solution builds and all 888 tests pass.
-- 2026-03-16T04:33:32Z – claude-opus-reviewer – shell_pid=16549 – lane=doing – Started review via workflow command
-- 2026-03-16T04:37:49Z – claude-opus-reviewer – shell_pid=16549 – lane=done – Review passed: All 7 subtasks (T028-T034) complete. 25 tests across 7 test lists cover CRUD, rehydration, subscriptions, concurrency, disposal, DI registration, and schema auto-creation. Full solution builds (0 errors), all tests pass. Code mirrors MailboxProcessorStore patterns consistently. No regressions.
