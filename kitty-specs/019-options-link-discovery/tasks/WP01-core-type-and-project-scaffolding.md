@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Core Type and Project Scaffolding
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: 7b7d58d7a253edee23d92878e00801326a122534
@@ -16,8 +16,8 @@ phase: Phase 0 - Setup
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "4072"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-16T01:20:58Z'
   lane: planned
@@ -237,3 +237,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 - 2026-03-16T04:02:38Z – claude-opus-4-6 – shell_pid=98469 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:14:36Z – claude-opus-4-6 – shell_pid=98469 – lane=for_review – Ready for review: DiscoveryMediaType struct added to Builder.fs, Frank.Discovery project scaffolded with multi-targeting, Frank.Discovery.Tests scaffolded with Expecto, both added to Frank.sln. Solution builds successfully.
 - 2026-03-16T04:16:35Z – claude-opus-reviewer – shell_pid=4072 – lane=doing – Started review via workflow command
+- 2026-03-16T04:18:50Z – claude-opus-reviewer – shell_pid=4072 – lane=done – Review passed: All 5 subtasks verified. DiscoveryMediaType is a [<Struct>] record with correct fields and placement in Builder.fs. Frank.Discovery.fsproj has correct multi-targeting (net8.0/9.0/10.0), project reference, and framework reference. Frank.Discovery.Tests.fsproj matches Frank.Auth.Tests pattern with correct package versions and single net10.0 target. Both projects correctly nested in sln under src/test folders. dotnet build succeeds with 0 errors. dotnet test runs cleanly with 0 tests (expected). Constitution Principle V compliance verified (struct for zero allocation).
