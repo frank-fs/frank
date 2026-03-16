@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Frank.Statecharts.Tests" />
+    <InternalsVisibleTo Include="Frank.Cli.Core" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +28,7 @@
     <Compile Include="Smcat/Lexer.fs" />
     <Compile Include="Smcat/LabelParser.fs" />
     <Compile Include="Smcat/Parser.fs" />
-    <Compile Include="Smcat/Mapper.fs" />
+    <Compile Include="Smcat/Serializer.fs" />
     <!-- ALPS parser -->
     <Compile Include="Alps/Types.fs" />
     <Compile Include="Alps/JsonParser.fs" />
@@ -38,6 +39,9 @@
     <Compile Include="Scxml/Parser.fs" />
     <Compile Include="Scxml/Mapper.fs" />
     <Compile Include="Scxml/Generator.fs" />
+    <!-- XState serializer -->
+    <Compile Include="XState/Serializer.fs" />
+    <Compile Include="XState/Deserializer.fs" />
     <!-- Validation -->
     <Compile Include="Validation/Types.fs" />
     <Compile Include="Validation/Validator.fs" />
