@@ -30,8 +30,8 @@
 - [x] T001 Add `InternalsVisibleTo Include="Frank.Cli.Core"` to `Frank.Statecharts.fsproj`
 - [x] T002 Add `Frank.Statecharts` project reference to `Frank.Cli.Core.fsproj`
 - [x] T003 [P] Create `src/Frank.Statecharts/XState/Serializer.fs` — `StatechartDocument -> XState v5 JSON`
-- [ ] T004 [P] Create `src/Frank.Statecharts/XState/Deserializer.fs` — `XState v5 JSON -> Ast.ParseResult`
-- [ ] T005 Add XState compile entries to `Frank.Statecharts.fsproj` (before `StatefulResourceBuilder.fs`)
+- [x] T004 [P] Create `src/Frank.Statecharts/XState/Deserializer.fs` — `XState v5 JSON -> Ast.ParseResult`
+- [x] T005 Add XState compile entries to `Frank.Statecharts.fsproj` (before `StatefulResourceBuilder.fs`)
 - [ ] T006 Verify solution builds with `dotnet build`
 
 ### Implementation Notes
