@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Roundtrip Tests & Golden Files
-lane: planned
+lane: "planned"
 dependencies:
 - WP03
 subtasks:
@@ -14,8 +14,9 @@ phase: Phase 3 - Validation
 assignee: ''
 agent: ''
 shell_pid: ''
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/fix-lane.md"
 history:
 - timestamp: '2026-03-15T23:59:14Z'
   lane: planned
@@ -38,11 +39,13 @@ requirement_refs: [FR-002, FR-009]
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/fix-lane.md`
 
-*[This section is empty initially.]*
+**Issue**: Manually correcting lane status to done
 
----
 
 ## Implementation Command
 
@@ -403,3 +406,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP06 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T14:34:43Z – unknown – lane=planned – Moved to planned
