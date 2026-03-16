@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <Compile Include="OptionsDiscoveryMiddleware.fs" />
+<<<<<<< HEAD
+=======
+    <Compile Include="LinkHeaderMiddleware.fs" />
+>>>>>>> 019-wp03-link-headers
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
