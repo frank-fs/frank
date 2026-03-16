@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP04"
+work_package_id: WP04
+title: Cross-Format Validation Rules
+lane: "doing"
+dependencies: [WP02]
+base_branch: 021-cross-format-validator-WP02
+base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
+created_at: '2026-03-16T04:17:12.703868+00:00'
 subtasks:
-  - "T022"
-  - "T023"
-  - "T024"
-  - "T025"
-  - "T026"
-  - "T027"
-title: "Cross-Format Validation Rules"
-phase: "Phase 1 - Core Rules"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02"]
-requirement_refs: ["FR-012", "FR-014", "FR-015", "FR-017"]
+- T022
+- T023
+- T024
+- T025
+- T026
+- T027
+phase: Phase 1 - Core Rules
+assignee: ''
+agent: ''
+shell_pid: "4668"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:11Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:11Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-012, FR-014, FR-015, FR-017]
 ---
 
 # Work Package Prompt: WP04 -- Cross-Format Validation Rules
