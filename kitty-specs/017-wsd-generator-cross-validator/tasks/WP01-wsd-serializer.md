@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-title: "WSD Serializer"
-phase: "Phase 1a - Serializer"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: WSD Serializer
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-006", "FR-008", "FR-009"]
+base_branch: master
+base_commit: c25f06152554a9fee69211eb7ba68098b454cc7f
+created_at: '2026-03-16T04:02:31.877115+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+phase: Phase 1a - Serializer
+assignee: ''
+agent: ''
+shell_pid: "98343"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:06Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:06Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-002, FR-003, FR-004, FR-006, FR-008, FR-009]
 ---
 
 # Work Package Prompt: WP01 -- WSD Serializer
