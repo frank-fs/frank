@@ -10,7 +10,7 @@ subtasks:
   - "T019"
 title: "SCXML Generator"
 phase: "Phase 2 - Implementation"
-lane: "planned"
+lane: "for_review"
 assignee: ""
 agent: ""
 shell_pid: ""
@@ -441,3 +441,4 @@ Expected output:
 ## Activity Log
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:21:37Z – unknown – lane=for_review – Moved to for_review
