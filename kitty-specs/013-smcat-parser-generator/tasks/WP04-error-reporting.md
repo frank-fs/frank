@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Structured Error Reporting
-lane: "doing"
+lane: "for_review"
 dependencies: [WP03]
 base_branch: 013-smcat-parser-generator-WP03
 base_commit: e7d26a104f5958375c245c1f7107a55307ddee48
@@ -330,3 +330,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP04 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-16T11:57:05Z – unknown – shell_pid=61124 – lane=for_review – Ready for review: Structured error reporting with 28 passing tests. All 129 Smcat tests pass, full suite 375 passes, multi-target build succeeds.
