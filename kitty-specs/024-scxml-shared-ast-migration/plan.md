@@ -1,108 +1,137 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: SCXML Shared AST Migration
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `024-scxml-shared-ast-migration` | **Date**: 2026-03-16 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `kitty-specs/024-scxml-shared-ast-migration/spec.md`
+**Issue**: #114 | **Parent**: #57
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Migrate the SCXML parser and generator in `Frank.Statecharts` to work directly with the shared `StatechartDocument` AST (spec 020), eliminating the format-specific `ScxmlDocument`/`ScxmlState`/`ScxmlTransition` intermediate types and the `Mapper.fs` bridge module. This follows the established WSD migration pattern exactly. The parser produces `Ast.ParseResult` directly, the generator consumes `StatechartDocument` directly, and SCXML-specific data (transition types, multi-target transitions, datamodel attributes, binding, invoke IDs, history default transitions, state-level initial attributes) is preserved via new `ScxmlMeta` annotation cases on the shared AST.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts)
+**Primary Dependencies**: Frank.Statecharts (project-internal), System.Xml.Linq (in-framework), System.Xml (for `IXmlLineInfo`)
+**Storage**: N/A (stateless parser/generator library)
+**Testing**: Expecto (existing Frank.Statecharts.Tests project)
+**Target Platform**: .NET 8.0, 9.0, 10.0 (multi-targeting)
+**Project Type**: Single library project (Frank.Statecharts)
+**Performance Goals**: No regression from current implementation -- both parser and generator are I/O-bound on XML parsing
+**Constraints**: All existing SCXML tests must pass after migration; zero references to deleted types
+**Scale/Scope**: 4 source files modified (Ast/Types.fs, Scxml/Types.fs, Scxml/Parser.fs, Scxml/Generator.fs), 1 file deleted (Scxml/Mapper.fs), 1 project file updated (Frank.Statecharts.fsproj), 5 test files updated
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Resource-Oriented Design | N/A | Statechart subsystem, not HTTP resource API |
+| II. Idiomatic F# | PASS | Discriminated unions (ScxmlMeta cases), option types, pipeline-friendly signatures |
+| III. Library, Not Framework | PASS | Internal module refactor, no API surface change for library consumers |
+| IV. ASP.NET Core Native | N/A | No ASP.NET Core interaction in parser/generator |
+| V. Performance Parity | PASS | Eliminates one allocation layer (Mapper intermediary), net-neutral or positive |
+| VI. Resource Disposal Discipline | PASS | Parser already uses `use` for StreamReader/XDocument; no change to disposal patterns |
+| VII. No Silent Exception Swallowing | PASS | Parser error handling preserved (XmlException catch with position data) |
+| VIII. No Duplicated Logic Across Modules | PASS | Migration *removes* duplication -- Mapper.fs duplicated conversion logic that will now live in one place each (parser for parse direction, generator for generate direction) |
+
+**Post-design re-check**: No new violations. The migration reduces code paths and eliminates the Mapper intermediary.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/024-scxml-shared-ast-migration/
+├── plan.md              # This file
+├── research.md          # Phase 0 output (minimal -- established pattern)
+├── data-model.md        # Phase 1 output (ScxmlMeta type extensions)
+├── quickstart.md        # Phase 1 output (migration verification steps)
+└── tasks.md             # Phase 2 output (generated by /spec-kitty.tasks)
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+src/Frank.Statecharts/
+├── Ast/
+│   └── Types.fs             # MODIFIED: Add 6 new ScxmlMeta cases
+├── Scxml/
+│   ├── Types.fs             # MODIFIED: Delete ScxmlDocument, ScxmlState, ScxmlTransition,
+│   │                        #   ScxmlParseResult, ScxmlStateKind, DataEntry, ParseError,
+│   │                        #   ParseWarning; retain ScxmlTransitionType, ScxmlHistoryKind,
+│   │                        #   SourcePosition
+│   ├── Parser.fs            # MODIFIED: Return Ast.ParseResult directly (absorb Mapper.toStatechartDocument)
+│   ├── Generator.fs         # MODIFIED: Accept StatechartDocument (absorb Mapper.fromStatechartDocument)
+│   └── Mapper.fs            # DELETED
+├── Frank.Statecharts.fsproj # MODIFIED: Remove Scxml/Mapper.fs entry
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+test/Frank.Statecharts.Tests/
+├── Scxml/
+│   ├── TypeTests.fs         # MODIFIED: Test retained types only
+│   ├── ParserTests.fs       # MODIFIED: Use Ast types (ParseResult, StatechartDocument)
+│   ├── GeneratorTests.fs    # MODIFIED: Use Ast types (StatechartDocument)
+│   ├── RoundTripTests.fs    # MODIFIED: Use Ast types, strip Ast.SourcePosition
+│   └── ErrorTests.fs        # MODIFIED: Use Ast types (ParseResult)
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Pure refactor within existing project structure. No new projects, no new directories. Follows the WSD migration pattern where `Wsd/Types.fs` retains only Token/Lexer types after migration.
 
 ## Complexity Tracking
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+No constitution violations. No complexity justification needed.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+## Migration Pattern Reference (WSD Precedent)
+
+The WSD parser/serializer migration (spec 020) established the pattern:
+
+1. **Parser** (`Wsd/Parser.fs`): Opens `Frank.Statecharts.Ast`, constructs `StatechartDocument`, `StateNode`, `TransitionEdge` directly, attaches `WsdAnnotation(...)` for format-specific data
+2. **Serializer** (`Wsd/Serializer.fs`): Opens `Frank.Statecharts.Ast`, reads `StatechartDocument` fields, extracts `WsdAnnotation(...)` for format-specific reconstruction
+3. **Types.fs** (`Wsd/Types.fs`): Retains only lexer/parser internal types (`TokenKind`, `Token`)
+4. **No Mapper**: Mapper module was deleted; conversion logic absorbed into parser and serializer
+
+SCXML follows this pattern with the added complexity of:
+- Hierarchical state nesting (recursive `StateNode.Children`)
+- 6 new `ScxmlMeta` cases vs WSD's 3 `WsdMeta` cases
+- History pseudo-states with default transitions
+- Invoke elements with id/type/src
+- Document-level attributes (datamodel, binding)
+- Multi-target transitions
+- State-level initial attributes
+
+## Key Design Decisions
+
+### D1: ScxmlMeta Extension Strategy
+
+Add 6 new cases to the existing `ScxmlMeta` DU in `Ast/Types.fs`:
+
+```fsharp
+type ScxmlMeta =
+    | ScxmlInvoke of invokeType: string * src: string option * id: string option  // extended with id
+    | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option  // extended with default transition
+    | ScxmlNamespace of string  // existing, unchanged
+    | ScxmlTransitionType of internal: bool  // NEW: true=internal, false=external
+    | ScxmlMultiTarget of targets: string list  // NEW: all targets for multi-target transitions
+    | ScxmlDatamodelType of datamodel: string  // NEW: document-level datamodel attribute
+    | ScxmlBinding of binding: string  // NEW: document-level binding attribute
+    | ScxmlInitial of initialId: string  // NEW: state-level initial attribute
+```
+
+**Rationale**: Extending `ScxmlInvoke` with `id` and `ScxmlHistory` with `defaultTarget` avoids adding separate small cases. New cases use descriptive field names. `ScxmlTransitionType` uses a `bool` for internal (simpler than wrapping the enum) -- but on reflection, using the existing `ScxmlTransitionType` DU from `Scxml/Types.fs` would be more idiomatic. However, the `Scxml.Types.ScxmlTransitionType` is format-internal. We use a simple `internal: bool` to avoid coupling the shared AST to format-internal types.
+
+### D2: History Default Transition Representation
+
+History default transitions are stored in the `ScxmlHistory` annotation payload as `defaultTarget: string option`, NOT as separate `TransitionElement` entries in the document. This is because:
+- SCXML `<history>` contains at most one `<transition>` child for the default
+- The shared AST's `TransitionElement` entries are keyed by source state, and history pseudo-states would need special-case handling
+- Storing in the annotation keeps the round-trip simple and contained
+
+### D3: State-Level Data Entry Handling
+
+State-scoped `<datamodel>/<data>` entries are flattened into `StatechartDocument.DataEntries` (matching existing Mapper behavior). If state-scope placement is needed for round-trip fidelity, a `ScxmlAnnotation(ScxmlStateData(stateId, entryNames))` could be added later, but the current Mapper already flattens, so this is not a regression.
+
+### D4: Non-SCXML StateKind Handling in Generator
+
+When the generator encounters `StateNode` entries with kinds that have no SCXML equivalent (`Choice`, `ForkJoin`, `Terminate`, `Initial`):
+- `Initial` is mapped to `<state>` (reasonable SCXML fallback)
+- `Choice`, `ForkJoin`, `Terminate` are silently skipped (matching WSD serializer behavior for non-WSD state kinds)
