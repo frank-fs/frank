@@ -61,7 +61,7 @@ New files must be inserted in dependency order. The approximate insertion points
 <Compile Include="Help/HelpSubcommand.fs" />
 <Compile Include="Help/HelpAction.fs" />
 
-<!-- After Commands/CompileCommand.fs -->
+<!-- Before Commands/ValidateCommand.fs -->
 <Compile Include="Commands/StalenessChecker.fs" />
 <Compile Include="Commands/StatusCommand.fs" />
 ```

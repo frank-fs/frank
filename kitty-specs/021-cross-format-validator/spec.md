@@ -123,7 +123,7 @@ A developer receives a validation failure and can immediately understand what we
 
 ### Functional Requirements
 
-- **FR-001**: System MUST define a `ValidationRule` contract as a function signature that accepts a list of format-tagged artifacts and returns a list of validation checks (pass/fail/skip with optional failure details)
+- **FR-001**: System MUST define a `ValidationRule` contract as a function signature that accepts a list of format-tagged artifacts and returns a tuple of `ValidationCheck list * ValidationFailure list` (checks with pass/fail/skip status, and corresponding failure details for any failed checks)
 - **FR-002**: System MUST define a `FormatArtifact` type that wraps a parsed shared AST (`StatechartDocument` from spec 020) with a format tag identifying which parser produced it (WSD, ALPS, SCXML, smcat, XState)
 - **FR-003**: System MUST define a `ValidationReport` type containing: total checks performed, total checks skipped, total failures, a list of `ValidationCheck` results, and a list of `ValidationFailure` details
 - **FR-004**: System MUST define a `ValidationCheck` type representing a named invariant with status (pass, fail, skip) and an optional reason for skip status
@@ -145,9 +145,9 @@ A developer receives a validation failure and can immediately understand what we
 
 - **ValidationReport**: Top-level result containing the total number of checks performed, checks skipped, and failures. Holds a list of `ValidationCheck` results and a list of `ValidationFailure` details. Returned as a data structure; presentation is the CLI's concern.
 - **ValidationFailure**: A single cross-format or intra-format mismatch. Contains the formats involved (one for self-consistency, two for cross-format), the entity type (state name, event, transition target, etc.), expected and actual values, and a human-readable description.
-- **ValidationCheck**: A named invariant with a status of pass, fail, or skip. Skip status includes a reason (e.g., "ALPS artifact not available"). Failed checks reference their corresponding `ValidationFailure` entries.
+- **ValidationCheck**: A named invariant with a status of pass, fail, or skip. Skip status includes a reason (e.g., "ALPS artifact not available"). Failed checks are paired with corresponding `ValidationFailure` entries in the tuple returned by the rule.
 - **FormatArtifact**: A format-tagged wrapper around a parsed `StatechartDocument` (from spec 020). The format tag is a discriminated union identifying the source format (WSD, ALPS, SCXML, smcat, XState).
-- **ValidationRule**: A function that accepts a list of `FormatArtifact` values and returns a list of `ValidationCheck` results. Each rule declares which formats it requires. Rules are defined by format modules and registered with the validator.
+- **ValidationRule**: A function that accepts a list of `FormatArtifact` values and returns a `ValidationCheck list * ValidationFailure list` tuple (checks and their corresponding failure details). Each rule declares which formats it requires. Rules are defined by format modules and registered with the validator.
 - **FormatTag**: A discriminated union with cases for each supported format: WSD, ALPS, SCXML, Smcat, XState. Used to tag artifacts and declare rule requirements.
 
 ## Success Criteria

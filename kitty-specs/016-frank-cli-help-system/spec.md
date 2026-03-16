@@ -156,7 +156,7 @@ Every command registered in frank-cli has complete help metadata: a summary, at 
 
 - **FR-025**: All help and status outputs MUST support the existing `--format` option (text and json), consistent with other frank-cli commands.
 - **FR-026**: JSON output from the help subcommand MUST be structured and parseable, following the same conventions as existing command JSON output.
-- **FR-027**: Text output MUST respect the existing `NO_COLOR` environment variable convention for terminal formatting.
+- **FR-027**: Text output MUST respect the existing `NO_COLOR` environment variable convention for terminal formatting. Implementation note: HelpRenderer must use the existing `TextOutput.isColorEnabled()` function rather than reimplementing NO_COLOR detection.
 
 ### Key Entities
 

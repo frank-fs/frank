@@ -11,6 +11,10 @@
 
 ## Clarifications
 
+### Shared AST Clarification
+
+Parser populates format-specific types (e.g., `AlpsDocument`). Mapping to the shared AST (spec 020) is handled by a separate mapper module, deferred until spec 020 is implemented.
+
 ### Session 2026-03-15
 
 - Q: Should the ALPS parser live under `src/Frank.Statecharts/Alps/` (like WSD under `Wsd/`) or in a separate project? -> A: Internal to Frank.Statecharts, under `Alps/` sub-directory, following the WSD pattern.

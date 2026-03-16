@@ -10,6 +10,10 @@
 
 ## Clarifications
 
+### Shared AST Clarification
+
+Parser populates format-specific types (e.g., `SmcatDocument`). Mapping to the shared AST (spec 020) is handled by a separate mapper module, deferred until spec 020 is implemented.
+
 ### Session 2026-03-15
 
 - Q: Are the `StateMachineMetadata` types available? -> A: Yes, #87 merged via PR #96. The types `StateMachine`, `StateMachineMetadata`, `StateInfo`, `Guard`, `TransitionResult`, `BlockReason`, and `GuardResult` are all defined in `src/Frank.Statecharts/Types.fs` and `src/Frank.Statecharts/StatefulResourceBuilder.fs`.
@@ -18,7 +22,7 @@
 
 smcat (state-machine-cat) is a lightweight text-based state machine notation with visualization support. It uses a concise, readable syntax where states are declared implicitly or explicitly, transitions use `=>` arrows, and transition labels follow the format `event [guard] / action`. The notation supports pseudo-states (initial, final, history, choice, fork/join), composite/nested states, state activities (entry/exit/do), and attributes on both states and transitions.
 
-This feature provides bidirectional support: parsing smcat text into a typed F# AST (and mapping that AST to `StateMachineMetadata` for cross-validation and LLM-assisted code scaffolding), and generating smcat text from `StateMachineMetadata` (for exporting compiled Frank.Statecharts assemblies back to a human-readable notation).
+This feature provides bidirectional support: parsing smcat text into a typed F# AST (and mapping that AST to `StateMachine<'State, 'Event, 'Context>` for cross-validation and LLM-assisted code scaffolding), and generating smcat text from `StateMachine<'State, 'Event, 'Context>` (for exporting compiled Frank.Statecharts assemblies back to a human-readable notation).
 
 The parser and generator use the shared statechart AST (defined in spec 020), which all format parsers populate. smcat populates the portions of the shared AST it can represent: states (including pseudo-states), transitions with event/guard/action labels, and composite state hierarchy. Data model and semantic meaning, which smcat does not express, are left unpopulated for other formats to contribute. The implementation follows the same internal-module pattern established by the existing WSD parser in `src/Frank.Statecharts/Wsd/`.
 
@@ -53,9 +57,9 @@ A developer passes an smcat text string to the parser and receives a typed F# AS
 
 ---
 
-### User Story 2 - Map Parsed AST to StateMachineMetadata (Priority: P1)
+### User Story 2 - Map Parsed AST to StateMachine (Priority: P1)
 
-A developer parses an smcat file and then maps the resulting AST into a `StateMachineMetadata`-compatible representation. This enables the parsed smcat to serve as input for LLM-assisted code scaffolding or cross-validation against compiled Frank.Statecharts assemblies.
+A developer parses an smcat file and then maps the resulting AST into a `StateMachine<'State, 'Event, 'Context>`-compatible representation. This enables the parsed smcat to serve as input for LLM-assisted code scaffolding or cross-validation against compiled Frank.Statecharts assemblies.
 
 **Why this priority**: The AST alone is not useful without a bridge to the Frank.Statecharts type system. The mapper is required for both the CLI `import` command and the roundtrip guarantee.
 
@@ -70,7 +74,7 @@ A developer parses an smcat file and then maps the resulting AST into a `StateMa
 
 ---
 
-### User Story 3 - Generate smcat Text from StateMachineMetadata (Priority: P2)
+### User Story 3 - Generate smcat Text from StateMachine (Priority: P2)
 
 A developer has a compiled Frank.Statecharts assembly and wants to export its state machine definition as human-readable smcat text. The generator produces valid smcat notation with `event [guard] / action` labels on transitions.
 
@@ -153,8 +157,8 @@ A developer submits malformed smcat text. Instead of a generic error, the parser
 - **FR-005**: System MUST parse composite (nested) state declarations containing inner state machines within `{ ... }` blocks, supporting arbitrary nesting depth
 - **FR-006**: System MUST parse state activities (`entry/`, `exit/`, and `...` do activities) from explicit state declarations into structured fields on the AST node
 - **FR-007**: System MUST parse state and transition attributes in `[key=value key2=value2]` format, preserving them as ordered key-value pairs on the AST node
-- **FR-008**: System MUST map a parsed smcat AST into a representation compatible with `StateMachineMetadata`, extracting: state names, initial state, final states, transition topology (source, target, event, guard name), and guard names
-- **FR-009**: System MUST generate valid smcat text from `StateMachineMetadata`, producing transitions with `event [guard] / action` labels where applicable
+- **FR-008**: System MUST map a parsed smcat AST into a representation compatible with `StateMachine<'State, 'Event, 'Context>`, extracting: state names, initial state, final states, transition topology (source, target, event, guard name), and guard names
+- **FR-009**: System MUST generate valid smcat text from `StateMachine<'State, 'Event, 'Context>`, producing transitions with `event [guard] / action` labels where applicable
 - **FR-010**: System MUST produce structured failure reports for unparseable input, each containing: source position (line and column), description of the error, what was expected, what was found, and a corrective example
 - **FR-011**: System MUST collect multiple parse errors (up to a configurable limit, default: 50) rather than aborting on the first error
 - **FR-012**: System MUST ignore comment lines (starting with `#`) and blank lines during parsing
@@ -194,5 +198,5 @@ A developer submits malformed smcat text. Instead of a generic error, the parser
 - smcat has no concept of context/data -- only state topology and transition labels are modeled
 - The parser is internal to `Frank.Statecharts` (no standalone use case exists), following the same pattern as the WSD parser
 - Actions in transition labels are informational annotations -- they are preserved in the AST but have no execution semantics in the Frank.Statecharts runtime
-- The mapper produces an intermediate representation rather than a live `StateMachineMetadata` with closures, since closures (handlers, store access) cannot be derived from text notation
+- The mapper produces a `StateMachine<'State, 'Event, 'Context>` representation (the generic compile-time type from `Types.fs`), not a `StateMachineMetadata` (the non-generic runtime type in `StatefulResourceBuilder.fs` which contains closures that cannot be derived from text notation)
 - State type inference from naming conventions follows the state-machine-cat project's own conventions (e.g., names containing "initial", "final", "history")

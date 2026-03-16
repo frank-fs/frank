@@ -100,7 +100,7 @@ A Frank developer wants all semantically-marked resources to automatically inclu
 ### Functional Requirements
 
 - **FR-001**: System MUST provide an implicit OPTIONS response for any resource when the discovery middleware is registered, returning an `Allow` header listing all HTTP methods that resource has handlers for, plus `OPTIONS` itself
-- **FR-002**: System MUST aggregate media type information from endpoint metadata contributed by registered extensions (e.g., Frank.LinkedData, Frank.Statecharts) and include them in the OPTIONS response
+- **FR-002**: System MUST aggregate media type information from endpoint metadata contributed by registered extensions (e.g., Frank.LinkedData, Frank.Statecharts) and communicate them on the OPTIONS response via `Link` headers with `rel="describedby"` (the same Link header format used for GET/HEAD responses per FR-004). The OPTIONS response therefore returns: an `Allow` header (listing HTTP methods), `Link` headers (listing available media types), and an empty body
 - **FR-003**: System MUST define a standard endpoint metadata type for media type discovery that any extension can use to register its supported media types on a per-resource basis
 - **FR-004**: System MUST include `Link` headers with `rel="describedby"` on responses from semantically-marked resources when Link header discovery is enabled, following RFC 8288 (Web Linking)
 - **FR-005**: System MUST support opt-in for Link header discovery both per-resource (implicitly, by whether an extension adds `DiscoveryMediaType` metadata to a resource -- e.g., via the `linkedData` custom operation) and globally (via `useLinkHeaders`/`useDiscovery` WebHostBuilder operations that register the `LinkHeaderMiddleware`)

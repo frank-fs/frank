@@ -17,6 +17,7 @@
 - Q: Should the WSD generator infer arrow styles from HTTP method semantics (GET = dashed/safe, POST = solid/unsafe), depend on ALPS transition type metadata from #97, or use defaults? → A: Use a default arrow style for all transitions. ALPS enrichment comes later when #97 lands.
 - Q: What is the scope of the cross-format validator given that other format generators (#97 ALPS, #98 SCXML, #100 smcat) do not exist yet? → A: Define the full validation framework AND implement all cross-format checks. The validator skips checks gracefully when a format's parser/generator is not available yet. All format parsers will share a single AST (defined in a separate spec). The cross-format validator validates against this shared AST.
 - Q: Is runtime serving of WSD at `/_statecharts/{resourceName}.wsd` in scope? → A: Out of scope. This spec covers only the pure generator function (`StateMachineMetadata -> WSD text`) and the cross-format validator. Runtime serving is handled by `frank-cli compile` (#94). Each parser/generator spec adds its validations to the cross-format validator.
+- Q: How are transitions represented in the WSD output given that `StateHandlerMap` maps states to HTTP method handlers, not transitions? → A: The generator reads from `StateHandlerMap` which provides HTTP method handlers per state, not transition targets. The WSD output is a state-capability diagram: each state emits a message per HTTP method handler, with a synthetic "Resource" participant (named after the resource from `GenerateOptions`) as the receiver.
 
 ## Background
 
@@ -80,7 +81,7 @@ A developer's state machine has named guards with predicates. The WSD generator 
 ### Edge Cases
 
 - State machines with a single state and no transitions (degenerate case) produce valid WSD with one participant and no messages
-- State machines with self-transitions (state transitions to itself) produce a message where sender and receiver are the same participant
+- State machines with self-transitions (state transitions to itself): note that this is a state-capability diagram (listing HTTP method handlers per state), not a transition graph. Self-transitions are not explicitly modeled; each state's handlers produce messages to the synthetic Resource participant
 - State names containing special characters (spaces, hyphens) are quoted or escaped in WSD participant declarations
 - Guard names with special characters are properly escaped in `[guard: ...]` syntax
 - Very large state machines (20+ states, 50+ transitions) generate WSD without performance degradation
@@ -99,7 +100,7 @@ A developer's state machine has named guards with predicates. The WSD generator 
 - **FR-002**: System MUST construct a WSD AST (reusing the types defined in #90) as an intermediate representation before serializing to text
 - **FR-003**: System MUST emit a `participant` declaration for each state in the state machine, using the state's string representation as the participant name
 - **FR-004**: System MUST emit the initial state as the first participant in the generated WSD output
-- **FR-005**: System MUST emit a message (arrow) for each transition in the state machine, with the label set to the event name that triggers the transition
+- **FR-005**: System MUST emit a message (arrow) for each HTTP method handler in each state, with a synthetic "Resource" participant (named after the resource from `GenerateOptions`) as the receiver, and the label set to the HTTP method name
 - **FR-006**: System MUST use a single default arrow style (`->`, solid forward) for all transitions, since ALPS transition type enrichment is deferred
 - **FR-007**: System MUST emit `note over` annotations with `[guard: key=value]` syntax for transitions that have associated guards, preserving guard names as keys
 - **FR-008**: System MUST produce WSD output that can be parsed back through the WSD parser from #90 without errors (roundtrip compatibility)

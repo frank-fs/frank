@@ -11,6 +11,10 @@
 
 ## Clarifications
 
+### Shared AST Clarification
+
+Parser populates format-specific types (e.g., `ScxmlDocument`). Mapping to the shared AST (spec 020) is handled by a separate mapper module, deferred until spec 020 is implemented.
+
 ### Session 2026-03-15
 
 - Q: Should the SCXML parser produce its own per-format AST or use a shared AST? -> A: All format parsers (WSD, ALPS, SCXML, smcat) share a single AST. The shared AST is defined in a separate prerequisite spec. Each format parser populates the parts of the shared AST it can represent. The WSD parser's existing per-format AST will be migrated to the shared AST in that prerequisite spec.
