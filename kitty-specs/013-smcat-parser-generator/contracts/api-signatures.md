@@ -48,26 +48,30 @@ val parseSmcat : source:string -> ParseResult
 ```fsharp
 module internal Frank.Statecharts.Smcat.Generator
 
+/// Options controlling smcat generation behavior.
+type GenerateOptions = { ResourceName: string }
+
 /// Generate valid smcat text from StateMachineMetadata.
+/// Uses precomputed GuardNames and StateMetadataMap — no reflection needed.
 /// The output is a single string with newline-separated statements.
 /// - Initial state transition is emitted first
+/// - Self-messages for each (state, HTTP method) handler pair
 /// - Final state transitions are emitted last
-/// - Transition labels include event [guard] / action as applicable
-/// - State names use the string representation of the generic 'State type
-val generate<'State, 'Event, 'Context when 'State : equality and 'State : comparison> :
-    metadata:StateMachineMetadata<'State, 'Event, 'Context> ->
-    stateNames:('State -> string) ->
-    eventNames:('Event -> string) ->
-    transitions:('State * 'Event * 'State) list ->
-    string
+val generate : options:GenerateOptions -> metadata:StateMachineMetadata -> string
+
+/// Generate valid smcat text and write directly to a TextWriter.
+/// The caller owns the writer lifecycle.
+val generateTo : writer:System.IO.TextWriter -> options:GenerateOptions -> metadata:StateMachineMetadata -> unit
+
+/// Format a transition label from optional components.
+/// Format: "event [guard] / action" with absent components omitted.
+val internal formatLabel : eventName:string option -> guardName:string option -> actionName:string option -> string option
+
+/// Format a single transition line: "source => target: label;" or "source => target;"
+val internal formatTransition : source:string -> target:string -> label:string option -> string
 ```
 
-**Note on Generator API**: Because `StateMachineMetadata` stores its `Transition` function as a closure (not a declarative transition table), the generator cannot enumerate all transitions automatically. The caller must provide:
-- `stateNames`: Function to convert a state DU case to its smcat name
-- `eventNames`: Function to convert an event DU case to its smcat name
-- `transitions`: Explicit list of (source, event, target) triples to render
-
-This is consistent with the spec's assumption that "the mapper produces an intermediate representation rather than a live StateMachineMetadata with closures."
+**Note**: The generator takes `StateMachineMetadata` (the untyped endpoint metadata record) rather than the generic `StateMachine<'S,'E,'C>`. Guard names and state metadata are precomputed at registration time via the `GuardNames` and `StateMetadataMap` fields — no runtime reflection is used.
 
 ## Smcat.Mapper (Blocked on Spec 020)
 
