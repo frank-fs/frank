@@ -14,6 +14,12 @@ type OptionsDiscoveryMiddleware(next: RequestDelegate, dataSource: EndpointDataS
     /// Find all RouteEndpoints whose route pattern matches the given request path.
     /// Uses simple string matching against RoutePattern.RawText for literal routes,
     /// since Frank resources use literal route templates (e.g., "/items", "/health").
+    ///
+    /// Design decision: We match by comparing ctx.Request.Path against RoutePattern.RawText
+    /// rather than using ctx.GetEndpoint(). For OPTIONS requests without an explicit OPTIONS
+    /// handler, ASP.NET Core routing does not match an endpoint (GetEndpoint() returns null)
+    /// because no route is registered for the OPTIONS method. Path-based matching against
+    /// the EndpointDataSource is therefore the correct approach for implicit OPTIONS handling.
     let findSiblingEndpoints (requestPath: string) =
         let path = requestPath.TrimStart('/')
         dataSource.Endpoints
@@ -72,7 +78,7 @@ type OptionsDiscoveryMiddleware(next: RequestDelegate, dataSource: EndpointDataS
                         |> Set.add "OPTIONS"
 
                     // (k)-(l) Collect and deduplicate DiscoveryMediaType entries
-                    let _mediaTypes =
+                    let mediaTypes =
                         siblings
                         |> Seq.collect (fun ep ->
                             ep.Metadata
@@ -90,5 +96,12 @@ type OptionsDiscoveryMiddleware(next: RequestDelegate, dataSource: EndpointDataS
                     let allowValue = methods |> Set.toSeq |> String.concat ", "
                     ctx.Response.Headers["Allow"] <- allowValue
 
-                    // (o) Return with empty body
+                    // (o) Emit Link headers for each DiscoveryMediaType (RFC 8288)
+                    let routePattern = (List.head siblings).RoutePattern.RawText
+                    let path = if routePattern.StartsWith("/") then routePattern else "/" + routePattern
+
+                    for mt in mediaTypes do
+                        ctx.Response.Headers.Append("Link", $"<{path}>; rel=\"{mt.Rel}\"; type=\"{mt.MediaType}\"")
+
+                    // (p) Return with empty body
                     Task.CompletedTask
