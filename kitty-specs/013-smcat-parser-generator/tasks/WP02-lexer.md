@@ -9,12 +9,12 @@ subtasks:
   - "T011"
 title: "Lexer"
 phase: "Phase 0 - Foundation"
-lane: "doing"
+lane: "done"
 assignee: ""
 agent: "claude-opus-4-6"
 shell_pid: "12561"
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-012", "FR-013", "FR-014"]
 history:
@@ -377,3 +377,4 @@ To change a work package's lane, either:
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:28:05Z – unknown – lane=for_review – Ready for review: smcat lexer with 52 passing tests, all token types covered
 - 2026-03-16T04:28:45Z – claude-opus-4-6 – shell_pid=12561 – lane=doing – Started review via workflow command
+- 2026-03-16T04:31:13Z – claude-opus-4-6 – shell_pid=12561 – lane=done – Moved to done
