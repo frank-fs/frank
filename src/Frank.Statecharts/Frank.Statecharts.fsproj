@@ -32,6 +32,10 @@
     <Compile Include="Alps/JsonParser.fs" />
     <Compile Include="Alps/JsonGenerator.fs" />
     <Compile Include="Alps/Mapper.fs" />
+    <!-- SCXML parser -->
+    <Compile Include="Scxml/Types.fs" />
+    <Compile Include="Scxml/Parser.fs" />
+    <Compile Include="Scxml/Generator.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->
     <Compile Include="StatefulResourceBuilder.fs" />
     <Compile Include="Wsd/Generator.fs" />

@@ -30,6 +30,12 @@
     <Compile Include="Smcat/ErrorTests.fs" />
     <Compile Include="Smcat/GeneratorTests.fs" />
     <Compile Include="Smcat/RoundTripTests.fs" />
+    <!-- SCXML tests -->
+    <Compile Include="Scxml/TypeTests.fs" />
+    <Compile Include="Scxml/ParserTests.fs" />
+    <Compile Include="Scxml/ErrorTests.fs" />
+    <Compile Include="Scxml/GeneratorTests.fs" />
+    <Compile Include="Scxml/RoundTripTests.fs" />
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Alps/GoldenFiles.fs" />
     <Compile Include="Alps/TypeTests.fs" />
