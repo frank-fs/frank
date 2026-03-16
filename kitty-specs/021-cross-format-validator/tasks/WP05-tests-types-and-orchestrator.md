@@ -1,9 +1,12 @@
 ---
 work_package_id: WP05
 title: Validation Tests - Types & Orchestrator
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 021-cross-format-validator-WP01
+base_commit: 2ab90f1895bb7a4cfe04bd5469803e2d8c4db322
+created_at: '2026-03-16T11:46:03.721226+00:00'
 subtasks:
 - T028
 - T029
@@ -15,7 +18,7 @@ subtasks:
 phase: Phase 2 - Testing
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "59373"
 review_status: ''
 reviewed_by: ''
 history:
