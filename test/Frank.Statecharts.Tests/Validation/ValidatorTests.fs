@@ -61,7 +61,8 @@ let passingRule (name: string) : ValidationRule =
         fun _ ->
             [ { Name = name
                 Status = Pass
-                Reason = None } ] }
+                Reason = None } ],
+            [] }
 
 /// Create a simple failing rule.
 let failingRule (name: string) : ValidationRule =
@@ -71,7 +72,12 @@ let failingRule (name: string) : ValidationRule =
         fun _ ->
             [ { Name = name
                 Status = Fail
-                Reason = Some "Test failure" } ] }
+                Reason = Some "Test failure" } ],
+            [ { Formats = []
+                EntityType = "validation"
+                Expected = "pass"
+                Actual = "fail"
+                Description = sprintf "Rule '%s' failed: Test failure" name } ] }
 
 /// Create a rule that requires specific formats.
 let formatRequiringRule (name: string) (formats: FormatTag Set) : ValidationRule =
@@ -81,7 +87,8 @@ let formatRequiringRule (name: string) (formats: FormatTag Set) : ValidationRule
         fun _ ->
             [ { Name = name
                 Status = Pass
-                Reason = None } ] }
+                Reason = None } ],
+            [] }
 
 // ─────────────────────────────────────────────
 // T030: Orchestrator execution tests
@@ -138,7 +145,12 @@ let orchestratorExecutionTests =
                               Reason = None }
                             { Name = "check 3"
                               Status = Fail
-                              Reason = Some "found issue" } ] }
+                              Reason = Some "found issue" } ],
+                          [ { Formats = []
+                              EntityType = "validation"
+                              Expected = "pass"
+                              Actual = "fail"
+                              Description = "found issue" } ] }
 
               let artifacts = [ makeArtifact Wsd emptyDocument ]
               let report = Validator.validate [ multiRule ] artifacts
@@ -171,7 +183,8 @@ let orchestratorExecutionTests =
 
                           [ { Name = "ok"
                               Status = Pass
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [] }
 
               let doc1 = makeDocument [ "A" ] []
               let doc2 = makeDocument [ "B" ] []
@@ -229,7 +242,8 @@ let orchestratorSkipTests =
                       fun _ ->
                           [ { Name = "universal check"
                               Status = Pass
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [] }
 
               // Even with only one artifact type, universal rule runs
               let artifacts = [ makeArtifact Wsd emptyDocument ]
@@ -247,7 +261,8 @@ let orchestratorSkipTests =
                       fun _ ->
                           [ { Name = "universal check"
                               Status = Pass
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [] }
 
               let report = Validator.validate [ rule ] []
 
@@ -460,7 +475,8 @@ let edgeCaseTests =
                                     Pass
                                 else
                                     Fail
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [] }
 
               let artifacts = [ makeArtifact Wsd unicodeDoc ]
               let report = Validator.validate [ rule ] artifacts
@@ -483,7 +499,12 @@ let edgeCaseTests =
                               Reason = Some "error" }
                             { Name = "pass2"
                               Status = Pass
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [ { Formats = []
+                              EntityType = "validation"
+                              Expected = "pass"
+                              Actual = "fail"
+                              Description = "error" } ] }
 
               let skipRule = formatRequiringRule "skipped" (set [ Alps ])
               let rules = [ multiRule; skipRule ]
@@ -555,7 +576,8 @@ let edgeCaseTests =
                                     Pass
                                 else
                                     Fail
-                              Reason = None } ] }
+                              Reason = None } ],
+                          [] }
 
               let artifacts = [ makeArtifact Wsd emptyDocument ]
               let report = Validator.validate [ rule ] artifacts

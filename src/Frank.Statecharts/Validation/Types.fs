@@ -44,7 +44,9 @@ type ValidationReport =
       Failures: ValidationFailure list }
 
 /// A validation rule defined by a format module.
+/// Check returns a tuple of (checks, failures) so rules can produce
+/// rich diagnostic information for each failure.
 type ValidationRule =
     { Name: string
       RequiredFormats: FormatTag Set
-      Check: FormatArtifact list -> ValidationCheck list }
+      Check: FormatArtifact list -> ValidationCheck list * ValidationFailure list }

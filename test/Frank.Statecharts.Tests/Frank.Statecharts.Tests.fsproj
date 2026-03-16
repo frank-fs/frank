@@ -21,6 +21,7 @@
     <Compile Include="StatechartETagProviderTests.fs" />
     <Compile Include="Validation/TypeTests.fs" />
     <Compile Include="Validation/ValidatorTests.fs" />
+    <Compile Include="Validation/IntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

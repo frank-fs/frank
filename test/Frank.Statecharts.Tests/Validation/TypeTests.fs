@@ -288,7 +288,7 @@ let validationRuleTests =
               let rule =
                   { Name = "test rule"
                     RequiredFormats = set [ Scxml; XState ]
-                    Check = fun _ -> [] }
+                    Check = fun _ -> ([], []) }
 
               Expect.equal rule.Name "test rule" "Name should match"
               Expect.equal rule.RequiredFormats (set [ Scxml; XState ]) "RequiredFormats should match"
@@ -298,7 +298,7 @@ let validationRuleTests =
               let rule =
                   { Name = "universal rule"
                     RequiredFormats = Set.empty
-                    Check = fun _ -> [] }
+                    Check = fun _ -> ([], []) }
 
               Expect.equal rule.RequiredFormats Set.empty "RequiredFormats should be empty for universal rules"
           }
@@ -309,11 +309,12 @@ let validationRuleTests =
                     RequiredFormats = Set.empty
                     Check =
                       fun _ ->
-                          [ { Name = "check1"
-                              Status = Pass
-                              Reason = None } ] }
+                          ([ { Name = "check1"
+                               Status = Pass
+                               Reason = None } ],
+                           []) }
 
-              let result = rule.Check []
-              Expect.equal (List.length result) 1 "Should return one check"
-              Expect.equal result.[0].Status Pass "Check should pass"
+              let checks, _failures = rule.Check []
+              Expect.equal (List.length checks) 1 "Should return one check"
+              Expect.equal checks.[0].Status Pass "Check should pass"
           } ]

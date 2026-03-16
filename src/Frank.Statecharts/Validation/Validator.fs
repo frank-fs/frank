@@ -58,6 +58,585 @@ module AstHelpers =
         |> List.choose _.Target
         |> Set.ofList
 
+/// Universal self-consistency rules that validate structural integrity
+/// of any single-format artifact.
+module SelfConsistencyRules =
+
+    /// Check that all transition targets reference existing states within each artifact.
+    let orphanTransitionTargets: ValidationRule =
+        { Name = "Orphan transition targets"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks, failures =
+                    artifacts
+                    |> List.fold
+                        (fun (cs, fs) artifact ->
+                            let stateIds = AstHelpers.stateIdentifiers artifact.Document
+                            let targets = AstHelpers.transitionTargets artifact.Document
+                            let orphans = targets - stateIds
+
+                            if Set.isEmpty orphans then
+                                let c =
+                                    { Name = sprintf "Orphan transition targets (%A)" artifact.Format
+                                      Status = Pass
+                                      Reason = None }
+
+                                (c :: cs, fs)
+                            else
+                                let newChecks, newFailures =
+                                    orphans
+                                    |> Set.toList
+                                    |> List.map (fun orphan ->
+                                        let c =
+                                            { Name = sprintf "Orphan transition target '%s' (%A)" orphan artifact.Format
+                                              Status = Fail
+                                              Reason =
+                                                Some(
+                                                    sprintf
+                                                        "Transition target '%s' does not reference any state in %A artifact"
+                                                        orphan
+                                                        artifact.Format
+                                                ) }
+
+                                        let f =
+                                            { Formats = [ artifact.Format ]
+                                              EntityType = "transition target"
+                                              Expected = sprintf "Target '%s' should reference an existing state" orphan
+                                              Actual = sprintf "State '%s' not found in %A artifact" orphan artifact.Format
+                                              Description =
+                                                sprintf
+                                                    "Transition targets state '%s' which does not exist in the %A artifact"
+                                                    orphan
+                                                    artifact.Format }
+
+                                        (c, f))
+                                    |> List.unzip
+
+                                (newChecks @ cs, newFailures @ fs))
+                        ([], [])
+
+                (checks |> List.rev, failures |> List.rev) }
+
+    /// Check that all state identifiers are unique within each artifact.
+    let duplicateStateIdentifiers: ValidationRule =
+        { Name = "Duplicate state identifiers"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks, failures =
+                    artifacts
+                    |> List.fold
+                        (fun (cs, fs) artifact ->
+                            let allStates = AstHelpers.allStates artifact.Document
+                            let ids = allStates |> List.map (fun s -> s.Identifier)
+
+                            let duplicates =
+                                ids
+                                |> List.groupBy id
+                                |> List.filter (fun (_, group) -> group.Length > 1)
+                                |> List.map fst
+
+                            if List.isEmpty duplicates then
+                                let c =
+                                    { Name = sprintf "Duplicate state identifiers (%A)" artifact.Format
+                                      Status = Pass
+                                      Reason = None }
+
+                                (c :: cs, fs)
+                            else
+                                let newChecks, newFailures =
+                                    duplicates
+                                    |> List.map (fun dup ->
+                                        let c =
+                                            { Name = sprintf "Duplicate state identifier '%s' (%A)" dup artifact.Format
+                                              Status = Fail
+                                              Reason =
+                                                Some(
+                                                    sprintf
+                                                        "State identifier '%s' appears multiple times in %A artifact"
+                                                        dup
+                                                        artifact.Format
+                                                ) }
+
+                                        let f =
+                                            { Formats = [ artifact.Format ]
+                                              EntityType = "state identifier"
+                                              Expected = sprintf "State identifier '%s' should be unique" dup
+                                              Actual =
+                                                sprintf
+                                                    "State identifier '%s' appears multiple times in %A artifact"
+                                                    dup
+                                                    artifact.Format
+                                              Description =
+                                                sprintf "Duplicate state identifier '%s' in %A artifact" dup artifact.Format }
+
+                                        (c, f))
+                                    |> List.unzip
+
+                                (newChecks @ cs, newFailures @ fs))
+                        ([], [])
+
+                (checks |> List.rev, failures |> List.rev) }
+
+    /// Check that required AST fields are populated in each artifact.
+    let requiredAstFields: ValidationRule =
+        { Name = "Required AST fields"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks, failures =
+                    artifacts
+                    |> List.fold
+                        (fun (cs, fs) artifact ->
+                            let states = AstHelpers.allStates artifact.Document
+                            let transitions = AstHelpers.allTransitions artifact.Document
+
+                            let emptyStateChecks, emptyStateFailures =
+                                states
+                                |> List.filter (fun s -> System.String.IsNullOrWhiteSpace s.Identifier)
+                                |> List.mapi (fun i _ ->
+                                    let c =
+                                        { Name = sprintf "Empty state identifier #%d (%A)" (i + 1) artifact.Format
+                                          Status = Fail
+                                          Reason =
+                                            Some(
+                                                sprintf
+                                                    "State at index %d has empty identifier in %A artifact"
+                                                    i
+                                                    artifact.Format
+                                            ) }
+
+                                    let f =
+                                        { Formats = [ artifact.Format ]
+                                          EntityType = "state identifier"
+                                          Expected = "Non-empty state identifier"
+                                          Actual = "Empty or whitespace-only state identifier"
+                                          Description =
+                                            sprintf
+                                                "State at index %d has empty identifier in %A artifact"
+                                                i
+                                                artifact.Format }
+
+                                    (c, f))
+                                |> List.unzip
+
+                            let emptySourceChecks, emptySourceFailures =
+                                transitions
+                                |> List.filter (fun t -> System.String.IsNullOrWhiteSpace t.Source)
+                                |> List.mapi (fun i _ ->
+                                    let c =
+                                        { Name = sprintf "Empty transition source #%d (%A)" (i + 1) artifact.Format
+                                          Status = Fail
+                                          Reason =
+                                            Some(
+                                                sprintf
+                                                    "Transition at index %d has empty source in %A artifact"
+                                                    i
+                                                    artifact.Format
+                                            ) }
+
+                                    let f =
+                                        { Formats = [ artifact.Format ]
+                                          EntityType = "transition source"
+                                          Expected = "Non-empty transition source"
+                                          Actual = "Empty or whitespace-only transition source"
+                                          Description =
+                                            sprintf
+                                                "Transition at index %d has empty source in %A artifact"
+                                                i
+                                                artifact.Format }
+
+                                    (c, f))
+                                |> List.unzip
+
+                            let allIssueChecks = emptyStateChecks @ emptySourceChecks
+                            let allIssueFailures = emptyStateFailures @ emptySourceFailures
+
+                            if List.isEmpty allIssueChecks then
+                                let c =
+                                    { Name = sprintf "Required AST fields (%A)" artifact.Format
+                                      Status = Pass
+                                      Reason = None }
+
+                                (c :: cs, fs)
+                            else
+                                (allIssueChecks @ cs, allIssueFailures @ fs))
+                        ([], [])
+
+                (checks |> List.rev, failures |> List.rev) }
+
+    /// Warn about states with no incoming or outgoing transitions.
+    /// Isolated states may be intentional, so this is a warning (Pass with reason), not a failure.
+    let isolatedStates: ValidationRule =
+        { Name = "Isolated states"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks =
+                    artifacts
+                    |> List.collect (fun artifact ->
+                        let stateIds = AstHelpers.stateIdentifiers artifact.Document
+                        let transitions = AstHelpers.allTransitions artifact.Document
+                        let sources = transitions |> List.map (fun t -> t.Source) |> Set.ofList
+                        let targets = transitions |> List.choose (fun t -> t.Target) |> Set.ofList
+                        let connected = Set.union sources targets
+                        let isolated = stateIds - connected
+
+                        if Set.isEmpty isolated then
+                            [ { Name = sprintf "Isolated states (%A)" artifact.Format
+                                Status = Pass
+                                Reason = None } ]
+                        else
+                            isolated
+                            |> Set.toList
+                            |> List.map (fun stateId ->
+                                { Name = sprintf "Isolated state '%s' (%A)" stateId artifact.Format
+                                  Status = Pass // WARNING, not failure
+                                  Reason =
+                                    Some(
+                                        sprintf
+                                            "State '%s' has no incoming or outgoing transitions in %A artifact (may be intentional)"
+                                            stateId
+                                            artifact.Format
+                                    ) }))
+
+                (checks, []) }
+
+    /// Warn about artifacts with empty state machines (no states, no transitions).
+    let emptyStatechart: ValidationRule =
+        { Name = "Empty statechart"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks =
+                    artifacts
+                    |> List.collect (fun artifact ->
+                        let states = AstHelpers.allStates artifact.Document
+                        let transitions = AstHelpers.allTransitions artifact.Document
+
+                        if List.isEmpty states && List.isEmpty transitions then
+                            [ { Name = sprintf "Empty statechart (%A)" artifact.Format
+                                Status = Pass // WARNING, not failure
+                                Reason = Some(sprintf "%A artifact contains no states and no transitions" artifact.Format) } ]
+                        else
+                            [ { Name = sprintf "Empty statechart (%A)" artifact.Format
+                                Status = Pass
+                                Reason = None } ])
+
+                (checks, []) }
+
+    /// All universal self-consistency rules.
+    let rules: ValidationRule list =
+        [ orphanTransitionTargets
+          duplicateStateIdentifiers
+          requiredAstFields
+          isolatedStates
+          emptyStatechart ]
+
+/// Cross-format pairwise validation rules for state name agreement,
+/// event name agreement, and transition target agreement.
+module CrossFormatRules =
+
+    /// Check if a value has a case-insensitive match in a set but not an exact match.
+    /// Returns a descriptive note about the casing difference, or empty string if no near-match.
+    let private describeCasingMismatch (value: string) (candidates: string Set) : string =
+        let nearMatch =
+            candidates
+            |> Set.toList
+            |> List.tryFind (fun c ->
+                System.String.Equals(value, c, System.StringComparison.OrdinalIgnoreCase) && value <> c)
+
+        match nearMatch with
+        | Some found -> sprintf " Note: case-insensitive match found: '%s' vs '%s' (casing differs)" value found
+        | None -> ""
+
+    /// Create a state name agreement rule for a specific format pair.
+    let stateNameAgreement (formatA: FormatTag) (formatB: FormatTag) : ValidationRule =
+        { Name = sprintf "%A-%A state name agreement" formatA formatB
+          RequiredFormats = set [ formatA; formatB ]
+          Check =
+            fun artifacts ->
+                let artA = artifacts |> List.find (fun a -> a.Format = formatA)
+                let artB = artifacts |> List.find (fun a -> a.Format = formatB)
+                let statesA = AstHelpers.stateIdentifiers artA.Document
+                let statesB = AstHelpers.stateIdentifiers artB.Document
+
+                let missingFromB = statesA - statesB
+                let missingFromA = statesB - statesA
+
+                let failuresFromB =
+                    missingFromB
+                    |> Set.toList
+                    |> List.map (fun stateId ->
+                        let casingNote = describeCasingMismatch stateId statesB
+
+                        let c =
+                            { Name = sprintf "State '%s' missing from %A" stateId formatB
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf "State '%s' exists in %A but not in %A.%s" stateId formatA formatB casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "state name"
+                              Expected = sprintf "State '%s' should exist in %A" stateId formatB
+                              Actual = sprintf "State '%s' not found in %A" stateId formatB
+                              Description =
+                                sprintf
+                                    "State '%s' exists in %A but not in %A.%s"
+                                    stateId
+                                    formatA
+                                    formatB
+                                    casingNote }
+
+                        (c, f))
+
+                let failuresFromA =
+                    missingFromA
+                    |> Set.toList
+                    |> List.map (fun stateId ->
+                        let casingNote = describeCasingMismatch stateId statesA
+
+                        let c =
+                            { Name = sprintf "State '%s' missing from %A" stateId formatA
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf "State '%s' exists in %A but not in %A.%s" stateId formatB formatA casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "state name"
+                              Expected = sprintf "State '%s' should exist in %A" stateId formatA
+                              Actual = sprintf "State '%s' not found in %A" stateId formatA
+                              Description =
+                                sprintf
+                                    "State '%s' exists in %A but not in %A.%s"
+                                    stateId
+                                    formatB
+                                    formatA
+                                    casingNote }
+
+                        (c, f))
+
+                let allPairs = failuresFromB @ failuresFromA
+
+                if List.isEmpty allPairs then
+                    ([ { Name = sprintf "%A-%A state name agreement" formatA formatB
+                         Status = Pass
+                         Reason = None } ],
+                     [])
+                else
+                    allPairs |> List.unzip }
+
+    /// Create an event name agreement rule for a specific format pair.
+    let eventNameAgreement (formatA: FormatTag) (formatB: FormatTag) : ValidationRule =
+        { Name = sprintf "%A-%A event name agreement" formatA formatB
+          RequiredFormats = set [ formatA; formatB ]
+          Check =
+            fun artifacts ->
+                let artA = artifacts |> List.find (fun a -> a.Format = formatA)
+                let artB = artifacts |> List.find (fun a -> a.Format = formatB)
+                let eventsA = AstHelpers.eventNames artA.Document
+                let eventsB = AstHelpers.eventNames artB.Document
+
+                let missingFromB = eventsA - eventsB
+                let missingFromA = eventsB - eventsA
+
+                let failuresFromB =
+                    missingFromB
+                    |> Set.toList
+                    |> List.map (fun eventName ->
+                        let casingNote = describeCasingMismatch eventName eventsB
+
+                        let c =
+                            { Name = sprintf "Event '%s' missing from %A" eventName formatB
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf
+                                        "Event '%s' exists in %A but not in %A.%s"
+                                        eventName
+                                        formatA
+                                        formatB
+                                        casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "event name"
+                              Expected = sprintf "Event '%s' should exist in %A" eventName formatB
+                              Actual = sprintf "Event '%s' not found in %A" eventName formatB
+                              Description =
+                                sprintf
+                                    "Event '%s' exists in %A but not in %A.%s"
+                                    eventName
+                                    formatA
+                                    formatB
+                                    casingNote }
+
+                        (c, f))
+
+                let failuresFromA =
+                    missingFromA
+                    |> Set.toList
+                    |> List.map (fun eventName ->
+                        let casingNote = describeCasingMismatch eventName eventsA
+
+                        let c =
+                            { Name = sprintf "Event '%s' missing from %A" eventName formatA
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf
+                                        "Event '%s' exists in %A but not in %A.%s"
+                                        eventName
+                                        formatB
+                                        formatA
+                                        casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "event name"
+                              Expected = sprintf "Event '%s' should exist in %A" eventName formatA
+                              Actual = sprintf "Event '%s' not found in %A" eventName formatA
+                              Description =
+                                sprintf
+                                    "Event '%s' exists in %A but not in %A.%s"
+                                    eventName
+                                    formatB
+                                    formatA
+                                    casingNote }
+
+                        (c, f))
+
+                let allPairs = failuresFromB @ failuresFromA
+
+                if List.isEmpty allPairs then
+                    ([ { Name = sprintf "%A-%A event name agreement" formatA formatB
+                         Status = Pass
+                         Reason = None } ],
+                     [])
+                else
+                    allPairs |> List.unzip }
+
+    /// Create a transition target agreement rule for a specific format pair.
+    let transitionTargetAgreement (formatA: FormatTag) (formatB: FormatTag) : ValidationRule =
+        { Name = sprintf "%A-%A transition target agreement" formatA formatB
+          RequiredFormats = set [ formatA; formatB ]
+          Check =
+            fun artifacts ->
+                let artA = artifacts |> List.find (fun a -> a.Format = formatA)
+                let artB = artifacts |> List.find (fun a -> a.Format = formatB)
+                let targetsA = AstHelpers.transitionTargets artA.Document
+                let statesB = AstHelpers.stateIdentifiers artB.Document
+                let targetsB = AstHelpers.transitionTargets artB.Document
+                let statesA = AstHelpers.stateIdentifiers artA.Document
+
+                let missingInB = targetsA - statesB
+                let missingInA = targetsB - statesA
+
+                let failuresAtoB =
+                    missingInB
+                    |> Set.toList
+                    |> List.map (fun target ->
+                        let casingNote = describeCasingMismatch target statesB
+
+                        let c =
+                            { Name =
+                                sprintf "Transition target '%s' from %A missing in %A states" target formatA formatB
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf
+                                        "Transition target '%s' in %A does not correspond to any state in %A.%s"
+                                        target
+                                        formatA
+                                        formatB
+                                        casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "transition target"
+                              Expected = sprintf "Transition target '%s' should reference a state in %A" target formatB
+                              Actual = sprintf "State '%s' not found in %A" target formatB
+                              Description =
+                                sprintf
+                                    "Transition target '%s' in %A does not correspond to any state in %A.%s"
+                                    target
+                                    formatA
+                                    formatB
+                                    casingNote }
+
+                        (c, f))
+
+                let failuresBtoA =
+                    missingInA
+                    |> Set.toList
+                    |> List.map (fun target ->
+                        let casingNote = describeCasingMismatch target statesA
+
+                        let c =
+                            { Name =
+                                sprintf "Transition target '%s' from %A missing in %A states" target formatB formatA
+                              Status = Fail
+                              Reason =
+                                Some(
+                                    sprintf
+                                        "Transition target '%s' in %A does not correspond to any state in %A.%s"
+                                        target
+                                        formatB
+                                        formatA
+                                        casingNote
+                                ) }
+
+                        let f =
+                            { Formats = [ formatA; formatB ]
+                              EntityType = "transition target"
+                              Expected = sprintf "Transition target '%s' should reference a state in %A" target formatA
+                              Actual = sprintf "State '%s' not found in %A" target formatA
+                              Description =
+                                sprintf
+                                    "Transition target '%s' in %A does not correspond to any state in %A.%s"
+                                    target
+                                    formatB
+                                    formatA
+                                    casingNote }
+
+                        (c, f))
+
+                let allPairs = failuresAtoB @ failuresBtoA
+
+                if List.isEmpty allPairs then
+                    ([ { Name = sprintf "%A-%A transition target agreement" formatA formatB
+                         Status = Pass
+                         Reason = None } ],
+                     [])
+                else
+                    allPairs |> List.unzip }
+
+    /// All unique pairs of format tags.
+    let private formatPairs: (FormatTag * FormatTag) list =
+        let tags = [ Wsd; Alps; Scxml; Smcat; XState ]
+
+        [ for i in 0 .. tags.Length - 2 do
+              for j in i + 1 .. tags.Length - 1 do
+                  yield (tags.[i], tags.[j]) ]
+
+    /// All cross-format rules generated from pairwise combinations.
+    let private allPairwiseRules: ValidationRule list =
+        formatPairs
+        |> List.collect (fun (a, b) -> [ stateNameAgreement a b; eventNameAgreement a b; transitionTargetAgreement a b ])
+
+    /// All cross-format rules for all applicable format pairs.
+    let rules: ValidationRule list = allPairwiseRules
+
 /// Validation orchestrator.
 module Validator =
 
@@ -89,25 +668,7 @@ module Validator =
                         (skipCheck :: checks, failures)
                     else
                         try
-                            let ruleChecks = rule.Check artifacts
-
-                            let ruleFailures =
-                                ruleChecks
-                                |> List.choose (fun c ->
-                                    if c.Status = Fail then
-                                        Some
-                                            { Formats = []
-                                              EntityType = "validation"
-                                              Expected = "pass"
-                                              Actual = "fail"
-                                              Description =
-                                                match c.Reason with
-                                                | Some reason ->
-                                                    sprintf "Rule '%s' failed: %s" rule.Name reason
-                                                | None -> sprintf "Rule '%s' failed" rule.Name }
-                                    else
-                                        None)
-
+                            let ruleChecks, ruleFailures = rule.Check artifacts
                             (ruleChecks @ checks, ruleFailures @ failures)
                         with ex ->
                             let failCheck =

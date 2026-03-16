@@ -13,10 +13,7 @@
   <ItemGroup>
     <Compile Include="Ast/Types.fs" />
     <Compile Include="Validation/Types.fs" />
-<<<<<<< HEAD
-=======
     <Compile Include="Validation/Validator.fs" />
->>>>>>> 021-cross-format-validator-WP05
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
