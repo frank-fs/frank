@@ -6,10 +6,10 @@ subtasks:
   - "T008"
 title: "OPTIONS Discovery Middleware"
 phase: "Phase 1 - Core Implementation"
-lane: "for_review"
+lane: "doing"
 assignee: ""
 agent: "claude-opus"
-shell_pid: "16154"
+shell_pid: "61472"
 review_status: "has_feedback"
 reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
@@ -426,3 +426,4 @@ Use language identifiers in code blocks: ````fsharp`, ````xml`
 - 2026-03-16T04:32:56Z – claude-opus – shell_pid=16154 – lane=doing – Started review via workflow command
 - 2026-03-16T04:37:55Z – claude-opus – shell_pid=16154 – lane=planned – Moved to planned
 - 2026-03-16T11:49:04Z – claude-opus – shell_pid=16154 – lane=for_review – Moved to for_review
+- 2026-03-16T11:49:09Z – claude-opus – shell_pid=61472 – lane=doing – Started review via workflow command
