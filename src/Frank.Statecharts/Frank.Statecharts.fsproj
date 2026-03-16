@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <Compile Include="Scxml/Types.fs" />
+    <Compile Include="Scxml/Parser.fs" />
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
     <Compile Include="Wsd/GuardParser.fs" />
