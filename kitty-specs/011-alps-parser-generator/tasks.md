@@ -100,7 +100,7 @@
 ### Included Subtasks
 - [x] T015 Implement top-level parseAlpsXml function in `src/Frank.Statecharts/Alps/XmlParser.fs` -- parse root `<alps>` element, `version` attribute, `<doc>` child element
 - [x] T016 Implement descriptor parsing in XmlParser.fs -- `id`, `type`, `href`, `rt` as XML attributes; nested `<descriptor>`, `<ext>`, `<link>`, `<doc>` as child elements
-- [ ] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
+- [x] T017 Implement error handling in XmlParser.fs -- wrap `XDocument.Parse` in try/catch for `XmlException` with line/column info, schema validation, return `Result<AlpsDocument, AlpsParseError list>`
 - [ ] T018 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/JsonParser.fs)
 - [ ] T019 Create `test/Frank.Statecharts.Tests/Alps/XmlParserTests.fs` -- tic-tac-toe golden file test, cross-format equivalence test (JSON AST vs XML AST)
 - [ ] T020 [P] Add edge case and error tests in XmlParserTests.fs -- empty document, namespace handling, forward-compatible unknown elements, malformed XML, missing attributes
