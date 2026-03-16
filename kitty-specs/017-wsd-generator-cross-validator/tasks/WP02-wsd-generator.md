@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: WSD Generator
-lane: "doing"
+lane: "planned"
 dependencies: []
 base_branch: master
 base_commit: 26152db61a6bfc6f2f54b873ecb7e6522997e677
@@ -17,8 +17,9 @@ phase: Phase 1b - Generator
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "1848"
-review_status: ''
-reviewed_by: ''
+review_status: "has_feedback"
+reviewed_by: "Ryan Riley"
+review_feedback_file: "/private/tmp/spec-kitty-review-feedback-WP02.md"
 history:
 - timestamp: '2026-03-15T23:59:06Z'
   lane: planned
@@ -32,11 +33,74 @@ requirement_refs: [FR-001, FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-01
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
+**Reviewed by**: Ryan Riley
+**Status**: ❌ Changes Requested
+**Date**: 2026-03-16
+**Feedback file**: `/private/tmp/spec-kitty-review-feedback-WP02.md`
 
-*[This section is empty initially.]*
+# WP02 Review Feedback
 
----
+**Reviewer**: claude-opus-reviewer
+**Verdict**: Changes requested
+
+## Issues Found
+
+### 1. Dead code: `NoStatesFound` error is unreachable (Medium)
+
+In `Generator.fs` lines 49-63, `orderedStates` always starts with `metadata.InitialStateKey` because both branches of the if/else on lines 55-59 prepend it:
+
+```fsharp
+let orderedStates =
+    let others =
+        stateNames
+        |> List.filter (fun s -> s <> metadata.InitialStateKey)
+        |> List.sort
+    if stateNames |> List.contains metadata.InitialStateKey then
+        metadata.InitialStateKey :: others
+    else
+        // InitialStateKey not in handler map -- still include as first participant
+        metadata.InitialStateKey :: others
+```
+
+Both branches are identical, so `orderedStates` is never empty. The `NoStatesFound` error check on line 62-63 is dead code.
+
+**Fix**: Remove the redundant if/else -- just use `metadata.InitialStateKey :: others` directly. Either (a) remove the `NoStatesFound` case entirely since it cannot be triggered, or (b) if the intent is to error when `StateHandlerMap` is empty AND InitialStateKey is empty/blank, add a check before the participant construction (e.g., check `metadata.InitialStateKey` is non-empty, or check both stateNames and InitialStateKey).
+
+Recommended approach: simplify to `metadata.InitialStateKey :: others` (no if/else) and keep `NoStatesFound` only if you add a meaningful trigger condition (e.g., `if String.IsNullOrWhiteSpace metadata.InitialStateKey && stateNames.IsEmpty`). Otherwise remove the DU case.
+
+### 2. Stray task metadata changes in commit (Low)
+
+The commit includes lane state changes for 8 unrelated task files across specs 010, 011, 013, 016, 017 (WP01), 018, 019. These should be excluded from this WP's commit. Please amend the commit or create a new commit that only includes the WP02 source/test changes and the relevant `.fsproj` edits.
+
+Affected files to remove from the commit:
+- `kitty-specs/010-statecharts-production-readiness/tasks/WP03-actor-concurrency-validation.md`
+- `kitty-specs/010-statecharts-production-readiness/tasks/WP04-sqlite-store-implementation.md`
+- `kitty-specs/011-alps-parser-generator/tasks/WP01-foundation-types-golden-files.md`
+- `kitty-specs/013-smcat-parser-generator/tasks/WP01-types-and-project-setup.md`
+- `kitty-specs/016-frank-cli-help-system/tasks/WP01-foundation-types-and-utilities.md`
+- `kitty-specs/017-wsd-generator-cross-validator/tasks/WP01-wsd-serializer.md`
+- `kitty-specs/018-scxml-parser-generator/tasks.md`
+- `kitty-specs/018-scxml-parser-generator/tasks/WP01-scxml-types-and-project-setup.md`
+- `kitty-specs/019-options-link-discovery/tasks.md`
+- `kitty-specs/019-options-link-discovery/tasks/WP01-core-type-and-project-scaffolding.md`
+
+## Informational Notes (no action required from implementer)
+
+### FR-005 spec-vs-task discrepancy
+
+FR-005 in `spec.md` says the message receiver should be a synthetic "Resource" participant named from `GenerateOptions.ResourceName`. The WP02 task prompt (T009) instructs self-messages (sender = receiver = state name). The implementation correctly follows the task prompt. This discrepancy should be resolved at the spec level -- either update FR-005 to match the self-message design, or update the task prompt and implementation.
+
+## What Looks Good
+
+- All 13 required test cases present, plus 5 bonus tests (18 total)
+- `module internal` declaration correct (DD-06)
+- Reflection code correctly uses `FSharpValue.GetRecordFields` with field index 3 matching `Guards` declaration order
+- Guard wildcard `"*"` matches R-03 decision
+- All participants `Explicit = true`
+- Pure function, no side effects (SC-008)
+- Compile order placement after `StatefulResourceBuilder.fs` is correct for F# dependency resolution
+- Test helper `makeMetadata` is well-designed with proper stub closures
+
 
 ## Markdown Formatting
 Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
@@ -414,3 +478,4 @@ let turnstileHandlerMap =
 - 2026-03-16T04:02:51Z – claude-opus – shell_pid=98705 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:11:37Z – claude-opus – shell_pid=98705 – lane=for_review – Ready for review: Generator.fs implements pure function StateMachineMetadata -> Result<Diagram, GeneratorError>. 18 tests pass. Builds across all TFMs.
 - 2026-03-16T04:13:40Z – claude-opus-reviewer – shell_pid=1848 – lane=doing – Started review via workflow command
+- 2026-03-16T04:17:41Z – claude-opus-reviewer – shell_pid=1848 – lane=planned – Moved to planned
