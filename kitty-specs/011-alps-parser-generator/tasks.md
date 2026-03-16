@@ -138,7 +138,7 @@
 - [x] T023 Add `Alps/JsonGenerator.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/XmlParser.fs, before Alps/Mapper.fs)
 - [x] T024 Create `test/Frank.Statecharts.Tests/Alps/JsonGeneratorTests.fs` -- tic-tac-toe golden file comparison, onboarding golden file comparison
 - [x] T025 [P] Add well-formedness and structural validation tests in JsonGeneratorTests.fs -- valid ALPS root structure, empty document generation, conditional transition (multiple rt) generation
-- [ ] T026 Create `test/Frank.Statecharts.Tests/Alps/RoundTripTests.fs` -- parse ALPS JSON -> generate -> re-parse, compare ASTs for tic-tac-toe and onboarding
+- [x] T026 Create `test/Frank.Statecharts.Tests/Alps/RoundTripTests.fs` -- parse ALPS JSON -> generate -> re-parse, compare ASTs for tic-tac-toe and onboarding
 - [ ] T027 [P] Add cross-format roundtrip test in RoundTripTests.fs -- parse ALPS XML -> generate ALPS JSON -> re-parse JSON, verify equivalence
 
 ### Implementation Notes
