@@ -24,7 +24,7 @@ subtasks:
   - "T015"
   - "T016"
 history:
-  - timestamp: "2026-03-15T23:59:00Z"
+  - timestamp: "2026-03-16T00:05:00Z"
     lane: "planned"
     agent: "system"
     shell_pid: ""
@@ -33,34 +33,28 @@ history:
 
 # Work Package Prompt: WP02 -- Guard Discriminated Union
 
-## IMPORTANT: Review Feedback Status
+## Important: Review Feedback Status
 
 **Read this first if you are implementing this task!**
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately (right below this notice).
-- **You must address all feedback** before your work is complete. Feedback items are your implementation TODO list.
+- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
+- **You must address all feedback** before your work is complete.
 - **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
-- **Report progress**: As you address each feedback item, update the Activity Log explaining what you changed.
 
 ---
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes. Implementation must address every item listed below before returning for re-review.
+> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
 
-*[This section is empty initially. Reviewers will populate it if the work is returned from review. If you see feedback here, treat each item as a must-do before completion.]*
-
----
-
-## Markdown Formatting
-Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
-Use language identifiers in code blocks: ````fsharp`, ````bash`
+*[This section is empty initially. Reviewers will populate it if the work is returned from review.]*
 
 ---
 
 ## Implementation Command
 
-This WP depends on WP01:
+Depends on WP01 -- branch from WP01:
+
 ```bash
 spec-kitty implement WP02 --base WP01
 ```
@@ -69,382 +63,347 @@ spec-kitty implement WP02 --base WP01
 
 ## Objectives & Success Criteria
 
-Replace the `Guard` record type and `GuardContext` record with a Guard DU plus phase-specific context records that eliminate `Unchecked.defaultof<'E>` and provide type-safe two-phase guard evaluation:
+Replace the current `Guard` record type and `GuardContext` record with a `Guard` discriminated union having `AccessControl` and `EventValidation` cases. Introduce `AccessControlContext` (no event field) and `EventValidationContext` (with event field) records. Update middleware to two-phase guard evaluation. Eliminate all uses of `Unchecked.defaultof<'E>`.
 
-1. `GuardContext` record is replaced by two phase-specific context records: `AccessControlContext<'S,'C>` and `EventValidationContext<'S,'E,'C>`
-2. `Guard<'S,'E,'C>` becomes a DU with `AccessControl` (named, pre-handler, no event) and `EventValidation` (named, post-handler, with event) cases
-3. `StateMachine` record keeps a single `Guards` field with the new DU type
-4. Middleware evaluates `AccessControl` guards before the handler, `EventValidation` guards after the handler with the actual event
-5. `Unchecked.defaultof<'E>` is completely eliminated from the codebase
-6. All existing tests are updated to use the new Guard DU and context records
-7. New tests validate both guard phases
-
-**Success gate**: `dotnet build` succeeds across all targets. `dotnet test` passes all tests. No instance of `Unchecked.defaultof` remains in the statecharts source.
+**Success Criteria**:
+1. `Guard` is a DU with `AccessControl` and `EventValidation` cases, each carrying a `name: string` and a predicate function
+2. `AccessControlContext` has no `Event` field -- guards cannot access the event at compile time
+3. `EventValidationContext` has an `Event` field with the actual event value (never null/defaultof)
+4. `GuardContext` record is removed entirely
+5. `StateMachine.Guards` stays as a single `Guard<'S,'E,'C> list` field -- no `EventGuards` field
+6. Middleware evaluates `AccessControl` guards pre-handler (step 3) and `EventValidation` guards post-handler (new step 5)
+7. No occurrences of `Unchecked.defaultof<'E>` remain in the codebase
+8. All existing tests compile and pass after guard type updates
+9. Build succeeds across all targets (net8.0, net9.0, net10.0)
 
 ## Context & Constraints
 
-- **Spec**: `kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 3 (Guard Access to Event Context, P2)
-- **Plan**: `kitty-specs/010-statecharts-production-readiness/plan.md` -- Decision D-003
-- **Research**: `kitty-specs/010-statecharts-production-readiness/research.md` -- Decision 3 (Guard DU with Phase-Typed Cases)
-- **Breaking change**: Acceptable for pre-1.0 library. Guard type changes from record to DU.
-- **Constraint**: Single `Guards` field on `StateMachine` -- NO separate `EventGuards` field. The plan explicitly says "No separate `EventGuards` field."
-- **Constraint**: `StateMachineMetadata` gets a NEW `EvaluateEventGuards` closure field (this is a metadata field, not a `StateMachine` field)
-- **Constraint**: If `EventValidation` guard blocks after response started, log warning (same pattern as existing `TransitionAttemptResult.Blocked` handling)
+- **Spec**: `/kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 3 (Guard Access to Event Context), FR-005, FR-006, FR-012
+- **Plan**: `/kitty-specs/010-statecharts-production-readiness/plan.md` -- Decision D-003
+- **Research**: `/kitty-specs/010-statecharts-production-readiness/research.md` -- Decision 3 (full rationale, builder closure sketches)
+- **Data Model**: `/kitty-specs/010-statecharts-production-readiness/data-model.md` -- Guard DU entity, AccessControlContext, EventValidationContext, StateMachineMetadata changes, middleware flow
+- **Constitution**: Principle II (Idiomatic F#) -- DU is the idiomatic modeling choice; Principle VIII (No Duplicated Logic) -- single Guards list with DU dispatch
 
-### Key Files
-- `src/Frank.Statecharts/Types.fs` -- Guard DU definition, context records, GuardContext removal, StateMachine update
-- `src/Frank.Statecharts/StatefulResourceBuilder.fs` -- evaluateGuards split, evaluateEventGuards closure, StateMachineMetadata update
-- `src/Frank.Statecharts/Middleware.fs` -- two-phase guard evaluation flow
-- `test/Frank.Statecharts.Tests/TypeTests.fs` -- update guard type references
-- `test/Frank.Statecharts.Tests/MiddlewareTests.fs` -- update guard tests, add two-phase tests
-- `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` -- update guard references
+**Breaking Change**: This is a source-breaking change. The old `Guard` record (`{ Name; Predicate }`) and `GuardContext` record (`{ User; CurrentState; Event; Context }`) are both replaced. All code constructing guards must be updated. This is acceptable for pre-1.0.
+
+**Depends on WP01**: WP01 must land first because both WPs modify `Types.fs` and `StatefulResourceBuilder.fs`. WP01 stabilizes the `StateMachine` record shape and the builder's closure structure before WP02 modifies them further.
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T008 -- Replace `Guard` record and `GuardContext` with Guard DU + context records in `Types.fs`
+### Subtask T008 -- Replace Guard record and GuardContext with Guard DU + new context records in Types.fs
 
-**Purpose**: Define the new Guard discriminated union with named cases and phase-specific context records that provide type-safe guard evaluation.
+- **Purpose**: Define the core type changes that replace the footgun `Unchecked.defaultof<'E>` with type-safe DU cases.
+- **Files**: `src/Frank.Statecharts/Types.fs`
+- **Steps**:
+  1. **Remove** the `GuardContext` record type:
+     ```fsharp
+     // DELETE THIS:
+     type GuardContext<'State, 'Event, 'Context> =
+         { User: ClaimsPrincipal
+           CurrentState: 'State
+           Event: 'Event
+           Context: 'Context }
+     ```
 
-**Steps**:
+  2. **Remove** the `Guard` record type:
+     ```fsharp
+     // DELETE THIS:
+     type Guard<'State, 'Event, 'Context> =
+         { Name: string
+           Predicate: GuardContext<'State, 'Event, 'Context> -> GuardResult }
+     ```
 
-1. In `src/Frank.Statecharts/Types.fs`, replace the current `GuardContext` and `Guard` types:
+  3. **Add** new context record types and Guard DU in their place:
+     ```fsharp
+     /// Context for access-control guards (pre-handler). No event available.
+     type AccessControlContext<'State, 'Context> =
+         { User: ClaimsPrincipal
+           CurrentState: 'State
+           Context: 'Context }
 
-   **Current** (to be removed):
-   ```fsharp
-   type GuardContext<'State, 'Event, 'Context> =
-       { User: ClaimsPrincipal
-         CurrentState: 'State
-         Event: 'Event
-         Context: 'Context }
+     /// Context for event-validation guards (post-handler). Event is the actual value set by the handler.
+     type EventValidationContext<'State, 'Event, 'Context> =
+         { User: ClaimsPrincipal
+           CurrentState: 'State
+           Event: 'Event
+           Context: 'Context }
 
-   type Guard<'State, 'Event, 'Context> =
-       { Name: string
-         Predicate: GuardContext<'State, 'Event, 'Context> -> GuardResult }
-   ```
+     /// A guard that controls access to state transitions.
+     /// The DU case determines both execution phase and type signature.
+     type Guard<'State, 'Event, 'Context> =
+         /// Runs pre-handler. Cannot access the event (AccessControlContext has no Event field).
+         | AccessControl of name: string * predicate: (AccessControlContext<'State, 'Context> -> GuardResult)
+         /// Runs post-handler. Receives the actual event set by the handler.
+         | EventValidation of name: string * predicate: (EventValidationContext<'State, 'Event, 'Context> -> GuardResult)
+     ```
 
-   **New** (replacement):
-   ```fsharp
-   /// Context passed to access-control guards (pre-handler, no event available).
-   type AccessControlContext<'State, 'Context> =
-       { User: ClaimsPrincipal
-         CurrentState: 'State
-         Context: 'Context }
+  4. Place these types after `GuardResult` and before `StateInfo` in the file to maintain logical ordering.
 
-   /// Context passed to event-validation guards (post-handler, with actual event).
-   type EventValidationContext<'State, 'Event, 'Context> =
-       { User: ClaimsPrincipal
-         CurrentState: 'State
-         Event: 'Event
-         Context: 'Context }
+- **Notes**: The DU field labels (`name:`, `predicate:`) are named fields for documentation/readability, not for positional extraction. Pattern matching uses positional deconstruction: `AccessControl(name, pred)`.
 
-   /// A guard predicate that controls state transition access.
-   /// AccessControl runs pre-handler (no event available).
-   /// EventValidation runs post-handler (with actual event value).
-   type Guard<'State, 'Event, 'Context> =
-       | AccessControl of name: string * predicate: (AccessControlContext<'State, 'Context> -> GuardResult)
-       | EventValidation of name: string * predicate: (EventValidationContext<'State, 'Event, 'Context> -> GuardResult)
-   ```
+### Subtask T009 -- Update StateMachine record for Guard DU type
 
-2. The `name` field is kept on both DU cases (replacing the `Name` field from the old record) to support diagnostics and logging.
+- **Purpose**: The `StateMachine` record's `Guards` field keeps the same name but its element type changes from the old `Guard` record to the new `Guard` DU.
+- **Files**: `src/Frank.Statecharts/Types.fs`
+- **Steps**:
+  1. The `StateMachine` record definition does NOT need any code change -- the `Guards` field is typed as `Guard<'State, 'Event, 'Context> list`, and since we replaced the `Guard` type definition in T008 (same name, same type parameters), this field automatically uses the new DU type.
+  2. Verify the record definition still compiles:
+     ```fsharp
+     type StateMachine<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
+         { Initial: 'State
+           InitialContext: 'Context
+           Transition: 'State -> 'Event -> 'Context -> TransitionResult<'State, 'Context>
+           Guards: Guard<'State, 'Event, 'Context> list  // Now DU type
+           StateMetadata: Map<'State, StateInfo> }
+     ```
+- **Notes**: This subtask is minimal -- the type name hasn't changed. The breaking change manifests at call sites where guards are constructed.
 
-3. Keep all other types in `Types.fs` unchanged (`BlockReason`, `GuardResult`, `StateInfo`, `TransitionResult`, `StateMachine`).
+### Subtask T010 -- Update `evaluateGuards` closure to use AccessControl only
 
-**Files**: `src/Frank.Statecharts/Types.fs`
-**Parallel?**: No -- foundation for all subsequent subtasks
-**Notes**: The context records are separate types rather than anonymous tuples because they provide named field access, which is more ergonomic for guard implementations. `AccessControlContext` intentionally omits the `Event` field -- it's not in the type at all, so guards cannot accidentally access it.
+- **Purpose**: The existing `evaluateGuards` closure passes `Unchecked.defaultof<'E>` as the event. Replace it with a closure that only evaluates `AccessControl` guards using `AccessControlContext` (no event field).
+- **Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
+- **Steps**:
+  1. At the top of `Run`, after the machine is available, partition guards by DU case:
+     ```fsharp
+     let accessGuards =
+         machineWithMetadata.Guards
+         |> List.choose (function
+             | AccessControl(name, pred) -> Some(name, pred)
+             | _ -> None)
 
-### Subtask T009 -- Update `StateMachine` record for Guard DU
+     let eventGuards =
+         machineWithMetadata.Guards
+         |> List.choose (function
+             | EventValidation(name, pred) -> Some(name, pred)
+             | _ -> None)
+     ```
 
-**Purpose**: Ensure the `StateMachine` record uses the new `Guard` DU type in its single `Guards` field.
+  2. Replace the existing `evaluateGuards` closure (currently around lines 197-212):
+     ```fsharp
+     let evaluateGuards (ctx: HttpContext) : GuardResult =
+         let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+         let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
 
-**Steps**:
+         let guardCtx: AccessControlContext<'S, 'C> =
+             { User = ctx.User
+               CurrentState = state
+               Context = context }
 
-1. In `src/Frank.Statecharts/Types.fs`, verify the `StateMachine` record's `Guards` field. It should already be typed as `Guard<'State, 'Event, 'Context> list`. Since we replaced the `Guard` type in T008, this field automatically uses the new DU type.
+         accessGuards
+         |> List.tryPick (fun (_, pred) ->
+             match pred guardCtx with
+             | Allowed -> None
+             | Blocked reason -> Some(Blocked reason))
+         |> Option.defaultValue Allowed
+     ```
 
-2. Verify no compile errors -- the `StateMachine` record should be:
-   ```fsharp
-   type StateMachine<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
-       { Initial: 'State
-         InitialContext: 'Context
-         Transition: 'State -> 'Event -> 'Context -> TransitionResult<'State, 'Context>
-         Guards: Guard<'State, 'Event, 'Context> list
-         StateMetadata: Map<'State, StateInfo> }
-   ```
-
-3. Do NOT add a separate `EventGuards` field. The plan explicitly says "No separate `EventGuards` field."
-
-**Files**: `src/Frank.Statecharts/Types.fs`
-**Parallel?**: No -- depends on T008
-**Notes**: The `Guards` field now contains a mixed list of `AccessControl` and `EventValidation` guards. The builder splits them by pattern matching at build time.
-
-### Subtask T010 -- Update `evaluateGuards` closure (AccessControl only)
-
-**Purpose**: Modify the `evaluateGuards` closure in `StatefulResourceBuilder.fs` to evaluate only `AccessControl` guards (pre-handler phase) using `AccessControlContext`.
-
-**Steps**:
-
-1. In `src/Frank.Statecharts/StatefulResourceBuilder.fs`, find the `evaluateGuards` closure (around line 197-212).
-
-2. Replace the current implementation that uses `GuardContext` with:
-   ```fsharp
-   let evaluateGuards (ctx: HttpContext) : GuardResult =
-       let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
-       let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
-
-       let guardCtx: AccessControlContext<'S, 'C> =
-           { User = ctx.User
-             CurrentState = state
-             Context = context }
-
-       machineWithMetadata.Guards
-       |> List.tryPick (fun guard ->
-           match guard with
-           | AccessControl(_, predicate) ->
-               match predicate guardCtx with
-               | Allowed -> None
-               | Blocked reason -> Some(Blocked reason)
-           | EventValidation _ -> None)  // Skip event guards in pre-handler phase
-       |> Option.defaultValue Allowed
-   ```
-
-3. This eliminates the old `GuardContext` construction and the `Unchecked.defaultof<'E>` usage entirely.
-
-**Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
-**Parallel?**: No -- depends on T008, T009
-**Notes**: The key change is `| EventValidation _ -> None` which skips event-validation guards during the pre-handler phase. The `AccessControlContext` has no `Event` field, making it impossible to access the event.
+  3. This eliminates the `Unchecked.defaultof<'E>` line entirely.
 
 ### Subtask T011 -- Create `evaluateEventGuards` closure
 
-**Purpose**: Add a new closure that evaluates `EventValidation` guards after the handler has run and the event is available.
+- **Purpose**: Add a new closure for evaluating `EventValidation` guards post-handler, receiving the actual event value.
+- **Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
+- **Steps**:
+  1. Add a new closure after `evaluateGuards`:
+     ```fsharp
+     let evaluateEventGuards (ctx: HttpContext) : GuardResult =
+         let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
+         let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
 
-**Steps**:
+         match StateMachineContext.tryGetEvent<'E> ctx with
+         | None -> Allowed  // No event set -- skip event guards
+         | Some event ->
+             let guardCtx: EventValidationContext<'S, 'E, 'C> =
+                 { User = ctx.User
+                   CurrentState = state
+                   Event = event
+                   Context = context }
 
-1. In `src/Frank.Statecharts/StatefulResourceBuilder.fs`, after the `evaluateGuards` closure, add:
-   ```fsharp
-   let evaluateEventGuards (ctx: HttpContext) : GuardResult =
-       let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
-       let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+             eventGuards
+             |> List.tryPick (fun (_, pred) ->
+                 match pred guardCtx with
+                 | Allowed -> None
+                 | Blocked reason -> Some(Blocked reason))
+             |> Option.defaultValue Allowed
+     ```
 
-       match StateMachineContext.tryGetEvent<'E> ctx with
-       | None -> Allowed  // No event set -- nothing to validate
-       | Some event ->
-           let guardCtx: EventValidationContext<'S, 'E, 'C> =
-               { User = ctx.User
-                 CurrentState = state
-                 Event = event
-                 Context = context }
+  2. When no event is set (GET requests, or handlers that don't call `setEvent`), event guards are skipped by returning `Allowed`.
 
-           machineWithMetadata.Guards
-           |> List.tryPick (fun guard ->
-               match guard with
-               | EventValidation(_, predicate) ->
-                   match predicate guardCtx with
-                   | Allowed -> None
-                   | Blocked reason -> Some(Blocked reason)
-               | AccessControl _ -> None)  // Skip access guards in post-handler phase
-           |> Option.defaultValue Allowed
-   ```
+### Subtask T012 -- Add `EvaluateEventGuards` field to `StateMachineMetadata`
 
-2. This closure retrieves the event from `HttpContext.Items` (set by the handler via `StateMachineContext.setEvent`) and passes it to `EventValidation` guards via the `EventValidationContext`.
+- **Purpose**: Expose the event-guard evaluation closure to the middleware via endpoint metadata.
+- **Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
+- **Steps**:
+  1. Add a new field to the `StateMachineMetadata` record:
+     ```fsharp
+     type StateMachineMetadata =
+         {
+             Machine: obj
+             StateHandlerMap: Map<string, (string * RequestDelegate) list>
+             ResolveInstanceId: HttpContext -> string
+             TransitionObservers: (obj -> unit) list
+             InitialStateKey: string
+             GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
+             EvaluateGuards: HttpContext -> GuardResult
+             /// Evaluate event-validation guards after the handler has set the event.
+             EvaluateEventGuards: HttpContext -> GuardResult  // NEW
+             ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>
+         }
+     ```
 
-**Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
-**Parallel?**: No -- depends on T010
-**Notes**: If no event is set (e.g., GET request), the event guards are skipped entirely (return `Allowed`). This is correct -- GET requests don't trigger transitions.
-
-### Subtask T012 -- Add `EvaluateEventGuards` to `StateMachineMetadata`
-
-**Purpose**: Add the new closure field to `StateMachineMetadata` so the middleware can call it.
-
-**Steps**:
-
-1. In `src/Frank.Statecharts/StatefulResourceBuilder.fs`, update the `StateMachineMetadata` record definition:
-   ```fsharp
-   type StateMachineMetadata =
-       { Machine: obj
-         StateHandlerMap: Map<string, (string * RequestDelegate) list>
-         ResolveInstanceId: HttpContext -> string
-         TransitionObservers: (obj -> unit) list
-         InitialStateKey: string
-         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
-         EvaluateGuards: HttpContext -> GuardResult
-         EvaluateEventGuards: HttpContext -> GuardResult  // NEW
-         ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult> }
-   ```
-
-2. Update the metadata construction in `Run` to include the new field:
-   ```fsharp
-   let metadata: StateMachineMetadata =
-       { Machine = box machineWithMetadata
-         StateHandlerMap = stateHandlerMap
-         ResolveInstanceId = resolveId
-         TransitionObservers = ...
-         InitialStateKey = initialStateKey
-         GetCurrentStateKey = getCurrentStateKey
-         EvaluateGuards = evaluateGuards
-         EvaluateEventGuards = evaluateEventGuards  // NEW
-         ExecuteTransition = executeTransition }
-   ```
-
-**Files**: `src/Frank.Statecharts/StatefulResourceBuilder.fs`
-**Parallel?**: No -- depends on T011
-**Notes**: This is a breaking change to `StateMachineMetadata`, but it's an internal type (not part of the public API for end users).
+  2. Wire the closure into the metadata construction:
+     ```fsharp
+     let metadata: StateMachineMetadata =
+         { Machine = box machineWithMetadata
+           StateHandlerMap = stateHandlerMap
+           ResolveInstanceId = resolveId
+           TransitionObservers = ...
+           InitialStateKey = initialStateKey
+           GetCurrentStateKey = getCurrentStateKey
+           EvaluateGuards = evaluateGuards
+           EvaluateEventGuards = evaluateEventGuards  // NEW
+           ExecuteTransition = executeTransition }
+     ```
 
 ### Subtask T013 -- Update Middleware.fs to two-phase guard evaluation
 
-**Purpose**: Change the middleware flow from 5-step to 6-step, inserting event-validation guard evaluation between handler invocation and transition execution.
+- **Purpose**: Change the middleware flow from 5-step to 6-step, inserting event-guard evaluation between handler invocation and transition execution.
+- **Files**: `src/Frank.Statecharts/Middleware.fs`
+- **Steps**:
+  1. After the handler invocation (`do! handler.Invoke(ctx)`) and before the transition execution (`let! transResult = meta.ExecuteTransition ...`), insert event-guard evaluation:
+     ```fsharp
+     | Allowed ->
+         // Step 4: Invoke the state-specific handler
+         do! handler.Invoke(ctx)
 
-**Steps**:
+         // Step 5: Evaluate event-validation guards (NEW)
+         let eventGuardResult = meta.EvaluateEventGuards ctx
 
-1. In `src/Frank.Statecharts/Middleware.fs`, find the `HandleStateful` method.
+         match eventGuardResult with
+         | Blocked reason ->
+             if not ctx.Response.HasStarted then
+                 ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
+                 match BlockReasonMapping.toMessage reason with
+                 | Some msg -> do! ctx.Response.WriteAsync(msg)
+                 | None -> ()
+             else
+                 logger.LogWarning(
+                     "Event guard blocked for instance {InstanceId} but response already started",
+                     instanceId
+                 )
+         | Allowed ->
+             // Step 6: Try transition (event set by handler in HttpContext.Items)
+             let! transResult = meta.ExecuteTransition ctx.RequestServices ctx instanceId
+             // ... existing transition result handling ...
+     ```
 
-2. The current flow is:
-   ```
-   Step 1: GetCurrentStateKey
-   Step 2: Method check
-   Step 3: Evaluate guards (all, pre-handler)
-   Step 4: Invoke handler
-   Step 5: Execute transition
-   ```
+  2. The full updated flow becomes:
+     - Step 1: Look up current state from store
+     - Step 2: Check HTTP method allowed
+     - Step 3: Evaluate `AccessControl` guards (pre-handler)
+     - Step 4: Invoke handler
+     - Step 5: Evaluate `EventValidation` guards (post-handler) -- **NEW**
+     - Step 6: Execute transition
 
-3. Change to:
-   ```
-   Step 1: GetCurrentStateKey
-   Step 2: Method check
-   Step 3: Evaluate AccessControl guards (pre-handler)
-   Step 4: Invoke handler
-   Step 5: Evaluate EventValidation guards (post-handler)
-   Step 6: Execute transition
-   ```
+  3. The existing transition result handling (lines 84-117) stays the same but is now nested inside the `Allowed` branch of the event guard check.
 
-4. After the handler invocation (`do! handler.Invoke(ctx)`) and BEFORE the transition execution, insert:
-   ```fsharp
-   // Step 5: Evaluate EventValidation guards (post-handler)
-   let eventGuardResult = meta.EvaluateEventGuards ctx
+- **Notes**: If an `EventValidation` guard blocks, the handler has already run. If the response has already started, log a warning (same pattern as the existing `TransitionAttemptResult.Blocked` handling). The transition is NOT executed when an event guard blocks.
 
-   match eventGuardResult with
-   | Blocked reason ->
-       if not ctx.Response.HasStarted then
-           ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
-           match BlockReasonMapping.toMessage reason with
-           | Some msg -> do! ctx.Response.WriteAsync(msg)
-           | None -> ()
-       else
-           logger.LogWarning(
-               "EventValidation guard blocked for instance {InstanceId} but response already started",
-               instanceId
-           )
-   | Allowed ->
-       // Step 6: Execute transition
-       let! transResult = meta.ExecuteTransition ctx.RequestServices ctx instanceId
-       // ... existing transition result handling
-   ```
+### Subtask T014 -- Update existing tests referencing Guard record / GuardContext types
 
-5. The existing transition result handling (lines 84-117) moves inside the `| Allowed ->` branch of the event guard check.
+- **Purpose**: All existing test code that constructs `Guard` records or `GuardContext` records must be updated to use the new DU.
+- **Files**: `test/Frank.Statecharts.Tests/TypeTests.fs`, `test/Frank.Statecharts.Tests/MiddlewareTests.fs`, `test/Frank.Statecharts.Tests/StatefulResourceTests.fs`
+- **Steps**:
+  1. **TypeTests.fs** -- `guardTests`: Update guard construction from record syntax to DU syntax:
+     ```fsharp
+     // OLD:
+     let adminGuard: Guard<TurnstileState, TurnstileEvent, unit> =
+         { Name = "isAdmin"
+           Predicate = fun ctx -> if ctx.User.IsInRole("Admin") then Allowed else Blocked(NotAllowed) }
+     let ctx = { User = adminPrincipal; CurrentState = Locked; Event = Coin; Context = () }
+     Expect.equal (adminGuard.Predicate ctx) Allowed "admin should be allowed"
 
-**Files**: `src/Frank.Statecharts/Middleware.fs`
-**Parallel?**: No -- depends on T012
-**Notes**: The "response already started" warning for event guard blocking follows the exact same pattern as the existing `TransitionAttemptResult.Blocked` handling (lines 96-107). This is consistent per the research.md decision.
+     // NEW:
+     let adminGuard: Guard<TurnstileState, TurnstileEvent, unit> =
+         AccessControl("isAdmin", fun ctx -> if ctx.User.IsInRole("Admin") then Allowed else Blocked(NotAllowed))
+     let ctx: AccessControlContext<TurnstileState, unit> =
+         { User = adminPrincipal; CurrentState = Locked; Context = () }
+     match adminGuard with
+     | AccessControl(_, pred) -> Expect.equal (pred ctx) Allowed "admin should be allowed"
+     | _ -> failtest "Expected AccessControl"
+     ```
 
-### Subtask T014 -- Update existing tests for Guard DU
+  2. **MiddlewareTests.fs** -- `guardedMachine` and `notYourTurnMachine`: Update guard construction:
+     ```fsharp
+     // OLD:
+     Guards = [ { Name = "RequireAdmin"; Predicate = fun ctx -> ... } ]
+     // NEW:
+     Guards = [ AccessControl("RequireAdmin", fun ctx ->
+         if ctx.User.IsInRole("admin") then Allowed else Blocked NotAllowed) ]
+     ```
+     Note: These guards only check `ctx.User`, so they become `AccessControl` guards with `AccessControlContext`.
 
-**Purpose**: Update all test files that reference the old `Guard` record and `GuardContext` type to use the new `Guard` DU and context records.
+  3. **StatefulResourceTests.fs** -- `turnGuard`: Update from record to DU:
+     ```fsharp
+     let turnGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
+         AccessControl("TurnGuard", fun ctx ->
+             match ctx.CurrentState with
+             | XTurn ->
+                 if ctx.User.HasClaim("player", "X") then Allowed
+                 elif ctx.User.HasClaim("player", "O") then Blocked NotYourTurn
+                 else Blocked NotAllowed
+             | OTurn ->
+                 if ctx.User.HasClaim("player", "O") then Allowed
+                 elif ctx.User.HasClaim("player", "X") then Blocked NotYourTurn
+                 else Blocked NotAllowed
+             | Won _ | Draw -> Allowed)
+     ```
 
-**Steps**:
+  4. **Search for all `GuardContext` occurrences** across the codebase and replace.
 
-1. **`test/Frank.Statecharts.Tests/TypeTests.fs`**: Find any tests that construct `Guard` records or `GuardContext` records. Update to use the DU:
+### Subtask T015 -- Add tests for AccessControl guards (pre-handler)
 
-   Old pattern:
-   ```fsharp
-   { Name = "test"; Predicate = fun ctx -> Allowed }
-   ```
-   New pattern:
-   ```fsharp
-   AccessControl("test", fun ctx -> Allowed)
-   ```
+- **Purpose**: Verify that `AccessControl` guards run before the handler and block requests appropriately.
+- **Files**: `test/Frank.Statecharts.Tests/MiddlewareTests.fs`
+- **Parallel**: Yes (after T008-T013)
+- **Steps**:
+  1. Add test that `AccessControl` guard blocks before handler invocation (handler must NOT run).
+  2. Add test that `AccessControl` guard passes allow handler to proceed normally.
 
-2. **`test/Frank.Statecharts.Tests/MiddlewareTests.fs`**: Find tests that set up guards on `StateMachine` records. Update the guard construction. Old `GuardContext` field access (e.g., `ctx.CurrentState`) stays the same since `AccessControlContext` has the same field names (minus `Event`).
+### Subtask T016 -- Add tests for EventValidation guards (post-handler)
 
-3. **`test/Frank.Statecharts.Tests/StatefulResourceTests.fs`**: Find tests that register guards. Update guard construction.
-
-4. Search across all test files for `GuardContext` references -- all must be removed since the type no longer exists.
-
-5. Search for `Unchecked.defaultof` -- ensure none remain in source or tests.
-
-6. Compile and run tests after updating. Fix any remaining compilation errors.
-
-**Files**: `test/Frank.Statecharts.Tests/TypeTests.fs`, `test/Frank.Statecharts.Tests/MiddlewareTests.fs`, `test/Frank.Statecharts.Tests/StatefulResourceTests.fs`
-**Parallel?**: No -- must update all tests together for compilation to succeed
-**Notes**: This is a mechanical refactor. The `Guards = []` pattern on `StateMachine` records stays the same since the list type is unchanged. Only tests that provide non-empty guard lists need updating. Guards that previously accessed `ctx.Event` were receiving `Unchecked.defaultof` -- those should become `EventValidation` guards that receive the actual event.
-
-### Subtask T015 -- Add tests for `AccessControl` guards (pre-handler)
-
-**Purpose**: Validate that `AccessControl` guards run before the handler and correctly block/allow without an event.
-
-**Steps**:
-
-1. Add tests in `test/Frank.Statecharts.Tests/MiddlewareTests.fs`:
-
-   - **Test: AccessControl guard allows request**: Register an `AccessControl("allow", fun ctx -> Allowed)` guard. Make a request. Verify handler is invoked (200 OK).
-
-   - **Test: AccessControl guard blocks request**: Register an `AccessControl("deny", fun ctx -> Blocked NotAllowed)` guard. Make a request. Verify 403 returned. Verify handler is NOT invoked.
-
-   - **Test: AccessControl guard receives correct state**: Register an `AccessControl("check-state", fun ctx -> ...)` guard that checks `ctx.CurrentState`. Set store to a specific state. Make a request. Verify guard received the correct state.
-
-   - **Test: AccessControl guard receives correct user**: Register an `AccessControl("check-user", fun ctx -> ...)` guard that checks `ctx.User`. Configure authentication. Verify guard receives the user.
-
-**Files**: `test/Frank.Statecharts.Tests/MiddlewareTests.fs`
-**Parallel?**: Yes -- can proceed alongside T016 after T014
-**Notes**: These tests validate the new DU-based guard behavior specifically. The `AccessControlContext` has `User`, `CurrentState`, and `Context` fields but no `Event`.
-
-### Subtask T016 -- Add tests for `EventValidation` guards (post-handler)
-
-**Purpose**: Validate that `EventValidation` guards run after the handler and receive the actual event value via `EventValidationContext`.
-
-**Steps**:
-
-1. Add tests in `test/Frank.Statecharts.Tests/MiddlewareTests.fs`:
-
-   - **Test: EventValidation guard receives actual event**: Register an `EventValidation("check-event", fun ctx -> ...)` guard that captures `ctx.Event`. Handler sets an event via `StateMachineContext.setEvent`. Make a POST request. Verify the guard received the actual event (not null/default).
-
-   - **Test: EventValidation guard blocks transition**: Register an `EventValidation("block", fun ctx -> Blocked PreconditionFailed)` guard. Handler sets an event. Make a POST request. Verify the handler ran (response may have started) but the transition was NOT executed (state unchanged).
-
-   - **Test: EventValidation guard skipped when no event**: Register an `EventValidation("skip", fun ctx -> ...)` guard. Make a GET request (handler does not set event). Verify the guard is NOT evaluated (or returns `Allowed` because no event).
-
-   - **Test: EventValidation guard blocking after response started**: Register an `EventValidation("late-block", fun ctx -> Blocked ...)` guard. Handler writes to response before returning. Verify the middleware logs a warning instead of changing status code.
-
-   - **Test: Mixed guards (AccessControl + EventValidation)**: Register both guard types. Verify `AccessControl` runs first (pre-handler), `EventValidation` runs after handler. Verify correct sequencing.
-
-**Files**: `test/Frank.Statecharts.Tests/MiddlewareTests.fs`
-**Parallel?**: Yes -- can proceed alongside T015 after T014
-**Notes**: The `EventValidationContext` has `User`, `CurrentState`, `Event`, and `Context` fields. The `Event` field contains the actual event value set by the handler. The "blocking after response started" test validates the edge case from the spec.
+- **Purpose**: Verify that `EventValidation` guards run after the handler and receive the actual event value.
+- **Files**: `test/Frank.Statecharts.Tests/MiddlewareTests.fs`
+- **Parallel**: Yes (after T008-T013)
+- **Steps**:
+  1. Add test that `EventValidation` guard receives actual event value via `ctx.Event`.
+  2. Add test that `EventValidation` guard blocking suppresses transition (state does not change).
+  3. Add test with both `AccessControl` and `EventValidation` guards mixed in one `Guards` list.
+  4. Add test that `EventValidation` guards are skipped on GET (no event set).
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Breaking change to `Guard` type breaks all guard constructions | T014 covers comprehensive test updates; this is expected for pre-1.0 |
-| `EventValidation` guard evaluated when response already started | Middleware checks `ctx.Response.HasStarted` and logs warning (same as existing pattern) |
-| `GuardContext` removal breaks code that imports it | Search all files for `GuardContext` references; it's internal to the statecharts project |
-| `StateMachineMetadata` gains a field -- any code constructing it directly breaks | `StateMachineMetadata` is internal; only `StatefulResourceBuilder.Run` constructs it |
-| Middleware logic becomes more complex with two guard phases | Clear step numbering in comments; each phase is a simple pattern match |
+1. **Breaking change scope**: All guard construction code changes. The migration is mechanical: wrap existing predicates in `AccessControl(name, fun ctx -> ...)` and adjust context field access. All affected test files are enumerated in T014.
+
+2. **Event guard ordering**: If the handler writes to the response and an `EventValidation` guard then blocks, the response may be partially written. The middleware handles this with `ctx.Response.HasStarted` check and logs a warning.
+
+3. **WSD Guard Parser**: Check `src/Frank.Statecharts/Wsd/GuardParser.fs` for references to the old `Guard` type and update if needed.
 
 ## Review Guidance
 
-- Verify `GuardContext` type is completely removed from `Types.fs`
-- Verify `AccessControlContext` and `EventValidationContext` records are defined
-- Verify `Guard` DU cases include `name` field for diagnostics
-- Verify `Unchecked.defaultof` is eliminated from all statecharts source files
-- Verify `StateMachine` has a SINGLE `Guards` field (no `EventGuards`)
-- Verify middleware flow: AccessControl -> handler -> EventValidation -> transition
-- Verify "response already started" warning pattern for event guard blocking
-- Run `dotnet build` across all targets
-- Run `dotnet test` -- all tests must pass
+- Verify `Unchecked.defaultof` does not appear anywhere in the codebase after this WP
+- Verify `AccessControlContext` has exactly 3 fields: `User`, `CurrentState`, `Context` (no `Event`)
+- Verify `EventValidationContext` has exactly 4 fields: `User`, `CurrentState`, `Event`, `Context`
+- Verify middleware flow is 6-step (state lookup, method check, access guard, handler, event guard, transition)
+- Verify `EventValidation` guards are skipped when no event is set
+- Verify the `StateMachine` record has a single `Guards` field (no `EventGuards` field)
+- Run `dotnet build` for all targets and `dotnet test` to confirm no regressions
 
 ## Activity Log
 
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
-- 2026-03-15T23:59:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T00:05:00Z -- system -- lane=planned -- Prompt generated via /spec-kitty.tasks
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP03"
 title: "Actor Concurrency Validation & Documentation"
-phase: "Phase 2 - Wave 1"
+phase: "Phase 2 - Parallel Streams"
 lane: "planned"
 assignee: ""
 agent: ""
@@ -18,7 +18,7 @@ subtasks:
   - "T019"
   - "T020"
 history:
-  - timestamp: "2026-03-15T23:59:00Z"
+  - timestamp: "2026-03-16T00:05:00Z"
     lane: "planned"
     agent: "system"
     shell_pid: ""
@@ -27,34 +27,28 @@ history:
 
 # Work Package Prompt: WP03 -- Actor Concurrency Validation & Documentation
 
-## IMPORTANT: Review Feedback Status
+## Important: Review Feedback Status
 
 **Read this first if you are implementing this task!**
 
-- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately (right below this notice).
-- **You must address all feedback** before your work is complete. Feedback items are your implementation TODO list.
+- **Has review feedback?**: Check the `review_status` field above. If it says `has_feedback`, scroll to the **Review Feedback** section immediately.
+- **You must address all feedback** before your work is complete.
 - **Mark as acknowledged**: When you understand the feedback and begin addressing it, update `review_status: acknowledged` in the frontmatter.
-- **Report progress**: As you address each feedback item, update the Activity Log explaining what you changed.
 
 ---
 
 ## Review Feedback
 
-> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes. Implementation must address every item listed below before returning for re-review.
+> **Populated by `/spec-kitty.review`** -- Reviewers add detailed feedback here when work needs changes.
 
-*[This section is empty initially. Reviewers will populate it if the work is returned from review. If you see feedback here, treat each item as a must-do before completion.]*
-
----
-
-## Markdown Formatting
-Wrap HTML/XML tags in backticks: `` `<div>` ``, `` `<script>` ``
-Use language identifiers in code blocks: ````fsharp`, ````bash`
+*[This section is empty initially. Reviewers will populate it if the work is returned from review.]*
 
 ---
 
 ## Implementation Command
 
-This WP depends on WP02:
+Depends on WP02 -- branch from WP02:
+
 ```bash
 spec-kitty implement WP03 --base WP02
 ```
@@ -63,224 +57,186 @@ spec-kitty implement WP03 --base WP02
 
 ## Objectives & Success Criteria
 
-Validate and document that the `IStateMachineStore` contract assumes actor-serialized access, and prove the existing `MailboxProcessorStore` correctly serializes concurrent operations:
+Validate and document that the existing `IStateMachineStore` contract assumes actor-serialized access. Add concurrency tests proving the `MailboxProcessorStore` serializes concurrent state operations correctly. Document the backpressure limitation.
 
-1. `IStateMachineStore` interface gains XML documentation stating the actor-serialization contract requirement
-2. `MailboxProcessorStore` gains XML documentation noting unbounded queue as a known limitation
-3. Concurrency tests prove that `MailboxProcessorStore` processes concurrent `SetState` calls sequentially with no lost updates
-4. No interface changes, no code changes -- documentation and tests only
-
-**Success gate**: `dotnet test test/Frank.Statecharts.Tests/` passes all tests including new concurrency tests.
+**Success Criteria**:
+1. `IStateMachineStore` interface and `MailboxProcessorStore` class have XML documentation describing the actor-serialization contract
+2. Concurrency tests prove sequential processing of concurrent operations (no lost updates)
+3. `MailboxProcessor` backpressure is documented as a known limitation
+4. No source code changes to `IStateMachineStore` or `MailboxProcessorStore` (documentation only)
+5. All tests pass
 
 ## Context & Constraints
 
-- **Spec**: `kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 2 (Actor-Serialized Concurrency, P1)
-- **Plan**: `kitty-specs/010-statecharts-production-readiness/plan.md` -- Decision D-002 (Actor-serialized concurrency, no interface changes)
-- **Research**: `kitty-specs/010-statecharts-production-readiness/research.md` -- Decision 2 (Actor-Serialized Concurrency Model) and Decision 5 (Backpressure)
-- **Constraint**: `IStateMachineStore` interface is UNCHANGED -- this WP adds documentation only
-- **Constraint**: `MailboxProcessorStore` implementation is UNCHANGED -- this WP adds tests that validate existing behavior
-- **Constraint**: No version tokens, no compare-and-swap, no 409 Conflict -- the actor model eliminates these
+- **Spec**: `/kitty-specs/010-statecharts-production-readiness/spec.md` -- User Story 2 (Actor-Serialized Concurrency)
+- **Plan**: `/kitty-specs/010-statecharts-production-readiness/plan.md` -- Decision D-002
+- **Research**: `/kitty-specs/010-statecharts-production-readiness/research.md` -- Decision 2 (Actor-Serialized Concurrency Model), Decision 5 (Backpressure)
+- **Data Model**: `/kitty-specs/010-statecharts-production-readiness/data-model.md` -- IStateMachineStore (UNCHANGED), MailboxProcessorStore (UNCHANGED)
 
-### Key Files
-- `src/Frank.Statecharts/Store.fs` -- documentation additions only
-- `test/Frank.Statecharts.Tests/StoreTests.fs` -- new concurrency tests
+**Key Insight**: The `IStateMachineStore` interface is NOT modified. The actor-serialization requirement is a documented contract, not an interface-level enforcement. The `MailboxProcessorStore` already implements this correctly. This WP validates existing behavior and adds documentation.
+
+**Parallel with WP04**: This WP can run in parallel with WP04 (SQLite store) since they touch independent concerns. WP03 validates existing `MailboxProcessorStore`; WP04 creates a new project.
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T017 -- Add documentation to `IStateMachineStore` about actor-serialization contract
+### Subtask T017 -- Document actor-serialization contract on IStateMachineStore
 
-**Purpose**: Make the actor-serialization contract explicit in the code so future store implementors understand the requirement.
+- **Purpose**: Make the actor-serialization requirement explicit in the interface documentation so future store implementors know they must serialize access through an actor.
+- **Files**: `src/Frank.Statecharts/Store.fs`
+- **Steps**:
+  1. Add XML doc comments to `IStateMachineStore`:
+     ```fsharp
+     /// <summary>
+     /// Abstraction for state machine instance persistence.
+     /// </summary>
+     /// <remarks>
+     /// <para>
+     /// All implementations MUST serialize state access through an actor (e.g., <c>MailboxProcessor</c>).
+     /// This ensures concurrent requests to the same instance are processed sequentially,
+     /// preventing lost updates without requiring optimistic concurrency tokens.
+     /// </para>
+     /// <para>
+     /// The actor is the sole accessor of the backing store. External code never reads or writes
+     /// the backing store directly -- all operations go through <c>GetState</c>/<c>SetState</c>.
+     /// </para>
+     /// <para>
+     /// For durable implementations (e.g., SQLite), persistence operations occur inside the actor loop.
+     /// The actor wraps the backing store, not the other way around.
+     /// </para>
+     /// </remarks>
+     type IStateMachineStore<'State, 'Context when 'State: equality> =
+     ```
 
-**Steps**:
+  2. Add XML docs to each interface member emphasizing actor serialization.
+  3. Add XML docs to `StoreMessage` DU explaining it is private to the actor.
 
-1. In `src/Frank.Statecharts/Store.fs`, update the XML doc comment on `IStateMachineStore`:
-
-   ```fsharp
-   /// Abstraction for state machine instance persistence.
-   /// <remarks>
-   /// All implementations MUST serialize state access through an actor (e.g., MailboxProcessor).
-   /// This ensures no concurrent reads or writes to the backing store.
-   /// The actor is the concurrency mechanism -- no version tokens or compare-and-swap needed.
-   /// Callers can safely invoke GetState and SetState concurrently; the implementation
-   /// serializes all operations internally.
-   /// </remarks>
-   type IStateMachineStore<'State, 'Context when 'State: equality> =
-   ```
-
-2. Also update individual method doc comments to note the serialization guarantee:
-
-   ```fsharp
-   /// Retrieve the current state and context for an instance.
-   /// Returns None if the instance doesn't exist yet.
-   /// <remarks>Serialized by the actor -- safe to call concurrently.</remarks>
-   abstract GetState: instanceId: string -> Task<('State * 'Context) option>
-
-   /// Persist a state change for an instance.
-   /// <remarks>Serialized by the actor -- concurrent calls are processed sequentially.</remarks>
-   abstract SetState: instanceId: string -> state: 'State -> context: 'Context -> Task<unit>
-
-   /// Subscribe to state changes for an instance.
-   /// Returns an IDisposable that unsubscribes when disposed.
-   /// BehaviorSubject semantics: new subscribers immediately receive current state.
-   /// <remarks>Serialized by the actor -- subscription management is thread-safe.</remarks>
-   abstract Subscribe: instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable
-   ```
-
-**Files**: `src/Frank.Statecharts/Store.fs`
-**Parallel?**: No -- foundation documentation
-**Notes**: These are documentation-only changes. No signatures, no behavior changes.
+- **Notes**: These are documentation-only changes. The interface signature is unchanged.
 
 ### Subtask T018 -- Add concurrency serialization tests
 
-**Purpose**: Prove that `MailboxProcessorStore` processes concurrent `SetState` calls sequentially with deterministic results.
+- **Purpose**: Prove that the `MailboxProcessorStore` processes concurrent operations sequentially.
+- **Files**: `test/Frank.Statecharts.Tests/StoreTests.fs`
+- **Steps**:
+  1. Add a test that fires multiple concurrent `SetState` calls to the SAME instance and verifies the final state reflects sequential processing:
+     ```fsharp
+     testAsync "Concurrent SetState to same instance are serialized" {
+         let store, _ = makeStore ()
+         use _s = store :> IDisposable
+         let iface = store :> IStateMachineStore<string, int>
 
-**Steps**:
+         // Fire 20 concurrent SetState operations to the same instance
+         let completionOrder = System.Collections.Concurrent.ConcurrentBag<int>()
+         let ops =
+             [| for i in 0..19 ->
+                    async {
+                        do! iface.SetState "same-instance" (sprintf "State-%d" i) i |> Async.AwaitTask
+                        completionOrder.Add(i)
+                    } |]
 
-1. In `test/Frank.Statecharts.Tests/StoreTests.fs`, add a test section for concurrency:
+         do! Async.Parallel ops |> Async.Ignore
 
-2. **Test: Sequential processing of concurrent SetState calls**:
-   ```fsharp
-   testAsync "concurrent SetState calls are serialized" {
-       // Create store
-       let store = createStore ()
+         // All 20 operations should have completed
+         Expect.equal completionOrder.Count 20 "all operations should complete"
 
-       // Use a barrier to ensure all tasks start simultaneously
-       let barrier = new System.Threading.Barrier(10)
+         // The final state should be one of the 20 values (the last one processed)
+         let! result = iface.GetState("same-instance") |> Async.AwaitTask
+         Expect.isSome result "should have state after concurrent writes"
+     }
+     ```
 
-       // Fire 10 concurrent SetState calls, each setting a different state
-       let tasks =
-           [| for i in 0..9 ->
-               task {
-                   barrier.SignalAndWait()
-                   do! (store :> IStateMachineStore<_, _>).SetState "inst" (SomeState i) { Counter = i }
-               } |]
+  2. Add a test that interleaves `GetState` and `SetState` on the same instance and verifies no torn reads occur.
 
-       do! Task.WhenAll(tasks) |> Async.AwaitTask
+- **Notes**: Existing tests in `StoreTests.concurrencyTests` already test 100 concurrent operations, but they distribute across 10 instances. The new tests focus on same-instance contention to prove serialization.
 
-       // Verify the final state is one of the values (last one processed by actor)
-       let! result = (store :> IStateMachineStore<_, _>).GetState "inst" |> Async.AwaitTask
-       Expect.isSome result "State should exist"
-       // The exact final state depends on actor ordering, but it must be one of the 10 values
-       let state, ctx = result.Value
-       Expect.isTrue (ctx.Counter >= 0 && ctx.Counter <= 9) "Counter should be in valid range"
-   }
-   ```
+### Subtask T019 -- Test verifying no lost updates
 
-3. **Test: No lost updates**: Fire N concurrent increment operations and verify the final count reflects all increments:
-   ```fsharp
-   testAsync "no lost updates under concurrent access" {
-       let store = createStore ()
-       let instanceId = "counter"
-       let n = 100
+- **Purpose**: Explicitly verify the "no lost updates" property under concurrent access to the same instance.
+- **Files**: `test/Frank.Statecharts.Tests/StoreTests.fs`
+- **Parallel**: Yes
+- **Steps**:
+  1. Add a test using a notification subscriber to count all state changes:
+     ```fsharp
+     testAsync "All state changes are observed (no lost updates via subscriber)" {
+         let store, _ = makeStore ()
+         use _s = store :> IDisposable
+         let iface = store :> IStateMachineStore<string, int>
 
-       // Initialize
-       do! (store :> IStateMachineStore<_, _>).SetState instanceId InitialState { Counter = 0 } |> Async.AwaitTask
+         let received = System.Collections.Concurrent.ConcurrentBag<string * int>()
+         let observer =
+             { new IObserver<string * int> with
+                 member _.OnNext(v) = received.Add(v)
+                 member _.OnError(_) = ()
+                 member _.OnCompleted() = () }
 
-       // Fire N concurrent "increment" operations
-       // Each reads current state, increments counter, writes back
-       // With actor serialization, all N should succeed sequentially
-       let mutable completedCount = 0
-       let tasks =
-           [| for _ in 0..n-1 ->
-               task {
-                   let! current = (store :> IStateMachineStore<_, _>).GetState instanceId
-                   match current with
-                   | Some(state, ctx) ->
-                       do! (store :> IStateMachineStore<_, _>).SetState instanceId state { ctx with Counter = ctx.Counter + 1 }
-                       System.Threading.Interlocked.Increment(&completedCount) |> ignore
-                   | None -> ()
-               } |]
+         let sub = iface.Subscribe "tracked" observer
 
-       do! Task.WhenAll(tasks) |> Async.AwaitTask
-       Expect.equal completedCount n "All operations should complete"
+         // 50 concurrent SetState calls
+         let ops =
+             [| for i in 1..50 ->
+                    async { do! iface.SetState "tracked" (sprintf "S%d" i) i |> Async.AwaitTask } |]
 
-       // NOTE: The final counter value may NOT be N because GetState and SetState
-       // are separate actor messages. Two concurrent tasks may both read Counter=5
-       // and both write Counter=6. This is expected behavior -- the actor serializes
-       // individual operations, not read-modify-write sequences.
-       // The test validates that no EXCEPTIONS occur and all operations complete.
-   }
-   ```
+         do! Async.Parallel ops |> Async.Ignore
 
-4. Add a note explaining that read-modify-write atomicity is the responsibility of the transition function (called in middleware before SetState), not the store. The store's actor serializes individual operations.
+         sub.Dispose()
 
-**Files**: `test/Frank.Statecharts.Tests/StoreTests.fs`
-**Parallel?**: No -- core test implementation
-**Notes**: Define appropriate test state types for concurrency tests. Reuse existing test types if they have a counter or similar field, or define new ones local to the test.
+         // Every SetState should have triggered a subscriber notification
+         Expect.equal received.Count 50 "subscriber should receive all 50 state changes"
+     }
+     ```
 
-### Subtask T019 -- Test verifying no lost updates under concurrent access
-
-**Purpose**: Validate the end-to-end middleware flow with concurrent requests to the same stateful resource instance.
-
-**Steps**:
-
-1. This test operates at the middleware level, not just the store level. Two concurrent HTTP requests should be serialized by the store's actor.
-
-2. In `test/Frank.Statecharts.Tests/StoreTests.fs` (or `MiddlewareTests.fs` if more appropriate), add:
-
-   - **Test: Two concurrent transitions from same state**:
-     - Set up a stateful resource with a counter state
-     - Set store to state A
-     - Fire two simultaneous POST requests that trigger transitions
-     - Verify both complete without errors
-     - Verify the final state reflects sequential processing
-
-3. Use `Task.WhenAll` to fire concurrent requests. The actor guarantees sequential processing of the `SetState` calls.
-
-**Files**: `test/Frank.Statecharts.Tests/StoreTests.fs`
-**Parallel?**: Yes -- can proceed alongside T020 after T018
-**Notes**: Concurrency tests are inherently non-deterministic in ordering. Test for correctness (no exceptions, valid final state) rather than specific ordering.
+  2. This test proves that no state changes are lost -- each `SetState` produces exactly one subscriber notification because the actor processes them sequentially.
 
 ### Subtask T020 -- Document MailboxProcessor backpressure limitation
 
-**Purpose**: Add documentation noting that MailboxProcessor queues are unbounded and providing guidance for production deployments.
+- **Purpose**: Document that `MailboxProcessor` queues are unbounded and note mitigation strategies.
+- **Files**: `src/Frank.Statecharts/Store.fs`
+- **Parallel**: Yes
+- **Steps**:
+  1. Add XML doc comment to `MailboxProcessorStore`:
+     ```fsharp
+     /// <summary>
+     /// In-memory <see cref="IStateMachineStore{TState, TContext}"/> backed by a <c>MailboxProcessor</c>.
+     /// </summary>
+     /// <remarks>
+     /// <para>
+     /// All state operations are serialized through the <c>MailboxProcessor</c> agent.
+     /// Concurrent requests are queued and processed sequentially.
+     /// </para>
+     /// <para>
+     /// <strong>Known limitation</strong>: The <c>MailboxProcessor</c> message queue is unbounded.
+     /// Under extreme load, the queue can grow without limit. In practice, the HTTP server
+     /// (Kestrel) provides implicit backpressure via connection limits.
+     /// Monitor <c>CurrentQueueLength</c> in production for queue depth visibility.
+     /// For bounded queue behavior, consider a custom store implementation with
+     /// <c>inbox.CurrentQueueLength</c> checks.
+     /// </para>
+     /// </remarks>
+     type MailboxProcessorStore<'State, 'Context when 'State: equality>
+     ```
 
-**Steps**:
-
-1. In `src/Frank.Statecharts/Store.fs`, add XML documentation to `MailboxProcessorStore`:
-
-   ```fsharp
-   /// In-memory state machine store using MailboxProcessor for actor-serialized access.
-   /// <remarks>
-   /// The MailboxProcessor uses an unbounded internal message queue. Under extreme load,
-   /// the queue can grow without limit. In practice, Kestrel's connection limits provide
-   /// implicit backpressure. For production deployments, monitor CurrentQueueLength and
-   /// consider Kestrel connection limit configuration as the primary backpressure mechanism.
-   ///
-   /// If queue depth monitoring is needed, access the underlying MailboxProcessor's
-   /// CurrentQueueLength property via the store instance.
-   /// </remarks>
-   type MailboxProcessorStore<'State, 'Context when 'State: equality>
-   ```
-
-2. This is documentation only -- no code changes.
-
-**Files**: `src/Frank.Statecharts/Store.fs`
-**Parallel?**: Yes -- independent documentation task
-**Notes**: Per research.md Decision 5, backpressure is deferred to a future version. This WP only documents the limitation.
+- **Notes**: This is documentation-only. No code behavior changes.
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Concurrency tests are non-deterministic | Use barriers for synchronization; test for correctness (no exceptions, valid final state) not specific ordering |
-| `MailboxProcessor` queue growth under test load | Tests use small N (10-100) which won't cause memory issues |
-| Read-modify-write is not atomic at the store level | Document this clearly in tests; explain that atomicity is the middleware's responsibility (transition function) |
+1. **Non-deterministic concurrency tests**: Use sufficient iteration counts (20-50 operations) and verify aggregate properties (all operations complete, subscriber count matches) rather than exact ordering.
+
+2. **Test timing**: The `MailboxProcessor` processes messages asynchronously. Use `PostAndAsyncReply` (which blocks until the reply is received) to ensure operations have completed before asserting.
+
+3. **Existing concurrency tests**: `StoreTests.fs` already has `concurrencyTests`. The new tests complement these by focusing on serialization proof (subscriber notification counts, same-instance contention) rather than just "doesn't crash".
 
 ## Review Guidance
 
-- Verify `IStateMachineStore` has actor-serialization documentation
-- Verify `MailboxProcessorStore` has backpressure limitation documentation
-- Verify concurrency tests use proper synchronization (barriers, not sleeps)
-- Verify tests don't assert specific ordering (only correctness)
-- Verify no code changes to Store.fs beyond documentation
-- Run `dotnet test test/Frank.Statecharts.Tests/` -- all tests must pass
+- Verify `IStateMachineStore` interface signature is UNCHANGED (only XML docs added)
+- Verify `MailboxProcessorStore` implementation is UNCHANGED (only XML docs added)
+- Verify concurrency tests prove serialization (subscriber count matches operation count)
+- Verify backpressure is documented as a known limitation with mitigation guidance
+- Run `dotnet test` to confirm all tests pass
 
 ## Activity Log
 
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
-- 2026-03-15T23:59:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T00:05:00Z -- system -- lane=planned -- Prompt generated via /spec-kitty.tasks
 
 ---
 
