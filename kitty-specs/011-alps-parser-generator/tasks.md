@@ -137,7 +137,7 @@
 - [x] T022 Implement descriptor generation in JsonGenerator.fs -- write semantic descriptors with nested children, transition descriptors with `type`, `rt`, `href`, `ext` arrays, `link` arrays, `doc` elements
 - [x] T023 Add `Alps/JsonGenerator.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/XmlParser.fs, before Alps/Mapper.fs)
 - [x] T024 Create `test/Frank.Statecharts.Tests/Alps/JsonGeneratorTests.fs` -- tic-tac-toe golden file comparison, onboarding golden file comparison
-- [ ] T025 [P] Add well-formedness and structural validation tests in JsonGeneratorTests.fs -- valid ALPS root structure, empty document generation, conditional transition (multiple rt) generation
+- [x] T025 [P] Add well-formedness and structural validation tests in JsonGeneratorTests.fs -- valid ALPS root structure, empty document generation, conditional transition (multiple rt) generation
 - [ ] T026 Create `test/Frank.Statecharts.Tests/Alps/RoundTripTests.fs` -- parse ALPS JSON -> generate -> re-parse, compare ASTs for tic-tac-toe and onboarding
 - [ ] T027 [P] Add cross-format roundtrip test in RoundTripTests.fs -- parse ALPS XML -> generate ALPS JSON -> re-parse JSON, verify equivalence
 
