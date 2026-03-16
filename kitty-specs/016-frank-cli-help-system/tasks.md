@@ -58,7 +58,7 @@
 - [x] T008 [P] Add hardcoded HelpTopic records for "workflows" and "concepts" topics in HelpContent.fs
 - [x] T009 Add content lookup functions: `allCommands`, `allTopics`, `findCommand`, `findTopic` in HelpContent.fs
 - [x] T010 Create `src/Frank.Cli.Core/Commands/StatusCommand.fs` with project status inspection logic
-- [ ] T011 Add artifact detection to StatusCommand (check for ontology.owl.xml, shapes.shacl.ttl, manifest.json in obj/frank-cli/)
+- [x] T011 Add artifact detection to StatusCommand (check for ontology.owl.xml, shapes.shacl.ttl, manifest.json in obj/frank-cli/)
 - [ ] T012 Update `src/Frank.Cli.Core/Frank.Cli.Core.fsproj` -- add Compile entries for HelpContent.fs and StatusCommand.fs
 
 ### Implementation Notes
