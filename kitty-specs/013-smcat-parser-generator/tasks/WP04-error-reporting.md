@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP04"
+work_package_id: WP04
+title: Structured Error Reporting
+lane: "doing"
+dependencies: [WP03]
+base_branch: 013-smcat-parser-generator-WP03
+base_commit: e7d26a104f5958375c245c1f7107a55307ddee48
+created_at: '2026-03-16T11:48:44.087968+00:00'
 subtasks:
-  - "T020"
-  - "T021"
-  - "T022"
-  - "T023"
-  - "T024"
-title: "Structured Error Reporting"
-phase: "Phase 2 - Robustness"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP03"]
-requirement_refs: ["FR-010", "FR-011"]
+- T020
+- T021
+- T022
+- T023
+- T024
+phase: Phase 2 - Robustness
+assignee: ''
+agent: ''
+shell_pid: "61124"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:14Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:14Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-010, FR-011]
 ---
 
 # Work Package Prompt: WP04 -- Structured Error Reporting
