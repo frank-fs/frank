@@ -123,12 +123,12 @@
 **Estimated size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T022 Implement generic state name agreement rule (symmetric check between any two formats) in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T023 Implement generic event name agreement rule (symmetric check between any two formats) in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T024 Implement generic transition target agreement rule in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T025 Implement casing mismatch detection in cross-format comparisons (D-010)
-- [ ] T026 Create `CrossFormatRules` module exposing `rules: ValidationRule list` for all pairwise format combinations
-- [ ] T027 Implement rule generation for all 10 pairwise format combinations (5 choose 2)
+- [x] T022 Implement generic state name agreement rule (symmetric check between any two formats) in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T023 Implement generic event name agreement rule (symmetric check between any two formats) in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T024 Implement generic transition target agreement rule in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T025 Implement casing mismatch detection in cross-format comparisons (D-010)
+- [x] T026 Create `CrossFormatRules` module exposing `rules: ValidationRule list` for all pairwise format combinations
+- [x] T027 Implement rule generation for all 10 pairwise format combinations (5 choose 2)
 
 ### Implementation Notes
 - Cross-format rules require exactly 2 formats in `RequiredFormats`.
