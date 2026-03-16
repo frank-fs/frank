@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.Parser
 
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 open Frank.Statecharts.Smcat.LabelParser
 open Frank.Statecharts.Smcat.Lexer
@@ -10,7 +11,7 @@ open Frank.Statecharts.Smcat.Lexer
 type ParserState =
     { Tokens: Token array
       mutable Position: int
-      mutable Elements: SmcatElement list
+      mutable Elements: StatechartElement list
       mutable Errors: ParseFailure list
       mutable Warnings: ParseWarning list
       mutable ErrorLimitReached: bool
@@ -57,8 +58,8 @@ let private addError
     (example: string)
     : unit =
     if not state.ErrorLimitReached then
-        let failure =
-            { Position = pos
+        let failure : ParseFailure =
+            { Position = Some pos
               Description = desc
               Expected = expected
               Found = found
@@ -70,8 +71,8 @@ let private addError
             state.ErrorLimitReached <- true
 
 let private addWarning (state: ParserState) (pos: SourcePosition) (desc: string) (suggestion: string option) : unit =
-    let warning =
-        { Position = pos
+    let warning : ParseWarning =
+        { Position = Some pos
           Description = desc
           Suggestion = suggestion }
 
@@ -242,7 +243,8 @@ let private parseAttributes (state: ParserState) : SmcatAttribute list =
 // T014: Activity parsing
 
 /// Parse state activities (entry/, exit/, ...) after a colon.
-let private parseActivities (state: ParserState) : StateActivity =
+/// Returns StateActivities directly (shared AST type).
+let private parseActivities (state: ParserState) : StateActivities =
     let mutable entry: string option = None
     let mutable exit: string option = None
     let mutable doActivity: string option = None
@@ -321,9 +323,9 @@ let private parseActivities (state: ParserState) : StateActivity =
                 doActivity <- Some(System.String.Join(" ", parts))
         | _ -> cont <- false
 
-    { Entry = entry
-      Exit = exit
-      Do = doActivity }
+    { Entry = entry |> Option.map List.singleton |> Option.defaultValue []
+      Exit = exit |> Option.map List.singleton |> Option.defaultValue []
+      Do = doActivity |> Option.map List.singleton |> Option.defaultValue [] }
 
 /// Read an identifier name, handling Caret and CloseBracketPrefix prefixes for pseudo-states.
 let private readStateName (state: ParserState) : string option =
@@ -363,10 +365,21 @@ let private isTransitionAhead (state: ParserState) : bool =
 
     pos < state.Tokens.Length && state.Tokens[pos].Kind = TransitionArrow
 
+/// Convert SmcatAttribute list to Annotation list (inline from Mapper.toAnnotation).
+/// Attributes with key "type" are not converted to annotations (consumed by inferStateType).
+let private attributesToAnnotations (attributes: SmcatAttribute list) : Annotation list =
+    attributes
+    |> List.choose (fun attr ->
+        match attr.Key.ToLowerInvariant() with
+        | "type" -> None // consumed by inferStateType, not stored as annotation
+        | "color" -> Some(SmcatAnnotation(SmcatColor attr.Value))
+        | "label" -> Some(SmcatAnnotation(SmcatStateLabel attr.Value))
+        | kind -> Some(SmcatAnnotation(SmcatActivity(kind, attr.Value))))
+
 // T014-T016: Main parsing functions (mutually recursive)
 
 /// Parse a complete smcat document at a given nesting depth.
-let rec private parseDocument (state: ParserState) (depth: int) : SmcatDocument =
+let rec private parseDocument (state: ParserState) (depth: int) : StatechartDocument =
     if depth > 50 then
         addWarning
             state
@@ -374,7 +387,7 @@ let rec private parseDocument (state: ParserState) (depth: int) : SmcatDocument 
             (sprintf "Nesting depth exceeds 50 levels (depth %d)" depth)
             (Some "Consider flattening the state hierarchy")
 
-    let elements = ResizeArray<SmcatElement>()
+    let elements = ResizeArray<StatechartElement>()
 
     let rec loop () =
         if state.ErrorLimitReached then
@@ -403,11 +416,16 @@ let rec private parseDocument (state: ParserState) (depth: int) : SmcatDocument 
                 loop ()
 
     loop ()
-    { Elements = elements |> Seq.toList }
+
+    { Title = None
+      InitialStateId = None
+      Elements = elements |> Seq.toList
+      DataEntries = []
+      Annotations = [] }
 
 /// Parse a single element (state declaration or transition).
 /// T020: Uses skipToNextStatement for error recovery to ensure forward progress.
-and private parseElement (state: ParserState) (depth: int) (elements: ResizeArray<SmcatElement>) : unit =
+and private parseElement (state: ParserState) (depth: int) (elements: ResizeArray<StatechartElement>) : unit =
     let tok = peek state
     let posBeforeParse = state.Position
 
@@ -461,7 +479,7 @@ and private parseTransition
     (state: ParserState)
     (sourceName: string)
     (startPos: SourcePosition)
-    (elements: ResizeArray<SmcatElement>)
+    (elements: ResizeArray<StatechartElement>)
     (depth: int)
     : unit =
     // Skip any newlines between source and arrow
@@ -506,14 +524,17 @@ and private parseTransition
                 // Skip to terminator and emit the transition without a label
                 skipToNextStatement state
 
-                let transition =
+                let edge : TransitionEdge =
                     { Source = sourceName
-                      Target = targetName
-                      Label = None
-                      Attributes = []
-                      Position = startPos }
+                      Target = Some targetName
+                      Event = None
+                      Guard = None
+                      Action = None
+                      Parameters = []
+                      Position = Some startPos
+                      Annotations = [] }
 
-                elements.Add(TransitionElement transition)
+                elements.Add(TransitionElement edge)
             | _ ->
                 // Check for label (colon)
                 let label =
@@ -601,14 +622,25 @@ and private parseTransition
                         parseAttributes state
                     | _ -> []
 
-                let transition =
-                    { Source = sourceName
-                      Target = targetName
-                      Label = label
-                      Attributes = attributes
-                      Position = startPos }
+                // Split label into event/guard/action components
+                let (ev, gd, ac) =
+                    match label with
+                    | Some l -> (l.Event, l.Guard, l.Action)
+                    | None -> (None, None, None)
 
-                elements.Add(TransitionElement transition)
+                let annotations = attributesToAnnotations attributes
+
+                let edge : TransitionEdge =
+                    { Source = sourceName
+                      Target = Some targetName
+                      Event = ev
+                      Guard = gd
+                      Action = ac
+                      Parameters = []
+                      Position = Some startPos
+                      Annotations = annotations }
+
+                elements.Add(TransitionElement edge)
 
                 consumeTerminator state
         | None ->
@@ -656,7 +688,7 @@ and private tryHandleInvalidArrow
     (state: ParserState)
     (name: string)
     (startPos: SourcePosition)
-    (elements: ResizeArray<SmcatElement>)
+    (elements: ResizeArray<StatechartElement>)
     : bool =
     if (peek state).Kind = Equals then
         let eqPos = (peek state).Position
@@ -681,14 +713,17 @@ and private tryHandleInvalidArrow
             // Try to parse the rest as a transition (target + optional label)
             match readStateName state with
             | Some targetName ->
-                let transition =
+                let edge : TransitionEdge =
                     { Source = name
-                      Target = targetName
-                      Label = None
-                      Attributes = []
-                      Position = startPos }
+                      Target = Some targetName
+                      Event = None
+                      Guard = None
+                      Action = None
+                      Parameters = []
+                      Position = Some startPos
+                      Annotations = [] }
 
-                elements.Add(TransitionElement transition)
+                elements.Add(TransitionElement edge)
                 consumeTerminator state
             | None ->
                 skipToNextStatement state
@@ -706,7 +741,7 @@ and private parseStateDeclaration
     (state: ParserState)
     (name: string)
     (startPos: SourcePosition)
-    (elements: ResizeArray<SmcatElement>)
+    (elements: ResizeArray<StatechartElement>)
     (depth: int)
     : unit =
     // T021: Check for invalid arrow syntax before normal state declaration parsing
@@ -750,7 +785,7 @@ and private parseStateDeclaration
         |> Option.map (fun a -> a.Value)
 
     // Check for composite children
-    let children =
+    let (childStateNodes, childOtherElements) =
         match (peek state).Kind with
         | LeftBrace ->
             advance state |> ignore
@@ -769,8 +804,23 @@ and private parseStateDeclaration
                     (tokenDescription tok)
                     (sprintf "%s { ... };" name)
 
-            Some childDoc
-        | _ -> None
+            // Extract child state nodes and other elements (transitions)
+            let childStates =
+                childDoc.Elements
+                |> List.choose (fun el ->
+                    match el with
+                    | StateDecl node -> Some node
+                    | _ -> None)
+
+            let otherElements =
+                childDoc.Elements
+                |> List.filter (fun el ->
+                    match el with
+                    | StateDecl _ -> false
+                    | _ -> true)
+
+            (childStates, otherElements)
+        | _ -> ([], [])
 
     let stateType = inferStateType name attributes
 
@@ -806,22 +856,29 @@ and private parseStateDeclaration
     else
         state.DeclaredStates <- state.DeclaredStates.Add(name)
 
-    let smcatState =
-        { Name = name
-          Label = label
-          StateType = stateType
-          Activities = activities
-          Attributes = attributes
-          Children = children
-          Position = startPos }
+    // Convert attributes to annotations (excluding "type" which is consumed by inferStateType)
+    let annotations = attributesToAnnotations attributes
 
-    elements.Add(StateDeclaration smcatState)
+    let stateNode : StateNode =
+        { Identifier = name
+          Label = label
+          Kind = stateType
+          Children = childStateNodes
+          Activities = activities
+          Position = Some startPos
+          Annotations = annotations }
+
+    elements.Add(StateDecl stateNode)
+
+    // Add child transitions (and other non-state elements) to the parent elements list
+    for el in childOtherElements do
+        elements.Add(el)
 
     consumeTerminator state
 
 // T017: Public API
 
-/// Parse a token list into an SmcatDocument.
+/// Parse a token list into a StatechartDocument.
 let parse (tokens: Token list) (maxErrors: int) : ParseResult =
     let state = createState tokens maxErrors
     let doc = parseDocument state 0
