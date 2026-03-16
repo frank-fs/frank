@@ -133,7 +133,7 @@
 **Estimated Prompt Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T021 Implement generateAlpsJson function in `src/Frank.Statecharts/Alps/JsonGenerator.fs` -- Utf8JsonWriter setup, root `alps` object, `version`, `doc` element
+- [x] T021 Implement generateAlpsJson function in `src/Frank.Statecharts/Alps/JsonGenerator.fs` -- Utf8JsonWriter setup, root `alps` object, `version`, `doc` element
 - [ ] T022 Implement descriptor generation in JsonGenerator.fs -- write semantic descriptors with nested children, transition descriptors with `type`, `rt`, `href`, `ext` arrays, `link` arrays, `doc` elements
 - [ ] T023 Add `Alps/JsonGenerator.fs` to `Frank.Statecharts.fsproj` compile order (after Alps/XmlParser.fs, before Alps/Mapper.fs)
 - [ ] T024 Create `test/Frank.Statecharts.Tests/Alps/JsonGeneratorTests.fs` -- tic-tac-toe golden file comparison, onboarding golden file comparison
