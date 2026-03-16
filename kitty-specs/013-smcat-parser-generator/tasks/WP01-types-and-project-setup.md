@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Types & Project Setup
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: b6ebc1db2fa12d44f6003965cae9fe3f8c3b2c18
@@ -344,3 +344,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T04:02:21Z – claude-opus – shell_pid=97851 – lane=doing – Assigned agent via workflow command
+- 2026-03-16T04:15:11Z – claude-opus – shell_pid=97851 – lane=for_review – Moved to for_review
