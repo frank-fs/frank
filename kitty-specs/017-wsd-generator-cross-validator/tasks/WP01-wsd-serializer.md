@@ -15,7 +15,7 @@ subtasks:
 - T006
 phase: Phase 1a - Serializer
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "98343"
 review_status: ''
 reviewed_by: ''
@@ -300,3 +300,4 @@ let quoteName (name: string) : string =
 ## Activity Log
 
 - 2026-03-15T23:59:06Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T04:02:32Z – claude-opus – shell_pid=98343 – lane=doing – Assigned agent via workflow command
