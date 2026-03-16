@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: SCXML Parser -- Data Model, History, Invoke, Errors, and Overloads
-lane: "done"
+lane: "doing"
 dependencies: [WP02]
 base_branch: 018-scxml-parser-generator-WP02
 base_commit: a586f2fc55d542f912d187f67b5779360c6b8b48
@@ -15,8 +15,8 @@ phase: Phase 2 - Implementation
 assignee: ''
 agent: "claude-opus"
 shell_pid: "15369"
-review_status: "approved"
-reviewed_by: "Ryan Riley"
+review_status: ''
+reviewed_by: ''
 history:
 - timestamp: '2026-03-16T01:17:00Z'
   lane: planned
@@ -341,4 +341,3 @@ Verify that:
 
 - 2026-03-16T01:17:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T04:31:57Z – claude-opus – shell_pid=15369 – lane=doing – Assigned agent via workflow command
-- 2026-03-16T14:33:09Z – claude-opus – shell_pid=15369 – lane=done – Moved to done

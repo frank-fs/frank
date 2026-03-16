@@ -472,3 +472,4 @@ testList "Alps.RoundTrip cross-format" [
 - 2026-03-16T00:00:00Z - system - lane=planned - Prompt created.
 - 2026-03-16T11:46:31Z – unknown – lane=for_review – Moved to for_review
 - 2026-03-16T11:48:44Z – unknown – lane=done – Review passed: All 322 tests pass. Generator correctly uses Utf8JsonWriter with use bindings, flushes before stream read, omits empty optionals/arrays, handles all 4 descriptor types recursively. Golden file and roundtrip tests compare parsed ASTs (not strings). T027 (cross-format roundtrip) intentionally deferred -- XmlParser from WP03 not on this branch.
+- 2026-03-16T14:33:11Z – unknown – lane=done – Moved to done

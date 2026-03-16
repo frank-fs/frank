@@ -378,3 +378,4 @@ To change a work package's lane, either:
 - 2026-03-16T04:28:05Z – unknown – lane=for_review – Ready for review: smcat lexer with 52 passing tests, all token types covered
 - 2026-03-16T04:28:45Z – claude-opus-4-6 – shell_pid=12561 – lane=doing – Started review via workflow command
 - 2026-03-16T04:31:13Z – claude-opus-4-6 – shell_pid=12561 – lane=done – Moved to done
+- 2026-03-16T14:33:11Z – claude-opus-4-6 – shell_pid=12561 – lane=done – Moved to done

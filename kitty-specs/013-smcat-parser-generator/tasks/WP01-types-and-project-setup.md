@@ -346,3 +346,4 @@ To change a work package's lane, either:
 - 2026-03-16T04:02:21Z – claude-opus – shell_pid=97851 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T04:15:11Z – claude-opus – shell_pid=97851 – lane=for_review – Moved to for_review
 - 2026-03-16T04:18:56Z – claude-opus – shell_pid=97851 – lane=done – Moved to done
+- 2026-03-16T14:33:10Z – claude-opus – shell_pid=97851 – lane=done – Moved to done

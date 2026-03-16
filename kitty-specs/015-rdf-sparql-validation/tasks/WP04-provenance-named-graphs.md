@@ -9,12 +9,12 @@ subtasks:
   - "T023"
 title: "US3 -- Provenance Named Graph Isolation"
 phase: "Phase 2 - P2 User Stories"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs: ["FR-009", "FR-010"]
 history:
@@ -496,3 +496,4 @@ testAsync "US3-Edge: Empty provenance graph returns empty results, not errors" {
 ## Activity Log
 
 - 2026-03-15T23:59:02Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T14:33:11Z – unknown – lane=done – Moved to done

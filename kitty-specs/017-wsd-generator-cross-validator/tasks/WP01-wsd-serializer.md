@@ -304,3 +304,4 @@ let quoteName (name: string) : string =
 - 2026-03-16T04:09:31Z – claude-opus – shell_pid=98343 – lane=for_review – Ready for review: Serializer.fs with needsQuoting, quoteName, serialize + 41 tests (all pass, including roundtrip)
 - 2026-03-16T04:12:54Z – claude-reviewer – shell_pid=1461 – lane=doing – Started review via workflow command
 - 2026-03-16T04:20:33Z – claude-reviewer – shell_pid=1461 – lane=done – Review passed: Serializer implementation is complete and correct. All 41 new tests pass (287 total). Builds across all 3 TFMs. Module is internal, uses Unix line endings, handles all arrow styles, guard annotations, groups, and edge cases. Roundtrip tests confirm parseWsd succeeds on serializer output. Code is clean idiomatic F#.
+- 2026-03-16T14:33:11Z – claude-reviewer – shell_pid=1461 – lane=done – Moved to done

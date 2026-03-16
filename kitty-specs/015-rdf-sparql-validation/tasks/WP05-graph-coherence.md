@@ -9,12 +9,12 @@ subtasks:
   - "T029"
 title: "US4 -- Cross-Resource Graph Coherence"
 phase: "Phase 2 - P2 User Stories"
-lane: "for_review"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 dependencies: ["WP01"]
 requirement_refs: ["FR-008", "FR-011", "FR-012"]
 history:
@@ -459,3 +459,4 @@ testAsync "US4-Edge: Special character URIs are properly encoded in RDF" {
 
 - 2026-03-15T23:59:02Z -- system -- lane=planned -- Prompt created.
 - 2026-03-16T11:54:58Z – unknown – lane=for_review – Ready for review: 52 Expecto tests for validation types and orchestrator. All tests pass (298 total). Includes prerequisite Ast/Types.fs stub, Validation/Types.fs, and Validation/Validator.fs.
+- 2026-03-16T14:33:11Z – unknown – lane=done – Moved to done

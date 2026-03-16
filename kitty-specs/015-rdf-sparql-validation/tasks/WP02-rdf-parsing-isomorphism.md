@@ -375,3 +375,4 @@ testAsync "US1-Edge: Minimal RDF content parses without errors" {
 - 2026-03-16T11:46:50Z – unknown – lane=for_review – Ready for review: All 6 US1 test cases implemented and passing
 - 2026-03-16T11:48:00Z – claude-opus – shell_pid=60814 – lane=doing – Started review via workflow command
 - 2026-03-16T11:50:40Z – claude-opus – shell_pid=60814 – lane=done – Review passed: All 6 US1 test cases present and passing. FR-001/002/003/004/012 covered. GraphDiff used for isomorphism. Proper use bindings throughout. Test naming convention followed. Clean build with 0 warnings.
+- 2026-03-16T14:33:11Z – claude-opus – shell_pid=60814 – lane=done – Moved to done
