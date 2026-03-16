@@ -27,7 +27,7 @@
 **Estimated prompt size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Create `src/Frank.Statecharts/Scxml/Types.fs` with all SCXML-specific parse types (SourcePosition, ScxmlTransitionType, ScxmlHistoryKind, ScxmlStateKind, DataEntry, ScxmlTransition, ScxmlHistory, ScxmlInvoke, ScxmlState, ScxmlDocument, ParseError, ParseWarning, ScxmlParseResult)
+- [x] T001 Create `src/Frank.Statecharts/Scxml/Types.fs` with all SCXML-specific parse types (SourcePosition, ScxmlTransitionType, ScxmlHistoryKind, ScxmlStateKind, DataEntry, ScxmlTransition, ScxmlHistory, ScxmlInvoke, ScxmlState, ScxmlDocument, ParseError, ParseWarning, ScxmlParseResult)
 - [ ] T002 Update `src/Frank.Statecharts/Frank.Statecharts.fsproj` to add `Scxml/Types.fs` compile entry (before Wsd entries)
 
 ### Implementation Notes
