@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP02"
-subtasks:
-  - "T007"
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-title: "WSD Generator"
-phase: "Phase 1b - Generator"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP02
+title: WSD Generator
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-009", "FR-010", "FR-011"]
+base_branch: master
+base_commit: 26152db61a6bfc6f2f54b873ecb7e6522997e677
+created_at: '2026-03-16T04:02:51.698098+00:00'
+subtasks:
+- T007
+- T008
+- T009
+- T010
+- T011
+- T012
+phase: Phase 1b - Generator
+assignee: ''
+agent: ''
+shell_pid: "98705"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-15T23:59:06Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-15T23:59:06Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-010, FR-011]
 ---
 
 # Work Package Prompt: WP02 -- WSD Generator
