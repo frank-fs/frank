@@ -18,8 +18,6 @@ module WebHostBuilderExtensions =
                     >> fun app ->
                         app.UseMiddleware<OptionsDiscoveryMiddleware>() |> ignore
                         app }
-<<<<<<< HEAD
-=======
 
         /// Registers the Link header middleware. Responses to GET/HEAD requests
         /// from endpoints with DiscoveryMediaType metadata will include
@@ -44,4 +42,3 @@ module WebHostBuilderExtensions =
                             .UseMiddleware<LinkHeaderMiddleware>()
                         |> ignore
                         app }
->>>>>>> 019-wp03-link-headers

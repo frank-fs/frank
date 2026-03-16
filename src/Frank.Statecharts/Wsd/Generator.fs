@@ -3,10 +3,6 @@ module internal Frank.Statecharts.Wsd.Generator
 open Frank.Statecharts
 open Frank.Statecharts.Wsd.Types
 
-/// Error cases for WSD generation from StateMachineMetadata.
-type GeneratorError =
-    | UnrecognizedMachineType of typeName: string
-
 /// Options controlling WSD generation behavior.
 type GenerateOptions =
     { ResourceName: string }
@@ -14,99 +10,72 @@ type GenerateOptions =
 /// Synthetic source position for all generated AST nodes (not from parsed text).
 let private syntheticPos : SourcePosition = { Line = 0; Column = 0 }
 
-/// Extract guard names from the boxed StateMachine's Guards field via reflection.
-/// StateMachine<'S,'E,'C> record fields in declaration order:
-///   0: Initial, 1: InitialContext, 2: Transition, 3: Guards, 4: StateMetadata
-let private extractGuardNames (machine: obj) : string list =
-    let fields = FSharp.Reflection.FSharpValue.GetRecordFields(machine)
-    let guardsObj = fields.[3]
-
-    match guardsObj with
-    | :? System.Collections.IEnumerable as guards ->
-        [ for g in guards do
-              let nameField = g.GetType().GetProperty("Name")
-              yield nameField.GetValue(g) :?> string ]
-    | _ -> []
-
 /// Generate a WSD Diagram AST from StateMachineMetadata.
-/// Returns Ok(Diagram) on success or Error(GeneratorError) on failure.
-let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Result<Diagram, GeneratorError> =
-    // Validate the boxed Machine type is StateMachine<_,_,_>
-    let machineType = metadata.Machine.GetType()
+let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Diagram =
+    // Extract state names from StateHandlerMap keys
+    let stateNames = metadata.StateHandlerMap |> Map.toList |> List.map fst
 
-    let isStateMachine =
-        machineType.IsGenericType
-        && machineType.GetGenericTypeDefinition() = typedefof<StateMachine<_, _, _>>
+    // Order states: initial state first, then others alphabetically (FR-004)
+    // InitialStateKey is always included as the first participant, even if absent from the handler map
+    let others =
+        stateNames
+        |> List.filter (fun s -> s <> metadata.InitialStateKey)
+        |> List.sort
 
-    if not isStateMachine then
-        Error(UnrecognizedMachineType machineType.FullName)
-    else
-        // Extract state names from StateHandlerMap keys
-        let stateNames = metadata.StateHandlerMap |> Map.toList |> List.map fst
+    let orderedStates = metadata.InitialStateKey :: others
 
-        // Order states: initial state first, then others alphabetically (FR-004)
-        // InitialStateKey is always included as the first participant, even if absent from the handler map
-        let others =
-            stateNames
-            |> List.filter (fun s -> s <> metadata.InitialStateKey)
-            |> List.sort
+    // Build participant list with Explicit = true (prevents parser implicit-participant warnings)
+    let participants =
+        orderedStates
+        |> List.map (fun name ->
+            { Name = name
+              Alias = None
+              Explicit = true
+              Position = syntheticPos })
 
-        let orderedStates = metadata.InitialStateKey :: others
+    let participantElements = participants |> List.map ParticipantDecl
 
-        // Build participant list with Explicit = true (prevents parser implicit-participant warnings)
-        let participants =
-            orderedStates
-            |> List.map (fun name ->
-                { Name = name
-                  Alias = None
-                  Explicit = true
-                  Position = syntheticPos })
+    // Use precomputed guard names from metadata (FR-007)
+    let guardNames = metadata.GuardNames
 
-        let participantElements = participants |> List.map ParticipantDecl
+    let guardElements =
+        if guardNames.IsEmpty then
+            []
+        else
+            let pairs = guardNames |> List.map (fun name -> (name, "*"))
+            let guard = { Pairs = pairs; Position = syntheticPos }
 
-        // Extract guards via reflection on the boxed Machine (FR-007)
-        let guardNames = extractGuardNames metadata.Machine
+            [ NoteElement
+                  { NotePosition = Over
+                    Target = metadata.InitialStateKey
+                    Content = ""
+                    Guard = Some guard
+                    Position = syntheticPos } ]
 
-        let guardElements =
-            if guardNames.IsEmpty then
-                []
-            else
-                let pairs = guardNames |> List.map (fun name -> (name, "*"))
-                let guard = { Pairs = pairs; Position = syntheticPos }
+    // Build message elements from StateHandlerMap (FR-005)
+    // Each (state, httpMethod) pair becomes a self-message (DD-05: state-capability diagram)
+    let messageElements =
+        orderedStates
+        |> List.collect (fun stateName ->
+            match Map.tryFind stateName metadata.StateHandlerMap with
+            | Some handlers ->
+                handlers
+                |> List.map (fun (httpMethod, _) ->
+                    MessageElement
+                        { Sender = stateName
+                          Receiver = stateName
+                          ArrowStyle = Solid   // DD-03: default arrow style
+                          Direction = Forward   // DD-03: default direction
+                          Label = httpMethod
+                          Parameters = []
+                          Position = syntheticPos })
+            | None -> [])
 
-                [ NoteElement
-                      { NotePosition = Over
-                        Target = metadata.InitialStateKey
-                        Content = ""
-                        Guard = Some guard
-                        Position = syntheticPos } ]
+    // Assemble the final Diagram (FR-009: title from GenerateOptions)
+    let allElements = participantElements @ guardElements @ messageElements
 
-        // Build message elements from StateHandlerMap (FR-005)
-        // Each (state, httpMethod) pair becomes a self-message (DD-05: state-capability diagram)
-        let messageElements =
-            orderedStates
-            |> List.collect (fun stateName ->
-                match Map.tryFind stateName metadata.StateHandlerMap with
-                | Some handlers ->
-                    handlers
-                    |> List.map (fun (httpMethod, _) ->
-                        MessageElement
-                            { Sender = stateName
-                              Receiver = stateName
-                              ArrowStyle = Solid   // DD-03: default arrow style
-                              Direction = Forward   // DD-03: default direction
-                              Label = httpMethod
-                              Parameters = []
-                              Position = syntheticPos })
-                | None -> [])
+    { Title = Some options.ResourceName
+      AutoNumber = false
+      Participants = participants
+      Elements = allElements }
 
-        // Assemble the final Diagram (FR-009: title from GenerateOptions)
-        let allElements = participantElements @ guardElements @ messageElements
-
-        let diagram =
-            { Title = Some options.ResourceName
-              AutoNumber = false
-              Participants = participants
-              Elements = allElements }
-
-        Ok diagram
