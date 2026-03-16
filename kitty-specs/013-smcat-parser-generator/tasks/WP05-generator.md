@@ -1,10 +1,13 @@
 ---
 work_package_id: WP05
 title: Generator
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
 - WP02
+base_branch: 013-smcat-parser-generator-WP05-merge-base
+base_commit: 8129dd5d9159bf6609e884a7f65a3050b2f1c4b6
+created_at: '2026-03-16T04:25:25.875918+00:00'
 subtasks:
 - T025
 - T026
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 2 - Generation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "9648"
 review_status: ''
 reviewed_by: ''
 history:
