@@ -60,12 +60,12 @@
 **Estimated Prompt Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T007 Create `Wsd/Generator.fs` module with `GeneratorError` DU, `GenerateOptions` record, and `generate` function signature
-- [ ] T008 Implement state discovery — extract participant names from `StateHandlerMap` keys, order initial state first
-- [ ] T009 Implement transition discovery — emit `MessageElement` for each (state, httpMethod) pair from `StateHandlerMap` values
-- [ ] T010 Implement guard extraction via reflection — unbox `Machine: obj`, check if generic type is `StateMachine<_,_,_>`, extract `Guards` field, emit `NoteElement` with `[guard: name=*]` syntax
-- [ ] T011 Add `Wsd/Generator.fs` to `Frank.Statecharts.fsproj` compile items after `Wsd/Serializer.fs`
-- [ ] T012 [P] Create `Wsd/GeneratorTests.fs` in test project with unit tests covering happy path (3-state turnstile), single state, empty handlers, guard emission, unrecognized machine type error, and special character state names
+- [x] T007 Create `Wsd/Generator.fs` module with `GeneratorError` DU, `GenerateOptions` record, and `generate` function signature
+- [x] T008 Implement state discovery — extract participant names from `StateHandlerMap` keys, order initial state first
+- [x] T009 Implement transition discovery — emit `MessageElement` for each (state, httpMethod) pair from `StateHandlerMap` values
+- [x] T010 Implement guard extraction via reflection — unbox `Machine: obj`, check if generic type is `StateMachine<_,_,_>`, extract `Guards` field, emit `NoteElement` with `[guard: name=*]` syntax
+- [x] T011 Add `Wsd/Generator.fs` to `Frank.Statecharts.fsproj` compile items after `Wsd/Serializer.fs`
+- [x] T012 [P] Create `Wsd/GeneratorTests.fs` in test project with unit tests covering happy path (3-state turnstile), single state, empty handlers, guard emission, unrecognized machine type error, and special character state names
 
 ### Implementation Notes
 - Generator depends on `Wsd.Types` and `StateMachineMetadata` (from `StatefulResourceBuilder.fs`)
