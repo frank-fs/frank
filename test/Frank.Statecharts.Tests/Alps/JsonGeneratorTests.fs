@@ -337,4 +337,77 @@ let jsonGeneratorStructureTests =
                   parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
 
               let transDesc = stateA.GetProperty("descriptor").[0]
-              Expect.equal (transDesc.GetProperty("rt").GetString()) "#gameState" "rt preserved" ]
+              Expect.equal (transDesc.GetProperty("rt").GetString()) "#gameState" "rt preserved"
+
+          // ---------------------------------------------------------------
+          // Absorbed from MapperTests.EdgeCases (generator-direction)
+          // ---------------------------------------------------------------
+
+          testCase "defaults to unsafe when transition has no AlpsTransitionType annotation"
+          <| fun _ ->
+              let doc =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "doThing"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let json = generateAlpsJson doc
+              use parsed = JsonDocument.Parse(json)
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              Expect.equal (transDesc.GetProperty("type").GetString()) "unsafe" "should default to unsafe"
+
+          testCase "re-adds # prefix to local rt targets"
+          <| fun _ ->
+              let doc =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        StateDecl
+                            { Identifier = "B"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "B"
+                              Event = Some "go"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Safe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let json = generateAlpsJson doc
+              Expect.isTrue (json.Contains("\"#B\"")) "local rt target should have # prefix" ]

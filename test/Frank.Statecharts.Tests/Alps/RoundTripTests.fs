@@ -190,4 +190,141 @@ let roundTripTests =
                     Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
               let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
-              Expect.equal roundTripped original "version-only document roundtrips" ]
+              Expect.equal roundTripped original "version-only document roundtrips"
+
+          // ---------------------------------------------------------------
+          // Absorbed from MapperTests.Roundtrip
+          // ---------------------------------------------------------------
+
+          testCase "roundtrip preserves transition events"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalEvents =
+                  getTransitions original |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              let roundTrippedEvents =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              Expect.equal roundTrippedEvents originalEvents "transition events preserved"
+
+          testCase "roundtrip preserves rt targets"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalTargets =
+                  getTransitions original |> List.choose (fun t -> t.Target) |> Set.ofList
+
+              let roundTrippedTargets =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Target) |> Set.ofList
+
+              Expect.equal roundTrippedTargets originalTargets "rt targets preserved"
+
+          testCase "onboarding roundtrip preserves state ids"
+          <| fun _ ->
+              let original = parseOk onboardingAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalIds =
+                  getStates original |> List.map (fun s -> s.Identifier) |> Set.ofList
+
+              let roundTrippedIds =
+                  getStates roundTripped |> List.map (fun s -> s.Identifier) |> Set.ofList
+
+              Expect.equal roundTrippedIds originalIds "onboarding state identifiers preserved"
+
+          testCase "roundtrip preserves guard labels"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalGuards =
+                  getTransitions original |> List.choose (fun t -> t.Guard) |> Set.ofList
+
+              let roundTrippedGuards =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Guard) |> Set.ofList
+
+              Expect.equal roundTrippedGuards originalGuards "guard labels preserved"
+
+          testCase "roundtrip sets version to 1.0"
+          <| fun _ ->
+              let original =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal (getVersion roundTripped) (Some "1.0") "generator sets version to 1.0"
+
+          testCase "roundtrip preserves title as documentation"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalTitle = original.Title
+              let roundTrippedTitle = roundTripped.Title
+              Expect.equal roundTrippedTitle originalTitle "title preserved"
+
+              let originalDocAnnotation = getDocumentation original
+              let roundTrippedDocAnnotation = getDocumentation roundTripped
+              Expect.equal roundTrippedDocAnnotation originalDocAnnotation "documentation annotation preserved" ]
+
+// ---------------------------------------------------------------------------
+// SC-008: Cross-format validator compatibility test
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let crossFormatCompatibilityTests =
+    testList
+        "Alps.CrossFormatValidatorCompatibility"
+        [ testCase "ALPS parser output is accepted by cross-format validator"
+          <| fun _ ->
+              let result = parseAlpsJson ticTacToeAlpsJson
+              Expect.isEmpty result.Errors "parse failed"
+
+              let artifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Alps
+                    Document = result.Document }
+
+              // Verify that a self-consistency validation run succeeds without exceptions
+              let report =
+                  Frank.Statecharts.Validation.Validator.validate
+                      Frank.Statecharts.Validation.SelfConsistencyRules.rules
+                      [ artifact ]
+
+              Expect.isGreaterThan report.TotalChecks 0 "self-consistency rules should run against ALPS artifact"
+              Expect.equal report.TotalFailures 0 "ALPS tic-tac-toe should pass self-consistency"
+
+          testCase "ALPS parser output works in cross-format comparison"
+          <| fun _ ->
+              let result = parseAlpsJson ticTacToeAlpsJson
+              Expect.isEmpty result.Errors "parse failed"
+
+              let alpsArtifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Alps
+                    Document = result.Document }
+
+              // Build a matching SCXML-tagged artifact from the same doc
+              let scxmlArtifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Scxml
+                    Document = result.Document }
+
+              let report =
+                  Frank.Statecharts.Validation.Validator.validate
+                      Frank.Statecharts.Validation.CrossFormatRules.rules
+                      [ alpsArtifact; scxmlArtifact ]
+
+              Expect.isGreaterThan report.TotalChecks 0 "cross-format rules should run"
+              Expect.equal report.TotalFailures 0 "identical documents should have zero cross-format failures" ]
