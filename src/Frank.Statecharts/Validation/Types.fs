@@ -50,3 +50,21 @@ type ValidationRule =
     { Name: string
       RequiredFormats: FormatTag Set
       Check: FormatArtifact list -> ValidationCheck list * ValidationFailure list }
+
+/// Pipeline-level error for invalid input (not parse errors).
+type PipelineError =
+    | DuplicateFormat of FormatTag
+    | UnsupportedFormat of FormatTag
+
+/// Per-format parse outcome from the pipeline.
+type FormatParseResult =
+    { Format: FormatTag
+      Errors: ParseFailure list
+      Warnings: ParseWarning list
+      Succeeded: bool }
+
+/// Top-level result from the validation pipeline.
+type PipelineResult =
+    { ParseResults: FormatParseResult list
+      Report: ValidationReport
+      Errors: PipelineError list }
