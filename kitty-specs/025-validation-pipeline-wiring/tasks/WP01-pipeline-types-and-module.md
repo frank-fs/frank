@@ -1,42 +1,45 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
-title: "Pipeline Types & Module Foundation"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Pipeline Types & Module Foundation
+lane: "doing"
 dependencies: []
-requirement_refs:
-  - "FR-001"
-  - "FR-002"
-  - "FR-003"
-  - "FR-004"
-  - "FR-005"
-  - "FR-006"
-  - "FR-007"
-  - "FR-009"
-  - "FR-010"
-  - "FR-011"
-  - "FR-012"
-  - "FR-013"
-  - "FR-014"
+base_branch: master
+base_commit: b73e5455785e394d39d47b986125f459682e8eb3
+created_at: '2026-03-17T22:52:51.732872+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "80000"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:13:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:13:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-001
+- FR-002
+- FR-003
+- FR-004
+- FR-005
+- FR-006
+- FR-007
+- FR-009
+- FR-010
+- FR-011
+- FR-012
+- FR-013
+- FR-014
 ---
 
 # Work Package Prompt: WP01 -- Pipeline Types & Module Foundation
