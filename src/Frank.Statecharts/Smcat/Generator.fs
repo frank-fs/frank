@@ -1,65 +1,37 @@
 module internal Frank.Statecharts.Smcat.Generator
 
-open System.IO
 open Frank.Statecharts
-open Frank.Statecharts.Smcat.Types
-
-/// Determines whether an smcat name requires quoting (contains characters
-/// that are not alphanumeric, underscore, dot, or hyphen).
-let private needsQuoting (name: string) =
-    name
-    |> Seq.exists (fun c -> not (System.Char.IsLetterOrDigit c || c = '_' || c = '.' || c = '-'))
-
-/// Wraps a name in double quotes if it contains special characters,
-/// escaping any embedded double quotes.
-let private quoteName (name: string) =
-    if needsQuoting name then
-        sprintf "\"%s\"" (name.Replace("\"", "\\\""))
-    else
-        name
-
-/// Format a transition label from optional event, guard, and action components.
-/// Returns None if all components are absent (no label needed).
-/// Format: "event [guard] / action" with absent components omitted.
-let internal formatLabel
-    (eventName: string option)
-    (guardName: string option)
-    (actionName: string option)
-    : string option =
-    match eventName, guardName, actionName with
-    | None, None, None -> None
-    | Some e, None, None -> Some e
-    | Some e, Some g, None -> Some(sprintf "%s [%s]" e g)
-    | Some e, None, Some a -> Some(sprintf "%s / %s" e a)
-    | Some e, Some g, Some a -> Some(sprintf "%s [%s] / %s" e g a)
-    | None, Some g, None -> Some(sprintf "[%s]" g)
-    | None, Some g, Some a -> Some(sprintf "[%s] / %s" g a)
-    | None, None, Some a -> Some(sprintf "/ %s" a)
-
-/// Format a single transition line with source, target, and optional label.
-let internal formatTransition (source: string) (target: string) (label: string option) : string =
-    match label with
-    | Some l -> sprintf "%s => %s: %s;" (quoteName source) (quoteName target) l
-    | None -> sprintf "%s => %s;" (quoteName source) (quoteName target)
+open Frank.Statecharts.Ast
 
 /// Options controlling smcat generation behavior.
 type GenerateOptions =
     { ResourceName: string }
 
-/// Generate valid smcat text from StateMachineMetadata.
-/// Uses precomputed GuardNames and StateMetadataMap — no reflection needed.
-///
-/// Output format:
-/// - One statement per line, semicolon terminators.
-/// - Initial transition emitted first: "initial => <state>;"
-/// - Self-messages for each (state, HTTP method) handler pair.
-/// - Final state transitions emitted last: "<state> => final;"
-let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : string =
-    let sb = System.Text.StringBuilder()
+/// Error cases from the smcat generator.
+type GeneratorError =
+    | UnrecognizedMachineType of typeName: string
 
-    // Order states: initial first, others alphabetically
+/// Synthetic source position for all generated AST nodes (not from parsed text).
+let private syntheticPos : SourcePosition = { Line = 0; Column = 0 }
+
+/// Check whether the boxed Machine is a StateMachine<_,_,_> record.
+let private isStateMachineType (machine: obj) : bool =
+    let t = machine.GetType()
+    t.IsGenericType && t.GetGenericTypeDefinition().Name.StartsWith("StateMachine`")
+
+/// Generate a StatechartDocument AST from StateMachineMetadata.
+/// Follows the Wsd.Generator pattern but includes smcat-specific
+/// initial-to-first-state and state-to-final transition elements.
+let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Result<StatechartDocument, GeneratorError> =
+    // Validate boxed Machine type
+    if not (isStateMachineType metadata.Machine) then
+        Error(UnrecognizedMachineType(metadata.Machine.GetType().FullName))
+    else
+
+    // Extract state names from StateHandlerMap keys
     let stateNames = metadata.StateHandlerMap |> Map.toList |> List.map fst
 
+    // Order states: initial state first, then others alphabetically
     let others =
         stateNames
         |> List.filter (fun s -> s <> metadata.InitialStateKey)
@@ -67,30 +39,72 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : strin
 
     let orderedStates = metadata.InitialStateKey :: others
 
-    // 1. Emit initial transition
-    sb.Append(sprintf "initial => %s;" (quoteName metadata.InitialStateKey)) |> ignore
+    // State declarations
+    let stateElements =
+        orderedStates
+        |> List.map (fun name ->
+            StateDecl
+                { Identifier = name
+                  Label = None
+                  Kind = Regular
+                  Children = []
+                  Activities = None
+                  Position = Some syntheticPos
+                  Annotations = [] })
 
-    // 2. Emit self-messages for each (state, httpMethod) handler pair
-    for stateName in orderedStates do
-        match Map.tryFind stateName metadata.StateHandlerMap with
-        | Some handlers ->
-            for (httpMethod, _) in handlers do
-                sb.Append('\n') |> ignore
-                let label = formatLabel (Some httpMethod) None None
-                sb.Append(formatTransition stateName stateName label) |> ignore
-        | None -> ()
+    // Initial transition: initial => <firstState>
+    let initialTransition =
+        [ TransitionElement
+              { Source = "initial"
+                Target = Some metadata.InitialStateKey
+                Event = None
+                Guard = None
+                Action = None
+                Parameters = []
+                Position = Some syntheticPos
+                Annotations = [] } ]
 
-    // 3. Emit final state transitions last (using precomputed StateMetadataMap)
-    for stateName in orderedStates do
-        match Map.tryFind stateName metadata.StateMetadataMap with
-        | Some info when info.IsFinal ->
-            sb.Append('\n') |> ignore
-            sb.Append(formatTransition stateName "final" None) |> ignore
-        | _ -> ()
+    // Self-transitions for each (state, httpMethod) handler pair
+    let transitionElements =
+        orderedStates
+        |> List.collect (fun stateName ->
+            match Map.tryFind stateName metadata.StateHandlerMap with
+            | Some handlers ->
+                handlers
+                |> List.map (fun (httpMethod, _) ->
+                    TransitionElement
+                        { Source = stateName
+                          Target = Some stateName
+                          Event = Some httpMethod
+                          Guard = None
+                          Action = None
+                          Parameters = []
+                          Position = Some syntheticPos
+                          Annotations = [] })
+            | None -> [])
 
-    sb.ToString()
+    // Final state transitions: <state> => final
+    let finalTransitions =
+        orderedStates
+        |> List.collect (fun stateName ->
+            match Map.tryFind stateName metadata.StateMetadataMap with
+            | Some info when info.IsFinal ->
+                [ TransitionElement
+                      { Source = stateName
+                        Target = Some "final"
+                        Event = None
+                        Guard = None
+                        Action = None
+                        Parameters = []
+                        Position = Some syntheticPos
+                        Annotations = [] } ]
+            | _ -> [])
 
-/// Generate valid smcat text and write directly to a TextWriter.
-/// The caller owns the writer lifecycle.
-let generateTo (writer: TextWriter) (options: GenerateOptions) (metadata: StateMachineMetadata) : unit =
-    writer.Write(generate options metadata)
+    let allElements = stateElements @ initialTransition @ transitionElements @ finalTransitions
+
+    Ok
+        { Title = Some options.ResourceName
+          InitialStateId = Some metadata.InitialStateKey
+          Elements = allElements
+          DataEntries = []
+          Annotations = [] }
