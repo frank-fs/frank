@@ -1,8 +1,17 @@
 module Frank.Statecharts.Tests.Scxml.ErrorTests
 
 open Expecto
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Scxml.Parser
+
+/// Extract StateDecl entries from a StatechartDocument's Elements.
+let private stateDecls (doc: StatechartDocument) =
+    doc.Elements |> List.choose (function StateDecl s -> Some s | _ -> None)
+
+/// Extract history child nodes from a StateNode.
+let private historyChildren (state: StateNode) =
+    state.Children
+    |> List.filter (fun c -> match c.Kind with ShallowHistory | DeepHistory -> true | _ -> false)
 
 [<Tests>]
 let errorTests =
@@ -17,7 +26,8 @@ let errorTests =
                   """<scxml xmlns="http://www.w3.org/2005/07/scxml"><state id="s1">"""
 
               let result = parseString xml
-              Expect.isNone result.Document "document should be None"
+              // Document is always present now (best-effort), check for errors
+              Expect.isEmpty (stateDecls result.Document) "document should have no states"
               Expect.isNonEmpty result.Errors "should have errors"
               let err = result.Errors.[0]
               Expect.isTrue (err.Description.Length > 0) "error should have description"
@@ -29,13 +39,13 @@ let errorTests =
                   """<scxml xmlns="http://www.w3.org/2005/07/scxml">&invalid;</scxml>"""
 
               let result = parseString xml
-              Expect.isNone result.Document "document should be None"
+              Expect.isEmpty (stateDecls result.Document) "document should have no states"
               Expect.isNonEmpty result.Errors "should have errors"
 
           testCase "malformed XML: empty string"
           <| fun _ ->
               let result = parseString ""
-              Expect.isNone result.Document "document should be None"
+              Expect.isEmpty (stateDecls result.Document) "document should have no states"
               Expect.isNonEmpty result.Errors "should have errors"
 
           testCase "malformed XML: missing closing tag"
@@ -44,7 +54,7 @@ let errorTests =
                   """<scxml xmlns="http://www.w3.org/2005/07/scxml"><state id="s1"/>"""
 
               let result = parseString xml
-              Expect.isNone result.Document "document should be None"
+              Expect.isEmpty (stateDecls result.Document) "document should have no states"
               Expect.isNonEmpty result.Errors "should have errors"
               let err = result.Errors.[0]
               Expect.isSome err.Position "error should have position"
@@ -65,7 +75,7 @@ let errorTests =
           <| fun _ ->
               let xml = """<notscxml/>"""
               let result = parseString xml
-              Expect.isNone result.Document "document should be None"
+              Expect.isEmpty (stateDecls result.Document) "document should have no states"
               Expect.isNonEmpty result.Errors "should have errors"
               Expect.isTrue
                   (result.Errors.[0].Description.Contains("scxml"))
@@ -83,7 +93,7 @@ let errorTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should still parse successfully"
+              Expect.isNonEmpty (stateDecls result.Document) "should still parse successfully"
               Expect.isNonEmpty result.Warnings "should have warnings"
               Expect.isTrue
                   (result.Warnings.[0].Description.Contains("unknown"))
@@ -98,7 +108,7 @@ let errorTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should still parse successfully"
+              Expect.isNonEmpty (stateDecls result.Document) "should still parse successfully"
               Expect.isNonEmpty result.Warnings "should have warnings"
               Expect.isTrue
                   (result.Warnings.[0].Description.Contains("custom"))
@@ -115,7 +125,7 @@ let errorTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse successfully"
+              Expect.isNonEmpty (stateDecls result.Document) "should parse successfully"
               Expect.isEmpty result.Warnings "no warnings for out-of-scope elements"
 
           testCase "invalid history type value produces warning"
@@ -128,14 +138,14 @@ let errorTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should still parse"
+              Expect.isNonEmpty (stateDecls result.Document) "should still parse"
               Expect.isNonEmpty result.Warnings "should have warnings"
               Expect.isTrue
                   (result.Warnings.[0].Description.Contains("invalid"))
                   "warning should mention invalid type"
-              // Should default to Shallow
-              let h = result.Document.Value.States.[0].HistoryNodes.[0]
-              Expect.equal h.Kind Shallow "defaults to Shallow"
+              // Should default to ShallowHistory
+              let h = (historyChildren (stateDecls result.Document).[0]).[0]
+              Expect.equal h.Kind ShallowHistory "defaults to ShallowHistory"
 
           testCase "valid document has no errors and no warnings"
           <| fun _ ->
@@ -148,6 +158,6 @@ let errorTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse"
+              Expect.isNonEmpty (stateDecls result.Document) "should parse"
               Expect.isEmpty result.Errors "no errors"
               Expect.isEmpty result.Warnings "no warnings" ]
