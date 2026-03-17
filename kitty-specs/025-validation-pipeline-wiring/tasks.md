@@ -63,15 +63,15 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T008 Create `test/Frank.Statecharts.Tests/Validation/PipelineTests.fs` with test module and helpers
-- [ ] T009 Test: empty input returns valid PipelineResult with empty report (FR-011)
-- [ ] T010 Test: duplicate format tags return `DuplicateFormat` pipeline error (FR-010)
-- [ ] T011 Test: unsupported format tag (XState) returns `UnsupportedFormat` error (FR-012)
-- [ ] T012 Test: single format runs self-consistency, cross-format rules skipped (User Story 3)
-- [ ] T013 Test: two consistent formats produce zero validation failures (User Story 1, scenario 1)
-- [ ] T014 Test: parse errors included in `FormatParseResult.Errors` (FR-008, User Story 2)
-- [ ] T015 Test: `validateSourcesWithRules` includes custom rules (FR-014)
-- [ ] T016 Add `Compile Include` for `Validation/PipelineTests.fs` in `Frank.Statecharts.Tests.fsproj`
+- [x] T008 Create `test/Frank.Statecharts.Tests/Validation/PipelineTests.fs` with test module and helpers
+- [x] T009 Test: empty input returns valid PipelineResult with empty report (FR-011)
+- [x] T010 Test: duplicate format tags return `DuplicateFormat` pipeline error (FR-010)
+- [x] T011 Test: unsupported format tag (XState) returns `UnsupportedFormat` error (FR-012)
+- [x] T012 Test: single format runs self-consistency, cross-format rules skipped (User Story 3)
+- [x] T013 Test: two consistent formats produce zero validation failures (User Story 1, scenario 1)
+- [x] T014 Test: parse errors included in `FormatParseResult.Errors` (FR-008, User Story 2)
+- [x] T015 Test: `validateSourcesWithRules` includes custom rules (FR-014)
+- [x] T016 Add `Compile Include` for `Validation/PipelineTests.fs` in `Frank.Statecharts.Tests.fsproj`
 
 ### Implementation Notes
 - Tests use Expecto (`testList`, `test`, `Expect.*`) matching the project's test style.
