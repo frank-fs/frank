@@ -289,7 +289,7 @@ let annotationCoexistenceTests =
                     Position = None
                     Annotations =
                         [ WsdAnnotation(WsdNotePosition Over)
-                          ScxmlAnnotation(ScxmlHistory("h1", Deep)) ] }
+                          ScxmlAnnotation(ScxmlHistory("h1", Deep, None)) ] }
 
               let wsdAnns =
                   state.Annotations

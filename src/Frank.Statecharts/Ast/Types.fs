@@ -83,11 +83,15 @@ type AlpsMeta =
 // -- SCXML annotation stub --
 
 /// SCXML-specific annotation metadata.
-/// To be fleshed out by SCXML parser spec.
 type ScxmlMeta =
-    | ScxmlInvoke of invokeType: string * src: string option
-    | ScxmlHistory of id: string * historyKind: HistoryKind
+    | ScxmlInvoke of invokeType: string * src: string option * id: string option
+    | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option
     | ScxmlNamespace of string
+    | ScxmlTransitionType of isInternal: bool
+    | ScxmlMultiTarget of targets: string list
+    | ScxmlDatamodelType of datamodel: string
+    | ScxmlBinding of binding: string
+    | ScxmlInitial of initialId: string
 
 // -- smcat annotation stub --
 

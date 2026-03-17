@@ -1,38 +1,28 @@
 module Frank.Statecharts.Tests.Scxml.RoundTripTests
 
 open Expecto
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Scxml.Parser
 open Frank.Statecharts.Scxml.Generator
 
 // Strip Position fields for structural comparison (positions differ between
 // original parse and re-parse of generated output).
-let rec private stripPositions (state: ScxmlState) : ScxmlState =
+let rec private stripStatePositions (state: StateNode) : StateNode =
     { state with
         Position = None
-        Transitions =
-            state.Transitions
-            |> List.map (fun t -> { t with Position = None })
-        Children = state.Children |> List.map stripPositions
-        DataEntries =
-            state.DataEntries
-            |> List.map (fun d -> { d with Position = None })
-        HistoryNodes =
-            state.HistoryNodes
-            |> List.map (fun h ->
-                { h with
-                    Position = None
-                    DefaultTransition =
-                        h.DefaultTransition
-                        |> Option.map (fun t -> { t with Position = None }) })
-        InvokeNodes =
-            state.InvokeNodes
-            |> List.map (fun i -> { i with Position = None }) }
+        Children = state.Children |> List.map stripStatePositions }
 
-let private stripDocPositions (doc: ScxmlDocument) : ScxmlDocument =
+let private stripElementPositions (el: StatechartElement) : StatechartElement =
+    match el with
+    | StateDecl s -> StateDecl(stripStatePositions s)
+    | TransitionElement t -> TransitionElement { t with Position = None }
+    | NoteElement n -> NoteElement { n with Position = None }
+    | GroupElement g -> GroupElement { g with Position = None }
+    | DirectiveElement d -> DirectiveElement d
+
+let private stripDocPositions (doc: StatechartDocument) : StatechartDocument =
     { doc with
-        Position = None
-        States = doc.States |> List.map stripPositions
+        Elements = doc.Elements |> List.map stripElementPositions
         DataEntries =
             doc.DataEntries
             |> List.map (fun d -> { d with Position = None }) }
@@ -62,11 +52,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              Expect.isSome result2.Document "re-parsed successfully"
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "ASTs should be structurally equal"
 
           testCase "US5-S2: roundtrip minimal document"
@@ -77,10 +66,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "minimal doc roundtrips"
 
           testCase "US5-S3: roundtrip parallel, history, invoke"
@@ -98,10 +87,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "parallel/history/invoke roundtrip"
 
           testCase "roundtrip compound states with initial"
@@ -117,10 +106,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "compound state roundtrip"
 
           testCase "roundtrip internal transition"
@@ -133,10 +122,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "internal transition roundtrip"
 
           testCase "roundtrip state-scoped datamodel"
@@ -151,10 +140,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "state-scoped datamodel roundtrip"
 
           testCase "roundtrip history with default transition"
@@ -170,10 +159,10 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "history with default transition roundtrip"
 
           testCase "roundtrip traffic light state machine"
@@ -219,9 +208,8 @@ let roundTripTests =
 </scxml>"""
 
               let result1 = parseString xml
-              let generated = generate result1.Document.Value
+              let generated = generate result1.Document
               let result2 = parseString generated
-              Expect.isSome result2.Document "complex doc re-parsed"
-              let doc1 = stripDocPositions result1.Document.Value
-              let doc2 = stripDocPositions result2.Document.Value
+              let doc1 = stripDocPositions result1.Document
+              let doc2 = stripDocPositions result2.Document
               Expect.equal doc1 doc2 "complex traffic light roundtrip" ]

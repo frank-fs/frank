@@ -2,12 +2,13 @@ module internal Frank.Statecharts.Scxml.Parser
 
 open System.Xml
 open System.Xml.Linq
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 
-// T003: SCXML namespace constant
+// SCXML namespace constant
 let private scxmlNs = XNamespace.Get("http://www.w3.org/2005/07/scxml")
 
-// T003: Extract source position from any XObject via IXmlLineInfo
+// Extract source position from any XObject via IXmlLineInfo.
+// Returns Ast.SourcePosition directly to avoid conversion overhead.
 let private extractPosition (obj: XObject) : SourcePosition option =
     let lineInfo = obj :> IXmlLineInfo
 
@@ -16,24 +17,24 @@ let private extractPosition (obj: XObject) : SourcePosition option =
     else
         None
 
-// T003: Get attribute value as string option
+// Get attribute value as string option
 let private attrValue (name: string) (el: XElement) : string option =
     match el.Attribute(XName.Get name) with
     | null -> None
     | attr -> Some attr.Value
 
-// T003: Check if an element matches a local name (supports both namespaced and no-namespace docs)
+// Check if an element matches a local name (supports both namespaced and no-namespace docs)
 let private isElement (localName: string) (el: XElement) : bool =
     el.Name.LocalName = localName
     && (el.Name.Namespace = scxmlNs || el.Name.Namespace = XNamespace.None)
 
-// T003: Check if an element is a state-like element (state, parallel, or final)
+// Check if an element is a state-like element (state, parallel, or final)
 let private isStateElement (el: XElement) : bool =
     let n = el.Name.LocalName
     (n = "state" || n = "parallel" || n = "final")
     && (el.Name.Namespace = scxmlNs || el.Name.Namespace = XNamespace.None)
 
-// T010: Out-of-scope but known elements (silently skipped, no warning per parser-api.md section 9)
+// Out-of-scope but known elements (silently skipped, no warning per parser-api.md section 9)
 let private outOfScopeElements =
     set
         [ "onentry"
@@ -50,7 +51,7 @@ let private outOfScopeElements =
           "donedata"
           "finalize" ]
 
-// T010: Elements that are recognized within a state context (no warning)
+// Elements that are recognized within a state context (no warning)
 let private knownStateChildElements =
     set
         [ "state"
@@ -62,8 +63,8 @@ let private knownStateChildElements =
           "invoke"
           "initial" ]
 
-// T006: Parse a <transition> element into ScxmlTransition
-let private parseTransition (el: XElement) : ScxmlTransition =
+// Parse a <transition> element into TransitionEdge
+let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
     let targets =
         match attrValue "target" el with
         | Some t ->
@@ -71,18 +72,27 @@ let private parseTransition (el: XElement) : ScxmlTransition =
             |> Array.toList
         | None -> []
 
-    let transType =
+    let isInternal =
         match attrValue "type" el with
-        | Some "internal" -> Internal
-        | _ -> External // Default per W3C spec
+        | Some "internal" -> true
+        | _ -> false
 
-    { Event = attrValue "event" el
+    let annotations =
+        [ if isInternal then
+              yield ScxmlAnnotation(ScxmlTransitionType(true))
+          if targets.Length >= 2 then
+              yield ScxmlAnnotation(ScxmlMultiTarget(targets)) ]
+
+    { Source = sourceId
+      Target = targets |> List.tryHead
+      Event = attrValue "event" el
       Guard = attrValue "cond" el
-      Targets = targets
-      TransitionType = transType
-      Position = extractPosition el }
+      Action = None
+      Parameters = []
+      Position = extractPosition el
+      Annotations = annotations }
 
-// T007: Parse <datamodel>/<data> elements from a parent element
+// Parse <datamodel>/<data> elements from a parent element, producing DataEntry list
 let private parseDataEntries (parent: XElement) : DataEntry list =
     parent.Elements()
     |> Seq.filter (fun el -> el.Name.LocalName = "datamodel")
@@ -103,52 +113,50 @@ let private parseDataEntries (parent: XElement) : DataEntry list =
                 else
                     Some text
 
-        { Id = (attrValue "id" dataEl) |> Option.defaultValue ""
+        { DataEntry.Name = (attrValue "id" dataEl) |> Option.defaultValue ""
           Expression = expr
           Position = extractPosition dataEl })
     |> Seq.toList
 
-// T008: Parse a <history> element into ScxmlHistory
+// Parse a <history> element into StateNode
 let private parseHistory
     (warnings: ResizeArray<ParseWarning>)
     (el: XElement)
-    : ScxmlHistory =
-    let kind =
+    : StateNode =
+    let historyId = (attrValue "id" el) |> Option.defaultValue ""
+
+    let astHistoryKind, stateKind =
         match attrValue "type" el with
-        | Some "deep" -> Deep
-        | Some "shallow" -> Shallow
+        | Some "deep" -> Deep, DeepHistory
+        | Some "shallow" -> Shallow, ShallowHistory
         | Some invalid ->
-            // T010: Invalid history type value -- emit warning, default to Shallow
+            // Invalid history type value -- emit warning, default to Shallow
             warnings.Add(
-                { Description =
+                { ParseWarning.Position = extractPosition el
+                  Description =
                     sprintf
                         "Invalid <history> type value '%s'; defaulting to 'shallow'"
                         invalid
-                  Position = extractPosition el
                   Suggestion = Some "Use 'shallow' or 'deep'" }
             )
 
-            Shallow
-        | None -> Shallow // Default per W3C spec (FR-010)
+            Shallow, ShallowHistory
+        | None -> Shallow, ShallowHistory // Default per W3C spec
 
-    let defaultTransition =
+    let defaultTarget =
         el.Elements()
         |> Seq.tryFind (fun child -> child.Name.LocalName = "transition")
-        |> Option.map parseTransition
+        |> Option.bind (fun t -> attrValue "target" t)
 
-    { Id = (attrValue "id" el) |> Option.defaultValue ""
-      Kind = kind
-      DefaultTransition = defaultTransition
-      Position = extractPosition el }
+    { Identifier = historyId
+      Label = None
+      Kind = stateKind
+      Children = []
+      Activities = None
+      Position = extractPosition el
+      Annotations = [ ScxmlAnnotation(ScxmlHistory(historyId, astHistoryKind, defaultTarget)) ] }
 
-// T008: Parse an <invoke> element into ScxmlInvoke
-let private parseInvoke (el: XElement) : ScxmlInvoke =
-    { InvokeType = attrValue "type" el
-      Src = attrValue "src" el
-      Id = attrValue "id" el
-      Position = extractPosition el }
-
-// T010: Collect warnings for unknown child elements within a state
+// Collect warnings for unknown child elements within a state
 let private collectChildWarnings
     (warnings: ResizeArray<ParseWarning>)
     (el: XElement)
@@ -162,77 +170,89 @@ let private collectChildWarnings
             && not (outOfScopeElements.Contains localName)
         then
             warnings.Add(
-                { Description =
+                { ParseWarning.Position = extractPosition child
+                  Description =
                     sprintf "Unknown element <%s> inside <%s>" localName el.Name.LocalName
-                  Position = extractPosition child
                   Suggestion = None }
             ))
 
-// T005: Parse <state>, <final>, <parallel> elements recursively
+// Parse <state>, <final>, <parallel> elements recursively.
+// Returns (StateNode, TransitionEdge list, DataEntry list).
 let rec private parseState
     (warnings: ResizeArray<ParseWarning>)
     (el: XElement)
-    : ScxmlState =
+    : StateNode * TransitionEdge list * DataEntry list =
     let localName = el.Name.LocalName
+    let stateId = (attrValue "id" el) |> Option.defaultValue ""
 
-    // T005: Determine ScxmlStateKind based on element name and child presence
-    let hasChildStates =
-        el.Elements()
-        |> Seq.exists isStateElement
-
-    let kind =
+    // Determine StateKind based on element name
+    let astKind =
         match localName with
         | "final" -> Final
         | "parallel" -> Parallel
-        | "state" ->
-            if hasChildStates then Compound else Simple
-        | _ -> Simple // Fallback (should not occur for valid SCXML)
+        | "state" -> Regular
+        | _ -> Regular // Fallback (should not occur for valid SCXML)
 
     // Recursively parse child state elements
-    let children =
+    let childResults =
         el.Elements()
         |> Seq.filter isStateElement
         |> Seq.map (parseState warnings)
         |> Seq.toList
 
-    // T006: Parse child <transition> elements
-    let transitions =
+    let childNodes = childResults |> List.map (fun (n, _, _) -> n)
+    let childTransitions = childResults |> List.collect (fun (_, t, _) -> t)
+    let childDataEntries = childResults |> List.collect (fun (_, _, d) -> d)
+
+    // Parse child <transition> elements
+    let ownTransitions =
         el.Elements()
         |> Seq.filter (fun child -> isElement "transition" child)
-        |> Seq.map parseTransition
+        |> Seq.map (parseTransition stateId)
         |> Seq.toList
 
-    // T007: Parse <datamodel>/<data> entries
-    let dataEntries = parseDataEntries el
+    // Parse <datamodel>/<data> entries at state level
+    let stateDataEntries = parseDataEntries el
 
-    // T008: Parse <history> elements
+    // Parse <history> elements
     let historyNodes =
         el.Elements()
         |> Seq.filter (fun child -> child.Name.LocalName = "history")
         |> Seq.map (parseHistory warnings)
         |> Seq.toList
 
-    // T008: Parse <invoke> elements
-    let invokeNodes =
+    // Parse <invoke> elements -> ScxmlAnnotation entries
+    let invokeAnnotations =
         el.Elements()
         |> Seq.filter (fun child -> child.Name.LocalName = "invoke")
-        |> Seq.map parseInvoke
+        |> Seq.map (fun invEl ->
+            let invokeType = attrValue "type" invEl |> Option.defaultValue ""
+            let src = attrValue "src" invEl
+            let invId = attrValue "id" invEl
+            ScxmlAnnotation(ScxmlInvoke(invokeType, src, invId)))
         |> Seq.toList
 
-    // T010: Collect warnings for unknown child elements
+    // Parse state-level initial attribute
+    let initialAnnotation =
+        match attrValue "initial" el with
+        | Some initId -> [ ScxmlAnnotation(ScxmlInitial(initId)) ]
+        | None -> []
+
+    // Collect warnings for unknown child elements
     collectChildWarnings warnings el
 
-    { Id = attrValue "id" el
-      Kind = kind
-      InitialId = attrValue "initial" el
-      Transitions = transitions
-      Children = children
-      DataEntries = dataEntries
-      HistoryNodes = historyNodes
-      InvokeNodes = invokeNodes
-      Position = extractPosition el }
+    let stateNode =
+        { Identifier = stateId
+          Label = None
+          Kind = astKind
+          Children = childNodes @ historyNodes
+          Activities = None
+          Position = extractPosition el
+          Annotations = invokeAnnotations @ initialAnnotation }
 
-// T010: Collect warnings for unknown child elements at root <scxml> level
+    stateNode, ownTransitions @ childTransitions, stateDataEntries @ childDataEntries
+
+// Collect warnings for unknown child elements at root <scxml> level
 let private collectRootWarnings
     (warnings: ResizeArray<ParseWarning>)
     (root: XElement)
@@ -249,70 +269,98 @@ let private collectRootWarnings
             && not (outOfScopeElements.Contains localName)
         then
             warnings.Add(
-                { Description =
+                { ParseWarning.Position = extractPosition child
+                  Description =
                     sprintf "Unknown element <%s> inside <scxml>" localName
-                  Position = extractPosition child
                   Suggestion = None }
             ))
 
-// T004/T011: Parse XDocument into ScxmlParseResult (core logic shared by all entry points)
-let private parseDocument (xdoc: XDocument) : ScxmlParseResult =
+// Parse XDocument into ParseResult (core logic shared by all entry points)
+let private parseDocument (xdoc: XDocument) : ParseResult =
     let root = xdoc.Root
 
-    // T004: Validate root element is <scxml> (namespaced or no-namespace)
+    let emptyDoc =
+        { Title = None
+          InitialStateId = None
+          Elements = []
+          DataEntries = []
+          Annotations = [] }
+
+    // Validate root element is <scxml> (namespaced or no-namespace)
     if root = null then
-        { Document = None
+        { Document = emptyDoc
           Errors =
-            [ { Description = "Empty XML document: no root element found"
-                Position = None } ]
+            [ { Position = None
+                Description = "Empty XML document: no root element found"
+                Expected = ""; Found = ""; CorrectiveExample = "" } ]
           Warnings = [] }
     elif not (isElement "scxml" root) then
-        { Document = None
+        { Document = emptyDoc
           Errors =
-            [ { Description =
+            [ { Position = extractPosition root
+                Description =
                     sprintf
                         "Expected root element <scxml> but found <%s>"
                         root.Name.LocalName
-                Position = extractPosition root } ]
+                Expected = ""; Found = ""; CorrectiveExample = "" } ]
           Warnings = [] }
     else
-        // T010: Accumulate warnings during parsing
+        // Accumulate warnings during parsing
         let warnings = ResizeArray<ParseWarning>()
 
-        // T005: Collect top-level state elements
-        let states =
+        // Collect top-level state elements
+        let stateResults =
             root.Elements()
             |> Seq.filter isStateElement
             |> Seq.map (parseState warnings)
             |> Seq.toList
 
-        // T009: Initial state inference
+        let stateNodes = stateResults |> List.map (fun (n, _, _) -> n)
+        let allTransitions = stateResults |> List.collect (fun (_, t, _) -> t)
+        let stateDataEntries = stateResults |> List.collect (fun (_, _, d) -> d)
+
+        // Initial state inference
         let initialId =
             match attrValue "initial" root with
             | Some id -> Some id
             | None ->
                 // Per W3C section 3.2: use first child state's id
-                states
+                stateNodes
                 |> List.tryHead
-                |> Option.bind (fun s -> s.Id)
+                |> Option.map (fun s -> s.Identifier)
 
-        // T010: Collect warnings for unknown root children
+        // Collect warnings for unknown root children
         collectRootWarnings warnings root
 
-        // T007: Parse document-level <datamodel>/<data> entries
-        let dataEntries = parseDataEntries root
+        // Parse document-level <datamodel>/<data> entries
+        let docDataEntries = parseDataEntries root
 
-        // T004: Build the ScxmlDocument
+        // Combine document-level + state-scoped data entries (flattened)
+        let allDataEntries = docDataEntries @ stateDataEntries
+
+        // Build Elements list (states first, then transitions -- matching Mapper order)
+        let stateElements = stateNodes |> List.map StateDecl
+        let transitionElements = allTransitions |> List.map TransitionElement
+        let elements = stateElements @ transitionElements
+
+        // Build document-level annotations
+        let docAnnotations =
+            [ match attrValue "datamodel" root with
+              | Some dm -> yield ScxmlAnnotation(ScxmlDatamodelType(dm))
+              | None -> ()
+              match attrValue "binding" root with
+              | Some b -> yield ScxmlAnnotation(ScxmlBinding(b))
+              | None -> () ]
+
+        // Build the StatechartDocument
         let doc =
-            { Name = attrValue "name" root
-              InitialId = initialId
-              DatamodelType = attrValue "datamodel" root
-              Binding = attrValue "binding" root
-              States = states
-              DataEntries = dataEntries
-              Position = extractPosition root }
+            { Title = attrValue "name" root
+              InitialStateId = initialId
+              Elements = elements
+              DataEntries = allDataEntries
+              Annotations = docAnnotations }
 
-        { Document = Some doc
+        { Document = doc
           Errors = []
           Warnings = warnings |> Seq.toList }
 
@@ -320,28 +368,31 @@ let private parseDocument (xdoc: XDocument) : ScxmlParseResult =
 // (DtdProcessing.Prohibit, XmlResolver = null). XXE and billion-laughs attacks
 // are mitigated without explicit configuration. See: https://learn.microsoft.com/en-us/dotnet/standard/linq/linq-xml-security
 
-// T010/T011: Shared error-handling wrapper for all parse entry points
-let private tryParseWith (loadFn: unit -> XDocument) : ScxmlParseResult =
+// Shared error-handling wrapper for all parse entry points
+let private tryParseWith (loadFn: unit -> XDocument) : ParseResult =
     try
         loadFn () |> parseDocument
     with :? XmlException as ex ->
-        { Document = None
+        { Document =
+            { Title = None
+              InitialStateId = None
+              Elements = []
+              DataEntries = []
+              Annotations = [] }
           Errors =
-            [ { Description = ex.Message
-                Position =
-                    Some
-                        { Line = ex.LineNumber
-                          Column = ex.LinePosition } } ]
+            [ { Position = Some { Line = ex.LineNumber; Column = ex.LinePosition }
+                Description = ex.Message
+                Expected = ""; Found = ""; CorrectiveExample = "" } ]
           Warnings = [] }
 
-// T003/T004/T010: Parse SCXML from a string
-let parseString (xml: string) : ScxmlParseResult =
+// Parse SCXML from a string
+let parseString (xml: string) : ParseResult =
     tryParseWith (fun () -> XDocument.Parse(xml, LoadOptions.SetLineInfo))
 
-// T011: Parse SCXML from a TextReader (caller owns lifetime)
-let parseReader (reader: System.IO.TextReader) : ScxmlParseResult =
+// Parse SCXML from a TextReader (caller owns lifetime)
+let parseReader (reader: System.IO.TextReader) : ParseResult =
     tryParseWith (fun () -> XDocument.Load(reader, LoadOptions.SetLineInfo))
 
-// T011: Parse SCXML from a Stream (caller owns lifetime)
-let parseStream (stream: System.IO.Stream) : ScxmlParseResult =
+// Parse SCXML from a Stream (caller owns lifetime)
+let parseStream (stream: System.IO.Stream) : ParseResult =
     tryParseWith (fun () -> XDocument.Load(stream, LoadOptions.SetLineInfo))

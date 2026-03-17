@@ -1,8 +1,47 @@
 module Frank.Statecharts.Tests.Scxml.ParserTests
 
 open Expecto
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Scxml.Parser
+
+/// Extract StateDecl entries from a StatechartDocument's Elements.
+let private stateDecls (doc: StatechartDocument) =
+    doc.Elements |> List.choose (function StateDecl s -> Some s | _ -> None)
+
+/// Extract TransitionEdge entries for a given source state from a StatechartDocument.
+let private transitionsFrom (source: string) (doc: StatechartDocument) =
+    doc.Elements
+    |> List.choose (function TransitionElement t when t.Source = source -> Some t | _ -> None)
+
+/// Extract history child nodes from a StateNode.
+let private historyChildren (state: StateNode) =
+    state.Children
+    |> List.filter (fun c -> match c.Kind with ShallowHistory | DeepHistory -> true | _ -> false)
+
+/// Extract ScxmlInvoke annotations from a StateNode.
+let private invokeAnnotations (state: StateNode) =
+    state.Annotations
+    |> List.choose (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlInvoke(t, src, id)) -> Some(t, src, id)
+        | _ -> None)
+
+/// Check if a TransitionEdge has the ScxmlTransitionType(true) annotation (i.e., internal).
+let private isInternalTransition (t: TransitionEdge) =
+    t.Annotations
+    |> List.exists (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlTransitionType(true)) -> true
+        | _ -> false)
+
+/// Get all targets for a transition (checking ScxmlMultiTarget annotation first).
+let private allTargets (t: TransitionEdge) =
+    t.Annotations
+    |> List.tryPick (fun a ->
+        match a with
+        | ScxmlAnnotation(ScxmlMultiTarget(targets)) -> Some targets
+        | _ -> None)
+    |> Option.defaultWith (fun () -> t.Target |> Option.toList)
 
 [<Tests>]
 let parserTests =
@@ -20,12 +59,12 @@ let parserTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse successfully"
-              let doc = result.Document.Value
-              Expect.equal doc.InitialId (Some "idle") "initial state should be idle"
-              Expect.equal doc.States.Length 2 "should have 2 states"
-              Expect.equal doc.States.[0].Id (Some "idle") "first state is idle"
-              Expect.equal doc.States.[1].Id (Some "active") "second state is active"
+              let doc = result.Document
+              Expect.equal doc.InitialStateId (Some "idle") "initial state should be idle"
+              let states = stateDecls doc
+              Expect.equal states.Length 2 "should have 2 states"
+              Expect.equal states.[0].Identifier "idle" "first state is idle"
+              Expect.equal states.[1].Identifier "active" "second state is active"
 
           testCase "US1-S2: transition with event and target"
           <| fun _ ->
@@ -38,12 +77,12 @@ let parserTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
-              let idleState = doc.States.[0]
-              Expect.equal idleState.Transitions.Length 1 "idle has one transition"
-              let t = idleState.Transitions.[0]
+              let doc = result.Document
+              let idleTransitions = transitionsFrom "idle" doc
+              Expect.equal idleTransitions.Length 1 "idle has one transition"
+              let t = idleTransitions.[0]
               Expect.equal t.Event (Some "start") "event is start"
-              Expect.equal t.Targets [ "active" ] "target is active"
+              Expect.equal t.Target (Some "active") "target is active"
 
           testCase "US1-S3: guarded transition"
           <| fun _ ->
@@ -56,10 +95,10 @@ let parserTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
+              let t = (transitionsFrom "idle" result.Document).[0]
               Expect.equal t.Event (Some "submit") "event is submit"
               Expect.equal t.Guard (Some "isValid") "guard is isValid"
-              Expect.equal t.Targets [ "submitted" ] "target is submitted"
+              Expect.equal t.Target (Some "submitted") "target is submitted"
 
           testCase "US1-S4: final state"
           <| fun _ ->
@@ -70,8 +109,9 @@ let parserTests =
 </scxml>"""
 
               let result = parseString xml
-              let finalState = result.Document.Value.States.[1]
-              Expect.equal finalState.Id (Some "done") "final state id"
+              let states = stateDecls result.Document
+              let finalState = states.[1]
+              Expect.equal finalState.Identifier "done" "final state id"
               Expect.equal finalState.Kind Final "kind is Final"
 
           testCase "US1-S5: compound states"
@@ -85,11 +125,12 @@ let parserTests =
 </scxml>"""
 
               let result = parseString xml
-              let parent = result.Document.Value.States.[0]
-              Expect.equal parent.Kind Compound "parent is Compound"
+              let states = stateDecls result.Document
+              let parent = states.[0]
+              Expect.equal parent.Kind Regular "parent is Regular"
               Expect.equal parent.Children.Length 2 "parent has 2 children"
-              Expect.equal parent.Children.[0].Id (Some "child1") "first child"
-              Expect.equal parent.Children.[1].Id (Some "child2") "second child" ]
+              Expect.equal parent.Children.[0].Identifier "child1" "first child"
+              Expect.equal parent.Children.[1].Identifier "child2" "second child" ]
 
 [<Tests>]
 let edgeCaseTests =
@@ -102,8 +143,7 @@ let edgeCaseTests =
                   """<scxml xmlns="http://www.w3.org/2005/07/scxml"/>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse successfully"
-              Expect.isEmpty result.Document.Value.States "no states"
+              Expect.isEmpty (stateDecls result.Document) "no states"
               Expect.isEmpty result.Errors "no errors"
 
           testCase "no initial attribute infers from first child"
@@ -114,8 +154,8 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
-              Expect.equal doc.InitialId (Some "first") "InitialId inferred from first child"
+              let doc = result.Document
+              Expect.equal doc.InitialStateId (Some "first") "InitialStateId inferred from first child"
 
           testCase "self-transition"
           <| fun _ ->
@@ -127,9 +167,9 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
+              let t = (transitionsFrom "s1" result.Document).[0]
               Expect.equal t.Event (Some "retry") "event is retry"
-              Expect.equal t.Targets [ "s1" ] "target is the containing state"
+              Expect.equal t.Target (Some "s1") "target is the containing state"
 
           testCase "eventless transition"
           <| fun _ ->
@@ -142,9 +182,9 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
+              let t = (transitionsFrom "s1" result.Document).[0]
               Expect.isNone t.Event "Event should be None"
-              Expect.equal t.Targets [ "next" ] "target is next"
+              Expect.equal t.Target (Some "next") "target is next"
 
           testCase "targetless transition"
           <| fun _ ->
@@ -156,10 +196,10 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
+              let t = (transitionsFrom "s1" result.Document).[0]
               Expect.equal t.Event (Some "check") "event is check"
               Expect.equal t.Guard (Some "isReady") "guard is isReady"
-              Expect.isEmpty t.Targets "Targets should be empty"
+              Expect.isNone t.Target "Target should be None"
 
           testCase "multiple transitions same event different guards"
           <| fun _ ->
@@ -174,12 +214,12 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let transitions = result.Document.Value.States.[0].Transitions
+              let transitions = transitionsFrom "s1" result.Document
               Expect.equal transitions.Length 2 "two transitions"
               Expect.equal transitions.[0].Guard (Some "isValid") "first guard"
               Expect.equal transitions.[1].Guard (Some "isInvalid") "second guard"
-              Expect.equal transitions.[0].Targets [ "ok" ] "first target"
-              Expect.equal transitions.[1].Targets [ "error" ] "second target"
+              Expect.equal transitions.[0].Target (Some "ok") "first target"
+              Expect.equal transitions.[1].Target (Some "error") "second target"
 
           testCase "deeply nested states (5 levels)"
           <| fun _ ->
@@ -197,20 +237,21 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
-              let l1 = doc.States.[0]
-              Expect.equal l1.Id (Some "L1") "level 1"
-              Expect.equal l1.Kind Compound "L1 is compound"
+              let doc = result.Document
+              let states = stateDecls doc
+              let l1 = states.[0]
+              Expect.equal l1.Identifier "L1" "level 1"
+              Expect.equal l1.Kind Regular "L1 is Regular"
               let l2 = l1.Children.[0]
-              Expect.equal l2.Id (Some "L2") "level 2"
-              Expect.equal l2.Kind Compound "L2 is compound"
+              Expect.equal l2.Identifier "L2" "level 2"
+              Expect.equal l2.Kind Regular "L2 is Regular"
               let l3 = l2.Children.[0]
-              Expect.equal l3.Id (Some "L3") "level 3"
+              Expect.equal l3.Identifier "L3" "level 3"
               let l4 = l3.Children.[0]
-              Expect.equal l4.Id (Some "L4") "level 4"
+              Expect.equal l4.Identifier "L4" "level 4"
               let l5 = l4.Children.[0]
-              Expect.equal l5.Id (Some "L5") "level 5"
-              Expect.equal l5.Kind Simple "L5 is simple (leaf)"
+              Expect.equal l5.Identifier "L5" "level 5"
+              Expect.equal l5.Kind Regular "L5 is Regular (leaf)"
 
           testCase "prefixed namespace"
           <| fun _ ->
@@ -223,11 +264,12 @@ let edgeCaseTests =
 </sc:scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse with prefixed namespace"
-              let doc = result.Document.Value
-              Expect.equal doc.States.Length 2 "two states"
-              Expect.equal doc.States.[0].Id (Some "s1") "first state"
-              Expect.equal doc.States.[0].Transitions.Length 1 "one transition"
+              let doc = result.Document
+              let states = stateDecls doc
+              Expect.equal states.Length 2 "two states"
+              Expect.equal states.[0].Identifier "s1" "first state"
+              let s1Transitions = transitionsFrom "s1" doc
+              Expect.equal s1Transitions.Length 1 "one transition"
 
           testCase "multiple space-separated targets"
           <| fun _ ->
@@ -241,8 +283,8 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
-              Expect.equal t.Targets [ "s1"; "s2"; "s3" ] "three targets"
+              let t = (transitionsFrom "s1" result.Document).[0]
+              Expect.equal (allTargets t) [ "s1"; "s2"; "s3" ] "three targets"
 
           testCase "unicode in IDs"
           <| fun _ ->
@@ -252,9 +294,9 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
-              Expect.equal doc.InitialId (Some "zustand_bereit") "unicode initial"
-              Expect.equal doc.States.[0].Id (Some "zustand_bereit") "unicode state id"
+              let doc = result.Document
+              Expect.equal doc.InitialStateId (Some "zustand_bereit") "unicode initial"
+              Expect.equal (stateDecls doc).[0].Identifier "zustand_bereit" "unicode state id"
 
           testCase "XML comments are ignored"
           <| fun _ ->
@@ -267,8 +309,7 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse successfully"
-              Expect.equal result.Document.Value.States.Length 2 "two states"
+              Expect.equal (stateDecls result.Document).Length 2 "two states"
               Expect.isEmpty result.Errors "no errors"
 
           testCase "parallel state element"
@@ -282,8 +323,8 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let p = result.Document.Value.States.[0]
-              Expect.equal p.Id (Some "p") "parallel id"
+              let p = (stateDecls result.Document).[0]
+              Expect.equal p.Identifier "p" "parallel id"
               Expect.equal p.Kind Parallel "kind is Parallel"
               Expect.equal p.Children.Length 2 "two children"
 
@@ -299,11 +340,11 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
+              let doc = result.Document
               Expect.equal doc.DataEntries.Length 2 "two data entries"
-              Expect.equal doc.DataEntries.[0].Id "counter" "first data id"
+              Expect.equal doc.DataEntries.[0].Name "counter" "first data id"
               Expect.equal doc.DataEntries.[0].Expression (Some "0") "first data expr"
-              Expect.equal doc.DataEntries.[1].Id "name" "second data id"
+              Expect.equal doc.DataEntries.[1].Name "name" "second data id"
 
           testCase "transition type internal"
           <| fun _ ->
@@ -315,8 +356,8 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
-              Expect.equal t.TransitionType Internal "transition type is internal"
+              let t = (transitionsFrom "s1" result.Document).[0]
+              Expect.isTrue (isInternalTransition t) "transition type is internal"
 
           testCase "transition type defaults to external"
           <| fun _ ->
@@ -329,8 +370,8 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let t = result.Document.Value.States.[0].Transitions.[0]
-              Expect.equal t.TransitionType External "default transition type is external"
+              let t = (transitionsFrom "s1" result.Document).[0]
+              Expect.isFalse (isInternalTransition t) "default transition type is external"
 
           testCase "history pseudo-state"
           <| fun _ ->
@@ -345,13 +386,21 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              let s1 = result.Document.Value.States.[0]
-              Expect.equal s1.HistoryNodes.Length 1 "one history node"
-              let h = s1.HistoryNodes.[0]
-              Expect.equal h.Id "h1" "history id"
-              Expect.equal h.Kind Deep "history kind is deep"
-              Expect.isSome h.DefaultTransition "has default transition"
-              Expect.equal h.DefaultTransition.Value.Targets [ "child1" ] "default transition target"
+              let s1 = (stateDecls result.Document).[0]
+              let historyNodes = historyChildren s1
+              Expect.equal historyNodes.Length 1 "one history node"
+              let h = historyNodes.[0]
+              Expect.equal h.Identifier "h1" "history id"
+              Expect.equal h.Kind DeepHistory "history kind is deep"
+              // Check the ScxmlHistory annotation for the default transition target
+              let historyMeta =
+                  h.Annotations
+                  |> List.tryPick (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlHistory(_, _, defaultTarget)) -> Some defaultTarget
+                      | _ -> None)
+              Expect.isSome historyMeta "has ScxmlHistory annotation"
+              Expect.equal historyMeta.Value (Some "child1") "default transition target"
 
           testCase "no-namespace document parses correctly"
           <| fun _ ->
@@ -361,9 +410,9 @@ let edgeCaseTests =
 </scxml>"""
 
               let result = parseString xml
-              Expect.isSome result.Document "should parse without namespace"
-              Expect.equal result.Document.Value.States.Length 1 "one state"
-              Expect.equal result.Document.Value.States.[0].Id (Some "s1") "state id" ]
+              let states = stateDecls result.Document
+              Expect.equal states.Length 1 "one state"
+              Expect.equal states.[0].Identifier "s1" "state id" ]
 
 // === User Story 3: Data Model Parsing (T022) ===
 
@@ -384,11 +433,11 @@ let dataModelTests =
 </scxml>"""
 
               let result = parseString xml
-              let doc = result.Document.Value
+              let doc = result.Document
               Expect.equal doc.DataEntries.Length 2 "should have 2 data entries"
-              Expect.equal doc.DataEntries.[0].Id "count" "first entry id"
+              Expect.equal doc.DataEntries.[0].Name "count" "first entry id"
               Expect.equal doc.DataEntries.[0].Expression (Some "0") "first entry expr"
-              Expect.equal doc.DataEntries.[1].Id "name" "second entry id"
+              Expect.equal doc.DataEntries.[1].Name "name" "second entry id"
               Expect.equal doc.DataEntries.[1].Expression (Some "'default'") "second entry expr"
 
           testCase "US3-S2: data entry with no expr"
@@ -402,8 +451,8 @@ let dataModelTests =
 </scxml>"""
 
               let result = parseString xml
-              let entry = result.Document.Value.DataEntries.[0]
-              Expect.equal entry.Id "items" "entry id"
+              let entry = result.Document.DataEntries.[0]
+              Expect.equal entry.Name "items" "entry id"
               Expect.isNone entry.Expression "expression should be None"
 
           testCase "US3-S3: state-scoped datamodel"
@@ -418,10 +467,11 @@ let dataModelTests =
 </scxml>"""
 
               let result = parseString xml
-              let state = result.Document.Value.States.[0]
-              Expect.equal state.DataEntries.Length 1 "state should have 1 data entry"
-              Expect.equal state.DataEntries.[0].Id "localVar" "entry id"
-              Expect.equal state.DataEntries.[0].Expression (Some "42") "entry expr"
+              // State-scoped data entries are flattened into document DataEntries
+              let doc = result.Document
+              Expect.equal doc.DataEntries.Length 1 "should have 1 data entry (flattened)"
+              Expect.equal doc.DataEntries.[0].Name "localVar" "entry id"
+              Expect.equal doc.DataEntries.[0].Expression (Some "42") "entry expr"
 
           testCase "data with child text content"
           <| fun _ ->
@@ -434,8 +484,8 @@ let dataModelTests =
 </scxml>"""
 
               let result = parseString xml
-              let entry = result.Document.Value.DataEntries.[0]
-              Expect.equal entry.Id "config" "entry id"
+              let entry = result.Document.DataEntries.[0]
+              Expect.equal entry.Name "config" "entry id"
               Expect.equal entry.Expression (Some "some content") "expression from child content" ]
 
 // === User Story 4: Parallel, History, and Invoke Parsing (T023) ===
@@ -456,9 +506,9 @@ let advancedParserTests =
 </scxml>"""
 
               let result = parseString xml
-              let p = result.Document.Value.States.[0]
+              let p = (stateDecls result.Document).[0]
               Expect.equal p.Kind Parallel "kind is Parallel"
-              Expect.equal p.Id (Some "p1") "id is p1"
+              Expect.equal p.Identifier "p1" "id is p1"
               Expect.equal p.Children.Length 2 "has 2 child states"
 
           testCase "US4-S2: history with type deep"
@@ -472,11 +522,12 @@ let advancedParserTests =
 </scxml>"""
 
               let result = parseString xml
-              let state = result.Document.Value.States.[0]
-              Expect.equal state.HistoryNodes.Length 1 "has 1 history node"
-              let h = state.HistoryNodes.[0]
-              Expect.equal h.Id "h1" "history id"
-              Expect.equal h.Kind Deep "history kind is Deep"
+              let state = (stateDecls result.Document).[0]
+              let historyNodes = historyChildren state
+              Expect.equal historyNodes.Length 1 "has 1 history node"
+              let h = historyNodes.[0]
+              Expect.equal h.Identifier "h1" "history id"
+              Expect.equal h.Kind DeepHistory "history kind is Deep"
 
           testCase "US4-S3: history defaults to shallow"
           <| fun _ ->
@@ -489,8 +540,8 @@ let advancedParserTests =
 </scxml>"""
 
               let result = parseString xml
-              let h = result.Document.Value.States.[0].HistoryNodes.[0]
-              Expect.equal h.Kind Shallow "history kind defaults to Shallow"
+              let h = (historyChildren (stateDecls result.Document).[0]).[0]
+              Expect.equal h.Kind ShallowHistory "history kind defaults to Shallow"
 
           testCase "US4-S4: invoke with attributes"
           <| fun _ ->
@@ -502,11 +553,12 @@ let advancedParserTests =
 </scxml>"""
 
               let result = parseString xml
-              let state = result.Document.Value.States.[0]
-              Expect.equal state.InvokeNodes.Length 1 "has 1 invoke node"
-              let inv = state.InvokeNodes.[0]
-              Expect.equal inv.InvokeType (Some "http") "invoke type"
-              Expect.equal inv.Src (Some "https://example.com/service") "invoke src"
+              let state = (stateDecls result.Document).[0]
+              let invokes = invokeAnnotations state
+              Expect.equal invokes.Length 1 "has 1 invoke node"
+              let (invType, invSrc, _invId) = invokes.[0]
+              Expect.equal invType "http" "invoke type"
+              Expect.equal invSrc (Some "https://example.com/service") "invoke src"
 
           testCase "history with default transition"
           <| fun _ ->
@@ -521,6 +573,12 @@ let advancedParserTests =
 </scxml>"""
 
               let result = parseString xml
-              let h = result.Document.Value.States.[0].HistoryNodes.[0]
-              Expect.isSome h.DefaultTransition "should have default transition"
-              Expect.equal h.DefaultTransition.Value.Targets [ "child1" ] "default target" ]
+              let h = (historyChildren (stateDecls result.Document).[0]).[0]
+              let historyMeta =
+                  h.Annotations
+                  |> List.tryPick (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlHistory(_, _, defaultTarget)) -> Some defaultTarget
+                      | _ -> None)
+              Expect.isSome historyMeta "should have ScxmlHistory annotation"
+              Expect.equal historyMeta.Value (Some "child1") "default target" ]

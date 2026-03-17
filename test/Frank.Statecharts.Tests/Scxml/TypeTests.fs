@@ -1,7 +1,7 @@
 module Frank.Statecharts.Tests.Scxml.TypeTests
 
 open Expecto
-open Frank.Statecharts.Scxml.Types
+open Frank.Statecharts.Ast
 
 [<Tests>]
 let typeTests =
@@ -10,22 +10,16 @@ let typeTests =
         [
           testCase "SourcePosition construction"
           <| fun _ ->
-              let pos = { Line = 1; Column = 5 }
+              let pos: SourcePosition = { Line = 1; Column = 5 }
               Expect.equal pos.Line 1 "line"
               Expect.equal pos.Column 5 "column"
 
-          testCase "ScxmlStateKind has all four cases"
+          testCase "StateKind has Regular, Parallel, and Final cases"
           <| fun _ ->
-              let kinds = [ Simple; Compound; Parallel; Final ]
-              Expect.hasLength kinds 4 "four state kinds"
+              let kinds: StateKind list = [ Regular; Parallel; Final ]
+              Expect.hasLength kinds 3 "three SCXML-relevant state kinds"
 
-          testCase "ScxmlTransitionType has Internal and External"
-          <| fun _ ->
-              let types = [ Internal; External ]
-              Expect.hasLength types 2 "two transition types"
-              Expect.notEqual Internal External "Internal <> External"
-
-          testCase "ScxmlHistoryKind has Shallow and Deep"
+          testCase "HistoryKind has Shallow and Deep"
           <| fun _ ->
               let kinds = [ Shallow; Deep ]
               Expect.hasLength kinds 2 "two history kinds"
@@ -33,115 +27,166 @@ let typeTests =
 
           testCase "DataEntry construction"
           <| fun _ ->
-              let entry =
-                  { Id = "counter"
+              let entry: DataEntry =
+                  { Name = "counter"
                     Expression = Some "0"
                     Position = None }
 
-              Expect.equal entry.Id "counter" "id"
+              Expect.equal entry.Name "counter" "name"
               Expect.equal entry.Expression (Some "0") "expression"
               Expect.isNone entry.Position "position is None"
 
-          testCase "ScxmlTransition construction"
+          testCase "TransitionEdge construction"
           <| fun _ ->
-              let t =
-                  { Event = Some "submit"
+              let t: TransitionEdge =
+                  { Source = "s1"
+                    Target = Some "submitted"
+                    Event = Some "submit"
                     Guard = Some "isValid"
-                    Targets = [ "submitted" ]
-                    TransitionType = External
-                    Position = Some { Line = 3; Column = 5 } }
+                    Action = None
+                    Parameters = []
+                    Position = Some { Line = 3; Column = 5 }
+                    Annotations = [] }
 
               Expect.equal t.Event (Some "submit") "event"
               Expect.equal t.Guard (Some "isValid") "guard"
-              Expect.equal t.Targets [ "submitted" ] "targets"
-              Expect.equal t.TransitionType External "transition type"
+              Expect.equal t.Target (Some "submitted") "target"
+              Expect.equal t.Source "s1" "source"
               Expect.isSome t.Position "has position"
 
-          testCase "ScxmlState construction with nested children"
+          testCase "StateNode construction with nested children"
           <| fun _ ->
-              let child =
-                  { Id = Some "child1"
-                    Kind = Simple
-                    InitialId = None
-                    Transitions = []
+              let child: StateNode =
+                  { Identifier = "child1"
+                    Label = None
+                    Kind = Regular
                     Children = []
-                    DataEntries = []
-                    HistoryNodes = []
-                    InvokeNodes = []
-                    Position = None }
+                    Activities = None
+                    Position = None
+                    Annotations = [] }
 
-              let parent =
-                  { Id = Some "parent"
-                    Kind = Compound
-                    InitialId = None
-                    Transitions = []
+              let parent: StateNode =
+                  { Identifier = "parent"
+                    Label = None
+                    Kind = Regular
                     Children = [ child ]
-                    DataEntries = []
-                    HistoryNodes = []
-                    InvokeNodes = []
-                    Position = None }
+                    Activities = None
+                    Position = None
+                    Annotations = [] }
 
               Expect.equal parent.Children.Length 1 "parent has one child"
-              Expect.equal parent.Children.[0].Id (Some "child1") "child id"
+              Expect.equal parent.Children.[0].Identifier "child1" "child id"
 
-          testCase "ScxmlDocument construction"
+          testCase "StatechartDocument construction"
           <| fun _ ->
-              let doc =
-                  { Name = Some "test"
-                    InitialId = Some "s1"
-                    DatamodelType = None
-                    Binding = None
-                    States = []
+              let doc: StatechartDocument =
+                  { Title = Some "test"
+                    InitialStateId = Some "s1"
+                    Elements = []
                     DataEntries =
-                      [ { Id = "x"
+                      [ { Name = "x"
                           Expression = Some "1"
                           Position = None } ]
-                    Position = None }
+                    Annotations = [] }
 
-              Expect.equal doc.Name (Some "test") "name"
-              Expect.equal doc.InitialId (Some "s1") "initial"
+              Expect.equal doc.Title (Some "test") "title"
+              Expect.equal doc.InitialStateId (Some "s1") "initial"
               Expect.equal doc.DataEntries.Length 1 "one data entry"
 
-          testCase "ScxmlDocument structural equality"
+          testCase "StatechartDocument structural equality"
           <| fun _ ->
-              let doc1 =
-                  { Name = Some "test"
-                    InitialId = Some "s1"
-                    DatamodelType = None
-                    Binding = None
-                    States = []
+              let doc1: StatechartDocument =
+                  { Title = Some "test"
+                    InitialStateId = Some "s1"
+                    Elements = []
                     DataEntries = []
-                    Position = None }
+                    Annotations = [] }
 
-              let doc2 =
-                  { Name = Some "test"
-                    InitialId = Some "s1"
-                    DatamodelType = None
-                    Binding = None
-                    States = []
+              let doc2: StatechartDocument =
+                  { Title = Some "test"
+                    InitialStateId = Some "s1"
+                    Elements = []
                     DataEntries = []
-                    Position = None }
+                    Annotations = [] }
 
               Expect.equal doc1 doc2 "identical documents should be equal"
 
-          testCase "ScxmlDocument inequality on different InitialId"
+          testCase "StatechartDocument inequality on different InitialStateId"
           <| fun _ ->
-              let doc1 =
-                  { Name = None
-                    InitialId = Some "s1"
-                    DatamodelType = None
-                    Binding = None
-                    States = []
+              let doc1: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements = []
                     DataEntries = []
-                    Position = None }
+                    Annotations = [] }
 
-              let doc2 =
-                  { Name = None
-                    InitialId = Some "s2"
-                    DatamodelType = None
-                    Binding = None
-                    States = []
+              let doc2: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s2"
+                    Elements = []
                     DataEntries = []
-                    Position = None }
+                    Annotations = [] }
 
-              Expect.notEqual doc1 doc2 "different InitialId should not be equal" ]
+              Expect.notEqual doc1 doc2 "different InitialStateId should not be equal"
+
+          // === ScxmlMeta annotation tests ===
+
+          testCase "ScxmlTransitionType annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlTransitionType(true))
+              match ann with
+              | ScxmlAnnotation(ScxmlTransitionType(isInternal)) ->
+                  Expect.isTrue isInternal "should be internal"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlMultiTarget annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlMultiTarget([ "s1"; "s2"; "s3" ]))
+              match ann with
+              | ScxmlAnnotation(ScxmlMultiTarget(targets)) ->
+                  Expect.equal targets [ "s1"; "s2"; "s3" ] "targets"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlInvoke annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlInvoke("http", Some "url", Some "id"))
+              match ann with
+              | ScxmlAnnotation(ScxmlInvoke(t, src, id)) ->
+                  Expect.equal t "http" "invoke type"
+                  Expect.equal src (Some "url") "src"
+                  Expect.equal id (Some "id") "id"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlHistory annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlHistory("h1", Deep, Some "child1"))
+              match ann with
+              | ScxmlAnnotation(ScxmlHistory(id, kind, defaultTarget)) ->
+                  Expect.equal id "h1" "history id"
+                  Expect.equal kind Deep "history kind"
+                  Expect.equal defaultTarget (Some "child1") "default target"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlDatamodelType annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlDatamodelType("ecmascript"))
+              match ann with
+              | ScxmlAnnotation(ScxmlDatamodelType(dm)) ->
+                  Expect.equal dm "ecmascript" "datamodel type"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlBinding annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlBinding("late"))
+              match ann with
+              | ScxmlAnnotation(ScxmlBinding(b)) ->
+                  Expect.equal b "late" "binding"
+              | _ -> failtest "wrong annotation type"
+
+          testCase "ScxmlInitial annotation"
+          <| fun _ ->
+              let ann = ScxmlAnnotation(ScxmlInitial("child1"))
+              match ann with
+              | ScxmlAnnotation(ScxmlInitial(id)) ->
+                  Expect.equal id "child1" "initial id"
+              | _ -> failtest "wrong annotation type" ]
