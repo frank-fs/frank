@@ -27,13 +27,13 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Add `PipelineError` discriminated union to `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T002 Add `FormatParseResult` record type to `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T003 Add `PipelineResult` record type to `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T004 Create `src/Frank.Statecharts/Validation/Pipeline.fs` with `parserFor` private function
-- [ ] T005 Implement `validateSourcesWithRules` public function in `Pipeline.fs`
-- [ ] T006 Implement `validateSources` as shorthand calling `validateSourcesWithRules []`
-- [ ] T007 Add `Compile Include` for `Validation/Pipeline.fs` in `Frank.Statecharts.fsproj` after `Validation/Validator.fs`
+- [x] T001 Add `PipelineError` discriminated union to `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T002 Add `FormatParseResult` record type to `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T003 Add `PipelineResult` record type to `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T004 Create `src/Frank.Statecharts/Validation/Pipeline.fs` with `parserFor` private function
+- [x] T005 Implement `validateSourcesWithRules` public function in `Pipeline.fs`
+- [x] T006 Implement `validateSources` as shorthand calling `validateSourcesWithRules []`
+- [x] T007 Add `Compile Include` for `Validation/Pipeline.fs` in `Frank.Statecharts.fsproj` after `Validation/Validator.fs`
 
 ### Implementation Notes
 - Types must be added below the existing `ValidationRule` type in `Types.fs` to avoid forward-reference issues.
