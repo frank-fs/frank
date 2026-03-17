@@ -1,36 +1,39 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: Pipeline Unit Tests
+lane: "doing"
+dependencies: [WP01]
+base_branch: 025-validation-pipeline-wiring-WP01
+base_commit: 7bdd1a1840ee9ebbb5918636ea69184783fd2cc0
+created_at: '2026-03-17T22:55:46.520355+00:00'
 subtasks:
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-  - "T014"
-  - "T015"
-  - "T016"
-title: "Pipeline Unit Tests"
-phase: "Phase 1 - Unit Tests"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs:
-  - "FR-008"
-  - "FR-010"
-  - "FR-011"
-  - "FR-012"
-  - "FR-014"
+- T008
+- T009
+- T010
+- T011
+- T012
+- T013
+- T014
+- T015
+- T016
+phase: Phase 1 - Unit Tests
+assignee: ''
+agent: ''
+shell_pid: "80834"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:13:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:13:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-008
+- FR-010
+- FR-011
+- FR-012
+- FR-014
 ---
 
 # Work Package Prompt: WP02 -- Pipeline Unit Tests
