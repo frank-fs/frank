@@ -193,12 +193,21 @@ spec-kitty implement WP03 --base WP02
   2. Use ALPS JSON structure. ALPS represents states as descriptors with `type: "semantic"` and transitions as links between descriptors.
 - **Notes**:
   - **This is the trickiest format.** ALPS has a fundamentally different conceptual model -- it uses descriptors, not states/transitions.
-  - Check `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` and `test/Frank.Statecharts.Tests/Alps/MapperTests.fs` for how ALPS JSON is structured and how the mapper converts it to `StatechartDocument`.
-  - The ALPS mapper (`Alps.Mapper.toStatechartDocument`) must produce states matching `idle`, `playerX`, `playerO`, `gameOver` and events matching `start`, `move`, `win`.
-  - Read the existing ALPS test golden files or fixtures to understand the JSON structure that maps to states and transitions.
-  - If the ALPS mapper cannot produce states/transitions from ALPS JSON in a way that matches the other formats, you may need to: (a) study the mapper logic carefully, or (b) use a simpler state machine for the ALPS portion, or (c) adjust the ALPS source to match what the mapper expects.
+  - Check `test/Frank.Statecharts.Tests/Alps/JsonParserTests.fs` and `test/Frank.Statecharts.Tests/Alps/GoldenFiles.fs` for how ALPS JSON is structured and how it produces `StatechartDocument`.
+  - The ALPS parser (`Alps.JsonParser.parseAlpsJson`) now returns `ParseResult` directly (mapper logic is inlined in the parser post-migration).
+  - ALPS encodes states as `semantic` descriptors with IDs, and transitions as child descriptors with `type` (safe/unsafe/idempotent) and `rt` attributes pointing to target states using `#StateId` format.
+  - Example minimal ALPS JSON for 2 states + 1 transition:
+    ```json
+    { "alps": { "version": "1.0", "descriptor": [
+        { "id": "StateA", "type": "semantic", "descriptor": [
+            { "id": "go", "type": "safe", "rt": "#StateB" }
+        ]},
+        { "id": "StateB", "type": "semantic" }
+    ]}}
+    ```
+  - If the ALPS parser cannot produce states/transitions matching the other formats, you may need to study the classifier logic in `src/Frank.Statecharts/Alps/JsonParser.fs` to understand how descriptors are classified as states.
 - **Files**: `test/Frank.Statecharts.Tests/Validation/PipelineIntegrationTests.fs`
-- **Research needed**: Read `src/Frank.Statecharts/Alps/Mapper.fs` to understand how ALPS descriptors map to `StatechartDocument` states and transitions. Read `test/Frank.Statecharts.Tests/Alps/MapperTests.fs` for working examples of ALPS JSON that produces known AST outputs.
+- **Research needed**: Read `src/Frank.Statecharts/Alps/JsonParser.fs` to understand how ALPS descriptors map to `StatechartDocument` states and transitions. Read `test/Frank.Statecharts.Tests/Alps/GoldenFiles.fs` for working examples.
 
 ### Subtask T022 -- Test: consistent 4-format sources produce zero failures (SC-001)
 
@@ -350,7 +359,7 @@ dotnet test test/Frank.Statecharts.Tests/
 
 2. **SCXML `<final>` vs `<state>`**: The SCXML parser may treat `<final id="gameOver"/>` differently from `<state id="gameOver"/>`. If `<final>` produces a different state kind that affects cross-format comparisons, use `<state>` instead. **Mitigation**: Check `src/Frank.Statecharts/Scxml/Mapper.fs` to see how `<final>` maps to `StateKind`.
 
-3. **Parser error for malformed SCXML (T025)**: The SCXML parser uses `System.Xml.Linq.XDocument.Parse` which throws `XmlException` on malformed XML. The pipeline's `parserFor` adapter must handle this. If the SCXML parser does not catch XML exceptions internally, the pipeline may need a try/catch. **Mitigation**: Check `src/Frank.Statecharts/Scxml/Parser.fs` `tryParseWith` function to see if it catches `XmlException`.
+3. **Parser error for malformed SCXML (T025)**: The SCXML parser uses `System.Xml.Linq.XDocument.Parse` which throws `XmlException` on malformed XML. Check `src/Frank.Statecharts/Scxml/Parser.fs` `tryParseWith` function to see if it catches `XmlException` internally.
 
 4. **State identity across formats**: Different parsers may normalize state identifiers differently (e.g., trimming whitespace, case changes). The tic-tac-toe state names are simple lowercase identifiers (`idle`, `playerX`, `playerO`, `gameOver`) which should survive all parsers unchanged. If cross-format failures appear, debug by printing each format's extracted state identifiers.
 

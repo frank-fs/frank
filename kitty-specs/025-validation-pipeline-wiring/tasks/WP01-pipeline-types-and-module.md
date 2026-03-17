@@ -84,13 +84,13 @@ spec-kitty implement WP01
 - **Data Model**: `kitty-specs/025-validation-pipeline-wiring/data-model.md` -- type definitions
 - **Quickstart**: `kitty-specs/025-validation-pipeline-wiring/quickstart.md` -- API usage examples
 
-**Key constraint**: The spec assumes all parsers return `Ast.ParseResult` directly (post-migration). However, the current codebase has:
-- **WSD**: `Wsd.Parser.parseWsd : string -> ParseResult` -- already returns `Ast.ParseResult` directly. Module is `internal`.
-- **smcat**: `Smcat.Parser.parseSmcat : string -> Smcat.Types.ParseResult` -- returns smcat-specific `ParseResult` (with `SmcatDocument`). Needs `Smcat.Mapper.toStatechartDocument : Smcat.Types.ParseResult -> Ast.ParseResult`. Module is `internal`.
-- **SCXML**: `Scxml.Parser.parseString : string -> ScxmlParseResult` -- returns SCXML-specific type. Needs `Scxml.Mapper.toStatechartDocument : ScxmlParseResult -> Ast.ParseResult`.
-- **ALPS**: `Alps.JsonParser.parseAlpsJson : string -> Result<AlpsDocument, AlpsParseError list>` -- returns `Result` of ALPS-specific types. Needs `Alps.Mapper.toStatechartDocument : AlpsDocument -> StatechartDocument` plus manual error conversion.
+**Key fact**: All parsers now return `Ast.ParseResult` directly (AST migrations 022/023/024 are complete). No mapper modules exist. The uniform interface is `string -> ParseResult`:
+- **WSD**: `Wsd.Parser.parseWsd : string -> ParseResult`
+- **smcat**: `Smcat.Parser.parseSmcat : string -> ParseResult`
+- **SCXML**: `Scxml.Parser.parseString : string -> ParseResult`
+- **ALPS**: `Alps.JsonParser.parseAlpsJson : string -> ParseResult`
 
-The pipeline MUST adapt to the current parser interfaces using the existing Mapper modules. All parser modules are `internal` but Pipeline lives in the same assembly, so access is fine.
+All parser modules are `internal` but Pipeline lives in the same assembly, so access is fine.
 
 **Compile order in `Frank.Statecharts.fsproj`**: Pipeline.fs must appear AFTER `Validation/Validator.fs` (which is after all parser and mapper files). Insert it as the last entry in the `<!-- Validation -->` section.
 
@@ -171,40 +171,15 @@ The pipeline MUST adapt to the current parser interfaces using the existing Mapp
       let private parserFor (tag: FormatTag) : (string -> ParseResult) option =
           match tag with
           | Wsd -> Some Wsd.Parser.parseWsd
-          | Smcat -> Some (fun s -> Smcat.Mapper.toStatechartDocument (Smcat.Parser.parseSmcat s))
-          | Scxml -> Some (fun s -> Scxml.Mapper.toStatechartDocument (Scxml.Parser.parseString s))
-          | Alps ->
-              Some (fun s ->
-                  match Alps.JsonParser.parseAlpsJson s with
-                  | Ok alpsDoc ->
-                      let doc = Alps.Mapper.toStatechartDocument alpsDoc
-                      { Document = doc; Errors = []; Warnings = [] }
-                  | Error errors ->
-                      let failures =
-                          errors
-                          |> List.map (fun e ->
-                              { Position = None
-                                Description = e.ToString()
-                                Expected = ""
-                                Found = ""
-                                CorrectiveExample = "" })
-                      { Document =
-                            { Title = None
-                              InitialStateId = None
-                              Elements = []
-                              DataEntries = []
-                              Annotations = [] }
-                        Errors = failures
-                        Warnings = [] })
+          | Smcat -> Some Smcat.Parser.parseSmcat
+          | Scxml -> Some Scxml.Parser.parseString
+          | Alps -> Some Alps.JsonParser.parseAlpsJson
           | XState -> None
   ```
 - **Files**: `src/Frank.Statecharts/Validation/Pipeline.fs` (NEW)
 - **Notes**:
-  - WSD and smcat already return `Ast.ParseResult` directly -- simple delegation.
-  - SCXML returns `ScxmlParseResult` -- wrap with `Scxml.Mapper.toStatechartDocument` which returns `Ast.ParseResult`.
-  - ALPS returns `Result<AlpsDocument, AlpsParseError list>` -- on `Ok`, map through `Alps.Mapper.toStatechartDocument` (which returns `StatechartDocument`, not `ParseResult`), then wrap in `ParseResult`. On `Error`, create `ParseResult` with failures and an empty document.
-  - **IMPORTANT**: Check the exact types of `ParseFailure` fields. Read `src/Frank.Statecharts/Ast/Types.fs` to verify field names (`Position`, `Description`, `Expected`, `Found`, `CorrectiveExample`). The ALPS error conversion must match.
-  - **IMPORTANT**: Check the ALPS `AlpsParseError` type in `src/Frank.Statecharts/Alps/Types.fs` to understand its structure for the `ToString()` call.
+  - All four parsers return `Ast.ParseResult` directly (post-migration). Each case is simple delegation.
+  - No mapper modules or adapter logic needed.
 
 ### Subtask T005 -- Implement `validateSourcesWithRules` public function
 
@@ -321,11 +296,9 @@ The pipeline MUST adapt to the current parser interfaces using the existing Mapp
 
 ## Risks & Mitigations
 
-1. **ALPS parser error type adaptation**: The ALPS `AlpsParseError` type structure may differ from what the `ParseFailure` record expects. Read the ALPS types file (`src/Frank.Statecharts/Alps/Types.fs`) to verify field mappings. Use `.ToString()` for the description if the error type is a simple DU.
+1. **Internal module access**: All parser modules are `internal`. Since `Pipeline.fs` is in the same assembly (`Frank.Statecharts`), it can access internal modules directly.
 
-2. **Internal module access**: All parser modules are `internal`. Since `Pipeline.fs` is in the same assembly (`Frank.Statecharts`), it can access internal modules. However, verify the `InternalsVisibleTo` attribute is not needed within the same project.
-
-3. **F# compile order**: If `Pipeline.fs` cannot see parser modules, the build will fail immediately with "undefined" errors. The fsproj file order ensures parsers compile before the validation section.
+2. **F# compile order**: If `Pipeline.fs` cannot see parser modules, the build will fail immediately with "undefined" errors. The fsproj file order ensures parsers compile before the validation section.
 
 ## Review Guidance
 
