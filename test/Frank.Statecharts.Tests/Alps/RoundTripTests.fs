@@ -1,18 +1,85 @@
 module Frank.Statecharts.Tests.Alps.RoundTripTests
 
 open Expecto
-open Frank.Statecharts.Alps.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.Alps.JsonGenerator
 open Frank.Statecharts.Tests.Alps.GoldenFiles
 
-/// Recursively collect all extensions from a descriptor tree.
-let private collectAllExts (doc: AlpsDocument) =
-    let rec collect (descriptors: Descriptor list) =
-        descriptors
-        |> List.collect (fun d -> d.Extensions @ collect d.Descriptors)
+/// Extract all StateNodes from a StatechartDocument's elements.
+let private getStates (doc: StatechartDocument) =
+    doc.Elements
+    |> List.choose (fun el ->
+        match el with
+        | StateDecl s -> Some s
+        | _ -> None)
 
-    doc.Extensions @ collect doc.Descriptors
+/// Extract all TransitionEdges from a StatechartDocument's elements.
+let private getTransitions (doc: StatechartDocument) =
+    doc.Elements
+    |> List.choose (fun el ->
+        match el with
+        | TransitionElement t -> Some t
+        | _ -> None)
+
+/// Extract ALPS version from document annotations.
+let private getVersion (doc: StatechartDocument) =
+    doc.Annotations
+    |> List.tryPick (fun a ->
+        match a with
+        | AlpsAnnotation(AlpsVersion v) -> Some v
+        | _ -> None)
+
+/// Extract ALPS link annotations from document annotations.
+let private getLinks (doc: StatechartDocument) =
+    doc.Annotations
+    |> List.choose (fun a ->
+        match a with
+        | AlpsAnnotation(AlpsLink(rel, href)) -> Some(rel, href)
+        | _ -> None)
+
+/// Extract ALPS documentation from document annotations.
+let private getDocumentation (doc: StatechartDocument) =
+    doc.Annotations
+    |> List.tryPick (fun a ->
+        match a with
+        | AlpsAnnotation(AlpsDocumentation(fmt, value)) -> Some(fmt, value)
+        | _ -> None)
+
+/// Extract ALPS extension annotations from all annotations (document + state + transition).
+let private collectAllExtAnnotations (doc: StatechartDocument) =
+    let docExts =
+        doc.Annotations
+        |> List.choose (fun a ->
+            match a with
+            | AlpsAnnotation(AlpsExtension(id, href, value)) -> Some(id, href, value)
+            | _ -> None)
+
+    let stateExts =
+        getStates doc
+        |> List.collect (fun s ->
+            s.Annotations
+            |> List.choose (fun a ->
+                match a with
+                | AlpsAnnotation(AlpsExtension(id, href, value)) -> Some(id, href, value)
+                | _ -> None))
+
+    let transExts =
+        getTransitions doc
+        |> List.collect (fun t ->
+            t.Annotations
+            |> List.choose (fun a ->
+                match a with
+                | AlpsAnnotation(AlpsExtension(id, href, value)) -> Some(id, href, value)
+                | _ -> None))
+
+    docExts @ stateExts @ transExts
+
+/// Helper: parse and get document (assert no errors).
+let private parseOk json msg =
+    let result = parseAlpsJson json
+    Expect.isEmpty result.Errors msg
+    result.Document
 
 [<Tests>]
 let roundTripTests =
@@ -20,150 +87,244 @@ let roundTripTests =
         "Alps.RoundTrip"
         [ testCase "tic-tac-toe JSON roundtrip preserves all information"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
-
+              let original = parseOk ticTacToeAlpsJson "parse failed"
               let generated = generateAlpsJson original
-
-              let roundTripped =
-                  parseAlpsJson generated
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
+              let roundTripped = parseOk generated "re-parse failed"
               Expect.equal roundTripped original "roundtrip preserves all information"
 
           testCase "onboarding JSON roundtrip preserves all information"
           <| fun _ ->
-              let original =
-                  parseAlpsJson onboardingAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
-
+              let original = parseOk onboardingAlpsJson "parse failed"
               let generated = generateAlpsJson original
-
-              let roundTripped =
-                  parseAlpsJson generated
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
+              let roundTripped = parseOk generated "re-parse failed"
               Expect.equal roundTripped original "roundtrip preserves all information"
 
-          testCase "roundtrip preserves descriptor ids and types"
+          testCase "roundtrip preserves state identifiers"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
-
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
 
               let originalIds =
-                  original.Descriptors |> List.choose (fun d -> d.Id) |> Set.ofList
+                  getStates original |> List.map (fun s -> s.Identifier) |> Set.ofList
 
               let roundTrippedIds =
-                  roundTripped.Descriptors |> List.choose (fun d -> d.Id) |> Set.ofList
+                  getStates roundTripped |> List.map (fun s -> s.Identifier) |> Set.ofList
 
-              Expect.equal roundTrippedIds originalIds "descriptor ids preserved"
+              Expect.equal roundTrippedIds originalIds "state identifiers preserved"
 
-          testCase "roundtrip preserves ext elements"
+          testCase "roundtrip preserves ext annotations"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
 
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
-              let originalExts = collectAllExts original
-              let roundTrippedExts = collectAllExts roundTripped
-              Expect.equal roundTrippedExts originalExts "ext elements preserved"
+              let originalExts = collectAllExtAnnotations original
+              let roundTrippedExts = collectAllExtAnnotations roundTripped
+              Expect.equal roundTrippedExts originalExts "ext annotations preserved"
 
           testCase "roundtrip preserves links"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
-
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
-              Expect.equal roundTripped.Links original.Links "links preserved"
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal (getLinks roundTripped) (getLinks original) "links preserved"
 
           testCase "roundtrip preserves version"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
-
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
-              Expect.equal roundTripped.Version original.Version "version preserved"
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal (getVersion roundTripped) (getVersion original) "version preserved"
 
           testCase "roundtrip preserves documentation"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal (getDocumentation roundTripped) (getDocumentation original) "documentation preserved"
 
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
-
-              Expect.equal roundTripped.Documentation original.Documentation "documentation preserved"
-
-          testCase "roundtrip preserves nested descriptor hierarchy"
+          testCase "roundtrip preserves nested transition structure"
           <| fun _ ->
-              let original =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
 
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              // Check XTurn's transitions specifically
+              let originalXTurnTransitions =
+                  getTransitions original |> List.filter (fun t -> t.Source = "XTurn")
 
-              // Check XTurn's nested descriptors specifically
-              let originalXTurn =
-                  original.Descriptors |> List.find (fun d -> d.Id = Some "XTurn")
-
-              let roundTrippedXTurn =
-                  roundTripped.Descriptors |> List.find (fun d -> d.Id = Some "XTurn")
+              let roundTrippedXTurnTransitions =
+                  getTransitions roundTripped |> List.filter (fun t -> t.Source = "XTurn")
 
               Expect.equal
-                  roundTrippedXTurn.Descriptors.Length
-                  originalXTurn.Descriptors.Length
-                  "XTurn nested descriptor count preserved"
+                  roundTrippedXTurnTransitions.Length
+                  originalXTurnTransitions.Length
+                  "XTurn transition count preserved"
 
-              Expect.equal roundTrippedXTurn.Descriptors originalXTurn.Descriptors "XTurn nested descriptors preserved"
+              Expect.equal roundTrippedXTurnTransitions originalXTurnTransitions "XTurn transitions preserved"
 
           testCase "empty document roundtrips"
           <| fun _ ->
               let original =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [] }
 
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              // Generator adds default version "1.0", so the roundtripped doc will have it
+              let roundTrippedWithoutVersion =
+                  { roundTripped with
+                      Annotations =
+                          roundTripped.Annotations
+                          |> List.filter (fun a ->
+                              match a with
+                              | AlpsAnnotation(AlpsVersion _) -> false
+                              | _ -> true) }
 
-              Expect.equal roundTripped original "empty document roundtrips"
+              Expect.equal roundTrippedWithoutVersion original "empty document roundtrips (ignoring default version)"
 
           testCase "document with only version roundtrips"
           <| fun _ ->
               let original =
-                  { Version = Some "1.0"
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
-              let roundTripped =
-                  parseAlpsJson (generateAlpsJson original)
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal roundTripped original "version-only document roundtrips"
 
-              Expect.equal roundTripped original "version-only document roundtrips" ]
+          // ---------------------------------------------------------------
+          // Absorbed from MapperTests.Roundtrip
+          // ---------------------------------------------------------------
+
+          testCase "roundtrip preserves transition events"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalEvents =
+                  getTransitions original |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              let roundTrippedEvents =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              Expect.equal roundTrippedEvents originalEvents "transition events preserved"
+
+          testCase "roundtrip preserves rt targets"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalTargets =
+                  getTransitions original |> List.choose (fun t -> t.Target) |> Set.ofList
+
+              let roundTrippedTargets =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Target) |> Set.ofList
+
+              Expect.equal roundTrippedTargets originalTargets "rt targets preserved"
+
+          testCase "onboarding roundtrip preserves state ids"
+          <| fun _ ->
+              let original = parseOk onboardingAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalIds =
+                  getStates original |> List.map (fun s -> s.Identifier) |> Set.ofList
+
+              let roundTrippedIds =
+                  getStates roundTripped |> List.map (fun s -> s.Identifier) |> Set.ofList
+
+              Expect.equal roundTrippedIds originalIds "onboarding state identifiers preserved"
+
+          testCase "roundtrip preserves guard labels"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalGuards =
+                  getTransitions original |> List.choose (fun t -> t.Guard) |> Set.ofList
+
+              let roundTrippedGuards =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Guard) |> Set.ofList
+
+              Expect.equal roundTrippedGuards originalGuards "guard labels preserved"
+
+          testCase "roundtrip sets version to 1.0"
+          <| fun _ ->
+              let original =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+              Expect.equal (getVersion roundTripped) (Some "1.0") "generator sets version to 1.0"
+
+          testCase "roundtrip preserves title as documentation"
+          <| fun _ ->
+              let original = parseOk ticTacToeAlpsJson "parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalTitle = original.Title
+              let roundTrippedTitle = roundTripped.Title
+              Expect.equal roundTrippedTitle originalTitle "title preserved"
+
+              let originalDocAnnotation = getDocumentation original
+              let roundTrippedDocAnnotation = getDocumentation roundTripped
+              Expect.equal roundTrippedDocAnnotation originalDocAnnotation "documentation annotation preserved" ]
+
+// ---------------------------------------------------------------------------
+// SC-008: Cross-format validator compatibility test
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let crossFormatCompatibilityTests =
+    testList
+        "Alps.CrossFormatValidatorCompatibility"
+        [ testCase "ALPS parser output is accepted by cross-format validator"
+          <| fun _ ->
+              let result = parseAlpsJson ticTacToeAlpsJson
+              Expect.isEmpty result.Errors "parse failed"
+
+              let artifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Alps
+                    Document = result.Document }
+
+              // Verify that a self-consistency validation run succeeds without exceptions
+              let report =
+                  Frank.Statecharts.Validation.Validator.validate
+                      Frank.Statecharts.Validation.SelfConsistencyRules.rules
+                      [ artifact ]
+
+              Expect.isGreaterThan report.TotalChecks 0 "self-consistency rules should run against ALPS artifact"
+              Expect.equal report.TotalFailures 0 "ALPS tic-tac-toe should pass self-consistency"
+
+          testCase "ALPS parser output works in cross-format comparison"
+          <| fun _ ->
+              let result = parseAlpsJson ticTacToeAlpsJson
+              Expect.isEmpty result.Errors "parse failed"
+
+              let alpsArtifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Alps
+                    Document = result.Document }
+
+              // Build a matching SCXML-tagged artifact from the same doc
+              let scxmlArtifact: Frank.Statecharts.Validation.FormatArtifact =
+                  { Format = Frank.Statecharts.Validation.Scxml
+                    Document = result.Document }
+
+              let report =
+                  Frank.Statecharts.Validation.Validator.validate
+                      Frank.Statecharts.Validation.CrossFormatRules.rules
+                      [ alpsArtifact; scxmlArtifact ]
+
+              Expect.isGreaterThan report.TotalChecks 0 "cross-format rules should run"
+              Expect.equal report.TotalFailures 0 "identical documents should have zero cross-format failures" ]
