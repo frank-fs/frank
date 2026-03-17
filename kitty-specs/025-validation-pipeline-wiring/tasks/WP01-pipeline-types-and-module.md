@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Pipeline Types & Module Foundation
-lane: "doing"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: b73e5455785e394d39d47b986125f459682e8eb3
@@ -18,8 +18,8 @@ phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "80597"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-16T19:13:00Z'
   lane: planned
@@ -318,3 +318,4 @@ All parser modules are `internal` but Pipeline lives in the same assembly, so ac
 - 2026-03-17T22:52:51Z – claude-opus – shell_pid=80000 – lane=doing – Assigned agent via workflow command
 - 2026-03-17T22:54:20Z – claude-opus – shell_pid=80000 – lane=for_review – Ready for review: types + Pipeline module, build green
 - 2026-03-17T22:54:26Z – claude-opus-reviewer – shell_pid=80597 – lane=doing – Started review via workflow command
+- 2026-03-17T22:55:38Z – claude-opus-reviewer – shell_pid=80597 – lane=done – Review passed: types match data-model, Pipeline module public, all edge cases handled, build green
