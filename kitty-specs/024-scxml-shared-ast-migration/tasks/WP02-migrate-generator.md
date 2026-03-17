@@ -9,12 +9,12 @@ subtasks:
   - "T022"
 title: "Migrate Generator to Shared AST"
 phase: "Phase 1 - Core Migration"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "claude-opus"
 dependencies: ["WP01"]
 requirement_refs: [FR-017, FR-018, FR-019, FR-020, FR-021, FR-022, FR-023, FR-024]
 history:
@@ -395,6 +395,7 @@ spec-kitty implement WP02 --base WP01
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-16T19:26:17Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T23:45:00Z -- claude-opus -- lane=done -- Review APPROVED. All 6 subtasks (T017-T022) verified. Generator.fs correctly consumes StatechartDocument, extracts all 8 ScxmlMeta annotation cases, produces valid SCXML XML, and has zero references to old format-specific types. Code follows WSD Serializer precedent pattern faithfully.
 
 ---
 

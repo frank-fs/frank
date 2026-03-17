@@ -2,12 +2,12 @@
 work_package_id: "WP05"
 title: "Build Verification and Cleanup"
 phase: "Phase 4 - Verification"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "claude-opus"
 dependencies: ["WP04"]
 requirement_refs: ["FR-022", "FR-023"]
 subtasks:
@@ -215,3 +215,4 @@ spec-kitty implement WP05 --base WP04
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T22:30:00Z -- claude-opus -- lane=done -- Review APPROVED. All 5 success criteria (SC-005 through SC-009) independently verified: Release build succeeds across net8.0/net9.0/net10.0 with 0 errors and 0 warnings; 156 Smcat tests pass; 818 total tests pass (no regressions); zero references to deleted types in src/ and test/; Mapper.fs confirmed deleted; 18 CrossFormat and 104 Validation tests pass.

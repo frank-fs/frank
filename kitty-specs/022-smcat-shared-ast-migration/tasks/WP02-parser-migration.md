@@ -2,12 +2,12 @@
 work_package_id: "WP02"
 title: "Parser Migration to Shared AST"
 phase: "Phase 1 - Foundation"
-lane: "planned"
+lane: "done"
 assignee: ""
 agent: ""
 shell_pid: ""
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "claude-opus"
 dependencies: ["WP01"]
 requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-009", "FR-010"]
 subtasks:
@@ -452,3 +452,4 @@ spec-kitty implement WP02 --base WP01
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-16T21:00:00Z -- claude-opus -- lane=done -- Review approved. All 7 subtasks (T004-T010) pass. Parser produces Ast.ParseResult with StatechartDocument directly. No references to deleted smcat-specific types. Commit ddc5d67.

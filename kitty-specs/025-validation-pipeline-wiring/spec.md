@@ -104,7 +104,7 @@ Integration tests parse the same tic-tac-toe state machine expressed in real WSD
 ### Edge Cases
 
 - Empty source list (no formats provided) produces a valid `PipelineResult` with an empty `ValidationReport` (zero checks, zero failures)
-- Duplicate format tags in the input (e.g., two WSD sources) produces an error result indicating that each format may appear at most once
+- Duplicate format tags in the input (e.g., two WSD sources) produces an error result indicating that each format may appear at most once. Note: Duplicate format checking is performed first (input validation), before any parsing begins. Once duplicates are rejected, unsupported format checking occurs for the remaining unique tags.
 - Unsupported `FormatTag` value (e.g., `XState`) that has no registered parser produces a parse error for that format rather than crashing
 - A format source that is an empty string produces a parse result with appropriate errors or warnings (parser-dependent behavior), and validation runs on the resulting empty document
 - Very large source text (thousands of lines) does not cause excessive memory allocation or timeout -- the pipeline delegates to existing parsers that already handle large inputs
@@ -125,7 +125,7 @@ Integration tests parse the same tic-tac-toe state machine expressed in real WSD
 - **FR-009**: System MUST handle parse failures gracefully -- when a parser returns errors, the best-effort `ParseResult.Document` is still used for validation (per the shared AST contract that `Document` is always populated)
 - **FR-010**: System MUST reject duplicate `FormatTag` values in the input list and return an error indicating which format was duplicated
 - **FR-011**: System MUST return a valid result (not throw an exception) for an empty input list, producing a `ValidationReport` with zero checks
-- **FR-012**: System MUST report an error for `FormatTag` values that have no registered parser (currently `XState` has no parser), rather than crashing
+- **FR-012**: System MUST report an error for `FormatTag` values that have no registered parser (currently `XState` has no parser), rather than crashing. When an unsupported format is encountered, the pipeline adds `UnsupportedFormat` to errors and continues processing remaining formats rather than aborting the entire pipeline.
 - **FR-013**: The `Pipeline` module MUST be public (not `internal`) so that external consumers (e.g., frank-cli) can call it
 - **FR-014**: System MUST allow callers to optionally provide additional custom `ValidationRule` values beyond the built-in self-consistency and cross-format rules
 

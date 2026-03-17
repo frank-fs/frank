@@ -116,12 +116,14 @@ See `kitty-specs/025-validation-pipeline-wiring/data-model.md` for full type def
 `Pipeline.fs` -- a public module `Frank.Statecharts.Validation.Pipeline` containing:
 
 1. **`parserFor`** (private): `FormatTag -> (string -> Ast.ParseResult) option`
-   - Match on `FormatTag` and return the corresponding parser function
-   - `Wsd -> Some Wsd.Parser.parseWsd`
-   - `Smcat -> Some Smcat.Parser.parseSmcat` (post-migration)
-   - `Scxml -> Some (fun s -> Scxml.Parser.parseString s)` (post-migration, returns `Ast.ParseResult` directly)
-   - `Alps -> Some Alps.JsonParser.parseAlps` (post-migration, returns `Ast.ParseResult` directly)
-   - `XState -> None` (no parser exists)
+   - Match on `FormatTag` and return a function that parses text to `Ast.ParseResult`
+   - `Wsd -> Some Wsd.Parser.parseWsd` (already returns `Ast.ParseResult` directly)
+   - `XState -> None` (no parser exists yet)
+   - For smcat, SCXML, and ALPS: these parsers currently return format-specific types and require a mapper step to produce `StatechartDocument`. The `parserFor` function must compose the parser and mapper calls into a single `string -> Ast.ParseResult` function. **Post-migration** (after specs 022/023/024 complete), these become direct calls. **Pre-migration** (current state), the composed calls are:
+     - `Smcat -> Some (fun s -> let r = Smcat.Parser.parseSmcat s in Smcat.Mapper.toStatechartDocument r)` -- compose parser + mapper
+     - `Scxml -> Some (fun s -> let r = Scxml.Parser.parseString s in Scxml.Mapper.toStatechartDocument r)` -- compose parser + mapper
+     - `Alps -> Some (fun s -> let r = Alps.JsonParser.parseAlpsJson s in Alps.Mapper.toStatechartDocument r)` -- compose parser + mapper (note: `parseAlpsJson` returns `Result<AlpsDocument, ...>`, so error handling is needed)
+   - The tasks (WP01) already describe this correctly. When specs 022/023/024 land, these simplify to direct parser calls returning `Ast.ParseResult`.
 
 2. **`validateSources`** (public): `(FormatTag * string) list -> PipelineResult`
    - Validate input: check for empty list (return empty result), duplicate formats (return error)

@@ -6,7 +6,7 @@
 
 ## Summary
 
-Migrate the ALPS JSON parser and generator from format-specific types (`AlpsDocument`, `Descriptor`, `AlpsParseError`) to the shared `StatechartDocument` AST established by spec 020. The parser absorbs the descriptor-to-state mapping heuristics currently in `Mapper.fs`, producing `ParseResult` directly. The generator reconstructs the ALPS descriptor hierarchy from `StatechartDocument` with `AlpsMeta` annotations, including generator-side deduplication of shared transitions. The `AlpsMeta` discriminated union is extended with 4 new cases and the existing `AlpsExtension` case is expanded for full-fidelity roundtripping. After migration, `Alps/Types.fs` format-specific types and `Alps/Mapper.fs` are deleted. All ~89 tests are migrated to shared AST types.
+Migrate the ALPS JSON parser and generator from format-specific types (`AlpsDocument`, `Descriptor`, `AlpsParseError`) to the shared `StatechartDocument` AST established by spec 020. The parser absorbs the descriptor-to-state mapping heuristics currently in `Mapper.fs`, producing `ParseResult` directly. The generator reconstructs the ALPS descriptor hierarchy from `StatechartDocument` with `AlpsMeta` annotations, including generator-side deduplication of shared transitions. The `AlpsMeta` discriminated union is extended with 4 new cases and the existing `AlpsExtension` case is expanded for full-fidelity roundtripping. After migration, `Alps/Types.fs` format-specific types and `Alps/Mapper.fs` are deleted. All ~110 tests are migrated to shared AST types.
 
 ## Technical Context
 
@@ -18,7 +18,7 @@ Migrate the ALPS JSON parser and generator from format-specific types (`AlpsDocu
 **Project Type**: Single library project with test project
 **Performance Goals**: N/A (not a hot path -- parse/generate are startup-time or developer-tool operations)
 **Constraints**: Must preserve existing roundtrip property; must not break cross-format validator
-**Scale/Scope**: 4 source files modified/deleted, 5 test files modified/deleted, ~89 tests migrated
+**Scale/Scope**: 4 source files modified/deleted, 5 test files modified/deleted, ~110 tests migrated
 
 ## Constitution Check
 
@@ -199,11 +199,11 @@ Document-level annotations:
 | Current File | Action | Target File | Test Count |
 |-------------|--------|-------------|------------|
 | `GoldenFiles.fs` | Unchanged | `GoldenFiles.fs` | 0 (data) |
-| `TypeTests.fs` | Delete | N/A | 12 deleted |
-| `JsonParserTests.fs` | Rewrite | `JsonParserTests.fs` | ~29 rewritten + ~15 absorbed from MapperTests |
-| `JsonGeneratorTests.fs` | Rewrite | `JsonGeneratorTests.fs` | ~17 rewritten |
-| `MapperTests.fs` | Delete (absorbed) | `JsonParserTests.fs` | 22 absorbed |
-| `RoundTripTests.fs` | Rewrite | `RoundTripTests.fs` | 9 rewritten |
+| `TypeTests.fs` | Delete | N/A | 10 deleted |
+| `JsonParserTests.fs` | Rewrite | `JsonParserTests.fs` | 39 rewritten + ~23 absorbed from MapperTests |
+| `JsonGeneratorTests.fs` | Rewrite | `JsonGeneratorTests.fs` | 16 rewritten |
+| `MapperTests.fs` | Delete (absorbed) | `JsonParserTests.fs` | 33 absorbed |
+| `RoundTripTests.fs` | Rewrite | `RoundTripTests.fs` | 10 rewritten |
 
 **Parser test absorption**: The following MapperTests test lists are absorbed into JsonParserTests:
 - `Alps.Mapper.StateExtraction` (5 tests) -> new `Alps.JsonParser.StateExtraction` test list

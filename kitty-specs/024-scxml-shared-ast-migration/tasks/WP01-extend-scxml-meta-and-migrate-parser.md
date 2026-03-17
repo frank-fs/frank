@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Extend ScxmlMeta DU + Migrate Parser to Shared AST
-lane: "for_review"
+lane: "done"
 dependencies: []
 base_branch: master
 base_commit: 2c8d91f0f1fe2b6bc3c8f334aa5d366779bd4ec9
@@ -27,8 +27,8 @@ phase: Phase 0+1 - Foundation & Parser Migration
 assignee: ''
 agent: "claude-opus"
 shell_pid: "26098"
-review_status: ''
-reviewed_by: ''
+review_status: approved
+reviewed_by: claude-opus
 history:
 - timestamp: '2026-03-16T19:26:17Z'
   lane: planned
@@ -565,3 +565,4 @@ To change a work package's lane, either:
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-16T22:51:46Z – claude-opus – shell_pid=26098 – lane=doing – Assigned agent via workflow command
 - 2026-03-16T22:57:38Z – claude-opus – shell_pid=26098 – lane=for_review – Ready for review: Extended ScxmlMeta DU with 5 new cases and 2 extended cases, migrated SCXML parser to produce Ast.ParseResult directly, deleted Mapper.fs. Build passes on all 3 TFMs with 0 warnings/errors.
+- 2026-03-16T23:15:00Z – claude-opus – lane=done – review_status=approved – Code review APPROVED. All 16 subtasks verified: ScxmlMeta DU has 8 cases (correct), parser returns Ast.ParseResult from all 3 entry points, Mapper.fs deleted and removed from fsproj, Generator also migrated to shared AST (bonus), test files updated for extended DU signatures, no remaining references to old SCXML types. No blocking issues found.

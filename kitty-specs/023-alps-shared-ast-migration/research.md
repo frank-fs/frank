@@ -60,13 +60,13 @@ type AlpsMeta =
 | File | Test count | Migration impact |
 |------|-----------|-----------------|
 | `GoldenFiles.fs` | 0 (data only) | No changes needed |
-| `TypeTests.fs` | 12 tests | Must be rewritten or deleted — tests construct `AlpsDocument` directly |
-| `JsonParserTests.fs` | 29 tests | Must be rewritten — parser returns `ParseResult` not `Result<AlpsDocument, ...>` |
-| `JsonGeneratorTests.fs` | 17 tests | Must be rewritten — generator accepts `StatechartDocument` |
-| `MapperTests.fs` | 22 tests | Absorbed into `JsonParserTests.fs` — file deleted |
-| `RoundTripTests.fs` | 9 tests | Must be rewritten — roundtrip compares `StatechartDocument` equality |
+| `TypeTests.fs` | 10 tests | Must be rewritten or deleted — tests construct `AlpsDocument` directly |
+| `JsonParserTests.fs` | 39 tests (16 core + 15 edge case + 8 error) | Must be rewritten — parser returns `ParseResult` not `Result<AlpsDocument, ...>` |
+| `JsonGeneratorTests.fs` | 16 tests (4 core + 12 structure) | Must be rewritten — generator accepts `StatechartDocument` |
+| `MapperTests.fs` | 33 tests | Absorbed into `JsonParserTests.fs` — file deleted |
+| `RoundTripTests.fs` | 10 tests | Must be rewritten — roundtrip compares `StatechartDocument` equality |
 
-**Total**: ~89 tests across 5 test files. All depend on `Alps.Types` types that will be deleted.
+**Total**: ~110 tests across 5 test files (plus 1 AST partial population test). All depend on `Alps.Types` types that will be deleted.
 
 ## 5. Risks: ALPS Descriptor Hierarchy Reconstruction in Generator
 

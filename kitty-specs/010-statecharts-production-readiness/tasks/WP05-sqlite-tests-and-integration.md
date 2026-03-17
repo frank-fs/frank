@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: SQLite Store Tests + DI Registration + Integration
-lane: planned
+lane: done
 dependencies:
 - WP04
 - WP01
@@ -377,6 +377,7 @@ Create the SQLite store test project, add comprehensive tests, implement the DI 
 > **CRITICAL**: Activity log entries MUST be in chronological order (oldest first, newest last).
 
 - 2026-03-16T00:05:00Z -- system -- lane=planned -- Prompt generated via /spec-kitty.tasks
+- 2026-03-16T18:30:00Z -- system -- lane=done -- Manually marked complete (WP05 was implemented in prior session)
 
 ---
 

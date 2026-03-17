@@ -106,7 +106,7 @@ A developer passes a `StatechartDocument` to a new `serialize` function and rece
 
 ### User Story 3 - Generator Produces Shared AST from Runtime Metadata (Priority: P1)
 
-A developer passes `StateMachineMetadata` (Frank runtime metadata) to the smcat `Generator.generate` function and receives a `Result<StatechartDocument, GeneratorError>`. This follows the exact same pattern as `Wsd.Generator.generate` -- validating the boxed Machine type, extracting states from `StateHandlerMap`, ordering them (initial first), creating `StateDecl` and `TransitionElement` entries, and returning a `StatechartDocument`.
+A developer passes `StateMachineMetadata` (Frank runtime metadata) to the smcat `Generator.generate` function and receives a `Result<StatechartDocument, GeneratorError>`. This follows the same structural pattern as `Wsd.Generator.generate` -- validating the boxed Machine type, extracting states from `StateHandlerMap`, ordering them (initial first), creating `StateDecl` and `TransitionElement` entries, and returning a `StatechartDocument`. However, the smcat Generator intentionally diverges from WSD by also producing initial-to-first-state and state-to-final transition elements (e.g., `initial => Idle;` and `Done => final;`), which are idiomatic smcat constructs that the WSD Generator does not produce. This is intentional smcat-specific behavior, not a bug.
 
 **Why this priority**: The generator bridges runtime metadata to the shared AST, enabling `frank statechart generate smcat` CLI command (#94). The current Generator.fs bypasses the AST entirely (metadata -> raw text), which must change.
 
@@ -116,7 +116,7 @@ A developer passes `StateMachineMetadata` (Frank runtime metadata) to the smcat 
 
 1. **Given** `StateMachineMetadata` with states `["Idle"; "Active"; "Done"]` and `InitialStateKey = "Idle"`, **When** `generate` is called, **Then** the result contains `StateDecl` nodes in order: `Idle` (initial), then `Active`, `Done` (alphabetical).
 2. **Given** `StateMachineMetadata` with `StateHandlerMap` containing `("Idle", [("GET", _); ("POST", _)])`, **When** generated, **Then** self-transition `TransitionElement` entries are created for each HTTP method.
-3. **Given** `StateMachineMetadata` with `GuardNames = ["isReady"; "isAdmin"]`, **When** generated, **Then** guard information is stored in the AST (as `NoteElement` with guard data, following WSD pattern).
+3. **Given** `StateMachineMetadata` with `GuardNames = ["isReady"; "isAdmin"]`, **When** generated, **Then** guard information is stored in the AST as `NoteElement` entries with plain text content (e.g., `"Guard: isReady"`). Note: The smcat Generator does NOT use `WsdAnnotation(WsdGuardData ...)` for guards. Since smcat has no guard syntax, the Generator stores guard information as `NoteElement` with plain text content (no format-specific annotation). The smcat Serializer will skip `NoteElement` entries, which is acceptable because the Generator's output goes through format-specific Serializers that handle their own conventions.
 4. **Given** an invalid boxed `Machine` object, **When** `generate` is called, **Then** the result is `Error(UnrecognizedMachineType ...)`.
 
 ---
@@ -187,7 +187,7 @@ All existing smcat tests (parser, generator, lexer, label parser, round-trip, er
 #### Serializer (New)
 
 - **FR-011**: New `Serializer.fs` MUST provide a `serialize` function with signature `StatechartDocument -> string` that produces valid smcat text
-- **FR-012**: Serializer MUST reconstruct state declarations with type markers, activities (from `StateNode.Activities`), attributes (from `SmcatAnnotation` entries), and composite state blocks (from `StateNode.Children`)
+- **FR-012**: Serializer MUST reconstruct state declarations with type markers, activities (from `StateNode.Activities`), attributes (from `SmcatAnnotation` entries), and composite state blocks (from `StateNode.Children`). Note: The smcat Serializer ignores `NoteElement`, `GroupElement`, and `DirectiveElement` cases since smcat has no syntax for these constructs. Only `StateDecl` and `TransitionElement` are serialized to smcat text output.
 - **FR-013**: Serializer MUST reconstruct transition arrows with labels in the format `source => target: event [guard] / action;`
 - **FR-014**: Serializer MUST use sensible defaults when `SmcatAnnotation` entries are absent: no attributes, no activities, regular state type
 

@@ -113,12 +113,16 @@ A new `Serializer.fs` with signature `serialize: StatechartDocument -> string` p
 
 ### DD-003: Generator refactored to metadata-to-AST
 
-`Generator.fs` is refactored to produce `Result<StatechartDocument, GeneratorError>` from `StateMachineMetadata`, following the exact `Wsd.Generator` pattern:
+`Generator.fs` is refactored to produce `Result<StatechartDocument, GeneratorError>` from `StateMachineMetadata`, following the same structural pattern as `Wsd.Generator`:
 - Validate boxed `Machine` type
 - Extract states from `StateHandlerMap`
 - Order states (initial first, others alphabetically)
 - Create `StateDecl` and `TransitionElement` entries
 - Return `StatechartDocument`
+
+**Intentional divergence from WSD Generator**: The smcat Generator also produces initial-to-first-state transitions (e.g., `initial => Idle`) and state-to-final transitions (for states marked as final). These are idiomatic smcat constructs that the WSD Generator does not produce. This smcat-specific behavior is preserved in the migration.
+
+**Guard annotation**: The smcat Generator stores guard information as `NoteElement` entries with plain text content (e.g., `"Guard: isReady"`), NOT as `WsdAnnotation(WsdGuardData ...)`. Since smcat has no guard syntax, format-specific guard annotations are unnecessary. The smcat Serializer will skip `NoteElement` entries, which is acceptable because the Generator's output goes through format-specific Serializers that handle their own conventions.
 
 The existing `formatLabel`, `formatTransition`, `generateTo` functions are deleted (their logic moves to `Serializer.fs`). The `GenerateOptions` type is retained.
 

@@ -86,7 +86,7 @@ spec-kitty implement WP01
 
 **Key constraint**: The spec assumes all parsers return `Ast.ParseResult` directly (post-migration). However, the current codebase has:
 - **WSD**: `Wsd.Parser.parseWsd : string -> ParseResult` -- already returns `Ast.ParseResult` directly. Module is `internal`.
-- **smcat**: `Smcat.Parser.parseSmcat : string -> ParseResult` -- already returns `Ast.ParseResult` directly. Module is `internal`.
+- **smcat**: `Smcat.Parser.parseSmcat : string -> Smcat.Types.ParseResult` -- returns smcat-specific `ParseResult` (with `SmcatDocument`). Needs `Smcat.Mapper.toStatechartDocument : Smcat.Types.ParseResult -> Ast.ParseResult`. Module is `internal`.
 - **SCXML**: `Scxml.Parser.parseString : string -> ScxmlParseResult` -- returns SCXML-specific type. Needs `Scxml.Mapper.toStatechartDocument : ScxmlParseResult -> Ast.ParseResult`.
 - **ALPS**: `Alps.JsonParser.parseAlpsJson : string -> Result<AlpsDocument, AlpsParseError list>` -- returns `Result` of ALPS-specific types. Needs `Alps.Mapper.toStatechartDocument : AlpsDocument -> StatechartDocument` plus manual error conversion.
 
@@ -171,7 +171,7 @@ The pipeline MUST adapt to the current parser interfaces using the existing Mapp
       let private parserFor (tag: FormatTag) : (string -> ParseResult) option =
           match tag with
           | Wsd -> Some Wsd.Parser.parseWsd
-          | Smcat -> Some Smcat.Parser.parseSmcat
+          | Smcat -> Some (fun s -> Smcat.Mapper.toStatechartDocument (Smcat.Parser.parseSmcat s))
           | Scxml -> Some (fun s -> Scxml.Mapper.toStatechartDocument (Scxml.Parser.parseString s))
           | Alps ->
               Some (fun s ->
@@ -185,9 +185,9 @@ The pipeline MUST adapt to the current parser interfaces using the existing Mapp
                           |> List.map (fun e ->
                               { Position = None
                                 Description = e.ToString()
-                                Expected = None
-                                Found = None
-                                CorrectiveExample = None })
+                                Expected = ""
+                                Found = ""
+                                CorrectiveExample = "" })
                       { Document =
                             { Title = None
                               InitialStateId = None

@@ -13,7 +13,7 @@ assignee: ""
 agent: ""
 shell_pid: ""
 review_status: "approved"
-reviewed_by: "Ryan Riley"
+reviewed_by: "claude-opus"
 history:
   - timestamp: "2026-03-16T19:13:00Z"
     lane: "planned"
@@ -151,4 +151,4 @@ spec-kitty implement WP01
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
-- 2026-03-16T23:01:00Z – unknown – lane=done – Review passed (claude-opus): All 3 subtasks correctly implemented. T001: Types.fs reduced to lexer-only types (TokenKind, Token, SmcatAttribute, TransitionLabel, inferStateType). T002: LabelParser.fs uses Ast.SourcePosition and Ast.ParseWarning with Position wrapped in Some. T003: fsproj swaps Mapper.fs for Serializer.fs, stub Serializer.fs created. Lexer.fs correctly updated with open Ast.
+- 2026-03-16T23:01:00Z -- claude-opus -- lane=done -- Review APPROVED: All 3 subtasks verified. T001: AlpsMeta DU extended with 4 new cases (AlpsDocumentation, AlpsLink, AlpsDataDescriptor, AlpsVersion) and AlpsExtension expanded from (name, value) to (id, href option, value option). Type matches target shape exactly. T002: No pattern match updates needed -- grep confirms no code pattern-matches on AlpsMeta.AlpsExtension (only Alps.Types.AlpsExtension record). T003: Build passes 0 errors across net8.0/net9.0/net10.0; all 828 tests pass. Stub comment removed from doc. Commit 9e9e71f.
