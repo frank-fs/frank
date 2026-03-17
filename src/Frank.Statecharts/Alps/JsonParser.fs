@@ -2,7 +2,6 @@ module internal Frank.Statecharts.Alps.JsonParser
 
 open System.Text.Json
 open Frank.Statecharts.Ast
-open Frank.Statecharts.Alps.Types
 
 // ---------------------------------------------------------------------------
 // Private intermediate types for JSON parsing pass (T004)

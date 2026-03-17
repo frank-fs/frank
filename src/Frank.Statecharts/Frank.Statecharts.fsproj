@@ -29,10 +29,8 @@
     <Compile Include="Smcat/Parser.fs" />
     <Compile Include="Smcat/Mapper.fs" />
     <!-- ALPS parser -->
-    <Compile Include="Alps/Types.fs" />
     <Compile Include="Alps/JsonParser.fs" />
     <Compile Include="Alps/JsonGenerator.fs" />
-    <Compile Include="Alps/Mapper.fs" />
     <!-- SCXML parser -->
     <Compile Include="Scxml/Types.fs" />
     <Compile Include="Scxml/Parser.fs" />
