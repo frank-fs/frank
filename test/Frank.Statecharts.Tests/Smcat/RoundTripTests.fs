@@ -1,9 +1,10 @@
 module Frank.Statecharts.Tests.Smcat.RoundTripTests
 
 open Expecto
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 open Frank.Statecharts.Smcat.Parser
-open Frank.Statecharts.Smcat.Generator
+open Frank.Statecharts.Smcat.Serializer
 
 // =============================================================================
 // Golden File Examples
@@ -40,104 +41,59 @@ operating {
 operating => final: powerOff;"""
 
 // =============================================================================
-// Test-Only Generator Helper: generates smcat text from a parsed SmcatDocument
-// =============================================================================
-
-/// Format a TransitionLabel back into the "event [guard] / action" string format.
-let private formatLabelText (label: TransitionLabel) : string option =
-    formatLabel label.Event label.Guard label.Action
-
-/// Generate smcat text from an SmcatDocument AST (test-only helper).
-/// This re-serializes the parsed AST back to smcat text for roundtrip validation.
-/// Features that survive roundtrip: state names, transitions, labels (event/guard/action).
-/// Features that do NOT survive: comments, state activities, state/transition attributes,
-/// element ordering (preserved), whitespace formatting.
-let rec private generateFromDocument (doc: SmcatDocument) (indent: string) : string =
-    let lines = ResizeArray<string>()
-
-    for element in doc.Elements do
-        match element with
-        | TransitionElement t ->
-            let label = t.Label |> Option.bind formatLabelText
-
-            let line =
-                match label with
-                | Some l -> sprintf "%s%s => %s: %s;" indent t.Source t.Target l
-                | None -> sprintf "%s%s => %s;" indent t.Source t.Target
-
-            lines.Add(line)
-        | StateDeclaration s ->
-            match s.Children with
-            | Some childDoc ->
-                // Composite state: emit name { children };
-                lines.Add(sprintf "%s%s {" indent s.Name)
-                let childText = generateFromDocument childDoc (indent + "  ")
-
-                if childText.Length > 0 then
-                    lines.Add(childText)
-
-                lines.Add(sprintf "%s};" indent)
-            | None ->
-                // Only emit explicit state declarations if they have no transitions
-                // referencing them (standalone state declarations like "idle;")
-                lines.Add(sprintf "%s%s;" indent s.Name)
-        | CommentElement _ ->
-            // Comments do not survive roundtrip (by design)
-            ()
-
-    lines |> String.concat "\n"
-
-let private generateSmcatFromDocument (doc: SmcatDocument) : string =
-    generateFromDocument doc ""
-
-// =============================================================================
 // Semantic Equivalence Comparison
 // =============================================================================
 
-/// Extract the set of (stateName, stateType) pairs from all transitions and
-/// state declarations in a document (recursively for composite states).
-let rec private extractStateSet (doc: SmcatDocument) : Set<string * StateType> =
+/// Extract the set of (stateName, stateKind) pairs from all elements in a document
+/// (recursively for composite states).
+let rec private extractStateSet (doc: StatechartDocument) : Set<string * StateKind> =
     doc.Elements
     |> List.collect (fun el ->
         match el with
         | TransitionElement t ->
-            [ (t.Source, inferStateType t.Source [])
-              (t.Target, inferStateType t.Target []) ]
-        | StateDeclaration s ->
-            let childStates =
-                match s.Children with
-                | Some childDoc -> extractStateSet childDoc |> Set.toList
+            let targetStates =
+                match t.Target with
+                | Some target -> [ (target, inferStateType target []) ]
                 | None -> []
-
-            (s.Name, s.StateType) :: childStates
-        | CommentElement _ -> [])
+            (t.Source, inferStateType t.Source []) :: targetStates
+        | StateDecl s ->
+            let childStates =
+                extractStateSetFromChildren s.Children
+            (s.Identifier, s.Kind) :: childStates
+        | _ -> [])
     |> Set.ofList
+
+and private extractStateSetFromChildren (children: StateNode list) : (string * StateKind) list =
+    children
+    |> List.collect (fun s ->
+        let nested = extractStateSetFromChildren s.Children
+        (s.Identifier, s.Kind) :: nested)
 
 /// Extract the set of (source, target, event, guard, action) tuples from all
 /// transitions in a document (recursively for composite states).
 let rec private extractTransitionSet
-    (doc: SmcatDocument)
-    : Set<string * string * string option * string option * string option> =
+    (doc: StatechartDocument)
+    : Set<string * string option * string option * string option * string option> =
     doc.Elements
     |> List.collect (fun el ->
         match el with
         | TransitionElement t ->
-            let (ev, gd, ac) =
-                match t.Label with
-                | Some l -> (l.Event, l.Guard, l.Action)
-                | None -> (None, None, None)
-
-            [ (t.Source, t.Target, ev, gd, ac) ]
-        | StateDeclaration s ->
-            match s.Children with
-            | Some childDoc -> extractTransitionSet childDoc |> Set.toList
-            | None -> []
-        | CommentElement _ -> [])
+            [ (t.Source, t.Target, t.Event, t.Guard, t.Action) ]
+        | StateDecl s ->
+            extractTransitionSetFromChildren s.Children
+        | _ -> [])
     |> Set.ofList
 
-/// Assert that two SmcatDocument ASTs are semantically equivalent.
+and private extractTransitionSetFromChildren (children: StateNode list) : (string * string option * string option * string option * string option) list =
+    // Child transitions are lifted to the parent elements, so children don't carry transitions.
+    // Just recurse into nested children.
+    children
+    |> List.collect (fun s ->
+        extractTransitionSetFromChildren s.Children)
+
+/// Assert that two StatechartDocument ASTs are semantically equivalent.
 /// Compares state sets and transition sets (order-independent).
-let private assertSemanticEquivalence (doc1: SmcatDocument) (doc2: SmcatDocument) =
+let private assertSemanticEquivalence (doc1: StatechartDocument) (doc2: StatechartDocument) =
     let states1 = extractStateSet doc1
     let states2 = extractStateSet doc2
     Expect.equal states1 states2 "State sets should be equivalent"
@@ -150,14 +106,14 @@ let private assertSemanticEquivalence (doc1: SmcatDocument) (doc2: SmcatDocument
 // Roundtrip Cycle Helper
 // =============================================================================
 
-/// Run the full roundtrip cycle: parse -> generate -> re-parse -> compare.
+/// Run the full roundtrip cycle: parse -> serialize -> re-parse -> compare.
 let private roundtrip (smcatText: string) =
     // Step 1: Parse original text
     let result1 = parseSmcat smcatText
     Expect.isEmpty result1.Errors (sprintf "Original parse should have no errors, got: %A" result1.Errors)
 
-    // Step 2: Generate smcat text from the parsed AST
-    let generatedText = generateSmcatFromDocument result1.Document
+    // Step 2: Serialize the parsed AST back to smcat text
+    let generatedText = serialize result1.Document
 
     // Step 3: Re-parse generated text
     let result2 = parseSmcat generatedText
@@ -219,7 +175,7 @@ a => c: stay;"""
           <| fun _ ->
               let result1 = parseSmcat ""
               Expect.isEmpty result1.Errors "no errors"
-              let generatedText = generateSmcatFromDocument result1.Document
+              let generatedText = serialize result1.Document
               let result2 = parseSmcat generatedText
               Expect.isEmpty result2.Errors "no errors on re-parse"
               assertSemanticEquivalence result1.Document result2.Document
@@ -262,7 +218,7 @@ let semanticEquivalenceTests =
               // Verify guard+action transition
               let guardAction =
                   transitions
-                  |> Set.filter (fun (s, t, _, _, _) -> s = "WIP" && t = "customerData")
+                  |> Set.filter (fun (s, t, _, _, _) -> s = "WIP" && t = Some "customerData")
 
               Expect.equal guardAction.Count 1 "one WIP->customerData transition"
 
@@ -302,9 +258,9 @@ a => final: done;"""
           testCase "deterministic roundtrip - same input produces same output"
           <| fun _ ->
               let result1 = parseSmcat goldenBranchingGuards
-              let gen1 = generateSmcatFromDocument result1.Document
+              let gen1 = serialize result1.Document
               let result2 = parseSmcat goldenBranchingGuards
-              let gen2 = generateSmcatFromDocument result2.Document
+              let gen2 = serialize result2.Document
               Expect.equal gen1 gen2 "deterministic generation" ]
 
 // =============================================================================
@@ -320,7 +276,7 @@ let successCriteriaTests =
               // Parse golden file 2 (most complex flat example)
               let result1 = parseSmcat goldenBranchingGuards
               Expect.isEmpty result1.Errors "original parse succeeds"
-              let generated = generateSmcatFromDocument result1.Document
+              let generated = serialize result1.Document
               let result2 = parseSmcat generated
               Expect.isEmpty result2.Errors "re-parse succeeds"
 
