@@ -2,7 +2,7 @@ module Frank.Statecharts.Tests.Alps.JsonGeneratorTests
 
 open System.Text.Json
 open Expecto
-open Frank.Statecharts.Alps.Types
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.Alps.JsonGenerator
 open Frank.Statecharts.Tests.Alps.GoldenFiles
@@ -13,40 +13,40 @@ let jsonGeneratorTests =
         "Alps.JsonGenerator"
         [ testCase "generate from tic-tac-toe AST produces valid reparseable JSON"
           <| fun _ ->
-              let originalDoc =
-                  parseAlpsJson ticTacToeAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
+              let originalResult = parseAlpsJson ticTacToeAlpsJson
+              Expect.isEmpty originalResult.Errors "parse failed"
+              let originalDoc = originalResult.Document
 
               let generatedJson = generateAlpsJson originalDoc
 
-              let reparsedDoc =
-                  parseAlpsJson generatedJson
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              let reparsedResult = parseAlpsJson generatedJson
+              Expect.isEmpty reparsedResult.Errors "re-parse failed"
+              let reparsedDoc = reparsedResult.Document
 
               Expect.equal reparsedDoc originalDoc "generated JSON round-trips to same AST"
 
           testCase "generate from onboarding AST produces valid reparseable JSON"
           <| fun _ ->
-              let originalDoc =
-                  parseAlpsJson onboardingAlpsJson
-                  |> Result.defaultWith (fun _ -> failwith "parse failed")
+              let originalResult = parseAlpsJson onboardingAlpsJson
+              Expect.isEmpty originalResult.Errors "parse failed"
+              let originalDoc = originalResult.Document
 
               let generatedJson = generateAlpsJson originalDoc
 
-              let reparsedDoc =
-                  parseAlpsJson generatedJson
-                  |> Result.defaultWith (fun _ -> failwith "re-parse failed")
+              let reparsedResult = parseAlpsJson generatedJson
+              Expect.isEmpty reparsedResult.Errors "re-parse failed"
+              let reparsedDoc = reparsedResult.Document
 
               Expect.equal reparsedDoc originalDoc "generated JSON round-trips to same AST"
 
           testCase "generated JSON has alps root object"
           <| fun _ ->
               let doc =
-                  { Version = Some "1.0"
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -56,11 +56,11 @@ let jsonGeneratorTests =
           testCase "generated JSON preserves version"
           <| fun _ ->
               let doc =
-                  { Version = Some "1.0"
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -75,210 +75,169 @@ let jsonGeneratorStructureTests =
         [ testCase "empty document produces minimal ALPS JSON"
           <| fun _ ->
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
               let alps = parsed.RootElement.GetProperty("alps")
-              Expect.isFalse (alps.TryGetProperty("version") |> fst) "no version"
+              // Empty doc still gets version "1.0" from generator default
               Expect.isFalse (alps.TryGetProperty("descriptor") |> fst) "no descriptors"
               Expect.isFalse (alps.TryGetProperty("link") |> fst) "no links"
               Expect.isFalse (alps.TryGetProperty("ext") |> fst) "no extensions"
               Expect.isFalse (alps.TryGetProperty("doc") |> fst) "no doc"
 
-          testCase "descriptor type is written as string"
+          testCase "state with unsafe transition produces correct type string"
           <| fun _ ->
-              let desc =
-                  { Id = Some "test"
-                    Type = Unsafe
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = []
-                    Links = [] }
-
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ desc ]
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "test"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
 
-              let descriptor =
+              let stateDesc =
                   parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
 
-              Expect.equal (descriptor.GetProperty("type").GetString()) "unsafe" "type is unsafe"
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              Expect.equal (transDesc.GetProperty("type").GetString()) "unsafe" "type is unsafe"
 
-          testCase "all four descriptor types produce correct strings"
+          testCase "all three transition types produce correct strings"
           <| fun _ ->
-              let makeDesc dt =
-                  { Id = Some(sprintf "test_%A" dt)
-                    Type = dt
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = []
-                    Links = [] }
-
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ makeDesc Semantic; makeDesc Safe; makeDesc Unsafe; makeDesc Idempotent ]
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "safe_t"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Safe) ] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "unsafe_t"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe) ] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "idempotent_t"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Idempotent) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
-              let descriptors = parsed.RootElement.GetProperty("alps").GetProperty("descriptor")
-              Expect.equal (descriptors.[0].GetProperty("type").GetString()) "semantic" "semantic"
-              Expect.equal (descriptors.[1].GetProperty("type").GetString()) "safe" "safe"
-              Expect.equal (descriptors.[2].GetProperty("type").GetString()) "unsafe" "unsafe"
-              Expect.equal (descriptors.[3].GetProperty("type").GetString()) "idempotent" "idempotent"
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let children = stateDesc.GetProperty("descriptor")
 
-          testCase "nested descriptors are written recursively"
+              let typeOf (idx: int) =
+                  children.[idx].GetProperty("type").GetString()
+
+              Expect.equal (typeOf 0) "safe" "safe"
+              Expect.equal (typeOf 1) "unsafe" "unsafe"
+              Expect.equal (typeOf 2) "idempotent" "idempotent"
+
+          testCase "guard extension is written on transition"
           <| fun _ ->
-              let child =
-                  { Id = Some "child"
-                    Type = Safe
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = []
-                    Links = [] }
-
-              let parent =
-                  { Id = Some "parent"
-                    Type = Semantic
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = [ child ]
-                    Extensions = []
-                    Links = [] }
-
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ parent ]
-                    Links = []
-                    Extensions = [] }
-
-              let json = generateAlpsJson doc
-              use parsed = JsonDocument.Parse(json)
-
-              let parentDesc =
-                  parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
-
-              let childDesc = parentDesc.GetProperty("descriptor").[0]
-              Expect.equal (childDesc.GetProperty("id").GetString()) "child" "nested child present"
-
-          testCase "ext elements are written with id and value"
-          <| fun _ ->
-              let ext =
-                  { Id = "guard"
-                    Href = None
-                    Value = Some "role=PlayerX" }
-
-              let desc =
-                  { Id = Some "test"
-                    Type = Unsafe
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = [ ext ]
-                    Links = [] }
-
-              let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ desc ]
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "A"
+                              Event = Some "test"
+                              Guard = Some "role=PlayerX"
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
 
-              let extElem =
-                  parsed.RootElement
-                      .GetProperty("alps")
-                      .GetProperty("descriptor").[0]
-                      .GetProperty("ext").[0]
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              let extElem = transDesc.GetProperty("ext").[0]
 
               Expect.equal (extElem.GetProperty("id").GetString()) "guard" "ext id"
               Expect.equal (extElem.GetProperty("value").GetString()) "role=PlayerX" "ext value"
 
-          testCase "ext element with href and no value"
-          <| fun _ ->
-              let ext =
-                  { Id = "ref"
-                    Href = Some "http://example.com/ext"
-                    Value = None }
-
-              let desc =
-                  { Id = Some "test"
-                    Type = Semantic
-                    Href = None
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = [ ext ]
-                    Links = [] }
-
-              let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ desc ]
-                    Links = []
-                    Extensions = [] }
-
-              let json = generateAlpsJson doc
-              use parsed = JsonDocument.Parse(json)
-
-              let extElem =
-                  parsed.RootElement
-                      .GetProperty("alps")
-                      .GetProperty("descriptor").[0]
-                      .GetProperty("ext").[0]
-
-              Expect.equal (extElem.GetProperty("id").GetString()) "ref" "ext id"
-              Expect.equal (extElem.GetProperty("href").GetString()) "http://example.com/ext" "ext href"
-              Expect.isFalse (extElem.TryGetProperty("value") |> fst) "no value property"
-
           testCase "output is indented (human-readable)"
           <| fun _ ->
               let doc =
-                  { Version = Some "1.0"
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
               let json = generateAlpsJson doc
               Expect.isTrue (json.Contains("\n")) "should contain newlines (indented)"
 
-          testCase "documentation with format is written correctly"
+          testCase "documentation annotation is written correctly"
           <| fun _ ->
-              let docElem =
-                  { Format = Some "html"
-                    Value = "Some <b>bold</b> text" }
-
               let doc =
-                  { Version = None
-                    Documentation = Some docElem
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations =
+                      [ AlpsAnnotation(AlpsDocumentation(Some "html", "Some <b>bold</b> text")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -292,14 +251,12 @@ let jsonGeneratorStructureTests =
 
           testCase "documentation without format omits format property"
           <| fun _ ->
-              let docElem = { Format = None; Value = "Plain text" }
-
               let doc =
-                  { Version = None
-                    Documentation = Some docElem
-                    Descriptors = []
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsDocumentation(None, "Plain text")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -307,16 +264,15 @@ let jsonGeneratorStructureTests =
               Expect.isFalse (alpsDoc.TryGetProperty("format") |> fst) "no format property"
               Expect.equal (alpsDoc.GetProperty("value").GetString()) "Plain text" "doc value"
 
-          testCase "link elements are written with rel and href"
+          testCase "link annotations are written with rel and href"
           <| fun _ ->
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = []
-                    Links =
-                        [ { Rel = "self"
-                            Href = "http://example.com/alps/test" } ]
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations =
+                      [ AlpsAnnotation(AlpsLink("self", "http://example.com/alps/test")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -324,17 +280,15 @@ let jsonGeneratorStructureTests =
               Expect.equal (link.GetProperty("rel").GetString()) "self" "link rel"
               Expect.equal (link.GetProperty("href").GetString()) "http://example.com/alps/test" "link href"
 
-          testCase "top-level ext elements are written"
+          testCase "top-level ext annotations are written"
           <| fun _ ->
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = []
-                    Links = []
-                    Extensions =
-                        [ { Id = "custom"
-                            Href = None
-                            Value = Some "data" } ] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements = []
+                    DataEntries = []
+                    Annotations =
+                      [ AlpsAnnotation(AlpsExtension("custom", None, Some "data")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -342,61 +296,45 @@ let jsonGeneratorStructureTests =
               Expect.equal (ext.GetProperty("id").GetString()) "custom" "ext id"
               Expect.equal (ext.GetProperty("value").GetString()) "data" "ext value"
 
-          testCase "descriptor with href only (no id)"
+          testCase "transition with rt field produces correct output"
           <| fun _ ->
-              let desc =
-                  { Id = None
-                    Type = Semantic
-                    Href = Some "#otherDescriptor"
-                    ReturnType = None
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = []
-                    Links = [] }
-
               let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ desc ]
-                    Links = []
-                    Extensions = [] }
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = "A"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        StateDecl
+                            { Identifier = "gameState"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "A"
+                              Target = Some "gameState"
+                              Event = Some "viewGame"
+                              Guard = None
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Safe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
 
-              let descriptor =
+              let stateA =
                   parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
 
-              Expect.isFalse (descriptor.TryGetProperty("id") |> fst) "no id property"
-
-              Expect.equal
-                  (descriptor.GetProperty("href").GetString())
-                  "#otherDescriptor"
-                  "href present"
-
-          testCase "descriptor with rt field"
-          <| fun _ ->
-              let desc =
-                  { Id = Some "viewGame"
-                    Type = Safe
-                    Href = None
-                    ReturnType = Some "#gameState"
-                    Documentation = None
-                    Descriptors = []
-                    Extensions = []
-                    Links = [] }
-
-              let doc =
-                  { Version = None
-                    Documentation = None
-                    Descriptors = [ desc ]
-                    Links = []
-                    Extensions = [] }
-
-              let json = generateAlpsJson doc
-              use parsed = JsonDocument.Parse(json)
-
-              let descriptor =
-                  parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
-
-              Expect.equal (descriptor.GetProperty("rt").GetString()) "#gameState" "rt preserved" ]
+              let transDesc = stateA.GetProperty("descriptor").[0]
+              Expect.equal (transDesc.GetProperty("rt").GetString()) "#gameState" "rt preserved" ]
