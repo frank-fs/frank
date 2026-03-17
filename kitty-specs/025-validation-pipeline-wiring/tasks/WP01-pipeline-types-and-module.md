@@ -16,7 +16,7 @@ subtasks:
 - T007
 phase: Phase 0 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "80000"
 review_status: ''
 reviewed_by: ''
@@ -315,3 +315,4 @@ All parser modules are `internal` but Pipeline lives in the same assembly, so ac
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-17T22:52:51Z – claude-opus – shell_pid=80000 – lane=doing – Assigned agent via workflow command
