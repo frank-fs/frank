@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Pipeline Unit Tests
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 025-validation-pipeline-wiring-WP01
 base_commit: 7bdd1a1840ee9ebbb5918636ea69184783fd2cc0
@@ -292,3 +292,4 @@ dotnet test test/Frank.Statecharts.Tests/
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-17T22:55:46Z – claude-opus – shell_pid=80834 – lane=doing – Assigned agent via workflow command
+- 2026-03-17T23:01:00Z – claude-opus – shell_pid=80834 – lane=for_review – Ready for review: 9 tests, all green, 817 total
