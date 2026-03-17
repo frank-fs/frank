@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Pipeline Types & Module Foundation
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: b73e5455785e394d39d47b986125f459682e8eb3
@@ -316,3 +316,4 @@ All parser modules are `internal` but Pipeline lives in the same assembly, so ac
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-17T22:52:51Z – claude-opus – shell_pid=80000 – lane=doing – Assigned agent via workflow command
+- 2026-03-17T22:54:20Z – claude-opus – shell_pid=80000 – lane=for_review – Ready for review: types + Pipeline module, build green
