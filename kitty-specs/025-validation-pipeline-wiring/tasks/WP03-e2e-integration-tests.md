@@ -1,9 +1,12 @@
 ---
 work_package_id: WP03
 title: End-to-End Integration Tests
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 025-validation-pipeline-wiring-WP01
+base_commit: 7bdd1a1840ee9ebbb5918636ea69184783fd2cc0
+created_at: '2026-03-17T23:01:46.715653+00:00'
 subtasks:
 - T017
 - T018
@@ -19,7 +22,7 @@ subtasks:
 phase: Phase 2 - Integration Tests
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "83131"
 review_status: ''
 reviewed_by: ''
 history:
