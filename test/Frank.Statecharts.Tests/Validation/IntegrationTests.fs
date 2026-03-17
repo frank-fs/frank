@@ -10,7 +10,7 @@ open Frank.Statecharts.Ast
 
 /// Create a state element with the given identifier.
 let makeState (id: string) : StateNode =
-    { Identifier = id
+    { Identifier = Some id
       Label = None
       Kind = Regular
       Children = []

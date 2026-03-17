@@ -66,8 +66,8 @@ let private generateHistory (h: StateNode) : XElement =
             el.Add(t))
     | None ->
         // Fallback: use StateNode fields directly
-        if h.Identifier <> "" then
-            el.SetAttributeValue(XName.Get "id", h.Identifier)
+        h.Identifier |> Option.iter (fun id ->
+            el.SetAttributeValue(XName.Get "id", id))
         let typeStr = match h.Kind with | DeepHistory -> "deep" | _ -> "shallow"
         el.SetAttributeValue(XName.Get "type", typeStr)
 
@@ -91,8 +91,8 @@ let rec private generateState
     | Some elementName ->
 
     let el = XElement(scxmlNs + elementName)
-    if state.Identifier <> "" then
-        el.SetAttributeValue(XName.Get "id", state.Identifier)
+    state.Identifier |> Option.iter (fun id ->
+        el.SetAttributeValue(XName.Get "id", id))
 
     // Extract ScxmlInitial annotation for the initial attribute
     state.Annotations
@@ -116,8 +116,8 @@ let rec private generateState
 
     // Generate transitions for this state
     let ownTransitions =
-        transitionsBySource
-        |> Map.tryFind state.Identifier
+        state.Identifier
+        |> Option.bind (fun id -> Map.tryFind id transitionsBySource)
         |> Option.defaultValue []
     for t in ownTransitions do
         el.Add(generateTransition t)

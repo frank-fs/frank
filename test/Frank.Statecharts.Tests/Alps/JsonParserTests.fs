@@ -94,7 +94,7 @@ let jsonParserTests =
           testCase "tic-tac-toe has state elements"
           <| fun _ ->
               let doc = parseOk ticTacToeAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.containsAll
                   stateIds
@@ -234,7 +234,7 @@ let jsonParserTests =
           testCase "onboarding has all state elements"
           <| fun _ ->
               let doc = parseOk onboardingAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.containsAll
                   stateIds
@@ -357,7 +357,7 @@ let jsonParserEdgeCaseTests =
               let doc = parseOk json "parse failed"
               let states = getStates doc
 
-              let stateA = states |> List.find (fun s -> s.Identifier = "StateA")
+              let stateA = states |> List.find (fun s -> s.Identifier = Some "StateA")
 
               // State annotations should include the extensions
               let extAnnotations =
@@ -414,7 +414,7 @@ let jsonParserEdgeCaseTests =
               let doc = parseOk json "parse failed"
               let states = getStates doc
               Expect.equal states.Length 1 "one state"
-              Expect.equal states.[0].Identifier "level1" "level1 is a state"
+              Expect.equal states.[0].Identifier (Some "level1") "level1 is a state"
 
           testCase "doc element with no format"
           <| fun _ ->
@@ -485,7 +485,7 @@ let stateExtractionTests =
         [ testCase "tic-tac-toe states are extracted"
           <| fun _ ->
               let doc = parseOk ticTacToeAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.containsAll
                   stateIds
@@ -495,13 +495,13 @@ let stateExtractionTests =
           testCase "tic-tac-toe extracts gameState as a state (it is an rt target)"
           <| fun _ ->
               let doc = parseOk ticTacToeAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
               Expect.isTrue (Set.contains "gameState" stateIds) "gameState is an rt target so it is a state"
 
           testCase "tic-tac-toe does not extract pure data descriptors as states"
           <| fun _ ->
               let doc = parseOk ticTacToeAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
               // position and player are pure data descriptors (no transition children, not rt targets)
               Expect.isFalse (Set.contains "position" stateIds) "position is not a state"
               Expect.isFalse (Set.contains "player" stateIds) "player is not a state"
@@ -509,7 +509,7 @@ let stateExtractionTests =
           testCase "onboarding states are extracted"
           <| fun _ ->
               let doc = parseOk onboardingAlpsJson "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.containsAll
                   stateIds
@@ -522,7 +522,7 @@ let stateExtractionTests =
               let states = getStates doc
 
               for s in states do
-                  Expect.equal s.Kind StateKind.Regular (sprintf "state %s should be Regular" s.Identifier) ]
+                  Expect.equal s.Kind StateKind.Regular (sprintf "state %s should be Regular" (s.Identifier |> Option.defaultValue "")) ]
 
 [<Tests>]
 let transitionMappingTests =
@@ -740,7 +740,7 @@ let edgeCaseParserTests =
                   """{"alps":{"version":"1.0","descriptor":[{"id":"Active","type":"semantic","descriptor":[{"id":"finish","type":"unsafe","rt":"#Done"}]},{"id":"Done","type":"semantic"}]}}"""
 
               let doc = parseOk json "parse failed"
-              let stateIds = getStates doc |> List.map (fun s -> s.Identifier) |> Set.ofList
+              let stateIds = getStates doc |> List.choose (fun s -> s.Identifier) |> Set.ofList
               Expect.isTrue (Set.contains "Done" stateIds) "Done is a state (referenced as rt target)"
 
           testCase "missing workflow ordering leaves InitialStateId as None"

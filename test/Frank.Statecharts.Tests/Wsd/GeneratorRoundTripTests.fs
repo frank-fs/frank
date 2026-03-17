@@ -54,7 +54,7 @@ let private dummyHandler = RequestDelegate(fun _ -> Task.CompletedTask)
 let private participantNames (r: ParseResult) =
     r.Document.Elements
     |> List.choose (function
-        | StateDecl s -> Some s.Identifier
+        | StateDecl s -> s.Identifier
         | _ -> None)
 
 /// Extract (source, target, event) triples from transitions in a ParseResult.
@@ -188,7 +188,8 @@ let generatorRoundTripTests =
                             | _ -> None)
 
                     for s in states do
-                        Expect.equal s.Kind Regular $"participant {s.Identifier} is Regular"
+                        let stateId = s.Identifier |> Option.defaultValue ""
+                        Expect.equal s.Kind Regular (sprintf "participant %s is Regular" stateId)
                 }
 
                 test "no implicit-participant warnings" {

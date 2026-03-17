@@ -134,9 +134,9 @@ let roundTripTests =
                     let result = parseWsd onboardingWsd
                     let ps = stateDecls result
                     Expect.equal ps.Length 3 "three participants"
-                    Expect.equal ps.[0].Identifier "Client" "first"
-                    Expect.equal ps.[1].Identifier "API" "second"
-                    Expect.equal ps.[2].Identifier "DB" "third"
+                    Expect.equal ps.[0].Identifier (Some "Client") "first"
+                    Expect.equal ps.[1].Identifier (Some "API") "second"
+                    Expect.equal ps.[2].Identifier (Some "DB") "third"
 
                     // All participants are explicit -- no implicit warnings
                     let implicitWarnings =
@@ -229,10 +229,10 @@ let roundTripTests =
                     let result = parseWsd ticTacToeWsd
                     let ps = stateDecls result
                     Expect.equal ps.Length 4 "four participants"
-                    Expect.equal ps.[0].Identifier "PlayerX" "first"
-                    Expect.equal ps.[1].Identifier "PlayerO" "second"
-                    Expect.equal ps.[2].Identifier "Board" "third"
-                    Expect.equal ps.[3].Identifier "GameEngine" "fourth"
+                    Expect.equal ps.[0].Identifier (Some "PlayerX") "first"
+                    Expect.equal ps.[1].Identifier (Some "PlayerO") "second"
+                    Expect.equal ps.[2].Identifier (Some "Board") "third"
+                    Expect.equal ps.[3].Identifier (Some "GameEngine") "fourth"
                 }
 
                 test "first note guard: role=PlayerX, state=XTurn" {
@@ -309,8 +309,8 @@ Utilisateur->Serveur: requête
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    Expect.equal (stateDecls result).[0].Identifier "Utilisateur" "unicode name"
-                    Expect.equal (stateDecls result).[1].Identifier "Serveur" "unicode name 2"
+                    Expect.equal (stateDecls result).[0].Identifier (Some "Utilisateur") "unicode name"
+                    Expect.equal (stateDecls result).[1].Identifier (Some "Serveur") "unicode name 2"
                 }
 
                 test "empty input produces empty diagram" {
@@ -359,7 +359,7 @@ Client->Client: self
 """
 
                     Expect.isEmpty result.Errors "no errors"
-                    let uniqueNames = stateDecls result |> List.map (fun s -> s.Identifier) |> List.distinct
+                    let uniqueNames = stateDecls result |> List.choose (fun s -> s.Identifier) |> List.distinct
                     Expect.equal uniqueNames.Length 1 "still one unique participant"
                 }
 

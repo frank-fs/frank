@@ -43,7 +43,7 @@ let errorTests =
               Expect.isGreaterThanOrEqual result.Errors.Length 1 "at least one error from invalid line"
               let decls = stateDecls result
               Expect.hasLength decls 1 "participant still parsed"
-              Expect.equal decls.[0].Identifier "Client" "correct participant"
+              Expect.equal decls.[0].Identifier (Some "Client") "correct participant"
               let edges = transitions result
               Expect.hasLength edges 1 "message still parsed after error"
               Expect.equal edges.[0].Event (Some "hello") "correct message label"

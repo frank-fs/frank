@@ -95,7 +95,7 @@ let parserTests =
               let decls = stateDecls result
               Expect.equal decls.Length 1 "one participant"
               let p = decls.[0]
-              Expect.equal p.Identifier "Client" "name"
+              Expect.equal p.Identifier (Some "Client") "name"
               Expect.isNone p.Label "no alias"
 
           testCase "participant with string alias"
@@ -104,7 +104,7 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
               let decls = stateDecls result
               let p = decls.[0]
-              Expect.equal p.Identifier "API" "name"
+              Expect.equal p.Identifier (Some "API") "name"
               Expect.equal p.Label (Some "REST API") "alias"
 
           testCase "participant with identifier alias"
@@ -113,7 +113,7 @@ let parserTests =
               Expect.isEmpty result.Errors "no errors"
               let decls = stateDecls result
               let p = decls.[0]
-              Expect.equal p.Identifier "X" "name"
+              Expect.equal p.Identifier (Some "X") "name"
               Expect.equal p.Label (Some "Y") "alias"
 
           testCase "duplicate participant is a no-op"
@@ -125,7 +125,7 @@ let parserTests =
               let decls = stateDecls result
               Expect.equal decls.Length 2 "two decl elements emitted"
               // Both have the same identifier
-              let uniqueNames = decls |> List.map (fun s -> s.Identifier) |> List.distinct
+              let uniqueNames = decls |> List.choose (fun s -> s.Identifier) |> List.distinct
               Expect.equal uniqueNames.Length 1 "still one unique participant"
 
           testCase "participant with no name produces error"
@@ -138,7 +138,7 @@ let parserTests =
           <| fun _ ->
               let result = parseWsd "participant A\nparticipant B\nparticipant C\n"
               Expect.isEmpty result.Errors "no errors"
-              let names = stateDecls result |> List.map (fun s -> s.Identifier)
+              let names = stateDecls result |> List.choose (fun s -> s.Identifier)
               Expect.equal names [ "A"; "B"; "C" ] "order preserved"
 
           // === Message tests (T020) ===
@@ -473,6 +473,6 @@ participant Client
               // (or if the warning was emitted before the explicit decl, that's parser-internal)
               // We verify Client appears as a StateDecl
               let clientDecls =
-                  stateDecls result |> List.filter (fun s -> s.Identifier = "Client")
+                  stateDecls result |> List.filter (fun s -> s.Identifier = Some "Client")
 
               Expect.isGreaterThanOrEqual clientDecls.Length 1 "Client appears as declared" ]

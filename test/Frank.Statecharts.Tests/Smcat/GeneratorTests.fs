@@ -170,9 +170,9 @@ let generatorTests =
               let doc = generate options (makeMetadata machine handlers) |> unwrapResult
               let ss = extractStates doc
               // States should be ordered: Idle (initial) first, then Running, Stopped alphabetically
-              Expect.equal ss[0].Identifier "Idle" "Idle (initial) first"
-              Expect.equal ss[1].Identifier "Running" "Running alphabetically"
-              Expect.equal ss[2].Identifier "Stopped" "Stopped alphabetically"
+              Expect.equal ss[0].Identifier (Some "Idle") "Idle (initial) first"
+              Expect.equal ss[1].Identifier (Some "Running") "Running alphabetically"
+              Expect.equal ss[2].Identifier (Some "Stopped") "Stopped alphabetically"
           }
 
           test "single state, no handlers" {

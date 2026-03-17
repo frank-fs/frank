@@ -63,8 +63,8 @@ let parserTests =
               Expect.equal doc.InitialStateId (Some "idle") "initial state should be idle"
               let states = stateDecls doc
               Expect.equal states.Length 2 "should have 2 states"
-              Expect.equal states.[0].Identifier "idle" "first state is idle"
-              Expect.equal states.[1].Identifier "active" "second state is active"
+              Expect.equal states.[0].Identifier (Some "idle") "first state is idle"
+              Expect.equal states.[1].Identifier (Some "active") "second state is active"
 
           testCase "US1-S2: transition with event and target"
           <| fun _ ->
@@ -111,7 +111,7 @@ let parserTests =
               let result = parseString xml
               let states = stateDecls result.Document
               let finalState = states.[1]
-              Expect.equal finalState.Identifier "done" "final state id"
+              Expect.equal finalState.Identifier (Some "done") "final state id"
               Expect.equal finalState.Kind Final "kind is Final"
 
           testCase "US1-S5: compound states"
@@ -129,8 +129,8 @@ let parserTests =
               let parent = states.[0]
               Expect.equal parent.Kind Regular "parent is Regular"
               Expect.equal parent.Children.Length 2 "parent has 2 children"
-              Expect.equal parent.Children.[0].Identifier "child1" "first child"
-              Expect.equal parent.Children.[1].Identifier "child2" "second child" ]
+              Expect.equal parent.Children.[0].Identifier (Some "child1") "first child"
+              Expect.equal parent.Children.[1].Identifier (Some "child2") "second child" ]
 
 [<Tests>]
 let edgeCaseTests =
@@ -240,17 +240,17 @@ let edgeCaseTests =
               let doc = result.Document
               let states = stateDecls doc
               let l1 = states.[0]
-              Expect.equal l1.Identifier "L1" "level 1"
+              Expect.equal l1.Identifier (Some "L1") "level 1"
               Expect.equal l1.Kind Regular "L1 is Regular"
               let l2 = l1.Children.[0]
-              Expect.equal l2.Identifier "L2" "level 2"
+              Expect.equal l2.Identifier (Some "L2") "level 2"
               Expect.equal l2.Kind Regular "L2 is Regular"
               let l3 = l2.Children.[0]
-              Expect.equal l3.Identifier "L3" "level 3"
+              Expect.equal l3.Identifier (Some "L3") "level 3"
               let l4 = l3.Children.[0]
-              Expect.equal l4.Identifier "L4" "level 4"
+              Expect.equal l4.Identifier (Some "L4") "level 4"
               let l5 = l4.Children.[0]
-              Expect.equal l5.Identifier "L5" "level 5"
+              Expect.equal l5.Identifier (Some "L5") "level 5"
               Expect.equal l5.Kind Regular "L5 is Regular (leaf)"
 
           testCase "prefixed namespace"
@@ -267,7 +267,7 @@ let edgeCaseTests =
               let doc = result.Document
               let states = stateDecls doc
               Expect.equal states.Length 2 "two states"
-              Expect.equal states.[0].Identifier "s1" "first state"
+              Expect.equal states.[0].Identifier (Some "s1") "first state"
               let s1Transitions = transitionsFrom "s1" doc
               Expect.equal s1Transitions.Length 1 "one transition"
 
@@ -296,7 +296,7 @@ let edgeCaseTests =
               let result = parseString xml
               let doc = result.Document
               Expect.equal doc.InitialStateId (Some "zustand_bereit") "unicode initial"
-              Expect.equal (stateDecls doc).[0].Identifier "zustand_bereit" "unicode state id"
+              Expect.equal (stateDecls doc).[0].Identifier (Some "zustand_bereit") "unicode state id"
 
           testCase "XML comments are ignored"
           <| fun _ ->
@@ -324,7 +324,7 @@ let edgeCaseTests =
 
               let result = parseString xml
               let p = (stateDecls result.Document).[0]
-              Expect.equal p.Identifier "p" "parallel id"
+              Expect.equal p.Identifier (Some "p") "parallel id"
               Expect.equal p.Kind Parallel "kind is Parallel"
               Expect.equal p.Children.Length 2 "two children"
 
@@ -390,7 +390,7 @@ let edgeCaseTests =
               let historyNodes = historyChildren s1
               Expect.equal historyNodes.Length 1 "one history node"
               let h = historyNodes.[0]
-              Expect.equal h.Identifier "h1" "history id"
+              Expect.equal h.Identifier (Some "h1") "history id"
               Expect.equal h.Kind DeepHistory "history kind is deep"
               // Check the ScxmlHistory annotation for the default transition target
               let historyMeta =
@@ -412,7 +412,7 @@ let edgeCaseTests =
               let result = parseString xml
               let states = stateDecls result.Document
               Expect.equal states.Length 1 "one state"
-              Expect.equal states.[0].Identifier "s1" "state id" ]
+              Expect.equal states.[0].Identifier (Some "s1") "state id" ]
 
 // === User Story 3: Data Model Parsing (T022) ===
 
@@ -508,7 +508,7 @@ let advancedParserTests =
               let result = parseString xml
               let p = (stateDecls result.Document).[0]
               Expect.equal p.Kind Parallel "kind is Parallel"
-              Expect.equal p.Identifier "p1" "id is p1"
+              Expect.equal p.Identifier (Some "p1") "id is p1"
               Expect.equal p.Children.Length 2 "has 2 child states"
 
           testCase "US4-S2: history with type deep"
@@ -526,7 +526,7 @@ let advancedParserTests =
               let historyNodes = historyChildren state
               Expect.equal historyNodes.Length 1 "has 1 history node"
               let h = historyNodes.[0]
-              Expect.equal h.Identifier "h1" "history id"
+              Expect.equal h.Identifier (Some "h1") "history id"
               Expect.equal h.Kind DeepHistory "history kind is Deep"
 
           testCase "US4-S3: history defaults to shallow"

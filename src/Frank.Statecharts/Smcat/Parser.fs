@@ -860,7 +860,7 @@ and private parseStateDeclaration
     let annotations = attributesToAnnotations attributes
 
     let stateNode : StateNode =
-        { Identifier = name
+        { Identifier = Some name
           Label = label
           Kind = stateType
           Children = childStateNodes

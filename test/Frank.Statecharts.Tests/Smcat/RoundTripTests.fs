@@ -59,7 +59,7 @@ let rec private extractStateSet (doc: StatechartDocument) : Set<string * StateKi
         | StateDecl s ->
             let childStates =
                 extractStateSetFromChildren s.Children
-            (s.Identifier, s.Kind) :: childStates
+            (s.Identifier |> Option.defaultValue "", s.Kind) :: childStates
         | _ -> [])
     |> Set.ofList
 
@@ -67,7 +67,7 @@ and private extractStateSetFromChildren (children: StateNode list) : (string * S
     children
     |> List.collect (fun s ->
         let nested = extractStateSetFromChildren s.Children
-        (s.Identifier, s.Kind) :: nested)
+        (s.Identifier |> Option.defaultValue "", s.Kind) :: nested)
 
 /// Extract the set of (source, target, event, guard, action) tuples from all
 /// transitions in a document (recursively for composite states).

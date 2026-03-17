@@ -16,7 +16,7 @@ let partialPopulationTests =
           testCase "WSD parser: states, transitions, groups -- no hierarchy, no final state"
           <| fun _ ->
               let client =
-                  { Identifier = "Client"
+                  { Identifier = Some "Client"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -25,7 +25,7 @@ let partialPopulationTests =
                     Annotations = [] }
 
               let server =
-                  { Identifier = "Server"
+                  { Identifier = Some "Server"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -63,7 +63,7 @@ let partialPopulationTests =
           testCase "smcat parser: states with hierarchy -- no data model"
           <| fun _ ->
               let child1 =
-                  { Identifier = "sub1"
+                  { Identifier = Some "sub1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -72,7 +72,7 @@ let partialPopulationTests =
                     Annotations = [] }
 
               let child2 =
-                  { Identifier = "sub2"
+                  { Identifier = Some "sub2"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -81,7 +81,7 @@ let partialPopulationTests =
                     Annotations = [] }
 
               let parent =
-                  { Identifier = "parent"
+                  { Identifier = Some "parent"
                     Label = None
                     Kind = Regular
                     Children = [ child1; child2 ]
@@ -90,7 +90,7 @@ let partialPopulationTests =
                     Annotations = [] }
 
               let initial =
-                  { Identifier = "start"
+                  { Identifier = Some "start"
                     Label = None
                     Kind = Initial
                     Children = []
@@ -99,7 +99,7 @@ let partialPopulationTests =
                     Annotations = [] }
 
               let final =
-                  { Identifier = "end"
+                  { Identifier = Some "end"
                     Label = None
                     Kind = Final
                     Children = []
@@ -123,7 +123,7 @@ let partialPopulationTests =
           testCase "ALPS parser: states and transitions with transition type -- no initial state"
           <| fun _ ->
               let desc1 =
-                  { Identifier = "user"
+                  { Identifier = Some "user"
                     Label = Some "User Descriptor"
                     Kind = Regular
                     Children = []
@@ -155,7 +155,7 @@ let partialPopulationTests =
           testCase "SCXML parser: full population (most expressive format)"
           <| fun _ ->
               let state =
-                  { Identifier = "s1"
+                  { Identifier = Some "s1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -168,7 +168,7 @@ let partialPopulationTests =
                     Annotations = [ ScxmlAnnotation(ScxmlNamespace "http://www.w3.org/2005/07/scxml") ] }
 
               let finalState =
-                  { Identifier = "done"
+                  { Identifier = Some "done"
                     Label = None
                     Kind = Final
                     Children = []
@@ -210,7 +210,7 @@ let partialPopulationTests =
           testCase "XState parser: states with context and actions -- no grouping blocks"
           <| fun _ ->
               let state =
-                  { Identifier = "active"
+                  { Identifier = Some "active"
                     Label = None
                     Kind = Regular
                     Children = []

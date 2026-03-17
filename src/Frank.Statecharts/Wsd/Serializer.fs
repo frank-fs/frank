@@ -187,7 +187,7 @@ let serialize (document: StatechartDocument) : string =
         match element with
         | StateDecl s ->
             sb.Append("participant ") |> ignore
-            sb.Append(quoteName s.Identifier) |> ignore
+            sb.Append(quoteName (s.Identifier |> Option.defaultValue "")) |> ignore
 
             match s.Label with
             | Some alias ->

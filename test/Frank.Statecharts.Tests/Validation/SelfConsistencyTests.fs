@@ -9,7 +9,7 @@ open Frank.Statecharts.Ast
 // ─────────────────────────────────────────────
 
 let makeState id =
-    { Identifier = id
+    { Identifier = Some id
       Label = None
       Kind = Regular
       Children = []

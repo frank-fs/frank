@@ -48,11 +48,11 @@ let private writeState
     (transMap: Map<string, TransitionEdge list>)
     (state: StateNode)
     =
-    writer.WritePropertyName(state.Identifier)
+    writer.WritePropertyName(state.Identifier |> Option.defaultValue "")
     writer.WriteStartObject()
 
     // Write transitions if any exist for this state
-    match transMap |> Map.tryFind state.Identifier with
+    match state.Identifier |> Option.bind (fun id -> Map.tryFind id transMap) with
     | Some transitions when not transitions.IsEmpty -> writeTransitions writer transitions
     | _ -> ()
 

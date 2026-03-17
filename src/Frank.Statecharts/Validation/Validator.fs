@@ -42,7 +42,7 @@ module AstHelpers =
 
     /// Extract the set of all state identifiers from a document.
     let stateIdentifiers (doc: StatechartDocument) : string Set =
-        allStates doc |> List.map _.Identifier |> Set.ofList
+        allStates doc |> List.choose _.Identifier |> Set.ofList
 
     /// Extract the set of all event names from transitions in a document.
     /// Filters out None events.
@@ -129,7 +129,7 @@ module SelfConsistencyRules =
                     |> List.fold
                         (fun (cs, fs) artifact ->
                             let allStates = AstHelpers.allStates artifact.Document
-                            let ids = allStates |> List.map (fun s -> s.Identifier)
+                            let ids = allStates |> List.choose (fun s -> s.Identifier)
 
                             let duplicates =
                                 ids
@@ -194,7 +194,10 @@ module SelfConsistencyRules =
 
                             let emptyStateChecks, emptyStateFailures =
                                 states
-                                |> List.filter (fun s -> System.String.IsNullOrWhiteSpace s.Identifier)
+                                |> List.filter (fun s ->
+                                    match s.Identifier with
+                                    | None -> true
+                                    | Some id -> System.String.IsNullOrWhiteSpace id)
                                 |> List.mapi (fun i _ ->
                                     let c =
                                         { Name = sprintf "Empty state identifier #%d (%A)" (i + 1) artifact.Format

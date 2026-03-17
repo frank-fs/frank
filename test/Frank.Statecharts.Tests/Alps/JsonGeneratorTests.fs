@@ -97,7 +97,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -132,7 +132,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -188,7 +188,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -303,7 +303,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -311,7 +311,7 @@ let jsonGeneratorStructureTests =
                               Position = None
                               Annotations = [] }
                         StateDecl
-                            { Identifier = "gameState"
+                            { Identifier = Some "gameState"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -350,7 +350,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -382,7 +382,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []
@@ -390,7 +390,7 @@ let jsonGeneratorStructureTests =
                               Position = None
                               Annotations = [] }
                         StateDecl
-                            { Identifier = "B"
+                            { Identifier = Some "B"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []

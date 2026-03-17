@@ -117,7 +117,7 @@ let private serializeActivities (activities: StateActivities option) : string =
 /// Serialize a single state node (handles composites recursively).
 let rec private serializeState (sb: System.Text.StringBuilder) (indent: string) (node: StateNode) (siblingTransitions: TransitionEdge list) : unit =
     sb.Append(indent) |> ignore
-    sb.Append(quoteName node.Identifier) |> ignore
+    sb.Append(quoteName (node.Identifier |> Option.defaultValue "")) |> ignore
     sb.Append(serializeActivities node.Activities) |> ignore
     sb.Append(serializeAttributes node.Annotations) |> ignore
 
@@ -125,7 +125,7 @@ let rec private serializeState (sb: System.Text.StringBuilder) (indent: string) 
     | [] -> sb.Append(";\n") |> ignore
     | children ->
         sb.Append(" {\n") |> ignore
-        let childNames = children |> List.map (fun c -> c.Identifier) |> Set.ofList
+        let childNames = children |> List.choose (fun c -> c.Identifier) |> Set.ofList
         let innerIndent = indent + "  "
         let childTransitions =
             siblingTransitions
@@ -169,7 +169,7 @@ let serialize (document: StatechartDocument) : string =
 
     // Collect all child state names (to avoid double-emitting transitions)
     let rec collectChildNames (nodes: StateNode list) =
-        nodes |> List.collect (fun n -> n.Identifier :: collectChildNames n.Children)
+        nodes |> List.collect (fun n -> (n.Identifier |> Option.toList) @ collectChildNames n.Children)
     let childNames =
         allStates
         |> List.collect (fun s -> collectChildNames s.Children)

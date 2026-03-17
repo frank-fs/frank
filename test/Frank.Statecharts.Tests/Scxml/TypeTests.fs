@@ -57,7 +57,7 @@ let typeTests =
           testCase "StateNode construction with nested children"
           <| fun _ ->
               let child: StateNode =
-                  { Identifier = "child1"
+                  { Identifier = Some "child1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -66,7 +66,7 @@ let typeTests =
                     Annotations = [] }
 
               let parent: StateNode =
-                  { Identifier = "parent"
+                  { Identifier = Some "parent"
                     Label = None
                     Kind = Regular
                     Children = [ child ]
@@ -75,7 +75,7 @@ let typeTests =
                     Annotations = [] }
 
               Expect.equal parent.Children.Length 1 "parent has one child"
-              Expect.equal parent.Children.[0].Identifier "child1" "child id"
+              Expect.equal parent.Children.[0].Identifier (Some "child1") "child id"
 
           testCase "StatechartDocument construction"
           <| fun _ ->

@@ -105,10 +105,10 @@ let roundTripTests =
               let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
 
               let originalIds =
-                  getStates original |> List.map (fun s -> s.Identifier) |> Set.ofList
+                  getStates original |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               let roundTrippedIds =
-                  getStates roundTripped |> List.map (fun s -> s.Identifier) |> Set.ofList
+                  getStates roundTripped |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.equal roundTrippedIds originalIds "state identifiers preserved"
 
@@ -228,10 +228,10 @@ let roundTripTests =
               let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
 
               let originalIds =
-                  getStates original |> List.map (fun s -> s.Identifier) |> Set.ofList
+                  getStates original |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               let roundTrippedIds =
-                  getStates roundTripped |> List.map (fun s -> s.Identifier) |> Set.ofList
+                  getStates roundTripped |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
               Expect.equal roundTrippedIds originalIds "onboarding state identifiers preserved"
 
@@ -255,7 +255,7 @@ let roundTripTests =
                     InitialStateId = None
                     Elements =
                       [ StateDecl
-                            { Identifier = "A"
+                            { Identifier = Some "A"
                               Label = None
                               Kind = StateKind.Regular
                               Children = []

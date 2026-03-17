@@ -44,7 +44,7 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
         orderedStates
         |> List.map (fun name ->
             StateDecl
-                { Identifier = name
+                { Identifier = Some name
                   Label = None
                   Kind = Regular
                   Children = []

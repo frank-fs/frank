@@ -10,7 +10,7 @@ let private pos = { Line = 0; Column = 0 }
 
 /// Helper to create a StateNode (was Participant).
 let private mkParticipant name alias =
-    { Identifier = name
+    { Identifier = Some name
       Label = alias
       Kind = Regular
       Children = []

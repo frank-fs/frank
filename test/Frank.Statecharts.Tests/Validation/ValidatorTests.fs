@@ -22,7 +22,7 @@ let makeDocument (stateIds: string list) (transitions: (string * string option *
         stateIds
         |> List.map (fun id ->
             StateDecl
-                { Identifier = id
+                { Identifier = Some id
                   Label = None
                   Kind = Regular
                   Children = []

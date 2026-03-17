@@ -188,7 +188,7 @@ and GroupBlock =
 
 /// A state within the statechart (FR-002).
 and StateNode =
-    { Identifier: string
+    { Identifier: string option
       Label: string option
       Kind: StateKind
       Children: StateNode list

@@ -123,7 +123,7 @@ let private parseHistory
     (warnings: ResizeArray<ParseWarning>)
     (el: XElement)
     : StateNode =
-    let historyId = (attrValue "id" el) |> Option.defaultValue ""
+    let historyId = attrValue "id" el
 
     let astHistoryKind, stateKind =
         match attrValue "type" el with
@@ -148,13 +148,15 @@ let private parseHistory
         |> Seq.tryFind (fun child -> child.Name.LocalName = "transition")
         |> Option.bind (fun t -> attrValue "target" t)
 
+    let historyIdStr = historyId |> Option.defaultValue ""
+
     { Identifier = historyId
       Label = None
       Kind = stateKind
       Children = []
       Activities = None
       Position = extractPosition el
-      Annotations = [ ScxmlAnnotation(ScxmlHistory(historyId, astHistoryKind, defaultTarget)) ] }
+      Annotations = [ ScxmlAnnotation(ScxmlHistory(historyIdStr, astHistoryKind, defaultTarget)) ] }
 
 // Collect warnings for unknown child elements within a state
 let private collectChildWarnings
@@ -183,7 +185,7 @@ let rec private parseState
     (el: XElement)
     : StateNode * TransitionEdge list * DataEntry list =
     let localName = el.Name.LocalName
-    let stateId = (attrValue "id" el) |> Option.defaultValue ""
+    let stateId = attrValue "id" el
 
     // Determine StateKind based on element name
     let astKind =
@@ -208,7 +210,7 @@ let rec private parseState
     let ownTransitions =
         el.Elements()
         |> Seq.filter (fun child -> isElement "transition" child)
-        |> Seq.map (parseTransition stateId)
+        |> Seq.map (parseTransition (stateId |> Option.defaultValue ""))
         |> Seq.toList
 
     // Parse <datamodel>/<data> entries at state level
@@ -327,7 +329,7 @@ let private parseDocument (xdoc: XDocument) : ParseResult =
                 // Per W3C section 3.2: use first child state's id
                 stateNodes
                 |> List.tryHead
-                |> Option.map (fun s -> s.Identifier)
+                |> Option.bind (fun s -> s.Identifier)
 
         // Collect warnings for unknown root children
         collectRootWarnings warnings root

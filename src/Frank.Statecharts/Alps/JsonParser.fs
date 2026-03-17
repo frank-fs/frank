@@ -247,7 +247,7 @@ let private extractTransitions
 
 /// Convert a state descriptor to a StateNode.
 let private toStateNode (d: ParsedDescriptor) : StateNode =
-    { Identifier = d.Id |> Option.defaultValue ""
+    { Identifier = d.Id
       Label = d.DocValue
       Kind = StateKind.Regular
       Children = []

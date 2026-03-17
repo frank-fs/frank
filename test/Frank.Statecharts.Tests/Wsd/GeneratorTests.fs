@@ -167,7 +167,7 @@ let generatorTests =
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
               let doc = generate { ResourceName = "turnstile" } metadata |> unwrap
               let states = stateDecls doc
-              Expect.equal states.[0].Identifier "Locked" "Locked is first"
+              Expect.equal states.[0].Identifier (Some "Locked") "Locked is first"
 
           testCase "all states present as state declarations"
           <| fun _ ->
@@ -176,7 +176,7 @@ let generatorTests =
               let states = stateDecls doc
               Expect.equal states.Length 3 "3 state declarations"
 
-              let names = states |> List.map (fun s -> s.Identifier)
+              let names = states |> List.choose (fun s -> s.Identifier)
               Expect.contains names "Locked" "has Locked"
               Expect.contains names "Unlocked" "has Unlocked"
               Expect.contains names "Broken" "has Broken"
@@ -185,7 +185,7 @@ let generatorTests =
           <| fun _ ->
               let metadata = makeMetadata turnstileMachine turnstileHandlerMap
               let doc = generate { ResourceName = "turnstile" } metadata |> unwrap
-              let names = stateDecls doc |> List.map (fun s -> s.Identifier)
+              let names = stateDecls doc |> List.choose (fun s -> s.Identifier)
               // Locked first (initial), then Broken, Unlocked (alphabetical)
               Expect.equal names [ "Locked"; "Broken"; "Unlocked" ] "correct order"
 
@@ -239,7 +239,8 @@ let generatorTests =
               let doc = generate { ResourceName = "turnstile" } metadata |> unwrap
 
               for s in stateDecls doc do
-                  Expect.isNone s.Label $"state {s.Identifier} has no label (explicit declaration)"
+                  let stateId = s.Identifier |> Option.defaultValue ""
+                  Expect.isNone s.Label (sprintf "state %s has no label (explicit declaration)" stateId)
 
           testCase "no auto-number directive present"
           <| fun _ ->
@@ -259,7 +260,8 @@ let generatorTests =
               let synth: SourcePosition = { Line = 0; Column = 0 }
 
               for s in stateDecls doc do
-                  Expect.equal s.Position (Some synth) $"state {s.Identifier} has synthetic position"
+                  let stateId = s.Identifier |> Option.defaultValue ""
+                  Expect.equal s.Position (Some synth) (sprintf "state %s has synthetic position" stateId)
 
               for t in transitions doc do
                   Expect.equal t.Position (Some synth) $"transition {t.Event} has synthetic position"
@@ -271,7 +273,7 @@ let generatorTests =
               let doc = generate { ResourceName = "single" } metadata |> unwrap
               let states = stateDecls doc
               Expect.equal states.Length 1 "1 state declaration"
-              Expect.equal states.[0].Identifier "Only" "state is Only"
+              Expect.equal states.[0].Identifier (Some "Only") "state is Only"
               let trans = transitions doc
               Expect.isEmpty trans "no transitions"
 
@@ -282,7 +284,7 @@ let generatorTests =
               let doc = generate { ResourceName = "empty" } metadata |> unwrap
               let states = stateDecls doc
               Expect.equal states.Length 1 "1 state declaration (initial state only)"
-              Expect.equal states.[0].Identifier "Locked" "state is initial state"
+              Expect.equal states.[0].Identifier (Some "Locked") "state is initial state"
               let trans = transitions doc
               Expect.isEmpty trans "no transitions"
 

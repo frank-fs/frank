@@ -52,7 +52,7 @@ let private parseLabel (stateElem: JsonElement) : string option =
 
 /// Parse a single state from an XState JSON "states" object property.
 let private parseState (stateId: string) (stateElem: JsonElement) : StateNode =
-    { Identifier = stateId
+    { Identifier = Some stateId
       Label = parseLabel stateElem
       Kind = parseStateKind stateElem
       Children = []

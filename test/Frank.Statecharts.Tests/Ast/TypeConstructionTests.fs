@@ -9,7 +9,7 @@ open Frank.Statecharts.Ast
 
 let private buildTicTacToe () =
     let idle =
-        { Identifier = "idle"
+        { Identifier = Some "idle"
           Label = None
           Kind = Initial
           Children = []
@@ -18,7 +18,7 @@ let private buildTicTacToe () =
           Annotations = [] }
 
     let xTurn =
-        { Identifier = "xTurn"
+        { Identifier = Some "xTurn"
           Label = Some "X's Turn"
           Kind = Regular
           Children = []
@@ -27,7 +27,7 @@ let private buildTicTacToe () =
           Annotations = [] }
 
     let oTurn =
-        { Identifier = "oTurn"
+        { Identifier = Some "oTurn"
           Label = Some "O's Turn"
           Kind = Regular
           Children = []
@@ -36,7 +36,7 @@ let private buildTicTacToe () =
           Annotations = [] }
 
     let gameOver =
-        { Identifier = "gameOver"
+        { Identifier = Some "gameOver"
           Label = None
           Kind = Final
           Children = []
@@ -157,7 +157,7 @@ let ticTacToeTests =
                       | StateDecl s -> Some s
                       | _ -> None)
 
-              let xTurn = states |> List.find (fun s -> s.Identifier = "xTurn")
+              let xTurn = states |> List.find (fun s -> s.Identifier = Some "xTurn")
               Expect.equal xTurn.Label (Some "X's Turn") "xTurn has label"
 
               let transitions =
@@ -281,7 +281,7 @@ let annotationCoexistenceTests =
           testCase "WSD and SCXML annotations coexist on state"
           <| fun _ ->
               let state =
-                  { Identifier = "s1"
+                  { Identifier = Some "s1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -341,7 +341,7 @@ let sourcePositionTests =
         [ testCase "programmatic construction has None position"
           <| fun _ ->
               let state =
-                  { Identifier = "s1"
+                  { Identifier = Some "s1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -354,7 +354,7 @@ let sourcePositionTests =
           testCase "parser output has Some position"
           <| fun _ ->
               let state =
-                  { Identifier = "Client"
+                  { Identifier = Some "Client"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -408,7 +408,7 @@ let edgeCaseTests =
         [ testCase "state with no transitions is valid"
           <| fun _ ->
               let state =
-                  { Identifier = "sink"
+                  { Identifier = Some "sink"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -508,7 +508,7 @@ let edgeCaseTests =
           testCase "deeply nested hierarchy (5+ levels)"
           <| fun _ ->
               let leaf =
-                  { Identifier = "leaf"
+                  { Identifier = Some "leaf"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -517,7 +517,7 @@ let edgeCaseTests =
                     Annotations = [] }
 
               let l4 =
-                  { Identifier = "l4"
+                  { Identifier = Some "l4"
                     Label = None
                     Kind = Regular
                     Children = [ leaf ]
@@ -526,7 +526,7 @@ let edgeCaseTests =
                     Annotations = [] }
 
               let l3 =
-                  { Identifier = "l3"
+                  { Identifier = Some "l3"
                     Label = None
                     Kind = Regular
                     Children = [ l4 ]
@@ -535,7 +535,7 @@ let edgeCaseTests =
                     Annotations = [] }
 
               let l2 =
-                  { Identifier = "l2"
+                  { Identifier = Some "l2"
                     Label = None
                     Kind = Regular
                     Children = [ l3 ]
@@ -544,7 +544,7 @@ let edgeCaseTests =
                     Annotations = [] }
 
               let l1 =
-                  { Identifier = "l1"
+                  { Identifier = Some "l1"
                     Label = None
                     Kind = Regular
                     Children = [ l2 ]
@@ -570,7 +570,7 @@ let edgeCaseTests =
           testCase "empty annotations list is valid"
           <| fun _ ->
               let state =
-                  { Identifier = "s1"
+                  { Identifier = Some "s1"
                     Label = None
                     Kind = Regular
                     Children = []
@@ -583,7 +583,7 @@ let edgeCaseTests =
           testCase "unicode characters in identifiers and events"
           <| fun _ ->
               let state =
-                  { Identifier = "Utilisateur"
+                  { Identifier = Some "Utilisateur"
                     Label = Some "Benutzer"
                     Kind = Regular
                     Children = []
@@ -601,5 +601,5 @@ let edgeCaseTests =
                     Position = None
                     Annotations = [] }
 
-              Expect.equal state.Identifier "Utilisateur" "unicode identifier"
+              Expect.equal state.Identifier (Some "Utilisateur") "unicode identifier"
               Expect.equal edge.Event (Some "requete") "unicode event" ]

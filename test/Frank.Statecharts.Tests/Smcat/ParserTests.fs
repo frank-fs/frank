@@ -204,7 +204,7 @@ let stateDeclarationTests =
               let result = parseSmcat "idle;"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].Identifier "idle" "state name"
+              Expect.equal ss[0].Identifier (Some "idle") "state name"
               Expect.equal ss[0].Kind StateKind.Regular "regular type"
 
           testCase "comma-separated states"
@@ -212,9 +212,9 @@ let stateDeclarationTests =
               let result = parseSmcat "idle, running, stopped;"
               let ss = states result
               Expect.equal ss.Length 3 "three states"
-              Expect.equal ss[0].Identifier "idle" "first state"
-              Expect.equal ss[1].Identifier "running" "second state"
-              Expect.equal ss[2].Identifier "stopped" "third state"
+              Expect.equal ss[0].Identifier (Some "idle") "first state"
+              Expect.equal ss[1].Identifier (Some "running") "second state"
+              Expect.equal ss[2].Identifier (Some "stopped") "third state"
 
           testCase "state with attributes"
           <| fun _ ->
@@ -273,7 +273,7 @@ let compositeStateTests =
               let result = parseSmcat "parent {\n  child1 => child2;\n};"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].Identifier "parent" "parent name"
+              Expect.equal ss[0].Identifier (Some "parent") "parent name"
               // child1 => child2 is a transition only (no state declarations inside composite)
               // Transitions are lifted to the parent elements list; Children only holds StateDecl nodes
               let allTransitions = transitions result
@@ -286,11 +286,11 @@ let compositeStateTests =
           <| fun _ ->
               let result = parseSmcat "parent {\n  child {\n    grandchild1 => grandchild2;\n  };\n};"
               let ss = states result
-              Expect.equal ss[0].Identifier "parent" "parent name"
+              Expect.equal ss[0].Identifier (Some "parent") "parent name"
               Expect.isNonEmpty ss[0].Children "has children"
               let childSs = ss[0].Children
               Expect.equal childSs.Length 1 "one child state"
-              Expect.equal childSs[0].Identifier "child" "child name"
+              Expect.equal childSs[0].Identifier (Some "child") "child name"
               // grandchild1 => grandchild2 is a transition (no state declarations inside child)
               // Transitions are lifted; child.Children only holds StateDecl nodes
 

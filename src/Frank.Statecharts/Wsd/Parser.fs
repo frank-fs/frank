@@ -171,7 +171,7 @@ let private ensureParticipant (state: ParserState) (name: string) (pos: SourcePo
         // Emit a StateDecl element for the implicit participant so it
         // appears in the shared AST's Elements list (same as explicit decls)
         let stateNode =
-            { Identifier = name
+            { Identifier = Some name
               Label = None
               Kind = StateKind.Regular
               Children = []
@@ -226,7 +226,7 @@ let private parseParticipant (state: ParserState) : unit =
         registerParticipant state name alias true startToken.Position
 
         let stateNode =
-            { Identifier = name
+            { Identifier = Some name
               Label = alias
               Kind = StateKind.Regular
               Children = []

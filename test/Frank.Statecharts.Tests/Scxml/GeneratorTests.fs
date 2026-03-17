@@ -58,13 +58,13 @@ let generatorTests =
                     InitialStateId = Some "idle"
                     Elements =
                       [ StateDecl
-                            { Identifier = "idle"; Label = None; Kind = Regular
+                            { Identifier = Some "idle"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         StateDecl
-                            { Identifier = "active"; Label = None; Kind = Regular
+                            { Identifier = Some "active"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         StateDecl
-                            { Identifier = "done"; Label = None; Kind = Final
+                            { Identifier = Some "done"; Label = None; Kind = Final
                               Children = []; Activities = None; Position = None; Annotations = [] } ]
                     DataEntries = []
                     Annotations = [] }
@@ -84,10 +84,10 @@ let generatorTests =
                     InitialStateId = Some "active"
                     Elements =
                       [ StateDecl
-                            { Identifier = "active"; Label = None; Kind = Regular
+                            { Identifier = Some "active"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         StateDecl
-                            { Identifier = "submitted"; Label = None; Kind = Regular
+                            { Identifier = Some "submitted"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         TransitionElement
                             { Source = "active"; Target = Some "submitted"
@@ -109,11 +109,11 @@ let generatorTests =
                     InitialStateId = Some "parent"
                     Elements =
                       [ StateDecl
-                            { Identifier = "parent"; Label = None; Kind = Regular
+                            { Identifier = Some "parent"; Label = None; Kind = Regular
                               Children =
-                                [ { Identifier = "child1"; Label = None; Kind = Regular
+                                [ { Identifier = Some "child1"; Label = None; Kind = Regular
                                     Children = []; Activities = None; Position = None; Annotations = [] }
-                                  { Identifier = "child2"; Label = None; Kind = Regular
+                                  { Identifier = Some "child2"; Label = None; Kind = Regular
                                     Children = []; Activities = None; Position = None; Annotations = [] } ]
                               Activities = None; Position = None
                               Annotations = [ ScxmlAnnotation(ScxmlInitial("child1")) ] } ]
@@ -132,7 +132,7 @@ let generatorTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] } ]
                     DataEntries =
                       [ { Name = "count"
@@ -163,11 +163,11 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children =
-                                [ { Identifier = "child1"; Label = None; Kind = Regular
+                                [ { Identifier = Some "child1"; Label = None; Kind = Regular
                                     Children = []; Activities = None; Position = None; Annotations = [] }
-                                  { Identifier = "h1"; Label = None; Kind = DeepHistory
+                                  { Identifier = Some "h1"; Label = None; Kind = DeepHistory
                                     Children = []; Activities = None; Position = None
                                     Annotations = [ ScxmlAnnotation(ScxmlHistory("h1", Deep, None)) ] } ]
                               Activities = None; Position = None
@@ -188,7 +188,7 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None
                               Annotations =
                                 [ ScxmlAnnotation(ScxmlInvoke("http", Some "https://example.com/api", Some "inv1")) ] } ]
@@ -224,7 +224,7 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] } ]
                     DataEntries = []
                     Annotations = [] }
@@ -240,7 +240,7 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         TransitionElement
                             { Source = "s1"; Target = Some "s1"
@@ -261,13 +261,13 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         StateDecl
-                            { Identifier = "s2"; Label = None; Kind = Regular
+                            { Identifier = Some "s2"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         StateDecl
-                            { Identifier = "s3"; Label = None; Kind = Regular
+                            { Identifier = Some "s3"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] }
                         TransitionElement
                             { Source = "s1"; Target = Some "s2"
@@ -288,7 +288,7 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children = []; Activities = None; Position = None; Annotations = [] } ]
                     DataEntries =
                       [ { Name = "x"
@@ -308,11 +308,11 @@ let generatorAdvancedTests =
                     InitialStateId = Some "s1"
                     Elements =
                       [ StateDecl
-                            { Identifier = "s1"; Label = None; Kind = Regular
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
                               Children =
-                                [ { Identifier = "child1"; Label = None; Kind = Regular
+                                [ { Identifier = Some "child1"; Label = None; Kind = Regular
                                     Children = []; Activities = None; Position = None; Annotations = [] }
-                                  { Identifier = "h1"; Label = None; Kind = ShallowHistory
+                                  { Identifier = Some "h1"; Label = None; Kind = ShallowHistory
                                     Children = []; Activities = None; Position = None
                                     Annotations = [ ScxmlAnnotation(ScxmlHistory("h1", Shallow, Some "child1")) ] } ]
                               Activities = None; Position = None

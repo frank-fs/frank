@@ -275,7 +275,7 @@ let generateAlpsJson (doc: StatechartDocument) : string =
         // 2. State descriptors
         for state in states do
             writer.WriteStartObject()
-            writer.WriteString("id", state.Identifier)
+            state.Identifier |> Option.iter (fun id -> writer.WriteString("id", id))
             writer.WriteString("type", "semantic")
 
             // State-level documentation
@@ -283,8 +283,8 @@ let generateAlpsJson (doc: StatechartDocument) : string =
 
             // State's transitions as child descriptors
             let stateTransitions =
-                transitionsBySource
-                |> Map.tryFind state.Identifier
+                state.Identifier
+                |> Option.bind (fun id -> Map.tryFind id transitionsBySource)
                 |> Option.defaultValue []
 
             if not stateTransitions.IsEmpty then
