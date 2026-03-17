@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.Lexer
 
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 
 let tokenize (source: string) : Token list =

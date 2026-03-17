@@ -1,10 +1,11 @@
 module Frank.Statecharts.Tests.Smcat.LabelParserTests
 
 open Expecto
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 open Frank.Statecharts.Smcat.LabelParser
 
-let private pos = { Line = 1; Column = 1 }
+let private pos : SourcePosition = { Line = 1; Column = 1 }
 
 [<Tests>]
 let labelTests =

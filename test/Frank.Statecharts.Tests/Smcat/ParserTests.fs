@@ -1,6 +1,7 @@
 module Frank.Statecharts.Tests.Smcat.ParserTests
 
 open Expecto
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 open Frank.Statecharts.Smcat.Parser
 
@@ -17,7 +18,7 @@ let private states (result: ParseResult) =
     result.Document.Elements
     |> List.choose (fun e ->
         match e with
-        | StateDeclaration s -> Some s
+        | StateDecl s -> Some s
         | _ -> None)
 
 [<Tests>]
@@ -58,8 +59,10 @@ let transitionTests =
               let ts = transitions result
               Expect.equal ts.Length 1 "one transition"
               Expect.equal ts[0].Source "a" "source"
-              Expect.equal ts[0].Target "b" "target"
-              Expect.equal ts[0].Label None "no label"
+              Expect.equal ts[0].Target (Some "b") "target"
+              Expect.equal ts[0].Event None "no event"
+              Expect.equal ts[0].Guard None "no guard"
+              Expect.equal ts[0].Action None "no action"
               Expect.isEmpty result.Errors "no errors"
 
           testCase "transition with event label"
@@ -67,20 +70,18 @@ let transitionTests =
               let result = parseSmcat "a => b: event;"
               let ts = transitions result
               Expect.equal ts.Length 1 "one transition"
-              Expect.isSome ts[0].Label "has label"
-              Expect.equal ts[0].Label.Value.Event (Some "event") "event"
-              Expect.equal ts[0].Label.Value.Guard None "no guard"
-              Expect.equal ts[0].Label.Value.Action None "no action"
+              Expect.equal ts[0].Event (Some "event") "event"
+              Expect.equal ts[0].Guard None "no guard"
+              Expect.equal ts[0].Action None "no action"
 
           testCase "transition with full label"
           <| fun _ ->
               let result = parseSmcat "a => b: event [guard] / action;"
               let ts = transitions result
               Expect.equal ts.Length 1 "one transition"
-              let label = ts[0].Label.Value
-              Expect.equal label.Event (Some "event") "event"
-              Expect.equal label.Guard (Some "guard") "guard"
-              Expect.equal label.Action (Some "action") "action"
+              Expect.equal ts[0].Event (Some "event") "event"
+              Expect.equal ts[0].Guard (Some "guard") "guard"
+              Expect.equal ts[0].Action (Some "action") "action"
 
           testCase "multiple transitions"
           <| fun _ ->
@@ -106,7 +107,7 @@ let transitionTests =
           <| fun _ ->
               let result = parseSmcat "a => \"target state\";"
               let ts = transitions result
-              Expect.equal ts[0].Target "target state" "quoted target" ]
+              Expect.equal ts[0].Target (Some "target state") "quoted target" ]
 
 [<Tests>]
 let onboardingExampleTests =
@@ -124,27 +125,27 @@ let onboardingExampleTests =
 
               // Transition 1: initial => home: start
               Expect.equal ts[0].Source "initial" "t1 source"
-              Expect.equal ts[0].Target "home" "t1 target"
-              Expect.equal ts[0].Label.Value.Event (Some "start") "t1 event"
-              Expect.equal ts[0].Label.Value.Guard None "t1 no guard"
-              Expect.equal ts[0].Label.Value.Action None "t1 no action"
+              Expect.equal ts[0].Target (Some "home") "t1 target"
+              Expect.equal ts[0].Event (Some "start") "t1 event"
+              Expect.equal ts[0].Guard None "t1 no guard"
+              Expect.equal ts[0].Action None "t1 no action"
 
               // Transition 2: home => WIP: begin
               Expect.equal ts[1].Source "home" "t2 source"
-              Expect.equal ts[1].Target "WIP" "t2 target"
-              Expect.equal ts[1].Label.Value.Event (Some "begin") "t2 event"
+              Expect.equal ts[1].Target (Some "WIP") "t2 target"
+              Expect.equal ts[1].Event (Some "begin") "t2 event"
 
               // Transition 3: WIP => customerData: collectCustomerData [isValid] / logAction
               Expect.equal ts[2].Source "WIP" "t3 source"
-              Expect.equal ts[2].Target "customerData" "t3 target"
-              Expect.equal ts[2].Label.Value.Event (Some "collectCustomerData") "t3 event"
-              Expect.equal ts[2].Label.Value.Guard (Some "isValid") "t3 guard"
-              Expect.equal ts[2].Label.Value.Action (Some "logAction") "t3 action"
+              Expect.equal ts[2].Target (Some "customerData") "t3 target"
+              Expect.equal ts[2].Event (Some "collectCustomerData") "t3 event"
+              Expect.equal ts[2].Guard (Some "isValid") "t3 guard"
+              Expect.equal ts[2].Action (Some "logAction") "t3 action"
 
               // Transition 4: customerData => final: complete
               Expect.equal ts[3].Source "customerData" "t4 source"
-              Expect.equal ts[3].Target "final" "t4 target"
-              Expect.equal ts[3].Label.Value.Event (Some "complete") "t4 event" ]
+              Expect.equal ts[3].Target (Some "final") "t4 target"
+              Expect.equal ts[3].Event (Some "complete") "t4 event" ]
 
 [<Tests>]
 let pseudoStateTests =
@@ -160,7 +161,7 @@ let pseudoStateTests =
           <| fun _ ->
               let result = parseSmcat "home => final;"
               let ts = transitions result
-              Expect.equal ts[0].Target "final" "target name is final"
+              Expect.equal ts[0].Target (Some "final") "target name is final"
 
           testCase "choice pseudo-state"
           <| fun _ ->
@@ -179,14 +180,14 @@ let pseudoStateTests =
               let result = parseSmcat "initial;"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].StateType Initial "initial state type"
+              Expect.equal ss[0].Kind StateKind.Initial "initial state type"
 
           testCase "state declaration with final type"
           <| fun _ ->
               let result = parseSmcat "final;"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].StateType Final "final state type"
+              Expect.equal ss[0].Kind StateKind.Final "final state type"
 
           testCase "forkjoin pseudo-state"
           <| fun _ ->
@@ -203,28 +204,32 @@ let stateDeclarationTests =
               let result = parseSmcat "idle;"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].Name "idle" "state name"
-              Expect.equal ss[0].StateType Regular "regular type"
+              Expect.equal ss[0].Identifier "idle" "state name"
+              Expect.equal ss[0].Kind StateKind.Regular "regular type"
 
           testCase "comma-separated states"
           <| fun _ ->
               let result = parseSmcat "idle, running, stopped;"
               let ss = states result
               Expect.equal ss.Length 3 "three states"
-              Expect.equal ss[0].Name "idle" "first state"
-              Expect.equal ss[1].Name "running" "second state"
-              Expect.equal ss[2].Name "stopped" "third state"
+              Expect.equal ss[0].Identifier "idle" "first state"
+              Expect.equal ss[1].Identifier "running" "second state"
+              Expect.equal ss[2].Identifier "stopped" "third state"
 
           testCase "state with attributes"
           <| fun _ ->
               let result = parseSmcat "on [label=\"Lamp on\" color=\"#008800\"];"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].Attributes.Length 2 "two attributes"
-              Expect.equal ss[0].Attributes[0].Key "label" "first attr key"
-              Expect.equal ss[0].Attributes[0].Value "Lamp on" "first attr value"
-              Expect.equal ss[0].Attributes[1].Key "color" "second attr key"
-              Expect.equal ss[0].Attributes[1].Value "#008800" "second attr value"
+              // Annotations now hold SmcatAnnotation values (label and color)
+              // label is extracted to ss[0].Label; color becomes SmcatAnnotation(SmcatColor ...)
+              Expect.equal ss[0].Label (Some "Lamp on") "label extracted from attributes"
+              let colorAnnotation =
+                  ss[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatColor c) -> Some c
+                      | _ -> None)
+              Expect.equal colorAnnotation (Some "#008800") "color annotation"
 
           testCase "state label from attribute"
           <| fun _ ->
@@ -242,22 +247,22 @@ let activityTests =
               let ss = states result
               Expect.equal ss.Length 1 "one state"
               Expect.isSome ss[0].Activities "has activities"
-              Expect.equal ss[0].Activities.Value.Entry (Some "start") "entry activity"
+              Expect.equal ss[0].Activities.Value.Entry [ "start" ] "entry activity"
 
           testCase "state with exit activity"
           <| fun _ ->
               let result = parseSmcat "active: exit/ stop;"
               let ss = states result
               Expect.isSome ss[0].Activities "has activities"
-              Expect.equal ss[0].Activities.Value.Exit (Some "stop") "exit activity"
+              Expect.equal ss[0].Activities.Value.Exit [ "stop" ] "exit activity"
 
           testCase "state with multiple activities"
           <| fun _ ->
               let result = parseSmcat "active: entry/ start exit/ stop;"
               let ss = states result
               Expect.isSome ss[0].Activities "has activities"
-              Expect.equal ss[0].Activities.Value.Entry (Some "start") "entry"
-              Expect.equal ss[0].Activities.Value.Exit (Some "stop") "exit" ]
+              Expect.equal ss[0].Activities.Value.Entry [ "start" ] "entry"
+              Expect.equal ss[0].Activities.Value.Exit [ "stop" ] "exit" ]
 
 [<Tests>]
 let compositeStateTests =
@@ -268,33 +273,33 @@ let compositeStateTests =
               let result = parseSmcat "parent {\n  child1 => child2;\n};"
               let ss = states result
               Expect.equal ss.Length 1 "one state"
-              Expect.equal ss[0].Name "parent" "parent name"
-              Expect.isSome ss[0].Children "has children"
-              let children = ss[0].Children.Value
-              let childTs = children.Elements |> List.choose (fun e -> match e with TransitionElement t -> Some t | _ -> None)
+              Expect.equal ss[0].Identifier "parent" "parent name"
+              // child1 => child2 is a transition only (no state declarations inside composite)
+              // Transitions are lifted to the parent elements list; Children only holds StateDecl nodes
+              let allTransitions = transitions result
+              let childTs = allTransitions |> List.filter (fun t -> t.Source = "child1")
               Expect.equal childTs.Length 1 "one child transition"
               Expect.equal childTs[0].Source "child1" "child source"
-              Expect.equal childTs[0].Target "child2" "child target"
+              Expect.equal childTs[0].Target (Some "child2") "child target"
 
           testCase "nested composite state (2 levels)"
           <| fun _ ->
               let result = parseSmcat "parent {\n  child {\n    grandchild1 => grandchild2;\n  };\n};"
               let ss = states result
-              Expect.equal ss[0].Name "parent" "parent name"
-              Expect.isSome ss[0].Children "has children"
-              let childSs =
-                  ss[0].Children.Value.Elements
-                  |> List.choose (fun e -> match e with StateDeclaration s -> Some s | _ -> None)
+              Expect.equal ss[0].Identifier "parent" "parent name"
+              Expect.isNonEmpty ss[0].Children "has children"
+              let childSs = ss[0].Children
               Expect.equal childSs.Length 1 "one child state"
-              Expect.equal childSs[0].Name "child" "child name"
-              Expect.isSome childSs[0].Children "child has children"
+              Expect.equal childSs[0].Identifier "child" "child name"
+              // grandchild1 => grandchild2 is a transition (no state declarations inside child)
+              // Transitions are lifted; child.Children only holds StateDecl nodes
 
           testCase "composite state with transition and state"
           <| fun _ ->
               let source = "parent {\n  child1 => child2: event;\n  child2;\n};"
               let result = parseSmcat source
               Expect.isEmpty result.Errors "no errors"
-              Expect.isSome (states result).[0].Children "has children"
+              Expect.isNonEmpty (states result).[0].Children "has children"
 
           testCase "deeply nested composites (5 levels)"
           <| fun _ ->
@@ -307,11 +312,7 @@ let compositeStateTests =
               let mutable current = Some (states result).[0]
               while current.IsSome do
                   depth <- depth + 1
-                  let childStates =
-                      current.Value.Children
-                      |> Option.map (fun doc ->
-                          doc.Elements |> List.choose (fun e -> match e with StateDeclaration s -> Some s | _ -> None))
-                      |> Option.defaultValue []
+                  let childStates = current.Value.Children
                   current <-
                       if childStates.Length > 0 then Some childStates[0]
                       else None
@@ -325,15 +326,19 @@ let attributeTests =
           <| fun _ ->
               let result = parseSmcat "a => b [color=\"red\"];"
               let ts = transitions result
-              Expect.equal ts[0].Attributes.Length 1 "one attribute"
-              Expect.equal ts[0].Attributes[0].Key "color" "attr key"
-              Expect.equal ts[0].Attributes[0].Value "red" "attr value"
+              // Transition annotations are now Annotation list
+              let colorAnnotation =
+                  ts[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatColor c) -> Some c
+                      | _ -> None)
+              Expect.equal colorAnnotation (Some "red") "color annotation"
 
           testCase "state with type attribute overrides naming"
           <| fun _ ->
               let result = parseSmcat "myState [type=initial];"
               let ss = states result
-              Expect.equal ss[0].StateType Initial "type attribute overrides" ]
+              Expect.equal ss[0].Kind StateKind.Initial "type attribute overrides" ]
 
 [<Tests>]
 let edgeCaseTests =
@@ -349,11 +354,13 @@ let edgeCaseTests =
               let result = parseSmcat ","
               Expect.isEmpty result.Errors "no errors from empty statement"
 
-          testCase "transition without label has None"
+          testCase "transition without label has no event/guard/action"
           <| fun _ ->
               let result = parseSmcat "a => b;"
               let ts = transitions result
-              Expect.equal ts[0].Label None "no label"
+              Expect.equal ts[0].Event None "no event"
+              Expect.equal ts[0].Guard None "no guard"
+              Expect.equal ts[0].Action None "no action"
 
           testCase "multiple statements on one line with commas"
           <| fun _ ->

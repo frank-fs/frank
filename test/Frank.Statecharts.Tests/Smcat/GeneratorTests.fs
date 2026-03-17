@@ -4,7 +4,9 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Expecto
 open Frank.Statecharts
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Generator
+open Frank.Statecharts.Smcat.Serializer
 
 // --- Test state machine types ---
 
@@ -59,52 +61,32 @@ let private simpleMachine guards stateMetadata : StateMachine<TestState, TestEve
 
 let private options = { ResourceName = "TestResource" }
 
-// === Label formatting tests (internal helpers, still testable) ===
+/// Unwrap generator Result or fail the test.
+let private unwrapResult (result: Result<StatechartDocument, GeneratorError>) : StatechartDocument =
+    match result with
+    | Ok doc -> doc
+    | Error e -> failwithf "Generator returned error: %A" e
 
-[<Tests>]
-let labelFormattingTests =
-    testList
-        "Smcat.Generator.formatLabel"
-        [ test "event only" {
-              Expect.equal (formatLabel (Some "start") None None) (Some "start") ""
-          }
-          test "event and guard" {
-              Expect.equal (formatLabel (Some "start") (Some "isReady") None) (Some "start [isReady]") ""
-          }
-          test "event and action" {
-              Expect.equal (formatLabel (Some "start") None (Some "log")) (Some "start / log") ""
-          }
-          test "all three" {
-              Expect.equal (formatLabel (Some "start") (Some "isReady") (Some "log")) (Some "start [isReady] / log") ""
-          }
-          test "guard only" {
-              Expect.equal (formatLabel None (Some "isReady") None) (Some "[isReady]") ""
-          }
-          test "action only" {
-              Expect.equal (formatLabel None None (Some "log")) (Some "/ log") ""
-          }
-          test "none" {
-              Expect.equal (formatLabel None None None) None ""
-          } ]
+/// Extract transitions from a StatechartDocument.
+let private extractTransitions (doc: StatechartDocument) =
+    doc.Elements
+    |> List.choose (fun e ->
+        match e with
+        | TransitionElement t -> Some t
+        | _ -> None)
 
-// === Transition formatting tests ===
+/// Extract state declarations from a StatechartDocument.
+let private extractStates (doc: StatechartDocument) =
+    doc.Elements
+    |> List.choose (fun e ->
+        match e with
+        | StateDecl s -> Some s
+        | _ -> None)
 
-[<Tests>]
-let transitionFormattingTests =
-    testList
-        "Smcat.Generator.formatTransition"
-        [ test "with label" {
-              Expect.equal (formatTransition "idle" "running" (Some "start")) "idle => running: start;" ""
-          }
-          test "without label" {
-              Expect.equal (formatTransition "idle" "running" None) "idle => running;" ""
-          }
-          test "quotes names with spaces" {
-              Expect.equal (formatTransition "my state" "next" (Some "go")) "\"my state\" => next: go;" ""
-          }
-          test "no quoting for underscores, dots, hyphens" {
-              Expect.equal (formatTransition "state_one" "v2.0-beta" None) "state_one => v2.0-beta;" ""
-          } ]
+/// Generate and serialize to smcat text for text-based assertions.
+let private generateText (options: GenerateOptions) (metadata: StateMachineMetadata) : string =
+    let doc = generate options metadata |> unwrapResult
+    serialize doc
 
 // === Full generator tests using StateMachineMetadata ===
 
@@ -112,7 +94,7 @@ let transitionFormattingTests =
 let generatorTests =
     testList
         "Smcat.Generator"
-        [ test "emits initial transition first" {
+        [ test "emits initial transition" {
               let machine =
                   simpleMachine
                       []
@@ -125,12 +107,14 @@ let generatorTests =
                       [ ("Idle", [ ("GET", dummyHandler) ])
                         ("Running", [ ("GET", dummyHandler) ]) ]
 
-              let result = generate options (makeMetadata machine handlers)
-              let lines = result.Split('\n')
-              Expect.equal lines.[0] "initial => Idle;" "first line is initial transition"
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ts = extractTransitions doc
+              let initialT = ts |> List.tryFind (fun t -> t.Source = "initial")
+              Expect.isSome initialT "has initial transition"
+              Expect.equal initialT.Value.Target (Some "Idle") "initial transition targets Idle"
           }
 
-          test "emits self-messages for each HTTP method" {
+          test "emits self-transitions for each HTTP method" {
               let machine =
                   simpleMachine
                       []
@@ -140,13 +124,15 @@ let generatorTests =
               let handlers =
                   Map.ofList [ ("Idle", [ ("GET", dummyHandler); ("POST", dummyHandler) ]) ]
 
-              let result = generate options (makeMetadata machine handlers)
-              let lines = result.Split('\n')
-              Expect.equal lines.[1] "Idle => Idle: GET;" "GET self-message"
-              Expect.equal lines.[2] "Idle => Idle: POST;" "POST self-message"
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ts = extractTransitions doc
+              let selfTs = ts |> List.filter (fun t -> t.Source = "Idle" && t.Target = Some "Idle")
+              Expect.equal selfTs.Length 2 "two self-transitions"
+              Expect.equal selfTs[0].Event (Some "GET") "GET self-transition"
+              Expect.equal selfTs[1].Event (Some "POST") "POST self-transition"
           }
 
-          test "emits final state transitions last" {
+          test "emits final state transitions" {
               let machine =
                   simpleMachine
                       []
@@ -159,10 +145,11 @@ let generatorTests =
                       [ ("Idle", [ ("GET", dummyHandler) ])
                         ("Completed", []) ]
 
-              let result = generate options (makeMetadata machine handlers)
-              let lines = result.Split('\n')
-              let lastLine = lines.[lines.Length - 1]
-              Expect.equal lastLine "Completed => final;" "last line is final transition"
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ts = extractTransitions doc
+              let finalT = ts |> List.tryFind (fun t -> t.Target = Some "final")
+              Expect.isSome finalT "has final transition"
+              Expect.equal finalT.Value.Source "Completed" "Completed => final"
           }
 
           test "states ordered: initial first, others alphabetically" {
@@ -180,13 +167,12 @@ let generatorTests =
                         ("Running", [ ("GET", dummyHandler) ])
                         ("Stopped", [ ("GET", dummyHandler) ]) ]
 
-              let result = generate options (makeMetadata machine handlers)
-              let lines = result.Split('\n')
-              // initial => Idle; Idle self; Running self; Stopped self
-              Expect.equal lines.[0] "initial => Idle;" "initial first"
-              Expect.equal lines.[1] "Idle => Idle: GET;" "Idle (initial) second"
-              Expect.equal lines.[2] "Running => Running: GET;" "Running alphabetically"
-              Expect.equal lines.[3] "Stopped => Stopped: GET;" "Stopped alphabetically"
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ss = extractStates doc
+              // States should be ordered: Idle (initial) first, then Running, Stopped alphabetically
+              Expect.equal ss[0].Identifier "Idle" "Idle (initial) first"
+              Expect.equal ss[1].Identifier "Running" "Running alphabetically"
+              Expect.equal ss[2].Identifier "Stopped" "Stopped alphabetically"
           }
 
           test "single state, no handlers" {
@@ -196,6 +182,30 @@ let generatorTests =
                       (Map.ofList [ (Idle, { AllowedMethods = []; IsFinal = false; Description = None }) ])
 
               let handlers = Map.ofList [ ("Idle", []) ]
-              let result = generate options (makeMetadata machine handlers)
-              Expect.equal result "initial => Idle;" "only initial transition"
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ts = extractTransitions doc
+              // Only the initial => Idle transition
+              Expect.equal ts.Length 1 "one transition"
+              Expect.equal ts[0].Source "initial" "source is initial"
+              Expect.equal ts[0].Target (Some "Idle") "target is Idle"
+          }
+
+          test "serialized output contains all elements" {
+              let machine =
+                  simpleMachine
+                      []
+                      (Map.ofList
+                          [ (Idle, { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None })
+                            (Completed, { AllowedMethods = []; IsFinal = true; Description = None }) ])
+
+              let handlers =
+                  Map.ofList
+                      [ ("Idle", [ ("GET", dummyHandler) ])
+                        ("Completed", []) ]
+
+              let result = generateText options (makeMetadata machine handlers)
+              // Serialized text should contain key elements
+              Expect.stringContains result "initial => Idle" "has initial transition"
+              Expect.stringContains result "Idle => Idle: GET" "has GET self-transition"
+              Expect.stringContains result "Completed => final" "has final transition"
           } ]

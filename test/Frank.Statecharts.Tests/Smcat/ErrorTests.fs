@@ -1,6 +1,7 @@
 module Frank.Statecharts.Tests.Smcat.ErrorTests
 
 open Expecto
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 open Frank.Statecharts.Smcat.Parser
 open Frank.Statecharts.Smcat.Lexer
@@ -18,7 +19,7 @@ let private states (result: ParseResult) =
     result.Document.Elements
     |> List.choose (fun e ->
         match e with
-        | StateDeclaration s -> Some s
+        | StateDecl s -> Some s
         | _ -> None)
 
 // T024: Acceptance scenario tests from User Story 5
@@ -33,9 +34,10 @@ let missingColonTests =
               let result = parseSmcat "on => off switch flicked;"
               Expect.isNonEmpty result.Errors "should have errors"
               let err = result.Errors[0]
-              // Verify line/column present
-              Expect.isGreaterThan err.Position.Line 0 "has line"
-              Expect.isGreaterThan err.Position.Column 0 "has column"
+              // Verify line/column present (Position is SourcePosition option)
+              Expect.isSome err.Position "has position"
+              Expect.isGreaterThan err.Position.Value.Line 0 "has line"
+              Expect.isGreaterThan err.Position.Value.Column 0 "has column"
               // Verify expected mentions colon or semicolon
               Expect.stringContains err.Expected "':'" "expected mentions colon"
               // Verify corrective example shows correct syntax
@@ -48,7 +50,7 @@ let missingColonTests =
               let ts = transitions result
               Expect.equal ts.Length 1 "partial transition emitted"
               Expect.equal ts[0].Source "on" "source preserved"
-              Expect.equal ts[0].Target "off" "target preserved" ]
+              Expect.equal ts[0].Target (Some "off") "target preserved" ]
 
 [<Tests>]
 let invalidArrowTests =
@@ -61,8 +63,9 @@ let invalidArrowTests =
               Expect.isNonEmpty result.Errors "should have errors"
               let err = result.Errors[0]
               // Verify position
-              Expect.isGreaterThan err.Position.Line 0 "has line"
-              Expect.isGreaterThan err.Position.Column 0 "has column"
+              Expect.isSome err.Position "has position"
+              Expect.isGreaterThan err.Position.Value.Line 0 "has line"
+              Expect.isGreaterThan err.Position.Value.Column 0 "has column"
               // Verify error mentions arrow
               Expect.stringContains err.Description "==>" "mentions invalid arrow"
               Expect.stringContains err.Description "=>" "mentions correct arrow"
@@ -75,7 +78,7 @@ let invalidArrowTests =
               let ts = transitions result
               Expect.equal ts.Length 1 "partial transition emitted"
               Expect.equal ts[0].Source "on" "source preserved"
-              Expect.equal ts[0].Target "off" "target preserved" ]
+              Expect.equal ts[0].Target (Some "off") "target preserved" ]
 
 [<Tests>]
 let unclosedBracketTests =
@@ -88,8 +91,9 @@ let unclosedBracketTests =
               Expect.isNonEmpty result.Errors "should have errors"
               let err = result.Errors[0]
               // Verify position
-              Expect.isGreaterThan err.Position.Line 0 "has line"
-              Expect.isGreaterThan err.Position.Column 0 "has column"
+              Expect.isSome err.Position "has position"
+              Expect.isGreaterThan err.Position.Value.Line 0 "has line"
+              Expect.isGreaterThan err.Position.Value.Column 0 "has column"
               // Verify error mentions unclosed bracket
               Expect.stringContains err.Description "Unclosed bracket" "mentions unclosed bracket"
               // Verify corrective example
@@ -116,8 +120,9 @@ let multipleErrorTests =
 
               // Verify each error has all required fields
               for err in result.Errors do
-                  Expect.isGreaterThan err.Position.Line 0 "has line"
-                  Expect.isGreaterThan err.Position.Column 0 "has column"
+                  Expect.isSome err.Position "has position"
+                  Expect.isGreaterThan err.Position.Value.Line 0 "has line"
+                  Expect.isGreaterThan err.Position.Value.Column 0 "has column"
                   Expect.isNotEmpty err.Description "has description"
                   Expect.isNotEmpty err.CorrectiveExample "has corrective example"
 
@@ -129,7 +134,10 @@ let multipleErrorTests =
               Expect.isGreaterThanOrEqual result.Errors.Length 2 "multiple errors"
 
               // Different lines
-              let lines = result.Errors |> List.map (fun e -> e.Position.Line) |> List.distinct
+              let lines =
+                  result.Errors
+                  |> List.choose (fun e -> e.Position |> Option.map (fun p -> p.Line))
+                  |> List.distinct
               Expect.isGreaterThan lines.Length 1 "errors on different lines" ]
 
 [<Tests>]
@@ -144,7 +152,7 @@ let errorRecoveryTests =
               // The valid transition should still be parsed
               let ts = transitions result
               Expect.isGreaterThanOrEqual ts.Length 1 "at least one transition parsed"
-              let validT = ts |> List.tryFind (fun t -> t.Source = "b" && t.Target = "c")
+              let validT = ts |> List.tryFind (fun t -> t.Source = "b" && t.Target = Some "c")
               Expect.isSome validT "valid transition parsed after error"
 
           testCase "multiple valid statements around error"
@@ -315,8 +323,9 @@ let edgeCaseTests =
               let result = parseSmcat "on => off switch flicked;"
               Expect.isNonEmpty result.Errors "has errors"
               let err = result.Errors[0]
-              Expect.isGreaterThan err.Position.Line 0 "Position.Line populated"
-              Expect.isGreaterThan err.Position.Column 0 "Position.Column populated"
+              Expect.isSome err.Position "has position"
+              Expect.isGreaterThan err.Position.Value.Line 0 "Position.Line populated"
+              Expect.isGreaterThan err.Position.Value.Column 0 "Position.Column populated"
               Expect.isNotEmpty err.Description "Description populated"
               Expect.isNotEmpty err.Expected "Expected populated"
               Expect.isNotEmpty err.Found "Found populated"

@@ -1,10 +1,7 @@
 module internal Frank.Statecharts.Smcat.Types
 
 open System
-
-// Temporary duplicate of Wsd.Types.SourcePosition — will be unified by spec 020.
-[<Struct>]
-type SourcePosition = { Line: int; Column: int }
+open Frank.Statecharts.Ast
 
 // Token types for the smcat lexer.
 type TokenKind =
@@ -39,23 +36,6 @@ type Token =
     { Kind: TokenKind
       Position: SourcePosition }
 
-// State classification for pseudo-state detection.
-type StateType =
-    | Regular
-    | Initial
-    | Final
-    | ShallowHistory
-    | DeepHistory
-    | Choice
-    | ForkJoin
-    | Terminate
-
-// Activities that can be declared within a state.
-type StateActivity =
-    { Entry: string option
-      Exit: string option
-      Do: string option }
-
 // Key-value attribute pair attached to states or transitions.
 type SmcatAttribute = { Key: string; Value: string }
 
@@ -65,52 +45,9 @@ type TransitionLabel =
       Guard: string option
       Action: string option }
 
-// Mutually recursive AST types: SmcatState -> SmcatDocument -> SmcatElement -> SmcatState.
-type SmcatState =
-    { Name: string
-      Label: string option
-      StateType: StateType
-      Activities: StateActivity option
-      Attributes: SmcatAttribute list
-      Children: SmcatDocument option
-      Position: SourcePosition }
-
-and SmcatTransition =
-    { Source: string
-      Target: string
-      Label: TransitionLabel option
-      Attributes: SmcatAttribute list
-      Position: SourcePosition }
-
-and SmcatElement =
-    | StateDeclaration of SmcatState
-    | TransitionElement of SmcatTransition
-    | CommentElement of string
-
-and SmcatDocument =
-    { Elements: SmcatElement list }
-
-// Parse result types.
-type ParseFailure =
-    { Position: SourcePosition
-      Description: string
-      Expected: string
-      Found: string
-      CorrectiveExample: string }
-
-type ParseWarning =
-    { Position: SourcePosition
-      Description: string
-      Suggestion: string option }
-
-type ParseResult =
-    { Document: SmcatDocument
-      Errors: ParseFailure list
-      Warnings: ParseWarning list }
-
 // Infer state type from name and attributes.
 // Priority order: attribute override > naming convention > Regular.
-let inferStateType (name: string) (attributes: SmcatAttribute list) : StateType =
+let inferStateType (name: string) (attributes: SmcatAttribute list) : StateKind =
     // 1. Attribute override takes highest priority (R-002).
     let typeAttr =
         attributes
@@ -119,22 +56,22 @@ let inferStateType (name: string) (attributes: SmcatAttribute list) : StateType 
     match typeAttr with
     | Some attr ->
         match attr.Value.ToLowerInvariant() with
-        | "initial" -> Initial
-        | "final" -> Final
-        | "history" -> ShallowHistory
-        | "deep.history" -> DeepHistory
-        | "choice" -> Choice
-        | "forkjoin" -> ForkJoin
-        | "terminate" -> Terminate
-        | "regular" -> Regular
-        | _ -> Regular
+        | "initial" -> StateKind.Initial
+        | "final" -> StateKind.Final
+        | "history" -> StateKind.ShallowHistory
+        | "deep.history" -> StateKind.DeepHistory
+        | "choice" -> StateKind.Choice
+        | "forkjoin" -> StateKind.ForkJoin
+        | "terminate" -> StateKind.Terminate
+        | "regular" -> StateKind.Regular
+        | _ -> StateKind.Regular
     | None ->
         // 2-8. Naming convention checks in priority order.
-        if name.Contains("initial", StringComparison.OrdinalIgnoreCase) then Initial
-        elif name.Contains("final", StringComparison.OrdinalIgnoreCase) then Final
-        elif name.Contains("deep.history", StringComparison.OrdinalIgnoreCase) then DeepHistory
-        elif name.Contains("history", StringComparison.OrdinalIgnoreCase) then ShallowHistory
-        elif name.StartsWith('^') then Choice
-        elif name.StartsWith(']') then ForkJoin
-        elif name.Contains("terminate", StringComparison.OrdinalIgnoreCase) then Terminate
-        else Regular
+        if name.Contains("initial", StringComparison.OrdinalIgnoreCase) then StateKind.Initial
+        elif name.Contains("final", StringComparison.OrdinalIgnoreCase) then StateKind.Final
+        elif name.Contains("deep.history", StringComparison.OrdinalIgnoreCase) then StateKind.DeepHistory
+        elif name.Contains("history", StringComparison.OrdinalIgnoreCase) then StateKind.ShallowHistory
+        elif name.StartsWith('^') then StateKind.Choice
+        elif name.StartsWith(']') then StateKind.ForkJoin
+        elif name.Contains("terminate", StringComparison.OrdinalIgnoreCase) then StateKind.Terminate
+        else StateKind.Regular

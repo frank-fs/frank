@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.LabelParser
 
+open Frank.Statecharts.Ast
 open Frank.Statecharts.Smcat.Types
 
 /// Parse a transition label string in the format "event [guard] / action".
@@ -51,8 +52,8 @@ let parseLabel (label: string) (position: SourcePosition) : TransitionLabel * Pa
         if bracketStart >= 0 && bracketEnd < 0 then
             warnings.Add(
                 { Position =
-                    { Line = position.Line
-                      Column = position.Column + bracketStart }
+                    Some { Line = position.Line
+                           Column = position.Column + bracketStart }
                   Description = "Unclosed bracket in transition label"
                   Suggestion = Some "Add closing ']' bracket" }
             )
