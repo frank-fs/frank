@@ -99,17 +99,17 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T017 Create `test/Frank.Statecharts.Tests/Validation/PipelineIntegrationTests.fs` with real format source constants
-- [ ] T018 [P] Define tic-tac-toe WSD source text constant (states: idle, playerX, playerO, gameOver; events: start, move, win)
-- [ ] T019 [P] Define tic-tac-toe smcat source text constant (same state machine)
-- [ ] T020 [P] Define tic-tac-toe SCXML source text constant (same state machine)
-- [ ] T021 [P] Define tic-tac-toe ALPS source text constant (same state machine)
-- [ ] T022 Test: consistent 4-format sources produce zero validation failures (SC-001, User Story 5 scenario 1)
-- [ ] T023 Test: state name mismatch detected (rename gameOver to finished in smcat) (SC-002, User Story 5 scenario 2)
-- [ ] T024 Test: missing event detected (remove start event from ALPS) (User Story 5 scenario 3)
-- [ ] T025 Test: parse error in one format still validates others (User Story 2, scenario 1)
-- [ ] T026 Test: performance -- 4 formats under 2 seconds (SC-004)
-- [ ] T027 Add `Compile Include` for `Validation/PipelineIntegrationTests.fs` in `Frank.Statecharts.Tests.fsproj`
+- [x] T017 Create `test/Frank.Statecharts.Tests/Validation/PipelineIntegrationTests.fs` with real format source constants
+- [x] T018 [P] Define tic-tac-toe WSD source text constant (states: idle, playerX, playerO, gameOver; events: start, move, win)
+- [x] T019 [P] Define tic-tac-toe smcat source text constant (same state machine)
+- [x] T020 [P] Define tic-tac-toe SCXML source text constant (same state machine)
+- [x] T021 [P] Define tic-tac-toe ALPS source text constant (same state machine)
+- [x] T022 Test: consistent 4-format sources produce zero validation failures (SC-001, User Story 5 scenario 1)
+- [x] T023 Test: state name mismatch detected (rename gameOver to finished in smcat) (SC-002, User Story 5 scenario 2)
+- [x] T024 Test: missing event detected (remove start event from ALPS) (User Story 5 scenario 3)
+- [x] T025 Test: parse error in one format still validates others (User Story 2, scenario 1)
+- [x] T026 Test: performance -- 4 formats under 2 seconds (SC-004)
+- [x] T027 Add `Compile Include` for `Validation/PipelineIntegrationTests.fs` in `Frank.Statecharts.Tests.fsproj`
 
 ### Implementation Notes
 - Source text constants must produce parseable documents with the correct states and transitions. Use the quickstart.md examples as a starting point for WSD and smcat syntax. For SCXML, use valid `<scxml>` XML. For ALPS, use valid ALPS JSON.
