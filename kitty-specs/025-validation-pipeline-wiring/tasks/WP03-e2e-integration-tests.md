@@ -21,7 +21,7 @@ subtasks:
 - T027
 phase: Phase 2 - Integration Tests
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "83131"
 review_status: ''
 reviewed_by: ''
@@ -379,3 +379,4 @@ dotnet test test/Frank.Statecharts.Tests/
 ## Activity Log
 
 - 2026-03-16T19:13:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-17T23:01:46Z – claude-opus – shell_pid=83131 – lane=doing – Assigned agent via workflow command
