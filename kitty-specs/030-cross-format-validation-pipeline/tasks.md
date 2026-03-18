@@ -33,13 +33,13 @@
 **Prompt**: `tasks/WP02-merge-function.md`
 
 ### Included Subtasks
-- [ ] T007 Implement `formatPriority` function mapping `FormatTag` to integer priority
-- [ ] T008 Implement state matching by identifier with annotation accumulation
-- [ ] T009 Implement transition matching by (source, target, event) with annotation accumulation
-- [ ] T010 Implement `mergeSources` as left fold over priority-sorted parsed documents
-- [ ] T011 Handle edge cases: single source, no overlap, ALPS-only states
-- [ ] T012 Add merge unit tests
-- [ ] T013 Verify `dotnet build` and `dotnet test`
+- [x] T007 Implement `formatPriority` function mapping `FormatTag` to integer priority
+- [x] T008 Implement state matching by identifier with annotation accumulation
+- [x] T009 Implement transition matching by (source, target, event) with annotation accumulation
+- [x] T010 Implement `mergeSources` as left fold over priority-sorted parsed documents
+- [x] T011 Handle edge cases: single source, no overlap, ALPS-only states
+- [x] T012 Add merge unit tests
+- [x] T013 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP01.
