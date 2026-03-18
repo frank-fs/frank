@@ -222,8 +222,8 @@ let private scxmlSimple =
 </scxml>"""
 
 // ALPS JSON: semantic descriptors with transition children.
-// 'done' has a reset transition child so it is classified as a state by isStateDescriptor.
-// 'idle' and 'active' are rt targets, so all three pass isStateDescriptor.
+// All three top-level descriptors have transition-type children,
+// so all are classified as states by isStateDescriptor.
 let private alpsSimple =
     """{
   "alps": {
@@ -240,7 +240,7 @@ let private alpsSimple =
         "id": "active",
         "type": "semantic",
         "descriptor": [
-          { "id": "complete", "type": "safe", "rt": "#done" }
+          { "id": "complete", "type": "unsafe", "rt": "#done" }
         ]
       },
       {
