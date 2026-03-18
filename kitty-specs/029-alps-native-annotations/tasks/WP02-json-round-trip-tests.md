@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP02"
-subtasks: ["T006", "T007", "T008", "T009", "T010"]
-title: "JSON Round-Trip Fidelity Tests"
-phase: "Phase 1 - Validation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-009"]
+work_package_id: WP02
+title: JSON Round-Trip Fidelity Tests
+lane: "doing"
+dependencies: [WP01]
+base_branch: 029-alps-native-annotations-WP01
+base_commit: 666360c2268bcc73f70027a51d33121deb4f4827
+created_at: '2026-03-18T14:34:08.798584+00:00'
+subtasks: [T006, T007, T008, T009, T010]
+phase: Phase 1 - Validation
+assignee: ''
+agent: ''
+shell_pid: "71783"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T14:14:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T14:14:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-009]
 ---
 
 # Work Package Prompt: WP02 – JSON Round-Trip Fidelity Tests
