@@ -88,6 +88,20 @@ let private generateText (options: GenerateOptions) (metadata: StateMachineMetad
     let doc = generate options metadata |> unwrapResult
     serialize doc
 
+/// Check whether an annotation list contains a SmcatStateType annotation with the given kind and origin.
+let private hasSmcatStateType kind origin (annotations: Annotation list) =
+    annotations
+    |> List.exists (function
+        | SmcatAnnotation(SmcatStateType(k, o)) -> k = kind && o = origin
+        | _ -> false)
+
+/// Check whether an annotation list contains a SmcatTransition annotation with the expected kind.
+let private hasSmcatTransition expected (annotations: Annotation list) =
+    annotations
+    |> List.exists (function
+        | SmcatAnnotation(SmcatTransition tk) -> tk = expected
+        | _ -> false)
+
 // === Full generator tests using StateMachineMetadata ===
 
 [<Tests>]
@@ -108,10 +122,24 @@ let generatorTests =
                         ("Running", [ ("GET", dummyHandler) ]) ]
 
               let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ss = extractStates doc
               let ts = extractTransitions doc
+
+              // Initial pseudo-state declaration: Kind=Initial, SmcatStateType(Initial, Explicit)
+              let initialStateDecl = ss |> List.tryFind (fun s -> s.Identifier = Some "initial")
+              Expect.isSome initialStateDecl "has initial pseudo-state declaration"
+              Expect.equal initialStateDecl.Value.Kind Initial "initial StateDecl has Kind=Initial"
+              Expect.isTrue
+                  (hasSmcatStateType Initial Explicit initialStateDecl.Value.Annotations)
+                  "initial StateDecl has SmcatStateType(Initial, Explicit) annotation"
+
+              // Initial transition targets the first domain state
               let initialT = ts |> List.tryFind (fun t -> t.Source = "initial")
               Expect.isSome initialT "has initial transition"
               Expect.equal initialT.Value.Target (Some "Idle") "initial transition targets Idle"
+              Expect.isTrue
+                  (hasSmcatTransition InitialTransition initialT.Value.Annotations)
+                  "initial transition has SmcatTransition InitialTransition annotation"
           }
 
           test "emits self-transitions for each HTTP method" {
@@ -130,6 +158,12 @@ let generatorTests =
               Expect.equal selfTs.Length 2 "two self-transitions"
               Expect.equal selfTs[0].Event (Some "GET") "GET self-transition"
               Expect.equal selfTs[1].Event (Some "POST") "POST self-transition"
+              Expect.isTrue
+                  (hasSmcatTransition SelfTransition selfTs[0].Annotations)
+                  "GET self-transition has SmcatTransition SelfTransition annotation"
+              Expect.isTrue
+                  (hasSmcatTransition SelfTransition selfTs[1].Annotations)
+                  "POST self-transition has SmcatTransition SelfTransition annotation"
           }
 
           test "emits final state transitions" {
@@ -146,10 +180,24 @@ let generatorTests =
                         ("Completed", []) ]
 
               let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ss = extractStates doc
               let ts = extractTransitions doc
+
+              // Final pseudo-state declaration: Kind=Final, SmcatStateType(Final, Explicit)
+              let finalStateDecl = ss |> List.tryFind (fun s -> s.Identifier = Some "final")
+              Expect.isSome finalStateDecl "has final pseudo-state declaration"
+              Expect.equal finalStateDecl.Value.Kind Final "final StateDecl has Kind=Final"
+              Expect.isTrue
+                  (hasSmcatStateType Final Explicit finalStateDecl.Value.Annotations)
+                  "final StateDecl has SmcatStateType(Final, Explicit) annotation"
+
+              // Final transition from Completed to final
               let finalT = ts |> List.tryFind (fun t -> t.Target = Some "final")
               Expect.isSome finalT "has final transition"
               Expect.equal finalT.Value.Source "Completed" "Completed => final"
+              Expect.isTrue
+                  (hasSmcatTransition FinalTransition finalT.Value.Annotations)
+                  "final transition has SmcatTransition FinalTransition annotation"
           }
 
           test "states ordered: initial first, others alphabetically" {
@@ -169,10 +217,12 @@ let generatorTests =
 
               let doc = generate options (makeMetadata machine handlers) |> unwrapResult
               let ss = extractStates doc
-              // States should be ordered: Idle (initial) first, then Running, Stopped alphabetically
-              Expect.equal ss[0].Identifier (Some "Idle") "Idle (initial) first"
-              Expect.equal ss[1].Identifier (Some "Running") "Running alphabetically"
-              Expect.equal ss[2].Identifier (Some "Stopped") "Stopped alphabetically"
+              // Element ordering: initial pseudo-state, then domain states (Idle first, then alphabetically)
+              // ss[0] = "initial" (pseudo-state), ss[1] = "Idle", ss[2] = "Running", ss[3] = "Stopped"
+              Expect.equal ss[0].Identifier (Some "initial") "initial pseudo-state first"
+              Expect.equal ss[1].Identifier (Some "Idle") "Idle (initial domain state) second"
+              Expect.equal ss[2].Identifier (Some "Running") "Running alphabetically"
+              Expect.equal ss[3].Identifier (Some "Stopped") "Stopped alphabetically"
           }
 
           test "single state, no handlers" {
@@ -188,6 +238,42 @@ let generatorTests =
               Expect.equal ts.Length 1 "one transition"
               Expect.equal ts[0].Source "initial" "source is initial"
               Expect.equal ts[0].Target (Some "Idle") "target is Idle"
+              Expect.isTrue
+                  (hasSmcatTransition InitialTransition ts[0].Annotations)
+                  "initial transition has SmcatTransition InitialTransition annotation"
+          }
+
+          test "regular states have no SmcatStateType annotation" {
+              let machine =
+                  simpleMachine
+                      []
+                      (Map.ofList
+                          [ (Idle, { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None })
+                            (Running, { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None }) ])
+
+              let handlers =
+                  Map.ofList
+                      [ ("Idle", [ ("GET", dummyHandler) ])
+                        ("Running", [ ("GET", dummyHandler) ]) ]
+
+              let doc = generate options (makeMetadata machine handlers) |> unwrapResult
+              let ss = extractStates doc
+              // Domain states (non-pseudo) should have no SmcatStateType annotation
+              let domainStates =
+                  ss
+                  |> List.filter (fun s ->
+                      s.Identifier <> Some "initial" && s.Identifier <> Some "final")
+
+              for s in domainStates do
+                  let hasStateTypeAnnotation =
+                      s.Annotations
+                      |> List.exists (function
+                          | SmcatAnnotation(SmcatStateType _) -> true
+                          | _ -> false)
+
+                  Expect.isFalse
+                      hasStateTypeAnnotation
+                      (sprintf "domain state '%A' should not have SmcatStateType annotation" s.Identifier)
           }
 
           test "serialized output contains all elements" {
