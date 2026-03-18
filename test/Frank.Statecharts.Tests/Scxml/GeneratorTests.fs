@@ -331,3 +331,265 @@ let generatorAdvancedTests =
                       | _ -> None)
               Expect.isSome historyMeta "has ScxmlHistory annotation"
               Expect.equal historyMeta.Value (Some "child1") "default target preserved" ]
+
+// === Executable Content, Initial Element, DataSrc, Namespace Tests (T028-WP03) ===
+
+[<Tests>]
+let generatorWp03Tests =
+    testList
+        "Scxml.Generator.WP03"
+        [
+          testCase "ScxmlOnEntry annotation emits <onentry> element"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlOnEntry("<onentry><log expr=\"'entering s1'\"/></onentry>")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              // XLinq serializes a no-namespace element inside a namespaced parent as
+              // <onentry xmlns=""> to explicitly cancel the inherited namespace, so we
+              // check for the opening tag prefix rather than exact <onentry>.
+              Expect.isTrue (xml.Contains("<onentry")) "output contains onentry element"
+              Expect.isTrue (xml.Contains("log")) "onentry content present"
+
+          testCase "ScxmlOnExit annotation emits <onexit> element"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlOnExit("<onexit><assign location=\"x\" expr=\"0\"/></onexit>")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains("<onexit")) "output contains onexit element"
+              Expect.isTrue (xml.Contains("assign")) "onexit content present"
+
+          testCase "ScxmlOnEntry with invalid XML is silently skipped"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlOnEntry("<<not valid xml>>")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              // Should not throw; just silently skip the invalid XML
+              let xml = generate doc
+              Expect.isFalse (xml.Contains("<onentry")) "invalid onentry not emitted"
+
+          testCase "ScxmlOnExit with invalid XML is silently skipped"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlOnExit("<<not valid xml>>")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isFalse (xml.Contains("<onexit")) "invalid onexit not emitted"
+
+          testCase "ScxmlOnEntry and ScxmlOnExit both present"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlOnEntry("<onentry><log expr=\"'in'\"/></onentry>"))
+                                  ScxmlAnnotation(ScxmlOnExit("<onexit><log expr=\"'out'\"/></onexit>")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains("<onentry")) "output contains onentry element"
+              Expect.isTrue (xml.Contains("<onexit")) "output contains onexit element"
+
+          testCase "ScxmlInitialElement emits <initial><transition target/></initial> child"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "parent"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "parent"; Label = None; Kind = Regular
+                              Children =
+                                [ { Identifier = Some "child1"; Label = None; Kind = Regular
+                                    Children = []; Activities = None; Position = None; Annotations = [] }
+                                  { Identifier = Some "child2"; Label = None; Kind = Regular
+                                    Children = []; Activities = None; Position = None; Annotations = [] } ]
+                              Activities = None; Position = None
+                              Annotations = [ ScxmlAnnotation(ScxmlInitialElement("child1")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains("<initial>")) "output contains <initial> child element"
+              Expect.isTrue (xml.Contains("target=\"child1\"")) "initial transition target is correct"
+              // Should NOT emit the initial attribute on <state> when ScxmlInitialElement is used
+              Expect.isFalse
+                  (xml.Contains("initial=\"child1\""))
+                  "initial attribute not emitted when <initial> child element is used"
+
+          testCase "ScxmlInitialElement takes precedence over ScxmlInitial attribute"
+          <| fun _ ->
+              // When both are present, ScxmlInitialElement wins (child element over attribute)
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "parent"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "parent"; Label = None; Kind = Regular
+                              Children =
+                                [ { Identifier = Some "child1"; Label = None; Kind = Regular
+                                    Children = []; Activities = None; Position = None; Annotations = [] } ]
+                              Activities = None; Position = None
+                              Annotations =
+                                [ ScxmlAnnotation(ScxmlInitialElement("child1"))
+                                  ScxmlAnnotation(ScxmlInitial("child1")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains("<initial>")) "child initial element emitted"
+              // The initial= attribute should not appear on the <state> element
+              // (it would appear as initial="child1" on the <state id="parent"> element)
+              // We check by verifying the state element doesn't have initial= attribute
+              // The xml will have target="child1" from the <initial> child but not initial="child1"
+              // on the parent <state> since ScxmlInitialElement took precedence
+              let stateLines =
+                  xml.Split('\n')
+                  |> Array.filter (fun line -> line.Contains("state") && line.Contains("id=\"parent\""))
+              Expect.all stateLines (fun line -> not (line.Contains("initial="))) "state element has no initial= attribute"
+
+          testCase "ScxmlDataSrc annotation adds src attribute to <data> element"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None; Annotations = [] } ]
+                    DataEntries =
+                      [ { Name = "config"
+                          Expression = None
+                          Position = None } ]
+                    Annotations =
+                      [ ScxmlAnnotation(ScxmlDataSrc("config", "https://example.com/config.json")) ] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains("src=\"https://example.com/config.json\"")) "data src attribute present"
+              Expect.isTrue (xml.Contains("id=\"config\"")) "data id attribute present"
+
+          testCase "ScxmlDataSrc only applies to matching data entry by name"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None; Annotations = [] } ]
+                    DataEntries =
+                      [ { Name = "config"; Expression = None; Position = None }
+                        { Name = "data"; Expression = Some "[]"; Position = None } ]
+                    Annotations =
+                      [ ScxmlAnnotation(ScxmlDataSrc("config", "https://example.com/config.json")) ] }
+
+              let xml = generate doc
+              // config data entry should have src
+              Expect.isTrue (xml.Contains("src=\"https://example.com/config.json\"")) "config has src"
+              // data entry with expression should have expr but no src
+              Expect.isTrue (xml.Contains("expr=\"[]\"")) "data entry has expr"
+
+          testCase "ScxmlNamespace empty string emits no namespace on elements"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None; Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [ ScxmlAnnotation(ScxmlNamespace("")) ] }
+
+              let xml = generate doc
+              // With no namespace the elements should not contain the W3C SCXML namespace URI
+              Expect.isFalse
+                  (xml.Contains("http://www.w3.org/2005/07/scxml"))
+                  "W3C namespace not present when ScxmlNamespace is empty"
+              // The document should still be parseable (parser accepts no-namespace SCXML)
+              let reparsed = parseString xml
+              Expect.isEmpty reparsed.Errors "no parse errors"
+              let states = stateDecls reparsed.Document
+              Expect.equal states.Length 1 "state preserved"
+
+          testCase "no ScxmlNamespace annotation uses default W3C namespace"
+          <| fun _ ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None; Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = generate doc
+              Expect.isTrue
+                  (xml.Contains("http://www.w3.org/2005/07/scxml"))
+                  "default W3C SCXML namespace present"
+              // Verify backward compatibility: re-parse succeeds
+              let reparsed = parseString xml
+              Expect.isEmpty reparsed.Errors "no parse errors"
+              let states = stateDecls reparsed.Document
+              Expect.equal states.Length 1 "state preserved"
+
+          testCase "ScxmlNamespace custom URI uses that namespace on elements"
+          <| fun _ ->
+              let customNs = "http://example.com/custom-scxml"
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = Some "s1"
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "s1"; Label = None; Kind = Regular
+                              Children = []; Activities = None; Position = None; Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [ ScxmlAnnotation(ScxmlNamespace(customNs)) ] }
+
+              let xml = generate doc
+              Expect.isTrue (xml.Contains(customNs)) "custom namespace URI present in output"
+              Expect.isFalse
+                  (xml.Contains("http://www.w3.org/2005/07/scxml"))
+                  "W3C namespace not present when custom namespace is used" ]
