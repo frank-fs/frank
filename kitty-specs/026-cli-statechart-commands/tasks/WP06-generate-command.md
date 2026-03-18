@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP06"
-title: "Generate Command"
-lane: "planned"
-dependencies: ["WP02", "WP03"]
+work_package_id: WP06
+title: Generate Command
+lane: "doing"
+dependencies: [WP02, WP03]
+base_branch: 026-cli-statechart-commands-WP06-merge-base
+base_commit: 4bb9bf40314cb20e63171875c5eef9b2c691d9e9
+created_at: '2026-03-18T02:39:24.507016+00:00'
 subtasks:
-  - "T032"
-  - "T033"
-  - "T034"
-  - "T035"
-  - "T036"
-  - "T037"
-  - "T038"
-  - "T039"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T032
+- T033
+- T034
+- T035
+- T036
+- T037
+- T038
+- T039
+assignee: ''
+agent: ''
+shell_pid: "8948"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP06 -- Generate Command
