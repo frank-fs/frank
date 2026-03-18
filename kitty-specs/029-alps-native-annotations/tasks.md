@@ -57,12 +57,12 @@
 **Prompt**: `tasks/WP03-alps-xml-parser.md`
 
 ### Included Subtasks
-- [ ] T011 Create `Alps/XmlParser.fs` — Pass 1: parse `<alps>`, `<descriptor>`, `<doc>`, `<ext>`, `<link>` elements to `ParsedDescriptor` list
-- [ ] T012 Wire Pass 2 classification from `Classification` module to produce `StatechartDocument`
-- [ ] T013 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` after `Classification.fs`
-- [ ] T014 Add XML parser tests in `test/Frank.Statecharts.Tests/Alps/`
-- [ ] T015 Add cross-format equivalence test (JSON and XML parsers produce identical ASTs for equivalent input)
-- [ ] T016 Verify `dotnet build` and `dotnet test`
+- [x] T011 Create `Alps/XmlParser.fs` — Pass 1: parse `<alps>`, `<descriptor>`, `<doc>`, `<ext>`, `<link>` elements to `ParsedDescriptor` list
+- [x] T012 Wire Pass 2 classification from `Classification` module to produce `StatechartDocument`
+- [x] T013 Add `Alps/XmlParser.fs` to `Frank.Statecharts.fsproj` after `Classification.fs`
+- [x] T014 Add XML parser tests in `test/Frank.Statecharts.Tests/Alps/`
+- [x] T015 Add cross-format equivalence test (JSON and XML parsers produce identical ASTs for equivalent input)
+- [x] T016 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP01 (requires `Classification` module for shared types and Pass 2 logic).
