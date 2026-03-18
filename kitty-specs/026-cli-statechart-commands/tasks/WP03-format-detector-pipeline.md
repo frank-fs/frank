@@ -70,11 +70,10 @@ spec-kitty implement WP03 --base WP02
 - **Existing generators** (all `internal`):
   - `Frank.Statecharts.Wsd.Generator.generate` -- takes `GenerateOptions` + `StateMachineMetadata` -> `Result<StatechartDocument, GeneratorError>`
   - `Frank.Statecharts.Wsd.Serializer.serialize` -- takes `StatechartDocument` -> `string`
-  - `Frank.Statecharts.Alps.Mapper.fromStatechartDocument` -- `StatechartDocument` -> `AlpsDocument`
-  - `Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson` -- `AlpsDocument` -> `string`
-  - `Frank.Statecharts.Scxml.Mapper.fromStatechartDocument` -- `StatechartDocument` -> `ScxmlDocument`
-  - `Frank.Statecharts.Scxml.Generator.generate` -- `ScxmlDocument` -> `string`
-  - `Frank.Statecharts.Smcat.Generator.generate` -- takes `GenerateOptions` + `StateMachineMetadata` -> `string` (direct, no AST)
+  - `Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson` -- `StatechartDocument` -> `string`
+  - `Frank.Statecharts.Scxml.Generator.generate` -- `StatechartDocument` -> `string`
+  - `Frank.Statecharts.Smcat.Generator.generate` -- takes `GenerateOptions` + `StateMachineMetadata` -> `Result<StatechartDocument, GeneratorError>`
+  - `Frank.Statecharts.Smcat.Serializer.serialize` -- `StatechartDocument` -> `string`
   - `Frank.Statecharts.XState.Serializer.serialize` -- `StatechartDocument` -> `string` (from WP01)
 
 ---
@@ -83,7 +82,7 @@ spec-kitty implement WP03 --base WP02
 
 ### Subtask T014 -- Create FormatDetector.fs
 
-- **Purpose**: Centralize file extension -> format tag mapping used by validate and import commands (FR-020, FR-027).
+- **Purpose**: Centralize file extension -> format tag mapping used by validate and parse commands (FR-020, FR-027).
 - **Steps**:
   1. Create `src/Frank.Cli.Core/Statechart/FormatDetector.fs`
   2. Module declaration: `module Frank.Cli.Core.Statechart.FormatDetector`
@@ -153,9 +152,7 @@ spec-kitty implement WP03 --base WP02
      | Alps ->
          let opts: Wsd.Generator.GenerateOptions = { ResourceName = resourceName }
          match Wsd.Generator.generate opts metadata with
-         | Ok doc ->
-             let alpsDoc = Alps.Mapper.fromStatechartDocument doc
-             Ok (Alps.JsonGenerator.generateAlpsJson alpsDoc)
+         | Ok doc -> Ok (Alps.JsonGenerator.generateAlpsJson doc)
          | Error err -> Error (...)
      ```
 
@@ -164,17 +161,18 @@ spec-kitty implement WP03 --base WP02
      | Scxml ->
          let opts: Wsd.Generator.GenerateOptions = { ResourceName = resourceName }
          match Wsd.Generator.generate opts metadata with
-         | Ok doc ->
-             let scxmlDoc = Scxml.Mapper.fromStatechartDocument doc
-             Ok (Scxml.Generator.generate scxmlDoc)
+         | Ok doc -> Ok (Scxml.Generator.generate doc)
          | Error err -> Error (...)
      ```
 
-     **smcat pipeline** (direct, no AST intermediate):
+     **smcat pipeline**:
      ```fsharp
      | Smcat ->
          let opts: Smcat.Generator.GenerateOptions = { ResourceName = resourceName }
-         Ok (Smcat.Generator.generate opts metadata)
+         match Smcat.Generator.generate opts metadata with
+         | Ok doc -> Ok (Smcat.Serializer.serialize doc)
+         | Error (Smcat.Generator.UnrecognizedMachineType typeName) ->
+             Error $"Unrecognized machine type: {typeName}"
      ```
 
      **XState pipeline**:
@@ -207,7 +205,7 @@ spec-kitty implement WP03 --base WP02
 
 - **Files**: `src/Frank.Cli.Core/Statechart/FormatPipeline.fs` (NEW, ~100-140 lines)
 - **Parallel?**: Yes -- can proceed alongside T014.
-- **Notes**: The WSD Generator is the central metadata-to-AST converter. All format pipelines except smcat go through it. Check the `Alps.Mapper`, `Scxml.Mapper`, and `Scxml.Generator` function signatures by reading the source files -- they may have slightly different names or signatures than documented here.
+- **Notes**: The WSD Generator is the central metadata-to-AST converter. All format pipelines except smcat go through it. ALPS and SCXML generators take `StatechartDocument` directly (no intermediate mapper step). The smcat pipeline uses its own `Smcat.Generator.generate` -> `Smcat.Serializer.serialize` chain. All parsers return `Ast.ParseResult` directly (no mapper step). Check function signatures by reading the source files -- they may have slightly different names or signatures than documented here.
 
 ### Subtask T016 -- Implement format detection logic
 
@@ -223,12 +221,13 @@ spec-kitty implement WP03 --base WP02
 ### Subtask T017 -- Implement generation pipelines
 
 - **Purpose**: This is covered by T015. Included for tracking -- verify each pipeline.
-- **Steps**: Verify each format pipeline produces non-empty output from valid `StateMachineMetadata`. Check function signatures of existing mappers by reading source.
+- **Steps**: Verify each format pipeline produces non-empty output from valid `StateMachineMetadata`. Check function signatures of existing generators by reading source.
 - **Files**: `src/Frank.Cli.Core/Statechart/FormatPipeline.fs`
-- **Notes**: Read the actual mapper source files to verify function signatures:
-  - `src/Frank.Statecharts/Alps/Mapper.fs` -- look for `fromStatechartDocument` or `toAlpsDocument`
-  - `src/Frank.Statecharts/Scxml/Mapper.fs` -- look for `fromStatechartDocument` or `toScxmlDocument`
-  - `src/Frank.Statecharts/Scxml/Generator.fs` -- look for `generate` function signature
+- **Notes**: Read the actual generator source files to verify function signatures:
+  - `src/Frank.Statecharts/Alps/JsonGenerator.fs` -- `generateAlpsJson` takes `StatechartDocument` directly
+  - `src/Frank.Statecharts/Scxml/Generator.fs` -- `generate` takes `StatechartDocument` directly
+  - `src/Frank.Statecharts/Smcat/Generator.fs` -- `generate` returns `Result<StatechartDocument, GeneratorError>`
+  - `src/Frank.Statecharts/Smcat/Serializer.fs` -- `serialize` takes `StatechartDocument` -> `string`
 
 ### Subtask T018 -- Add compile entries to Frank.Cli.Core.fsproj
 
@@ -263,7 +262,7 @@ spec-kitty implement WP03 --base WP02
 | Risk | Mitigation |
 |------|------------|
 | Internal module function signatures differ from plan | Read actual source files before coding pipeline. Adapt signatures. |
-| ALPS/SCXML mappers have different function names | Check source: `fromStatechartDocument` vs `toAlpsDocument` etc. |
+| ALPS/SCXML generator signatures differ from plan | Read actual source files before coding pipeline. Both take `StatechartDocument` directly. |
 | Compound extension detection order | Test compound extensions are checked before plain `.json`. |
 
 ---

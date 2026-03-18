@@ -101,7 +101,7 @@
 
 ### Implementation Notes
 - FormatDetector: compound extensions (`.alps.json`, `.xstate.json`) must be checked before `.json`
-- FormatPipeline delegates to existing generators: `Wsd.Generator.generate`, `Wsd.Serializer.serialize`, `Alps.Mapper.fromStatechartDocument`, `Alps.JsonGenerator.generateAlpsJson`, `Scxml.Mapper.fromStatechartDocument`, `Scxml.Generator.generate`, `Smcat.Generator.generate`, `XState.Serializer.serialize`
+- FormatPipeline delegates to existing generators (all consume StatechartDocument directly, no mappers): `Wsd.Generator.generate`, `Wsd.Serializer.serialize`, `Alps.JsonGenerator.generateAlpsJson`, `Scxml.Generator.generate`, `Smcat.Generator.generate` + `Smcat.Serializer.serialize`, `XState.Serializer.serialize`
 - Each pipeline takes `StateMachineMetadata` and returns `string` (the generated text)
 - Resource slug derivation: extract from route template (e.g., `/games/{id}` -> `games`)
 
@@ -119,7 +119,7 @@
 
 ## Work Package WP04: StatechartDocumentJson & ValidationReportFormatter (Priority: P1)
 
-**Goal**: Create the `StatechartDocumentJson` module (StatechartDocument -> JSON serialization for import/extract output) and `ValidationReportFormatter` module (ValidationReport -> text/json output).
+**Goal**: Create the `StatechartDocumentJson` module (StatechartDocument -> JSON serialization for parse/extract output) and `ValidationReportFormatter` module (ValidationReport -> text/json output).
 **Independent Test**: Both modules compile and produce correct JSON/text output from test data.
 **Prompt**: `/tasks/WP04-document-json-report-formatter.md`
 **Estimated Size**: ~400 lines
@@ -134,7 +134,7 @@
 
 ### Implementation Notes
 - `StatechartDocumentJson` follows the `Utf8JsonWriter` pattern from existing `JsonOutput.fs`
-- Include parse errors/warnings in the JSON when present (for import command)
+- Include parse errors/warnings in the JSON when present (for parse command)
 - `ValidationReportFormatter.formatText` uses color helpers from `TextOutput.fs` (respect `NO_COLOR`)
 - `ValidationReportFormatter.formatJson` follows `JsonOutput.fs` conventions
 
@@ -251,9 +251,9 @@
 
 ## Work Package WP08: Import Command (Priority: P2)
 
-**Goal**: Implement the `frank statechart import <spec-file>` command logic in `StatechartImportCommand.fs`.
+**Goal**: Implement the `frank statechart parse <spec-file>` command logic in `StatechartParseCommand.fs`.
 **Independent Test**: Command module compiles. Given a spec file in any supported format, produces JSON StatechartDocument output.
-**Prompt**: `/tasks/WP08-import-command.md`
+**Prompt**: `/tasks/WP08-parse-command.md`
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
@@ -266,10 +266,9 @@
 - [ ] T054 Add compile entry to `Frank.Cli.Core.fsproj`
 
 ### Implementation Notes
-- Parser dispatch mirrors the import pipeline in plan.md
-- ALPS: `Alps.JsonParser.parseAlpsJson` -> `Alps.Mapper.toStatechartDocument`
-- SCXML: `Scxml.Parser.parseString` -> `Scxml.Mapper.toStatechartDocument`
-- smcat: `Smcat.Parser.parseSmcat` -> `Smcat.Mapper.toStatechartDocument`
+- Parser dispatch mirrors the parse pipeline in plan.md. All parsers return Ast.ParseResult directly (no mapper step).
+- All parsers return `Ast.ParseResult` directly (no mapper step):
+  - WSD: `Wsd.Parser.parseWsd`, ALPS: `Alps.JsonParser.parseAlpsJson`, SCXML: `Scxml.Parser.parseString`, smcat: `Smcat.Parser.parseSmcat`, XState: `XState.Deserializer.deserialize`
 - WSD: `Wsd.Parser.parseWsd` (produces `Ast.ParseResult` directly)
 - XState: `XState.Deserializer.deserialize` (produces `Ast.ParseResult` directly)
 
@@ -287,7 +286,7 @@
 ## Work Package WP09: CLI Wiring & Help Content (Priority: P1)
 
 **Goal**: Wire all 4 statechart subcommands into `Program.fs` under a `statechart` parent command. Register help metadata for each new command.
-**Independent Test**: `frank-cli statechart extract`, `generate`, `validate`, `import` subcommands are available. `frank-cli help statechart` shows help.
+**Independent Test**: `frank-cli semantic extract`, `statechart extract`, `statechart generate`, `statechart validate`, `statechart parse` all accessible. `frank-cli help statechart extract` and `frank-cli help semantic extract` return distinct help.
 **Prompt**: `/tasks/WP09-cli-wiring-help.md`
 **Estimated Size**: ~500 lines
 
@@ -296,7 +295,7 @@
 - [ ] T056 Wire `extract` subcommand with `<assembly>` argument and `--output-format` option
 - [ ] T057 Wire `generate` subcommand with `--format`, `<assembly>`, `--output`, `--resource`, `--output-format` options
 - [ ] T058 Wire `validate` subcommand with `<spec-file>` arguments, `<assembly>` argument, `--output-format` option
-- [ ] T059 Wire `import` subcommand with `<spec-file>` argument, `--format` option (for notation disambiguation), `--output-format` option
+- [ ] T059 Wire `parse` subcommand with `<spec-file>` argument, `--format` option (for notation disambiguation), `--output-format` option
 - [ ] T060 Add statechart command help entries to `HelpContent.fs`
 - [ ] T061 Verify all commands are accessible via CLI and existing commands are unaffected
 
@@ -427,7 +426,7 @@
 | T056 | Wire extract subcommand | WP09 | P1 | No |
 | T057 | Wire generate subcommand | WP09 | P1 | No |
 | T058 | Wire validate subcommand | WP09 | P1 | No |
-| T059 | Wire import subcommand | WP09 | P1 | No |
+| T059 | Wire parse subcommand | WP09 | P1 | No |
 | T060 | Add help entries to HelpContent.fs | WP09 | P1 | Yes |
 | T061 | Verify all commands accessible and no regressions | WP09 | P1 | No |
 | T062 | Create Frank.Statecharts.targets MSBuild file | WP10 | P3 | No |

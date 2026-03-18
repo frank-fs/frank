@@ -55,49 +55,59 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
 
 ## Objectives & Success Criteria
 
-1. Add `statechart` parent command to `Program.fs` root command.
-2. Wire all 4 subcommands (`extract`, `generate`, `validate`, `import`) under the `statechart` parent.
-3. Register help metadata for each new command in `HelpContent.fs`.
-4. Existing commands continue to function correctly (SC-007).
-5. All commands are accessible via `frank-cli statechart <subcommand>`.
+1. Restructure existing commands under `semantic` parent command in `Program.fs` (FR-036).
+2. Add `statechart` parent command with 4 subcommands (`extract`, `generate`, `validate`, `parse`) (FR-035).
+3. Keep `status` and `help` as top-level commands.
+4. Extend help system to support hierarchical command names (FR-038).
+5. Register help metadata for all restructured and new commands in `HelpContent.fs`.
+6. Add `statechart-workflows` help topic, rename `workflows` to `semantic-workflows` (FR-039).
+7. All commands accessible and functional (SC-007).
 
-**Success**: `frank-cli statechart extract`, `generate`, `validate`, `import` are all accessible. `frank-cli help` lists the new commands. Existing commands (extract, clarify, validate, diff, compile, status, help) are unaffected.
+**Success**: `frank-cli semantic extract`, `frank-cli statechart extract`, etc. all work. `frank-cli help statechart extract` and `frank-cli help semantic extract` return distinct help. `frank-cli help` lists both command groups.
 
 ---
 
 ## Context & Constraints
 
-- **Spec**: `kitty-specs/026-cli-statechart-commands/spec.md` (FR-035, FR-036, FR-037)
-- **Plan**: `kitty-specs/026-cli-statechart-commands/plan.md` (D-001, D-007)
-- **Existing CLI structure**: `src/Frank.Cli/Program.fs` -- imperative System.CommandLine pattern
-- **Existing help system**: `src/Frank.Cli.Core/Help/HelpContent.fs` -- hardcoded `CommandHelp` records
+- **Spec**: `kitty-specs/026-cli-statechart-commands/spec.md` (FR-035 through FR-039)
+- **Plan**: `kitty-specs/026-cli-statechart-commands/plan.md` (D-001, D-007, D-009, D-010)
+- **Existing CLI structure**: `src/Frank.Cli/Program.fs` -- imperative System.CommandLine pattern with flat commands
+- **Existing help system**: `src/Frank.Cli.Core/Help/HelpContent.fs` -- hardcoded `CommandHelp` records, flat name lookup
 - **Help types**: `src/Frank.Cli.Core/Help/HelpTypes.fs` -- `CommandHelp`, `CommandExample`, `WorkflowPosition`
-- **Key decision D-001**: Follow existing imperative pattern, no abstraction layer.
-- **Key decision D-007**: All commands use `--output-format` for text/json output rendering. `--format` is for notation format on generate and import.
+- **Key decision D-001**: Follow existing imperative pattern. Restructure into `semantic` + `statechart` parent commands.
+- **Key decision D-007**: All commands use `--output-format` for text/json output rendering. `--format` is for notation format on generate and parse.
+- **Key decision D-009**: Existing commands move under `semantic` parent. No backward compat needed (unreleased).
+- **Key decision D-010**: Help uses hierarchical names (`"semantic extract"`, `"statechart extract"`).
 
 ---
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T055 -- Add statechart parent Command to Program.fs
+### Subtask T055 -- Restructure Program.fs with semantic and statechart parent commands
 
-- **Purpose**: Create the `statechart` parent command group on the root command (FR-035).
+- **Purpose**: Create `semantic` and `statechart` parent command groups (FR-035, FR-036, FR-037).
 - **Steps**:
   1. Open `src/Frank.Cli/Program.fs`
-  2. After the existing commands (compile), add:
+  2. Create the `semantic` parent command and move the 5 existing commands under it:
+     ```fsharp
+     // ── semantic ──
+     let semanticCmd = Command("semantic")
+     semanticCmd.Description <- "Semantic resource extraction pipeline: OWL ontology and SHACL shapes from F# types"
+     root.Subcommands.Add(semanticCmd)
+     ```
+  3. Move existing command registrations (`extractCmd`, `clarifyCmd`, `validateCmd`, `diffCmd`, `compileCmd`) from `root.Subcommands.Add(...)` to `semanticCmd.Subcommands.Add(...)`.
+  4. Create the `statechart` parent command:
      ```fsharp
      // ── statechart ──
      let statechartCmd = Command("statechart")
-     statechartCmd.Description <- "Statechart pipeline operations for stateful Frank resources"
-     ```
-  3. Add the parent command to root:
-     ```fsharp
+     statechartCmd.Description <- "Statechart pipeline: extract, generate, validate, and parse state machine artifacts"
      root.Subcommands.Add(statechartCmd)
      ```
-  4. The 4 subcommands will be added to `statechartCmd` in the following subtasks.
+  5. `status` and `help` remain as `root.Subcommands.Add(...)`.
+  6. The 4 statechart subcommands will be added in the following subtasks.
 
 - **Files**: `src/Frank.Cli/Program.fs`
-- **Notes**: The `statechart` command is a parent (group) command. It has no handler of its own -- it just groups the 4 subcommands.
+- **Notes**: Both parent commands are groups with no handler of their own. The existing command handlers are unchanged — only their registration moves from root to the `semantic` parent.
 
 ### Subtask T056 -- Wire extract subcommand
 
@@ -279,37 +289,37 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
 - **Files**: `src/Frank.Cli/Program.fs`
 - **Notes**: The assembly is an option (not positional) because spec-files is variadic. Exit code 1 when validation has failures.
 
-### Subtask T059 -- Wire import subcommand
+### Subtask T059 -- Wire parse subcommand
 
-- **Purpose**: Add `frank statechart import <spec-file> [--format <fmt>] [--output-format text|json]`.
+- **Purpose**: Add `frank statechart parse <spec-file> [--format <fmt>] [--output-format text|json]`.
 - **Steps**:
-  1. Create the import subcommand:
+  1. Create the parse subcommand:
      ```fsharp
-     let scImportCmd = Command("import")
-     scImportCmd.Description <- "Parse a spec file and output the StatechartDocument as JSON"
+     let scParseCmd = Command("parse")
+     scParseCmd.Description <- "Parse a spec file and output the StatechartDocument as JSON"
 
-     let scImpFileArg = Argument<string>("spec-file")
-     scImpFileArg.Description <- "Path to the spec file to import"
-     scImportCmd.Arguments.Add(scImpFileArg)
+     let scParseFileArg = Argument<string>("spec-file")
+     scParseFileArg.Description <- "Path to the spec file to parse"
+     scParseCmd.Arguments.Add(scParseFileArg)
 
-     let scImpFormatOpt = Option<string>("--format")
-     scImpFormatOpt.Description <- "Notation format override (wsd|alps|scxml|smcat|xstate) for ambiguous file extensions"
-     scImportCmd.Options.Add(scImpFormatOpt)
+     let scParseFormatOpt = Option<string>("--format")
+     scParseFormatOpt.Description <- "Notation format override (wsd|alps|scxml|smcat|xstate) for ambiguous file extensions"
+     scParseCmd.Options.Add(scParseFormatOpt)
 
-     let scImpOutputFormatOpt = Option<string>("--output-format")
-     scImpOutputFormatOpt.Description <- "Output format (text|json)"
-     scImpOutputFormatOpt.DefaultValueFactory <- (fun _ -> "json")
-     scImportCmd.Options.Add(scImpOutputFormatOpt)
+     let scParseOutputFormatOpt = Option<string>("--output-format")
+     scParseOutputFormatOpt.Description <- "Output format (text|json)"
+     scParseOutputFormatOpt.DefaultValueFactory <- (fun _ -> "json")
+     scParseCmd.Options.Add(scParseOutputFormatOpt)
      ```
   2. Set the action handler:
      ```fsharp
-     scImportCmd.SetAction(fun parseResult ->
-         let specFile = parseResult.GetValue(scImpFileArg)
+     scParseCmd.SetAction(fun parseResult ->
+         let specFile = parseResult.GetValue(scParseFileArg)
          let formatOverride =
-             let v = parseResult.GetValue(scImpFormatOpt)
+             let v = parseResult.GetValue(scParseFormatOpt)
              if String.IsNullOrEmpty v then None else Some v
 
-         let result = StatechartImportCommand.execute specFile formatOverride
+         let result = StatechartParseCommand.execute specFile formatOverride
 
          match result with
          | Ok r ->
@@ -322,7 +332,7 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
              Environment.ExitCode <- 1
              Console.Error.WriteLine(TextOutput.formatError e))
      ```
-  3. Add to parent: `statechartCmd.Subcommands.Add(scImportCmd)`
+  3. Add to parent: `statechartCmd.Subcommands.Add(scParseCmd)`
 
 - **Files**: `src/Frank.Cli/Program.fs`
 - **Notes**: Import output is JSON by default (the StatechartDocument). The `--format` option is for notation disambiguation (per spec FR-031). The `--output-format` option controls text/json output rendering. Need to open `Frank.Cli.Core.Statechart` for `StatechartDocumentJson`.
@@ -383,14 +393,14 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
            Context =
              "Parses spec files, extracts metadata from the compiled assembly, and runs cross-format validation. Reports state/transition mismatches between spec files and code." }
 
-     let statechartImportHelp: CommandHelp =
-         { Name = "statechart import"
+     let statechartParseHelp: CommandHelp =
+         { Name = "statechart parse"
            Summary = "Parse a spec file and output the StatechartDocument as JSON"
            Examples =
-             [ { Invocation = "frank-cli statechart import game.xstate.json"
-                 Description = "Import an XState JSON file to StatechartDocument." }
-               { Invocation = "frank-cli statechart import game.json --format alps"
-                 Description = "Import a .json file explicitly as ALPS format." } ]
+             [ { Invocation = "frank-cli statechart parse game.xstate.json"
+                 Description = "Parse an XState JSON file to StatechartDocument." }
+               { Invocation = "frank-cli statechart parse game.json --format alps"
+                 Description = "Parse a .json file explicitly as ALPS format." } ]
            Workflow =
              { StepNumber = 1
                Prerequisites = []
@@ -400,25 +410,64 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
              "Parses a spec file in any supported notation format and outputs the parsed StatechartDocument as JSON. Useful for LLM-assisted code scaffolding: the output can be consumed by code generation tools." }
      ```
 
-  3. Add new commands to the `findCommand` lookup function (if it uses a list/map pattern):
-     - Check how existing commands are registered and follow the same pattern.
+  3. Rename existing command help entries to use hierarchical names:
+     - `extractHelp` → `Name = "semantic extract"` (was `"extract"`)
+     - `clarifyHelp` → `Name = "semantic clarify"` (was `"clarify"`)
+     - `validateHelp` → `Name = "semantic validate"` (was `"validate"`)
+     - `diffHelp` → `Name = "semantic diff"` (was `"diff"`)
+     - `compileHelp` → `Name = "semantic compile"` (was `"compile"`)
+     - Update `Workflow.NextSteps` and `Prerequisites` to use qualified names too.
+  4. Add all 4 statechart command help entries and the 5 renamed semantic entries to `allCommands`.
+  5. Rename the `workflows` topic to `semantic-workflows` and add a `statechart-workflows` topic:
+     ```fsharp
+     let statechartWorkflowsTopic: HelpTopic =
+         { Name = "statechart-workflows"
+           Summary = "End-to-end guide to the statechart pipeline"
+           Content = """The statechart pipeline extracts, generates, validates, and parses
+     state machine artifacts from Frank applications:
+
+       Step 1: statechart extract (required)
+         Extracts state machine metadata from a compiled assembly.
+         Prerequisites: (none)
+         Next: statechart generate, statechart validate
+
+       Step 2: statechart generate (required)
+         Generates spec artifacts in notation formats (WSD, ALPS, SCXML, smcat, XState).
+         Prerequisites: statechart extract
+         Next: statechart validate
+
+       Step 3: statechart validate (required)
+         Validates spec files against compiled assembly code-truth.
+         Prerequisites: statechart extract
+         Next: (end of pipeline)
+
+       statechart parse (standalone, optional)
+         Parses a spec file and outputs the StatechartDocument as JSON.
+         Prerequisites: (none)
+         Use case: LLM-assisted code scaffolding from notation files.""" }
+     ```
+  6. Update `allTopics` to include both workflow topics.
+  7. Update `pipelineStepCount` or add a separate count for the statechart pipeline.
 
 - **Files**: `src/Frank.Cli.Core/Help/HelpContent.fs`
 - **Parallel?**: Yes -- can proceed alongside T055-T059.
-- **Notes**: Read the existing `HelpContent.fs` to understand the full pattern including `findCommand` and `allCommands`.
+- **Notes**: The `findCommand` function uses `List.tryFind` with case-insensitive name matching. Since names now include spaces (`"statechart extract"`), no code change is needed for lookup — the existing string equality check handles spaces. Verify by testing `frank-cli help statechart extract`.
 
 ### Subtask T061 -- Verify all commands accessible and no regressions
 
-- **Purpose**: Confirm the new commands work and existing commands are unaffected (SC-007).
+- **Purpose**: Confirm restructured and new commands work (SC-007).
 - **Steps**:
   1. Run `dotnet build` to verify compilation.
-  2. Run `dotnet run --project src/Frank.Cli -- statechart --help` to verify the parent command.
-  3. Run `dotnet run --project src/Frank.Cli -- statechart extract --help` to verify the extract subcommand.
-  4. Run `dotnet run --project src/Frank.Cli -- statechart generate --help` to verify the generate subcommand.
-  5. Run `dotnet run --project src/Frank.Cli -- statechart validate --help` to verify the validate subcommand.
-  6. Run `dotnet run --project src/Frank.Cli -- statechart import --help` to verify the import subcommand.
-  7. Run `dotnet run --project src/Frank.Cli -- --help` to verify root help includes `statechart`.
-  8. Run `dotnet run --project src/Frank.Cli -- extract --help` to verify existing extract command is unaffected.
+  2. Run `dotnet run --project src/Frank.Cli -- --help` to verify root help shows `semantic`, `statechart`, `status`, `help`.
+  3. Run `dotnet run --project src/Frank.Cli -- semantic --help` to verify the semantic parent lists subcommands.
+  4. Run `dotnet run --project src/Frank.Cli -- semantic extract --help` to verify existing extract moved correctly.
+  5. Run `dotnet run --project src/Frank.Cli -- statechart --help` to verify the statechart parent lists subcommands.
+  6. Run `dotnet run --project src/Frank.Cli -- statechart extract --help` to verify extract subcommand.
+  7. Run `dotnet run --project src/Frank.Cli -- statechart generate --help` to verify generate subcommand.
+  8. Run `dotnet run --project src/Frank.Cli -- statechart validate --help` to verify validate subcommand.
+  9. Run `dotnet run --project src/Frank.Cli -- statechart parse --help` to verify parse subcommand.
+  10. Run `dotnet run --project src/Frank.Cli -- help statechart extract` to verify hierarchical help lookup.
+  11. Run `dotnet run --project src/Frank.Cli -- help semantic extract` to verify no collision with statechart extract.
 
 - **Files**: N/A (verification only)
 
@@ -430,8 +479,8 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
 
 | Risk | Mitigation |
 |------|------------|
-| Name collision: `extract` (existing) vs `statechart extract` (new) | Different command hierarchy. Existing `extract` is root-level; new one is under `statechart`. |
-| Name collision: `validate` (existing) vs `statechart validate` (new) | Same approach -- different hierarchy. No conflict. |
+| Existing command breakage during restructuring | Mechanical move: commands go from `root.Subcommands.Add` to `semanticCmd.Subcommands.Add`. Handlers unchanged. |
+| Help lookup with hierarchical names | Existing `findCommand` uses string equality — works with spaces. Test `help semantic extract` and `help statechart extract`. |
 | System.CommandLine argument parsing with variadic args | Use `ArgumentArity.OneOrMore` for spec-files. Assembly as `--assembly` option to avoid ambiguity. |
 | Missing opens for new modules | Open `Frank.Cli.Core.Statechart` and `Frank.Cli.Core.Commands` in Program.fs. |
 

@@ -74,7 +74,7 @@ Note: WP04 depends on WP01, and WP03 depends on WP01+WP02. If WP03 is not yet me
 - **Dependencies**:
   - `StatechartExtractor.extract` from WP02
   - `FormatDetector.detect` from WP03
-  - `FormatPipeline` from WP03 (for import-like parsing)
+  - `Frank.Statecharts.Validation.Pipeline` from spec 025 (provides `validateSources` / `validateSourcesWithRules` for parser dispatch + rule composition)
   - `ValidationReportFormatter.formatText/formatJson` from WP04
   - `Validator.validate` from `src/Frank.Statecharts/Validation/Validator.fs`
   - `SelfConsistencyRules.rules` and `CrossFormatRules.rules` from `Validator.fs`
@@ -115,38 +115,32 @@ Note: WP04 depends on WP01, and WP03 depends on WP01+WP02. If WP03 is not yet me
      b. Read file contents: `System.IO.File.ReadAllText(filePath)`
      c. Dispatch to the appropriate parser based on format:
 
+     All 5 parsers return `Ast.ParseResult` directly (with `Document`, `Errors`, `Warnings` fields) -- no mapper step is needed:
+
      ```fsharp
      let parseSpecFile (filePath: string) (format: FormatTag) : Result<FormatArtifact, string> =
          let content = File.ReadAllText(filePath)
-         match format with
-         | Wsd ->
-             let result = Wsd.Parser.parseWsd content
-             Ok { Format = Wsd; Document = result.Document }
-         | Alps ->
-             match Alps.JsonParser.parseAlpsJson content with
-             | Ok alpsDoc ->
-                 let doc = Alps.Mapper.toStatechartDocument alpsDoc
-                 Ok { Format = Alps; Document = doc }
-             | Error e -> Error $"ALPS parse error: {e}"
-         | Scxml ->
-             let result = Scxml.Parser.parseString content
-             let doc = Scxml.Mapper.toStatechartDocument result
-             Ok { Format = Scxml; Document = doc }
-         | Smcat ->
-             let result = Smcat.Parser.parseSmcat content
-             let doc = Smcat.Mapper.toStatechartDocument result
-             Ok { Format = Smcat; Document = doc }
-         | XState ->
-             let result = XState.Deserializer.deserialize content
-             Ok { Format = XState; Document = result.Document }
+         let result =
+             match format with
+             | Wsd   -> Wsd.Parser.parseWsd content
+             | Alps  -> Alps.JsonParser.parseAlpsJson content
+             | Scxml -> Scxml.Parser.parseString content
+             | Smcat -> Smcat.Parser.parseSmcat content
+             | XState -> XState.Deserializer.deserialize content
+         if result.Errors |> List.isEmpty then
+             Ok { Format = format; Document = result.Document }
+         else
+             Error (result.Errors |> List.map string |> String.concat "; ")
      ```
+
+     **Note**: The `Pipeline` module from spec 025 (`Frank.Statecharts.Validation.Pipeline`) provides `validateSources` and `validateSourcesWithRules` which handle parser dispatch and rule composition automatically. However, the validate command adds a code-truth artifact that Pipeline does not support, so calling `Validator.validate` directly (as shown in T043) is the appropriate approach. The parser dispatch above mirrors what Pipeline does internally.
 
   2. Handle `Ambiguous` detection result: error message listing supported formats with `--format` flag suggestion.
   3. Handle `Unsupported` detection result: error message listing supported extensions.
   4. Handle file not found: check `File.Exists` before reading.
 
 - **Files**: `src/Frank.Cli.Core/Commands/StatechartValidateCommand.fs`
-- **Notes**: The parser function signatures may differ slightly -- read the actual parser source files to verify. Especially check `Alps.JsonParser.parseAlpsJson` return type and `Scxml.Parser.parseString` return type.
+- **Notes**: All 5 parsers return `Ast.ParseResult` directly -- there are no separate mapper modules or intermediate types. Verify return types against actual parser source files if needed.
 
 ### Subtask T042 -- Implement code-truth artifact generation
 

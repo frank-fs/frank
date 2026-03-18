@@ -1,6 +1,6 @@
 ---
 work_package_id: "WP08"
-title: "Import Command"
+title: "Parse Command"
 lane: "planned"
 dependencies: ["WP01", "WP03", "WP04"]
 subtasks:
@@ -24,7 +24,7 @@ history:
     action: "Prompt generated via /spec-kitty.tasks"
 ---
 
-# Work Package Prompt: WP08 -- Import Command
+# Work Package Prompt: WP08 -- Parse Command
 
 ## Important: Review Feedback Status
 
@@ -53,45 +53,45 @@ spec-kitty implement WP08 --base WP04
 
 ## Objectives & Success Criteria
 
-1. Create `StatechartImportCommand` module implementing `frank statechart import <spec-file>`.
+1. Create `StatechartParseCommand` module implementing `frank statechart parse <spec-file>`.
 2. Detect format from file extension using `FormatDetector`.
 3. Parse the spec file using the appropriate format parser.
 4. Output the parsed `StatechartDocument` as JSON.
 5. Include parse errors/warnings in output when present.
 6. Exit with non-zero code when parse errors exist.
 
-**Success**: Command parses files in all 5 formats and produces JSON `StatechartDocument` output. Parse errors are included in the output.
+**Success**: Command parses files in all 5 formats and produces JSON `StatechartDocument` output. Parse errors are included in the output. All parsers return the shared `Ast.ParseResult` type directly -- no format-specific intermediate types exist.
 
 ---
 
 ## Context & Constraints
 
 - **Spec**: `kitty-specs/026-cli-statechart-commands/spec.md` -- User Story 4 (FR-026 through FR-031)
-- **Plan**: `kitty-specs/026-cli-statechart-commands/plan.md` -- Import Command Pipeline
+- **Plan**: `kitty-specs/026-cli-statechart-commands/plan.md` -- Parse Command Pipeline
 - **Dependencies**:
   - `FormatDetector.detect` from WP03
   - `StatechartDocumentJson.serializeParseResult` from WP04
   - `XState.Deserializer.deserialize` from WP01
   - Existing parsers (all `internal`, accessible via `InternalsVisibleTo` from WP01):
     - `Wsd.Parser.parseWsd` -> `Ast.ParseResult`
-    - `Alps.JsonParser.parseAlpsJson` -> `Result<AlpsDocument, ...>`
-    - `Scxml.Parser.parseString` -> `ScxmlParseResult`
-    - `Smcat.Parser.parseSmcat` -> `Smcat.Types.ParseResult`
-- **No assembly loading needed**: Import works on spec files only, not compiled assemblies.
+    - `Alps.JsonParser.parseAlpsJson` -> `Ast.ParseResult`
+    - `Scxml.Parser.parseString` -> `Ast.ParseResult`
+    - `Smcat.Parser.parseSmcat` -> `Ast.ParseResult`
+- **No assembly loading needed**: Parse works on spec files only, not compiled assemblies.
 
 ---
 
 ## Subtasks & Detailed Guidance
 
-### Subtask T048 -- Create StatechartImportCommand.fs
+### Subtask T048 -- Create StatechartParseCommand.fs
 
-- **Purpose**: Implement the import command logic.
+- **Purpose**: Implement the parse command logic.
 - **Steps**:
-  1. Create `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
-  2. Module declaration: `module Frank.Cli.Core.Commands.StatechartImportCommand`
+  1. Create `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
+  2. Module declaration: `module Frank.Cli.Core.Commands.StatechartParseCommand`
   3. Define result type:
      ```fsharp
-     type ImportResult =
+     type ParseCommandResult =
          { ParseResult: Ast.ParseResult
            Format: FormatTag
            HasErrors: bool }
@@ -101,10 +101,10 @@ spec-kitty implement WP08 --base WP04
      let execute
          (specFile: string)
          (explicitFormat: string option)
-         : Result<ImportResult, string>
+         : Result<ParseCommandResult, string>
      ```
 
-- **Files**: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs` (NEW, ~80-130 lines)
+- **Files**: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs` (NEW, ~80-130 lines)
 
 ### Subtask T049 -- Implement format detection from extension
 
@@ -126,7 +126,7 @@ spec-kitty implement WP08 --base WP04
      | other -> Error $"Unknown format: '{other}'"
      ```
 
-- **Files**: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
+- **Files**: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
 
 ### Subtask T050 -- Implement parser dispatch
 
@@ -141,6 +141,8 @@ spec-kitty implement WP08 --base WP04
      ```
   2. Dispatch to parser based on detected format:
 
+     All parsers return `Ast.ParseResult` directly. No format-specific intermediate types or mapper modules exist.
+
      **WSD**:
      ```fsharp
      | Wsd ->
@@ -151,41 +153,22 @@ spec-kitty implement WP08 --base WP04
      **ALPS**:
      ```fsharp
      | Alps ->
-         match Alps.JsonParser.parseAlpsJson content with
-         | Ok alpsDoc ->
-             let doc = Alps.Mapper.toStatechartDocument alpsDoc
-             Ok { ParseResult = { Document = doc; Errors = []; Warnings = [] }
-                  Format = Alps; HasErrors = false }
-         | Error e ->
-             // Create ParseResult with error
-             let failure: ParseFailure =
-                 { Position = None; Description = e
-                   Expected = "valid ALPS JSON"; Found = "parse error"
-                   CorrectiveExample = "" }
-             let emptyDoc: StatechartDocument =
-                 { Title = None; InitialStateId = None
-                   Elements = []; DataEntries = []; Annotations = [] }
-             Ok { ParseResult = { Document = emptyDoc; Errors = [ failure ]; Warnings = [] }
-                  Format = Alps; HasErrors = true }
+         let result = Alps.JsonParser.parseAlpsJson content
+         Ok { ParseResult = result; Format = Alps; HasErrors = not result.Errors.IsEmpty }
      ```
 
      **SCXML**:
      ```fsharp
      | Scxml ->
-         let scxmlResult = Scxml.Parser.parseString content
-         let doc = Scxml.Mapper.toStatechartDocument scxmlResult
-         // Map SCXML-specific errors/warnings to AST types
-         Ok { ParseResult = { Document = doc; Errors = []; Warnings = [] }
-              Format = Scxml; HasErrors = false }
+         let result = Scxml.Parser.parseString content
+         Ok { ParseResult = result; Format = Scxml; HasErrors = not result.Errors.IsEmpty }
      ```
 
      **smcat**:
      ```fsharp
      | Smcat ->
-         let smcatResult = Smcat.Parser.parseSmcat content
-         let doc = Smcat.Mapper.toStatechartDocument smcatResult
-         Ok { ParseResult = { Document = doc; Errors = []; Warnings = [] }
-              Format = Smcat; HasErrors = false }
+         let result = Smcat.Parser.parseSmcat content
+         Ok { ParseResult = result; Format = Smcat; HasErrors = not result.Errors.IsEmpty }
      ```
 
      **XState**:
@@ -196,16 +179,13 @@ spec-kitty implement WP08 --base WP04
               HasErrors = not result.Errors.IsEmpty }
      ```
 
-  3. **IMPORTANT**: Read the actual parser source files to verify function signatures and return types. The above is based on plan.md but actual signatures may differ:
+  3. **IMPORTANT**: Read the actual parser source files to verify function signatures and return types:
      - Check `src/Frank.Statecharts/Alps/JsonParser.fs` for `parseAlpsJson` signature
      - Check `src/Frank.Statecharts/Scxml/Parser.fs` for `parseString` signature and return type
      - Check `src/Frank.Statecharts/Smcat/Parser.fs` for `parseSmcat` signature and return type
-     - Check `src/Frank.Statecharts/Alps/Mapper.fs` for `toStatechartDocument` signature
-     - Check `src/Frank.Statecharts/Scxml/Mapper.fs` for `toStatechartDocument` signature
-     - Check `src/Frank.Statecharts/Smcat/Mapper.fs` for `toStatechartDocument` signature
 
-- **Files**: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
-- **Notes**: Each parser has a different return type. The import command normalizes them all to `Ast.ParseResult`. Some parsers return errors inline; others return `Result<doc, error>`. Handle both patterns.
+- **Files**: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
+- **Notes**: All parsers return `Ast.ParseResult` directly. No format-specific intermediate types or mapper modules exist. The parse command passes through the `Ast.ParseResult` from each parser uniformly.
 
 ### Subtask T051 -- Implement ambiguous .json handling
 
@@ -229,7 +209,7 @@ spec-kitty implement WP08 --base WP04
         ```
   2. The `tryParseAs` function wraps each parser in try/with to catch parse failures.
 
-- **Files**: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
+- **Files**: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
 - **Notes**: For ALPS, check if the JSON has an `"alps"` root key as a disambiguation heuristic. The `--format` flag name matches spec FR-031.
 
 ### Subtask T052 -- Implement JSON output of StatechartDocument
@@ -240,20 +220,20 @@ spec-kitty implement WP08 --base WP04
 
   **Text output** (in `TextOutput.fs`):
   ```fsharp
-  let formatStatechartImportResult (result: StatechartImportCommand.ImportResult) : string =
+  let formatStatechartParseResult (result: StatechartParseCommand.ParseCommandResult) : string =
       StatechartDocumentJson.serializeParseResult result.ParseResult
   ```
-  Note: Even text output for import is JSON (the StatechartDocument itself). The text/json distinction is mainly for status/error messages.
+  Note: Even text output for parse is JSON (the StatechartDocument itself). The text/json distinction is mainly for status/error messages.
 
   **JSON output** (in `JsonOutput.fs`):
   ```fsharp
-  let formatStatechartImportResult (result: StatechartImportCommand.ImportResult) : string =
+  let formatStatechartParseResult (result: StatechartParseCommand.ParseCommandResult) : string =
       // Wrap in status envelope
       let sb = StringBuilder()
       // ... or use StatechartDocumentJson.serializeParseResult
   ```
 
-  2. The import command's primary output IS the JSON representation of the parsed document. The `--format` flag is for format disambiguation only (per FR-031), not output format.
+  2. The parse command's primary output IS the JSON representation of the parsed document. The `--format` flag is for format disambiguation only (per FR-031), not output format.
 
 - **Files**: `src/Frank.Cli.Core/Output/TextOutput.fs`, `src/Frank.Cli.Core/Output/JsonOutput.fs`
 
@@ -266,7 +246,7 @@ spec-kitty implement WP08 --base WP04
      - The CLI wiring (WP09) sets `Environment.ExitCode <- 1`
   2. Errors and warnings are part of the `ParseResult` structure, serialized by `StatechartDocumentJson.serializeParseResult`.
 
-- **Files**: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
+- **Files**: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
 
 ### Subtask T054 -- Add compile entry to Frank.Cli.Core.fsproj
 
@@ -274,7 +254,7 @@ spec-kitty implement WP08 --base WP04
 - **Steps**:
   1. Add after `StatechartValidateCommand.fs`:
      ```xml
-     <Compile Include="Commands/StatechartImportCommand.fs" />
+     <Compile Include="Commands/StatechartParseCommand.fs" />
      ```
 
 - **Files**: `src/Frank.Cli.Core/Frank.Cli.Core.fsproj`
@@ -285,8 +265,7 @@ spec-kitty implement WP08 --base WP04
 
 | Risk | Mitigation |
 |------|------------|
-| Parser function signatures differ from documentation | Read actual source files before implementing dispatch. |
-| ALPS/SCXML mappers may not have `toStatechartDocument` | Check mapper source for actual function name (may be different direction). |
+| Parser function signatures differ from documentation | Read actual source files before implementing dispatch. All parsers return `Ast.ParseResult` directly. |
 | Ambiguous `.json` detection | Provide clear error message with `--format` flag suggestion. |
 
 ---
