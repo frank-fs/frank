@@ -77,13 +77,13 @@
 **Prompt**: `tasks/WP03-generator-emits-content.md`
 
 ### Included Subtasks
-- [ ] T010 Emit `<onentry>` blocks from `ScxmlOnEntry` annotations via `XElement.Parse`
-- [ ] T011 Emit `<onexit>` blocks from `ScxmlOnExit` annotations via `XElement.Parse`
-- [ ] T012 [P] Emit `<initial>` child elements from `ScxmlInitialElement` annotations
-- [ ] T013 [P] Emit `src` attribute on `<data>` elements from `ScxmlDataSrc` annotations
-- [ ] T014 [P] Respect namespace from `ScxmlNamespace` annotation (or default to W3C)
-- [ ] T015 Update `test/Frank.Statecharts.Tests/Scxml/GeneratorTests.fs` with new tests
-- [ ] T016 Verify `dotnet build` and `dotnet test`
+- [x] T010 Emit `<onentry>` blocks from `ScxmlOnEntry` annotations via `XElement.Parse`
+- [x] T011 Emit `<onexit>` blocks from `ScxmlOnExit` annotations via `XElement.Parse`
+- [x] T012 [P] Emit `<initial>` child elements from `ScxmlInitialElement` annotations
+- [x] T013 [P] Emit `src` attribute on `<data>` elements from `ScxmlDataSrc` annotations
+- [x] T014 [P] Respect namespace from `ScxmlNamespace` annotation (or default to W3C)
+- [x] T015 Update `test/Frank.Statecharts.Tests/Scxml/GeneratorTests.fs` with new tests
+- [x] T016 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - T010-T011: For each `ScxmlOnEntry`/`ScxmlOnExit` annotation, call `XElement.Parse(xml)` and add the resulting element to the state's `XElement`. Emit in order: `<onentry>` blocks, then `<onexit>` blocks, then child states and transitions.
