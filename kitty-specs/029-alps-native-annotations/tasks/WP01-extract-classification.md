@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Extract Shared Classification Module
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: a631caa8f67d215172a83b8feb7e0faacce0b5a2
@@ -9,8 +9,8 @@ created_at: '2026-03-18T14:31:00.726756+00:00'
 subtasks: [T001, T002, T003, T004, T005]
 phase: Phase 0 - Foundation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "71187"
+agent: "claude-opus-reviewer"
+shell_pid: "71665"
 review_status: ''
 reviewed_by: ''
 history:
@@ -163,3 +163,4 @@ spec-kitty implement WP01
 - 2026-03-18T14:14:54Z – system – lane=planned – Prompt created.
 - 2026-03-18T14:31:00Z – claude-opus – shell_pid=71187 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T14:33:52Z – claude-opus – shell_pid=71187 – lane=for_review – Pure refactor: Classification.fs created, JsonParser.fs reduced. 869 tests pass.
+- 2026-03-18T14:34:00Z – claude-opus-reviewer – shell_pid=71665 – lane=doing – Started review via workflow command
