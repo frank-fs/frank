@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP09"
 title: "CLI Wiring & Help Content"
-lane: "planned"
+lane: "for_review"
 dependencies: ["WP05", "WP06", "WP07", "WP08"]
 subtasks:
   - "T055"
@@ -500,3 +500,4 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
 ## Activity Log
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
+- 2026-03-18T03:14:50Z – unknown – lane=for_review – Ready for review: CLI restructured with semantic/statechart parent commands. 4 statechart subcommands wired. Help entries added. Build clean. kitty-specs diffs are from merge topology, not intentional changes.
