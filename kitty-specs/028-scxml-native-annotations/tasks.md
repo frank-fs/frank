@@ -43,13 +43,13 @@
 **Prompt**: `tasks/WP02-parser-captures-content.md`
 
 ### Included Subtasks
-- [ ] T003 Parse `<onentry>` blocks: remove from `outOfScopeElements`, store raw XML as `ScxmlOnEntry`, extract actions to `StateActivities.Entry`
-- [ ] T004 Parse `<onexit>` blocks: same pattern as T003 but for `<onexit>` → `ScxmlOnExit` + `StateActivities.Exit`
-- [ ] T005 [P] Parse `<initial>` child elements: store `ScxmlInitialElement(targetId)` annotation
-- [ ] T006 [P] Capture `<data src="...">` attribute: store `ScxmlDataSrc(name, src)` annotation
-- [ ] T007 [P] Store `ScxmlNamespace` annotation with actual namespace from parsed document
-- [ ] T008 Update `test/Frank.Statecharts.Tests/Scxml/ParserTests.fs` with new tests for all captured content
-- [ ] T009 Verify `dotnet build` and `dotnet test`
+- [x] T003 Parse `<onentry>` blocks: remove from `outOfScopeElements`, store raw XML as `ScxmlOnEntry`, extract actions to `StateActivities.Entry`
+- [x] T004 Parse `<onexit>` blocks: same pattern as T003 but for `<onexit>` → `ScxmlOnExit` + `StateActivities.Exit`
+- [x] T005 [P] Parse `<initial>` child elements: store `ScxmlInitialElement(targetId)` annotation
+- [x] T006 [P] Capture `<data src="...">` attribute: store `ScxmlDataSrc(name, src)` annotation
+- [x] T007 [P] Store `ScxmlNamespace` annotation with actual namespace from parsed document
+- [x] T008 Update `test/Frank.Statecharts.Tests/Scxml/ParserTests.fs` with new tests for all captured content
+- [x] T009 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - T003 is the largest change: remove `"onentry"` from `outOfScopeElements` set (line 38-52), add parsing logic in `parseState` function, build `StateActivities`, store raw XML annotation. One `ScxmlOnEntry` per `<onentry>` block (clarification Q1).
