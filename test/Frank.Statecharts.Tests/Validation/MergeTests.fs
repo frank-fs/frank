@@ -239,8 +239,6 @@ let annotationAccumulationTests =
     testList "Pipeline.mergeSources.AnnotationAccumulation" [
 
         test "Merge WSD + ALPS produces annotations from both on overlapping state" {
-            // WSD provides state A with a WSD annotation; ALPS provides state A
-            // with an ALPS annotation. After merge, both annotations must be present.
             let wsd = "participant A\nparticipant B\nA -> B: go\n"
             let alps = """{
   "alps": {
@@ -261,7 +259,6 @@ let annotationAccumulationTests =
             match result with
             | Error e -> failtestf "Expected Ok, got Error %A" e
             | Ok doc ->
-                // The merged document should have states from both
                 let states = statesOf doc
                 let stateIds = states |> List.choose (fun s -> s.Identifier) |> Set.ofList
                 Expect.isTrue (Set.contains "A" stateIds) "State A should be in merged doc"
@@ -269,12 +266,18 @@ let annotationAccumulationTests =
                 // No duplicate states
                 let aCount = states |> List.filter (fun s -> s.Identifier = Some "A") |> List.length
                 Expect.equal aCount 1 "State A should appear exactly once"
+                // ALPS contributes document-level annotations (AlpsVersion) and transition annotations (AlpsTransitionType)
+                let hasAlpsDocAnnotation = doc.Annotations |> List.exists (function AlpsAnnotation _ -> true | _ -> false)
+                Expect.isTrue hasAlpsDocAnnotation "Merged document should have ALPS annotations accumulated"
+                // Check transitions have ALPS annotations (AlpsTransitionType on the "go" transition)
+                let transitions = transitionsOf doc
+                let hasAlpsTransAnnotation =
+                    transitions |> List.exists (fun t ->
+                        t.Annotations |> List.exists (function AlpsAnnotation _ -> true | _ -> false))
+                Expect.isTrue hasAlpsTransAnnotation "Merged transitions should have ALPS annotations"
         }
 
         test "Transition annotations accumulate across formats" {
-            // Use two formats that both represent the same transition.
-            // WSD and smcat both express "A -> B: go". After merge the annotations
-            // from smcat (SmcatAnnotation) should be present alongside any WSD annotations.
             let wsd = "participant A\nparticipant B\nA -> B: go\n"
             let smcat = "A;\nB;\nA => B: go;"
             let result = Pipeline.mergeSources [(FormatTag.Wsd, wsd); (FormatTag.Smcat, smcat)]
@@ -282,31 +285,20 @@ let annotationAccumulationTests =
             | Error e -> failtestf "Expected Ok, got Error %A" e
             | Ok doc ->
                 let transitions = transitionsOf doc
-                // Should have the transition "A -> B: go"
-                let goTransition =
-                    transitions
-                    |> List.tryFind (fun t ->
-                        t.Source = "A" && t.Target = Some "B" && t.Event = Some "go")
-                match goTransition with
-                | None ->
-                    // It's possible parsers represent transitions differently;
-                    // verify that transitions exist and were merged (not duplicated)
-                    let abTransitions =
-                        transitions
-                        |> List.filter (fun t -> t.Source = "A" && t.Target = Some "B")
-                    // Either present once (merged) or we verify counts are reasonable
-                    Expect.isGreaterThan transitions.Length 0 "Some transitions should be present"
-                | Some t ->
-                    // If found, verify it has at least the annotations from whichever
-                    // format produced them (accumulation, not replacement)
-                    Expect.isGreaterThanOrEqual t.Annotations.Length 0
-                        "Annotations list should exist (may be empty if parsers add none)"
+                Expect.isGreaterThan transitions.Length 0 "Should have transitions after merge"
+                // Find the A->B transition (may have Event "go" or similar)
+                let abTransitions =
+                    transitions |> List.filter (fun t -> t.Source = "A" && t.Target = Some "B")
+                Expect.isNonEmpty abTransitions "Should have A->B transition"
+                // Verify annotations from smcat are present (SmcatAnnotation)
+                let hasSmcat =
+                    abTransitions
+                    |> List.exists (fun t ->
+                        t.Annotations |> List.exists (function SmcatAnnotation _ -> true | _ -> false))
+                Expect.isTrue hasSmcat "A->B transition should have SmcatAnnotation after merge"
         }
 
         test "Document-level annotations accumulate" {
-            // Verify doc.Annotations grows when both docs have document annotations.
-            // We test this end-to-end by using two parseable sources and confirming
-            // the merged doc.Annotations is the sum.
             let wsd = "participant A\n"
             let alps = """{
   "alps": {
@@ -319,10 +311,11 @@ let annotationAccumulationTests =
             let result = Pipeline.mergeSources [(FormatTag.Wsd, wsd); (FormatTag.Alps, alps)]
             match result with
             | Error e -> failtestf "Expected Ok, got Error %A" e
-            | Ok _doc ->
-                // Document parsed and merged without error; annotation counts depend
-                // on parser implementation details so we only assert no crash.
-                ()
+            | Ok doc ->
+                // ALPS parser produces document-level annotations (AlpsVersion at minimum)
+                let hasAlpsDocAnnotation =
+                    doc.Annotations |> List.exists (function AlpsAnnotation _ -> true | _ -> false)
+                Expect.isTrue hasAlpsDocAnnotation "Merged document should have ALPS annotations (e.g., AlpsVersion)"
         }
     ]
 
@@ -427,6 +420,32 @@ let dataEntriesTests =
 [<Tests>]
 let documentLevelFieldTests =
     testList "Pipeline.mergeSources.DocumentLevelFields" [
+
+        test "ALPS as sole source produces valid document" {
+            let alps = """{
+  "alps": {
+    "version": "1.0",
+    "descriptor": [
+      {
+        "id": "home",
+        "type": "semantic",
+        "descriptor": [
+          { "id": "go", "type": "unsafe", "rt": "#away" }
+        ]
+      },
+      { "id": "away", "type": "semantic" }
+    ]
+  }
+}"""
+            let result = Pipeline.mergeSources [(FormatTag.Alps, alps)]
+            match result with
+            | Error e -> failtestf "Expected Ok, got Error %A" e
+            | Ok doc ->
+                let states = statesOf doc
+                Expect.isGreaterThan states.Length 0 "ALPS-only merge should produce states"
+                let hasAlps = doc.Annotations |> List.exists (function AlpsAnnotation _ -> true | _ -> false)
+                Expect.isTrue hasAlps "ALPS-only doc should have ALPS annotations"
+        }
 
         test "Title from higher-priority format is preserved" {
             // SCXML (priority 0) sets initial; WSD (priority 3) does not.
