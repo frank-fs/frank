@@ -647,69 +647,78 @@ module CrossFormatRules =
                         let statesA = AstHelpers.stateIdentifiers a.Document
                         let statesB = AstHelpers.stateIdentifiers b.Document
 
-                        // Only compare states that have no exact match in the other set
+                        // Compare unmatched states from both directions (symmetric)
                         let unmatchedA = Set.difference statesA statesB
+                        let unmatchedB = Set.difference statesB statesA
+                        let reported = System.Collections.Generic.HashSet<string * string>()
 
                         for sA in unmatchedA do
-                            for sB in statesB do
+                            for sB in unmatchedB do
                                 let score = jaroWinkler sA sB
 
                                 if score > nearMatchThreshold then
-                                    let desc =
-                                        sprintf
-                                            "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
-                                            sA
-                                            a.Format
-                                            sB
-                                            b.Format
-                                            score
+                                    let key = if sA < sB then (sA, sB) else (sB, sA)
+                                    if reported.Add(key) then
+                                        let desc =
+                                            sprintf
+                                                "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
+                                                sA
+                                                a.Format
+                                                sB
+                                                b.Format
+                                                score
 
-                                    checks.Add(
-                                        { Name = sprintf "near-match-state-%s-%s" sA sB
-                                          Status = Fail
-                                          Reason = Some desc }
-                                    )
+                                        checks.Add(
+                                            { Name = sprintf "near-match-state-%s-%s" sA sB
+                                              Status = Fail
+                                              Reason = Some desc }
+                                        )
 
-                                    failures.Add(
-                                        { Formats = [ a.Format; b.Format ]
-                                          EntityType = "state"
-                                          Expected = sA
-                                          Actual = sB
-                                          Description = desc }
-                                    )
+                                        failures.Add(
+                                            { Formats = [ a.Format; b.Format ]
+                                              EntityType = "state"
+                                              Expected = sA
+                                              Actual = sB
+                                              Description = desc }
+                                        )
 
                         let eventsA = AstHelpers.eventNames a.Document
                         let eventsB = AstHelpers.eventNames b.Document
 
+                        // Compare unmatched events from both directions (symmetric)
                         let unmatchedEventsA = Set.difference eventsA eventsB
+                        let unmatchedEventsB = Set.difference eventsB eventsA
+                        let reportedEvents = System.Collections.Generic.HashSet<string * string>()
 
                         for eA in unmatchedEventsA do
-                            for eB in eventsB do
+                            for eB in unmatchedEventsB do
                                 let score = jaroWinkler eA eB
 
                                 if score > nearMatchThreshold then
-                                    let desc =
-                                        sprintf
-                                            "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
-                                            eA
-                                            a.Format
-                                            eB
-                                            b.Format
-                                            score
+                                    let key = if eA < eB then (eA, eB) else (eB, eA)
+                                    if reportedEvents.Add(key) then
+                                        let desc =
+                                            sprintf
+                                                "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
+                                                eA
+                                                a.Format
+                                                eB
+                                                b.Format
+                                                score
 
-                                    checks.Add(
-                                        { Name = sprintf "near-match-event-%s-%s" eA eB
-                                          Status = Fail
-                                          Reason = Some desc }
-                                    )
+                                        checks.Add(
+                                            { Name = sprintf "near-match-event-%s-%s" eA eB
+                                              Status = Fail
+                                              Reason = Some desc }
+                                        )
 
-                                    failures.Add(
-                                        { Formats = [ a.Format; b.Format ]
-                                          EntityType = "event"
-                                          Expected = eA
-                                          Actual = eB
-                                          Description = desc }
-                                    )
+                                        failures.Add(
+                                            { Formats = [ a.Format; b.Format ]
+                                              EntityType = "event"
+                                              Expected = eA
+                                              Actual = eB
+                                              Description = desc }
+                                        )
 
                 if checks.Count = 0 then
                     checks.Add(
