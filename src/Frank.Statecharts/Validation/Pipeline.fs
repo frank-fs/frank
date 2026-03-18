@@ -5,6 +5,10 @@ open Frank.Statecharts.Ast
 /// End-to-end validation pipeline: parse format sources and validate.
 module Pipeline =
 
+    let private emptyReport =
+        { TotalChecks = 0; TotalSkipped = 0; TotalFailures = 0
+          Checks = []; Failures = [] }
+
     /// Look up the parser function for a given format tag.
     /// Returns None for formats with no registered parser (e.g., XState).
     let private parserFor (tag: FormatTag) : (string -> ParseResult) option =
@@ -15,17 +19,28 @@ module Pipeline =
         | FormatTag.Alps -> Some Frank.Statecharts.Alps.JsonParser.parseAlpsJson
         | FormatTag.XState -> None
 
+    /// Parse a single (FormatTag * string) pair, returning either a
+    /// (FormatParseResult * FormatArtifact) on success or a PipelineError.
+    let private parseSource (tag: FormatTag) (source: string) =
+        match parserFor tag with
+        | None -> Error (UnsupportedFormat tag)
+        | Some parser ->
+            let result = parser source
+            let pr =
+                { Format = tag
+                  Errors = result.Errors
+                  Warnings = result.Warnings
+                  Succeeded = List.isEmpty result.Errors }
+            let art = { Format = tag; Document = result.Document }
+            Ok (pr, art)
+
     /// Validate format sources with custom rules prepended to built-in rules.
     let validateSourcesWithRules
         (customRules: ValidationRule list)
         (sources: (FormatTag * string) list)
         : PipelineResult =
         if List.isEmpty sources then
-            { ParseResults = []
-              Report =
-                  { TotalChecks = 0; TotalSkipped = 0; TotalFailures = 0
-                    Checks = []; Failures = [] }
-              Errors = [] }
+            { ParseResults = []; Report = emptyReport; Errors = [] }
         else
             let duplicates =
                 sources
@@ -35,37 +50,23 @@ module Pipeline =
                 |> List.map (fun (tag, _) -> DuplicateFormat tag)
 
             if not (List.isEmpty duplicates) then
-                { ParseResults = []
-                  Report =
-                      { TotalChecks = 0; TotalSkipped = 0; TotalFailures = 0
-                        Checks = []; Failures = [] }
-                  Errors = duplicates }
+                { ParseResults = []; Report = emptyReport; Errors = duplicates }
             else
-                let mutable pipelineErrors = []
-                let parseResults = ResizeArray<FormatParseResult>()
-                let artifacts = ResizeArray<FormatArtifact>()
+                let results = sources |> List.map (fun (tag, source) -> parseSource tag source)
 
-                for (tag, source) in sources do
-                    match parserFor tag with
-                    | None ->
-                        pipelineErrors <- UnsupportedFormat tag :: pipelineErrors
-                    | Some parser ->
-                        let result = parser source
-                        parseResults.Add(
-                            { Format = tag
-                              Errors = result.Errors
-                              Warnings = result.Warnings
-                              Succeeded = List.isEmpty result.Errors })
-                        artifacts.Add(
-                            { Format = tag
-                              Document = result.Document })
+                let parseResults =
+                    results |> List.choose (function Ok (pr, _) -> Some pr | Error _ -> None)
+                let artifacts =
+                    results |> List.choose (function Ok (_, art) -> Some art | Error _ -> None)
+                let pipelineErrors =
+                    results |> List.choose (function Error e -> Some e | Ok _ -> None)
 
                 let allRules = customRules @ SelfConsistencyRules.rules @ CrossFormatRules.rules
-                let report = Validator.validate allRules (Seq.toList artifacts)
+                let report = Validator.validate allRules artifacts
 
-                { ParseResults = Seq.toList parseResults
+                { ParseResults = parseResults
                   Report = report
-                  Errors = List.rev pipelineErrors }
+                  Errors = pipelineErrors }
 
     /// Validate format sources using built-in self-consistency and cross-format rules.
     let validateSources (sources: (FormatTag * string) list) : PipelineResult =
