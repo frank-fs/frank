@@ -65,9 +65,8 @@ let pipelineTests =
         }
 
         test "Two consistent formats produce zero validation failures" {
-            // Both sources must produce identical state/transition sets
             // smcat needs explicit state declarations (A; B;) because transition-only
-            // syntax does not create StateDecl elements for source/target states
+            // syntax does not create StateDecl elements for target-only states
             let wsdSource = "participant A\nparticipant B\nA -> B: go\nB -> A: back\n"
             let smcatSource = "A;\nB;\nA => B: go;\nB => A: back;"
             let result = Pipeline.validateSources [(FormatTag.Wsd, wsdSource); (FormatTag.Smcat, smcatSource)]
@@ -79,15 +78,45 @@ let pipelineTests =
             Expect.isEmpty result.Errors "No pipeline errors"
         }
 
-        test "Parse errors included in FormatParseResult" {
-            let malformedWsd = "!@#$%^&*()"
-            let result = Pipeline.validateSources [(FormatTag.Wsd, malformedWsd)]
+        test "Parse errors produce Succeeded = false with non-empty Errors" {
+            // "participant\n" triggers "Expected participant name" error
+            let result = Pipeline.validateSources [(FormatTag.Wsd, "participant\n")]
             Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
             let pr = result.ParseResults.[0]
-            Expect.equal pr.Format FormatTag.Wsd "Parse result should be for Wsd"
-            // WSD parser may produce errors or warnings for gibberish input
-            // The key assertion is that no exception was thrown and we got a result
+            Expect.isFalse pr.Succeeded "Succeeded should be false when errors exist"
+            Expect.isNonEmpty pr.Errors "Errors should contain the parse failure"
             Expect.isEmpty result.Errors "Parse failures are NOT pipeline errors"
+        }
+
+        test "Parse warnings propagated to FormatParseResult.Warnings" {
+            // Implicit participants (no prior declaration) produce warnings
+            let wsdSource = "Foo -> Bar: hello\n"
+            let result = Pipeline.validateSources [(FormatTag.Wsd, wsdSource)]
+            Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
+            let pr = result.ParseResults.[0]
+            Expect.isNonEmpty pr.Warnings "Implicit participants should produce warnings"
+            Expect.isTrue pr.Succeeded "Warnings alone should not set Succeeded to false"
+        }
+
+        test "Empty string source produces valid parse result" {
+            let result = Pipeline.validateSources [(FormatTag.Wsd, "")]
+            Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
+            let pr = result.ParseResults.[0]
+            Expect.isTrue pr.Succeeded "Empty input should succeed (no errors)"
+            Expect.isEmpty pr.Errors "No parse errors for empty input"
+            Expect.isEmpty result.Errors "No pipeline errors"
+        }
+
+        test "Parse result ordering matches input ordering" {
+            let wsdSource = "participant A\n"
+            let smcatSource = "A;"
+            let result = Pipeline.validateSources [
+                (FormatTag.Wsd, wsdSource)
+                (FormatTag.Smcat, smcatSource)
+            ]
+            Expect.equal (List.length result.ParseResults) 2 "Should have 2 parse results"
+            Expect.equal result.ParseResults.[0].Format FormatTag.Wsd "First result should be Wsd"
+            Expect.equal result.ParseResults.[1].Format FormatTag.Smcat "Second result should be Smcat"
         }
 
         test "validateSourcesWithRules includes custom rules" {
@@ -106,5 +135,29 @@ let pipelineTests =
                 result.Report.Checks
                 |> List.filter (fun c -> c.Name = "Custom: always pass")
             Expect.isNonEmpty customChecks "Custom rule should appear in checks"
+        }
+
+        test "Custom rule that produces failures surfaces them in report" {
+            let failingRule : ValidationRule =
+                { Name = "Custom: always fail"
+                  RequiredFormats = Set.empty
+                  Check = fun _ ->
+                      ([ { Name = "Custom: always fail"
+                           Status = Fail
+                           Reason = Some "intentional failure" } ],
+                       [ { Formats = [FormatTag.Wsd]
+                           EntityType = "test"
+                           Expected = "pass"
+                           Actual = "fail"
+                           Description = "Custom rule failure" } ]) }
+
+            let wsdSource = "participant A\n"
+            let result = Pipeline.validateSourcesWithRules [failingRule] [(FormatTag.Wsd, wsdSource)]
+
+            Expect.isGreaterThan result.Report.TotalFailures 0 "Should have failures from custom rule"
+            let customFailures =
+                result.Report.Failures
+                |> List.filter (fun f -> f.Description = "Custom rule failure")
+            Expect.isNonEmpty customFailures "Custom rule failure should appear in report"
         }
     ]
