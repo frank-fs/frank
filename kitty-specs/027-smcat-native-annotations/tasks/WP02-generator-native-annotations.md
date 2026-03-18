@@ -89,8 +89,8 @@ The generator (`src/Frank.Statecharts/Smcat/Generator.fs`, 111 lines) currently:
 - **Purpose**: The initial pseudo-state should declare its nature through `Kind` and annotations, not just its string name.
 - **File**: `src/Frank.Statecharts/Smcat/Generator.fs`
 - **Steps**:
-  1. The generator does not currently create a `StateDecl` for the initial pseudo-state — it only creates a `TransitionElement` with `Source = "initial"`. Check if a `StateDecl` for initial is needed or if the transition alone suffices.
-  2. If the generator creates state declarations (lines 43-53), add a dedicated initial state declaration BEFORE the ordered states:
+  1. The generator does not currently create a `StateDecl` for the initial pseudo-state — it only creates a `TransitionElement` with `Source = "initial"`. A `StateDecl` is required (the serializer walks `StateDecl` entries for attribute emission).
+  2. Add a dedicated initial state declaration BEFORE the ordered states:
      ```fsharp
      // Initial pseudo-state declaration
      let initialStateDecl =

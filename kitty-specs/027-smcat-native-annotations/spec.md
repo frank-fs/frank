@@ -47,7 +47,7 @@ A developer serializes a `StatechartDocument` (produced by the generator or the 
 **Acceptance Scenarios**:
 
 1. **Given** a `StateNode` with `SmcatAnnotation(SmcatStateType(Initial, Explicit))`, **When** serialized, **Then** the output includes `[type="initial"]` as an attribute on that state.
-2. **Given** a `StateNode` with `SmcatAnnotation(SmcatStateType(Regular, Inferred))`, **When** serialized, **Then** no `type` attribute is emitted (the type is conveyed by the state's name or defaults to regular).
+2. **Given** a `StateNode` with no `SmcatStateType` annotation (absence = `Regular, Inferred` default), **When** serialized, **Then** no `type` attribute is emitted.
 3. **Given** a `StateNode` with `SmcatAnnotation(SmcatColor "red")` and `SmcatAnnotation(SmcatStateType(Choice, Explicit))`, **When** serialized, **Then** the output includes `[color="red" type="choice"]` with both attributes present.
 
 ---
@@ -103,7 +103,8 @@ The shared AST's `SmcatMeta` discriminated union is expanded with new cases and 
 ### Edge Cases
 
 - What happens when a state has both naming-convention inference AND an explicit `[type="..."]` attribute that disagrees (e.g., state named `"initial"` with `[type="final"]`)? The explicit attribute takes precedence (existing behavior in `inferStateType`), and the annotation records `Explicit`.
-- What happens when the generator produces a state with `Kind = Initial` but no smcat annotation? The serializer should handle this gracefully by falling back to emitting the state kind as a `[type="..."]` attribute.
+- The generator MUST emit `StateDecl` entries for initial and final pseudo-states (with correct `Kind` and `SmcatAnnotation`) in addition to their `TransitionElement` entries. The serializer depends on `StateDecl` entries for attribute emission.
+- What happens when a non-generator `StatechartDocument` has a state with `Kind = Initial` but no smcat annotation? The serializer should handle this gracefully by falling back to emitting the state kind as a `[type="..."]` attribute.
 - What happens when a `StatechartDocument` from a non-smcat source (e.g., SCXML parser) is serialized to smcat? States without `SmcatAnnotation` entries should serialize using `StateNode.Kind` to infer the appropriate smcat type attribute.
 - What happens when `SmcatTransitionKind` is absent from a transition's annotations? The serializer treats it as a regular external transition (current behavior).
 
