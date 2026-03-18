@@ -111,11 +111,11 @@
 **Prompt**: `tasks/WP04-round-trip-fidelity.md`
 
 ### Included Subtasks
-- [ ] T017 Add comprehensive SCXML fixture with onentry/onexit, history, invoke, data, initial elements, namespace
-- [ ] T018 Add round-trip test for executable content preservation (onentry/onexit survive cycle)
-- [ ] T019 Add round-trip test for `<initial>` child element preservation
-- [ ] T020 Add round-trip test for `<data src>` preservation
-- [ ] T021 Verify `dotnet build` and `dotnet test`
+- [x] T017 Add comprehensive SCXML fixture with onentry/onexit, history, invoke, data, initial elements, namespace
+- [x] T018 Add round-trip test for executable content preservation (onentry/onexit survive cycle)
+- [x] T019 Add round-trip test for `<initial>` child element preservation
+- [x] T020 Add round-trip test for `<data src>` preservation
+- [x] T021 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - Extend existing `test/Frank.Statecharts.Tests/Scxml/RoundTripTests.fs`.
