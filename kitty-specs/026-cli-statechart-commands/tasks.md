@@ -157,12 +157,12 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T026 Create `src/Frank.Cli.Core/Commands/StatechartExtractCommand.fs` with `execute` function
-- [ ] T027 Implement text output: state names, initial state, guard names, per-state metadata (methods, final flag)
-- [ ] T028 Implement JSON output: array of state machine entries with all metadata fields
-- [ ] T029 Handle zero-stateful-resources case (message, exit code 0)
-- [ ] T030 Handle assembly load errors (non-zero exit code, clear message)
-- [ ] T031 Add compile entry to `Frank.Cli.Core.fsproj`
+- [x] T026 Create `src/Frank.Cli.Core/Commands/StatechartExtractCommand.fs` with `execute` function
+- [x] T027 Implement text output: state names, initial state, guard names, per-state metadata (methods, final flag)
+- [x] T028 Implement JSON output: array of state machine entries with all metadata fields
+- [x] T029 Handle zero-stateful-resources case (message, exit code 0)
+- [x] T030 Handle assembly load errors (non-zero exit code, clear message)
+- [x] T031 Add compile entry to `Frank.Cli.Core.fsproj`
 
 ### Implementation Notes
 - Calls `StatechartExtractor.extract` for assembly loading
