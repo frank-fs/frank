@@ -291,13 +291,13 @@
 **Estimated Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T055 Add `statechart` parent Command to `Program.fs` root command
-- [ ] T056 Wire `extract` subcommand with `<assembly>` argument and `--output-format` option
-- [ ] T057 Wire `generate` subcommand with `--format`, `<assembly>`, `--output`, `--resource`, `--output-format` options
-- [ ] T058 Wire `validate` subcommand with `<spec-file>` arguments, `<assembly>` argument, `--output-format` option
-- [ ] T059 Wire `parse` subcommand with `<spec-file>` argument, `--format` option (for notation disambiguation), `--output-format` option
-- [ ] T060 Add statechart command help entries to `HelpContent.fs`
-- [ ] T061 Verify all commands are accessible via CLI and existing commands are unaffected
+- [x] T055 Add `statechart` parent Command to `Program.fs` root command
+- [x] T056 Wire `extract` subcommand with `<assembly>` argument and `--output-format` option
+- [x] T057 Wire `generate` subcommand with `--format`, `<assembly>`, `--output`, `--resource`, `--output-format` options
+- [x] T058 Wire `validate` subcommand with `<spec-file>` arguments, `<assembly>` argument, `--output-format` option
+- [x] T059 Wire `parse` subcommand with `<spec-file>` argument, `--format` option (for notation disambiguation), `--output-format` option
+- [x] T060 Add statechart command help entries to `HelpContent.fs`
+- [x] T061 Verify all commands are accessible via CLI and existing commands are unaffected
 
 ### Implementation Notes
 - Follow existing imperative System.CommandLine pattern in Program.fs (D-001)
