@@ -132,7 +132,7 @@ A developer validates formats where state or event names are similar but not ide
 ### Functional Requirements
 
 - **FR-001**: A new `Pipeline.mergeSources` function MUST accept a list of `(FormatTag * string)` pairs and return a merged `StatechartDocument`.
-- **FR-002**: The merge MUST follow priority ordering for structural fields: SCXML > smcat > WSD. ALPS MUST NOT override structural fields.
+- **FR-002**: The merge MUST follow priority ordering for structural fields: SCXML > XState > smcat > WSD. ALPS MUST NOT override structural fields.
 - **FR-003**: The merge MUST accumulate annotations from all contributing formats on matching nodes (matched by identifier for states, by source+target+event for transitions).
 - **FR-004**: States present in one format but not others MUST be included in the merged document.
 - **FR-005**: Transitions present in one format but not others MUST be included in the merged document.

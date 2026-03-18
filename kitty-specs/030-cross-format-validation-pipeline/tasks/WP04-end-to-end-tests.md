@@ -53,25 +53,27 @@ Note: If implement only supports single --base, merge WP02+WP03 first or impleme
 
 ### T020 – Create multi-format test fixtures
 
-- Create inline string fixtures (or a shared golden file module) with the SAME simple state machine in all 4 formats.
+- Create inline string fixtures (or a shared golden file module) with the SAME simple state machine in all 5 supported formats.
 - Suggested state machine: 3 states (idle, active, done), 3 transitions (start, complete, reset), 1 guard.
 - Fixtures:
   - WSD: `idle->active: start\nactive->done: complete\ndone->idle: reset`
   - smcat: `idle => active: start;\nactive => done: complete;\ndone => idle: reset;`
   - SCXML: `<scxml ...><state id="idle"><transition event="start" target="active"/></state>...</scxml>`
   - ALPS JSON: `{"alps":{"version":"1.0","descriptor":[{"id":"idle","type":"semantic","descriptor":[{"id":"start","type":"unsafe","rt":"#active"}]},...]}}`
-- Ensure state names and event names are consistent across all 4 formats.
+  - XState JSON: `{"id":"test","initial":"idle","states":{"idle":{"on":{"start":"active"}},"active":{"on":{"complete":"done"}},"done":{"on":{"reset":"idle"}}}}`
+- Ensure state names and event names are consistent across all 5 formats.
 
 ### T021 – E2E: consistent formats → zero failures
 
 ```fsharp
-testCase "consistent 4-format input produces zero validation failures"
+testCase "consistent 5-format input produces zero validation failures"
 <| fun _ ->
     let sources = [
         (Wsd, wsdFixture)
         (Smcat, smcatFixture)
         (Scxml, scxmlFixture)
-        (Alps, alpsFixture) ]
+        (Alps, alpsFixture)
+        (XState, xstateFixture) ]
     let result = Pipeline.validateSources sources
     Expect.isEmpty result.Errors "no pipeline errors"
     Expect.equal result.Report.TotalFailures 0 "zero validation failures"

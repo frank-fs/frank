@@ -61,7 +61,7 @@ WP02 and WP03 can execute in parallel after WP01. WP04 depends on WP02 (needs me
 
 ### D-001: Merge as Left Fold
 
-`mergeSources` sorts source documents by format priority (SCXML first, then smcat, then WSD, then ALPS), then folds: the first document is the base, subsequent documents enrich it. For each subsequent document, matching states accumulate annotations and non-None fields fill gaps. Matching transitions accumulate annotations. Unmatched states/transitions are added.
+`mergeSources` sorts source documents by format priority (SCXML first, then XState, then smcat, then WSD, then ALPS), then folds: the first document is the base, subsequent documents enrich it. For each subsequent document, matching states accumulate annotations and non-None fields fill gaps. Matching transitions accumulate annotations. Unmatched states/transitions are added.
 
 ### D-002: Jaro-Winkler for Near-Match
 
