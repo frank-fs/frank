@@ -1,0 +1,9 @@
+{
+  "feature_number": "029",
+  "slug": "029-alps-native-annotations",
+  "feature_slug": "029-alps-native-annotations",
+  "friendly_name": "alps native annotations",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-18T13:37:38.949728+00:00"
+}
