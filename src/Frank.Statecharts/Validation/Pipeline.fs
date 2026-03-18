@@ -239,6 +239,11 @@ module Pipeline =
     /// Format priority determines which structural fields win on conflict (SCXML=0 is
     /// highest priority; Alps/AlpsXml=4 is lowest). Annotations always accumulate.
     /// Returns the merged document, or an empty document when sources is empty.
+    ///
+    /// NOTE: This function does NOT validate consistency before merging. Callers should
+    /// run validateSources first to detect state/event name mismatches and near-matches,
+    /// then decide whether to proceed with merge. The two functions are deliberately
+    /// separate to support workflows where merge is desired despite validation warnings.
     let mergeSources (sources: (FormatTag * string) list) : Result<StatechartDocument, PipelineError list> =
         if List.isEmpty sources then
             Ok emptyDocument
