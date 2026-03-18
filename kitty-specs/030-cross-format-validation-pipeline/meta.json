@@ -1,0 +1,9 @@
+{
+  "feature_number": "030",
+  "slug": "030-cross-format-validation-pipeline",
+  "feature_slug": "030-cross-format-validation-pipeline",
+  "friendly_name": "cross format validation pipeline",
+  "mission": "software-dev",
+  "target_branch": "master",
+  "created_at": "2026-03-18T16:46:24.119146+00:00"
+}
