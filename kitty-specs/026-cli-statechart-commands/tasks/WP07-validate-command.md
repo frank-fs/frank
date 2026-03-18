@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP07"
 title: "Validate Command"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP02", "WP03", "WP04"]
 subtasks:
   - "T040"
@@ -13,8 +13,8 @@ subtasks:
   - "T046"
   - "T047"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus"
+shell_pid: "10795"
 review_status: ""
 reviewed_by: ""
 history:
@@ -263,3 +263,4 @@ Note: WP04 depends on WP01, and WP03 depends on WP01+WP02. If WP03 is not yet me
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T02:48:28Z – unknown – lane=for_review – Ready for review: StatechartValidateCommand with cross-format validation. Build clean.
+- 2026-03-18T02:48:32Z – claude-opus – shell_pid=10795 – lane=doing – Started review via workflow command
