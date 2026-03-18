@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Merge Function
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01]
 base_branch: 030-cross-format-validation-pipeline-WP01
 base_commit: a9b25b95191f60d55fcba7c44d7688ce7674d54b
@@ -9,8 +9,8 @@ created_at: '2026-03-18T17:48:43.642625+00:00'
 subtasks: [T007, T008, T009, T010, T011, T012, T013]
 phase: Phase 1 - Implementation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "85141"
+agent: "claude-opus-reviewer"
+shell_pid: "86274"
 review_status: ''
 reviewed_by: ''
 history:
@@ -118,3 +118,4 @@ Add tests in `test/Frank.Statecharts.Tests/Validation/` (new or extend existing)
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
 - 2026-03-18T17:48:43Z – claude-opus – shell_pid=85141 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T17:59:18Z – claude-opus – shell_pid=85141 – lane=for_review – mergeSources implemented with priority ordering, annotation accumulation, 8 test groups. 977 tests pass.
+- 2026-03-18T18:00:02Z – claude-opus-reviewer – shell_pid=86274 – lane=doing – Started review via workflow command
