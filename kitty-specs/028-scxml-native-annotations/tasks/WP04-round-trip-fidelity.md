@@ -9,7 +9,7 @@ created_at: '2026-03-18T07:39:15.430803+00:00'
 subtasks: [T017, T018, T019, T020, T021]
 phase: Phase 2 - Validation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "51445"
 review_status: ''
 reviewed_by: ''
@@ -217,3 +217,4 @@ Note: If the implement command only supports a single `--base`, merge WP02+WP03 
 ## Activity Log
 
 - 2026-03-18T07:24:37Z – system – lane=planned – Prompt created.
+- 2026-03-18T07:39:15Z – claude-opus – shell_pid=51445 – lane=doing – Assigned agent via workflow command
