@@ -10,7 +10,7 @@ created_at: '2026-03-18T18:56:38.513803+00:00'
 subtasks: [T020, T021, T022, T023, T024, T025]
 phase: Phase 2 - Validation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "89819"
 review_status: ''
 reviewed_by: ''
@@ -132,3 +132,4 @@ testCase "validate then merge produces unified document"
 
 ## Activity Log
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
+- 2026-03-18T18:56:38Z – claude-opus – shell_pid=89819 – lane=doing – Assigned agent via workflow command
