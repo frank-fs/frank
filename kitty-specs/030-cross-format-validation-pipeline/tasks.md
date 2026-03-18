@@ -53,12 +53,12 @@
 **Prompt**: `tasks/WP03-near-match-detection.md`
 
 ### Included Subtasks
-- [ ] T014 Add near-match validation rule to `CrossFormatRules` in `src/Frank.Statecharts/Validation/Validator.fs`
-- [ ] T015 Rule checks state identifiers across format pairs for Jaro-Winkler similarity > threshold
-- [ ] T016 Rule checks event names across format pairs for near-matches
-- [ ] T017 Report near-match warnings with format pair, identifiers, similarity score
-- [ ] T018 Add near-match unit tests
-- [ ] T019 Verify `dotnet build` and `dotnet test`
+- [x] T014 Add near-match validation rule to `CrossFormatRules` in `src/Frank.Statecharts/Validation/Validator.fs`
+- [x] T015 Rule checks state identifiers across format pairs for Jaro-Winkler similarity > threshold
+- [x] T016 Rule checks event names across format pairs for near-matches
+- [x] T017 Report near-match warnings with format pair, identifiers, similarity score
+- [x] T018 Add near-match unit tests
+- [x] T019 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP01 (requires StringDistance.fs).
