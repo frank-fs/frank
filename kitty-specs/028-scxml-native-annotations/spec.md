@@ -6,6 +6,12 @@
 **Input**: Eliminate all lossy transformations in the SCXML parser and generator so that SCXML round-trips with zero information loss. Dual-layer approach: portable activities for cross-format tools, raw XML annotations for format-specific fidelity.
 **Closes**: #114
 
+## Clarifications
+
+### Session 2026-03-18
+
+- Q: SCXML allows multiple `<onentry>` blocks on the same state. Store one annotation per block or concatenate? → A: (A) One annotation per block — multiple `ScxmlOnEntry` entries in the `Annotations` list, matching the existing `ScxmlInvoke` pattern. Generator emits one `<onentry>` element per annotation. Preserves exact document structure.
+
 ## Background
 
 The SCXML parser and generator were migrated to the shared `StatechartDocument` AST (spec 018), but the implementation silently drops several SCXML features during parsing. `<onentry>` and `<onexit>` executable content blocks are skipped entirely — `StateActivities` is always `None`. `<initial>` child elements are recognized but not parsed. `<data src="...">` attributes are not captured. The namespace origin is not stored despite `ScxmlNamespace` existing in the `ScxmlMeta` DU. The result is a parser that produces a correct but impoverished AST — one that loses information that cannot be recovered during generation.
@@ -113,6 +119,7 @@ A developer parses SCXML, generates the AST back to SCXML, and parses the output
 - What happens when `<onentry>` contains only whitespace or comments? The parser stores the raw XML as-is (including whitespace). `StateActivities.Entry` is empty since no actions are present.
 - What happens when a `<data>` element has both `src` and `expr` attributes? Per W3C spec, `src` and `expr` are mutually exclusive. The parser captures whichever is present; if both appear, `expr` takes precedence (existing behavior) and `src` is stored as annotation.
 - What happens when `<initial>` child element has no `<transition>` child? Store annotation with empty target. Generator emits `<initial/>` empty element.
+- What happens when a state has multiple `<onentry>` blocks? Each block becomes a separate `ScxmlOnEntry` annotation. The generator emits one `<onentry>` element per annotation, preserving the original structure. `StateActivities.Entry` aggregates actions from all blocks.
 - What happens when `StateActivities` is populated but no `ScxmlOnEntry`/`ScxmlOnExit` annotation exists (e.g., from a non-SCXML source)? The generator should emit `<onentry>` with simple `<log>` elements derived from activity names (best-effort).
 
 ## Requirements
@@ -124,8 +131,8 @@ A developer parses SCXML, generates the AST back to SCXML, and parses the output
 - **FR-003**: The `ScxmlMeta` DU MUST include `ScxmlInitialElement of targetId: string` for distinguishing `<initial>` child elements from the `initial` attribute.
 - **FR-004**: The `ScxmlMeta` DU MUST include `ScxmlDataSrc of name: string * src: string` for capturing `<data src="...">` attributes.
 - **FR-005**: The SCXML parser MUST populate `StateNode.Activities` from `<onentry>`/`<onexit>` blocks, extracting action descriptions into `Entry`/`Exit` string lists.
-- **FR-006**: The SCXML parser MUST store `ScxmlAnnotation(ScxmlOnEntry(xml))` for each `<onentry>` block, capturing the full XML as a string.
-- **FR-007**: The SCXML parser MUST store `ScxmlAnnotation(ScxmlOnExit(xml))` for each `<onexit>` block, capturing the full XML as a string.
+- **FR-006**: The SCXML parser MUST store one `ScxmlAnnotation(ScxmlOnEntry(xml))` per `<onentry>` block encountered. Multiple `<onentry>` blocks on the same state produce multiple annotations (matching the `ScxmlInvoke` pattern).
+- **FR-007**: The SCXML parser MUST store one `ScxmlAnnotation(ScxmlOnExit(xml))` per `<onexit>` block encountered. Multiple `<onexit>` blocks on the same state produce multiple annotations.
 - **FR-008**: The SCXML parser MUST parse `<initial>` child elements and store `ScxmlAnnotation(ScxmlInitialElement(targetId))`.
 - **FR-009**: The SCXML parser MUST capture `<data src="...">` attributes as `ScxmlAnnotation(ScxmlDataSrc(name, src))`.
 - **FR-010**: The SCXML parser MUST store `ScxmlAnnotation(ScxmlNamespace(ns))` with the actual namespace string (or empty for no-namespace documents).
