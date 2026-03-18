@@ -6,6 +6,7 @@ open Frank.Statecharts.Ast
 type FormatTag =
     | Wsd
     | Alps
+    | AlpsXml
     | Scxml
     | Smcat
     | XState

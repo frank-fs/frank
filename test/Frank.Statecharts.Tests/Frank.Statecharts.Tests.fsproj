@@ -45,6 +45,7 @@
     <Compile Include="Alps/RoundTripTests.fs" />
     <Compile Include="Alps/XmlGeneratorTests.fs" />
     <!-- Validation tests -->
+    <Compile Include="Validation/StringDistanceTests.fs" />
     <Compile Include="Validation/TypeTests.fs" />
     <Compile Include="Validation/ValidatorTests.fs" />
     <Compile Include="Validation/SelfConsistencyTests.fs" />
@@ -52,6 +53,8 @@
     <Compile Include="Validation/IntegrationTests.fs" />
     <Compile Include="Validation/PipelineTests.fs" />
     <Compile Include="Validation/PipelineIntegrationTests.fs" />
+    <Compile Include="Validation/NearMatchTests.fs" />
+    <Compile Include="Validation/MergeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

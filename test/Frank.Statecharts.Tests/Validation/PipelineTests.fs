@@ -34,24 +34,19 @@ let pipelineTests =
             Expect.isTrue hasDuplicate "Should contain DuplicateFormat Smcat"
         }
 
-        test "Unsupported format tag XState returns UnsupportedFormat error" {
-            let result = Pipeline.validateSources [(FormatTag.XState, "anything")]
-            Expect.isNonEmpty result.Errors "Should have pipeline errors"
-            let hasUnsupported =
-                result.Errors |> List.exists (fun e ->
-                    match e with UnsupportedFormat FormatTag.XState -> true | _ -> false)
-            Expect.isTrue hasUnsupported "Should contain UnsupportedFormat XState"
+        test "XState format is supported and dispatches to deserializer" {
+            let xstateJson = """{"id":"test","initial":"idle","states":{"idle":{"on":{"start":"active"}},"active":{}}}"""
+            let result = Pipeline.validateSources [(FormatTag.XState, xstateJson)]
+            Expect.isEmpty result.Errors "No pipeline errors for XState"
+            Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
+            Expect.isTrue result.ParseResults.[0].Succeeded "XState should parse successfully"
         }
 
-        test "Mixed supported and unsupported formats: XState produces error, WSD still parsed" {
-            let wsdSource = "participant A\nparticipant B\nA -> B: go\n"
-            let result = Pipeline.validateSources [(FormatTag.Wsd, wsdSource); (FormatTag.XState, "x")]
-            let hasUnsupported =
-                result.Errors |> List.exists (fun e ->
-                    match e with UnsupportedFormat FormatTag.XState -> true | _ -> false)
-            Expect.isTrue hasUnsupported "Should contain UnsupportedFormat XState"
-            Expect.equal (List.length result.ParseResults) 1 "WSD should still be parsed"
-            Expect.equal result.ParseResults.[0].Format FormatTag.Wsd "Parse result should be for Wsd"
+        test "XState with invalid JSON produces parse error, not pipeline error" {
+            let result = Pipeline.validateSources [(FormatTag.XState, "not json")]
+            Expect.isEmpty result.Errors "Parse failures are not pipeline errors"
+            Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
+            Expect.isFalse result.ParseResults.[0].Succeeded "Invalid XState should have parse errors"
         }
 
         test "Single format runs self-consistency, cross-format rules skipped" {

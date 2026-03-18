@@ -341,6 +341,8 @@ module SelfConsistencyRules =
 /// event name agreement, and transition target agreement.
 module CrossFormatRules =
 
+    open Frank.Statecharts.Validation.StringDistance
+
     /// Check if a value has a case-insensitive match in a set but not an exact match.
     /// Returns a descriptive note about the casing difference, or empty string if no near-match.
     let private describeCasingMismatch (value: string) (candidates: string Set) : string =
@@ -624,9 +626,112 @@ module CrossFormatRules =
                 else
                     allPairs |> List.unzip }
 
+    /// Similarity threshold above which two identifiers are flagged as near-matches.
+    let nearMatchThreshold = 0.8
+
+    /// Universal near-match rule: detects identifiers that are similar but not identical
+    /// across any pair of artifacts using Jaro-Winkler similarity.
+    let nearMatchRule: ValidationRule =
+        { Name = "cross-format-near-match"
+          RequiredFormats = Set.empty
+          Check =
+            fun artifacts ->
+                let checks = ResizeArray<ValidationCheck>()
+                let failures = ResizeArray<ValidationFailure>()
+
+                for i in 0 .. artifacts.Length - 2 do
+                    for j in i + 1 .. artifacts.Length - 1 do
+                        let a = artifacts.[i]
+                        let b = artifacts.[j]
+
+                        let statesA = AstHelpers.stateIdentifiers a.Document
+                        let statesB = AstHelpers.stateIdentifiers b.Document
+
+                        // Compare unmatched states from both directions (symmetric)
+                        let unmatchedA = Set.difference statesA statesB
+                        let unmatchedB = Set.difference statesB statesA
+                        let reported = System.Collections.Generic.HashSet<string * string>()
+
+                        for sA in unmatchedA do
+                            for sB in unmatchedB do
+                                let score = jaroWinkler sA sB
+
+                                if score > nearMatchThreshold then
+                                    let key = if sA < sB then (sA, sB) else (sB, sA)
+                                    if reported.Add(key) then
+                                        let desc =
+                                            sprintf
+                                                "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
+                                                sA
+                                                a.Format
+                                                sB
+                                                b.Format
+                                                score
+
+                                        checks.Add(
+                                            { Name = sprintf "near-match-state-%s-%s" sA sB
+                                              Status = Fail
+                                              Reason = Some desc }
+                                        )
+
+                                        failures.Add(
+                                            { Formats = [ a.Format; b.Format ]
+                                              EntityType = "state"
+                                              Expected = sA
+                                              Actual = sB
+                                              Description = desc }
+                                        )
+
+                        let eventsA = AstHelpers.eventNames a.Document
+                        let eventsB = AstHelpers.eventNames b.Document
+
+                        // Compare unmatched events from both directions (symmetric)
+                        let unmatchedEventsA = Set.difference eventsA eventsB
+                        let unmatchedEventsB = Set.difference eventsB eventsA
+                        let reportedEvents = System.Collections.Generic.HashSet<string * string>()
+
+                        for eA in unmatchedEventsA do
+                            for eB in unmatchedEventsB do
+                                let score = jaroWinkler eA eB
+
+                                if score > nearMatchThreshold then
+                                    let key = if eA < eB then (eA, eB) else (eB, eA)
+                                    if reportedEvents.Add(key) then
+                                        let desc =
+                                            sprintf
+                                                "Near-match: '%s' in %A <-> '%s' in %A (similarity: %.2f)"
+                                                eA
+                                                a.Format
+                                                eB
+                                                b.Format
+                                                score
+
+                                        checks.Add(
+                                            { Name = sprintf "near-match-event-%s-%s" eA eB
+                                              Status = Fail
+                                              Reason = Some desc }
+                                        )
+
+                                        failures.Add(
+                                            { Formats = [ a.Format; b.Format ]
+                                              EntityType = "event"
+                                              Expected = eA
+                                              Actual = eB
+                                              Description = desc }
+                                        )
+
+                if checks.Count = 0 then
+                    checks.Add(
+                        { Name = "cross-format-near-match"
+                          Status = Pass
+                          Reason = None }
+                    )
+
+                (Seq.toList checks, Seq.toList failures) }
+
     /// All unique pairs of format tags.
     let private formatPairs: (FormatTag * FormatTag) list =
-        let tags = [ Wsd; Alps; Scxml; Smcat; XState ]
+        let tags = [ Wsd; Alps; AlpsXml; Scxml; Smcat; XState ]
 
         [ for i in 0 .. tags.Length - 2 do
               for j in i + 1 .. tags.Length - 1 do
@@ -637,8 +742,8 @@ module CrossFormatRules =
         formatPairs
         |> List.collect (fun (a, b) -> [ stateNameAgreement a b; eventNameAgreement a b; transitionTargetAgreement a b ])
 
-    /// All cross-format rules for all applicable format pairs.
-    let rules: ValidationRule list = allPairwiseRules
+    /// All cross-format rules for all applicable format pairs, plus the universal near-match rule.
+    let rules: ValidationRule list = allPairwiseRules @ [ nearMatchRule ]
 
 /// Validation orchestrator.
 module Validator =

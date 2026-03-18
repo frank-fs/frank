@@ -22,6 +22,9 @@ let formatTagTests =
               Expect.notEqual XState Wsd "XState <> Wsd"
               Expect.notEqual Alps Scxml "Alps <> Scxml"
               Expect.notEqual Smcat XState "Smcat <> XState"
+              Expect.notEqual AlpsXml Alps "AlpsXml <> Alps"
+              Expect.notEqual AlpsXml Wsd "AlpsXml <> Wsd"
+              Expect.notEqual AlpsXml Scxml "AlpsXml <> Scxml"
           }
 
           test "FormatTag structural equality" {
@@ -30,12 +33,13 @@ let formatTagTests =
               Expect.equal Scxml Scxml "Scxml = Scxml"
               Expect.equal Smcat Smcat "Smcat = Smcat"
               Expect.equal XState XState "XState = XState"
+              Expect.equal AlpsXml AlpsXml "AlpsXml = AlpsXml"
           }
 
-          test "All five FormatTag cases exist" {
-              let tags = [ Wsd; Alps; Scxml; Smcat; XState ]
-              Expect.equal (List.length tags) 5 "Should have 5 format tags"
-              Expect.equal (tags |> Set.ofList |> Set.count) 5 "All tags should be distinct"
+          test "All six FormatTag cases exist" {
+              let tags = [ Wsd; Alps; AlpsXml; Scxml; Smcat; XState ]
+              Expect.equal (List.length tags) 6 "Should have 6 format tags"
+              Expect.equal (tags |> Set.ofList |> Set.count) 6 "All tags should be distinct"
           } ]
 
 [<Tests>]
