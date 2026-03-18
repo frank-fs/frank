@@ -77,10 +77,10 @@
 **Prompt**: `tasks/WP03-serializer-annotation-consumption.md`
 
 ### Included Subtasks
-- [ ] T010 Add `StateKind → smcat type string` mapping function to `src/Frank.Statecharts/Smcat/Serializer.fs`
-- [ ] T011 [P] Update `serializeAttributes` to consume `SmcatStateType` annotations (Explicit → emit, Inferred → skip)
-- [ ] T012 [P] Add fallback for states without `SmcatAnnotation` (use `StateNode.Kind` for non-Regular)
-- [ ] T013 Verify `dotnet build` and `dotnet test`
+- [x] T010 Add `StateKind → smcat type string` mapping function to `src/Frank.Statecharts/Smcat/Serializer.fs`
+- [x] T011 [P] Update `serializeAttributes` to consume `SmcatStateType` annotations (Explicit → emit, Inferred → skip)
+- [x] T012 [P] Add fallback for states without `SmcatAnnotation` (use `StateNode.Kind` for non-Regular)
+- [x] T013 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - `StateKind` → string mapping: `Initial` → `"initial"`, `Final` → `"final"`, `Choice` → `"choice"`, `ForkJoin` → `"forkjoin"`, `ShallowHistory` → `"history"`, `DeepHistory` → `"deep.history"`, `Terminate` → `"terminate"`, `Parallel` → `"parallel"`, `Regular` → `"regular"`.
