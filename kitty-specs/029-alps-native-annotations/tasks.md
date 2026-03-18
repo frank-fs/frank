@@ -36,11 +36,11 @@
 **Prompt**: `tasks/WP02-json-round-trip-tests.md`
 
 ### Included Subtasks
-- [ ] T006 Add Amundsen's onboarding example as inline test fixture
-- [ ] T007 Add JSON round-trip test (parse → generate → parse → compare ASTs)
-- [ ] T008 Add tests for edge cases: shared transitions, nested descriptors, data descriptors with documentation
-- [ ] T009 Fix any JSON generator fidelity gaps discovered during testing
-- [ ] T010 Verify `dotnet build` and `dotnet test`
+- [x] T006 Add Amundsen's onboarding example as inline test fixture
+- [x] T007 Add JSON round-trip test (parse → generate → parse → compare ASTs)
+- [x] T008 Add tests for edge cases: shared transitions, nested descriptors, data descriptors with documentation
+- [x] T009 Fix any JSON generator fidelity gaps discovered during testing
+- [x] T010 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP01 (JsonParser.fs was refactored).
