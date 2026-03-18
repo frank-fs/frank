@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP10"
 title: "MSBuild Integration"
-lane: "for_review"
+lane: "doing"
 dependencies: ["WP09"]
 subtasks:
   - "T062"
@@ -11,8 +11,8 @@ subtasks:
   - "T066"
   - "T067"
 assignee: ""
-agent: ""
-shell_pid: ""
+agent: "claude-opus"
+shell_pid: "15786"
 review_status: ""
 reviewed_by: ""
 history:
@@ -140,3 +140,4 @@ To change a work package's lane, either:
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
 - 2026-03-18T03:18:56Z – unknown – lane=for_review – Ready for review: MSBuild targets file. kitty-specs diffs inherited from WP09 merge topology.
+- 2026-03-18T03:18:59Z – claude-opus – shell_pid=15786 – lane=doing – Started review via workflow command
