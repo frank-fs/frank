@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Generator Native Annotations
-lane: "doing"
+lane: "done"
 dependencies: [WP01]
 base_branch: 027-smcat-native-annotations-WP01
 base_commit: 1a657d3121f0d1d274c9aa8cae2459565738e29a
@@ -16,8 +16,8 @@ phase: Phase 1 - Implementation
 assignee: ''
 agent: "claude-opus-reviewer"
 shell_pid: "39260"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-18T05:39:36Z'
   lane: planned
@@ -208,3 +208,4 @@ The generator (`src/Frank.Statecharts/Smcat/Generator.fs`, 111 lines) currently:
 - 2026-03-18T06:13:43Z – claude-opus – shell_pid=37678 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T06:18:26Z – claude-opus – shell_pid=37678 – lane=for_review – All 5 subtasks complete. Initial/final StateDecls with Kind+annotations, all transitions annotated. 828 tests pass.
 - 2026-03-18T06:20:28Z – claude-opus-reviewer – shell_pid=39260 – lane=doing – Started review via workflow command
+- 2026-03-18T06:28:12Z – claude-opus-reviewer – shell_pid=39260 – lane=done – Review passed: All 10 checklist items pass. Generator produces typed AST with correct Kind and annotations. 828 tests pass.
