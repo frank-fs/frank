@@ -2,8 +2,10 @@
   "feature_number": "028",
   "slug": "028-scxml-native-annotations",
   "feature_slug": "028-scxml-native-annotations",
-  "friendly_name": "scxml native annotations",
+  "friendly_name": "SCXML Native Annotations and Generator Fidelity",
   "mission": "software-dev",
+  "source_description": "GitHub issue #114 should be similar to #113 which just completed but for a different format.",
+  "created_at": "2026-03-18T07:13:46.940434+00:00",
   "target_branch": "master",
-  "created_at": "2026-03-18T07:13:46.940434+00:00"
+  "vcs": "git"
 }
