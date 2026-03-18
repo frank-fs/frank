@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Round-Trip Fidelity Tests
-lane: "doing"
+lane: "for_review"
 dependencies: [WP02, WP03, WP04]
 base_branch: 027-smcat-native-annotations-WP05-merge-base
 base_commit: d2f98bb15264f4f3fa481f96305a8acae368c0d8
@@ -309,3 +309,4 @@ The file has:
 
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
 - 2026-03-18T06:28:38Z – claude-opus – shell_pid=40571 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T06:49:28Z – claude-opus – shell_pid=40571 – lane=for_review – All 5 subtasks complete. 4 new golden files, structural equivalence comparison, annotation round-trip tests. Also fixed parser InternalTransition depth check in 2 code paths. 842 tests pass.
