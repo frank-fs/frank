@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: AST Type Definitions and Rename
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: a002e99e6b4dd059e6b305ae20db9b65d2c7624d
@@ -13,8 +13,8 @@ subtasks:
 - T004
 phase: Phase 0 - Foundation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "34417"
+agent: "claude-opus-reviewer"
+shell_pid: "36803"
 review_status: ''
 reviewed_by: ''
 history:
@@ -182,3 +182,4 @@ spec-kitty implement WP01
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
 - 2026-03-18T05:50:36Z – claude-opus – shell_pid=34417 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T06:08:28Z – claude-opus – shell_pid=34417 – lane=for_review – All 4 subtasks complete. 3 files changed, 827 tests pass, zero warnings.
+- 2026-03-18T06:10:32Z – claude-opus-reviewer – shell_pid=36803 – lane=doing – Started review via workflow command
