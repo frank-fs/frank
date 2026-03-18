@@ -5,84 +5,148 @@ namespace Frank.Cli.Core.Help
 module HelpContent =
 
     let extractHelp: CommandHelp =
-        { Name = "extract"
+        { Name = "semantic extract"
           Summary = "Extract semantic definitions from F# source"
           Examples =
-            [ { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj --base-uri http://example.org/"
+            [ { Invocation = "frank-cli semantic extract --project MyApp/MyApp.fsproj --base-uri http://example.org/"
                 Description = "Extract semantic definitions from the MyApp project." }
-              { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj --base-uri http://example.org/ --vocabularies schema.org,foaf"
+              { Invocation = "frank-cli semantic extract --project MyApp/MyApp.fsproj --base-uri http://example.org/ --vocabularies schema.org,foaf"
                 Description = "Extract with multiple vocabulary alignments." } ]
           Workflow =
             { StepNumber = 1
               Prerequisites = []
-              NextSteps = [ "clarify"; "validate" ]
+              NextSteps = [ "semantic clarify"; "semantic validate" ]
               IsOptional = false }
           Context =
-            "The extract command analyzes F# source code to derive an OWL ontology and SHACL shapes. It maps F# record types to OWL classes, record fields to OWL properties, and route definitions to resource identities. The extraction state is saved to obj/frank-cli/state.json for use by subsequent commands (clarify, validate, compile)." }
+            "The semantic extract command analyzes F# source code to derive an OWL ontology and SHACL shapes. It maps F# record types to OWL classes, record fields to OWL properties, and route definitions to resource identities. The extraction state is saved to obj/frank-cli/state.json for use by subsequent commands (clarify, validate, compile)." }
 
     let clarifyHelp: CommandHelp =
-        { Name = "clarify"
+        { Name = "semantic clarify"
           Summary = "Identify ambiguities requiring human input"
           Examples =
-            [ { Invocation = "frank-cli clarify --project MyApp/MyApp.fsproj"
+            [ { Invocation = "frank-cli semantic clarify --project MyApp/MyApp.fsproj"
                 Description = "Identify ambiguities in the extracted definitions." }
-              { Invocation = "frank-cli clarify --project MyApp/MyApp.fsproj --format json"
+              { Invocation = "frank-cli semantic clarify --project MyApp/MyApp.fsproj --output-format json"
                 Description = "Output ambiguities in JSON format for programmatic processing." } ]
           Workflow =
             { StepNumber = 2
-              Prerequisites = [ "extract" ]
-              NextSteps = [ "validate" ]
+              Prerequisites = [ "semantic extract" ]
+              NextSteps = [ "semantic validate" ]
               IsOptional = true }
           Context =
-            "The clarify command identifies ambiguities in the extraction that require human judgment. For example, when a record field could map to multiple OWL properties, or when the relationship between types is unclear. Resolving clarifications improves the quality of the generated ontology and shapes." }
+            "The semantic clarify command identifies ambiguities in the extraction that require human judgment. For example, when a record field could map to multiple OWL properties, or when the relationship between types is unclear. Resolving clarifications improves the quality of the generated ontology and shapes." }
 
     let validateHelp: CommandHelp =
-        { Name = "validate"
+        { Name = "semantic validate"
           Summary = "Validate completeness and consistency of extracted definitions"
           Examples =
-            [ { Invocation = "frank-cli validate --project MyApp/MyApp.fsproj"
+            [ { Invocation = "frank-cli semantic validate --project MyApp/MyApp.fsproj"
                 Description = "Validate extracted definitions for completeness and consistency." }
-              { Invocation = "frank-cli validate --project MyApp/MyApp.fsproj --format json"
+              { Invocation = "frank-cli semantic validate --project MyApp/MyApp.fsproj --output-format json"
                 Description = "Output validation results in JSON format." } ]
           Workflow =
             { StepNumber = 3
-              Prerequisites = [ "extract" ]
-              NextSteps = [ "compile" ]
+              Prerequisites = [ "semantic extract" ]
+              NextSteps = [ "semantic compile" ]
               IsOptional = false }
           Context =
-            "The validate command checks the extracted semantic definitions for completeness and consistency. It verifies that all OWL classes have labels, that SHACL shapes reference valid classes, that property domains and ranges are consistent, and that the extraction is not stale relative to the source files." }
+            "The semantic validate command checks the extracted semantic definitions for completeness and consistency. It verifies that all OWL classes have labels, that SHACL shapes reference valid classes, that property domains and ranges are consistent, and that the extraction is not stale relative to the source files." }
 
     let diffHelp: CommandHelp =
-        { Name = "diff"
+        { Name = "semantic diff"
           Summary = "Compare current extraction state with a previous snapshot"
           Examples =
-            [ { Invocation = "frank-cli diff --project MyApp/MyApp.fsproj"
+            [ { Invocation = "frank-cli semantic diff --project MyApp/MyApp.fsproj"
                 Description = "Compare current extraction state with the previous snapshot." }
-              { Invocation = "frank-cli diff --project MyApp/MyApp.fsproj --format json"
+              { Invocation = "frank-cli semantic diff --project MyApp/MyApp.fsproj --output-format json"
                 Description = "Output differences in JSON format." } ]
           Workflow =
             { StepNumber = 4
-              Prerequisites = [ "extract" ]
+              Prerequisites = [ "semantic extract" ]
               NextSteps = []
               IsOptional = true }
           Context =
-            "The diff command compares the current extraction state with a previously saved snapshot, showing what classes, properties, or shapes have been added, removed, or modified. This is useful for understanding the impact of source code changes on the semantic model." }
+            "The semantic diff command compares the current extraction state with a previously saved snapshot, showing what classes, properties, or shapes have been added, removed, or modified. This is useful for understanding the impact of source code changes on the semantic model." }
 
     let compileHelp: CommandHelp =
-        { Name = "compile"
+        { Name = "semantic compile"
           Summary = "Generate OWL/XML and SHACL artifacts from extraction state"
           Examples =
-            [ { Invocation = "frank-cli compile --project MyApp/MyApp.fsproj"
+            [ { Invocation = "frank-cli semantic compile --project MyApp/MyApp.fsproj"
                 Description = "Generate OWL/XML and SHACL artifacts from the current extraction state." }
-              { Invocation = "frank-cli compile --project MyApp/MyApp.fsproj --format json"
+              { Invocation = "frank-cli semantic compile --project MyApp/MyApp.fsproj --output-format json"
                 Description = "Output compilation results in JSON format." } ]
           Workflow =
             { StepNumber = 5
-              Prerequisites = [ "extract" ]
+              Prerequisites = [ "semantic extract" ]
               NextSteps = []
               IsOptional = false }
           Context =
-            "The compile command generates final artifact files from the extraction state: an OWL/XML ontology file (ontology.owl.xml), a SHACL shapes file (shapes.shacl.ttl), and a manifest file (manifest.json). These artifacts can be used by RDF tools, SPARQL endpoints, or other semantic web infrastructure." }
+            "The semantic compile command generates final artifact files from the extraction state: an OWL/XML ontology file (ontology.owl.xml), a SHACL shapes file (shapes.shacl.ttl), and a manifest file (manifest.json). These artifacts can be used by RDF tools, SPARQL endpoints, or other semantic web infrastructure." }
+
+    let statechartExtractHelp: CommandHelp =
+        { Name = "statechart extract"
+          Summary = "Extract state machine metadata from F# source using the compiler"
+          Examples =
+            [ { Invocation = "frank-cli statechart extract --project MyApp/MyApp.fsproj"
+                Description = "Extract all stateful resource metadata." }
+              { Invocation = "frank-cli statechart extract --project MyApp/MyApp.fsproj --output-format json"
+                Description = "Extract metadata in JSON format." } ]
+          Workflow =
+            { StepNumber = 1
+              Prerequisites = []
+              NextSteps = [ "statechart generate"; "statechart validate" ]
+              IsOptional = false }
+          Context =
+            "Uses FSharp.Compiler.Service to analyze an F# project, finds statefulResource computation expressions, and extracts state machine metadata: state DU case names, initial state, allowed HTTP methods per state, and guard names. No assembly loading needed — works directly from source." }
+
+    let statechartGenerateHelp: CommandHelp =
+        { Name = "statechart generate"
+          Summary = "Generate statechart spec artifacts from F# source"
+          Examples =
+            [ { Invocation = "frank-cli statechart generate --project MyApp/MyApp.fsproj --format wsd"
+                Description = "Generate WSD notation for all stateful resources." }
+              { Invocation = "frank-cli statechart generate --project MyApp/MyApp.fsproj --format all --output ./specs/"
+                Description = "Generate all format artifacts and write to files." } ]
+          Workflow =
+            { StepNumber = 2
+              Prerequisites = [ "statechart extract" ]
+              NextSteps = [ "statechart validate" ]
+              IsOptional = false }
+          Context =
+            "Analyzes F# source to extract state machine metadata and generates spec artifacts in the specified notation format. Supports WSD, ALPS, ALPS XML, SCXML, smcat, and XState JSON formats." }
+
+    let statechartValidateHelp: CommandHelp =
+        { Name = "statechart validate"
+          Summary = "Validate statechart spec files for cross-format consistency"
+          Examples =
+            [ { Invocation = "frank-cli statechart validate game.wsd game.alps.json"
+                Description = "Cross-format validation between WSD and ALPS specs." }
+              { Invocation = "frank-cli statechart validate game.wsd game.scxml --output-format json"
+                Description = "Cross-format validation with JSON output." } ]
+          Workflow =
+            { StepNumber = 3
+              Prerequisites = [ "statechart generate" ]
+              NextSteps = []
+              IsOptional = false }
+          Context =
+            "Parses spec files and runs cross-format validation rules. Reports state/transition mismatches between spec files. Optionally accepts --assembly for code-truth extraction." }
+
+    let statechartParseHelp: CommandHelp =
+        { Name = "statechart parse"
+          Summary = "Parse a spec file and output the StatechartDocument as JSON"
+          Examples =
+            [ { Invocation = "frank-cli statechart parse game.xstate.json"
+                Description = "Parse an XState JSON file to StatechartDocument." }
+              { Invocation = "frank-cli statechart parse game.json --format alps"
+                Description = "Parse a .json file explicitly as ALPS format." } ]
+          Workflow =
+            { StepNumber = 1
+              Prerequisites = []
+              NextSteps = []
+              IsOptional = true }
+          Context =
+            "Parses a spec file in any supported notation format and outputs the parsed StatechartDocument as JSON. Useful for LLM-assisted code scaffolding: the output can be consumed by code generation tools." }
 
     let statusHelp: CommandHelp =
         { Name = "status"
@@ -90,7 +154,7 @@ module HelpContent =
           Examples =
             [ { Invocation = "frank-cli status --project MyApp/MyApp.fsproj"
                 Description = "Show the current extraction and compilation status." }
-              { Invocation = "frank-cli status --project MyApp/MyApp.fsproj --format json"
+              { Invocation = "frank-cli status --project MyApp/MyApp.fsproj --output-format json"
                 Description = "Output status in JSON format for programmatic consumption." } ]
           Workflow =
             { StepNumber = 0
@@ -106,10 +170,14 @@ module HelpContent =
           Examples =
             [ { Invocation = "frank-cli help"
                 Description = "List all available commands and topics." }
-              { Invocation = "frank-cli help extract"
-                Description = "Show detailed help for the extract command." }
-              { Invocation = "frank-cli help workflows"
-                Description = "Show the end-to-end extraction pipeline guide." } ]
+              { Invocation = "frank-cli help semantic extract"
+                Description = "Show detailed help for the semantic extract command." }
+              { Invocation = "frank-cli help statechart extract"
+                Description = "Show detailed help for the statechart extract command." }
+              { Invocation = "frank-cli help semantic-workflows"
+                Description = "Show the semantic extraction pipeline guide." }
+              { Invocation = "frank-cli help statechart-workflows"
+                Description = "Show the statechart pipeline guide." } ]
           Workflow =
             { StepNumber = 0
               Prerequisites = []
@@ -120,42 +188,68 @@ module HelpContent =
 
     // -- Help Topics --
 
-    let workflowsTopic: HelpTopic =
-        { Name = "workflows"
-          Summary = "End-to-end guide to the extraction pipeline"
-          Content = """The frank-cli extraction pipeline transforms F# source code into semantic
+    let semanticWorkflowsTopic: HelpTopic =
+        { Name = "semantic-workflows"
+          Summary = "End-to-end guide to the semantic extraction pipeline"
+          Content = """The frank-cli semantic extraction pipeline transforms F# source code into semantic
 definitions (OWL ontology + SHACL shapes) through a series of commands:
 
-  Step 1: extract (required)
+  Step 1: semantic extract (required)
     Analyzes F# source code and produces initial semantic definitions.
     Prerequisites: (none)
-    Next: clarify, validate
+    Next: semantic clarify, semantic validate
 
-  Step 2: clarify (optional)
+  Step 2: semantic clarify (optional)
     Identifies ambiguities in the extraction and presents questions.
-    Prerequisites: extract
-    Next: validate
+    Prerequisites: semantic extract
+    Next: semantic validate
 
-  Step 3: validate (required)
+  Step 3: semantic validate (required)
     Checks completeness and consistency of the extracted definitions.
-    Prerequisites: extract
-    Next: compile
+    Prerequisites: semantic extract
+    Next: semantic compile
 
-  Step 4: diff (optional)
+  Step 4: semantic diff (optional)
     Compares current extraction state with a previous snapshot.
-    Prerequisites: extract
+    Prerequisites: semantic extract
     Next: (informational only)
 
-  Step 5: compile (required)
+  Step 5: semantic compile (required)
     Generates final OWL/XML and SHACL artifact files.
-    Prerequisites: extract (validate recommended)
+    Prerequisites: semantic extract (validate recommended)
     Next: (end of pipeline)
 
 Typical usage:
-  frank-cli extract --project MyApp.fsproj --base-uri http://example.org/
-  frank-cli clarify --project MyApp.fsproj
-  frank-cli validate --project MyApp.fsproj
-  frank-cli compile --project MyApp.fsproj""" }
+  frank-cli semantic extract --project MyApp.fsproj --base-uri http://example.org/
+  frank-cli semantic clarify --project MyApp.fsproj
+  frank-cli semantic validate --project MyApp.fsproj
+  frank-cli semantic compile --project MyApp.fsproj""" }
+
+    let statechartWorkflowsTopic: HelpTopic =
+        { Name = "statechart-workflows"
+          Summary = "End-to-end guide to the statechart pipeline"
+          Content = """The statechart pipeline extracts, generates, validates, and parses
+state machine artifacts from Frank applications:
+
+  Step 1: statechart extract (required)
+    Extracts state machine metadata from a compiled assembly.
+    Prerequisites: (none)
+    Next: statechart generate, statechart validate
+
+  Step 2: statechart generate (required)
+    Generates spec artifacts in notation formats (WSD, ALPS, SCXML, smcat, XState).
+    Prerequisites: statechart extract
+    Next: statechart validate
+
+  Step 3: statechart validate (required)
+    Validates spec files against compiled assembly code-truth.
+    Prerequisites: statechart extract
+    Next: (end of pipeline)
+
+  statechart parse (standalone, optional)
+    Parses a spec file and outputs the StatechartDocument as JSON.
+    Prerequisites: (none)
+    Use case: LLM-assisted code scaffolding from notation files.""" }
 
     let conceptsTopic: HelpTopic =
         { Name = "concepts"
@@ -191,15 +285,26 @@ informed decisions during extraction and clarification.
 
     // -- Lookup Functions --
 
-    /// Total number of steps in the pipeline (for "Step N of M" display).
+    /// Total number of steps in the semantic pipeline (for "Step N of M" display).
     let pipelineStepCount = 5
 
     /// All command help records.
     let allCommands: CommandHelp list =
-        [ extractHelp; clarifyHelp; validateHelp; diffHelp; compileHelp; statusHelp; helpHelp ]
+        [ extractHelp
+          clarifyHelp
+          validateHelp
+          diffHelp
+          compileHelp
+          statechartExtractHelp
+          statechartGenerateHelp
+          statechartValidateHelp
+          statechartParseHelp
+          statusHelp
+          helpHelp ]
 
     /// All topic records.
-    let allTopics: HelpTopic list = [ workflowsTopic; conceptsTopic ]
+    let allTopics: HelpTopic list =
+        [ semanticWorkflowsTopic; statechartWorkflowsTopic; conceptsTopic ]
 
     /// Find a command by name (case-insensitive).
     let findCommand (name: string) : CommandHelp option =

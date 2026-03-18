@@ -20,6 +20,10 @@
     <Compile Include="CapabilityMapperTests.fs" />
     <Compile Include="ShapeGeneratorTests.fs" />
     <Compile Include="VocabularyAlignerTests.fs" />
+    <Compile Include="Statechart/FormatDetectorTests.fs" />
+    <Compile Include="Statechart/FormatPipelineTests.fs" />
+    <Compile Include="Statechart/ValidationReportFormatterTests.fs" />
+    <Compile Include="Statechart/StatechartDocumentJsonTests.fs" />
     <Compile Include="Commands/ExtractCommandTests.fs" />
     <Compile Include="Commands/ClarifyCommandTests.fs" />
     <Compile Include="Commands/ValidateCommandTests.fs" />

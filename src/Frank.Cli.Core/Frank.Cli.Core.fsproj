@@ -20,6 +20,16 @@
     <Compile Include="Analysis/ProjectLoader.fs" />
     <Compile Include="State/ExtractionState.fs" />
     <Compile Include="State/DiffEngine.fs" />
+    <!-- Shared output helpers -->
+    <Compile Include="Output/AnsiColors.fs" />
+    <!-- Statechart pipeline -->
+    <Compile Include="Statechart/FormatDetector.fs" />
+    <Compile Include="Statechart/StatechartError.fs" />
+    <Compile Include="Statechart/StatechartExtractor.fs" />
+    <Compile Include="Statechart/StatechartSourceExtractor.fs" />
+    <Compile Include="Statechart/FormatPipeline.fs" />
+    <Compile Include="Statechart/StatechartDocumentJson.fs" />
+    <Compile Include="Statechart/ValidationReportFormatter.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
@@ -33,6 +43,10 @@
     <Compile Include="Commands/DiffCommand.fs" />
     <Compile Include="Commands/CompileCommand.fs" />
     <Compile Include="Commands/StatusCommand.fs" />
+    <Compile Include="Commands/StatechartExtractCommand.fs" />
+    <Compile Include="Commands/StatechartGenerateCommand.fs" />
+    <Compile Include="Commands/StatechartValidateCommand.fs" />
+    <Compile Include="Commands/StatechartParseCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />
   </ItemGroup>

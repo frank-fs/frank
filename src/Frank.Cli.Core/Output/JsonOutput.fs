@@ -336,9 +336,83 @@ module JsonOutput =
         writer.Flush()
         Encoding.UTF8.GetString(stream.ToArray())
 
+    let formatStatechartGenerateResult (result: StatechartGenerateCommand.GenerateResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+        writer.WriteStartArray("artifacts")
+
+        for a in result.Artifacts do
+            writer.WriteStartObject()
+            writeString writer "resourceSlug" a.ResourceSlug
+            writeString writer "routeTemplate" a.RouteTemplate
+            writeString writer "format" (Frank.Cli.Core.Statechart.FormatDetector.FormatTag.toLower a.Format)
+
+            match a.FilePath with
+            | Some p -> writeString writer "filePath" p
+            | None -> writer.WriteNull("filePath")
+
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+
+        if not result.GenerationErrors.IsEmpty then
+            writer.WriteStartArray("generationErrors")
+            for err in result.GenerationErrors do
+                writer.WriteStringValue(Frank.Cli.Core.Statechart.StatechartError.formatError err)
+            writer.WriteEndArray()
+
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatStatechartValidateResult (result: StatechartValidateCommand.ValidateResult) : string =
+        Frank.Cli.Core.Statechart.ValidationReportFormatter.formatJson result.Report
+
+    let formatStatechartParseResult (result: StatechartParseCommand.ParseCommandResult) : string =
+        Frank.Cli.Core.Statechart.StatechartDocumentJson.serializeParseResult result.ParseResult
+
     let formatError (message: string) : string =
         let error =
             {| status = "error"
                message = message |}
 
         JsonSerializer.Serialize(error, serializerOptions)
+
+    let formatStatechartError (error: Frank.Cli.Core.Statechart.StatechartError.StatechartError) : string =
+        Frank.Cli.Core.Statechart.StatechartError.formatErrorJson error
+
+    let formatStatechartExtractResult (result: StatechartExtractCommand.ExtractResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+        writer.WriteStartArray("stateMachines")
+        for sm in result.StateMachines do
+            writer.WriteStartObject()
+            writeString writer "routeTemplate" sm.RouteTemplate
+            writeString writer "initialState" sm.InitialStateKey
+            writer.WriteStartArray("states")
+            for s in sm.StateNames do writer.WriteStringValue(s)
+            writer.WriteEndArray()
+            writer.WriteStartArray("guards")
+            for g in sm.GuardNames do writer.WriteStringValue(g)
+            writer.WriteEndArray()
+            writer.WriteStartObject("stateMetadata")
+            for KeyValue(name, info) in sm.StateMetadata do
+                writer.WriteStartObject(name)
+                writer.WriteStartArray("allowedMethods")
+                for m in info.AllowedMethods do writer.WriteStringValue(m)
+                writer.WriteEndArray()
+                writer.WriteBoolean("isFinal", info.IsFinal)
+                match info.Description with
+                | Some d -> writeString writer "description" d
+                | None -> writer.WriteNull("description")
+                writer.WriteEndObject()
+            writer.WriteEndObject()
+            writer.WriteEndObject()
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())

@@ -6,21 +6,7 @@ open Frank.Cli.Core.Help
 
 module TextOutput =
 
-    let private isColorEnabled () =
-        let noColor = Environment.GetEnvironmentVariable("NO_COLOR")
-        isNull noColor && Console.IsOutputRedirected |> not
-
-    let private bold text =
-        if isColorEnabled () then $"\033[1m{text}\033[0m" else text
-
-    let private yellow text =
-        if isColorEnabled () then $"\033[33m{text}\033[0m" else text
-
-    let private red text =
-        if isColorEnabled () then $"\033[31m{text}\033[0m" else text
-
-    let private green text =
-        if isColorEnabled () then $"\033[32m{text}\033[0m" else text
+    open Frank.Cli.Core.Output.AnsiColors
 
     let formatExtractResult (result: ExtractCommand.ExtractResult) : string =
         let sb = System.Text.StringBuilder()
@@ -234,4 +220,70 @@ module TextOutput =
         sb.AppendLine("Use 'frank-cli help' to see all commands and topics.") |> ignore
         sb.ToString()
 
+    let formatStatechartGenerateResult (result: StatechartGenerateCommand.GenerateResult) : string =
+        if result.Artifacts |> List.isEmpty && result.GenerationErrors |> List.isEmpty then
+            "No state machines found in the assembly."
+        else
+            let sb = System.Text.StringBuilder()
+            let groupedByResource = result.Artifacts |> List.groupBy (fun a -> a.RouteTemplate)
+
+            for (route, arts) in groupedByResource do
+                let slug = (List.head arts).ResourceSlug
+                let header = bold (sprintf "=== Resource: %s (%s) ===" route slug)
+                sb.AppendLine(header) |> ignore
+                sb.AppendLine() |> ignore
+
+                for a in arts do
+                    let fmtName = Frank.Cli.Core.Statechart.FormatDetector.FormatTag.toString a.Format
+                    sb.AppendLine(sprintf "--- %s ---" fmtName) |> ignore
+
+                    match a.FilePath with
+                    | Some p -> sb.AppendLine(sprintf "Written to: %s" p) |> ignore
+                    | None -> sb.AppendLine(a.Content) |> ignore
+
+                    sb.AppendLine() |> ignore
+
+            if not result.GenerationErrors.IsEmpty then
+                sb.AppendLine() |> ignore
+                sb.AppendLine(red (sprintf "Generation errors (%d):" result.GenerationErrors.Length)) |> ignore
+                for err in result.GenerationErrors do
+                    sb.AppendLine(sprintf "  - %s" (Frank.Cli.Core.Statechart.StatechartError.formatError err)) |> ignore
+
+            sb.ToString()
+
+    let formatStatechartValidateResult (result: StatechartValidateCommand.ValidateResult) : string =
+        Frank.Cli.Core.Statechart.ValidationReportFormatter.formatText result.Report
+
+    let formatStatechartParseResult (result: StatechartParseCommand.ParseCommandResult) : string =
+        Frank.Cli.Core.Statechart.StatechartDocumentJson.serializeParseResult result.ParseResult
+
     let formatError (message: string) : string = red (sprintf "Error: %s" message)
+
+    let formatStatechartError (error: Frank.Cli.Core.Statechart.StatechartError.StatechartError) : string =
+        red (sprintf "Error: %s" (Frank.Cli.Core.Statechart.StatechartError.formatError error))
+
+    let formatStatechartExtractResult (result: StatechartExtractCommand.ExtractResult) : string =
+        if result.StateMachines |> List.isEmpty then
+            "No state machines found in the assembly."
+        else
+            let sb = System.Text.StringBuilder()
+            for sm in result.StateMachines do
+                let header = bold (sprintf "Statechart: %s" sm.RouteTemplate)
+                sb.AppendLine(header) |> ignore
+                sb.AppendLine(sprintf "  Initial State: %s" sm.InitialStateKey) |> ignore
+                let stateList = sm.StateNames |> String.concat ", "
+                sb.AppendLine(sprintf "  States: %s" stateList) |> ignore
+                if not sm.GuardNames.IsEmpty then
+                    let guardList = sm.GuardNames |> String.concat ", "
+                    sb.AppendLine(sprintf "  Guards: %s" guardList) |> ignore
+                sb.AppendLine("  State Details:") |> ignore
+                for KeyValue(name, info) in sm.StateMetadata do
+                    sb.AppendLine(sprintf "    %s:" name) |> ignore
+                    let methods = info.AllowedMethods |> String.concat ", "
+                    sb.AppendLine(sprintf "      Methods: %s" methods) |> ignore
+                    sb.AppendLine(sprintf "      Final: %b" info.IsFinal) |> ignore
+                    match info.Description with
+                    | Some desc -> sb.AppendLine(sprintf "      Description: %s" desc) |> ignore
+                    | None -> ()
+                sb.AppendLine() |> ignore
+            sb.ToString()
