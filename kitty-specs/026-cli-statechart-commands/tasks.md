@@ -257,13 +257,13 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T048 Create `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs` with `execute` function
-- [ ] T049 Implement format detection from file extension (reuse FormatDetector)
-- [ ] T050 Implement parser dispatch: WSD, ALPS, SCXML, smcat, XState
-- [ ] T051 Implement ambiguous `.json` handling: try both ALPS and XState, or require `--format`
-- [ ] T052 Implement JSON output of parsed `StatechartDocument` (using `StatechartDocumentJson.serialize`)
-- [ ] T053 Include parse errors/warnings in output, non-zero exit on errors
-- [ ] T054 Add compile entry to `Frank.Cli.Core.fsproj`
+- [x] T048 Create `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs` with `execute` function
+- [x] T049 Implement format detection from file extension (reuse FormatDetector)
+- [x] T050 Implement parser dispatch: WSD, ALPS, SCXML, smcat, XState
+- [x] T051 Implement ambiguous `.json` handling: try both ALPS and XState, or require `--format`
+- [x] T052 Implement JSON output of parsed `StatechartDocument` (using `StatechartDocumentJson.serialize`)
+- [x] T053 Include parse errors/warnings in output, non-zero exit on errors
+- [x] T054 Add compile entry to `Frank.Cli.Core.fsproj`
 
 ### Implementation Notes
 - Parser dispatch mirrors the parse pipeline in plan.md. All parsers return Ast.ParseResult directly (no mapper step).
