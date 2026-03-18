@@ -14,7 +14,7 @@ subtasks:
 - T023
 phase: Phase 2 - Validation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "40571"
 review_status: ''
 reviewed_by: ''
@@ -308,3 +308,4 @@ The file has:
 ## Activity Log
 
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
+- 2026-03-18T06:28:38Z – claude-opus – shell_pid=40571 – lane=doing – Assigned agent via workflow command
