@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP01"
-subtasks: ["T001", "T002", "T003", "T004", "T005", "T006"]
-title: "Foundation — FormatTag, StringDistance, AlpsXml Dispatch"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Foundation — FormatTag, StringDistance, AlpsXml Dispatch
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-007", "FR-012", "FR-013", "FR-014", "FR-015"]
+base_branch: master
+base_commit: e99ea7fbaf00ba560afe579fa47c149ad2632024
+created_at: '2026-03-18T17:10:41.129880+00:00'
+subtasks: [T001, T002, T003, T004, T005, T006]
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "82433"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T17:06:48Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T17:06:48Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-007, FR-012, FR-013, FR-014, FR-015]
 ---
 
 # Work Package Prompt: WP01 – Foundation: FormatTag, StringDistance, AlpsXml Dispatch
