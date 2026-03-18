@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP01"
-subtasks: ["T001", "T002"]
-title: "ScxmlMeta DU Expansion"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: ScxmlMeta DU Expansion
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-017", "FR-018"]
+base_branch: master
+base_commit: 5f0d33f40fd6441ec59fa4dadf8566fdd80b437e
+created_at: '2026-03-18T07:29:53.570799+00:00'
+subtasks: [T001, T002]
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "49351"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T07:24:37Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T07:24:37Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-017, FR-018]
 ---
 
 # Work Package Prompt: WP01 – ScxmlMeta DU Expansion
