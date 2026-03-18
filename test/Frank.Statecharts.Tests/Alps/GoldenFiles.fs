@@ -316,6 +316,92 @@ let onboardingAlpsJson = """{
   }
 }"""
 
+/// Amundsen-style onboarding fixture (home/WIP/customerData states).
+/// Demonstrates the ALPS profile style from Mike Amundsen's book, featuring:
+///   - States: home, wip, customerData
+///   - Transitions: startOnboarding (safe), collectCustomerData (unsafe), completeOnboarding (unsafe)
+///   - Data descriptors: identifier, name, email
+///   - Root-level link and ext elements
+///   - Documentation at document, state, and transition levels
+///   - Guard extension on collectCustomerData
+[<Literal>]
+let amundsenOnboardingAlpsJson = """{
+  "alps": {
+    "version": "1.0",
+    "doc": { "format": "text", "value": "Customer onboarding profile (Amundsen style)" },
+    "link": [
+      { "rel": "self", "href": "http://example.com/alps/customer-onboarding" }
+    ],
+    "ext": [
+      { "id": "author", "value": "amundsen" }
+    ],
+    "descriptor": [
+      {
+        "id": "identifier",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "Unique customer identifier" }
+      },
+      {
+        "id": "name",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "Customer display name" }
+      },
+      {
+        "id": "email",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "Customer email address" }
+      },
+      {
+        "id": "home",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "State: Home/entry point for onboarding" },
+        "descriptor": [
+          {
+            "id": "startOnboarding",
+            "type": "safe",
+            "rt": "#wip",
+            "doc": { "format": "text", "value": "Begin the customer onboarding workflow" }
+          }
+        ]
+      },
+      {
+        "id": "wip",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "State: Work-in-progress, collecting customer data" },
+        "descriptor": [
+          {
+            "id": "collectCustomerData",
+            "type": "unsafe",
+            "rt": "#customerData",
+            "doc": { "format": "text", "value": "Submit customer data fields" },
+            "descriptor": [
+              { "href": "#name" },
+              { "href": "#email" }
+            ],
+            "ext": [
+              { "id": "guard", "value": "emailValid" }
+            ]
+          },
+          {
+            "id": "completeOnboarding",
+            "type": "unsafe",
+            "rt": "#home",
+            "doc": { "format": "text", "value": "Complete onboarding and return to home" },
+            "descriptor": [
+              { "href": "#identifier" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "customerData",
+        "type": "semantic",
+        "doc": { "format": "text", "value": "State: Customer data collected and confirmed" }
+      }
+    ]
+  }
+}"""
+
 [<Literal>]
 let onboardingAlpsXml = """<?xml version="1.0" encoding="UTF-8"?>
 <alps version="1.0">
