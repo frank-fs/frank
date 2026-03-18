@@ -6,6 +6,14 @@
 **Input**: Complete the remainder of issue #113. Parser and Generator follow WSD too closely without the benefits of being focused on the smcat format. Use smcat-specific annotations, not WSD annotations. Ensure full fidelity on the generator side. Leverage the DU for formats as much as possible.
 **Closes**: #113
 
+## Clarifications
+
+### Session 2026-03-18
+
+- Q: For initial/final pseudo-states, what should the generator use as `StateNode.Identifier`? → A: (A) Keep `Identifier = Some "initial"` / `Some "final"` — these are correct smcat pseudo-state names. Fix `Kind` to `Initial`/`Final` and add `SmcatAnnotation` metadata. The problem was `Kind = Regular` hiding the state's nature, not the identifier strings. `TransitionEdge.Source: string` requires identifiers for referential integrity.
+- Q: Should the `SmcatMeta` case wrapping `SmcatTransitionKind` be renamed to avoid self-referencing name collision? → A: (B) Rename case to `SmcatTransition of SmcatTransitionKind` — consistent with `SmcatStateType of StateKind * SmcatTypeOrigin` pattern where case name ≠ payload type name, and cleaner at match sites.
+- Q: Should every state carry `SmcatStateType` annotation, or only when noteworthy? → A: (B) Omit for `Regular, Inferred` (the universal default). Present for all other kind/origin combinations. Consumers use `Option.defaultValue (Regular, Inferred)` fallback. Rule: annotation present when it carries information beyond what `Kind = Regular` already conveys.
+
 ## Background
 
 The smcat parser, generator, and serializer were migrated to the shared `StatechartDocument` AST (spec 022), but the implementation mirrors the WSD pattern too closely. The generator creates synthetic `"initial"` and `"final"` string names instead of using typed `StateKind` values. Generated elements carry empty `Annotations = []` lists instead of smcat-specific metadata. The `SmcatMeta` discriminated union has only three cases (`SmcatColor`, `SmcatStateLabel`, `SmcatActivity`) and doesn't capture the full richness of smcat semantics. The result is a generator that produces a correct but impoverished AST — one that loses information during generation and can't guarantee round-trip fidelity through the serializer.
@@ -18,13 +26,13 @@ A developer using the Frank statechart system generates an smcat document from `
 
 **Why this priority**: The generator is the primary entry point for producing smcat output from Frank's runtime metadata. Without typed annotations, the AST is an incomplete intermediate representation that forces downstream consumers to guess semantics from conventions.
 
-**Independent Test**: Generate a `StatechartDocument` from a `StateMachineMetadata` with initial, regular, and final states. Verify every `StateNode` carries `SmcatAnnotation(SmcatStateType(...))` and every `TransitionElement` carries `SmcatAnnotation(SmcatTransitionKind ...)` with the correct semantic role.
+**Independent Test**: Generate a `StatechartDocument` from a `StateMachineMetadata` with initial, regular, and final states. Verify every `StateNode` carries `SmcatAnnotation(SmcatStateType(...))` and every `TransitionElement` carries `SmcatAnnotation(SmcatTransition ...)` with the correct semantic role.
 
 **Acceptance Scenarios**:
 
-1. **Given** a `StateMachineMetadata` with an initial state key and state handler map, **When** the smcat generator produces a `StatechartDocument`, **Then** the initial state node has `Kind = Initial` and `SmcatAnnotation(SmcatStateType(Initial, Explicit))`, not a string-named `"initial"` node with `Kind = Regular`.
-2. **Given** a `StateMachineMetadata` with a final state, **When** the smcat generator produces a `StatechartDocument`, **Then** the final state node has `Kind = Final` and `SmcatAnnotation(SmcatStateType(Final, Explicit))`, and the transition to it carries `SmcatAnnotation(SmcatTransitionKind FinalTransition)`.
-3. **Given** a `StateMachineMetadata` with self-transition handlers, **When** the smcat generator produces a `StatechartDocument`, **Then** each self-transition carries `SmcatAnnotation(SmcatTransitionKind SelfTransition)`.
+1. **Given** a `StateMachineMetadata` with an initial state key and state handler map, **When** the smcat generator produces a `StatechartDocument`, **Then** the initial pseudo-state node has `Identifier = Some "initial"`, `Kind = Initial`, and `SmcatAnnotation(SmcatStateType(Initial, Explicit))` — not `Kind = Regular` with no annotation.
+2. **Given** a `StateMachineMetadata` with a final state, **When** the smcat generator produces a `StatechartDocument`, **Then** the final state node has `Kind = Final` and `SmcatAnnotation(SmcatStateType(Final, Explicit))`, and the transition to it carries `SmcatAnnotation(SmcatTransition FinalTransition)`.
+3. **Given** a `StateMachineMetadata` with self-transition handlers, **When** the smcat generator produces a `StatechartDocument`, **Then** each self-transition carries `SmcatAnnotation(SmcatTransition SelfTransition)`.
 
 ---
 
@@ -56,7 +64,7 @@ A developer parses smcat text containing both explicitly typed states (`[type="i
 
 1. **Given** smcat text with `myState [type="initial"];`, **When** parsed, **Then** the resulting `StateNode` has `Kind = Initial` and `Annotations` contains `SmcatAnnotation(SmcatStateType(Initial, Explicit))`.
 2. **Given** smcat text with `initial;` (no explicit type attribute), **When** parsed, **Then** the resulting `StateNode` has `Kind = Initial` and `Annotations` contains `SmcatAnnotation(SmcatStateType(Initial, Inferred))`.
-3. **Given** smcat text with `idle;` (a regular state with no type attribute or naming convention), **When** parsed, **Then** the resulting `StateNode` has `Kind = Regular` and `Annotations` contains `SmcatAnnotation(SmcatStateType(Regular, Inferred))`.
+3. **Given** smcat text with `idle;` (a regular state with no type attribute or naming convention), **When** parsed, **Then** the resulting `StateNode` has `Kind = Regular` and `Annotations` does not contain a `SmcatStateType` entry (absence = `Regular, Inferred` default).
 
 ---
 
@@ -105,17 +113,17 @@ The shared AST's `SmcatMeta` discriminated union is expanded with new cases and 
 
 - **FR-001**: The `SmcatMeta` DU MUST include a `SmcatStateType of kind: StateKind * origin: SmcatTypeOrigin` case for carrying state type metadata with explicit/inferred origin tracking.
 - **FR-002**: The shared AST MUST define `SmcatTypeOrigin = Explicit | Inferred` as a discriminated union for type origin tracking.
-- **FR-003**: The `SmcatMeta` DU MUST include a `SmcatTransitionKind` case wrapping a `SmcatTransitionKind` DU with cases: `InitialTransition`, `FinalTransition`, `SelfTransition`, `ExternalTransition`, `InternalTransition`.
+- **FR-003**: The `SmcatMeta` DU MUST include a `SmcatTransition` case wrapping a `SmcatTransitionKind` DU with cases: `InitialTransition`, `FinalTransition`, `SelfTransition`, `ExternalTransition`, `InternalTransition`.
 - **FR-004**: The `SmcatActivity` case MUST be renamed to `SmcatCustomAttribute of key: string * value: string` with no change in semantics for non-standard attribute storage.
 - **FR-005**: The smcat generator MUST produce `StateNode` entries with `Kind` set to the appropriate `StateKind` value (not `Regular` for all states).
-- **FR-006**: The smcat generator MUST annotate every state node with `SmcatAnnotation(SmcatStateType(...))` carrying the state's kind and `Explicit` origin.
-- **FR-007**: The smcat generator MUST annotate every transition with `SmcatAnnotation(SmcatTransitionKind ...)` matching its semantic role.
-- **FR-008**: The smcat generator MUST NOT create synthetic string-named `"initial"` or `"final"` states; it MUST use typed `StateKind.Initial` and `StateKind.Final` on proper `StateNode` entries.
+- **FR-006**: The smcat generator MUST annotate state nodes with `SmcatAnnotation(SmcatStateType(...))` when the state's kind is not `Regular` or the origin is `Explicit`. The annotation MUST be omitted for `Regular, Inferred` states (the universal default). Consumers MUST treat absent `SmcatStateType` as `(Regular, Inferred)`.
+- **FR-007**: The smcat generator MUST annotate every transition with `SmcatAnnotation(SmcatTransition ...)` matching its semantic role.
+- **FR-008**: The smcat generator MUST use typed `StateKind.Initial` and `StateKind.Final` with `SmcatAnnotation(SmcatStateType(...))` on initial and final pseudo-state nodes. The identifiers `"initial"` and `"final"` are correct smcat pseudo-state names and MUST be retained as `Identifier` values.
 - **FR-009**: The smcat serializer MUST emit `[type="..."]` attributes for states whose `SmcatStateType` annotation has `origin = Explicit`.
 - **FR-010**: The smcat serializer MUST NOT emit `[type="..."]` attributes for states whose `SmcatStateType` annotation has `origin = Inferred` (the type is conveyed by naming convention or is the default `Regular`).
 - **FR-011**: The smcat serializer MUST handle `StatechartDocument` nodes that lack `SmcatAnnotation` entries by falling back to `StateNode.Kind` for type determination.
 - **FR-012**: The smcat parser MUST store `SmcatAnnotation(SmcatStateType(kind, Explicit))` when a `[type="..."]` attribute is present in the source.
-- **FR-013**: The smcat parser MUST store `SmcatAnnotation(SmcatStateType(kind, Inferred))` when the state type is determined by naming convention or defaults to `Regular`.
+- **FR-013**: The smcat parser MUST store `SmcatAnnotation(SmcatStateType(kind, Inferred))` when the state type is determined by naming convention and the kind is not `Regular`. The annotation MUST be omitted for `Regular, Inferred` states.
 - **FR-014**: The smcat parser MUST continue to consume the `type` attribute for `StateKind` inference (existing behavior) while also storing it as an annotation (new behavior).
 - **FR-015**: Round-trip fidelity MUST be preserved: parsing smcat text, serializing the AST, and parsing again MUST produce structurally equivalent `StatechartDocument` values.
 - **FR-016**: All changes MUST compile across net8.0, net9.0, and net10.0 target frameworks.
@@ -125,16 +133,16 @@ The shared AST's `SmcatMeta` discriminated union is expanded with new cases and 
 
 - **SmcatTypeOrigin**: Two-case DU (`Explicit | Inferred`) tracking whether a state's type was declared via attribute or inferred from naming convention.
 - **SmcatTransitionKind**: Five-case DU (`InitialTransition | FinalTransition | SelfTransition | ExternalTransition | InternalTransition`) capturing the semantic role of each transition in smcat.
-- **SmcatMeta (expanded)**: Format-specific annotation DU carrying `SmcatColor`, `SmcatStateLabel`, `SmcatCustomAttribute`, `SmcatStateType`, and `SmcatTransitionKind`.
+- **SmcatMeta (expanded)**: Format-specific annotation DU carrying `SmcatColor`, `SmcatStateLabel`, `SmcatCustomAttribute`, `SmcatStateType`, and `SmcatTransition`.
 
 ## Success Criteria
 
 ### Measurable Outcomes
 
-- **SC-001**: Every `StateNode` produced by the smcat generator carries at least one `SmcatAnnotation` — zero nodes with empty annotation lists.
-- **SC-002**: Every `TransitionElement` produced by the smcat generator carries a `SmcatTransitionKind` annotation — zero transitions with empty annotation lists.
+- **SC-001**: Every non-regular `StateNode` produced by the smcat generator carries a `SmcatStateType` annotation. Regular states carry no `SmcatStateType` annotation (absence = `Regular, Inferred` default).
+- **SC-002**: Every `TransitionElement` produced by the smcat generator carries a `SmcatTransition` annotation — zero transitions with empty annotation lists.
 - **SC-003**: Round-trip test (parse → serialize → parse) produces structurally equivalent ASTs for all test fixtures.
-- **SC-004**: The smcat generator produces zero string-named `"initial"` or `"final"` state identifiers — all initial/final semantics conveyed through `StateKind` and annotations.
+- **SC-004**: Every initial and final pseudo-state node produced by the generator has `Kind` set to `StateKind.Initial` or `StateKind.Final` (not `Regular`) and carries a `SmcatStateType` annotation — zero pseudo-states with `Kind = Regular`.
 - **SC-005**: `dotnet build` and `dotnet test` pass across all target frameworks (net8.0, net9.0, net10.0) with zero regressions.
 - **SC-006**: Exhaustive pattern matching on `SmcatTransitionKind` compiles without warnings — all five cases handled in every match expression.
 
