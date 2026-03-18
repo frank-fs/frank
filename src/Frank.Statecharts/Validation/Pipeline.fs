@@ -52,14 +52,13 @@ module Pipeline =
             if not (List.isEmpty duplicates) then
                 { ParseResults = []; Report = emptyReport; Errors = duplicates }
             else
-                let results = sources |> List.map (fun (tag, source) -> parseSource tag source)
-
-                let parseResults =
-                    results |> List.choose (function Ok (pr, _) -> Some pr | Error _ -> None)
-                let artifacts =
-                    results |> List.choose (function Ok (_, art) -> Some art | Error _ -> None)
-                let pipelineErrors =
-                    results |> List.choose (function Error e -> Some e | Ok _ -> None)
+                let parseResults, artifacts, pipelineErrors =
+                    (([], [], []), sources)
+                    ||> List.fold (fun (prs, arts, errs) (tag, source) ->
+                        match parseSource tag source with
+                        | Ok (pr, art) -> (pr :: prs, art :: arts, errs)
+                        | Error e -> (prs, arts, e :: errs))
+                    |> fun (prs, arts, errs) -> (List.rev prs, List.rev arts, List.rev errs)
 
                 let allRules = customRules @ SelfConsistencyRules.rules @ CrossFormatRules.rules
                 let report = Validator.validate allRules artifacts
