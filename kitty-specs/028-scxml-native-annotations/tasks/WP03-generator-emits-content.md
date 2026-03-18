@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Generator Emits All Content
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 028-scxml-native-annotations-WP01
 base_commit: 5fe78bcab9b411214c67617e5a715e3629be9aec
@@ -232,3 +232,4 @@ spec-kitty implement WP03 --base WP01
 
 - 2026-03-18T07:24:37Z – system – lane=planned – Prompt created.
 - 2026-03-18T07:31:14Z – claude-opus – shell_pid=50078 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T07:38:52Z – claude-opus – shell_pid=50078 – lane=for_review – All 7 subtasks done. Generator emits onentry/onexit, initial elements, data src, respects namespace. 11 new tests, 854 total pass.
