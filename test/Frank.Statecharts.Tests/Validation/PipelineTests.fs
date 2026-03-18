@@ -137,6 +137,19 @@ let pipelineTests =
             Expect.isNonEmpty customChecks "Custom rule should appear in checks"
         }
 
+        test "All sources fail to parse still returns valid result" {
+            let result = Pipeline.validateSources [
+                (FormatTag.Wsd, "participant\n")
+                (FormatTag.Smcat, "=>=>=>")
+            ]
+            Expect.equal (List.length result.ParseResults) 2 "Should have 2 parse results"
+            for pr in result.ParseResults do
+                Expect.isFalse pr.Succeeded (sprintf "%A should fail to parse" pr.Format)
+            Expect.isEmpty result.Errors "Parse failures are not pipeline errors"
+            // Validation still ran against best-effort empty documents
+            Expect.isGreaterThanOrEqual result.Report.TotalChecks 0 "Report should exist"
+        }
+
         test "Custom rule that produces failures surfaces them in report" {
             let failingRule : ValidationRule =
                 { Name = "Custom: always fail"
