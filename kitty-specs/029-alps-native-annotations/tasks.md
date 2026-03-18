@@ -80,11 +80,11 @@
 **Prompt**: `tasks/WP04-alps-xml-generator.md`
 
 ### Included Subtasks
-- [ ] T017 Create `Alps/XmlGenerator.fs` — generate ALPS XML from `StatechartDocument`
-- [ ] T018 Add `Alps/XmlGenerator.fs` to `Frank.Statecharts.fsproj`
-- [ ] T019 Add XML generator tests
-- [ ] T020 Add XML round-trip test (parse XML → generate XML → parse XML → compare ASTs)
-- [ ] T021 Verify `dotnet build` and `dotnet test`
+- [x] T017 Create `Alps/XmlGenerator.fs` — generate ALPS XML from `StatechartDocument`
+- [x] T018 Add `Alps/XmlGenerator.fs` to `Frank.Statecharts.fsproj`
+- [x] T019 Add XML generator tests
+- [x] T020 Add XML round-trip test (parse XML → generate XML → parse XML → compare ASTs)
+- [x] T021 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP01 (Classification module), WP03 (XML parser needed for round-trip tests).
