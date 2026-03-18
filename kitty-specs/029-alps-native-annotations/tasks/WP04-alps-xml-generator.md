@@ -1,14 +1,17 @@
 ---
 work_package_id: WP04
 title: ALPS XML Generator + Round-Trip Tests
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 029-alps-native-annotations-WP01
+base_commit: 666360c2268bcc73f70027a51d33121deb4f4827
+created_at: '2026-03-18T14:34:11.080134+00:00'
 subtasks: [T017, T018, T019, T020, T021]
 phase: Phase 2 - Implementation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "71999"
 review_status: ''
 reviewed_by: ''
 history:
