@@ -626,12 +626,13 @@ module CrossFormatRules =
                 else
                     allPairs |> List.unzip }
 
-    /// Similarity threshold above which two identifiers are flagged as near-matches.
+    /// Default similarity threshold above which two identifiers are flagged as near-matches.
     let nearMatchThreshold = 0.8
 
-    /// Universal near-match rule: detects identifiers that are similar but not identical
-    /// across any pair of artifacts using Jaro-Winkler similarity.
-    let nearMatchRule: ValidationRule =
+    /// Create a near-match rule with a custom similarity threshold.
+    /// Threshold should be between 0.0 and 1.0 (default 0.8).
+    /// Higher values produce fewer matches (more strict), lower values produce more (more lenient).
+    let createNearMatchRule (threshold: float) : ValidationRule =
         { Name = "cross-format-near-match"
           RequiredFormats = Set.empty
           Check =
@@ -656,7 +657,7 @@ module CrossFormatRules =
                             for sB in unmatchedB do
                                 let score = jaroWinkler sA sB
 
-                                if score > nearMatchThreshold then
+                                if score > threshold then
                                     let key = if sA < sB then (sA, sB) else (sB, sA)
                                     if reported.Add(key) then
                                         let desc =
@@ -694,7 +695,7 @@ module CrossFormatRules =
                             for eB in unmatchedEventsB do
                                 let score = jaroWinkler eA eB
 
-                                if score > nearMatchThreshold then
+                                if score > threshold then
                                     let key = if eA < eB then (eA, eB) else (eB, eA)
                                     if reportedEvents.Add(key) then
                                         let desc =
@@ -741,6 +742,9 @@ module CrossFormatRules =
     let private allPairwiseRules: ValidationRule list =
         formatPairs
         |> List.collect (fun (a, b) -> [ stateNameAgreement a b; eventNameAgreement a b; transitionTargetAgreement a b ])
+
+    /// Universal near-match rule with the default threshold (0.8).
+    let nearMatchRule: ValidationRule = createNearMatchRule nearMatchThreshold
 
     /// All cross-format rules for all applicable format pairs, plus the universal near-match rule.
     let rules: ValidationRule list = allPairwiseRules @ [ nearMatchRule ]

@@ -367,11 +367,42 @@ let e2eValidateThenMergeTests =
                     merged.Elements |> List.choose (function StateDecl s -> Some s | _ -> None)
                 Expect.equal states.Length 3 "Merged document should have exactly 3 states (idle, active, done)"
         }
+
+        test "E2E: SCXML parallel regions preserved in merge with flat WSD" {
+            // SCXML with a parallel state containing two regions — WSD cannot express this
+            let scxmlParallel = """<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="running">
+  <parallel id="running">
+    <state id="regionA">
+      <state id="a1"/>
+      <state id="a2"/>
+    </state>
+    <state id="regionB">
+      <state id="b1"/>
+      <state id="b2"/>
+    </state>
+  </parallel>
+</scxml>"""
+            // WSD only knows about "running" as a flat participant
+            let wsdFlat = "participant running\n"
+            let result = Pipeline.mergeSources [(FormatTag.Scxml, scxmlParallel); (FormatTag.Wsd, wsdFlat)]
+            match result with
+            | Error errs -> failtestf "Merge failed: %A" errs
+            | Ok merged ->
+                let states = merged.Elements |> List.choose (function StateDecl s -> Some s | _ -> None)
+                let running = states |> List.tryFind (fun s -> s.Identifier = Some "running")
+                Expect.isSome running "running state should exist in merged doc"
+                // SCXML (priority 0) wins: running should be Parallel with children
+                Expect.equal running.Value.Kind Parallel "running should be Parallel (from SCXML, not Regular from WSD)"
+                Expect.isGreaterThan running.Value.Children.Length 0 "running should have children (regions from SCXML)"
+                // Verify the two regions survived
+                let childIds = running.Value.Children |> List.choose (fun c -> c.Identifier)
+                Expect.contains childIds "regionA" "regionA should be a child of running"
+                Expect.contains childIds "regionB" "regionB should be a child of running"
+        }
     ]
 
 // ---------------------------------------------------------------------------
 // T024 – Event name disagreement detected with real format text
-// Note: WP03 near-match labeling is not merged into this branch.
 // The cross-format event name agreement rule detects the disagreement
 // as a plain event mismatch ("startOnboarding" vs "start").
 // ---------------------------------------------------------------------------
