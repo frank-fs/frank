@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP10"
 title: "MSBuild Integration"
-lane: "planned"
+lane: "for_review"
 dependencies: ["WP09"]
 subtasks:
   - "T062"
@@ -139,3 +139,4 @@ To change a work package's lane, either:
 2. **Use CLI**: `spec-kitty agent tasks move-task WP10 --to <lane> --note "message"` (recommended)
 
 **Valid lanes**: `planned`, `doing`, `for_review`, `done`
+- 2026-03-18T03:18:56Z – unknown – lane=for_review – Ready for review: MSBuild targets file. kitty-specs diffs inherited from WP09 merge topology.
