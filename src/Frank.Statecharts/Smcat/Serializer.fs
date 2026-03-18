@@ -22,6 +22,23 @@ let private quoteName (name: string) =
         name
 
 // ---------------------------------------------------------------------------
+// Helpers: state kind mapping
+// ---------------------------------------------------------------------------
+
+/// Map StateKind to smcat type attribute value.
+let private stateKindToSmcatType (kind: StateKind) : string =
+    match kind with
+    | Regular -> "regular"
+    | Initial -> "initial"
+    | Final -> "final"
+    | Parallel -> "parallel"
+    | ShallowHistory -> "history"
+    | DeepHistory -> "deep.history"
+    | Choice -> "choice"
+    | ForkJoin -> "forkjoin"
+    | Terminate -> "terminate"
+
+// ---------------------------------------------------------------------------
 // Helpers: annotation extraction
 // ---------------------------------------------------------------------------
 
@@ -37,6 +54,13 @@ let private extractLabel (annotations: Annotation list) : string option =
     annotations
     |> List.tryPick (function
         | SmcatAnnotation(SmcatStateLabel l) -> Some l
+        | _ -> None)
+
+/// Extract SmcatStateType from annotations.
+let private extractStateType (annotations: Annotation list) : (StateKind * SmcatTypeOrigin) option =
+    annotations
+    |> List.tryPick (function
+        | SmcatAnnotation(SmcatStateType(kind, origin)) -> Some(kind, origin)
         | _ -> None)
 
 /// Extract non-standard attributes from SmcatAnnotation entries.
@@ -85,6 +109,12 @@ let private serializeAttributes (annotations: Annotation list) : string =
     for (key, value) in extractCustomAttributes annotations do
         parts.Add(sprintf "%s=\"%s\"" key value)
 
+    // State type (only when explicitly declared)
+    match extractStateType annotations with
+    | Some(kind, Explicit) -> parts.Add(sprintf "type=\"%s\"" (stateKindToSmcatType kind))
+    | Some(_, Inferred) -> ()
+    | None -> ()
+
     if parts.Count > 0 then
         sprintf " [%s]" (System.String.Join(" ", parts))
     else
@@ -116,10 +146,16 @@ let private serializeActivities (activities: StateActivities option) : string =
 
 /// Serialize a single state node (handles composites recursively).
 let rec private serializeState (sb: System.Text.StringBuilder) (indent: string) (node: StateNode) (siblingTransitions: TransitionEdge list) : unit =
+    let effectiveAnnotations =
+        match extractStateType node.Annotations with
+        | Some _ -> node.Annotations
+        | None when node.Kind <> Regular ->
+            SmcatAnnotation(SmcatStateType(node.Kind, Explicit)) :: node.Annotations
+        | None -> node.Annotations
     sb.Append(indent) |> ignore
     sb.Append(quoteName (node.Identifier |> Option.defaultValue "")) |> ignore
     sb.Append(serializeActivities node.Activities) |> ignore
-    sb.Append(serializeAttributes node.Annotations) |> ignore
+    sb.Append(serializeAttributes effectiveAnnotations) |> ignore
 
     match node.Children with
     | [] -> sb.Append(";\n") |> ignore
