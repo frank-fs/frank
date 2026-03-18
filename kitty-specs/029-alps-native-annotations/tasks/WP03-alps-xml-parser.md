@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: ALPS XML Parser
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 029-alps-native-annotations-WP01
 base_commit: 666360c2268bcc73f70027a51d33121deb4f4827
@@ -215,3 +215,4 @@ spec-kitty implement WP03 --base WP01
 
 - 2026-03-18T14:14:54Z – system – lane=planned – Prompt created.
 - 2026-03-18T14:34:10Z – claude-opus – shell_pid=71891 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T14:41:41Z – claude-opus – shell_pid=71891 – lane=for_review – XML parser with cross-format equivalence. 666 lines added, 906 tests pass.
