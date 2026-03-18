@@ -96,14 +96,31 @@ type ScxmlMeta =
     | ScxmlBinding of binding: string
     | ScxmlInitial of initialId: string
 
-// -- smcat annotation stub --
+// -- smcat annotation types --
+
+/// Tracks whether a state's type was declared via [type="..."] attribute
+/// or inferred from naming convention / default.
+type SmcatTypeOrigin =
+    | Explicit
+    | Inferred
+
+/// Semantic role of a transition in smcat format.
+type SmcatTransitionKind =
+    | InitialTransition
+    | FinalTransition
+    | SelfTransition
+    | ExternalTransition
+    | InternalTransition
 
 /// smcat-specific annotation metadata.
-/// To be fleshed out by smcat parser spec.
+/// Carries state type origin tracking, transition semantic roles,
+/// visual attributes, and custom key-value pairs.
 type SmcatMeta =
     | SmcatColor of string
     | SmcatStateLabel of string
-    | SmcatActivity of kind: string * body: string
+    | SmcatCustomAttribute of key: string * value: string
+    | SmcatStateType of kind: StateKind * origin: SmcatTypeOrigin
+    | SmcatTransition of SmcatTransitionKind
 
 // -- XState annotation stub --
 

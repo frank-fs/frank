@@ -374,7 +374,7 @@ let private attributesToAnnotations (attributes: SmcatAttribute list) : Annotati
         | "type" -> None // consumed by inferStateType, not stored as annotation
         | "color" -> Some(SmcatAnnotation(SmcatColor attr.Value))
         | "label" -> Some(SmcatAnnotation(SmcatStateLabel attr.Value))
-        | kind -> Some(SmcatAnnotation(SmcatActivity(kind, attr.Value))))
+        | key -> Some(SmcatAnnotation(SmcatCustomAttribute(key, attr.Value))))
 
 // T014-T016: Main parsing functions (mutually recursive)
 

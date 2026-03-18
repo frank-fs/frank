@@ -43,7 +43,7 @@ let private extractLabel (annotations: Annotation list) : string option =
 let private extractCustomAttributes (annotations: Annotation list) : (string * string) list =
     annotations
     |> List.choose (function
-        | SmcatAnnotation(SmcatActivity(kind, body)) -> Some (kind, body)
+        | SmcatAnnotation(SmcatCustomAttribute(key, value)) -> Some (key, value)
         | _ -> None)
 
 // ---------------------------------------------------------------------------
