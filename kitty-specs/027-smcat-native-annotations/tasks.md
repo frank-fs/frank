@@ -106,11 +106,11 @@
 **Prompt**: `tasks/WP04-parser-type-origin-tracking.md`
 
 ### Included Subtasks
-- [ ] T014 Update attribute-to-annotation conversion in `src/Frank.Statecharts/Smcat/Parser.fs` to store `SmcatAnnotation(SmcatStateType(kind, Explicit))` when `[type="..."]` attribute present
-- [ ] T015 Add `SmcatAnnotation(SmcatStateType(kind, Inferred))` after `inferStateType` for non-Regular states
-- [ ] T016 Add `SmcatAnnotation(SmcatTransition ...)` to parsed transitions based on structural analysis
-- [ ] T017 Update `test/Frank.Statecharts.Tests/Smcat/ParserTests.fs` to verify SmcatStateType and SmcatTransition annotations
-- [ ] T018 Verify `dotnet build` and `dotnet test`
+- [x] T014 Update attribute-to-annotation conversion in `src/Frank.Statecharts/Smcat/Parser.fs` to store `SmcatAnnotation(SmcatStateType(kind, Explicit))` when `[type="..."]` attribute present
+- [x] T015 Add `SmcatAnnotation(SmcatStateType(kind, Inferred))` after `inferStateType` for non-Regular states
+- [x] T016 Add `SmcatAnnotation(SmcatTransition ...)` to parsed transitions based on structural analysis
+- [x] T017 Update `test/Frank.Statecharts.Tests/Smcat/ParserTests.fs` to verify SmcatStateType and SmcatTransition annotations
+- [x] T018 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - Parser.fs line 370-377: attribute-to-annotation conversion. Currently `type` key is consumed by `inferStateType` and NOT stored. New behavior: consume AND store as `SmcatAnnotation(SmcatStateType(kind, Explicit))`.
