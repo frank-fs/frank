@@ -83,9 +83,11 @@ type AlpsMeta =
     | AlpsDataDescriptor of id: string * doc: (string option * string) option
     | AlpsVersion of string
 
-// -- SCXML annotation stub --
+// -- SCXML annotation types --
 
 /// SCXML-specific annotation metadata.
+/// Carries invoke, history, namespace, transition type, multi-target,
+/// datamodel, binding, initial, executable content, and data source metadata.
 type ScxmlMeta =
     | ScxmlInvoke of invokeType: string * src: string option * id: string option
     | ScxmlHistory of id: string * historyKind: HistoryKind * defaultTarget: string option
@@ -95,6 +97,10 @@ type ScxmlMeta =
     | ScxmlDatamodelType of datamodel: string
     | ScxmlBinding of binding: string
     | ScxmlInitial of initialId: string
+    | ScxmlOnEntry of xml: string
+    | ScxmlOnExit of xml: string
+    | ScxmlInitialElement of targetId: string
+    | ScxmlDataSrc of name: string * src: string
 
 // -- smcat annotation types --
 
