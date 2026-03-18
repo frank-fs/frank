@@ -352,16 +352,162 @@ The layers that already exist (statecharts, guards, SHACL, ALPS, provenance) pro
 1. **Cross-validator extensions**: add projection consistency checks and progress analysis to the spec pipeline’s `frank validate` command.
 1. **Session establishment patterns**: document the Option A / Option B patterns and provide examples for both simple (context data) and complex (separate protocol phase) establishment scenarios.
 
+## Propositions as Sessions: The Logical Foundation
+
+The operational MPST framework (Honda, Yoshida, Carbone 2008) describes session types as a process algebra — rules for well-typed communication. Wadler’s "Propositions as Sessions" (2012, 2014) establishes a deeper foundation: session types correspond to propositions in classical linear logic via the Curry-Howard correspondence. Proofs are processes, propositions are session types, and cut elimination is communication.
+
+This is not merely a theoretical reframing. The logical foundation reveals structure that the operational framework leaves implicit, and that structure has direct consequences for Frank’s design — particularly for client protocol derivation, composability, and the clef-lang port.
+
+### Duality and Client Protocol Derivation
+
+In Wadler’s framework, every session type has a **dual**. If the server’s type says "in state S, offer actions {A, B}" then the client’s dual says "in state S, select from {A, B}." The dual is not a separate artifact — it is *structurally determined* by the server’s type.
+
+Frank’s ALPS profiles describe the server’s offerings. The **dual** of an ALPS profile is the client’s protocol — the precise set of HTTP operations an agent may perform at each protocol state. Currently, agents discover this at runtime through OPTIONS requests and ALPS content negotiation. With explicit duality, the client protocol can be **derived** from the server’s profile before the first request.
+
+This is distinct from role projection (#107). Projection gives per-role *server-side* views: "what does the server offer to PlayerX in state XTurn?" Duality gives the *client-side* obligations: "given what the server offers, what is the complete set of valid client interaction sequences?"
+
+For agentic clients, this is the difference between:
+
+- **Discovery mode**: Request ALPS profile → parse available actions → choose one → request again. Each step is an independent discovery.
+- **Derivation mode**: Given the server’s session type (SCXML + ALPS), derive the client’s dual — a complete protocol specifying all valid request sequences to accomplish a goal. The agent follows the derived protocol, falling back to discovery only when the protocol diverges from expectation.
+
+Discovery mode is Frank’s strength for open-world participation. Derivation mode adds a **pre-computed fast path** for agents that know the protocol in advance. Both modes coexist — the derived protocol is the same information as runtime discovery, just computed ahead of time.
+
+#### Example: Tic-Tac-Toe Client Dual
+
+Given the server’s projected ALPS for PlayerX:
+
+| Server State | Server Offers (ALPS) | Client Dual (Derived Protocol) |
+|---|---|---|
+| `XTurn` | `makeMove(position)`, `viewGame` | MUST select `makeMove` or `viewGame`; if goal is "win", select `makeMove` |
+| `OTurn` | `viewGame` | MAY `viewGame` (poll); MUST wait for state change |
+| `Won(X)` | `viewGame` | Session complete; `viewGame` for confirmation |
+
+The dual tells the agent not just what it *can* do (that’s the ALPS profile) but what it *must* do to advance the protocol. An agent that holds the dual can plan a complete game strategy as a sequence of typed interactions.
+
+### Cut Elimination as Protocol Composition
+
+In linear logic, the **cut rule** connects two proofs on a shared proposition — one proves A, the other consumes A. Cut elimination guarantees the connection terminates and the composed proof is well-typed.
+
+For Frank, cut corresponds to **composing two protocol participants on a shared resource**. If service A’s output (an ALPS profile it produces) matches service B’s input (an ALPS profile it consumes), their composition is protocol-correct by construction. This formalizes what Frank’s middleware composition does operationally: the `plug` operation composes middlewares, and the resulting pipeline is correct if each middleware’s contract is satisfied.
+
+This matters for:
+
+- **Multi-service choreography**: If service A transitions a resource to state S and service B’s projected profile expects state S, the handoff is cut-safe.
+- **Spec pipeline validation**: Cross-format validation (#91) could verify that two services’ ALPS profiles are dual-compatible — one’s sends match the other’s receives.
+- **Agent orchestration**: An agent coordinating multiple Frank services could verify that its orchestration plan is cut-safe before executing.
+
+### Linearity and HTTP
+
+Linear logic’s core property is that every resource is used **exactly once**. HTTP’s request/response model is inherently linear: each request produces exactly one response, and neither can be replayed (ignoring caching, which is a controlled relaxation of linearity with explicit invalidation semantics via ETags and Cache-Control).
+
+Frank’s statechart transitions are linear: each event is consumed exactly once and produces exactly one state transition. The `TransitionResult` type (with `StateChanged` / `NoChange` / `InvalidTransition` outcomes) is a linear return — the event is consumed regardless of outcome.
+
+The tension is at the implementation boundary. `HttpContext.Items` stores state in a mutable dictionary with `box`/`:?>` casts — the opposite of linear discipline. The closures that capture generic types recover safety by inspection, not by construction (as the Wadler review notes). This is an unavoidable consequence of ASP.NET Core’s untyped middleware pipeline, not a design choice.
+
+### Session Types Across Target Platforms
+
+This document’s opening statement — "F# does not have the dependent or indexed type features that would make compile-time session type enforcement practical" — identifies the constraint for the F# implementation. But Frank’s multi-platform vision means session type enforcement will be evaluated on three additional platforms, each with different affordances. Ordered by immediacy:
+
+#### CloudflareFS: External State Makes Linearity Visible
+
+CloudflareFS runs F# on Cloudflare Workers — no long-running server, no in-memory state. Every state access crosses a network boundary to KV, Durable Objects, or D1. This changes the session type story fundamentally:
+
+- **The `obj` boundary moves outward.** In ASP.NET Core, the `obj` boxing happens inside the process at `HttpContext.Items`. On Workers, the equivalent boxing happens at the KV/Durable Object API boundary. The linearity violation becomes a *network call* — far more expensive and visible than an in-process cast.
+- **External state demands explicit contracts.** When state is remote, the contract between "read state, evaluate guard, perform transition, write state" must account for concurrency and latency. Session types formalize this: each state access is a typed interaction with the state store, and the session type guarantees the interaction sequence is valid.
+- **Durable Objects are natural session hosts.** A Durable Object is a single-threaded, addressable actor with persistent state — structurally similar to a session channel. Each Durable Object instance could host one protocol session, with incoming HTTP requests as session messages. The Durable Object’s single-threaded guarantee provides linearity that Workers (stateless, multi-instance) cannot.
+- **Guards must tolerate latency.** Frank’s guard evaluation assumes low-latency state access. With 50ms state fetches, guard evaluation that requires multiple state reads becomes a performance concern. Session types that encode which guards apply in which states could pre-compute guard evaluation paths, reducing round-trips.
+
+CloudflareFS still runs F#, so the type system constraints are identical to the main implementation. The session type benefits are operational (formal contracts with external state stores) rather than type-level.
+
+#### BEAM (Elixir + Gleam): Session Types as OTP Patterns
+
+The BEAM runtime provides several properties that MPST systems must normally prove or enforce, making it the most natural fit for session type enforcement:
+
+- **Processes give linearity for free.** An Erlang/Elixir process has a single mailbox. Messages are received by exactly one process and consumed exactly once. This is the linear channel that Wadler’s framework requires — not simulated, but built into the runtime.
+- **GenServer IS a session-typed process.** A GenServer’s `handle_call`/`handle_cast` callbacks define the messages it accepts, and pattern matching on the current state determines which messages are valid. This is a runtime encoding of a local session type: "in state S, accept messages {A, B}; in state T, accept messages {C}."
+- **Supervision gives progress.** OTP supervision trees guarantee that crashed participants are restarted. If a participant in a multi-party protocol fails, the supervisor can restart it (and potentially replay its session from a checkpoint). This is an operational progress guarantee that static MPST systems prove but never enforce at runtime.
+- **Gleam’s type system can encode session types.** Gleam compiles to BEAM but has a strict, ML-family type system with generics and exhaustive pattern matching. While Gleam does not have linear types, its type system is strict enough to encode session type discipline as phantom types or indexed state machines — more than Elixir’s dynamic types allow, less than full linear type enforcement.
+- **PubSub enables observation without participation.** Phoenix.PubSub allows any process to observe state changes without being a protocol participant — directly mapping to Frank’s "observation without participation" advantage over traditional MPSTs.
+
+The BEAM port should model each `statefulResource` as a GenServer (or GenStateMachine) where:
+- The process state is `(ProtocolState * Context)`
+- `handle_call` dispatches on `(Event * ProtocolState)` — invalid combinations return an error tuple
+- Guard evaluation happens inside the process (single-threaded, no concurrency concern)
+- The ALPS profile is derived from the GenServer’s message type + current state
+- Supervision handles participant failure and recovery
+
+This is not a reimplementation of session types on BEAM — it is a recognition that BEAM already provides the operational substrate. Frank’s contribution is the semantic layer (ALPS, SCXML, SHACL, content negotiation) that makes BEAM’s session-like properties discoverable and machine-readable at the HTTP boundary.
+
+#### clef-lang: Session Types in the Type System
+
+clef-lang’s MLIR-based compiler, designed from scratch with F#-like syntax, is the long-term opportunity to make session type enforcement a compile-time guarantee. Wadler’s work identifies exactly what’s needed: **linear types** and **session type duality** in the type system.
+
+If clef-lang incorporates linear types at the IR level:
+
+- Protocol violations become **compile-time errors**, not runtime 403/405/409 responses
+- The `obj` boundary disappears — linear channels replace `HttpContext.Items` / KV stores / GenServer mailboxes
+- Session type duality is checked by the compiler — the client dual is not a derived artifact but a type-level guarantee
+- Guard composition becomes monadic rather than list-based — the type system enforces that guards form a lawful monoid
+
+clef-lang also targets BEAM, so it inherits the operational linearity of processes while adding static linearity checking. This is the best of both worlds: runtime enforcement (BEAM process isolation) plus compile-time verification (linear session types).
+
+#### Summary: Platform Progression
+
+| Property | F# / ASP.NET Core | CloudflareFS | BEAM (Elixir/Gleam) | clef-lang |
+|---|---|---|---|---|
+| Linearity | Violated at `obj` boundary | Violated at KV/DO boundary | Provided by process mailboxes | Enforced by type system |
+| Session typing | Runtime middleware | Runtime middleware + external state contracts | Runtime GenServer + Gleam phantom types | Compile-time linear types |
+| Progress | Spec pipeline static analysis | Same | OTP supervision + static analysis | Compile-time proof + OTP supervision |
+| State isolation | `HttpContext.Items` (shared dict) | Durable Objects (per-instance actor) | Process (single-threaded mailbox) | Linear channel (compiler-verified) |
+| Guard latency | Microseconds (in-process) | ~50ms (network) | Microseconds (in-process) | Microseconds (in-process) |
+
+This does not mean the F# implementation is wrong. It means F# is the proving ground for concepts that gain stronger enforcement properties on platforms designed for them. The portable concepts (statechart-enforced HATEOAS, ALPS-as-local-type, projection, duality) transfer unchanged; only the enforcement mechanism improves at each step.
+
+### Algebraic Structure: The Implementation Gap
+
+Wadler’s type-theoretic lens highlights missing algebraic structure in Frank’s F# implementation that limits composability:
+
+| Component | Current Shape | Algebraic Gap | Consequence |
+|---|---|---|---|
+| `TransitionResult` | `Either`-like DU | No `map` / `bind` | Cannot compose transition outcomes without pattern matching |
+| Guards | `(string * GuardFn) list` | No monoid (identity + composition) | Guards compose by list concatenation + first-match-wins, not algebraically |
+| Handlers | `(string * RequestDelegate) list` | No functor / composition operator | Handler selection is linear scan, not composed dispatch |
+| HTTP methods | `string` | No type-level encoding | Method constraints are runtime string comparisons |
+
+Adding `map`/`bind` to `TransitionResult` and a monoid instance to guards would enable:
+
+- Composing sub-protocols into larger protocols (the operational equivalent of cut)
+- Property-based testing of guard composition laws
+- A foundation for ports: type-class instances on clef-lang, protocol implementations on BEAM/Gleam, same algebraic laws everywhere
+
+This is a portable concept improvement, not an F#-specific optimization — the algebraic structure translates directly to any target platform. On BEAM, guard composition maps to GenServer callback dispatch; on clef-lang, it maps to type-class instances with compiler-verified laws.
+
 ## References
 
-- Honda, Yoshida, Carbone (2008) — [Multiparty Asynchronous Session Types](https://doi.org/10.1145/1328438.1328472) (POPL ’08)
+### Operational MPST
+
+- Honda, Yoshida, Carbone (2008) — [Multiparty Asynchronous Session Types](https://doi.org/10.1145/1328438.1328472) (POPL ‘08)
 - [Scribble](http://www.scribble.org/) — Protocol description language for multiparty session types
 - [MPST at Imperial College](https://mrg.doc.ic.ac.uk/publications/multiparty-asynchronous-session-types/) — Research group and publications
+
+### Propositions as Sessions (Wadler)
+
+- Wadler (2012) — [Propositions as Sessions](https://doi.org/10.1145/2364527.2364568) (ICFP ‘12) — Curry-Howard correspondence between classical linear logic and session types
+- Wadler (2014) — [Propositions as Types](https://doi.org/10.1145/2699407) (Communications of the ACM) — Accessible overview of the propositions-as-types correspondence including sessions
+- Lindley & Morris (2015) — [A Semantics for Propositions as Sessions](https://doi.org/10.1007/978-3-662-46669-8_23) (ESOP ‘15) — Operational semantics for GV (functional session types)
+- Gay & Vasconcelos (2010) — [Linear Type Theory for Asynchronous Session Types](https://doi.org/10.1017/S0956796809990268) (JFP) — Linear types for async sessions
+
+### Standards
+
 - [ALPS Specification](http://alps.io/spec/drafts/draft-01.html) — Application-Level Profile Semantics
 - [SCXML W3C Recommendation](https://www.w3.org/TR/scxml/) — State Chart XML standard
 - [SHACL](https://www.w3.org/TR/shacl/) — Shapes Constraint Language
 - [PROV-O](https://www.w3.org/TR/prov-o/) — Provenance Ontology
 - [JSON-LD](https://www.w3.org/TR/json-ld11/) — JSON for Linking Data
+
+### Frank Design Documents
+
 - [Frank.Statecharts](STATECHARTS.md) — Application-level state machines
 - [Semantic Resources](SEMANTIC-RESOURCES.md) — Agent-legible application architecture
 - [Spec Pipeline](SPEC-PIPELINE.md) — Bidirectional design spec pipeline
