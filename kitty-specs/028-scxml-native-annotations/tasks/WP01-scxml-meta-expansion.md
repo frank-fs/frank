@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: ScxmlMeta DU Expansion
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: master
 base_commit: 5f0d33f40fd6441ec59fa4dadf8566fdd80b437e
@@ -115,3 +115,4 @@ spec-kitty implement WP01
 
 - 2026-03-18T07:24:37Z – system – lane=planned – Prompt created.
 - 2026-03-18T07:29:53Z – claude-opus – shell_pid=49351 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T07:30:48Z – claude-opus – shell_pid=49351 – lane=for_review – 4 new ScxmlMeta cases added. 842 tests pass, zero warnings.
