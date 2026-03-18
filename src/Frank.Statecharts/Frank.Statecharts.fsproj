@@ -30,6 +30,7 @@
     <Compile Include="Smcat/Parser.fs" />
     <Compile Include="Smcat/Serializer.fs" />
     <!-- ALPS parser -->
+    <Compile Include="Alps/Classification.fs" />
     <Compile Include="Alps/JsonParser.fs" />
     <Compile Include="Alps/JsonGenerator.fs" />
     <!-- SCXML parser -->
