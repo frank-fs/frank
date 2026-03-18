@@ -1,14 +1,17 @@
 ---
 work_package_id: WP04
 title: End-to-End Integration Tests
-lane: planned
+lane: "doing"
 dependencies:
 - WP02
+base_branch: 030-cross-format-validation-pipeline-WP02
+base_commit: 2073e1f83d2c3e27b32b220dfdaa5a628c4e7f59
+created_at: '2026-03-18T18:56:38.513803+00:00'
 subtasks: [T020, T021, T022, T023, T024, T025]
 phase: Phase 2 - Validation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "89819"
 review_status: ''
 reviewed_by: ''
 history:
