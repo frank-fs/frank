@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Serializer Annotation Consumption
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 027-smcat-native-annotations-WP01
 base_commit: 1a657d3121f0d1d274c9aa8cae2459565738e29a
@@ -184,3 +184,4 @@ The serializer currently:
 
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
 - 2026-03-18T06:13:44Z – claude-opus – shell_pid=37787 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T06:17:23Z – claude-opus – shell_pid=37787 – lane=for_review – All 4 subtasks complete. Serializer emits type attributes for Explicit, skips Inferred, falls back to Kind for cross-format. 827 tests pass.
