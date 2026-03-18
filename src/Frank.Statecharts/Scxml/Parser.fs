@@ -37,9 +37,7 @@ let private isStateElement (el: XElement) : bool =
 // Out-of-scope but known elements (silently skipped, no warning per parser-api.md section 9)
 let private outOfScopeElements =
     set
-        [ "onentry"
-          "onexit"
-          "script"
+        [ "script"
           "send"
           "raise"
           "log"
@@ -61,7 +59,9 @@ let private knownStateChildElements =
           "datamodel"
           "history"
           "invoke"
-          "initial" ]
+          "initial"
+          "onentry"
+          "onexit" ]
 
 // Parse a <transition> element into TransitionEdge
 let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
@@ -92,31 +92,46 @@ let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
       Position = extractPosition el
       Annotations = annotations }
 
-// Parse <datamodel>/<data> elements from a parent element, producing DataEntry list
-let private parseDataEntries (parent: XElement) : DataEntry list =
-    parent.Elements()
-    |> Seq.filter (fun el -> el.Name.LocalName = "datamodel")
-    |> Seq.collect (fun dm ->
-        dm.Elements()
-        |> Seq.filter (fun el -> el.Name.LocalName = "data"))
-    |> Seq.map (fun dataEl ->
-        let expr =
-            // expr attribute takes precedence over child text content (parser-api.md section 7)
-            match attrValue "expr" dataEl with
-            | Some e -> Some e
-            | None ->
-                // Fall back to trimmed child text content
-                let text = dataEl.Value.Trim()
+// Parse <datamodel>/<data> elements from a parent element.
+// Returns (DataEntry list, Annotation list) where annotations capture <data src="..."> attributes.
+let private parseDataEntries (parent: XElement) : DataEntry list * Annotation list =
+    let dataEls =
+        parent.Elements()
+        |> Seq.filter (fun el -> el.Name.LocalName = "datamodel")
+        |> Seq.collect (fun dm ->
+            dm.Elements()
+            |> Seq.filter (fun el -> el.Name.LocalName = "data"))
+        |> Seq.toList
 
-                if System.String.IsNullOrEmpty(text) then
-                    None
-                else
-                    Some text
+    let entries =
+        dataEls
+        |> List.map (fun dataEl ->
+            let expr =
+                // expr attribute takes precedence over child text content (parser-api.md section 7)
+                match attrValue "expr" dataEl with
+                | Some e -> Some e
+                | None ->
+                    // Fall back to trimmed child text content
+                    let text = dataEl.Value.Trim()
 
-        { DataEntry.Name = (attrValue "id" dataEl) |> Option.defaultValue ""
-          Expression = expr
-          Position = extractPosition dataEl })
-    |> Seq.toList
+                    if System.String.IsNullOrEmpty(text) then
+                        None
+                    else
+                        Some text
+
+            { DataEntry.Name = (attrValue "id" dataEl) |> Option.defaultValue ""
+              Expression = expr
+              Position = extractPosition dataEl })
+
+    let srcAnnotations =
+        dataEls
+        |> List.choose (fun dataEl ->
+            match attrValue "src" dataEl, attrValue "id" dataEl with
+            | Some src, Some id -> Some(ScxmlAnnotation(ScxmlDataSrc(id, src)))
+            | Some src, None -> Some(ScxmlAnnotation(ScxmlDataSrc("", src)))
+            | None, _ -> None)
+
+    entries, srcAnnotations
 
 // Parse a <history> element into StateNode
 let private parseHistory
@@ -178,6 +193,22 @@ let private collectChildWarnings
                   Suggestion = None }
             ))
 
+// Extract a description string from an executable content element.
+// e.g. <send event="done"/> -> "send done", <log expr="hello"/> -> "log hello"
+let private executableContentDescription (actionEl: XElement) : string =
+    let localName = actionEl.Name.LocalName
+    // Use the first meaningful attribute value as the description
+    let firstAttrValue =
+        actionEl.Attributes()
+        |> Seq.tryHead
+        |> Option.map (fun a -> a.Value)
+        |> Option.defaultValue ""
+
+    if System.String.IsNullOrEmpty(firstAttrValue) then
+        localName
+    else
+        sprintf "%s %s" localName firstAttrValue
+
 // Parse <state>, <final>, <parallel> elements recursively.
 // Returns (StateNode, TransitionEdge list, DataEntry list).
 let rec private parseState
@@ -214,7 +245,7 @@ let rec private parseState
         |> Seq.toList
 
     // Parse <datamodel>/<data> entries at state level
-    let stateDataEntries = parseDataEntries el
+    let stateDataEntries, stateDataSrcAnnotations = parseDataEntries el
 
     // Parse <history> elements
     let historyNodes =
@@ -234,6 +265,64 @@ let rec private parseState
             ScxmlAnnotation(ScxmlInvoke(invokeType, src, invId)))
         |> Seq.toList
 
+    // Parse <onentry> blocks (T003)
+    let onEntryElements =
+        el.Elements()
+        |> Seq.filter (fun child ->
+            child.Name.LocalName = "onentry"
+            && (child.Name.Namespace = scxmlNs || child.Name.Namespace = XNamespace.None))
+        |> Seq.toList
+
+    let entryAnnotations =
+        onEntryElements
+        |> List.map (fun onEntryEl -> ScxmlAnnotation(ScxmlOnEntry(onEntryEl.ToString())))
+
+    let entryActions =
+        onEntryElements
+        |> List.collect (fun onEntryEl ->
+            onEntryEl.Elements()
+            |> Seq.map executableContentDescription
+            |> Seq.toList)
+
+    // Parse <onexit> blocks (T004)
+    let onExitElements =
+        el.Elements()
+        |> Seq.filter (fun child ->
+            child.Name.LocalName = "onexit"
+            && (child.Name.Namespace = scxmlNs || child.Name.Namespace = XNamespace.None))
+        |> Seq.toList
+
+    let exitAnnotations =
+        onExitElements
+        |> List.map (fun onExitEl -> ScxmlAnnotation(ScxmlOnExit(onExitEl.ToString())))
+
+    let exitActions =
+        onExitElements
+        |> List.collect (fun onExitEl ->
+            onExitEl.Elements()
+            |> Seq.map executableContentDescription
+            |> Seq.toList)
+
+    // Build StateActivities when any entry or exit content exists (T003/T004)
+    let activities =
+        match entryActions, exitActions with
+        | [], [] -> None
+        | _ -> Some { Entry = entryActions; Exit = exitActions; Do = [] }
+
+    // Parse <initial> child elements (T005)
+    let initialElementAnnotations =
+        el.Elements()
+        |> Seq.filter (fun child ->
+            child.Name.LocalName = "initial"
+            && (child.Name.Namespace = scxmlNs || child.Name.Namespace = XNamespace.None))
+        |> Seq.collect (fun initEl ->
+            initEl.Elements()
+            |> Seq.filter (fun t -> t.Name.LocalName = "transition")
+            |> Seq.map (fun t ->
+                let target = attrValue "target" t |> Option.defaultValue ""
+                ScxmlAnnotation(ScxmlInitialElement(target))))
+        |> Seq.toList
+
     // Parse state-level initial attribute
     let initialAnnotation =
         match attrValue "initial" el with
@@ -248,9 +337,15 @@ let rec private parseState
           Label = None
           Kind = astKind
           Children = childNodes @ historyNodes
-          Activities = None
+          Activities = activities
           Position = extractPosition el
-          Annotations = invokeAnnotations @ initialAnnotation }
+          Annotations =
+            invokeAnnotations
+            @ entryAnnotations
+            @ exitAnnotations
+            @ initialElementAnnotations
+            @ initialAnnotation
+            @ stateDataSrcAnnotations }
 
     stateNode, ownTransitions @ childTransitions, stateDataEntries @ childDataEntries
 
@@ -334,8 +429,8 @@ let private parseDocument (xdoc: XDocument) : ParseResult =
         // Collect warnings for unknown root children
         collectRootWarnings warnings root
 
-        // Parse document-level <datamodel>/<data> entries
-        let docDataEntries = parseDataEntries root
+        // Parse document-level <datamodel>/<data> entries (T006)
+        let docDataEntries, docDataSrcAnnotations = parseDataEntries root
 
         // Combine document-level + state-scoped data entries (flattened)
         let allDataEntries = docDataEntries @ stateDataEntries
@@ -345,14 +440,20 @@ let private parseDocument (xdoc: XDocument) : ParseResult =
         let transitionElements = allTransitions |> List.map TransitionElement
         let elements = stateElements @ transitionElements
 
+        // Store namespace annotation (T007)
+        let namespaceAnnotation =
+            [ ScxmlAnnotation(ScxmlNamespace(root.Name.Namespace.NamespaceName)) ]
+
         // Build document-level annotations
         let docAnnotations =
-            [ match attrValue "datamodel" root with
-              | Some dm -> yield ScxmlAnnotation(ScxmlDatamodelType(dm))
-              | None -> ()
-              match attrValue "binding" root with
-              | Some b -> yield ScxmlAnnotation(ScxmlBinding(b))
-              | None -> () ]
+            namespaceAnnotation
+            @ [ match attrValue "datamodel" root with
+                | Some dm -> yield ScxmlAnnotation(ScxmlDatamodelType(dm))
+                | None -> ()
+                match attrValue "binding" root with
+                | Some b -> yield ScxmlAnnotation(ScxmlBinding(b))
+                | None -> () ]
+            @ docDataSrcAnnotations
 
         // Build the StatechartDocument
         let doc =

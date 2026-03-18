@@ -582,3 +582,281 @@ let advancedParserTests =
                       | _ -> None)
               Expect.isSome historyMeta "should have ScxmlHistory annotation"
               Expect.equal historyMeta.Value (Some "child1") "default target" ]
+
+// === WP02: Executable Content, Initial Elements, Data Src, Namespace (T003-T007) ===
+
+[<Tests>]
+let executableContentTests =
+    testList
+        "Scxml.Parser.ExecutableContent"
+        [
+          // T003: onentry with send and log actions
+          testCase "onentry with send produces entry actions and ScxmlOnEntry annotation"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <onentry>
+      <send event="done"/>
+      <log expr="hello"/>
+    </onentry>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+
+              // Activities.Entry should be populated
+              Expect.isSome state.Activities "Activities should be Some"
+              let activities = state.Activities.Value
+              Expect.equal activities.Entry [ "send done"; "log hello" ] "entry actions"
+              Expect.isEmpty activities.Exit "no exit actions"
+              Expect.isEmpty activities.Do "Do is always empty for SCXML"
+
+              // ScxmlOnEntry annotation should be present
+              let onEntryAnnotations =
+                  state.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlOnEntry xml) -> Some xml
+                      | _ -> None)
+
+              Expect.equal onEntryAnnotations.Length 1 "one ScxmlOnEntry annotation"
+              Expect.isTrue (onEntryAnnotations.[0].Contains "send") "annotation contains send element"
+
+          // T003: assign action uses location attribute as first attribute value
+          testCase "onentry with assign uses location as first attribute"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <onentry>
+      <assign location="x" expr="1"/>
+    </onentry>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+              Expect.isSome state.Activities "Activities should be Some"
+              let activities = state.Activities.Value
+              Expect.equal activities.Entry [ "assign x" ] "entry action is 'assign x'"
+
+          // T004: onexit with log produces exit actions and ScxmlOnExit annotation
+          testCase "onexit with log produces exit actions and ScxmlOnExit annotation"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <onexit>
+      <log expr="leaving"/>
+    </onexit>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+
+              Expect.isSome state.Activities "Activities should be Some"
+              let activities = state.Activities.Value
+              Expect.isEmpty activities.Entry "no entry actions"
+              Expect.equal activities.Exit [ "log leaving" ] "exit actions"
+
+              let onExitAnnotations =
+                  state.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlOnExit xml) -> Some xml
+                      | _ -> None)
+
+              Expect.equal onExitAnnotations.Length 1 "one ScxmlOnExit annotation"
+              Expect.isTrue (onExitAnnotations.[0].Contains "log") "annotation contains log element"
+
+          // T003 + T004: both onentry and onexit
+          testCase "onentry and onexit together populate both entry and exit activities"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <onentry>
+      <send event="started"/>
+    </onentry>
+    <onexit>
+      <send event="stopped"/>
+    </onexit>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+              Expect.isSome state.Activities "Activities should be Some"
+              let activities = state.Activities.Value
+              Expect.equal activities.Entry [ "send started" ] "entry actions"
+              Expect.equal activities.Exit [ "send stopped" ] "exit actions"
+
+          // T003: multiple onentry blocks produce multiple annotations
+          testCase "multiple onentry blocks produce multiple ScxmlOnEntry annotations"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <onentry>
+      <send event="first"/>
+    </onentry>
+    <onentry>
+      <log expr="second"/>
+    </onentry>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+
+              let onEntryAnnotations =
+                  state.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlOnEntry xml) -> Some xml
+                      | _ -> None)
+
+              Expect.equal onEntryAnnotations.Length 2 "two ScxmlOnEntry annotations (one per block)"
+              // Combined entry actions from both blocks
+              Expect.isSome state.Activities "Activities should be Some"
+              Expect.equal state.Activities.Value.Entry [ "send first"; "log second" ] "entry actions from both blocks"
+
+          // T003/T004: state with no onentry/onexit has Activities = None
+          testCase "state with no onentry or onexit has Activities = None"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <transition event="go" target="s2"/>
+  </state>
+  <state id="s2"/>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+              Expect.isNone state.Activities "Activities should be None when no onentry/onexit"
+
+          // T005: initial child element produces ScxmlInitialElement annotation
+          testCase "initial child element produces ScxmlInitialElement annotation"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <initial>
+      <transition target="child1"/>
+    </initial>
+    <state id="child1"/>
+    <state id="child2"/>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+
+              let initialElAnnotations =
+                  state.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlInitialElement targetId) -> Some targetId
+                      | _ -> None)
+
+              Expect.equal initialElAnnotations.Length 1 "one ScxmlInitialElement annotation"
+              Expect.equal initialElAnnotations.[0] "child1" "target is child1"
+
+          // T006: data element with src attribute produces ScxmlDataSrc annotation
+          testCase "data element with src attribute produces ScxmlDataSrc annotation"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <datamodel>
+    <data id="config" src="config.json"/>
+  </datamodel>
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let doc = result.Document
+
+              let dataSrcAnnotations =
+                  doc.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlDataSrc(name, src)) -> Some(name, src)
+                      | _ -> None)
+
+              Expect.equal dataSrcAnnotations.Length 1 "one ScxmlDataSrc annotation"
+              let (name, src) = dataSrcAnnotations.[0]
+              Expect.equal name "config" "data id is config"
+              Expect.equal src "config.json" "src is config.json"
+
+          // T006: data src at state level produces annotation on state
+          testCase "data element with src at state level produces ScxmlDataSrc on state"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1">
+    <datamodel>
+      <data id="local" src="local.json"/>
+    </datamodel>
+  </state>
+</scxml>"""
+
+              let result = parseString xml
+              let state = (stateDecls result.Document).[0]
+
+              let dataSrcAnnotations =
+                  state.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlDataSrc(name, src)) -> Some(name, src)
+                      | _ -> None)
+
+              Expect.equal dataSrcAnnotations.Length 1 "one ScxmlDataSrc annotation on state"
+              let (name, src) = dataSrcAnnotations.[0]
+              Expect.equal name "local" "data id is local"
+              Expect.equal src "local.json" "src is local.json"
+
+          // T007: namespace is stored as ScxmlNamespace annotation on document
+          testCase "SCXML namespace is stored as ScxmlNamespace annotation"
+          <| fun _ ->
+              let xml =
+                  """<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="s1">
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let doc = result.Document
+
+              let nsAnnotations =
+                  doc.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlNamespace ns) -> Some ns
+                      | _ -> None)
+
+              Expect.equal nsAnnotations.Length 1 "one ScxmlNamespace annotation"
+              Expect.equal nsAnnotations.[0] "http://www.w3.org/2005/07/scxml" "namespace URI"
+
+          // T007: no-namespace document stores empty namespace
+          testCase "no-namespace document stores empty namespace string"
+          <| fun _ ->
+              let xml =
+                  """<scxml initial="s1">
+  <state id="s1"/>
+</scxml>"""
+
+              let result = parseString xml
+              let doc = result.Document
+
+              let nsAnnotations =
+                  doc.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | ScxmlAnnotation(ScxmlNamespace ns) -> Some ns
+                      | _ -> None)
+
+              Expect.equal nsAnnotations.Length 1 "one ScxmlNamespace annotation"
+              Expect.equal nsAnnotations.[0] "" "no-namespace document has empty string" ]
