@@ -223,14 +223,14 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T040 Create `src/Frank.Cli.Core/Commands/StatechartValidateCommand.fs` with `execute` function
-- [ ] T041 Implement spec file parsing: detect format, read file, dispatch to parser
-- [ ] T042 Implement code-truth artifact generation: `Wsd.Generator.generate` -> `FormatArtifact(Wsd)`
-- [ ] T043 Implement validation orchestration: `Validator.validate` with self-consistency + cross-format rules
-- [ ] T044 Implement text output: passed checks, failed checks with diagnostics, skipped checks
-- [ ] T045 Implement JSON output using `ValidationReportFormatter.formatJson`
-- [ ] T046 Handle unsupported format extension, file read errors, non-zero exit on failures
-- [ ] T047 Add compile entry to `Frank.Cli.Core.fsproj`
+- [x] T040 Create `src/Frank.Cli.Core/Commands/StatechartValidateCommand.fs` with `execute` function
+- [x] T041 Implement spec file parsing: detect format, read file, dispatch to parser
+- [x] T042 Implement code-truth artifact generation: `Wsd.Generator.generate` -> `FormatArtifact(Wsd)`
+- [x] T043 Implement validation orchestration: `Validator.validate` with self-consistency + cross-format rules
+- [x] T044 Implement text output: passed checks, failed checks with diagnostics, skipped checks
+- [x] T045 Implement JSON output using `ValidationReportFormatter.formatJson`
+- [x] T046 Handle unsupported format extension, file read errors, non-zero exit on failures
+- [x] T047 Add compile entry to `Frank.Cli.Core.fsproj`
 
 ### Implementation Notes
 - Parse each spec file into a `FormatArtifact` (parsed document + format tag)
