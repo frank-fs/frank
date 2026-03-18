@@ -40,6 +40,7 @@
     <!-- ALPS tests -->
     <Compile Include="Alps/GoldenFiles.fs" />
     <Compile Include="Alps/JsonParserTests.fs" />
+    <Compile Include="Alps/XmlParserTests.fs" />
     <Compile Include="Alps/JsonGeneratorTests.fs" />
     <Compile Include="Alps/RoundTripTests.fs" />
     <!-- Validation tests -->
