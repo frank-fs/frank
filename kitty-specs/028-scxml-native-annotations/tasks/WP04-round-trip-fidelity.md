@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Round-Trip Fidelity Tests
-lane: "for_review"
+lane: "doing"
 dependencies: [WP02, WP03]
 base_branch: 028-scxml-native-annotations-WP04-merge-base
 base_commit: 1e2789761cec425c4d5373145755060d31a3cb5b
@@ -9,8 +9,8 @@ created_at: '2026-03-18T07:39:15.430803+00:00'
 subtasks: [T017, T018, T019, T020, T021]
 phase: Phase 2 - Validation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "51445"
+agent: "claude-opus-reviewer"
+shell_pid: "51835"
 review_status: ''
 reviewed_by: ''
 history:
@@ -219,3 +219,4 @@ Note: If the implement command only supports a single `--base`, merge WP02+WP03 
 - 2026-03-18T07:24:37Z – system – lane=planned – Prompt created.
 - 2026-03-18T07:39:15Z – claude-opus – shell_pid=51445 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T07:40:47Z – claude-opus – shell_pid=51445 – lane=for_review – All 5 subtasks done. 4 new round-trip tests including comprehensive fixture. 869 tests pass.
+- 2026-03-18T07:40:53Z – claude-opus-reviewer – shell_pid=51835 – lane=doing – Started review via workflow command
