@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Near-Match Detection
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01]
 base_branch: 030-cross-format-validation-pipeline-WP01
 base_commit: a9b25b95191f60d55fcba7c44d7688ce7674d54b
@@ -9,8 +9,8 @@ created_at: '2026-03-18T17:48:45.096751+00:00'
 subtasks: [T014, T015, T016, T017, T018, T019]
 phase: Phase 1 - Implementation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "85249"
+agent: "claude-opus-reviewer"
+shell_pid: "86358"
 review_status: ''
 reviewed_by: ''
 history:
@@ -114,3 +114,4 @@ Add tests:
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
 - 2026-03-18T17:48:45Z – claude-opus – shell_pid=85249 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T17:59:44Z – claude-opus – shell_pid=85249 – lane=for_review – Near-match rule with Jaro-Winkler, threshold 0.8. States and events. 15 new tests, 978 pass.
+- 2026-03-18T18:00:26Z – claude-opus-reviewer – shell_pid=86358 – lane=doing – Started review via workflow command
