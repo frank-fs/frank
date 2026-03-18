@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP08"
 title: "Parse Command"
-lane: "planned"
+lane: "for_review"
 dependencies: ["WP01", "WP03", "WP04"]
 subtasks:
   - "T048"
@@ -284,3 +284,4 @@ spec-kitty implement WP08 --base WP04
 ## Activity Log
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
+- 2026-03-18T02:50:16Z – unknown – lane=for_review – Ready for review: StatechartParseCommand with multi-format parsing and ambiguous .json handling. Build clean.
