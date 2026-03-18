@@ -1,108 +1,87 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: ALPS Native Annotations and Full Fidelity
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `029-alps-native-annotations` | **Date**: 2026-03-18 | **Spec**: [spec.md](spec.md)
+**Closes**: #115
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Fix JSON round-trip fidelity gaps, add ALPS XML parser and generator, extract shared classification logic per constitution Principle VIII. No `AlpsMeta` DU expansion needed — existing 7 cases are sufficient.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting)
+**Primary Dependencies**: Frank.Statecharts (project-internal), System.Text.Json (JSON), System.Xml.Linq (XML, already available from SCXML)
+**Storage**: N/A
+**Testing**: Expecto, existing `test/Frank.Statecharts.Tests/Alps/` infrastructure
+**Performance Goals**: N/A — startup/CLI-time code
+**Constraints**: All modules `internal`; breaking changes acceptable (unreleased)
+**Scale/Scope**: 3 new files, 2 modified files, 3-4 test files
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+- **I-VII**: All pass (same rationale as specs 027/028 — internal library changes)
+- **VIII. No Duplicated Logic**: CRITICAL — JSON and XML parsers share classification heuristics (`isStateDescriptor`, `collectRtTargets`, `buildDescriptorIndex`, etc.). These MUST be extracted to a shared module `Alps/Classification.fs`.
 
-[Gates determined based on constitution file]
+**Result**: All gates pass. Principle VIII drives the architecture (shared classification module).
 
 ## Project Structure
 
-### Documentation (this feature)
+### Source Code
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+src/Frank.Statecharts/
+└── Alps/
+    ├── Classification.fs        # NEW: shared intermediate types + Pass 2 heuristics
+    ├── JsonParser.fs            # MODIFY: extract Pass 2 to Classification.fs
+    ├── JsonGenerator.fs         # MODIFY: JSON fidelity fixes
+    ├── XmlParser.fs             # NEW: ALPS XML parser (Pass 1 XML, shared Pass 2)
+    └── XmlGenerator.fs          # NEW: ALPS XML generator
+
+test/Frank.Statecharts.Tests/
+└── Alps/
+    ├── JsonParserTests.fs       # MODIFY: add round-trip tests
+    ├── JsonGeneratorTests.fs    # MODIFY: add fidelity tests
+    ├── XmlParserTests.fs        # NEW: XML parser tests
+    ├── XmlGeneratorTests.fs     # NEW: XML generator tests
+    └── RoundTripTests.fs        # NEW or MODIFY: cross-format equivalence
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+## Dependency Graph
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+WP01: Classification.fs (extract shared logic)
+  ↓
+  ├── WP02: JsonParser.fs refactor + fidelity fixes
+  ├── WP03: XmlParser.fs (new, uses Classification)
+  └── WP04: XmlGenerator.fs (new)
+       ↓
+       WP05: Round-trip + cross-format tests
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+WP02, WP03, WP04 can execute in parallel after WP01. WP05 depends on all.
 
-## Complexity Tracking
+## Key Design Decisions
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+### D-001: Shared Classification Module
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+Extract `ParsedDescriptor`, `ParsedExtension`, `ParsedLink`, `isStateDescriptor`, `collectRtTargets`, `buildDescriptorIndex`, `extractTransitions`, `toStateNode`, `buildStateAnnotations`, `buildTransitionAnnotations` into `Alps/Classification.fs`. Both JSON and XML parsers import from this module.
+
+### D-002: XML Parser Structure
+
+Pass 1: `XDocument` → `ParsedDescriptor list` (convert XML elements to the same intermediate types).
+Pass 2: Reuse shared classification from `Classification.fs` → `StatechartDocument`.
+
+### D-003: No AlpsMeta Expansion
+
+The existing 7 cases cover all ALPS concepts. No new cases needed.
+
+## Files Impacted
+
+| File | Change Type | FRs |
+|------|-------------|-----|
+| `Alps/Classification.fs` | New | FR-005, FR-008 |
+| `Alps/JsonParser.fs` | Modify | FR-001, FR-002 |
+| `Alps/JsonGenerator.fs` | Modify | FR-002, FR-003, FR-004 |
+| `Alps/XmlParser.fs` | New | FR-005, FR-006, FR-008 |
+| `Alps/XmlGenerator.fs` | New | FR-007 |
+| Test files | New/Modify | FR-009, FR-010, FR-011 |
