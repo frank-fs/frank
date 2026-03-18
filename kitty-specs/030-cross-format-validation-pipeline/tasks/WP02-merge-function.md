@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP02"
-subtasks: ["T007", "T008", "T009", "T010", "T011", "T012", "T013"]
-title: "Merge Function"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-006", "FR-011"]
+work_package_id: WP02
+title: Merge Function
+lane: "doing"
+dependencies: [WP01]
+base_branch: 030-cross-format-validation-pipeline-WP01
+base_commit: a9b25b95191f60d55fcba7c44d7688ce7674d54b
+created_at: '2026-03-18T17:48:43.642625+00:00'
+subtasks: [T007, T008, T009, T010, T011, T012, T013]
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "85141"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T17:06:48Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T17:06:48Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-011]
 ---
 
 # Work Package Prompt: WP02 – Merge Function
