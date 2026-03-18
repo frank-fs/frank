@@ -1,108 +1,87 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Cross-Format Validation Pipeline and AST Merge
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `030-cross-format-validation-pipeline` | **Date**: 2026-03-18 | **Spec**: [spec.md](spec.md)
+**Closes**: #117
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Add AST merge function to the cross-format validation pipeline. Merge combines multiple `StatechartDocument` values into one unified document using format priority ordering (SCXML > smcat > WSD for structure, ALPS annotations-only). Enhance validator with near-match detection using Jaro-Winkler string distance. Wire ALPS XML into pipeline dispatch. Add end-to-end integration tests with real format text.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting)
+**Primary Dependencies**: Frank.Statecharts (project-internal), existing Validation module
+**Storage**: N/A
+**Testing**: Expecto, existing `test/Frank.Statecharts.Tests/` infrastructure
+**Performance Goals**: N/A — startup/CLI-time code
+**Constraints**: All modules `internal`; no external dependencies for string distance (implement inline)
+**Scale/Scope**: 3 new/modified source files, 1-2 new test files
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+- **I-VII**: All pass (internal library changes)
+- **VIII. No Duplicated Logic**: PASS — merge logic is new, not duplicated. Near-match detection is a new validation rule, not a copy.
 
-[Gates determined based on constitution file]
+**Result**: All gates pass.
 
 ## Project Structure
 
-### Documentation (this feature)
+### Source Code
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+src/Frank.Statecharts/
+└── Validation/
+    ├── Types.fs             # MODIFY: add FormatTag.AlpsXml
+    ├── Merge.fs             # NEW: mergeSources function + format priority
+    ├── StringDistance.fs     # NEW: Jaro-Winkler implementation (~30 lines)
+    ├── CrossFormatRules.fs  # MODIFY: add near-match detection rule
+    ├── Pipeline.fs          # MODIFY: add mergeSources, wire AlpsXml dispatch
+    └── Validator.fs         # UNCHANGED
+
+test/Frank.Statecharts.Tests/
+└── Validation/
+    ├── MergeTests.fs        # NEW: merge function tests
+    ├── NearMatchTests.fs    # NEW: near-match detection tests
+    └── PipelineTests.fs     # MODIFY: end-to-end integration tests
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+## Dependency Graph
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+WP01: Types.fs (FormatTag.AlpsXml) + StringDistance.fs + Pipeline.fs (AlpsXml dispatch)
+  ↓
+  ├── WP02: Merge.fs + MergeTests.fs
+  ├── WP03: CrossFormatRules.fs (near-match) + NearMatchTests.fs
+  └── WP04: End-to-end integration tests (PipelineTests.fs)
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+WP02 and WP03 can execute in parallel after WP01. WP04 depends on WP02 (needs merge) and WP03 (needs near-match).
 
-## Complexity Tracking
+## Key Design Decisions
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+### D-001: Merge as Left Fold
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+`mergeSources` sorts source documents by format priority (SCXML first, then smcat, then WSD, then ALPS), then folds: the first document is the base, subsequent documents enrich it. For each subsequent document, matching states accumulate annotations and non-None fields fill gaps. Matching transitions accumulate annotations. Unmatched states/transitions are added.
+
+### D-002: Jaro-Winkler for Near-Match
+
+Jaro-Winkler is better for short identifier strings than Levenshtein (it weights prefix matches). ~30 lines of F#, no external dependency. Threshold defaults to 0.8 (configurable).
+
+### D-003: Format Priority as DU Ordering
+
+The priority is encoded as a function `formatPriority: FormatTag -> int` where SCXML=0, smcat=1, WSD=2, Alps=3, AlpsXml=3, XState=4. Lower number = higher priority for structural fields.
+
+### D-004: AlpsXml as Separate FormatTag
+
+`FormatTag.AlpsXml` is a new case that dispatches to `Alps.XmlParser.parseAlpsXml`. It has the same merge priority as `Alps` (annotations only). This avoids overloading the `Alps` tag with format detection logic.
+
+## Files Impacted
+
+| File | Change Type | FRs |
+|------|-------------|-----|
+| `Validation/Types.fs` | Modify | FR-007 |
+| `Validation/StringDistance.fs` | New | FR-012, FR-013 |
+| `Validation/Merge.fs` | New | FR-001 through FR-005, FR-011 |
+| `Validation/CrossFormatRules.fs` | Modify | FR-012, FR-013 |
+| `Validation/Pipeline.fs` | Modify | FR-006, FR-007 |
+| Test files | New/Modify | FR-008 through FR-010, FR-014, FR-015 |

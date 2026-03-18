@@ -6,6 +6,12 @@
 **Input**: Create missing test cases and additional support for multiple formats contributing to a single StatechartDocument. Pipeline orchestration for validate-then-merge workflow.
 **Closes**: #117
 
+## Clarifications
+
+### Session 2026-03-18
+
+- Q: Should merge use exact or fuzzy event/state name matching? → A: Merge function uses exact match only (pure, deterministic). Validator enhanced with near-match detection (fuzzy warnings with string distance metrics). Pipeline supports a reconciliation step between validate and merge where the caller (Claude Code, CLI) can resolve near-misses before merging. Fuzzy warnings included in this spec scope.
+
 ## Background
 
 The cross-format validator (#112) works correctly at the `StatechartDocument` level, detecting state name mismatches, event mismatches, casing issues, and orphan targets. The validation pipeline (`Pipeline.validateSources`) parses format sources and runs validation rules. However, the original purpose of cross-format validation was to support **merging** multiple format ASTs into one unified `StatechartDocument` — not just comparing them. Each format contributes complementary data:
@@ -97,6 +103,22 @@ Integration tests parse real format text in multiple formats, run cross-format v
 
 ---
 
+### User Story 6 - Near-Match Detection in Validator (Priority: P1)
+
+A developer validates formats where state or event names are similar but not identical (e.g., "start" vs "startOnboarding"). The validator reports these as warnings with similarity scores and suggestions, enabling the caller (Claude Code, CLI) to auto-correct or prompt the user before merging.
+
+**Why this priority**: Without near-match detection, the validator only reports exact mismatches. Near-matches are the most common real-world issue when different team members author different format sources.
+
+**Independent Test**: Validate two formats with "start" vs "startOnboarding" — verify a near-match warning is produced with both names and a similarity score.
+
+**Acceptance Scenarios**:
+
+1. **Given** WSD with event "startOnboarding" and smcat with event "start", **When** validated, **Then** a near-match warning is reported with both names, the format pair, and a similarity score.
+2. **Given** formats with identical names, **When** validated, **Then** no near-match warnings are produced (only exact-match checks).
+3. **Given** formats with completely different names (e.g., "login" vs "shutdown"), **When** validated, **Then** no near-match warning is produced (similarity below threshold).
+
+---
+
 ### Edge Cases
 
 - What happens when merging a single format source? The merge returns the document as-is (no-op merge).
@@ -119,8 +141,11 @@ Integration tests parse real format text in multiple formats, run cross-format v
 - **FR-008**: End-to-end integration tests MUST parse real format text (not hand-constructed ASTs) through the full pipeline.
 - **FR-009**: Integration tests MUST cover consistent multi-format input (zero validation failures expected).
 - **FR-010**: Integration tests MUST cover intentionally inconsistent input (correct failure detection expected).
-- **FR-011**: All changes MUST compile across net8.0, net9.0, and net10.0 target frameworks.
-- **FR-012**: All existing validation tests MUST continue to pass.
+- **FR-011**: The merge function MUST use exact string matching for state identifiers and transition (source, target, event) triples. No fuzzy matching in the merge itself.
+- **FR-012**: The validator MUST detect near-matches between state names and event names across formats using string distance metrics, reporting them as warnings with suggestions (e.g., "'start' in smcat is a near-match for 'startOnboarding' in WSD").
+- **FR-013**: Near-match warnings MUST include the format pair, the mismatched identifiers, and a similarity score so the caller (CLI, Claude Code) can offer corrections.
+- **FR-014**: All changes MUST compile across net8.0, net9.0, and net10.0 target frameworks.
+- **FR-015**: All existing validation tests MUST continue to pass.
 
 ### Key Entities
 
@@ -144,4 +169,6 @@ Integration tests parse real format text in multiple formats, run cross-format v
 - The merge function does NOT enforce validation — the caller is responsible for validating first. `mergeSources` produces a best-effort merge regardless.
 - For end-to-end tests, equivalent representations of the same state machine in each format will be maintained as test fixtures (inline strings or golden files).
 - The XState format remains unsupported in the pipeline (`FormatTag.XState` returns `UnsupportedFormat`).
-- State matching is by `Identifier` string (exact match). Transition matching is by `(Source, Target, Event)` triple (exact match).
+- State matching is by `Identifier` string (exact match) in the merge function. The validator separately checks for near-matches using string distance metrics.
+- Transition matching is by `(Source, Target, Event)` triple (exact match) in the merge function.
+- String distance for near-match detection uses a standard metric (e.g., Jaro-Winkler or Levenshtein). The threshold for reporting near-matches is configurable but defaults to a reasonable value (e.g., 0.7 similarity).
