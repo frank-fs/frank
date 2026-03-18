@@ -53,6 +53,7 @@
     <Compile Include="Validation/IntegrationTests.fs" />
     <Compile Include="Validation/PipelineTests.fs" />
     <Compile Include="Validation/PipelineIntegrationTests.fs" />
+    <Compile Include="Validation/MergeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
