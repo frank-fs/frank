@@ -125,12 +125,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T020 [P] Create `src/Frank.Cli.Core/Statechart/StatechartDocumentJson.fs` — serialize `StatechartDocument` to JSON
-- [ ] T021 [P] Create `src/Frank.Cli.Core/Statechart/ValidationReportFormatter.fs` — format `ValidationReport` as text and JSON
-- [ ] T022 Implement `StatechartDocumentJson.serialize`: states array, transitions array, initial state, data entries
-- [ ] T023 Implement `ValidationReportFormatter.formatText` and `formatJson`: passed/failed/skipped checks, failure diagnostics
-- [ ] T024 Add compile entries to `Frank.Cli.Core.fsproj`
-- [ ] T025 Verify modules compile with `dotnet build`
+- [x] T020 [P] Create `src/Frank.Cli.Core/Statechart/StatechartDocumentJson.fs` — serialize `StatechartDocument` to JSON
+- [x] T021 [P] Create `src/Frank.Cli.Core/Statechart/ValidationReportFormatter.fs` — format `ValidationReport` as text and JSON
+- [x] T022 Implement `StatechartDocumentJson.serialize`: states array, transitions array, initial state, data entries
+- [x] T023 Implement `ValidationReportFormatter.formatText` and `formatJson`: passed/failed/skipped checks, failure diagnostics
+- [x] T024 Add compile entries to `Frank.Cli.Core.fsproj`
+- [x] T025 Verify modules compile with `dotnet build`
 
 ### Implementation Notes
 - `StatechartDocumentJson` follows the `Utf8JsonWriter` pattern from existing `JsonOutput.fs`
