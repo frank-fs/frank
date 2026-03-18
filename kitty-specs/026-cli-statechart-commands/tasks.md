@@ -59,13 +59,13 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T007 Create `src/Frank.Cli.Core/Statechart/StatechartExtractor.fs` with `ExtractedStatechart` type and `extract` function
-- [ ] T008 Implement `AssemblyLoadContext` isolation with `isCollectible: true`
-- [ ] T009 Implement endpoint scanning: build minimal WebApplication, register endpoints, collect `StateMachineMetadata` from endpoint metadata
-- [ ] T010 Implement route template extraction from `RouteEndpoint.RoutePattern.RawText`
-- [ ] T011 Implement error handling: assembly not found, load failures, startup exceptions
-- [ ] T012 Add `StatechartExtractor.fs` compile entry to `Frank.Cli.Core.fsproj`
-- [ ] T013 Verify module compiles with `dotnet build`
+- [x] T007 Create `src/Frank.Cli.Core/Statechart/StatechartExtractor.fs` with `ExtractedStatechart` type and `extract` function
+- [x] T008 Implement `AssemblyLoadContext` isolation with `isCollectible: true`
+- [x] T009 Implement endpoint scanning: build minimal WebApplication, register endpoints, collect `StateMachineMetadata` from endpoint metadata
+- [x] T010 Implement route template extraction from `RouteEndpoint.RoutePattern.RawText`
+- [x] T011 Implement error handling: assembly not found, load failures, startup exceptions
+- [x] T012 Add `StatechartExtractor.fs` compile entry to `Frank.Cli.Core.fsproj`
+- [x] T013 Verify module compiles with `dotnet build`
 
 ### Implementation Notes
 - Use host-based approach (D-003): load the assembly into an isolated `AssemblyLoadContext`, build a minimal `WebApplication`, register endpoints (which triggers `StatefulResourceBuilder.Run` and populates `StateMachineMetadata` on endpoint metadata), collect `StateMachineMetadata` instances from endpoint metadata, then shut down the host
