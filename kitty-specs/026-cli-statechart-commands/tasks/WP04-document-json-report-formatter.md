@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: StatechartDocumentJson & ValidationReportFormatter
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01]
 base_branch: 026-cli-statechart-commands-WP01
 base_commit: 0deb6951be74c1007947286eec458d85cfc6738c
@@ -15,7 +15,7 @@ subtasks:
 - T025
 assignee: ''
 agent: "claude-opus"
-shell_pid: "8092"
+shell_pid: "8673"
 review_status: ''
 reviewed_by: ''
 history:
@@ -279,3 +279,4 @@ spec-kitty implement WP04 --base WP01
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T02:35:39Z – claude-opus – shell_pid=8092 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T02:38:46Z – claude-opus – shell_pid=8092 – lane=for_review – Ready for review: StatechartDocumentJson and ValidationReportFormatter. Handles all AST element types including GroupBlock branches.
+- 2026-03-18T02:38:49Z – claude-opus – shell_pid=8673 – lane=doing – Started review via workflow command
