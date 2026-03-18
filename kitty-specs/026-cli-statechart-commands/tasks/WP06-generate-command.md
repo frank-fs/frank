@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Generate Command
-lane: "doing"
+lane: "for_review"
 dependencies: [WP02, WP03]
 base_branch: 026-cli-statechart-commands-WP06-merge-base
 base_commit: 4bb9bf40314cb20e63171875c5eef9b2c691d9e9
@@ -269,3 +269,4 @@ spec-kitty implement WP06 --base WP03
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T02:39:24Z – claude-opus – shell_pid=8948 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T02:55:40Z – claude-opus – shell_pid=8948 – lane=for_review – Ready for review: StatechartGenerateCommand with multi-format generation, file output, and resource filtering.
