@@ -6,19 +6,19 @@
 
 ## Summary
 
-Add a `frank statechart` subcommand group to frank-cli that exposes all statechart pipeline operations through the command line: `extract`, `generate`, `validate`, and `import`. The commands are thin wrappers over existing library modules in `Frank.Statecharts`. The primary new infrastructure is assembly loading (to extract `StateMachineMetadata` from compiled Frank applications), an XState v5 JSON serializer/deserializer (~250-350 lines), output formatting, and validation report rendering. All five notation formats (WSD, ALPS, SCXML, smcat, XState JSON) are supported.
+Restructure frank-cli into two subcommand groups — `frank-cli semantic` (existing linked-data pipeline) and `frank-cli statechart` (new statechart pipeline) — with `status` and `help` remaining top-level. The `statechart` group adds four commands: `extract`, `generate`, `validate`, and `parse`. The commands are thin wrappers over existing library modules in `Frank.Statecharts`. All parsers return `Ast.ParseResult` directly (no mapper modules). All generators consume `StatechartDocument` directly. The primary new infrastructure is assembly loading (to extract `StateMachineMetadata` from compiled Frank applications), an XState v5 JSON serializer/deserializer (~250-350 lines), output formatting, validation report rendering, and hierarchical help system support. All five notation formats (WSD, ALPS, SCXML, smcat, XState JSON) are supported.
 
 ## Technical Context
 
 **Language/Version**: F# 8.0+ targeting .NET 10.0 (matching Frank.Cli and Frank.Cli.Core)
-**Primary Dependencies**: System.CommandLine 2.0.3 (existing), Frank.Statecharts (new project reference from Frank.Cli.Core), System.Text.Json (in-framework)
+**Primary Dependencies**: System.CommandLine 2.0.3 (in Frank.Cli, not Frank.Cli.Core), Frank.Statecharts (new project reference from Frank.Cli.Core), System.Text.Json (in-framework)
 **Storage**: N/A (stateless CLI commands -- reads compiled assemblies and spec files, writes to stdout or output directory)
 **Testing**: Expecto + TestHost pattern (matching existing Frank test projects), targeting net10.0
 **Target Platform**: .NET 10.0 CLI tool (cross-platform)
 **Project Type**: Library additions to existing `Frank.Cli.Core` + CLI wiring in `Frank.Cli/Program.fs`
 **Performance Goals**: Extract completes within 5 seconds for typical applications (up to 10 stateful resources) per SC-001
 **Constraints**: Assembly loading must use isolated `AssemblyLoadContext` to prevent dependency conflicts (FR-006). All format modules in Frank.Statecharts are currently `internal` -- visibility must be expanded.
-**Scale/Scope**: 4 new CLI subcommands, 1 new XState serializer/deserializer module, 1 new assembly loading module, output formatting additions
+**Scale/Scope**: 4 new statechart CLI subcommands, `semantic` parent command restructuring for 5 existing commands, 1 new XState serializer/deserializer module, 1 new assembly loading module, output formatting additions, hierarchical help system extension
 
 ## Constitution Check
 
@@ -65,21 +65,21 @@ src/Frank.Cli.Core/
 │   ├── FormatDetector.fs             # File extension -> FormatTag mapping
 │   ├── FormatPipeline.fs             # Metadata -> format text generation pipelines
 │   ├── ValidationReportFormatter.fs  # ValidationReport -> text/json output
-│   └── StatechartDocumentJson.fs     # StatechartDocument -> JSON serialization (for import/extract)
+│   └── StatechartDocumentJson.fs     # StatechartDocument -> JSON serialization (for parse/extract)
 ├── Commands/
 │   ├── StatechartExtractCommand.fs   # NEW: extract subcommand logic
 │   ├── StatechartGenerateCommand.fs  # NEW: generate subcommand logic
 │   ├── StatechartValidateCommand.fs  # NEW: validate subcommand logic
-│   └── StatechartImportCommand.fs    # NEW: import subcommand logic
+│   └── StatechartParseCommand.fs     # NEW: parse subcommand logic
 ├── Output/
 │   ├── JsonOutput.fs                 # MODIFIED: add statechart output formatters
 │   └── TextOutput.fs                 # MODIFIED: add statechart output formatters
 ├── Help/
-│   └── HelpContent.fs               # MODIFIED: add statechart command help entries
+│   └── HelpContent.fs               # MODIFIED: hierarchical names, semantic + statechart entries, workflow topics
 └── Frank.Cli.Core.fsproj            # MODIFIED: add Frank.Statecharts reference, new files
 
 src/Frank.Cli/
-└── Program.fs                        # MODIFIED: add statechart parent command + 4 subcommands
+└── Program.fs                        # MODIFIED: restructure into semantic + statechart parent commands
 
 test/Frank.Cli.Statechart.Tests/      # NEW: test project
 ├── Frank.Cli.Statechart.Tests.fsproj
@@ -96,7 +96,7 @@ test/Frank.Cli.Statechart.Tests/      # NEW: test project
 ## Technical Decisions
 
 ### D-001: Command Registration Pattern
-Follow existing imperative System.CommandLine pattern in Program.fs. Add a `statechart` parent Command with four subcommands. No abstraction layer.
+Follow existing imperative System.CommandLine pattern in Program.fs. Restructure into `semantic` and `statechart` parent Commands with their respective subcommands. `status` and `help` remain top-level. No abstraction layer.
 
 ### D-002: Project Reference
 Add `Frank.Statecharts` project reference to `Frank.Cli.Core.fsproj`. This adds the `Microsoft.AspNetCore.App` framework reference transitively. Acceptable because the CLI already targets net10.0 and assembly loading requires ASP.NET Core types.
@@ -105,7 +105,7 @@ Add `Frank.Statecharts` project reference to `Frank.Cli.Core.fsproj`. This adds 
 Use the host-based approach (as confirmed in the spec clarification session): load the assembly into an isolated `AssemblyLoadContext`, build a minimal `WebApplication`, register endpoints (which triggers `StatefulResourceBuilder.Run` execution and populates `StateMachineMetadata` on endpoint metadata), collect `StateMachineMetadata` instances from the endpoint metadata, then shut down the host. This follows the same pattern ASP.NET Core's own OpenAPI tooling uses. The host-based approach is the primary and recommended strategy because `StateMachineMetadata` is populated during endpoint registration (not available via static reflection alone).
 
 ### D-004: Visibility
-Add `InternalsVisibleTo Include="Frank.Cli.Core"` to `Frank.Statecharts.fsproj`. This is the minimal change that unblocks CLI access to generators, parsers, and mappers without changing the public API surface of Frank.Statecharts.
+Add `InternalsVisibleTo Include="Frank.Cli.Core"` to `Frank.Statecharts.fsproj`. This is the minimal change that unblocks CLI access to generators, parsers, and serializers without changing the public API surface of Frank.Statecharts.
 
 ### D-005: XState Serializer Location
 New `src/Frank.Statecharts/XState/` subdirectory with `Serializer.fs` and `Deserializer.fs`, following the pattern of existing format modules.
@@ -114,7 +114,13 @@ New `src/Frank.Statecharts/XState/` subdirectory with `Serializer.fs` and `Deser
 The validate command generates a `FormatArtifact` from extracted metadata using `Wsd.Generator.generate` (the central metadata-to-AST converter). This artifact uses `FormatTag.Wsd` since it is generated by the WSD generator. Cross-format rules compare spec files against this code-derived WSD artifact.
 
 ### D-007: Output Format Disambiguation
-All commands use `--output-format text|json` for output rendering (defaulting to `text`). The `--format` flag is reserved for notation format selection: the `generate` command uses `--format` for the target notation format (wsd/alps/scxml/smcat/xstate/all), and the `import` command uses `--format` for notation disambiguation of ambiguous file extensions (e.g., `--format alps` or `--format xstate` for `.json` files). The principle: `--format` = what notation format, `--output-format` = how to render output.
+All commands use `--output-format text|json` for output rendering (defaulting to `text`). The `--format` flag is reserved for notation format selection: the `generate` command uses `--format` for the target notation format (wsd/alps/scxml/smcat/xstate/all), and the `parse` command uses `--format` for notation disambiguation of ambiguous file extensions (e.g., `--format alps` or `--format xstate` for `.json` files). The principle: `--format` = what notation format, `--output-format` = how to render output.
+
+### D-009: CLI Structure Restructuring
+Existing top-level commands (extract, clarify, validate, diff, compile) move under a `semantic` parent command. New statechart commands go under a `statechart` parent command. `status` and `help` remain top-level. Since nothing is released, no backward compatibility is needed. Help metadata uses hierarchical names (e.g., `"semantic extract"`, `"statechart extract"`) for distinct lookup.
+
+### D-010: Help System Hierarchical Names
+`HelpContent.findCommand` must support space-separated hierarchical names. Each subcommand is registered with its qualified name (e.g., `Name = "statechart extract"`). The `workflows` topic is renamed to `semantic-workflows` and a new `statechart-workflows` topic is added.
 
 ### D-008: MSBuild Integration (P3)
 Included as a final work package. The issue explicitly specifies MSBuild target integration for automatic spec generation after build. Depends on the generate command being implemented first.
@@ -140,12 +146,14 @@ Critical constraint: The loaded assembly's `Frank.Statecharts.StateMachineMetada
 
 ### Format Generation Pipelines
 
+All generators consume `StatechartDocument` directly (no mapper modules exist post-migration).
+
 | Format | Pipeline |
 |--------|----------|
 | WSD | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `Wsd.Serializer.serialize` -> text |
-| ALPS | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `Alps.Mapper.fromStatechartDocument` -> `AlpsDocument` -> `Alps.JsonGenerator.generateAlpsJson` -> JSON |
-| SCXML | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `Scxml.Mapper.fromStatechartDocument` -> `ScxmlDocument` -> `Scxml.Generator.generate` -> XML |
-| smcat | `StateMachineMetadata` -> `Smcat.Generator.generate` -> text (direct, no AST intermediate) |
+| ALPS | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `Alps.JsonGenerator.generateAlpsJson` -> JSON |
+| SCXML | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `Scxml.Generator.generate` -> XML |
+| smcat | `StateMachineMetadata` -> `Smcat.Generator.generate` -> `Result<StatechartDocument, GeneratorError>` -> `Smcat.Serializer.serialize` -> text |
 | XState | `StateMachineMetadata` -> `Wsd.Generator.generate` -> `StatechartDocument` -> `XState.Serializer.serialize` -> JSON |
 
 ### Format Detection (File Extension -> FormatTag)
@@ -159,19 +167,21 @@ Critical constraint: The loaded assembly's `Frank.Statecharts.StateMachineMetada
 | `.xstate.json` | XState | Compound extension, check before `.json` |
 | `.json` | Ambiguous | Require `--format` flag or try both ALPS and XState parsers |
 
-### Import Command Pipeline
+### Parse Command Pipeline
+
+All parsers return `Ast.ParseResult` directly (no mapper step, post-migration).
 
 ```
 spec file path
   -> FormatDetector.detect (file extension -> FormatTag)
   -> Read file contents
-  -> Dispatch to format parser:
-     - Wsd: Wsd.Parser.parseWsd -> Ast.ParseResult (shared AST directly)
-     - Alps: Alps.JsonParser.parseAlpsJson -> Result<AlpsDocument,...> -> Alps.Mapper.toStatechartDocument
-     - Scxml: Scxml.Parser.parseString -> ScxmlParseResult -> Scxml.Mapper.toStatechartDocument
-     - Smcat: Smcat.Parser.parseSmcat -> Smcat.Types.ParseResult -> Smcat.Mapper.toStatechartDocument
-     - XState: XState.Deserializer.deserialize -> Ast.ParseResult
-  -> Serialize StatechartDocument to JSON
+  -> Dispatch to format parser (all return Ast.ParseResult):
+     - Wsd: Wsd.Parser.parseWsd
+     - Alps: Alps.JsonParser.parseAlpsJson
+     - Scxml: Scxml.Parser.parseString
+     - Smcat: Smcat.Parser.parseSmcat
+     - XState: XState.Deserializer.deserialize
+  -> Serialize ParseResult (Document + Errors + Warnings) to JSON
   -> Output
 ```
 
