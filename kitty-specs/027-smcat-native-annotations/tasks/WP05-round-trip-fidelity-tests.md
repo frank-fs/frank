@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP05"
+work_package_id: WP05
+title: Round-Trip Fidelity Tests
+lane: "doing"
+dependencies: [WP02, WP03, WP04]
+base_branch: 027-smcat-native-annotations-WP05-merge-base
+base_commit: d2f98bb15264f4f3fa481f96305a8acae368c0d8
+created_at: '2026-03-18T06:28:38.518877+00:00'
 subtasks:
-  - "T019"
-  - "T020"
-  - "T021"
-  - "T022"
-  - "T023"
-title: "Round-Trip Fidelity Tests"
-phase: "Phase 2 - Validation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02", "WP03", "WP04"]
-requirement_refs: ["FR-015", "FR-016", "FR-017"]
+- T019
+- T020
+- T021
+- T022
+- T023
+phase: Phase 2 - Validation
+assignee: ''
+agent: ''
+shell_pid: "40571"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T05:39:36Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T05:39:36Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-015, FR-016, FR-017]
 ---
 
 # Work Package Prompt: WP05 – Round-Trip Fidelity Tests
