@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP02"
-title: "StatechartExtractor -- Assembly Loading & Metadata Extraction"
-lane: "planned"
-dependencies: ["WP01"]
+work_package_id: WP02
+title: StatechartExtractor -- Assembly Loading & Metadata Extraction
+lane: "doing"
+dependencies: [WP01]
+base_branch: 026-cli-statechart-commands-WP01
+base_commit: 0deb6951be74c1007947286eec458d85cfc6738c
+created_at: '2026-03-18T02:18:04.199970+00:00'
 subtasks:
-  - "T007"
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T007
+- T008
+- T009
+- T010
+- T011
+- T012
+- T013
+assignee: ''
+agent: ''
+shell_pid: "4905"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP02 -- StatechartExtractor -- Assembly Loading & Metadata Extraction
