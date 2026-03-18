@@ -92,12 +92,12 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T014 [P] Create `src/Frank.Cli.Core/Statechart/FormatDetector.fs` with `detect` function and `FormatTag` -> extension mappings
-- [ ] T015 [P] Create `src/Frank.Cli.Core/Statechart/FormatPipeline.fs` with per-format generation pipelines
-- [ ] T016 Implement format detection: `.wsd`, `.alps.json`, `.scxml`, `.smcat`, `.xstate.json`, `.json` (ambiguous)
-- [ ] T017 Implement generation pipelines: WSD, ALPS, SCXML, smcat, XState (using existing generators + new XState serializer)
-- [ ] T018 Add compile entries to `Frank.Cli.Core.fsproj` (before command files)
-- [ ] T019 Verify modules compile with `dotnet build`
+- [x] T014 [P] Create `src/Frank.Cli.Core/Statechart/FormatDetector.fs` with `detect` function and `FormatTag` -> extension mappings
+- [x] T015 [P] Create `src/Frank.Cli.Core/Statechart/FormatPipeline.fs` with per-format generation pipelines
+- [x] T016 Implement format detection: `.wsd`, `.alps.json`, `.scxml`, `.smcat`, `.xstate.json`, `.json` (ambiguous)
+- [x] T017 Implement generation pipelines: WSD, ALPS, SCXML, smcat, XState (using existing generators + new XState serializer)
+- [x] T018 Add compile entries to `Frank.Cli.Core.fsproj` (before command files)
+- [x] T019 Verify modules compile with `dotnet build`
 
 ### Implementation Notes
 - FormatDetector: compound extensions (`.alps.json`, `.xstate.json`) must be checked before `.json`
