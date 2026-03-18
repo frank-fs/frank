@@ -18,10 +18,10 @@
 **Prompt**: `tasks/WP01-ast-type-definitions.md`
 
 ### Included Subtasks
-- [ ] T001 Add `SmcatTypeOrigin` and `SmcatTransitionKind` DUs to `src/Frank.Statecharts/Ast/Types.fs`
-- [ ] T002 Add `SmcatStateType` and `SmcatTransition` cases to `SmcatMeta` in `src/Frank.Statecharts/Ast/Types.fs`
-- [ ] T003 Rename `SmcatActivity` → `SmcatCustomAttribute` in `src/Frank.Statecharts/Ast/Types.fs`, `src/Frank.Statecharts/Smcat/Parser.fs`, `src/Frank.Statecharts/Smcat/Serializer.fs`
-- [ ] T004 Verify `dotnet build` and `dotnet test` across all target frameworks
+- [x] T001 Add `SmcatTypeOrigin` and `SmcatTransitionKind` DUs to `src/Frank.Statecharts/Ast/Types.fs`
+- [x] T002 Add `SmcatStateType` and `SmcatTransition` cases to `SmcatMeta` in `src/Frank.Statecharts/Ast/Types.fs`
+- [x] T003 Rename `SmcatActivity` → `SmcatCustomAttribute` in `src/Frank.Statecharts/Ast/Types.fs`, `src/Frank.Statecharts/Smcat/Parser.fs`, `src/Frank.Statecharts/Smcat/Serializer.fs`
+- [x] T004 Verify `dotnet build` and `dotnet test` across all target frameworks
 
 ### Implementation Notes
 - T001-T002 are additive changes to `Ast/Types.fs` — no consumers break.
