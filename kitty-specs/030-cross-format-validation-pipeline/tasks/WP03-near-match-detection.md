@@ -9,7 +9,7 @@ created_at: '2026-03-18T17:48:45.096751+00:00'
 subtasks: [T014, T015, T016, T017, T018, T019]
 phase: Phase 1 - Implementation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "85249"
 review_status: ''
 reviewed_by: ''
@@ -112,3 +112,4 @@ Add tests:
 
 ## Activity Log
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
+- 2026-03-18T17:48:45Z – claude-opus – shell_pid=85249 – lane=doing – Assigned agent via workflow command
