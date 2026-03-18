@@ -529,6 +529,7 @@ and private parseTransition
                     if sourceName = "initial" then InitialTransition
                     elif targetName = "final" then FinalTransition
                     elif targetName = sourceName then SelfTransition
+                    elif depth > 0 then InternalTransition
                     else ExternalTransition
 
                 let edge : TransitionEdge =
@@ -731,7 +732,7 @@ and private tryHandleInvalidArrow
             // Try to parse the rest as a transition (target + optional label)
             match readStateName state with
             | Some targetName ->
-                // T016: Infer transition kind for annotation (error-recovery path)
+                // T016: Infer transition kind for annotation (error-recovery path, no depth available)
                 let transitionKind =
                     if name = "initial" then InitialTransition
                     elif targetName = "final" then FinalTransition

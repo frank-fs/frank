@@ -40,6 +40,44 @@ operating {
 };
 operating => final: powerOff;"""
 
+/// Golden File 4: Explicit type attributes and colors.
+/// Tests: SmcatStateType Explicit round-trip, SmcatColor, multiple attributes.
+let goldenExplicitTypes =
+    """myStart [type="initial"];
+idle [color="green"];
+processing;
+done [type="final"];
+myStart => idle: begin;
+idle => processing: submit;
+processing => done: complete;"""
+
+/// Golden File 5: Naming convention types (inferred).
+/// Tests: SmcatStateType Inferred round-trip, pseudo-state names.
+let goldenInferredTypes =
+    """initial => active: start;
+active => active: refresh;
+active => final: shutdown;"""
+
+/// Golden File 6: Activities and custom attributes.
+/// Tests: StateActivities, SmcatCustomAttribute round-trip.
+let goldenActivitiesAndAttributes =
+    """idle: entry/ initialize exit/ cleanup;
+working [priority="high"];
+idle => working: begin;
+working => idle: finish;"""
+
+/// Golden File 7: Composite states with internal transitions.
+/// Tests: nested states and transitions inside composite blocks.
+let goldenCompositeAnnotations =
+    """initial => machine: start;
+machine {
+  idle;
+  running;
+  idle => running: go;
+  running => idle: stop;
+};
+machine => final: shutdown;"""
+
 // =============================================================================
 // Semantic Equivalence Comparison
 // =============================================================================
@@ -103,6 +141,69 @@ let private assertSemanticEquivalence (doc1: StatechartDocument) (doc2: Statecha
     Expect.equal transitions1 transitions2 "Transition sets should be equivalent"
 
 // =============================================================================
+// Structural Equivalence Comparison (includes annotations)
+// =============================================================================
+
+/// Normalize annotations to a set for order-independent comparison.
+/// Excludes SmcatTransition annotations from comparison since transition kinds
+/// are inferred from structure (depth) and may change when composite blocks
+/// don't round-trip their nesting structure (e.g., transition-only composites).
+let private normalizeAnnotations (annotations: Annotation list) : Set<Annotation> =
+    annotations
+    |> List.filter (function
+        | SmcatAnnotation(SmcatTransition _) -> false
+        | _ -> true)
+    |> Set.ofList
+
+/// Extract (name, kind, annotations) tuples from document states (recursive).
+let rec private extractAnnotatedStateSet (doc: StatechartDocument) : Set<string * StateKind * Set<Annotation>> =
+    doc.Elements
+    |> List.collect (fun el ->
+        match el with
+        | StateDecl s ->
+            let childStates = extractAnnotatedStateSetFromChildren s.Children
+            (s.Identifier |> Option.defaultValue "", s.Kind, normalizeAnnotations s.Annotations)
+            :: childStates
+        | _ -> [])
+    |> Set.ofList
+
+and private extractAnnotatedStateSetFromChildren (children: StateNode list) : (string * StateKind * Set<Annotation>) list =
+    children
+    |> List.collect (fun s ->
+        let nested = extractAnnotatedStateSetFromChildren s.Children
+        (s.Identifier |> Option.defaultValue "", s.Kind, normalizeAnnotations s.Annotations)
+        :: nested)
+
+/// Extract (source, target, event, guard, action, annotations) tuples from transitions (recursive).
+let rec private extractAnnotatedTransitionSet (doc: StatechartDocument)
+    : Set<string * string option * string option * string option * string option * Set<Annotation>> =
+    doc.Elements
+    |> List.collect (fun el ->
+        match el with
+        | TransitionElement t ->
+            [ (t.Source, t.Target, t.Event, t.Guard, t.Action, normalizeAnnotations t.Annotations) ]
+        | StateDecl s ->
+            extractAnnotatedTransitionSetFromChildren s.Children
+        | _ -> [])
+    |> Set.ofList
+
+and private extractAnnotatedTransitionSetFromChildren (children: StateNode list)
+    : (string * string option * string option * string option * string option * Set<Annotation>) list =
+    children
+    |> List.collect (fun s ->
+        extractAnnotatedTransitionSetFromChildren s.Children)
+
+/// Assert structural equivalence including annotations (set-based comparison).
+let private assertStructuralEquivalence (doc1: StatechartDocument) (doc2: StatechartDocument) =
+    let states1 = extractAnnotatedStateSet doc1
+    let states2 = extractAnnotatedStateSet doc2
+    Expect.equal states1 states2 "Annotated state sets should be structurally equivalent"
+
+    let transitions1 = extractAnnotatedTransitionSet doc1
+    let transitions2 = extractAnnotatedTransitionSet doc2
+    Expect.equal transitions1 transitions2 "Annotated transition sets should be structurally equivalent"
+
+// =============================================================================
 // Roundtrip Cycle Helper
 // =============================================================================
 
@@ -124,6 +225,8 @@ let private roundtrip (smcatText: string) =
 
     // Step 4: Compare ASTs for semantic equivalence
     assertSemanticEquivalence result1.Document result2.Document
+    // Step 5: Compare ASTs for structural equivalence (includes annotations)
+    assertStructuralEquivalence result1.Document result2.Document
 
 // =============================================================================
 // Golden File Roundtrip Tests (T030, T031)
@@ -140,7 +243,19 @@ let goldenFileTests =
           <| fun _ -> roundtrip goldenBranchingGuards
 
           testCase "golden file 3 - composite states"
-          <| fun _ -> roundtrip goldenCompositeStates ]
+          <| fun _ -> roundtrip goldenCompositeStates
+
+          testCase "golden file 4 - explicit types and colors"
+          <| fun _ -> roundtrip goldenExplicitTypes
+
+          testCase "golden file 5 - inferred types"
+          <| fun _ -> roundtrip goldenInferredTypes
+
+          testCase "golden file 6 - activities and custom attributes"
+          <| fun _ -> roundtrip goldenActivitiesAndAttributes
+
+          testCase "golden file 7 - composite annotations"
+          <| fun _ -> roundtrip goldenCompositeAnnotations ]
 
 // =============================================================================
 // Edge Case Roundtrip Tests (T033)
@@ -298,3 +413,50 @@ let successCriteriaTests =
               roundtrip goldenBranchingGuards
               // Golden file 3: composite states
               roundtrip goldenCompositeStates ]
+
+// =============================================================================
+// Annotation Round-Trip Tests (spec 027)
+// =============================================================================
+
+[<Tests>]
+let annotationRoundTripTests =
+    testList
+        "Smcat.RoundTrip.Annotations"
+        [ testCase "explicit type survives round-trip"
+          <| fun _ ->
+              let result1 = parseSmcat "myState [type=\"initial\"];"
+              let generated = serialize result1.Document
+              Expect.stringContains generated "type=\"initial\"" "explicit type preserved in output"
+              let result2 = parseSmcat generated
+              assertStructuralEquivalence result1.Document result2.Document
+
+          testCase "inferred type does not gain explicit attribute"
+          <| fun _ ->
+              let result1 = parseSmcat "initial => idle;"
+              let generated = serialize result1.Document
+              let hasExplicitType = generated.Contains("type=\"initial\"")
+              Expect.isFalse hasExplicitType "inferred initial should not have type attribute"
+
+          testCase "color annotation survives round-trip"
+          <| fun _ -> roundtrip "myState [color=\"red\"];"
+
+          testCase "self-transition annotation round-trip"
+          <| fun _ ->
+              let result1 = parseSmcat "a => a: refresh;"
+              let ts1 =
+                  result1.Document.Elements
+                  |> List.choose (function TransitionElement t -> Some t | _ -> None)
+              let hasSelf =
+                  ts1[0].Annotations |> List.exists (function
+                      | SmcatAnnotation(SmcatTransition SelfTransition) -> true
+                      | _ -> false)
+              Expect.isTrue hasSelf "self-transition annotated"
+              roundtrip "a => a: refresh;"
+
+          testCase "SC-003: structural equivalence after round-trip"
+          <| fun _ ->
+              // Parse all golden files and verify structural equivalence
+              roundtrip goldenExplicitTypes
+              roundtrip goldenInferredTypes
+              roundtrip goldenActivitiesAndAttributes
+              roundtrip goldenCompositeAnnotations ]
