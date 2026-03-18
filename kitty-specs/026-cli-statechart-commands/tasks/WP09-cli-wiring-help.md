@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP09"
 title: "CLI Wiring & Help Content"
-lane: "doing"
+lane: "done"
 dependencies: ["WP05", "WP06", "WP07", "WP08"]
 subtasks:
   - "T055"
@@ -14,8 +14,8 @@ subtasks:
 assignee: ""
 agent: "claude-opus"
 shell_pid: "14998"
-review_status: ""
-reviewed_by: ""
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
   - timestamp: "2026-03-16T19:12:54Z"
     lane: "planned"
@@ -502,3 +502,4 @@ Note: This WP depends on all four command WPs. Ensure they are all merged into t
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T03:14:50Z – unknown – lane=for_review – Ready for review: CLI restructured with semantic/statechart parent commands. 4 statechart subcommands wired. Help entries added. Build clean. kitty-specs diffs are from merge topology, not intentional changes.
 - 2026-03-18T03:14:54Z – claude-opus – shell_pid=14998 – lane=doing – Started review via workflow command
+- 2026-03-18T03:15:31Z – claude-opus – shell_pid=14998 – lane=done – Review passed: CLI restructured correctly. semantic/statechart parent groups. 4 statechart subcommands. Help entries. Build and --help verified.
