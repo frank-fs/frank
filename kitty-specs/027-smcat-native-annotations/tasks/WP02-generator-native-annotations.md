@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: Generator Native Annotations
+lane: "doing"
+dependencies: [WP01]
+base_branch: 027-smcat-native-annotations-WP01
+base_commit: 1a657d3121f0d1d274c9aa8cae2459565738e29a
+created_at: '2026-03-18T06:13:42.850312+00:00'
 subtasks:
-  - "T005"
-  - "T006"
-  - "T007"
-  - "T008"
-  - "T009"
-title: "Generator Native Annotations"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-005", "FR-006", "FR-007", "FR-008"]
+- T005
+- T006
+- T007
+- T008
+- T009
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "37678"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T05:39:36Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T05:39:36Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-005, FR-006, FR-007, FR-008]
 ---
 
 # Work Package Prompt: WP02 – Generator Native Annotations
