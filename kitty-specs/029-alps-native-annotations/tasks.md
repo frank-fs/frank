@@ -14,11 +14,11 @@
 **Prompt**: `tasks/WP01-extract-classification.md`
 
 ### Included Subtasks
-- [ ] T001 Create `Alps/Classification.fs` with `internal` intermediate types (`ParsedDescriptor`, `ParsedExtension`, `ParsedLink`)
-- [ ] T002 Move classification functions to `Classification.fs` (`isTransitionTypeStr`, `collectRtTargets`, `isStateDescriptor`, `buildDescriptorIndex`, `resolveRt`, `extractGuard`, `extractParameters`, `toTransitionKind`, `resolveDescriptor`, `extractTransitions`, `toStateNode`, `buildStateAnnotations`, `buildTransitionAnnotations`)
-- [ ] T003 Update `JsonParser.fs` to import from `Classification` module instead of defining these privately
-- [ ] T004 Add `Alps/Classification.fs` to `Frank.Statecharts.fsproj` BEFORE `Alps/JsonParser.fs` in compilation order
-- [ ] T005 Verify `dotnet build` and `dotnet test` across all target frameworks
+- [x] T001 Create `Alps/Classification.fs` with `internal` intermediate types (`ParsedDescriptor`, `ParsedExtension`, `ParsedLink`)
+- [x] T002 Move classification functions to `Classification.fs` (`isTransitionTypeStr`, `collectRtTargets`, `isStateDescriptor`, `buildDescriptorIndex`, `resolveRt`, `extractGuard`, `extractParameters`, `toTransitionKind`, `resolveDescriptor`, `extractTransitions`, `toStateNode`, `buildStateAnnotations`, `buildTransitionAnnotations`)
+- [x] T003 Update `JsonParser.fs` to import from `Classification` module instead of defining these privately
+- [x] T004 Add `Alps/Classification.fs` to `Frank.Statecharts.fsproj` BEFORE `Alps/JsonParser.fs` in compilation order
+- [x] T005 Verify `dotnet build` and `dotnet test` across all target frameworks
 
 ### Dependencies
 - None (starting package).
