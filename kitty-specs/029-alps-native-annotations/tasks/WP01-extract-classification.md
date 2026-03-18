@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP01"
-subtasks: ["T001", "T002", "T003", "T004", "T005"]
-title: "Extract Shared Classification Module"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Extract Shared Classification Module
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-005", "FR-008", "FR-010", "FR-011"]
+base_branch: master
+base_commit: a631caa8f67d215172a83b8feb7e0faacce0b5a2
+created_at: '2026-03-18T14:31:00.726756+00:00'
+subtasks: [T001, T002, T003, T004, T005]
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "71187"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T14:14:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T14:14:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-005, FR-008, FR-010, FR-011]
 ---
 
 # Work Package Prompt: WP01 – Extract Shared Classification Module
