@@ -2,7 +2,7 @@
 
 **Feature Branch**: `015-rdf-sparql-validation`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #78
 **Dependencies**: Frank.LinkedData (#75, spec 001), Frank.Provenance (#77, spec 006)
 **Input**: Validate that Frank's RDF output is well-formed and queryable by SPARQL, ensuring interoperability with external triple stores

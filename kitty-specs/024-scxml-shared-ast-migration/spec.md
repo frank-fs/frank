@@ -2,7 +2,7 @@
 
 **Feature Branch**: `024-scxml-shared-ast-migration`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Done
 **Input**: Issue #114 - SCXML: migrate parser and generator to shared StatechartDocument AST
 
 ## User Scenarios & Testing *(mandatory)*

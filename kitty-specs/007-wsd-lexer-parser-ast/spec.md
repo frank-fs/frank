@@ -2,7 +2,7 @@
 
 **Feature Branch**: `007-wsd-lexer-parser-ast`
 **Created**: 2026-03-07
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #90
 **Dependencies**: Frank.Statecharts (#87) core runtime is complete
 **Location**: Internal to `src/Frank.Statecharts/` (WSD parser namespace), tests in `test/Frank.Statecharts.Tests/`

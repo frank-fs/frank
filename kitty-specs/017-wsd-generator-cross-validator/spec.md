@@ -2,7 +2,7 @@
 
 **Feature Branch**: `017-wsd-generator-cross-validator`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #91
 **Dependencies**: #90 (WSD Parser — provides AST types and enables roundtrip tests), Frank.Statecharts (#87) core runtime, Shared Statechart AST (spec 020) defines the unified AST
 **Parallel with**: #97 (ALPS), #98 (SCXML), #100 (smcat) — each owns its own generator

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-semantic-resources-phase1`
 **Created**: 2026-03-04
-**Status**: Draft
+**Status**: Done
 **Input**: Implement Phase 1 of milestone #2 (tracking issue #80) — parallel workstreams for frank-cli (#79) and Frank.LinkedData (#75)
 **Milestone**: v7.3.0 — Semantic Metadata-Augmented Resources
 **GitHub Issues**: #80 (tracking), #79 (frank-cli), #75 (Frank.LinkedData)

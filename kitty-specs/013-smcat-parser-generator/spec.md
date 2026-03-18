@@ -2,7 +2,7 @@
 
 **Feature Branch**: `013-smcat-parser-generator`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #100
 **Dependencies**: Frank.Statecharts (#87) core runtime is complete (merged via PR #96), Shared Statechart AST (spec 020) defines the unified AST all format parsers populate
 **Location**: Internal to `src/Frank.Statecharts/` (Smcat parser namespace), tests in `test/Frank.Statecharts.Tests/`

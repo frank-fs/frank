@@ -2,7 +2,7 @@
 
 **Feature Branch**: `016-frank-cli-help-system`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **Input**: GitHub issue #110 -- frank-cli: LLM-ready help system with workflow guidance, help topics, and project status
 **GitHub Issue**: #110
 

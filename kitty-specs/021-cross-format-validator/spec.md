@@ -2,7 +2,7 @@
 
 **Feature Branch**: `021-cross-format-validator`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **Dependencies**: Shared Statechart AST (spec 020, #87) must be complete. Format parser/generator specs: ALPS (spec 011, #97), smcat (spec 013, #100), WSD Generator (spec 017, #91), SCXML (spec 018, #98). Carved out of spec 017.
 **Consumed by**: frank-cli validate (#94) -- this spec does not provide a CLI interface
 **Parent issue**: #57 (statechart spec pipeline)

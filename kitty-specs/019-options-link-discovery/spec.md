@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-options-link-discovery`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #102
 **Dependencies**: Frank core (`src/Frank/`) for `ResourceBuilder`/`ResourceSpec`/endpoint metadata; Frank.LinkedData (#75) and Frank.Statecharts (#87) as contributing extensions
 **Location**: New extension package `Frank.Discovery` (shared OPTIONS/Link mechanism) with integration points in Frank.LinkedData and Frank.Statecharts

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `010-statecharts-production-readiness`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #95
 **Predecessor**: `kitty-specs/004-frank-statecharts/` (spec 004, issue #87)
 **Input**: Production readiness gaps identified during WP06 integration testing of #87. Four architectural concerns that must be addressed before Frank.Statecharts can be recommended for real applications.

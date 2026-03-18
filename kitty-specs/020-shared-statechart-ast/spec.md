@@ -2,7 +2,7 @@
 
 **Feature Branch**: `020-shared-statechart-ast`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **Dependencies**: #87 (core runtime -- `StateMachineMetadata` types, complete). This spec is a prerequisite for #97 (ALPS), #98 (SCXML), #100 (smcat), #91 (WSD Generator), and a forthcoming cross-format validator spec.
 **Location**: `src/Frank.Statecharts/Ast/` (shared AST types), with migration of `src/Frank.Statecharts/Wsd/Types.fs` and `src/Frank.Statecharts/Wsd/Parser.fs`. Tests in `test/Frank.Statecharts.Tests/`.
 **Input**: Cross-cutting architectural requirement -- unified AST for all statechart format parsers (WSD, ALPS, SCXML, smcat, XState JSON)

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `023-alps-shared-ast-migration`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Done
 **Dependencies**: #111 (Shared AST, spec 020 -- complete), #97 (ALPS Parser + Generator, spec 011 -- complete)
 **Location**: `src/Frank.Statecharts/Alps/` (parser, generator, types), `src/Frank.Statecharts/Ast/Types.fs` (AlpsMeta extensions). Tests in `test/Frank.Statecharts.Tests/Alps/`.
 **Input**: Issue #115 -- ALPS: migrate parser and generator to shared StatechartDocument AST

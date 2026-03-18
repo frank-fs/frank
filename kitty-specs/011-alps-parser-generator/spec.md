@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-alps-parser-generator`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #97
 **Dependencies**: Frank.Statecharts (#87) core runtime is complete, Shared Statechart AST (spec 020) defines the unified AST all format parsers populate
 **Parallel With**: #98 (SCXML), #100 (smcat), #90 (WSD Parser)

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `025-validation-pipeline-wiring`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Done
 **Dependencies**: #113 (smcat shared AST migration), #114 (SCXML shared AST migration), #115 (ALPS shared AST migration). All three must be complete before implementation begins -- each parser must return `ParseResult` directly. Also depends on spec 021 (cross-format validator engine, #112) which is already implemented and passing.
 **Consumed by**: frank-cli `validate` command (#94) -- the CLI delegates to the pipeline rather than orchestrating parse+validate itself
 **Parent issue**: #57 (statechart spec pipeline)

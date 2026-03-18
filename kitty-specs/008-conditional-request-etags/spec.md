@@ -2,7 +2,7 @@
 
 **Feature Branch**: `008-conditional-request-etags`
 **Created**: 2026-03-07
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #93
 **Dependencies**: Frank.Statecharts (#87, `statefulResource` CE) for default provider
 **Location**: Frank core (`src/Frank/`) — conditional requests are fundamental HTTP semantics

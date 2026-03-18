@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-prov-o-state-change-tracking`
 **Created**: 2026-03-07
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #77
 **Dependencies**: Frank.Statecharts (#87, complete), Frank.LinkedData (#75, complete)
 **Prerequisite**: `TransitionEvent<'State, 'Event, 'Context>` in Frank.Statecharts must be extended with `InstanceId: string`, `ResourceUri: string`, `HttpMethod: string`, and `Headers: Map<string, string>` fields before this feature can be implemented. Current fields: PreviousState, PreviousContext, NewState, NewContext, Event, Timestamp, User.

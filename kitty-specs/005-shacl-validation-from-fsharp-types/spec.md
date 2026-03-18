@@ -2,7 +2,7 @@
 
 **Feature Branch**: `005-shacl-validation-from-fsharp-types`
 **Created**: 2026-03-07
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #76
 **Dependencies**: Frank.LinkedData (#75, complete), Frank.Auth (capability-based authorization), Frank.Statecharts (#87, 004-frank-statecharts)
 **Input**: Phase 2 of #80 (Semantic Metadata-Augmented Resources). SHACL shapes as semantic request/response constraints, derived automatically from F# types.

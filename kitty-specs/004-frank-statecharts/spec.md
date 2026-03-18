@@ -2,7 +2,7 @@
 
 **Feature Branch**: `004-frank-statecharts`
 **Created**: 2026-03-07
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #87
 **Research**: `kitty-specs/003-statecharts-feasibility-research/`
 **Input**: Phase 2 of #80 (Semantic Metadata-Augmented Resources). Core runtime library unblocking #76 (Validation) and #77 (Provenance). CLI spec generation deferred to #57.

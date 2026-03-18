@@ -2,7 +2,7 @@
 
 **Feature Branch**: `018-scxml-parser-generator`
 **Created**: 2026-03-15
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #98
 **Dependencies**: #87 (core runtime -- `StateMachineMetadata` types, complete), shared AST spec (forthcoming -- defines the unified AST all format parsers populate)
 **Parallel with**: #97 (ALPS), #100 (smcat), #90 (WSD Parser)

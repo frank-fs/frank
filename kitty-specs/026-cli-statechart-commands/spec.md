@@ -2,7 +2,7 @@
 
 **Feature Branch**: `026-cli-statechart-commands`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Done
 **GitHub Issue**: #94
 **Dependencies**: #91 (WSD Generator), #90 (WSD Parser), #97 (ALPS Parser + Generator), #98 (SCXML Parser + Generator), #100 (smcat Parser + Generator), #112 (Cross-format validator, spec 021)
 **Parallel with**: #93 (ETag generation -- no dependency)

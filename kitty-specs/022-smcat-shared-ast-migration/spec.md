@@ -2,7 +2,7 @@
 
 **Feature Branch**: `022-smcat-shared-ast-migration`
 **Created**: 2026-03-16
-**Status**: Draft
+**Status**: Done
 **Dependencies**: #111 (Shared AST, spec 020 -- complete), #100 (smcat Parser + Generator, spec 013 -- complete)
 **Location**: `src/Frank.Statecharts/Smcat/` (parser, generator, types), `src/Frank.Statecharts/Ast/Types.fs` (SmcatMeta). Tests in `test/Frank.Statecharts.Tests/Smcat/`.
 **Input**: Issue #113 -- smcat: migrate parser and generator to shared StatechartDocument AST
