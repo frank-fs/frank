@@ -69,7 +69,7 @@ Jaro-Winkler is better for short identifier strings than Levenshtein (it weights
 
 ### D-003: Format Priority as DU Ordering
 
-The priority is encoded as a function `formatPriority: FormatTag -> int` where SCXML=0, smcat=1, WSD=2, Alps=3, AlpsXml=3, XState=4. Lower number = higher priority for structural fields.
+The priority is encoded as a function `formatPriority: FormatTag -> int` where SCXML=0, XState=1, smcat=2, WSD=3, Alps=4, AlpsXml=4. Lower number = higher priority for structural fields. XState ranks between SCXML and smcat (both are executable formats per Harel).
 
 ### D-004: AlpsXml as Separate FormatTag
 

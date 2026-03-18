@@ -151,7 +151,7 @@ A developer validates formats where state or event names are similar but not ide
 
 - **Pipeline.mergeSources**: New function merging multiple parsed `StatechartDocument` values into one unified document.
 - **FormatTag (extended)**: Add `AlpsXml` case for ALPS XML dispatch, or extend `Alps` to support both representations.
-- **MergePriority**: The structural precedence ordering: SCXML > smcat > WSD > ALPS (annotations only).
+- **MergePriority**: The structural precedence ordering: SCXML > XState > smcat > WSD > ALPS (annotations only).
 
 ## Success Criteria
 
@@ -168,7 +168,7 @@ A developer validates formats where state or event names are similar but not ide
 - The existing `Pipeline.validateSources` function is unchanged — merge is additive, not a modification.
 - The merge function does NOT enforce validation — the caller is responsible for validating first. `mergeSources` produces a best-effort merge regardless.
 - For end-to-end tests, equivalent representations of the same state machine in each format will be maintained as test fixtures (inline strings or golden files).
-- The XState format remains unsupported in the pipeline (`FormatTag.XState` returns `UnsupportedFormat`).
+- XState is wired into the pipeline via `XState.Deserializer.deserialize`. Its merge priority is between SCXML and smcat (SCXML > XState > smcat) per Harel's assessment — XState is an executable format like SCXML, not a descriptive format like smcat/WSD.
 - State matching is by `Identifier` string (exact match) in the merge function. The validator separately checks for near-matches using string distance metrics.
 - Transition matching is by `(Source, Target, Event)` triple (exact match) in the merge function.
 - String distance for near-match detection uses a standard metric (e.g., Jaro-Winkler or Levenshtein). The threshold for reporting near-matches is configurable but defaults to a reasonable value (e.g., 0.7 similarity).
