@@ -18,7 +18,7 @@ module Pipeline =
         | FormatTag.Scxml -> Some Frank.Statecharts.Scxml.Parser.parseString
         | FormatTag.Alps -> Some Frank.Statecharts.Alps.JsonParser.parseAlpsJson
         | FormatTag.AlpsXml -> Some Frank.Statecharts.Alps.XmlParser.parseAlpsXml
-        | FormatTag.XState -> None
+        | FormatTag.XState -> Some Frank.Statecharts.XState.Deserializer.deserialize
 
     /// Parse a single (FormatTag * string) pair, returning either a
     /// (FormatParseResult * FormatArtifact) on success or a PipelineError.
