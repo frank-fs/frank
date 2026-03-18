@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: FormatDetector & FormatPipeline
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01, WP02]
 base_branch: 026-cli-statechart-commands-WP03-merge-base
 base_commit: 30a746dce8d843a01d8834b2b48bd8975dc4d1bc
@@ -15,7 +15,7 @@ subtasks:
 - T019
 assignee: ''
 agent: "claude-opus"
-shell_pid: "7358"
+shell_pid: "7923"
 review_status: ''
 reviewed_by: ''
 history:
@@ -285,3 +285,4 @@ spec-kitty implement WP03 --base WP02
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T02:33:02Z – claude-opus – shell_pid=7358 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T02:35:06Z – claude-opus – shell_pid=7358 – lane=for_review – Ready for review: FormatDetector and FormatPipeline modules. All 5 format pipelines route through correct generators with proper StatechartDocument→format-specific document mapping.
+- 2026-03-18T02:35:11Z – claude-opus – shell_pid=7923 – lane=doing – Started review via workflow command
