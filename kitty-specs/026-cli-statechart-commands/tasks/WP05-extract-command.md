@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP05"
-title: "Extract Command"
-lane: "planned"
-dependencies: ["WP02"]
+work_package_id: WP05
+title: Extract Command
+lane: "doing"
+dependencies: [WP02]
+base_branch: 026-cli-statechart-commands-WP02
+base_commit: 30a746dce8d843a01d8834b2b48bd8975dc4d1bc
+created_at: '2026-03-18T02:39:20.616860+00:00'
 subtasks:
-  - "T026"
-  - "T027"
-  - "T028"
-  - "T029"
-  - "T030"
-  - "T031"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T026
+- T027
+- T028
+- T029
+- T030
+- T031
+assignee: ''
+agent: ''
+shell_pid: "8834"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP05 -- Extract Command
