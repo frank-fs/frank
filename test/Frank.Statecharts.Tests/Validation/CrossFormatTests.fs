@@ -350,8 +350,8 @@ let multiFormatTests =
               Expect.equal report.TotalFailures 0 "All consistent formats should have no failures"
               // AlpsXml is not in the artifact list, so its 5 pairs (x3 check types) are skipped
               Expect.equal report.TotalSkipped 15 "AlpsXml pairs should be skipped (5 pairs x 3 check types)"
-              // 10 pairs among the 5 provided formats x 3 check types = 30 executed
-              Expect.equal report.TotalChecks 30 "30 cross-format rules should execute (10 pairs x 3 check types)"
+              // 10 pairs among the 5 provided formats x 3 check types = 30 pairwise + 1 nearMatchRule = 31 executed
+              Expect.equal report.TotalChecks 31 "31 cross-format rules should execute (10 pairs x 3 check types + nearMatchRule)"
           }
 
           test "3 of 5 formats: applicable rules run, others skipped" {
@@ -370,9 +370,9 @@ let multiFormatTests =
 
               // 15 pairs total (6 tags), 3 of which involve only Scxml/XState/Smcat:
               //   Scxml-XState, Scxml-Smcat, Smcat-XState
-              // That's 3 pairs x 3 check types = 9 executed
+              // That's 3 pairs x 3 check types = 9 executed + 1 nearMatchRule (universal) = 10 executed
               // The other 12 pairs involve Wsd, Alps, or AlpsXml, so 12 x 3 = 36 skipped
-              Expect.equal report.TotalChecks 9 "9 rules should execute (3 pairs x 3 check types)"
+              Expect.equal report.TotalChecks 10 "10 rules should execute (3 pairs x 3 check types + nearMatchRule)"
               Expect.equal report.TotalSkipped 36 "36 rules should be skipped (12 pairs x 3 check types)"
           }
 
@@ -408,24 +408,26 @@ let multiFormatTests =
               Expect.isGreaterThan (List.length smcatFailChecks) 0 "Should report 'maintenance' failures for smcat pairs"
           }
 
-          test "no artifacts: all cross-format rules skipped" {
+          test "no artifacts: all pairwise cross-format rules skipped, nearMatchRule executes" {
               let report = Validator.validate CrossFormatRules.rules []
 
-              Expect.equal report.TotalChecks 0 "No checks should execute"
-              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 rules
-              Expect.equal report.TotalSkipped 45 "All 45 rules should be skipped"
+              // nearMatchRule (universal, RequiredFormats = empty) still executes and produces 1 pass check
+              Expect.equal report.TotalChecks 1 "nearMatchRule executes with no artifacts"
+              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 pairwise rules all skipped
+              Expect.equal report.TotalSkipped 45 "All 45 pairwise rules should be skipped"
               Expect.equal report.TotalFailures 0 "No failures"
           }
 
-          test "single artifact: all cross-format rules skipped" {
+          test "single artifact: pairwise cross-format rules skipped, nearMatchRule executes" {
               let doc = makeDocument [ "idle"; "active" ] []
               let artifacts = [ makeArtifact Scxml doc ]
 
               let report = Validator.validate CrossFormatRules.rules artifacts
 
-              Expect.equal report.TotalChecks 0 "No cross-format checks should execute with single artifact"
-              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 rules
-              Expect.equal report.TotalSkipped 45 "All 45 cross-format rules should be skipped"
+              // nearMatchRule (universal) executes but produces 1 pass (no pairs to compare)
+              Expect.equal report.TotalChecks 1 "Only nearMatchRule executes with single artifact"
+              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 pairwise rules all skipped
+              Expect.equal report.TotalSkipped 45 "All 45 pairwise cross-format rules should be skipped"
 
               // But self-consistency rules should still run
               let selfReport = Validator.validate SelfConsistencyRules.rules artifacts
