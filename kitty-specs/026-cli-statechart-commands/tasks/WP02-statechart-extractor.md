@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: StatechartExtractor -- Assembly Loading & Metadata Extraction
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 026-cli-statechart-commands-WP01
 base_commit: 0deb6951be74c1007947286eec458d85cfc6738c
@@ -252,3 +252,4 @@ spec-kitty implement WP02 --base WP01
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
 - 2026-03-18T02:18:04Z – claude-opus – shell_pid=4905 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T02:22:19Z – claude-opus – shell_pid=4905 – lane=for_review – Assembly loading infra complete. extractFromAssembly has placeholder — host-based scanning needs integration testing.
