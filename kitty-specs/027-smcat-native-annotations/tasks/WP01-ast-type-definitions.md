@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-title: "AST Type Definitions and Rename"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: AST Type Definitions and Rename
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-016", "FR-017"]
+base_branch: master
+base_commit: a002e99e6b4dd059e6b305ae20db9b65d2c7624d
+created_at: '2026-03-18T05:50:35.769769+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "34417"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T05:39:36Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T05:39:36Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-016, FR-017]
 ---
 
 # Work Package Prompt: WP01 – AST Type Definitions and Rename
