@@ -44,6 +44,7 @@
     <Compile Include="XState/Deserializer.fs" />
     <!-- Validation -->
     <Compile Include="Validation/Types.fs" />
+    <Compile Include="Validation/StringDistance.fs" />
     <Compile Include="Validation/Validator.fs" />
     <Compile Include="Validation/Pipeline.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->

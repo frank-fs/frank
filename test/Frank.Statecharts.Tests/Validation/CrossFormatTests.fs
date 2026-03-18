@@ -348,9 +348,10 @@ let multiFormatTests =
               let report = Validator.validate CrossFormatRules.rules artifacts
 
               Expect.equal report.TotalFailures 0 "All consistent formats should have no failures"
-              Expect.equal report.TotalSkipped 0 "All formats present, no rules should be skipped"
-              // 30 rules (10 pairs x 3 check types), each producing 1 pass check
-              Expect.equal report.TotalChecks 30 "All 30 cross-format rules should execute"
+              // AlpsXml is not in the artifact list, so its 5 pairs (x3 check types) are skipped
+              Expect.equal report.TotalSkipped 15 "AlpsXml pairs should be skipped (5 pairs x 3 check types)"
+              // 10 pairs among the 5 provided formats x 3 check types = 30 executed
+              Expect.equal report.TotalChecks 30 "30 cross-format rules should execute (10 pairs x 3 check types)"
           }
 
           test "3 of 5 formats: applicable rules run, others skipped" {
@@ -367,12 +368,12 @@ let multiFormatTests =
 
               Expect.equal report.TotalFailures 0 "Consistent formats should have no failures"
 
-              // 10 pairs total, 3 of which involve only Scxml/XState/Smcat:
+              // 15 pairs total (6 tags), 3 of which involve only Scxml/XState/Smcat:
               //   Scxml-XState, Scxml-Smcat, Smcat-XState
               // That's 3 pairs x 3 check types = 9 executed
-              // The other 7 pairs involve Wsd or Alps, so 7 x 3 = 21 skipped
+              // The other 12 pairs involve Wsd, Alps, or AlpsXml, so 12 x 3 = 36 skipped
               Expect.equal report.TotalChecks 9 "9 rules should execute (3 pairs x 3 check types)"
-              Expect.equal report.TotalSkipped 21 "21 rules should be skipped (7 pairs x 3 check types)"
+              Expect.equal report.TotalSkipped 36 "36 rules should be skipped (12 pairs x 3 check types)"
           }
 
           test "partial mismatch: SCXML-XState agree, smcat has extra 'maintenance'" {
@@ -411,7 +412,8 @@ let multiFormatTests =
               let report = Validator.validate CrossFormatRules.rules []
 
               Expect.equal report.TotalChecks 0 "No checks should execute"
-              Expect.equal report.TotalSkipped 30 "All 30 rules should be skipped"
+              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 rules
+              Expect.equal report.TotalSkipped 45 "All 45 rules should be skipped"
               Expect.equal report.TotalFailures 0 "No failures"
           }
 
@@ -422,7 +424,8 @@ let multiFormatTests =
               let report = Validator.validate CrossFormatRules.rules artifacts
 
               Expect.equal report.TotalChecks 0 "No cross-format checks should execute with single artifact"
-              Expect.equal report.TotalSkipped 30 "All 30 cross-format rules should be skipped"
+              // 6 tags -> C(6,2)=15 pairs x 3 check types = 45 rules
+              Expect.equal report.TotalSkipped 45 "All 45 cross-format rules should be skipped"
 
               // But self-consistency rules should still run
               let selfReport = Validator.validate SelfConsistencyRules.rules artifacts

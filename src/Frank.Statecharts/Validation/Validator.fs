@@ -626,7 +626,7 @@ module CrossFormatRules =
 
     /// All unique pairs of format tags.
     let private formatPairs: (FormatTag * FormatTag) list =
-        let tags = [ Wsd; Alps; Scxml; Smcat; XState ]
+        let tags = [ Wsd; Alps; AlpsXml; Scxml; Smcat; XState ]
 
         [ for i in 0 .. tags.Length - 2 do
               for j in i + 1 .. tags.Length - 1 do

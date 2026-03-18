@@ -17,6 +17,7 @@ module Pipeline =
         | FormatTag.Smcat -> Some Frank.Statecharts.Smcat.Parser.parseSmcat
         | FormatTag.Scxml -> Some Frank.Statecharts.Scxml.Parser.parseString
         | FormatTag.Alps -> Some Frank.Statecharts.Alps.JsonParser.parseAlpsJson
+        | FormatTag.AlpsXml -> Some Frank.Statecharts.Alps.XmlParser.parseAlpsXml
         | FormatTag.XState -> None
 
     /// Parse a single (FormatTag * string) pair, returning either a
