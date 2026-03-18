@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP03"
-subtasks: ["T010", "T011", "T012", "T013", "T014", "T015", "T016"]
-title: "Generator Emits All Content"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-011", "FR-012", "FR-013", "FR-014", "FR-015"]
+work_package_id: WP03
+title: Generator Emits All Content
+lane: "doing"
+dependencies: [WP01]
+base_branch: 028-scxml-native-annotations-WP01
+base_commit: 5fe78bcab9b411214c67617e5a715e3629be9aec
+created_at: '2026-03-18T07:31:13.859862+00:00'
+subtasks: [T010, T011, T012, T013, T014, T015, T016]
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "50078"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T07:24:37Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T07:24:37Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-011, FR-012, FR-013, FR-014, FR-015]
 ---
 
 # Work Package Prompt: WP03 – Generator Emits All Content
