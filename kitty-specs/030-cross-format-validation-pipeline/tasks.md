@@ -72,12 +72,12 @@
 **Prompt**: `tasks/WP04-end-to-end-tests.md`
 
 ### Included Subtasks
-- [ ] T020 Create multi-format test fixtures (same state machine in WSD, smcat, SCXML, ALPS JSON)
-- [ ] T021 Add end-to-end test: consistent formats → zero validation failures
-- [ ] T022 Add end-to-end test: intentional mismatches → correct failure detection
-- [ ] T023 Add end-to-end test: validate then merge → unified document with annotations from all formats
-- [ ] T024 Add end-to-end test: near-match detection with real format text
-- [ ] T025 Verify `dotnet build` and `dotnet test`
+- [x] T020 Create multi-format test fixtures (same state machine in WSD, smcat, SCXML, ALPS JSON)
+- [x] T021 Add end-to-end test: consistent formats → zero validation failures
+- [x] T022 Add end-to-end test: intentional mismatches → correct failure detection
+- [x] T023 Add end-to-end test: validate then merge → unified document with annotations from all formats
+- [x] T024 Add end-to-end test: near-match detection with real format text
+- [x] T025 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - Depends on WP02 (merge function), WP03 (near-match detection).
