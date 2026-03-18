@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: End-to-End Integration Tests
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP02
 base_branch: 030-cross-format-validation-pipeline-WP02
@@ -133,3 +133,4 @@ testCase "validate then merge produces unified document"
 ## Activity Log
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
 - 2026-03-18T18:56:38Z – claude-opus – shell_pid=89819 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T19:03:36Z – claude-opus – shell_pid=89819 – lane=for_review – 6 E2E tests: 5-format consistency, casing mismatch, validate-then-merge, 3-way merge, event mismatch. 984 tests pass.
