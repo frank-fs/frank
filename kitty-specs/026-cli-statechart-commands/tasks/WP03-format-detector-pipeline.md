@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP03"
-title: "FormatDetector & FormatPipeline"
-lane: "planned"
-dependencies: ["WP01", "WP02"]
+work_package_id: WP03
+title: FormatDetector & FormatPipeline
+lane: "doing"
+dependencies: [WP01, WP02]
+base_branch: 026-cli-statechart-commands-WP03-merge-base
+base_commit: 30a746dce8d843a01d8834b2b48bd8975dc4d1bc
+created_at: '2026-03-18T02:33:02.628667+00:00'
 subtasks:
-  - "T014"
-  - "T015"
-  - "T016"
-  - "T017"
-  - "T018"
-  - "T019"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T014
+- T015
+- T016
+- T017
+- T018
+- T019
+assignee: ''
+agent: ''
+shell_pid: "7358"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP03 -- FormatDetector & FormatPipeline
