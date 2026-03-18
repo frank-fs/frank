@@ -189,14 +189,14 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T032 Create `src/Frank.Cli.Core/Commands/StatechartGenerateCommand.fs` with `execute` function
-- [ ] T033 Implement single-format generation: delegate to FormatPipeline per format
-- [ ] T034 Implement `--format all` generation: iterate all 5 formats
-- [ ] T035 Implement `--output <directory>` file writing with naming convention `{resourceSlug}.{extension}`
-- [ ] T036 Implement `--resource <name>` filter for single-resource generation
-- [ ] T037 Implement stdout output with resource and format headers when `--output` is not specified
-- [ ] T038 Handle zero-resources and directory creation
-- [ ] T039 Add compile entry to `Frank.Cli.Core.fsproj`
+- [x] T032 Create `src/Frank.Cli.Core/Commands/StatechartGenerateCommand.fs` with `execute` function
+- [x] T033 Implement single-format generation: delegate to FormatPipeline per format
+- [x] T034 Implement `--format all` generation: iterate all 5 formats
+- [x] T035 Implement `--output <directory>` file writing with naming convention `{resourceSlug}.{extension}`
+- [x] T036 Implement `--resource <name>` filter for single-resource generation
+- [x] T037 Implement stdout output with resource and format headers when `--output` is not specified
+- [x] T038 Handle zero-resources and directory creation
+- [x] T039 Add compile entry to `Frank.Cli.Core.fsproj`
 
 ### Implementation Notes
 - Format option values: `wsd`, `alps`, `scxml`, `smcat`, `xstate`, `all`
