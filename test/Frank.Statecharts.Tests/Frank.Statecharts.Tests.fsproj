@@ -48,6 +48,7 @@
     <Compile Include="Validation/SelfConsistencyTests.fs" />
     <Compile Include="Validation/CrossFormatTests.fs" />
     <Compile Include="Validation/IntegrationTests.fs" />
+    <Compile Include="Validation/PipelineTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
