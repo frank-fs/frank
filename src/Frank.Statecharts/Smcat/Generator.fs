@@ -39,7 +39,18 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
 
     let orderedStates = metadata.InitialStateKey :: others
 
-    // State declarations
+    // Initial pseudo-state declaration
+    let initialStateDecl =
+        [ StateDecl
+              { Identifier = Some "initial"
+                Label = None
+                Kind = Initial
+                Children = []
+                Activities = None
+                Position = Some syntheticPos
+                Annotations = [ SmcatAnnotation(SmcatStateType(Initial, Explicit)) ] } ]
+
+    // Regular domain state declarations (no SmcatStateType annotation)
     let stateElements =
         orderedStates
         |> List.map (fun name ->
@@ -52,7 +63,29 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
                   Position = Some syntheticPos
                   Annotations = [] })
 
-    // Initial transition: initial => <firstState>
+    // Determine which states are final
+    let hasFinalTransitions =
+        orderedStates
+        |> List.exists (fun stateName ->
+            match Map.tryFind stateName metadata.StateMetadataMap with
+            | Some info when info.IsFinal -> true
+            | _ -> false)
+
+    // Final pseudo-state declaration (only emitted when there are final transitions)
+    let finalStateDecl =
+        if hasFinalTransitions then
+            [ StateDecl
+                  { Identifier = Some "final"
+                    Label = None
+                    Kind = Final
+                    Children = []
+                    Activities = None
+                    Position = Some syntheticPos
+                    Annotations = [ SmcatAnnotation(SmcatStateType(Final, Explicit)) ] } ]
+        else
+            []
+
+    // Initial transition: initial => <firstState> with InitialTransition annotation
     let initialTransition =
         [ TransitionElement
               { Source = "initial"
@@ -62,9 +95,9 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
                 Action = None
                 Parameters = []
                 Position = Some syntheticPos
-                Annotations = [] } ]
+                Annotations = [ SmcatAnnotation(SmcatTransition InitialTransition) ] } ]
 
-    // Self-transitions for each (state, httpMethod) handler pair
+    // Self-transitions for each (state, httpMethod) handler pair with SelfTransition annotation
     let transitionElements =
         orderedStates
         |> List.collect (fun stateName ->
@@ -80,10 +113,10 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
                           Action = None
                           Parameters = []
                           Position = Some syntheticPos
-                          Annotations = [] })
+                          Annotations = [ SmcatAnnotation(SmcatTransition SelfTransition) ] })
             | None -> [])
 
-    // Final state transitions: <state> => final
+    // Final state transitions: <state> => final with FinalTransition annotation
     let finalTransitions =
         orderedStates
         |> List.collect (fun stateName ->
@@ -97,10 +130,11 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
                         Action = None
                         Parameters = []
                         Position = Some syntheticPos
-                        Annotations = [] } ]
+                        Annotations = [ SmcatAnnotation(SmcatTransition FinalTransition) ] } ]
             | _ -> [])
 
-    let allElements = stateElements @ initialTransition @ transitionElements @ finalTransitions
+    let allElements =
+        initialStateDecl @ stateElements @ finalStateDecl @ initialTransition @ transitionElements @ finalTransitions
 
     Ok
         { Title = Some options.ResourceName
