@@ -9,7 +9,7 @@ created_at: '2026-03-18T14:34:09.976306+00:00'
 subtasks: [T011, T012, T013, T014, T015, T016]
 phase: Phase 1 - Implementation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "71891"
 review_status: ''
 reviewed_by: ''
@@ -214,3 +214,4 @@ spec-kitty implement WP03 --base WP01
 ## Activity Log
 
 - 2026-03-18T14:14:54Z – system – lane=planned – Prompt created.
+- 2026-03-18T14:34:10Z – claude-opus – shell_pid=71891 – lane=doing – Assigned agent via workflow command
