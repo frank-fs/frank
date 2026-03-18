@@ -1,7 +1,7 @@
 ---
 work_package_id: "WP07"
 title: "Validate Command"
-lane: "planned"
+lane: "for_review"
 dependencies: ["WP02", "WP03", "WP04"]
 subtasks:
   - "T040"
@@ -262,3 +262,4 @@ Note: WP04 depends on WP01, and WP03 depends on WP01+WP02. If WP03 is not yet me
 ## Activity Log
 
 - 2026-03-16T19:12:54Z -- system -- lane=planned -- Prompt created.
+- 2026-03-18T02:48:28Z – unknown – lane=for_review – Ready for review: StatechartValidateCommand with cross-format validation. Build clean.
