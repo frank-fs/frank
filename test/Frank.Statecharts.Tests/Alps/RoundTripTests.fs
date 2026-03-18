@@ -328,3 +328,199 @@ let crossFormatCompatibilityTests =
 
               Expect.isGreaterThan report.TotalChecks 0 "cross-format rules should run"
               Expect.equal report.TotalFailures 0 "identical documents should have zero cross-format failures" ]
+
+// ---------------------------------------------------------------------------
+// Amundsen onboarding fixture round-trip tests (WP02)
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let amundsenRoundTripTests =
+    testList
+        "Alps.RoundTrip.Amundsen"
+        [ testCase "Amundsen onboarding JSON roundtrip produces structurally equal ASTs"
+          <| fun _ ->
+              let result1 = parseAlpsJson amundsenOnboardingAlpsJson
+              Expect.isEmpty result1.Errors "initial parse should succeed"
+              let generated = generateAlpsJson result1.Document
+              let result2 = parseAlpsJson generated
+              Expect.isEmpty result2.Errors "re-parse of generated JSON should succeed"
+              Expect.equal result1.Document result2.Document "ASTs structurally equal after round-trip"
+
+          testCase "Amundsen onboarding roundtrip preserves states (home, wip, customerData)"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalStateIds =
+                  getStates original |> List.choose (fun s -> s.Identifier) |> Set.ofList
+
+              let roundTrippedStateIds =
+                  getStates roundTripped |> List.choose (fun s -> s.Identifier) |> Set.ofList
+
+              Expect.containsAll
+                  originalStateIds
+                  (Set.ofList [ "home"; "wip"; "customerData" ])
+                  "original has all three Amundsen states"
+
+              Expect.equal roundTrippedStateIds originalStateIds "roundtrip preserves state identifiers"
+
+          testCase "Amundsen onboarding roundtrip preserves data descriptors (identifier, name, email)"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let getDataDescriptorIds (doc: StatechartDocument) =
+                  doc.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | AlpsAnnotation(AlpsDataDescriptor(id, _)) -> Some id
+                      | _ -> None)
+                  |> Set.ofList
+
+              let originalDataIds = getDataDescriptorIds original
+              let roundTrippedDataIds = getDataDescriptorIds roundTripped
+
+              Expect.containsAll
+                  originalDataIds
+                  (Set.ofList [ "identifier"; "name"; "email" ])
+                  "original has all three data descriptors"
+
+              Expect.equal roundTrippedDataIds originalDataIds "roundtrip preserves data descriptor ids"
+
+          testCase "Amundsen onboarding roundtrip preserves transitions (startOnboarding, collectCustomerData, completeOnboarding)"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalEvents =
+                  getTransitions original |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              let roundTrippedEvents =
+                  getTransitions roundTripped |> List.choose (fun t -> t.Event) |> Set.ofList
+
+              Expect.containsAll
+                  originalEvents
+                  (Set.ofList [ "startOnboarding"; "collectCustomerData"; "completeOnboarding" ])
+                  "original has all three transitions"
+
+              Expect.equal roundTrippedEvents originalEvents "roundtrip preserves transition events"
+
+          testCase "Amundsen onboarding roundtrip preserves root-level link annotation"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let originalLinks = getLinks original
+              let roundTrippedLinks = getLinks roundTripped
+
+              Expect.equal originalLinks.Length 1 "original has one link"
+              Expect.equal (fst originalLinks.[0]) "self" "link rel is self"
+              Expect.equal roundTrippedLinks originalLinks "roundtrip preserves root-level links"
+
+          testCase "Amundsen onboarding roundtrip preserves root-level ext annotation"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let getDocExts (doc: StatechartDocument) =
+                  doc.Annotations
+                  |> List.choose (fun a ->
+                      match a with
+                      | AlpsAnnotation(AlpsExtension(id, href, value)) -> Some(id, href, value)
+                      | _ -> None)
+
+              let originalExts = getDocExts original
+              let roundTrippedExts = getDocExts roundTripped
+
+              Expect.equal originalExts.Length 1 "original has one root ext"
+              let (extId, _, extVal) = originalExts.[0]
+              Expect.equal extId "author" "ext id is author"
+              Expect.equal extVal (Some "amundsen") "ext value is amundsen"
+              Expect.equal roundTrippedExts originalExts "roundtrip preserves root-level ext annotations"
+
+          testCase "Amundsen onboarding roundtrip preserves guard extension on collectCustomerData"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let findCollectCustomerData (doc: StatechartDocument) =
+                  getTransitions doc
+                  |> List.find (fun t -> t.Event = Some "collectCustomerData")
+
+              let originalTransition = findCollectCustomerData original
+              let roundTrippedTransition = findCollectCustomerData roundTripped
+
+              Expect.equal originalTransition.Guard (Some "emailValid") "original guard is emailValid"
+              Expect.equal roundTrippedTransition.Guard originalTransition.Guard "roundtrip preserves guard"
+
+          testCase "Amundsen onboarding roundtrip preserves transition parameters"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              let collectParams doc =
+                  getTransitions doc
+                  |> List.find (fun t -> t.Event = Some "collectCustomerData")
+                  |> fun t -> t.Parameters
+
+              let originalParams = collectParams original
+              let roundTrippedParams = collectParams roundTripped
+
+              Expect.containsAll
+                  (Set.ofList originalParams)
+                  (Set.ofList [ "name"; "email" ])
+                  "collectCustomerData has name and email parameters"
+
+              Expect.equal (Set.ofList roundTrippedParams) (Set.ofList originalParams) "roundtrip preserves parameters"
+
+          testCase "Amundsen onboarding roundtrip preserves documentation at all levels"
+          <| fun _ ->
+              let original = parseOk amundsenOnboardingAlpsJson "initial parse failed"
+              let roundTripped = parseOk (generateAlpsJson original) "re-parse failed"
+
+              // Document-level doc
+              Expect.equal (getDocumentation roundTripped) (getDocumentation original) "document-level doc preserved"
+
+              // State-level doc: 'home' state should have doc annotation
+              let findStateDoc (doc: StatechartDocument) (stateId: string) =
+                  getStates doc
+                  |> List.find (fun s -> s.Identifier = Some stateId)
+                  |> fun s ->
+                      s.Annotations
+                      |> List.tryPick (fun a ->
+                          match a with
+                          | AlpsAnnotation(AlpsDocumentation(fmt, v)) -> Some(fmt, v)
+                          | _ -> None)
+
+              let originalHomeDoc = findStateDoc original "home"
+              let roundTrippedHomeDoc = findStateDoc roundTripped "home"
+
+              Expect.isSome originalHomeDoc "home state has documentation"
+              Expect.equal roundTrippedHomeDoc originalHomeDoc "state-level doc preserved"
+
+              // Transition-level doc: startOnboarding should have doc annotation
+              let findTransDoc (doc: StatechartDocument) (event: string) =
+                  getTransitions doc
+                  |> List.find (fun t -> t.Event = Some event)
+                  |> fun t ->
+                      t.Annotations
+                      |> List.tryPick (fun a ->
+                          match a with
+                          | AlpsAnnotation(AlpsDocumentation(fmt, v)) -> Some(fmt, v)
+                          | _ -> None)
+
+              let originalStartDoc = findTransDoc original "startOnboarding"
+              let roundTrippedStartDoc = findTransDoc roundTripped "startOnboarding"
+
+              Expect.isSome originalStartDoc "startOnboarding transition has documentation"
+              Expect.equal roundTrippedStartDoc originalStartDoc "transition-level doc preserved"
+
+          testCase "minimal document (version only) roundtrips without data loss"
+          <| fun _ ->
+              let minimal = """{"alps":{"version":"1.0"}}"""
+              let result1 = parseAlpsJson minimal
+              Expect.isEmpty result1.Errors "parse of minimal document should succeed"
+              let generated = generateAlpsJson result1.Document
+              let result2 = parseAlpsJson generated
+              Expect.isEmpty result2.Errors "re-parse of generated minimal document should succeed"
+              Expect.equal result1.Document result2.Document "minimal document ASTs structurally equal" ]
