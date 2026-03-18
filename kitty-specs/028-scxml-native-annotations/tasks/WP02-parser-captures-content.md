@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP02"
-subtasks: ["T003", "T004", "T005", "T006", "T007", "T008", "T009"]
-title: "Parser Captures All Content"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-005", "FR-006", "FR-007", "FR-008", "FR-009", "FR-010"]
+work_package_id: WP02
+title: Parser Captures All Content
+lane: "doing"
+dependencies: [WP01]
+base_branch: 028-scxml-native-annotations-WP01
+base_commit: 5fe78bcab9b411214c67617e5a715e3629be9aec
+created_at: '2026-03-18T07:31:12.543197+00:00'
+subtasks: [T003, T004, T005, T006, T007, T008, T009]
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "49969"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T07:24:37Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T07:24:37Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-005, FR-006, FR-007, FR-008, FR-009, FR-010]
 ---
 
 # Work Package Prompt: WP02 – Parser Captures All Content
