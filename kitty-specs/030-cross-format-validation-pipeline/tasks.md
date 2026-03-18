@@ -14,12 +14,12 @@
 **Prompt**: `tasks/WP01-foundation.md`
 
 ### Included Subtasks
-- [ ] T001 Add `AlpsXml` case to `FormatTag` in `src/Frank.Statecharts/Validation/Types.fs`
-- [ ] T002 Create `src/Frank.Statecharts/Validation/StringDistance.fs` with Jaro-Winkler implementation
-- [ ] T003 Wire `FormatTag.AlpsXml` dispatch in `src/Frank.Statecharts/Validation/Pipeline.fs`
-- [ ] T004 Update `Frank.Statecharts.fsproj` with new files in correct compilation order
-- [ ] T005 Fix exhaustive pattern matches broken by new `AlpsXml` case
-- [ ] T006 Verify `dotnet build` and `dotnet test`
+- [x] T001 Add `AlpsXml` case to `FormatTag` in `src/Frank.Statecharts/Validation/Types.fs`
+- [x] T002 Create `src/Frank.Statecharts/Validation/StringDistance.fs` with Jaro-Winkler implementation
+- [x] T003 Wire `FormatTag.AlpsXml` dispatch in `src/Frank.Statecharts/Validation/Pipeline.fs`
+- [x] T004 Update `Frank.Statecharts.fsproj` with new files in correct compilation order
+- [x] T005 Fix exhaustive pattern matches broken by new `AlpsXml` case
+- [x] T006 Verify `dotnet build` and `dotnet test`
 
 ### Dependencies
 - None (starting package).
