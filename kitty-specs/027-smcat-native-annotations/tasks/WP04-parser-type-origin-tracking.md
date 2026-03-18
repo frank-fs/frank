@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Parser Type Origin Tracking
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 027-smcat-native-annotations-WP01
 base_commit: 1a657d3121f0d1d274c9aa8cae2459565738e29a
@@ -276,3 +276,4 @@ spec-kitty implement WP04 --base WP01
 
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
 - 2026-03-18T06:13:45Z – claude-opus – shell_pid=37896 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T06:18:27Z – claude-opus – shell_pid=37896 – lane=for_review – All 5 subtasks complete. Parser stores SmcatStateType with Explicit/Inferred origin, SmcatTransition on all transitions. Tests pass.
