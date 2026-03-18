@@ -138,11 +138,11 @@
 **Prompt**: `tasks/WP05-round-trip-fidelity-tests.md`
 
 ### Included Subtasks
-- [ ] T019 Add new golden files to `test/Frank.Statecharts.Tests/Smcat/RoundTripTests.fs` with explicit types, colors, custom attributes, and activities
-- [ ] T020 Implement `assertStructuralEquivalence` function with annotation comparison
-- [ ] T021 Update `roundtrip` helper to include structural equivalence assertion alongside semantic equivalence
-- [ ] T022 Add test cases exercising explicit/inferred type preservation and SmcatTransitionKind round-trip
-- [ ] T023 Verify `dotnet build` and `dotnet test`
+- [x] T019 Add new golden files to `test/Frank.Statecharts.Tests/Smcat/RoundTripTests.fs` with explicit types, colors, custom attributes, and activities
+- [x] T020 Implement `assertStructuralEquivalence` function with annotation comparison
+- [x] T021 Update `roundtrip` helper to include structural equivalence assertion alongside semantic equivalence
+- [x] T022 Add test cases exercising explicit/inferred type preservation and SmcatTransitionKind round-trip
+- [x] T023 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - Extend existing `RoundTripTests.fs` — do not create new test files.
