@@ -46,11 +46,11 @@
 **Prompt**: `tasks/WP02-generator-native-annotations.md`
 
 ### Included Subtasks
-- [ ] T005 Update initial pseudo-state node: `Kind = Initial` + `SmcatAnnotation(SmcatStateType(Initial, Explicit))`
-- [ ] T006 Update final pseudo-state nodes: `Kind = Final` + `SmcatAnnotation(SmcatStateType(Final, Explicit))`
-- [ ] T007 Add `SmcatAnnotation(SmcatTransition ...)` to all generated transitions with correct `SmcatTransitionKind`
-- [ ] T008 Update `test/Frank.Statecharts.Tests/Smcat/GeneratorTests.fs` to verify Kind values and annotations
-- [ ] T009 Verify `dotnet build` and `dotnet test`
+- [x] T005 Update initial pseudo-state node: `Kind = Initial` + `SmcatAnnotation(SmcatStateType(Initial, Explicit))`
+- [x] T006 Update final pseudo-state nodes: `Kind = Final` + `SmcatAnnotation(SmcatStateType(Final, Explicit))`
+- [x] T007 Add `SmcatAnnotation(SmcatTransition ...)` to all generated transitions with correct `SmcatTransitionKind`
+- [x] T008 Update `test/Frank.Statecharts.Tests/Smcat/GeneratorTests.fs` to verify Kind values and annotations
+- [x] T009 Verify `dotnet build` and `dotnet test`
 
 ### Implementation Notes
 - Initial pseudo-state: `Identifier = Some "initial"` retained (smcat convention), `Kind` changed from `Regular` to `Initial`.
