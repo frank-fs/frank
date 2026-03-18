@@ -41,7 +41,7 @@ let private parseDocElement (parent: XElement) : string option * string option =
     | None -> None, None
     | Some doc ->
         let fmt = attrValue "format" doc
-        let value = doc.Value
+        let value = doc.Value.Trim()
 
         if System.String.IsNullOrEmpty value then
             fmt, None

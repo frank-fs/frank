@@ -523,4 +523,14 @@ let amundsenRoundTripTests =
               let generated = generateAlpsJson result1.Document
               let result2 = parseAlpsJson generated
               Expect.isEmpty result2.Errors "re-parse of generated minimal document should succeed"
-              Expect.equal result1.Document result2.Document "minimal document ASTs structurally equal" ]
+              Expect.equal result1.Document result2.Document "minimal document ASTs structurally equal"
+
+          testCase "idempotent transition type roundtrips"
+          <| fun _ ->
+              let json = """{"alps":{"version":"1.0","descriptor":[{"id":"resource","type":"semantic","descriptor":[{"id":"update","type":"idempotent","rt":"#resource"}]}]}}"""
+              let result1 = parseAlpsJson json
+              Expect.isEmpty result1.Errors "parse succeeds"
+              let generated = generateAlpsJson result1.Document
+              let result2 = parseAlpsJson generated
+              Expect.isEmpty result2.Errors "re-parse succeeds"
+              Expect.equal result1.Document result2.Document "idempotent transition roundtrips" ]

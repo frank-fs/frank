@@ -4,6 +4,7 @@ open System.Xml.Linq
 open Expecto
 open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.XmlGenerator
+open Frank.Statecharts.Alps.XmlParser
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.Tests.Alps.GoldenFiles
 
@@ -598,9 +599,7 @@ let xmlGeneratorParamTests =
               Expect.equal docEls.[0].Value "Email address" "data descriptor doc content" ]
 
 // ---------------------------------------------------------------------------
-// Round-trip test using XDocument structural verification
-// (parseAlpsXml not available in WP04 — branches from WP01, before WP03 XmlParser)
-// We verify the generated XML structure mirrors what a JSON-sourced AST expects.
+// Round-trip tests: structural verification and true AST round-trips
 // ---------------------------------------------------------------------------
 
 [<Tests>]
@@ -770,4 +769,30 @@ let xmlGeneratorRoundTripTests =
 
               // The number of state+data descriptors in XML >= stateCount
               // (data descriptors from annotations appear before states)
-              Expect.isGreaterThanOrEqual stateDescs.Length stateCount "XML has at least as many semantic descriptors as AST states" ]
+              Expect.isGreaterThanOrEqual stateDescs.Length stateCount "XML has at least as many semantic descriptors as AST states"
+
+          // True round-trip tests (now that XmlParser is available on master)
+          testCase "true XML round-trip: generate then parse produces equal AST"
+          <| fun _ ->
+              let json = """{"alps":{"version":"1.0","descriptor":[{"id":"home","type":"semantic","descriptor":[{"href":"#go"}]},{"id":"go","type":"unsafe","rt":"#home"}]}}"""
+              let ast = (parseAlpsJson json).Document
+              let xml = generateAlpsXml ast
+              let reparsed = parseAlpsXml xml
+              Expect.isEmpty reparsed.Errors "re-parse succeeds"
+              Expect.equal ast reparsed.Document "AST → XML → AST round-trip"
+
+          testCase "true XML round-trip: tic-tac-toe golden file"
+          <| fun _ ->
+              let ast = (parseAlpsJson ticTacToeAlpsJson).Document
+              let xml = generateAlpsXml ast
+              let reparsed = parseAlpsXml xml
+              Expect.isEmpty reparsed.Errors "re-parse succeeds"
+              Expect.equal ast reparsed.Document "tic-tac-toe AST → XML → AST round-trip"
+
+          testCase "true XML round-trip: onboarding golden file"
+          <| fun _ ->
+              let ast = (parseAlpsJson amundsenOnboardingAlpsJson).Document
+              let xml = generateAlpsXml ast
+              let reparsed = parseAlpsXml xml
+              Expect.isEmpty reparsed.Errors "re-parse succeeds"
+              Expect.equal ast reparsed.Document "onboarding AST → XML → AST round-trip" ]

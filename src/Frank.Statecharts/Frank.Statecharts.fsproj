@@ -33,6 +33,7 @@
     <Compile Include="Alps/Classification.fs" />
     <Compile Include="Alps/JsonParser.fs" />
     <Compile Include="Alps/XmlParser.fs" />
+    <Compile Include="Alps/GeneratorCommon.fs" />
     <Compile Include="Alps/JsonGenerator.fs" />
     <Compile Include="Alps/XmlGenerator.fs" />
     <!-- SCXML parser -->
