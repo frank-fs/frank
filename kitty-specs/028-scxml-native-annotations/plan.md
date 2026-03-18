@@ -1,108 +1,95 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: SCXML Native Annotations and Generator Fidelity
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `028-scxml-native-annotations` | **Date**: 2026-03-18 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/kitty-specs/028-scxml-native-annotations/spec.md`
+**Closes**: #114
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Eliminate all lossy transformations in the SCXML parser and generator. Expand `ScxmlMeta` DU with `ScxmlOnEntry`, `ScxmlOnExit`, `ScxmlInitialElement`, and `ScxmlDataSrc` cases. Parser stores raw XML for executable content, captures `<initial>` child elements, `<data src>` attributes, and namespace origin. Generator reconstructs all captured content. Dual-layer: portable `StateActivities` for cross-format tools, raw XML annotations for round-trip fidelity.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting)
+**Primary Dependencies**: Frank.Statecharts (project-internal), System.Xml.Linq (in-framework)
+**Storage**: N/A (stateless parser/generator library)
+**Testing**: Expecto, dotnet test, existing test infrastructure in `test/Frank.Statecharts.Tests/Scxml/`
+**Target Platform**: .NET multi-target library (net8.0;net9.0;net10.0)
+**Project Type**: Single library project with test project
+**Performance Goals**: N/A — startup/CLI-time code
+**Constraints**: All modules are `internal`; breaking changes acceptable (unreleased)
+**Scale/Scope**: 3 source files modified, 3-4 test files modified, 0 new files
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+- **I. Resource-Oriented Design**: N/A — Internal type system changes
+- **II. Idiomatic F#**: PASS — DU expansion, pattern matching, raw XML as strings (pragmatic)
+- **III. Library, Not Framework**: PASS — Internal changes only
+- **IV. ASP.NET Core Native**: N/A — No ASP.NET Core changes
+- **V. Performance Parity**: PASS — Startup/CLI-time code. Raw XML strings add payload but no hot-path cost.
+- **VI. Resource Disposal Discipline**: PASS — `XElement.Parse()` returns non-disposable. `StringWriter` in generator already uses `use`.
+- **VII. No Silent Exception Swallowing**: PASS — Parser already propagates XmlException. New code follows same pattern.
+- **VIII. No Duplicated Logic Across Modules**: PASS — Reuses existing annotation patterns (`ScxmlInvoke` multiple-per-state).
 
-[Gates determined based on constitution file]
+**Result**: All gates pass.
 
 ## Project Structure
 
-### Documentation (this feature)
+### Source Code (files modified)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+src/Frank.Statecharts/
+├── Ast/
+│   └── Types.fs                 # ScxmlMeta expansion (4 new cases)
+└── Scxml/
+    ├── Parser.fs                # Capture onentry/onexit, <initial>, <data src>, namespace
+    └── Generator.fs             # Emit onentry/onexit, <initial>, <data src>, respect namespace
+
+test/Frank.Statecharts.Tests/
+└── Scxml/
+    ├── ParserTests.fs           # New tests for captured content
+    ├── GeneratorTests.fs        # New tests for emitted content
+    └── RoundTripTests.fs        # Extended with comprehensive fixtures
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+## Dependency Graph
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+WP01: Ast/Types.fs (DU expansion)
+  ↓
+  ├── WP02: Parser.fs + ParserTests.fs (capture all content)
+  └── WP03: Generator.fs + GeneratorTests.fs (emit all content)
+       ↓
+       WP04: RoundTripTests.fs (depends on both parser + generator)
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+WP02 and WP03 can execute in parallel after WP01. WP04 depends on both.
 
-## Complexity Tracking
+## Key Design Decisions
 
-*Fill ONLY if Constitution Check has violations that must be justified*
+### D-001: Raw XML Storage for Executable Content
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+Store `<onentry>`/`<onexit>` blocks as raw XML strings via `XElement.ToString()`. Generator reconstructs via `XElement.Parse()`. No typed AST for executable content — keeps scope manageable while achieving zero information loss. Expert consensus: Don (pragmatic), Scott (dual-layer), Dave (minimal code).
+
+### D-002: One Annotation Per Block
+
+Multiple `<onentry>` blocks on the same state produce multiple `ScxmlOnEntry` annotations (not concatenated). Matches existing `ScxmlInvoke` pattern. Expert consensus: unanimous.
+
+### D-003: Dual-Layer Activities
+
+Portable `StateActivities.Entry`/`Exit` populated with action descriptions (`"send done"`, `"log hello"`). Format-specific `ScxmlOnEntry(xml)` preserves full XML. Both layers present when content exists.
+
+### D-004: Namespace Tracking
+
+Populate existing `ScxmlNamespace` DU case (already defined, never stored). Generator checks for annotation to decide whether to use W3C namespace or no-namespace.
+
+## Files Impacted
+
+| File | Change Type | FRs Addressed |
+|------|-------------|---------------|
+| `src/Frank.Statecharts/Ast/Types.fs` | Modify | FR-001, FR-002, FR-003, FR-004 |
+| `src/Frank.Statecharts/Scxml/Parser.fs` | Modify | FR-005 through FR-010 |
+| `src/Frank.Statecharts/Scxml/Generator.fs` | Modify | FR-011 through FR-015 |
+| `test/Frank.Statecharts.Tests/Scxml/ParserTests.fs` | Modify | FR-005 through FR-010, FR-018 |
+| `test/Frank.Statecharts.Tests/Scxml/GeneratorTests.fs` | Modify | FR-011 through FR-015, FR-018 |
+| `test/Frank.Statecharts.Tests/Scxml/RoundTripTests.fs` | Modify | FR-016, FR-018 |
