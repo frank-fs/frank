@@ -179,4 +179,23 @@ let pipelineIntegrationTests =
             Expect.isLessThan sw.Elapsed.TotalSeconds 2.0
                 (sprintf "Pipeline took %.3f seconds, expected < 2.0" sw.Elapsed.TotalSeconds)
         }
+
+        test "AlpsXml format dispatches through pipeline" {
+            let alpsXml = """<alps version="1.0">
+  <descriptor id="idle" type="semantic">
+    <descriptor id="start" type="unsafe" rt="#active"/>
+  </descriptor>
+  <descriptor id="active" type="semantic">
+    <descriptor id="finish" type="safe" rt="#idle"/>
+  </descriptor>
+</alps>"""
+            let result = Pipeline.validateSources [
+                (FormatTag.AlpsXml, alpsXml)
+            ]
+            Expect.isEmpty result.Errors "No pipeline errors for AlpsXml"
+            Expect.equal (List.length result.ParseResults) 1 "Should have 1 parse result"
+            let pr = result.ParseResults.[0]
+            Expect.isTrue pr.Succeeded "AlpsXml should parse successfully"
+            Expect.equal pr.Format FormatTag.AlpsXml "Format should be AlpsXml"
+        }
     ]

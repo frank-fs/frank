@@ -14,7 +14,7 @@ let jaro (s1: string) (s2: string) : float =
             let start = max 0 (i - matchWindow)
             let stop = min (i + matchWindow + 1) s2.Length
             for j in start .. stop - 1 do
-                if not s2Matches.[j] && s1.[i] = s2.[j] then
+                if not s1Matches.[i] && not s2Matches.[j] && s1.[i] = s2.[j] then
                     s1Matches.[i] <- true
                     s2Matches.[j] <- true
                     matches <- matches + 1.0
