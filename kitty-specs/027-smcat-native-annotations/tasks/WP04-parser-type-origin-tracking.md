@@ -1,27 +1,30 @@
 ---
-work_package_id: "WP04"
+work_package_id: WP04
+title: Parser Type Origin Tracking
+lane: "doing"
+dependencies: [WP01]
+base_branch: 027-smcat-native-annotations-WP01
+base_commit: 1a657d3121f0d1d274c9aa8cae2459565738e29a
+created_at: '2026-03-18T06:13:45.168634+00:00'
 subtasks:
-  - "T014"
-  - "T015"
-  - "T016"
-  - "T017"
-  - "T018"
-title: "Parser Type Origin Tracking"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-012", "FR-013", "FR-014"]
+- T014
+- T015
+- T016
+- T017
+- T018
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "37896"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T05:39:36Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T05:39:36Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-012, FR-013, FR-014]
 ---
 
 # Work Package Prompt: WP04 – Parser Type Origin Tracking
