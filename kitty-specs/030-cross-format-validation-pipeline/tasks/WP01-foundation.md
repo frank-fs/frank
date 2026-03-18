@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Foundation — FormatTag, StringDistance, AlpsXml Dispatch
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: e99ea7fbaf00ba560afe579fa47c149ad2632024
@@ -9,8 +9,8 @@ created_at: '2026-03-18T17:10:41.129880+00:00'
 subtasks: [T001, T002, T003, T004, T005, T006]
 phase: Phase 0 - Foundation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "82433"
+agent: "claude-opus-reviewer"
+shell_pid: "83002"
 review_status: ''
 reviewed_by: ''
 history:
@@ -109,3 +109,4 @@ spec-kitty implement WP01
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
 - 2026-03-18T17:10:41Z – claude-opus – shell_pid=82433 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T17:15:24Z – claude-opus – shell_pid=82433 – lane=for_review – FormatTag.AlpsXml, Jaro-Winkler, AlpsXml dispatch. 948 tests pass.
+- 2026-03-18T17:15:51Z – claude-opus-reviewer – shell_pid=83002 – lane=doing – Started review via workflow command
