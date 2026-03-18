@@ -3,6 +3,8 @@
 **Feature**: 026-cli-statechart-commands
 **Date**: 2026-03-16
 
+> **Note (FR-036)**: The existing linked-data pipeline commands (`extract`, `clarify`, `validate`, `diff`, `compile`) now live under the `semantic` parent command (e.g., `frank-cli semantic extract`). See plan.md D-009 for details.
+
 ## Command Group
 
 ```
@@ -10,7 +12,7 @@ frank-cli statechart <subcommand> [options]
 ```
 
 Parent command: `statechart`
-Description: "Statechart pipeline commands: extract, generate, validate, and import state machine artifacts"
+Description: "Statechart pipeline commands: extract, generate, validate, and parse state machine artifacts"
 
 ---
 
@@ -254,10 +256,10 @@ Failures:
 
 ---
 
-## Subcommand: import
+## Subcommand: parse
 
 ```
-frank-cli statechart import <spec-file> [--format wsd|alps|scxml|smcat|xstate] [--output-format text|json]
+frank-cli statechart parse <spec-file> [--format wsd|alps|scxml|smcat|xstate] [--output-format text|json]
 ```
 
 ### Arguments
@@ -313,7 +315,7 @@ Note: The `document` field is a flattened view of `StatechartDocument` suitable 
 ### Text Output Format
 
 ```
-Import: game.xstate.json (XState JSON)
+Parse: game.xstate.json (XState JSON)
 
 States:
   WaitingForPlayers (initial)

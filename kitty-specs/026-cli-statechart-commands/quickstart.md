@@ -53,17 +53,17 @@ frank-cli statechart validate specs/games.wsd specs/games.alps.json bin/Debug/ne
 frank-cli statechart validate specs/games.wsd bin/Debug/net10.0/MyApp.dll --output-format json
 ```
 
-## Import a Spec File
+## Parse a Spec File
 
 ```bash
 # Parse an XState JSON file for LLM consumption
-frank-cli statechart import game.xstate.json
+frank-cli statechart parse game.xstate.json
 
 # Parse a WSD file
-frank-cli statechart import onboarding.wsd
+frank-cli statechart parse onboarding.wsd
 
 # Handle ambiguous .json files
-frank-cli statechart import game.json --format xstate
+frank-cli statechart parse game.json --format xstate
 ```
 
 ## Typical Workflows
@@ -76,10 +76,10 @@ frank-cli statechart generate --format all bin/Debug/net10.0/MyApp.dll --output 
 git add specs/
 ```
 
-### Design-First (import spec, scaffold code)
+### Design-First (parse spec, scaffold code)
 ```bash
 # Parse the design spec
-frank-cli statechart import game.xstate.json --output-format json
+frank-cli statechart parse game.xstate.json --output-format json
 # Feed the JSON output to an LLM for F# code scaffolding
 ```
 

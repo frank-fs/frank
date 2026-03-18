@@ -190,7 +190,7 @@ spec file path
 ```
 spec files + assembly path
   -> FormatDetector.detect each spec file
-  -> Parse each into FormatArtifact (via import pipeline + FormatTag wrapping)
+  -> Parse each into FormatArtifact (via parse pipeline + FormatTag wrapping)
   -> StatechartExtractor.extract assembly -> StateMachineMetadata list
   -> For each metadata: Wsd.Generator.generate -> StatechartDocument -> FormatArtifact(Wsd)
   -> Validator.validate (SelfConsistencyRules.rules @ CrossFormatRules.rules) allArtifacts
@@ -227,4 +227,4 @@ All of the following must be complete before implementation begins:
 |-----------|--------|-------|
 | VI. Resource Disposal | PASS | `AssemblyLoadContext` uses `use` binding with `isCollectible: true`. File streams use `use`. `Utf8JsonWriter` uses `use`. |
 | VII. No Silent Swallowing | PASS | Assembly load failures -> `Result.Error` with descriptive message. Parser errors -> included in output. Startup exceptions -> caught and reported with context. |
-| VIII. No Duplicated Logic | PASS | FormatDetector centralizes extension-to-tag mapping (used by both validate and import). FormatPipeline centralizes metadata-to-text generation (used by both generate and validate). Existing WSD Generator serves as the single metadata-to-AST converter. |
+| VIII. No Duplicated Logic | PASS | FormatDetector centralizes extension-to-tag mapping (used by both validate and parse). FormatPipeline centralizes metadata-to-text generation (used by both generate and validate). Existing WSD Generator serves as the single metadata-to-AST converter. |

@@ -152,11 +152,11 @@ type StatechartValidateResult =
       IsValid: bool }
 ```
 
-### Import Command Result Types
-Location: `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs`
+### Parse Command Result Types
+Location: `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs`
 
 ```fsharp
-type StatechartImportResult =
+type StatechartParseResult =
     { Document: StatechartDocument
       Errors: ParseFailure list
       Warnings: ParseWarning list
@@ -184,7 +184,7 @@ type StatechartImportResult =
               ┌────────────┬───────────┼───────────┐
               │            │           │           │
         ┌─────▼─────┐ ┌───▼───┐ ┌─────▼─────┐ ┌───▼───┐
-        │  extract   │ │generate│ │ validate  │ │import │
+        │  extract   │ │generate│ │ validate  │ │ parse │
         │  command   │ │command │ │ command   │ │command│
         └─────┬─────┘ └───┬───┘ └─────┬─────┘ └───┬───┘
               │            │           │           │

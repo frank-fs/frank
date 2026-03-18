@@ -249,7 +249,7 @@
 
 ---
 
-## Work Package WP08: Import Command (Priority: P2)
+## Work Package WP08: Parse Command (Priority: P2)
 
 **Goal**: Implement the `frank statechart parse <spec-file>` command logic in `StatechartParseCommand.fs`.
 **Independent Test**: Command module compiles. Given a spec file in any supported format, produces JSON StatechartDocument output.
@@ -257,7 +257,7 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T048 Create `src/Frank.Cli.Core/Commands/StatechartImportCommand.fs` with `execute` function
+- [ ] T048 Create `src/Frank.Cli.Core/Commands/StatechartParseCommand.fs` with `execute` function
 - [ ] T049 Implement format detection from file extension (reuse FormatDetector)
 - [ ] T050 Implement parser dispatch: WSD, ALPS, SCXML, smcat, XState
 - [ ] T051 Implement ambiguous `.json` handling: try both ALPS and XState, or require `--format`
@@ -415,7 +415,7 @@
 | T045 | Implement JSON output for validate | WP07 | P1 | No |
 | T046 | Handle errors and exit codes | WP07 | P1 | No |
 | T047 | Add compile entry to fsproj | WP07 | P1 | No |
-| T048 | Create StatechartImportCommand.fs | WP08 | P2 | No |
+| T048 | Create StatechartParseCommand.fs | WP08 | P2 | No |
 | T049 | Implement format detection from extension | WP08 | P2 | No |
 | T050 | Implement parser dispatch | WP08 | P2 | No |
 | T051 | Implement ambiguous .json handling | WP08 | P2 | No |
