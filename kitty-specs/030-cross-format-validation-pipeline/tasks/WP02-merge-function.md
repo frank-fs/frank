@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Merge Function
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 030-cross-format-validation-pipeline-WP01
 base_commit: a9b25b95191f60d55fcba7c44d7688ce7674d54b
@@ -117,3 +117,4 @@ Add tests in `test/Frank.Statecharts.Tests/Validation/` (new or extend existing)
 ## Activity Log
 - 2026-03-18T17:06:48Z – system – lane=planned – Prompt created.
 - 2026-03-18T17:48:43Z – claude-opus – shell_pid=85141 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T17:59:18Z – claude-opus – shell_pid=85141 – lane=for_review – mergeSources implemented with priority ordering, annotation accumulation, 8 test groups. 977 tests pass.
