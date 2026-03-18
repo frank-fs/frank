@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Parser Captures All Content
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 028-scxml-native-annotations-WP01
 base_commit: 5fe78bcab9b411214c67617e5a715e3629be9aec
@@ -269,3 +269,4 @@ spec-kitty implement WP02 --base WP01
 
 - 2026-03-18T07:24:37Z – system – lane=planned – Prompt created.
 - 2026-03-18T07:31:12Z – claude-opus – shell_pid=49969 – lane=doing – Assigned agent via workflow command
+- 2026-03-18T07:38:28Z – claude-opus – shell_pid=49969 – lane=for_review – All 7 subtasks done. Parser captures onentry/onexit, initial elements, data src, namespace. 12 new tests, 853 total pass.
