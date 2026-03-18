@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP04"
-title: "StatechartDocumentJson & ValidationReportFormatter"
-lane: "planned"
-dependencies: ["WP01"]
+work_package_id: WP04
+title: StatechartDocumentJson & ValidationReportFormatter
+lane: "doing"
+dependencies: [WP01]
+base_branch: 026-cli-statechart-commands-WP01
+base_commit: 0deb6951be74c1007947286eec458d85cfc6738c
+created_at: '2026-03-18T02:35:39.495882+00:00'
 subtasks:
-  - "T020"
-  - "T021"
-  - "T022"
-  - "T023"
-  - "T024"
-  - "T025"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T020
+- T021
+- T022
+- T023
+- T024
+- T025
+assignee: ''
+agent: ''
+shell_pid: "8092"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-16T19:12:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-16T19:12:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP04 -- StatechartDocumentJson & ValidationReportFormatter
