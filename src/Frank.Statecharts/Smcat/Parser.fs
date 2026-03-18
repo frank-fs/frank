@@ -524,6 +524,13 @@ and private parseTransition
                 // Skip to terminator and emit the transition without a label
                 skipToNextStatement state
 
+                // T016: Infer transition kind for annotation
+                let transitionKind =
+                    if sourceName = "initial" then InitialTransition
+                    elif targetName = "final" then FinalTransition
+                    elif targetName = sourceName then SelfTransition
+                    else ExternalTransition
+
                 let edge : TransitionEdge =
                     { Source = sourceName
                       Target = Some targetName
@@ -532,7 +539,7 @@ and private parseTransition
                       Action = None
                       Parameters = []
                       Position = Some startPos
-                      Annotations = [] }
+                      Annotations = [ SmcatAnnotation(SmcatTransition transitionKind) ] }
 
                 elements.Add(TransitionElement edge)
             | _ ->
@@ -628,7 +635,18 @@ and private parseTransition
                     | Some l -> (l.Event, l.Guard, l.Action)
                     | None -> (None, None, None)
 
-                let annotations = attributesToAnnotations attributes
+                let attrAnnotations = attributesToAnnotations attributes
+
+                // T016: Infer transition kind for annotation
+                let transitionKind =
+                    if sourceName = "initial" then InitialTransition
+                    elif targetName = "final" then FinalTransition
+                    elif targetName = sourceName then SelfTransition
+                    elif depth > 0 then InternalTransition
+                    else ExternalTransition
+
+                let annotations =
+                    attrAnnotations @ [ SmcatAnnotation(SmcatTransition transitionKind) ]
 
                 let edge : TransitionEdge =
                     { Source = sourceName
@@ -713,6 +731,13 @@ and private tryHandleInvalidArrow
             // Try to parse the rest as a transition (target + optional label)
             match readStateName state with
             | Some targetName ->
+                // T016: Infer transition kind for annotation (error-recovery path)
+                let transitionKind =
+                    if name = "initial" then InitialTransition
+                    elif targetName = "final" then FinalTransition
+                    elif targetName = name then SelfTransition
+                    else ExternalTransition
+
                 let edge : TransitionEdge =
                     { Source = name
                       Target = Some targetName
@@ -721,7 +746,7 @@ and private tryHandleInvalidArrow
                       Action = None
                       Parameters = []
                       Position = Some startPos
-                      Annotations = [] }
+                      Annotations = [ SmcatAnnotation(SmcatTransition transitionKind) ] }
 
                 elements.Add(TransitionElement edge)
                 consumeTerminator state
@@ -856,8 +881,21 @@ and private parseStateDeclaration
     else
         state.DeclaredStates <- state.DeclaredStates.Add(name)
 
+    // T014 + T015: Compute SmcatStateType annotation to track type origin (explicit vs inferred)
+    let hasExplicitType =
+        attributes
+        |> List.exists (fun a -> a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
+
+    let typeAnnotation =
+        if hasExplicitType then
+            [ SmcatAnnotation(SmcatStateType(stateType, Explicit)) ]
+        elif stateType <> Regular then
+            [ SmcatAnnotation(SmcatStateType(stateType, Inferred)) ]
+        else
+            []
+
     // Convert attributes to annotations (excluding "type" which is consumed by inferStateType)
-    let annotations = attributesToAnnotations attributes
+    let annotations = typeAnnotation @ (attributesToAnnotations attributes)
 
     let stateNode : StateNode =
         { Identifier = Some name

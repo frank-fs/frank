@@ -367,3 +367,62 @@ let edgeCaseTests =
               let result = parseSmcat "a => b, c => d;"
               let ts = transitions result
               Expect.equal ts.Length 2 "two transitions" ]
+
+[<Tests>]
+let typeOriginAnnotationTests =
+    testList
+        "Smcat.Parser.TypeOriginAnnotations"
+        [ testCase "explicit type attribute stored as annotation"
+          <| fun _ ->
+              let result = parseSmcat "myState [type=\"initial\"];"
+              let ss = states result
+              let typeAnnotation =
+                  ss[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatStateType(k, o)) -> Some(k, o)
+                      | _ -> None)
+              Expect.equal typeAnnotation (Some(Initial, Explicit)) "explicit type annotation"
+
+          testCase "inferred type from naming convention"
+          <| fun _ ->
+              let result = parseSmcat "initial;"
+              let ss = states result
+              let typeAnnotation =
+                  ss[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatStateType(k, o)) -> Some(k, o)
+                      | _ -> None)
+              Expect.equal typeAnnotation (Some(Initial, Inferred)) "inferred type annotation"
+
+          testCase "regular state has no SmcatStateType annotation"
+          <| fun _ ->
+              let result = parseSmcat "idle;"
+              let ss = states result
+              let hasStateType =
+                  ss[0].Annotations
+                  |> List.exists (function
+                      | SmcatAnnotation(SmcatStateType _) -> true
+                      | _ -> false)
+              Expect.isFalse hasStateType "regular state has no SmcatStateType"
+
+          testCase "transition has SmcatTransition annotation"
+          <| fun _ ->
+              let result = parseSmcat "a => b: go;"
+              let ts = transitions result
+              let transKind =
+                  ts[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatTransition k) -> Some k
+                      | _ -> None)
+              Expect.equal transKind (Some ExternalTransition) "external transition"
+
+          testCase "initial transition annotation"
+          <| fun _ ->
+              let result = parseSmcat "initial => start;"
+              let ts = transitions result
+              let transKind =
+                  ts[0].Annotations
+                  |> List.tryPick (function
+                      | SmcatAnnotation(SmcatTransition k) -> Some k
+                      | _ -> None)
+              Expect.equal transKind (Some InitialTransition) "initial transition" ]
