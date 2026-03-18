@@ -324,12 +324,12 @@
 **Estimated Size**: ~300 lines
 
 ### Included Subtasks
-- [ ] T062 Create `src/Frank.Statecharts/build/Frank.Statecharts.targets` MSBuild targets file
-- [ ] T063 Implement `GenerateStatechartSpecs` target: runs after `Build`, invokes `frank-cli statechart generate --format all --output $(IntermediateOutputPath)statecharts/`
-- [ ] T064 Add condition to skip when no stateful resources present (graceful no-op)
-- [ ] T065 Include targets file in `Frank.Statecharts.fsproj` as `buildTransitive` content
-- [ ] T066 Verify target runs during `dotnet build` on a sample project with stateful resources
-- [ ] T067 Verify target produces no errors on a project without stateful resources
+- [x] T062 Create `src/Frank.Statecharts/build/Frank.Statecharts.targets` MSBuild targets file
+- [x] T063 Implement `GenerateStatechartSpecs` target: runs after `Build`, invokes `frank-cli statechart generate --format all --output $(IntermediateOutputPath)statecharts/`
+- [x] T064 Add condition to skip when no stateful resources present (graceful no-op)
+- [x] T065 Include targets file in `Frank.Statecharts.fsproj` as `buildTransitive` content
+- [x] T066 Verify target runs during `dotnet build` on a sample project with stateful resources
+- [x] T067 Verify target produces no errors on a project without stateful resources
 
 ### Implementation Notes
 - MSBuild target: `AfterTargets="Build"` to run after compilation
