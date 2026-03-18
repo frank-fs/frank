@@ -14,7 +14,7 @@ subtasks:
 - T009
 phase: Phase 1 - Implementation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "37678"
 review_status: ''
 reviewed_by: ''
@@ -205,3 +205,4 @@ The generator (`src/Frank.Statecharts/Smcat/Generator.fs`, 111 lines) currently:
 ## Activity Log
 
 - 2026-03-18T05:39:36Z – system – lane=planned – Prompt created.
+- 2026-03-18T06:13:43Z – claude-opus – shell_pid=37678 – lane=doing – Assigned agent via workflow command
