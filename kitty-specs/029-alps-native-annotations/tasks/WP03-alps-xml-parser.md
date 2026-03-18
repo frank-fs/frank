@@ -1,22 +1,25 @@
 ---
-work_package_id: "WP03"
-subtasks: ["T011", "T012", "T013", "T014", "T015", "T016"]
-title: "ALPS XML Parser"
-phase: "Phase 1 - Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-005", "FR-006", "FR-008"]
+work_package_id: WP03
+title: ALPS XML Parser
+lane: "doing"
+dependencies: [WP01]
+base_branch: 029-alps-native-annotations-WP01
+base_commit: 666360c2268bcc73f70027a51d33121deb4f4827
+created_at: '2026-03-18T14:34:09.976306+00:00'
+subtasks: [T011, T012, T013, T014, T015, T016]
+phase: Phase 1 - Implementation
+assignee: ''
+agent: ''
+shell_pid: "71891"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-18T14:14:54Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-18T14:14:54Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-005, FR-006, FR-008]
 ---
 
 # Work Package Prompt: WP03 – ALPS XML Parser
