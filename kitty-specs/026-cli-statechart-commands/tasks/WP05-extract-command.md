@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Extract Command
-lane: "doing"
+lane: "done"
 dependencies: [WP02]
 base_branch: 026-cli-statechart-commands-WP02
 base_commit: 30a746dce8d843a01d8834b2b48bd8975dc4d1bc
@@ -16,8 +16,8 @@ subtasks:
 assignee: ''
 agent: "claude-opus"
 shell_pid: "10017"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-16T19:12:54Z'
   lane: planned
@@ -235,3 +235,4 @@ spec-kitty implement WP05 --base WP02
 - 2026-03-18T02:39:20Z – claude-opus – shell_pid=8834 – lane=doing – Assigned agent via workflow command
 - 2026-03-18T02:45:22Z – claude-opus – shell_pid=8834 – lane=for_review – Ready for review: StatechartExtractCommand with text/JSON output formatters. Build passes clean.
 - 2026-03-18T02:45:26Z – claude-opus – shell_pid=10017 – lane=doing – Started review via workflow command
+- 2026-03-18T02:45:38Z – claude-opus – shell_pid=10017 – lane=done – Review passed: Thin command module delegates to extractor. Text and JSON output follow existing patterns. Build clean.
