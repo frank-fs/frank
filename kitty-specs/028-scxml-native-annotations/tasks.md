@@ -18,8 +18,8 @@
 **Prompt**: `tasks/WP01-scxml-meta-expansion.md`
 
 ### Included Subtasks
-- [ ] T001 Add `ScxmlOnEntry`, `ScxmlOnExit`, `ScxmlInitialElement`, `ScxmlDataSrc` cases to `ScxmlMeta` in `src/Frank.Statecharts/Ast/Types.fs`
-- [ ] T002 Verify `dotnet build` and `dotnet test` across all target frameworks
+- [x] T001 Add `ScxmlOnEntry`, `ScxmlOnExit`, `ScxmlInitialElement`, `ScxmlDataSrc` cases to `ScxmlMeta` in `src/Frank.Statecharts/Ast/Types.fs`
+- [x] T002 Verify `dotnet build` and `dotnet test` across all target frameworks
 
 ### Implementation Notes
 - T001 is a purely additive change — 4 new cases appended to the existing 8-case DU. No consumers break.
