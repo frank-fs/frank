@@ -17,7 +17,7 @@ subtasks:
 - T080
 phase: Phase 4 - Validation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "26479"
 review_status: ''
 reviewed_by: ''
@@ -724,3 +724,4 @@ spec-kitty implement WP13 --base WP07
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T04:06:57Z – claude-opus – shell_pid=26479 – lane=doing – Assigned agent via workflow command
