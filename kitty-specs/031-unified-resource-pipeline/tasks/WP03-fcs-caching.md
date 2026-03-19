@@ -1,34 +1,37 @@
 ---
-work_package_id: "WP03"
+work_package_id: WP03
+title: FCS Caching & Unified State Persistence
+lane: "doing"
+dependencies: [WP01]
+base_branch: 031-unified-resource-pipeline-WP01
+base_commit: bd0722e27d0fa12e9ab2ad5cdbbcb7b8e6d5fed6
+created_at: '2026-03-19T03:24:54.775727+00:00'
 subtasks:
-  - "T013"
-  - "T014"
-  - "T015"
-  - "T016"
-  - "T017"
-  - "T018"
-requirement_refs:
-  - "FR-005"
-  - "FR-006"
-  - "FR-025"
-  - "FR-026"
-  - "FR-027"
-  - "FR-028"
-title: "FCS Caching & Unified State Persistence"
-phase: "Phase 1 - Core Pipeline"
-lane: "planned"  # DO NOT EDIT - use: spec-kitty agent tasks move-task <WPID> --to <lane>
-assignee: ""      # Optional friendly name when in doing/for_review
-agent: ""         # CLI agent identifier (claude, codex, etc.)
-shell_pid: ""     # PID captured when the task moved to the current lane
-review_status: "" # empty | has_feedback | acknowledged (populated by reviewers/implementers)
-reviewed_by: ""   # Agent ID of the reviewer (if reviewed)
-dependencies: ["WP01"]
+- T013
+- T014
+- T015
+- T016
+- T017
+- T018
+phase: Phase 1 - Core Pipeline
+assignee: ''
+agent: ''
+shell_pid: "17669"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-19T02:15:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-19T02:15:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-005
+- FR-006
+- FR-025
+- FR-026
+- FR-027
+- FR-028
 ---
 
 # Work Package Prompt: WP03 -- FCS Caching & Unified State Persistence
