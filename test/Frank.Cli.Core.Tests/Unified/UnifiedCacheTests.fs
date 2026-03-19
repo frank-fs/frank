@@ -74,7 +74,7 @@ let unifiedCacheTests =
 
                 testCase "load returns None for missing file"
                 <| fun _ ->
-                    let path = Path.Combine(Path.GetTempPath(), "nonexistent", "unified-state.bin")
+                    let path = Path.Combine(Path.GetTempPath(), "nonexistent", "descriptors.bin")
                     let result = UnifiedCache.load path
                     Expect.equal result (Ok None) "Missing file returns Ok None"
 
@@ -84,7 +84,7 @@ let unifiedCacheTests =
 
                     try
                         let state = createSampleState "abc123"
-                        let path = Path.Combine(dir, "obj", "frank-cli", "unified-state.bin")
+                        let path = Path.Combine(dir, "obj", "frank-cli", "descriptors.bin")
                         let result = UnifiedCache.save path state
                         Expect.isOk result "save should create directories and succeed"
                         Expect.isTrue (File.Exists(path)) "File should exist after save"
@@ -97,7 +97,7 @@ let unifiedCacheTests =
                     Directory.CreateDirectory(dir) |> ignore
 
                     try
-                        let path = Path.Combine(dir, "unified-state.bin")
+                        let path = Path.Combine(dir, "descriptors.bin")
                         File.WriteAllBytes(path, [| 0xFFuy; 0xFEuy; 0x00uy |])
                         let result = UnifiedCache.load path
                         Expect.isError result "Corrupt data should return Error"

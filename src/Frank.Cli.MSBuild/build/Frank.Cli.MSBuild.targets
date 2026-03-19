@@ -6,17 +6,17 @@
        SDK collects resources. A dynamic Target with
        BeforeTargets="CoreCompile" fires too late — the F# compiler
        never sees the resource. -->
-  <ItemGroup Condition="Exists('$(FrankUnifiedStatePath)')">
-    <EmbeddedResource Include="$(FrankUnifiedStatePath)"
-                      LogicalName="$(FrankUnifiedStateLogicalName)"
-                      Link="frank-cli/unified-state.bin" />
+  <ItemGroup Condition="Exists('$(FrankDescriptorsPath)')">
+    <EmbeddedResource Include="$(FrankDescriptorsPath)"
+                      LogicalName="$(FrankDescriptorsLogicalName)"
+                      Link="frank-cli/descriptors.bin" />
   </ItemGroup>
 
-  <Target Name="WarnMissingFrankUnifiedState"
+  <Target Name="WarnMissingFrankDescriptors"
           BeforeTargets="CoreCompile"
-          Condition="!Exists('$(FrankUnifiedStatePath)')">
+          Condition="!Exists('$(FrankDescriptorsPath)')">
     <Message Importance="normal"
-             Text="Frank: No unified state binary found at '$(FrankUnifiedStatePath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
+             Text="Frank: No unified state binary found at '$(FrankDescriptorsPath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
   </Target>
 
   <!-- ================================================================

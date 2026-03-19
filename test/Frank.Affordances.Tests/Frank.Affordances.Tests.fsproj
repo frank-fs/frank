@@ -27,8 +27,8 @@
 
   <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->
   <ItemGroup>
-    <EmbeddedResource Include="Fixtures/test-unified-state.bin"
-                      LogicalName="Frank.Affordances.unified-state.bin" />
+    <EmbeddedResource Include="Fixtures/test-descriptors.bin"
+                      LogicalName="Frank.Descriptors.bin" />
   </ItemGroup>
 
 </Project>
