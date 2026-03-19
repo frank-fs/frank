@@ -33,6 +33,7 @@
     <!-- Unified pipeline -->
     <Compile Include="Unified/UnifiedModel.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
+    <Compile Include="Unified/AffordanceMapGenerator.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
@@ -59,6 +60,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Frank.Affordances/Frank.Affordances.fsproj" />
     <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 

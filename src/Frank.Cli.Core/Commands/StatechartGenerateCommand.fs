@@ -4,6 +4,7 @@ open System.IO
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
+open Frank.Cli.Core.Unified
 
 type GeneratedArtifact =
     { ResourceSlug: string
@@ -15,7 +16,9 @@ type GeneratedArtifact =
 type GenerateResult =
     { Artifacts: GeneratedArtifact list
       OutputDirectory: string option
-      GenerationErrors: StatechartError list }
+      GenerationErrors: StatechartError list
+      /// Affordance map JSON output (when --format affordance-map is used)
+      AffordanceMapJson: string option }
 
 let private parseFormat (s: string) : Result<FormatTag list, StatechartError> =
     match s.ToLowerInvariant() with
@@ -28,6 +31,35 @@ let private parseFormat (s: string) : Result<FormatTag list, StatechartError> =
     | "all" -> Ok FormatPipeline.allFormats
     | other -> Error (UnknownFormat other)
 
+/// Generate affordance map JSON from the unified extractor pipeline.
+let private executeAffordanceMap
+    (projectPath: string)
+    (baseUri: string)
+    (outputDir: string option)
+    : Async<Result<GenerateResult, StatechartError>> =
+    async {
+        match! UnifiedExtractor.extract projectPath with
+        | Error e -> return Error e
+        | Ok resources ->
+            let json = AffordanceMapGenerator.generate resources baseUri None
+            match outputDir with
+            | Some dir ->
+                Directory.CreateDirectory(dir) |> ignore
+                let filePath = Path.Combine(dir, "affordance-map.json")
+                File.WriteAllText(filePath, json)
+                return Ok
+                    { Artifacts = []
+                      OutputDirectory = Some dir
+                      GenerationErrors = []
+                      AffordanceMapJson = Some json }
+            | None ->
+                return Ok
+                    { Artifacts = []
+                      OutputDirectory = None
+                      GenerationErrors = []
+                      AffordanceMapJson = Some json }
+    }
+
 let execute
     (projectPath: string)
     (format: string)
@@ -35,6 +67,13 @@ let execute
     (resourceFilter: string option)
     : Async<Result<GenerateResult, StatechartError>> =
     async {
+        // Handle affordance-map as a special format (uses unified extractor)
+        match format.ToLowerInvariant() with
+        | "affordance-map" | "affordancemap" ->
+            let baseUri = "http://localhost:5000/alps"
+            return! executeAffordanceMap projectPath baseUri outputDir
+        | _ ->
+
         match parseFormat format with
         | Error e -> return Error e
         | Ok formats ->
@@ -78,7 +117,8 @@ let execute
                     | None ->
                         return Ok { Artifacts = artifacts
                                     OutputDirectory = None
-                                    GenerationErrors = List.rev generationErrors }
+                                    GenerationErrors = List.rev generationErrors
+                                    AffordanceMapJson = None }
                     | Some dir ->
                         Directory.CreateDirectory(dir) |> ignore
 
@@ -94,5 +134,22 @@ let execute
 
                         return Ok { Artifacts = written
                                     OutputDirectory = Some dir
-                                    GenerationErrors = List.rev generationErrors }
+                                    GenerationErrors = List.rev generationErrors
+                                    AffordanceMapJson = None }
+    }
+
+/// Execute affordance-map generation with an explicit base URI.
+let executeWithBaseUri
+    (projectPath: string)
+    (format: string)
+    (baseUri: string)
+    (outputDir: string option)
+    (resourceFilter: string option)
+    : Async<Result<GenerateResult, StatechartError>> =
+    async {
+        match format.ToLowerInvariant() with
+        | "affordance-map" | "affordancemap" ->
+            return! executeAffordanceMap projectPath baseUri outputDir
+        | _ ->
+            return! execute projectPath format outputDir resourceFilter
     }

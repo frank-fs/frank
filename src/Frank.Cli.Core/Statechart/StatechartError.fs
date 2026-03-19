@@ -32,7 +32,7 @@ let formatError (error: StatechartError) : string =
     | ExtractionNotImplemented ->
         "Assembly-based extraction is not yet implemented. Use 'statechart parse' to parse spec files directly."
     | UnknownFormat fmt ->
-        sprintf "Unknown format: '%s'. Supported: wsd, alps, alps-xml, scxml, smcat, xstate" fmt
+        sprintf "Unknown format: '%s'. Supported: wsd, alps, alps-xml, scxml, smcat, xstate, affordance-map" fmt
     | UnsupportedFileExtension(ext, path) ->
         sprintf "Unsupported file extension '%s' for '%s'. Supported: .wsd, .alps.json, .alps.xml, .scxml, .smcat, .xstate.json" ext path
     | AmbiguousFileExtension(path, _) ->

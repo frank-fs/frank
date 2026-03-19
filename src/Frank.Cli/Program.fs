@@ -329,9 +329,13 @@ let main args =
     scGenerateCmd.Options.Add(scGenProjectOpt)
 
     let scGenFormatOpt = Option<string>("--format")
-    scGenFormatOpt.Description <- "Target notation format (wsd|alps|scxml|smcat|xstate|all)"
+    scGenFormatOpt.Description <- "Target notation format (wsd|alps|scxml|smcat|xstate|affordance-map|all)"
     scGenFormatOpt.Required <- true
     scGenerateCmd.Options.Add(scGenFormatOpt)
+
+    let scGenBaseUriOpt = Option<string>("--base-uri")
+    scGenBaseUriOpt.Description <- "Base URI for ALPS profile namespace (required for affordance-map format)"
+    scGenerateCmd.Options.Add(scGenBaseUriOpt)
 
     let scGenOutputOpt = Option<string>("--output")
     scGenOutputOpt.Description <- "Output directory for generated artifacts"
@@ -358,26 +362,37 @@ let main args =
             let v = parseResult.GetValue(scGenResourceOpt)
             if String.IsNullOrEmpty v then None else Some v
 
+        let genBaseUri =
+            let v = parseResult.GetValue(scGenBaseUriOpt)
+            if String.IsNullOrEmpty v then "http://localhost:5000/alps" else v
+
         let outputFormat = parseResult.GetValue(scGenOutputFormatOpt)
 
-        let result = StatechartGenerateCommand.execute project format outputDir resource |> Async.RunSynchronously
+        let result =
+            StatechartGenerateCommand.executeWithBaseUri project format genBaseUri outputDir resource
+            |> Async.RunSynchronously
 
         match result with
         | Ok r ->
-            if outputDir.IsNone then
-                for artifact in r.Artifacts do
-                    let fmtName = FormatDetector.FormatTag.toString artifact.Format
-                    Console.WriteLine($"=== {artifact.RouteTemplate} ({fmtName}) ===")
-                    Console.WriteLine(artifact.Content)
-                    Console.WriteLine()
-            else
-                let output =
-                    if outputFormat = "json" then
-                        JsonOutput.formatStatechartGenerateResult r
-                    else
-                        TextOutput.formatStatechartGenerateResult r
+            // If affordance-map JSON is present, output it directly
+            match r.AffordanceMapJson with
+            | Some json ->
+                Console.WriteLine(json)
+            | None ->
+                if outputDir.IsNone then
+                    for artifact in r.Artifacts do
+                        let fmtName = FormatDetector.FormatTag.toString artifact.Format
+                        Console.WriteLine($"=== {artifact.RouteTemplate} ({fmtName}) ===")
+                        Console.WriteLine(artifact.Content)
+                        Console.WriteLine()
+                else
+                    let output =
+                        if outputFormat = "json" then
+                            JsonOutput.formatStatechartGenerateResult r
+                        else
+                            TextOutput.formatStatechartGenerateResult r
 
-                Console.WriteLine(output)
+                    Console.WriteLine(output)
 
             // Report generation errors
             if not r.GenerationErrors.IsEmpty then

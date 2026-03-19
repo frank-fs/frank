@@ -33,6 +33,7 @@
     <Compile Include="Output/TextOutputTests.fs" />
     <Compile Include="Unified/UnifiedModelTests.fs" />
     <Compile Include="Unified/UnifiedExtractorTests.fs" />
+    <Compile Include="Unified/AffordanceMapGeneratorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
