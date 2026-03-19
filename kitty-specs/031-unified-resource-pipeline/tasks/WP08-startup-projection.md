@@ -1,7 +1,7 @@
 ---
 work_package_id: WP08
 title: Startup Projection -- Binary to In-Memory ALPS/OWL/SHACL/Schema
-lane: "doing"
+lane: "for_review"
 dependencies: [WP07]
 base_branch: 031-unified-resource-pipeline-WP07
 base_commit: b9db0f0447b4f9f24313b68a6a272b4a3fa6e18f
@@ -419,3 +419,4 @@ dotnet test test/Frank.Affordances.Tests/ --filter "Profile"
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:41:37Z – claude-opus-wp08 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:49:21Z – claude-opus-wp08 – shell_pid=21017 – lane=for_review – Ready for review: startup projection with profile middleware, 33 tests passing, zero runtime deps on CLI
