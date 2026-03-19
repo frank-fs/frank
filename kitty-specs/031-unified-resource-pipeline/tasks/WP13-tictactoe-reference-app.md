@@ -1,7 +1,7 @@
 ---
 work_package_id: WP13
 title: Tic-Tac-Toe Reference App & End-to-End Validation
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP07
 base_branch: 031-unified-resource-pipeline-WP07
@@ -725,3 +725,4 @@ spec-kitty implement WP13 --base WP07
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T04:06:57Z – claude-opus – shell_pid=26479 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T04:19:18Z – claude-opus – shell_pid=26479 – lane=for_review – Ready for review: TicTacToe sample app with stateful resource, affordance middleware, Datastar SSE handler, and integration tests
