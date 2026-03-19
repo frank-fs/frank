@@ -1,8 +1,11 @@
 ---
 work_package_id: WP08
 title: Startup Projection -- Binary to In-Memory ALPS/OWL/SHACL/Schema
-lane: planned
+lane: "doing"
 dependencies: [WP07]
+base_branch: 031-unified-resource-pipeline-WP07
+base_commit: b9db0f0447b4f9f24313b68a6a272b4a3fa6e18f
+created_at: '2026-03-19T03:41:37.323728+00:00'
 subtasks:
 - T045
 - T046
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 2 - Runtime
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "21017"
 review_status: ''
 reviewed_by: ''
 history:
