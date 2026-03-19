@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: FCS Caching & Unified State Persistence
-lane: "doing"
+lane: "for_review"
 dependencies: [WP01]
 base_branch: 031-unified-resource-pipeline-WP01
 base_commit: bd0722e27d0fa12e9ab2ad5cdbbcb7b8e6d5fed6
@@ -547,3 +547,4 @@ dotnet test
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:24:55Z – claude-opus-wp03 – shell_pid=17669 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:34:30Z – claude-opus-wp03 – shell_pid=17669 – lane=for_review – Ready for review: UnifiedCache with MessagePack serialization, source hash, staleness detection, 17 tests passing
