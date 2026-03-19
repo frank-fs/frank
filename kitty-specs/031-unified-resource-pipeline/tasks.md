@@ -238,7 +238,7 @@
 ### Included Subtasks
 - [x] T052 Create `Frank.Affordances.MSBuild` project (C# .csproj)
 - [x] T053 Create `Frank.Affordances.targets` — discover and embed binary
-- [ ] T054 Wire target to AfterTargets="Build"
+- [x] T054 Wire target to AfterTargets="Build"
 - [ ] T055 Verify embedding via test project + GetManifestResourceStream
 - [ ] T056 Document NuGet packaging strategy (buildTransitive/)
 
