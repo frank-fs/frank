@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Affordance Map Generation
-lane: "doing"
+lane: "done"
 dependencies:
 - WP02
 base_branch: 031-unified-resource-pipeline-WP02
@@ -18,8 +18,8 @@ phase: Phase 1 - Core Pipeline
 assignee: ''
 agent: "claude-opus-wp06-review"
 shell_pid: "23922"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-19T02:15:00Z'
   lane: planned
@@ -327,3 +327,4 @@ dotnet test test/Frank.Cli.Core.Tests/ --filter "AffordanceMap"
 - 2026-03-19T03:41:36Z – claude-opus-wp06 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:48:49Z -- claude-opus-wp06 -- lane=for_review -- Implementation complete: T032-T037 all done. AffordanceMapGenerator.fs created, CLI wired, 27/27 tests pass. Committed as 9f5d3ce.
 - 2026-03-19T03:52:40Z – claude-opus-wp06-review – shell_pid=23922 – lane=doing – Started review via workflow command
+- 2026-03-19T03:55:18Z – claude-opus-wp06-review – shell_pid=23922 – lane=done – Review passed: all 6 checklist items verified. Build 0 warnings/0 errors. 27/27 AffordanceMapGenerator tests + 5/5 AffordanceMap tests pass. Composite key uses | separator with * wildcard for stateless. Profile URLs correctly derived. Link relations populated with IANA precedence. CLI --format affordance-map wired with --base-uri support. JSON output conforms to contracts/affordance-map-schema.json. Good testability design with optional timestamp parameter.
