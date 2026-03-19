@@ -5,6 +5,7 @@ open System.IO
 open System.Text
 open System.Text.Json
 open Frank.Affordances
+open Frank.Statecharts.Unified
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Composite Key Generation (T033)

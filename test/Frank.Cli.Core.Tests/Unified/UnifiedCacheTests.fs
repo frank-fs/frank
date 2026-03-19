@@ -3,6 +3,7 @@ module Frank.Cli.Core.Tests.Unified.UnifiedCacheTests
 open System
 open System.IO
 open Expecto
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Unified
 
 /// Create a temporary project directory with some .fs files and a .fsproj.
@@ -31,7 +32,8 @@ let private createSampleState (sourceHash: string) : UnifiedExtractionState =
       BaseUri = "https://example.com/"
       Vocabularies = [ "schema.org" ]
       ExtractedAt = DateTimeOffset(2026, 3, 19, 0, 0, 0, TimeSpan.Zero)
-      ToolVersion = UnifiedCache.currentToolVersion }
+      ToolVersion = UnifiedCache.currentToolVersion
+      Profiles = ProjectedProfiles.empty }
 
 /// Cleanup a temp directory.
 let private cleanup (dir: string) =

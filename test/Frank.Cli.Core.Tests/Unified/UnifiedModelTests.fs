@@ -5,6 +5,8 @@ open Expecto
 open MessagePack
 open MessagePack.Resolvers
 open MessagePack.FSharp
+open Frank.Affordances
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Unified
 
 let private options =
@@ -88,7 +90,8 @@ let unifiedModelTests =
                           BaseUri = "https://example.com/"
                           Vocabularies = [ "schema.org" ]
                           ExtractedAt = DateTimeOffset(2026, 3, 19, 0, 0, 0, TimeSpan.Zero)
-                          ToolVersion = "7.0.0" }
+                          ToolVersion = "7.0.0"
+                          Profiles = ProjectedProfiles.empty }
 
                     let bytes = MessagePackSerializer.Serialize(state, options)
 

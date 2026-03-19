@@ -7,6 +7,7 @@ open System.Text.Json
 open Microsoft.Extensions.Primitives
 
 /// A single link relation in an affordance map entry.
+[<RequireQualifiedAccess>]
 type AffordanceLinkRelation =
     { /// Link relation type (IANA registered or ALPS profile fragment URI)
       Rel: string
@@ -18,6 +19,7 @@ type AffordanceLinkRelation =
       Title: string option }
 
 /// One entry per (route, state) pair in the affordance map.
+[<RequireQualifiedAccess>]
 type AffordanceMapEntry =
     { /// HTTP route pattern
       RouteTemplate: string

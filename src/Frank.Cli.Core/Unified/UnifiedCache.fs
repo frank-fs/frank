@@ -3,6 +3,8 @@ module Frank.Cli.Core.Unified.UnifiedCache
 open System
 open System.IO
 open System.Security.Cryptography
+open Frank.Affordances
+open Frank.Statecharts.Unified
 open MessagePack
 open MessagePack.Resolvers
 open MessagePack.FSharp
@@ -145,7 +147,8 @@ let saveExtractionState
           BaseUri = baseUri
           Vocabularies = vocabularies
           ExtractedAt = DateTimeOffset.UtcNow
-          ToolVersion = currentToolVersion }
+          ToolVersion = currentToolVersion
+          Profiles = ProjectedProfiles.empty }
 
     let cacheFile = cachePath projectDir
     match save cacheFile state with

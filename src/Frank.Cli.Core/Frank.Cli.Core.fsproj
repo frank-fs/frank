@@ -37,7 +37,6 @@
     <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Unified/UnifiedAlpsGenerator.fs" />
     <Compile Include="Unified/AffordanceMapGenerator.fs" />
-    <Compile Include="Unified/RuntimeProjector.fs" />
     <Compile Include="Unified/ExtractionStateProjector.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />

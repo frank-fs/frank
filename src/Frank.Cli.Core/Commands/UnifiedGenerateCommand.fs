@@ -2,6 +2,7 @@ module Frank.Cli.Core.Commands.UnifiedGenerateCommand
 
 open System.IO
 open System.Text.Json
+open Frank.Statecharts.Unified
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart

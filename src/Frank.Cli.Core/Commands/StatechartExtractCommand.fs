@@ -1,5 +1,6 @@
 module Frank.Cli.Core.Commands.StatechartExtractCommand
 
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
 

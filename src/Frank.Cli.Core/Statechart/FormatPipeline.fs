@@ -2,6 +2,7 @@ module Frank.Cli.Core.Statechart.FormatPipeline
 
 open Frank.Statecharts
 open Frank.Statecharts.Ast
+open Frank.Statecharts.Unified
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Statechart.StatechartError
 

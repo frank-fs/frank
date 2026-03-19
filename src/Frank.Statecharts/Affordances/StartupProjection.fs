@@ -1,113 +1,95 @@
 namespace Frank.Affordances
 
 open System
-open System.IO
 open System.Reflection
-open System.Text.Json
+open Frank.Statecharts.Unified
+open MessagePack
+open MessagePack.Resolvers
+open MessagePack.FSharp
 
 module StartupProjection =
 
-    /// Default embedded resource name for the projected profiles JSON.
+    /// Embedded resource logical name for the unified state binary.
     [<Literal>]
-    let DefaultEmbeddedResourceName = "projected-profiles.json"
+    let DefaultEmbeddedResourceName = "Frank.Affordances.unified-state.bin"
 
-    /// JSON serializer options for reading/writing projected profiles.
-    let private jsonOptions =
-        let opts = JsonSerializerOptions(JsonSerializerDefaults.Web)
-        opts.WriteIndented <- false
-        opts
+    /// MessagePack deserialization options matching the CLI's serialization.
+    let private msgpackOptions =
+        MessagePackSerializerOptions
+            .Standard
+            .WithResolver(
+                CompositeResolver.Create(
+                    FSharpResolver.Instance,
+                    ContractlessStandardResolver.Instance))
 
-    /// Serialize projected profiles to a JSON string.
-    /// Used by frank-cli at extraction time to generate the embedded resource.
-    let serialize (profiles: ProjectedProfiles) : string =
-        JsonSerializer.Serialize(profiles, jsonOptions)
+    /// Project a HttpCapability to a RuntimeHttpCapability.
+    let private projectCapability (cap: HttpCapability) : RuntimeHttpCapability =
+        { Method = cap.Method
+          StateKey = cap.StateKey |> Option.defaultValue AffordanceMap.WildcardStateKey
+          LinkRelation = cap.LinkRelation
+          IsSafe = cap.IsSafe }
 
-    /// Deserialize projected profiles from a JSON string.
-    let deserialize (json: string) : ProjectedProfiles option =
-        try
-            let profiles = JsonSerializer.Deserialize<ProjectedProfiles>(json, jsonOptions)
-            Some profiles
-        with
-        | :? JsonException -> None
-        | :? ArgumentNullException -> None
+    /// Project a UnifiedResource to a RuntimeResource.
+    let private projectResource (resource: UnifiedResource) : RuntimeResource =
+        { RouteTemplate = resource.RouteTemplate
+          ResourceSlug = resource.ResourceSlug
+          Statechart =
+            match resource.Statechart with
+            | Some sc ->
+                { StateNames = sc.StateNames
+                  InitialStateKey = sc.InitialStateKey
+                  GuardNames = sc.GuardNames
+                  StateMetadata =
+                    sc.StateMetadata
+                    |> Map.map (fun _ (v: Frank.Statecharts.StateInfo) ->
+                        { AllowedMethods = v.AllowedMethods
+                          IsFinal = v.IsFinal
+                          Description = v.Description |> Option.defaultValue "" }) }
+            | None -> RuntimeStatechart.empty
+          HttpCapabilities = resource.HttpCapabilities |> List.map projectCapability }
 
-    /// Load projected profiles from an embedded resource in the given assembly.
-    /// Returns ProjectedProfiles.empty if the embedded resource is not found.
-    let loadFromAssembly (assembly: Assembly) : ProjectedProfiles =
-        let resourceName =
-            assembly.GetManifestResourceNames()
-            |> Array.tryFind (fun name -> name.EndsWith(DefaultEmbeddedResourceName, StringComparison.OrdinalIgnoreCase))
-
-        match resourceName with
-        | None -> ProjectedProfiles.empty
-        | Some name ->
-            use stream = assembly.GetManifestResourceStream(name)
-
-            if isNull stream then
-                ProjectedProfiles.empty
-            else
-                use reader = new StreamReader(stream)
-                let json = reader.ReadToEnd()
-
-                match deserialize json with
-                | Some profiles -> profiles
-                | None -> ProjectedProfiles.empty
-
-    /// Load projected profiles from a JSON file on disk.
-    /// Useful for development/testing when the embedded resource is not yet built.
-    let loadFromFile (filePath: string) : ProjectedProfiles option =
-        if File.Exists(filePath) then
-            let json = File.ReadAllText(filePath)
-            deserialize json
-        else
-            None
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // RuntimeState: full startup state with resource data for AffordanceMap
-    // generation plus pre-computed profile strings.
-    // ══════════════════════════════════════════════════════════════════════════
-
-    /// Default embedded resource name for the runtime state JSON.
-    [<Literal>]
-    let DefaultRuntimeStateResourceName = "runtime-state.json"
-
-    /// Serialize runtime state to a JSON string.
-    /// Used by frank-cli at compile time to generate the embedded resource.
-    let serializeRuntimeState (state: RuntimeState) : string =
-        JsonSerializer.Serialize(state, jsonOptions)
-
-    /// Deserialize runtime state from a JSON string.
-    let deserializeRuntimeState (json: string) : RuntimeState option =
-        try
-            let state = JsonSerializer.Deserialize<RuntimeState>(json, jsonOptions)
-            Some state
-        with
-        | :? JsonException -> None
-        | :? ArgumentNullException -> None
-
-    /// Load runtime state from an embedded resource in the given assembly.
-    /// Returns None if the runtime state is not found or cannot be deserialized.
-    let loadRuntimeStateFromAssembly (assembly: Assembly) : RuntimeState option =
+    /// Load the UnifiedExtractionState from the embedded binary resource.
+    /// Returns None if the resource is not found or cannot be deserialized.
+    let loadUnifiedStateFromAssembly (assembly: Assembly) : UnifiedExtractionState option =
         let resourceName =
             assembly.GetManifestResourceNames()
             |> Array.tryFind (fun name ->
-                name.EndsWith(DefaultRuntimeStateResourceName, StringComparison.OrdinalIgnoreCase))
+                name.EndsWith("unified-state.bin", StringComparison.OrdinalIgnoreCase))
 
         match resourceName with
         | None -> None
         | Some name ->
-            use stream = assembly.GetManifestResourceStream(name)
+            try
+                use stream = assembly.GetManifestResourceStream(name)
 
-            if isNull stream then
+                if isNull stream then
+                    None
+                else
+                    let state = MessagePackSerializer.Deserialize<UnifiedExtractionState>(stream, msgpackOptions)
+                    Some state
+            with _ ->
                 None
-            else
-                use reader = new StreamReader(stream)
-                let json = reader.ReadToEnd()
-                deserializeRuntimeState json
 
-    /// Load an AffordanceMap from the runtime state embedded in the given assembly.
-    /// Deserializes the runtime state, then generates the AffordanceMap from
-    /// the embedded resource data. Returns None if no runtime state is found.
+    /// Load an AffordanceMap from the unified state embedded in the given assembly.
+    /// Deserializes the binary, projects resources to runtime types, and generates
+    /// the AffordanceMap. Returns None if no unified state is found.
     let loadAffordanceMapFromAssembly (assembly: Assembly) : AffordanceMap option =
-        loadRuntimeStateFromAssembly assembly
-        |> Option.map AffordanceMap.fromRuntimeState
+        match loadUnifiedStateFromAssembly assembly with
+        | None -> None
+        | Some state ->
+            let runtimeResources = state.Resources |> List.map projectResource
+            Some(AffordanceMap.generateFromResources runtimeResources state.BaseUri)
+
+    /// Load a full RuntimeState from the unified state embedded in the given assembly.
+    /// Includes both runtime resource data (for AffordanceMap/statechart format generation)
+    /// and pre-computed profile strings (ALPS, OWL, SHACL, JSON Schema).
+    let loadRuntimeStateFromAssembly (assembly: Assembly) : RuntimeState option =
+        match loadUnifiedStateFromAssembly assembly with
+        | None -> None
+        | Some state ->
+            let runtimeResources = state.Resources |> List.map projectResource
+
+            Some
+                { Resources = runtimeResources
+                  BaseUri = state.BaseUri
+                  Profiles = state.Profiles }

@@ -1,14 +1,7 @@
 namespace Frank.Cli.Core.Statechart
 
 open Frank.Statecharts
-
-/// Structured representation of a single stateful resource extracted from source.
-type ExtractedStatechart =
-    { RouteTemplate: string
-      StateNames: string list
-      InitialStateKey: string
-      GuardNames: string list
-      StateMetadata: Map<string, StateInfo> }
+open Frank.Statecharts.Unified
 
 /// Helpers for constructing ExtractedStatechart values.
 module StatechartExtractor =

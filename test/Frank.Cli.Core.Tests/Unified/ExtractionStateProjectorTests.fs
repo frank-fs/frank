@@ -3,6 +3,7 @@ module ExtractionStateProjectorTests
 open System
 open System.IO
 open Expecto
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction
 open Frank.Cli.Core.State
@@ -38,7 +39,8 @@ let private testUnifiedState types : UnifiedExtractionState =
       BaseUri = "http://example.com/ontology"
       Vocabularies = [ "https://schema.org" ]
       ExtractedAt = DateTimeOffset.UtcNow
-      ToolVersion = "7.0.0" }
+      ToolVersion = "7.0.0"
+      Profiles = ProjectedProfiles.empty }
 
 [<Tests>]
 let extractionStateProjectorTests =

@@ -3,6 +3,7 @@ module Frank.Cli.Core.Tests.Unified.UnifiedAlpsGeneratorTests
 open System.Text.Json
 open Expecto
 open Frank.Statecharts
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Unified

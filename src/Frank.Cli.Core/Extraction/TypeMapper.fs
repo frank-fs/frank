@@ -6,6 +6,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Maps F# types (DUs, records) to OWL classes and properties.

@@ -11,6 +11,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Frank.Affordances
+open Frank.Statecharts.Unified
 
 // -- Test Fixtures --
 
@@ -312,58 +313,13 @@ let startupProjectionTests =
     testList
         "StartupProjection"
         [
-          // Round-trip serialization test
-          testCase "serialize and deserialize produces identical profiles"
+          // Runtime state loading from assembly
+          testCase "loadRuntimeStateFromAssembly returns None for assembly without embedded resource"
           <| fun _ ->
-              let original = testProfiles
-              let json = StartupProjection.serialize original
-
-              let deserialized = StartupProjection.deserialize json
-
-              Expect.isSome deserialized "Should deserialize successfully"
-              let result = deserialized.Value
-
-              Expect.equal
-                  (result.AlpsProfiles |> Map.count)
-                  (original.AlpsProfiles |> Map.count)
-                  "ALPS profile count should match"
-
-              Expect.equal
-                  (result.OwlOntologies |> Map.count)
-                  (original.OwlOntologies |> Map.count)
-                  "OWL ontology count should match"
-
-              Expect.equal
-                  (result.ShaclShapes |> Map.count)
-                  (original.ShaclShapes |> Map.count)
-                  "SHACL shapes count should match"
-
-              Expect.equal
-                  (result.JsonSchemas |> Map.count)
-                  (original.JsonSchemas |> Map.count)
-                  "JSON schema count should match"
-
-              // Verify content is preserved
-              Expect.equal
-                  (result.AlpsProfiles.["games"])
-                  (original.AlpsProfiles.["games"])
-                  "ALPS JSON content should be preserved"
-
-          testCase "deserialize returns None for invalid JSON"
-          <| fun _ ->
-              let result = StartupProjection.deserialize "not valid json {"
-              Expect.isNone result "Should return None for invalid JSON"
-
-          testCase "deserialize returns None for null"
-          <| fun _ ->
-              let result = StartupProjection.deserialize null
-              Expect.isNone result "Should return None for null"
-
-          testCase "loadFromAssembly returns empty for assembly without embedded resource"
-          <| fun _ ->
-              let assembly = typeof<ProjectedProfiles>.Assembly
-              let result = StartupProjection.loadFromAssembly assembly
-              Expect.isTrue (ProjectedProfiles.isEmpty result) "Should return empty profiles when no embedded resource"
+              // Use an assembly that doesn't have a unified-state.bin embedded
+              let assembly = typeof<obj>.Assembly
+              let result = StartupProjection.loadRuntimeStateFromAssembly assembly
+              Expect.isNone result "Should return None when no embedded resource"
 
           testCase "ProjectedProfiles.isEmpty returns true for empty profiles"
           <| fun _ ->

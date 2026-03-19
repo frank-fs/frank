@@ -4,6 +4,7 @@ open System.IO
 open Expecto
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Analysis
 
 let private checker = FSharpChecker.Create()

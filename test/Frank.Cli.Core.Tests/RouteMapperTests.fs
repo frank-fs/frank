@@ -5,6 +5,7 @@ open Expecto
 open VDS.RDF
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.Vocabularies
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction.TypeMapper
 open Frank.Cli.Core.Extraction.RouteMapper

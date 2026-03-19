@@ -1,6 +1,7 @@
 namespace Frank.Cli.Core.Commands
 
 open System.IO
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Unified
 

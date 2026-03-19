@@ -4,6 +4,7 @@ open System
 open System.Text.Json
 open Expecto
 open Frank.Statecharts
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart
 

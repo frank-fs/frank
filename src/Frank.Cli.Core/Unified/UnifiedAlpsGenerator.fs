@@ -5,6 +5,7 @@ open System.Text
 open System.Text.Json
 open System.Text.RegularExpressions
 open Frank.Cli.Core.Analysis
+open Frank.Statecharts.Unified
 
 // ============================================================================
 // Schema.org Vocabulary Alignment (T027)

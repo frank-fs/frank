@@ -56,6 +56,8 @@
     <Compile Include="StatechartETagProvider.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
+    <!-- Unified model types (shared with Frank.Cli.Core for runtime deserialization) -->
+    <Compile Include="UnifiedModel.fs" />
     <!-- Affordances (merged from Frank.Affordances) -->
     <Compile Include="Affordances/RuntimeProjection.fs" />
     <Compile Include="Affordances/AffordanceMap.fs" />
@@ -68,6 +70,11 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="MessagePack.FSharpExtensions" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>

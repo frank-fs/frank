@@ -9,6 +9,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Extraction
 open Frank.Cli.Core.Extraction.UriHelpers
 open Frank.Cli.Core.State

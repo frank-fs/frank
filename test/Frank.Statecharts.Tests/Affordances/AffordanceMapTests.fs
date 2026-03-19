@@ -20,11 +20,11 @@ let affordanceMapTests =
           testCase "tryFind returns matching entry"
           <| fun _ ->
               let entry =
-                  { RouteTemplate = "/games/{gameId}"
-                    StateKey = "XTurn"
-                    AllowedMethods = [ "GET"; "POST" ]
-                    LinkRelations = []
-                    ProfileUrl = "https://example.com/alps/games" }
+                  { AffordanceMapEntry.RouteTemplate = "/games/{gameId}"
+                    AffordanceMapEntry.StateKey = "XTurn"
+                    AffordanceMapEntry.AllowedMethods = [ "GET"; "POST" ]
+                    AffordanceMapEntry.LinkRelations = []
+                    AffordanceMapEntry.ProfileUrl = "https://example.com/alps/games" }
 
               let map =
                   { Version = AffordanceMap.currentVersion

@@ -7,6 +7,7 @@ open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Writing
 open Frank.Affordances
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Unified
@@ -18,7 +19,6 @@ module CompileCommand =
         { OntologyPath: string
           ShapesPath: string
           ManifestPath: string
-          RuntimeStatePath: string option
           EmbeddedResourceNames: string list }
 
     let private backupState (statePath: string) =
@@ -51,67 +51,52 @@ module CompileCommand =
         use _ = JsonDocument.Parse(manifestJson)
         ()
 
-    /// Generate ALPS profile strings per resource slug.
-    let private generateAlpsProfiles (unified: UnifiedExtractionState) : Map<string, string> =
-        unified.Resources
-        |> List.choose (fun resource ->
-            match UnifiedAlpsGenerator.generate resource unified.BaseUri with
-            | Ok alpsJson -> Some(resource.ResourceSlug, alpsJson)
-            | Error _ -> None)
-        |> Map.ofList
-
-    /// Serialize OWL ontology graph to Turtle string.
-    let private serializeOwlTurtle (state: ExtractionState) : string =
-        ExtractionState.graphToTurtle state.Ontology
-
-    /// Serialize SHACL shapes graph to Turtle string.
-    let private serializeShaclTurtle (state: ExtractionState) : string =
-        ExtractionState.graphToTurtle state.Shapes
-
-    /// Generate and write the runtime state file from the unified extraction state.
-    /// Populates ALPS profiles per resource, plus OWL/SHACL as whole-project strings.
-    /// Returns the path if successful, None if the unified state is not available.
-    let private generateRuntimeState
+    /// Populate the Profiles field on the unified extraction state binary.
+    /// Generates ALPS per resource and serializes OWL/SHACL as whole-project strings.
+    /// Re-saves the unified-state.bin with the populated profiles.
+    let private populateProfilesInBinary
         (projectDir: string)
-        (outDir: string)
         (legacyState: ExtractionState option)
-        : string option =
-        let unifiedPath = Path.Combine(projectDir, "obj", "frank-cli", "unified-state.bin")
+        : unit =
+        let unifiedPath = UnifiedCache.cachePath projectDir
 
         match UnifiedCache.load unifiedPath with
         | Ok(Some unified) ->
-            let alpsProfiles = generateAlpsProfiles unified
+            let alpsProfiles =
+                unified.Resources
+                |> List.choose (fun resource ->
+                    match UnifiedAlpsGenerator.generate resource unified.BaseUri with
+                    | Ok alpsJson -> Some(resource.ResourceSlug, alpsJson)
+                    | Error _ -> None)
+                |> Map.ofList
 
             let owlTurtle =
                 match legacyState with
-                | Some s -> serializeOwlTurtle s
+                | Some s -> ExtractionState.graphToTurtle s.Ontology
                 | None -> ""
 
             let shaclTurtle =
                 match legacyState with
-                | Some s -> serializeShaclTurtle s
+                | Some s -> ExtractionState.graphToTurtle s.Shapes
                 | None -> ""
 
             let profiles: ProjectedProfiles =
                 { AlpsProfiles = alpsProfiles
                   OwlOntologies =
-                    if System.String.IsNullOrEmpty owlTurtle then
+                    if String.IsNullOrEmpty owlTurtle then
                         Map.empty
                     else
                         Map.ofList [ ("_project", owlTurtle) ]
                   ShaclShapes =
-                    if System.String.IsNullOrEmpty shaclTurtle then
+                    if String.IsNullOrEmpty shaclTurtle then
                         Map.empty
                     else
                         Map.ofList [ ("_project", shaclTurtle) ]
                   JsonSchemas = Map.empty }
 
-            let runtimeState = RuntimeProjector.toRuntimeStateWithProfiles unified profiles
-            let json = StartupProjection.serializeRuntimeState runtimeState
-            let runtimeStatePath = Path.Combine(outDir, StartupProjection.DefaultRuntimeStateResourceName)
-            File.WriteAllText(runtimeStatePath, json)
-            Some runtimeStatePath
-        | _ -> None
+            let updatedState = { unified with Profiles = profiles }
+            UnifiedCache.save unifiedPath updatedState |> ignore
+        | _ -> ()
 
     let execute (projectPath: string) (outputDir: string option) : Result<CompileResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
@@ -134,14 +119,13 @@ module CompileCommand =
                 // Round-trip verification: re-parse each file to confirm validity
                 verifyRoundTrip ontologyPath shapesPath manifestPath
 
-                // Generate runtime state for embedded resource
-                let runtimeStatePath = generateRuntimeState projectDir outDir (Some state)
+                // Populate profiles in the unified state binary
+                populateProfilesInBinary projectDir (Some state)
 
                 Ok
                     { OntologyPath = ontologyPath
                       ShapesPath = shapesPath
                       ManifestPath = manifestPath
-                      RuntimeStatePath = runtimeStatePath
                       EmbeddedResourceNames =
                         [ "Frank.Semantic.ontology.owl.xml"
                           "Frank.Semantic.shapes.shacl.ttl"
@@ -191,15 +175,14 @@ module CompileCommand =
 
                         verifyRoundTrip ontologyPath shapesPath manifestPath
 
-                        // Generate runtime state for embedded resource
-                        let runtimeStatePath = generateRuntimeState projectDir outDir (Some state)
+                        // Populate profiles in the unified state binary
+                        populateProfilesInBinary projectDir (Some state)
 
                         return
                             Ok
                                 { OntologyPath = ontologyPath
                                   ShapesPath = shapesPath
                                   ManifestPath = manifestPath
-                                  RuntimeStatePath = runtimeStatePath
                                   EmbeddedResourceNames =
                                     [ "Frank.Semantic.ontology.owl.xml"
                                       "Frank.Semantic.shapes.shacl.ttl"

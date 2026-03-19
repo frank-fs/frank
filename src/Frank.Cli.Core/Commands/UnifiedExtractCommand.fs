@@ -2,6 +2,7 @@ module Frank.Cli.Core.Commands.UnifiedExtractCommand
 
 open System
 open System.IO
+open Frank.Statecharts.Unified
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart.StatechartError
 
@@ -82,7 +83,8 @@ let execute
                               BaseUri = baseUri
                               Vocabularies = vocabularies
                               ExtractedAt = DateTimeOffset.UtcNow
-                              ToolVersion = UnifiedCache.currentToolVersion }
+                              ToolVersion = UnifiedCache.currentToolVersion
+                              Profiles = ProjectedProfiles.empty }
 
                     let warnings = collectWarnings resources
 

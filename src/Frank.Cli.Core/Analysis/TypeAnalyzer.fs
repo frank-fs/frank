@@ -3,44 +3,7 @@ namespace Frank.Cli.Core.Analysis
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Text
-
-type FieldKind =
-    | Primitive of xsdType: string
-    | Guid
-    | Optional of inner: FieldKind
-    | Collection of element: FieldKind
-    | Reference of typeName: string
-
-type ConstraintAttribute =
-    | PatternAttr of regex: string
-    | MinInclusiveAttr of value: obj
-    | MaxInclusiveAttr of value: obj
-    | MinLengthAttr of length: int
-    | MaxLengthAttr of length: int
-
-type AnalyzedField =
-    { Name: string
-      Kind: FieldKind
-      IsRequired: bool
-      IsScalar: bool
-      Constraints: ConstraintAttribute list }
-
-type DuCase =
-    { Name: string
-      Fields: AnalyzedField list }
-
-type TypeKind =
-    | Record of fields: AnalyzedField list
-    | DiscriminatedUnion of cases: DuCase list
-    | Enum of values: string list
-
-type AnalyzedType =
-    { FullName: string
-      ShortName: string
-      Kind: TypeKind
-      GenericParameters: string list
-      SourceLocation: SourceLocation option
-      IsClosed: bool }
+open Frank.Statecharts.Unified
 
 module TypeAnalyzer =
 
