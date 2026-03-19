@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: Unified AST Walker
-lane: "doing"
+lane: "done"
 dependencies: [WP01]
 base_branch: 031-unified-resource-pipeline-WP01
 base_commit: bd0722e27d0fa12e9ab2ad5cdbbcb7b8e6d5fed6
@@ -18,8 +18,8 @@ phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus"
 shell_pid: "19854"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-19T02:15:00Z'
   lane: planned
@@ -781,3 +781,4 @@ dotnet test
 - 2026-03-19T03:24:17Z – claude-opus – shell_pid=17534 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:32:59Z – claude-opus – shell_pid=17534 – lane=for_review – Ready for review: single-pass unified AST walker with 12 tests, full solution builds cleanly
 - 2026-03-19T03:35:12Z – claude-opus – shell_pid=19854 – lane=doing – Started review via workflow command
+- 2026-03-19T03:36:08Z – claude-opus – shell_pid=19854 – lane=done – Review passed: single-pass walker correct, stateful before plain dispatch, DerivedResourceFields computation tested, extract API matches contract, 12/12 tests green
