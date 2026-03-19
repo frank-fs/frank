@@ -1,7 +1,7 @@
 ---
 work_package_id: WP07
 title: Runtime Affordance Middleware -- Link + Allow Headers
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 base_branch: 031-unified-resource-pipeline-WP01
@@ -463,3 +463,4 @@ dotnet test test/Frank.Affordances.Tests/
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:24:56Z – claude-opus-wp07 – shell_pid=17777 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:31:32Z – claude-opus-wp07 – shell_pid=17777 – lane=for_review – Ready for review: AffordanceMiddleware injects Link+Allow headers via pre-computed dictionary lookup. Zero per-request allocation. Wildcard fallback for plain resources. Graceful degradation. 15 tests passing (9 unit + 6 integration with TestHost).
