@@ -185,7 +185,7 @@
 - [x] T040 Request-time: read state key, lookup map, inject Allow + Link + profile + describedby headers
 - [x] T041 Handle plain resources (wildcard state key lookup)
 - [x] T042 Graceful degradation when no map loaded (log warning, pass through)
-- [ ] T043 Pre-compute Link header strings at startup (zero allocation per request)
+- [x] T043 Pre-compute Link header strings at startup (zero allocation per request)
 - [ ] T044 Integration tests with TestHost
 
 ### Dependencies
