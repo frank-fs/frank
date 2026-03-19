@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP09"
+work_package_id: WP09
+title: MSBuild Target for Binary Embedding
+lane: "doing"
+dependencies: [WP03]
+base_branch: 031-unified-resource-pipeline-WP03
+base_commit: 80c92fa5cc9a58f84715b0f763f317b04ae09435
+created_at: '2026-03-19T03:41:38.596500+00:00'
 subtasks:
-  - "T052"
-  - "T053"
-  - "T054"
-  - "T055"
-  - "T056"
-requirement_refs:
-  - "FR-013"
-title: "MSBuild Target for Binary Embedding"
-phase: "Phase 2 - Runtime"
-lane: "planned"
-dependencies: ["WP03"]
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T052
+- T053
+- T054
+- T055
+- T056
+phase: Phase 2 - Runtime
+assignee: ''
+agent: ''
+shell_pid: "21017"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-19T02:15:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-19T02:15:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-013
 ---
 
 # Work Package Prompt: WP09 -- MSBuild Target for Binary Embedding
