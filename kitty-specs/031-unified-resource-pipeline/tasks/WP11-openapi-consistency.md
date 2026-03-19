@@ -1,9 +1,12 @@
 ---
 work_package_id: WP11
 title: OpenAPI Consistency Validation
-lane: planned
+lane: "doing"
 dependencies:
 - WP02
+base_branch: 031-unified-resource-pipeline-WP02
+base_commit: 35175b217c2cce39589a312a0e8317e273430068
+created_at: '2026-03-19T04:06:36.072157+00:00'
 subtasks:
 - T062
 - T063
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 3 - Integration
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "26221"
 review_status: ''
 reviewed_by: ''
 history:
