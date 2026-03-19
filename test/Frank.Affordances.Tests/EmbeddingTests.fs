@@ -10,7 +10,7 @@ let embeddingTests =
         [ testCase "embedded resource is accessible via GetManifestResourceStream"
           <| fun _ ->
               let assembly = Assembly.GetExecutingAssembly()
-              use stream = assembly.GetManifestResourceStream("Frank.Affordances.unified-state.bin")
+              use stream = assembly.GetManifestResourceStream("Frank.Descriptors.bin")
               Expect.isNotNull stream "Embedded resource should exist"
               Expect.isGreaterThan stream.Length 0L "Embedded resource should have content"
 
@@ -18,12 +18,12 @@ let embeddingTests =
           <| fun _ ->
               let assembly = Assembly.GetExecutingAssembly()
               let names = assembly.GetManifestResourceNames()
-              Expect.contains names "Frank.Affordances.unified-state.bin" "Resource name should match logical name"
+              Expect.contains names "Frank.Descriptors.bin" "Resource name should match logical name"
 
           testCase "embedded resource content matches source file"
           <| fun _ ->
               let assembly = Assembly.GetExecutingAssembly()
-              use stream = assembly.GetManifestResourceStream("Frank.Affordances.unified-state.bin")
+              use stream = assembly.GetManifestResourceStream("Frank.Descriptors.bin")
               let bytes = Array.zeroCreate<byte> (int stream.Length)
               stream.Read(bytes, 0, bytes.Length) |> ignore
               Expect.isGreaterThan bytes.Length 0 "Should have non-empty content" ]

@@ -1,7 +1,31 @@
 <Project>
-  <!-- T061: Auto-invoke frank-cli compile --project before CoreCompile.
+  <!-- ================================================================
+       Unified state binary (produced by frank-cli extract)
+       ================================================================
+       Static item group: evaluated at project load time, before the F#
+       SDK collects resources. A dynamic Target with
+       BeforeTargets="CoreCompile" fires too late — the F# compiler
+       never sees the resource. -->
+  <ItemGroup Condition="Exists('$(FrankDescriptorsPath)')">
+    <EmbeddedResource Include="$(FrankDescriptorsPath)"
+                      LogicalName="$(FrankDescriptorsLogicalName)"
+                      Link="frank-cli/descriptors.bin" />
+  </ItemGroup>
+
+  <Target Name="WarnMissingFrankDescriptors"
+          BeforeTargets="CoreCompile"
+          Condition="!Exists('$(FrankDescriptorsPath)')">
+    <Message Importance="normal"
+             Text="Frank: No unified state binary found at '$(FrankDescriptorsPath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
+  </Target>
+
+  <!-- ================================================================
+       Semantic definitions (produced by frank-cli compile)
+       ================================================================ -->
+
+  <!-- Auto-invoke frank-cli compile before CoreCompile.
        Runs after ResolveAssemblyReferences so the project's assembly list is stable.
-       Incremental: skipped if shapes.shacl.ttl is newer than all @(Compile) inputs (T062). -->
+       Incremental: skipped if shapes.shacl.ttl is newer than all @(Compile) inputs. -->
   <Target Name="GenerateFrankSemanticDefinitions"
           AfterTargets="ResolveAssemblyReferences"
           BeforeTargets="CoreCompile"
@@ -17,19 +41,17 @@
              Text="Frank CLI shape generation failed (exit code $(_FrankCliExitCode)). Shapes may be stale. Run 'dotnet tool restore' if frank-cli is not installed." />
   </Target>
 
-  <Target Name="EmbedFrankSemanticDefinitions"
-          AfterTargets="GenerateFrankSemanticDefinitions"
-          BeforeTargets="CoreCompile"
-          Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
-    <ItemGroup>
-      <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
-                        LogicalName="Frank.Semantic.ontology.owl.xml" />
-      <EmbeddedResource Include="$(FrankCliOutputPath)shapes.shacl.ttl"
-                        LogicalName="Frank.Semantic.shapes.shacl.ttl" />
-      <EmbeddedResource Include="$(FrankCliOutputPath)manifest.json"
-                        LogicalName="Frank.Semantic.manifest.json" />
-    </ItemGroup>
-  </Target>
+  <!-- Static item group for semantic definitions — same rationale as
+       unified state above. Files must exist from a prior build or
+       explicit frank-cli compile invocation. -->
+  <ItemGroup Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
+    <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
+                      LogicalName="Frank.Semantic.ontology.owl.xml" />
+    <EmbeddedResource Include="$(FrankCliOutputPath)shapes.shacl.ttl"
+                      LogicalName="Frank.Semantic.shapes.shacl.ttl" />
+    <EmbeddedResource Include="$(FrankCliOutputPath)manifest.json"
+                      LogicalName="Frank.Semantic.manifest.json" />
+  </ItemGroup>
 
   <Target Name="ValidateFrankSemanticDefinitions"
           BeforeTargets="Build"

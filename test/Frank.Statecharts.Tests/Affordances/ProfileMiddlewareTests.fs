@@ -316,7 +316,7 @@ let startupProjectionTests =
           // Runtime state loading from assembly
           testCase "loadRuntimeStateFromAssembly returns None for assembly without embedded resource"
           <| fun _ ->
-              // Use an assembly that doesn't have a unified-state.bin embedded
+              // Use an assembly that doesn't have a descriptors.bin embedded
               let assembly = typeof<obj>.Assembly
               let result = StartupProjection.loadRuntimeStateFromAssembly assembly
               Expect.isNone result "Should return None when no embedded resource"

@@ -11,7 +11,7 @@ module StartupProjection =
 
     /// Embedded resource logical name for the unified state binary.
     [<Literal>]
-    let DefaultEmbeddedResourceName = "Frank.Affordances.unified-state.bin"
+    let DefaultEmbeddedResourceName = "Frank.Descriptors.bin"
 
     /// MessagePack deserialization options matching the CLI's serialization.
     let private msgpackOptions =
@@ -54,7 +54,7 @@ module StartupProjection =
         let resourceName =
             assembly.GetManifestResourceNames()
             |> Array.tryFind (fun name ->
-                name.EndsWith("unified-state.bin", StringComparison.OrdinalIgnoreCase))
+                name.EndsWith("Descriptors.bin", StringComparison.OrdinalIgnoreCase))
 
         match resourceName with
         | None -> None

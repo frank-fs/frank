@@ -21,7 +21,7 @@ let private msgpackOptions =
                 ContractlessStandardResolver.Instance))
 
 /// Cache file name for the unified extraction state.
-let cacheFileName = "unified-state.bin"
+let cacheFileName = "descriptors.bin"
 
 /// Compute the full cache path for a project directory.
 let cachePath (projectDir: string) : string =
