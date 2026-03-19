@@ -186,7 +186,7 @@
 - [x] T041 Handle plain resources (wildcard state key lookup)
 - [x] T042 Graceful degradation when no map loaded (log warning, pass through)
 - [x] T043 Pre-compute Link header strings at startup (zero allocation per request)
-- [ ] T044 Integration tests with TestHost
+- [x] T044 Integration tests with TestHost
 
 ### Dependencies
 - Depends on WP01 (types in Frank.Affordances) and WP06 (map format).
