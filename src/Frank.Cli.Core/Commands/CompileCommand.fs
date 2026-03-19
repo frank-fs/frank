@@ -51,14 +51,62 @@ module CompileCommand =
         use _ = JsonDocument.Parse(manifestJson)
         ()
 
+    /// Generate ALPS profile strings per resource slug.
+    let private generateAlpsProfiles (unified: UnifiedExtractionState) : Map<string, string> =
+        unified.Resources
+        |> List.choose (fun resource ->
+            match UnifiedAlpsGenerator.generate resource unified.BaseUri with
+            | Ok alpsJson -> Some(resource.ResourceSlug, alpsJson)
+            | Error _ -> None)
+        |> Map.ofList
+
+    /// Serialize OWL ontology graph to Turtle string.
+    let private serializeOwlTurtle (state: ExtractionState) : string =
+        ExtractionState.graphToTurtle state.Ontology
+
+    /// Serialize SHACL shapes graph to Turtle string.
+    let private serializeShaclTurtle (state: ExtractionState) : string =
+        ExtractionState.graphToTurtle state.Shapes
+
     /// Generate and write the runtime state file from the unified extraction state.
+    /// Populates ALPS profiles per resource, plus OWL/SHACL as whole-project strings.
     /// Returns the path if successful, None if the unified state is not available.
-    let private generateRuntimeState (projectDir: string) (outDir: string) : string option =
+    let private generateRuntimeState
+        (projectDir: string)
+        (outDir: string)
+        (legacyState: ExtractionState option)
+        : string option =
         let unifiedPath = Path.Combine(projectDir, "obj", "frank-cli", "unified-state.bin")
 
         match UnifiedCache.load unifiedPath with
         | Ok(Some unified) ->
-            let runtimeState = RuntimeProjector.toRuntimeState unified
+            let alpsProfiles = generateAlpsProfiles unified
+
+            let owlTurtle =
+                match legacyState with
+                | Some s -> serializeOwlTurtle s
+                | None -> ""
+
+            let shaclTurtle =
+                match legacyState with
+                | Some s -> serializeShaclTurtle s
+                | None -> ""
+
+            let profiles: ProjectedProfiles =
+                { AlpsProfiles = alpsProfiles
+                  OwlOntologies =
+                    if System.String.IsNullOrEmpty owlTurtle then
+                        Map.empty
+                    else
+                        Map.ofList [ ("_project", owlTurtle) ]
+                  ShaclShapes =
+                    if System.String.IsNullOrEmpty shaclTurtle then
+                        Map.empty
+                    else
+                        Map.ofList [ ("_project", shaclTurtle) ]
+                  JsonSchemas = Map.empty }
+
+            let runtimeState = RuntimeProjector.toRuntimeStateWithProfiles unified profiles
             let json = StartupProjection.serializeRuntimeState runtimeState
             let runtimeStatePath = Path.Combine(outDir, StartupProjection.DefaultRuntimeStateResourceName)
             File.WriteAllText(runtimeStatePath, json)
@@ -87,7 +135,7 @@ module CompileCommand =
                 verifyRoundTrip ontologyPath shapesPath manifestPath
 
                 // Generate runtime state for embedded resource
-                let runtimeStatePath = generateRuntimeState projectDir outDir
+                let runtimeStatePath = generateRuntimeState projectDir outDir (Some state)
 
                 Ok
                     { OntologyPath = ontologyPath
@@ -144,7 +192,7 @@ module CompileCommand =
                         verifyRoundTrip ontologyPath shapesPath manifestPath
 
                         // Generate runtime state for embedded resource
-                        let runtimeStatePath = generateRuntimeState projectDir outDir
+                        let runtimeStatePath = generateRuntimeState projectDir outDir (Some state)
 
                         return
                             Ok

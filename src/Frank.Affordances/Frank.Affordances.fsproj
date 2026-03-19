@@ -11,6 +11,7 @@
     <Compile Include="AffordanceMap.fs" />
     <Compile Include="AffordanceMiddleware.fs" />
     <Compile Include="StartupProjection.fs" />
+    <Compile Include="StatechartProjection.fs" />
     <Compile Include="ProfileMiddleware.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
@@ -21,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Frank\Frank.fsproj" />
+    <ProjectReference Include="..\Frank.Statecharts\Frank.Statecharts.fsproj" />
   </ItemGroup>
 
 </Project>

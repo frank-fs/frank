@@ -69,7 +69,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Frank.Affordances/Frank.Affordances.fsproj" />
     <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
