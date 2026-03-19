@@ -1,7 +1,7 @@
 ---
 work_package_id: WP12
 title: Semantic Subcommand Backward Compatibility
-lane: "for_review"
+lane: "doing"
 dependencies:
 - WP02
 base_branch: 031-unified-resource-pipeline-WP02
@@ -17,7 +17,7 @@ subtasks:
 phase: Phase 3 - Integration
 assignee: ''
 agent: "claude-opus"
-shell_pid: "26347"
+shell_pid: "29237"
 review_status: ''
 reviewed_by: ''
 history:
@@ -560,3 +560,4 @@ spec-kitty implement WP12 --base WP02
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T04:06:50Z – claude-opus – shell_pid=26347 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T04:21:51Z – claude-opus – shell_pid=26347 – lane=for_review – Ready for review: ExtractionStateProjector with TypeMapper/ShapeGenerator integration, 4 command updates, unified loader with legacy fallback, and 9 tests
+- 2026-03-19T04:27:40Z – claude-opus – shell_pid=29237 – lane=doing – Started review via workflow command
