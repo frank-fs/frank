@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Unified Model Types & Project Scaffolding
-lane: "for_review"
+lane: "doing"
 dependencies: []
 base_branch: master
 base_commit: 8a6c0503223ce83bc37f398547bf5d800eaecee0
@@ -15,7 +15,7 @@ subtasks:
 phase: Phase 0 - Foundation
 assignee: ''
 agent: "claude-opus"
-shell_pid: "15168"
+shell_pid: "17114"
 review_status: ''
 reviewed_by: ''
 history:
@@ -594,3 +594,4 @@ dotnet test test/Frank.Affordances.Tests/
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T02:54:47Z – claude-opus – shell_pid=15168 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:09:46Z – claude-opus – shell_pid=15168 – lane=for_review – Ready for review: all 5 subtasks complete, 12 tests passing, full solution builds cleanly
+- 2026-03-19T03:19:58Z – claude-opus – shell_pid=17114 – lane=doing – Started review via workflow command
