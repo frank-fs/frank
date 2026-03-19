@@ -190,6 +190,36 @@ module Vocabularies =
         [<Literal>]
         let Telephone = "https://schema.org/telephone"
 
+        [<Literal>]
+        let Person = "https://schema.org/Person"
+
+        [<Literal>]
+        let Organization = "https://schema.org/Organization"
+
+        [<Literal>]
+        let Product = "https://schema.org/Product"
+
+        [<Literal>]
+        let Event = "https://schema.org/Event"
+
+        [<Literal>]
+        let Place = "https://schema.org/Place"
+
+        [<Literal>]
+        let CreativeWork = "https://schema.org/CreativeWork"
+
+        [<Literal>]
+        let Order = "https://schema.org/Order"
+
+        [<Literal>]
+        let Review = "https://schema.org/Review"
+
+        [<Literal>]
+        let Offer = "https://schema.org/Offer"
+
+        [<Literal>]
+        let MediaObject = "https://schema.org/MediaObject"
+
     module Xsd =
         [<Literal>]
         let ns = "http://www.w3.org/2001/XMLSchema#"

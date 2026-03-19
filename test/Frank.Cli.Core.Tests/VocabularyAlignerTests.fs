@@ -51,6 +51,15 @@ let makeGraphWithProperty (propUri: Uri) (label: string) (isObject: bool) =
     assertTriple graph (propNode, createUriNode graph (Uri Rdfs.Label), createLiteralNode graph label None)
     graph
 
+/// Helper: create a graph with an owl:Class that has a given label
+let makeGraphWithClass (classUri: Uri) (label: string) =
+    let graph = createGraph ()
+    let classNode = createUriNode graph classUri
+    let rdfType = createUriNode graph (Uri Rdf.Type)
+    assertTriple graph (classNode, rdfType, createUriNode graph (Uri Owl.Class))
+    assertTriple graph (classNode, createUriNode graph (Uri Rdfs.Label), createLiteralNode graph label None)
+    graph
+
 [<Tests>]
 let tests =
     testList
@@ -154,5 +163,83 @@ let tests =
                       | _ -> false)
 
               Expect.isFalse hasAnyEquivalent "unrecognized field should have no equivalentProperty"
+
+              assertValidTurtle result
+
+          testCase "Person class gets owl:equivalentClass schema:Person"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/Person"
+              let graph = makeGraphWithClass classUri "Person"
+              let result = alignVocabularies configWithSchema graph
+
+              Expect.isTrue
+                  (hasTriple result classUri (Uri Owl.EquivalentClass) (Uri SchemaOrg.Person))
+                  "Person class should get owl:equivalentClass schema:Person"
+
+              assertValidTurtle result
+
+          testCase "User class gets owl:equivalentClass schema:Person"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/User"
+              let graph = makeGraphWithClass classUri "User"
+              let result = alignVocabularies configWithSchema graph
+
+              Expect.isTrue
+                  (hasTriple result classUri (Uri Owl.EquivalentClass) (Uri SchemaOrg.Person))
+                  "User class should get owl:equivalentClass schema:Person"
+
+              assertValidTurtle result
+
+          testCase "Organization class gets owl:equivalentClass schema:Organization"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/Organization"
+              let graph = makeGraphWithClass classUri "Organization"
+              let result = alignVocabularies configWithSchema graph
+
+              Expect.isTrue
+                  (hasTriple result classUri (Uri Owl.EquivalentClass) (Uri SchemaOrg.Organization))
+                  "Organization class should get owl:equivalentClass schema:Organization"
+
+              assertValidTurtle result
+
+          testCase "Product class gets owl:equivalentClass schema:Product"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/Product"
+              let graph = makeGraphWithClass classUri "Product"
+              let result = alignVocabularies configWithSchema graph
+
+              Expect.isTrue
+                  (hasTriple result classUri (Uri Owl.EquivalentClass) (Uri SchemaOrg.Product))
+                  "Product class should get owl:equivalentClass schema:Product"
+
+              assertValidTurtle result
+
+          testCase "no class alignment when schema.org not in config"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/Person"
+              let graph = makeGraphWithClass classUri "Person"
+              let result = alignVocabularies configWithoutSchema graph
+
+              Expect.isFalse
+                  (hasTriple result classUri (Uri Owl.EquivalentClass) (Uri SchemaOrg.Person))
+                  "Person class should NOT get alignment when schema.org not in config"
+
+              assertValidTurtle result
+
+          testCase "unrecognized class name gets no alignment"
+          <| fun _ ->
+              let classUri = Uri "http://example.org/api/classes/Widget"
+              let graph = makeGraphWithClass classUri "Widget"
+              let result = alignVocabularies configWithSchema graph
+
+              let hasAnyEquivalent =
+                  result.Triples
+                  |> Seq.exists (fun t ->
+                      match t.Subject, t.Predicate with
+                      | (:? IUriNode as sn), (:? IUriNode as pn) ->
+                          sn.Uri = classUri && pn.Uri = Uri Owl.EquivalentClass
+                      | _ -> false)
+
+              Expect.isFalse hasAnyEquivalent "unrecognized class should have no equivalentClass"
 
               assertValidTurtle result ]

@@ -96,9 +96,12 @@ module ExtractCommand =
             assertTriple target (s, p, o)
 
     let private countAligned (graph: IGraph) : int =
-        let equivPropUri = Uri Owl.EquivalentProperty
-        let equivPropNode = createUriNode graph equivPropUri
-        triplesWithPredicate graph equivPropNode |> Seq.length
+        let equivPropNode = createUriNode graph (Uri Owl.EquivalentProperty)
+        let equivClassNode = createUriNode graph (Uri Owl.EquivalentClass)
+
+        let propAligned = triplesWithPredicate graph equivPropNode |> Seq.length
+        let classAligned = triplesWithPredicate graph equivClassNode |> Seq.length
+        propAligned + classAligned
 
     let private detectUnmappedTypes
         (analyzedTypes: AnalyzedType list)
@@ -187,7 +190,7 @@ module ExtractCommand =
                     let objectPropCount = countByType alignedOntology (Uri Owl.ObjectProperty)
                     let propertyCount = datatypePropCount + objectPropCount
                     let alignedCount = countAligned alignedOntology
-                    let unalignedCount = propertyCount - alignedCount
+                    let unalignedCount = (propertyCount + classCount) - alignedCount
 
                     let shapeCount = countByType shapesGraph (Uri Shacl.NodeShape)
 

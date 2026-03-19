@@ -16,7 +16,7 @@ module VocabularyAligner =
     let private normalizeFieldName (name: string) =
         splitCamelCase(name).Replace(" ", "").ToLowerInvariant()
 
-    let private alignmentMap: (string list * string) list =
+    let private propertyAlignmentMap: (string list * string) list =
         [ ([ "name"; "title" ], SchemaOrg.Name)
           ([ "description"; "summary"; "body" ], SchemaOrg.Description)
           ([ "email"; "emailaddress" ], SchemaOrg.Email)
@@ -27,10 +27,22 @@ module VocabularyAligner =
           ([ "image"; "imageurl"; "photo" ], SchemaOrg.Image)
           ([ "telephone"; "phone" ], SchemaOrg.Telephone) ]
 
-    let private tryFindAlignment (fieldName: string) : string option =
-        let normalized = normalizeFieldName fieldName
+    let private classAlignmentMap: (string list * string) list =
+        [ ([ "person"; "user"; "customer"; "member"; "employee"; "author"; "contact" ], SchemaOrg.Person)
+          ([ "organization"; "company"; "business"; "team"; "group" ], SchemaOrg.Organization)
+          ([ "product"; "item"; "goods" ], SchemaOrg.Product)
+          ([ "event"; "meeting"; "appointment"; "booking" ], SchemaOrg.Event)
+          ([ "place"; "location"; "venue" ], SchemaOrg.Place)
+          ([ "creativework"; "post"; "article"; "blog"; "content"; "document"; "page" ], SchemaOrg.CreativeWork)
+          ([ "order"; "purchase" ], SchemaOrg.Order)
+          ([ "review"; "rating"; "feedback" ], SchemaOrg.Review)
+          ([ "offer"; "deal"; "listing" ], SchemaOrg.Offer)
+          ([ "mediaobject"; "file"; "attachment"; "media" ], SchemaOrg.MediaObject) ]
 
-        alignmentMap
+    let private tryFindIn (map: (string list * string) list) (name: string) : string option =
+        let normalized = normalizeFieldName name
+
+        map
         |> List.tryFind (fun (names, _) -> names |> List.contains normalized)
         |> Option.map snd
 
@@ -38,28 +50,28 @@ module VocabularyAligner =
         if not (config.Vocabularies |> List.contains "schema.org") then
             graph
         else
-            // Find all triples where the predicate is rdfs:label and subject is a property
-            // (i.e., subject has rdf:type owl:DatatypeProperty or owl:ObjectProperty)
             let rdfTypeUri = Uri Rdf.Type
             let datatypePropUri = Uri Owl.DatatypeProperty
             let objectPropUri = Uri Owl.ObjectProperty
+            let owlClassUri = Uri Owl.Class
             let equivalentPropUri = Uri Owl.EquivalentProperty
+            let equivalentClassUri = Uri Owl.EquivalentClass
 
             let rdfTypeNode = createUriNode graph rdfTypeUri
             let labelNode = createUriNode graph (Uri Rdfs.Label)
 
-            // Collect all property nodes (nodes that are typed as owl:DatatypeProperty or owl:ObjectProperty)
+            let typeTriples = triplesWithPredicate graph rdfTypeNode |> Seq.toList
+
+            // Align properties: owl:DatatypeProperty and owl:ObjectProperty → owl:equivalentProperty
             let propertyNodes =
-                triplesWithPredicate graph rdfTypeNode
-                |> Seq.filter (fun t ->
+                typeTriples
+                |> List.filter (fun t ->
                     match t.Object with
                     | :? IUriNode as on -> on.Uri = datatypePropUri || on.Uri = objectPropUri
                     | _ -> false)
-                |> Seq.map (fun t -> t.Subject)
-                |> Seq.distinct
-                |> Seq.toList
+                |> List.map (fun t -> t.Subject)
+                |> List.distinct
 
-            // For each property node, find its rdfs:label and try to align
             for propNode in propertyNodes do
                 let labelTriples =
                     triplesWithSubjectPredicate graph propNode labelNode |> Seq.toList
@@ -67,11 +79,36 @@ module VocabularyAligner =
                 for labelTriple in labelTriples do
                     match labelTriple.Object with
                     | :? ILiteralNode as lit ->
-                        match tryFindAlignment lit.Value with
+                        match tryFindIn propertyAlignmentMap lit.Value with
                         | Some schemaUri ->
                             let equivNode = createUriNode graph equivalentPropUri
                             let schemaNode = createUriNode graph (Uri schemaUri)
                             assertTriple graph (propNode, equivNode, schemaNode)
+                        | None -> ()
+                    | _ -> ()
+
+            // Align classes: owl:Class → owl:equivalentClass
+            let classNodes =
+                typeTriples
+                |> List.filter (fun t ->
+                    match t.Object with
+                    | :? IUriNode as on -> on.Uri = owlClassUri
+                    | _ -> false)
+                |> List.map (fun t -> t.Subject)
+                |> List.distinct
+
+            for classNode in classNodes do
+                let labelTriples =
+                    triplesWithSubjectPredicate graph classNode labelNode |> Seq.toList
+
+                for labelTriple in labelTriples do
+                    match labelTriple.Object with
+                    | :? ILiteralNode as lit ->
+                        match tryFindIn classAlignmentMap lit.Value with
+                        | Some schemaUri ->
+                            let equivNode = createUriNode graph equivalentClassUri
+                            let schemaNode = createUriNode graph (Uri schemaUri)
+                            assertTriple graph (classNode, equivNode, schemaNode)
                         | None -> ()
                     | _ -> ()
 
