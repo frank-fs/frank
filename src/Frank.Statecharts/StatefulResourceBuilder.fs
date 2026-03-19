@@ -74,7 +74,7 @@ type StateMachineMetadata =
         /// Precomputed state metadata (IsFinal, AllowedMethods, Description) keyed by state string.
         /// Avoids runtime reflection on the boxed Machine.
         StateMetadataMap: Map<string, StateInfo>
-        /// Resolve state from store, cache in HttpContext.Items, return state key string.
+        /// Resolve state from store, set IStatechartFeature on HttpContext.Features, return state key string.
         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
         /// Evaluate access-control guards using cached state from HttpContext.Items (pre-handler).
         EvaluateGuards: HttpContext -> GuardResult
@@ -189,7 +189,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         let initialStateKey = stateKey machine.Initial
 
-        // Closure: resolve state from store, cache typed values in HttpContext.Items
+        // Closure: resolve state from store, set typed values on IStatechartFeature
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
             let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
 
@@ -198,12 +198,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                 match result with
                 | Some(state, context) ->
-                    ctx.Items[StateMachineContext.stateKey] <- box state
-                    ctx.Items[StateMachineContext.contextKey] <- box context
+                    ctx.SetStatechartState(stateKey state, state, context, instanceId)
                     return stateKey state
                 | None ->
-                    ctx.Items[StateMachineContext.stateKey] <- box machine.Initial
-                    ctx.Items[StateMachineContext.contextKey] <- box machine.InitialContext
+                    ctx.SetStatechartState(initialStateKey, machine.Initial, machine.InitialContext, instanceId)
                     return initialStateKey
             }
 
