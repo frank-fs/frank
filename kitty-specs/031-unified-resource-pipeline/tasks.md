@@ -106,7 +106,7 @@
 - [x] T021 Update `generate` command to read from unified extraction state (project UnifiedResource → ExtractedStatechart → StatechartDocument → format text via existing generators)
 - [x] T022 Support `--format affordance-map` alongside existing formats (CLI flag wiring only — map generation logic is in WP06/T032-T036)
 - [x] T023 Update `HelpContent.fs` for unified extract command
-- [ ] T024 Update `TextOutput.fs` and `JsonOutput.fs` for unified results
+- [x] T024 Update `TextOutput.fs` and `JsonOutput.fs` for unified results
 - [ ] T025 Ensure existing `statechart parse` and `statechart validate` continue working
 
 ### Dependencies
