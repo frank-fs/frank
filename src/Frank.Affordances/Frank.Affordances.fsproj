@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="AffordanceMap.fs" />
     <Compile Include="AffordanceMiddleware.fs" />
+    <Compile Include="StartupProjection.fs" />
+    <Compile Include="ProfileMiddleware.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 

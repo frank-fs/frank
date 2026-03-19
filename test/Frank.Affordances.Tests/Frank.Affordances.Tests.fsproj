@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="AffordanceMapTests.fs" />
     <Compile Include="AffordanceMiddlewareTests.fs" />
+    <Compile Include="ProfileMiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
