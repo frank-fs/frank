@@ -64,11 +64,6 @@ module AffordanceMap =
     [<Literal>]
     let KeySeparator = "|"
 
-    /// HttpContext.Items key convention for the current statechart state key.
-    /// The statechart middleware stores the resolved state key at this key.
-    [<Literal>]
-    let StateKeyItemsKey = "statechart.stateKey"
-
     /// Build a composite lookup key from route template and state key.
     let lookupKey (routeTemplate: string) (stateKey: string) : string =
         routeTemplate + KeySeparator + stateKey
