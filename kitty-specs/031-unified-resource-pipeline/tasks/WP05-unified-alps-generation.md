@@ -1,7 +1,7 @@
 ---
 work_package_id: WP05
 title: Unified ALPS Generation -- Type + Behavior Descriptors
-lane: "for_review"
+lane: "doing"
 dependencies: [WP02]
 base_branch: 031-unified-resource-pipeline-WP02
 base_commit: 35175b217c2cce39589a312a0e8317e273430068
@@ -15,8 +15,8 @@ subtasks:
 - T031
 phase: Phase 1 - Core Pipeline
 assignee: ''
-agent: "claude-opus-wp05"
-shell_pid: "20809"
+agent: "claude-opus-wp05-review"
+shell_pid: "24010"
 review_status: ''
 reviewed_by: ''
 history:
@@ -328,3 +328,4 @@ dotnet test test/Frank.Cli.Core.Tests/ --filter "UnifiedAlps"
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:40:20Z – claude-opus-wp05 – shell_pid=20809 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:50:14Z – claude-opus-wp05 – shell_pid=20809 – lane=for_review – Implemented UnifiedAlpsGenerator with all 6 subtasks: T026 core generation, T027 Schema.org vocabulary alignment, T028 IANA-precedence link relations, T029 plain resource support, T030 round-trip validation, T031 23 passing tests including tic-tac-toe fixture.
+- 2026-03-19T03:52:45Z – claude-opus-wp05-review – shell_pid=24010 – lane=doing – Started review via workflow command
