@@ -17,7 +17,7 @@ subtasks:
 - T025
 phase: Phase 1 - Core Pipeline
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "20684"
 review_status: ''
 reviewed_by: ''
@@ -863,3 +863,4 @@ dotnet test
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T03:40:00Z – claude-opus – shell_pid=20684 – lane=doing – Assigned agent via workflow command
