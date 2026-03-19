@@ -16,7 +16,7 @@ subtasks:
 - T037
 phase: Phase 1 - Core Pipeline
 assignee: ''
-agent: ''
+agent: "claude-opus-wp06"
 shell_pid: "21017"
 review_status: ''
 reviewed_by: ''
@@ -324,3 +324,4 @@ dotnet test test/Frank.Cli.Core.Tests/ --filter "AffordanceMap"
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T03:41:36Z – claude-opus-wp06 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
