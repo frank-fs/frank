@@ -214,7 +214,7 @@
 - [x] T048 Project SHACL shapes (call `ShapeGenerator.generateShapes`)
 - [x] T049 Project JSON Schema per resource via `FSharp.Data.JsonSchema.OpenApi`
 - [x] T050 Create `ProfileMiddleware.fs` — serve views at configured URLs via content negotiation
-- [ ] T051 Integration tests: different Accept headers → correct content types
+- [x] T051 Integration tests: different Accept headers → correct content types
 
 ### Dependencies
 - Depends on WP07 (middleware infrastructure).
