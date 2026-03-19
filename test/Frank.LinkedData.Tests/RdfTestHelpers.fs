@@ -1,4 +1,4 @@
-module Frank.RdfValidation.Tests.TestHelpers
+module Frank.LinkedData.Tests.RdfTestHelpers
 
 open System
 open System.IO

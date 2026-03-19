@@ -1,4 +1,4 @@
-module Frank.RdfValidation.Tests.GraphCoherenceTests
+module Frank.LinkedData.Tests.GraphCoherenceTests
 
 open System
 open System.Net.Http
@@ -6,7 +6,7 @@ open Expecto
 open Microsoft.AspNetCore.TestHost
 open VDS.RDF
 open VDS.RDF.Query
-open Frank.RdfValidation.Tests.TestHelpers
+open Frank.LinkedData.Tests.RdfTestHelpers
 
 // ---------------------------------------------------------------------------
 // Helpers

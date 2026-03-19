@@ -18,6 +18,8 @@
     <Compile Include="AgentTypeTests.fs" />
     <Compile Include="CustomStoreTests.fs" />
     <Compile Include="IntegrationTests.fs" />
+    <Compile Include="SparqlHelpers.fs" />
+    <Compile Include="ProvenanceGraphTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -26,6 +28,7 @@
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0-*" />
+    <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
   </ItemGroup>
 
   <ItemGroup>

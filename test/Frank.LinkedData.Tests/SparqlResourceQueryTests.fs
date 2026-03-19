@@ -1,9 +1,9 @@
-module Frank.RdfValidation.Tests.SparqlResourceQueryTests
+module Frank.LinkedData.Tests.SparqlResourceQueryTests
 
 open Expecto
 open Microsoft.AspNetCore.TestHost
 open VDS.RDF
-open Frank.RdfValidation.Tests.TestHelpers
+open Frank.LinkedData.Tests.RdfTestHelpers
 
 [<Tests>]
 let tests =

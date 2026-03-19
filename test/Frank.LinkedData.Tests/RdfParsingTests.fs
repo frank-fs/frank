@@ -1,10 +1,10 @@
-module Frank.RdfValidation.Tests.RdfParsingTests
+module Frank.LinkedData.Tests.RdfParsingTests
 
 open System.Net.Http
 open Microsoft.AspNetCore.TestHost
 open Expecto
 open VDS.RDF
-open Frank.RdfValidation.Tests.TestHelpers
+open Frank.LinkedData.Tests.RdfTestHelpers
 
 [<Tests>]
 let tests =
