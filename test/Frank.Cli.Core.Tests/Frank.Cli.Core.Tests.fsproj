@@ -34,6 +34,7 @@
     <Compile Include="Unified/UnifiedModelTests.fs" />
     <Compile Include="Unified/UnifiedCacheTests.fs" />
     <Compile Include="Unified/UnifiedExtractorTests.fs" />
+    <Compile Include="Unified/UnifiedAlpsGeneratorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
