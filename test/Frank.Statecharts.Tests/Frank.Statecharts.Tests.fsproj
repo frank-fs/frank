@@ -55,6 +55,11 @@
     <Compile Include="Validation/PipelineIntegrationTests.fs" />
     <Compile Include="Validation/NearMatchTests.fs" />
     <Compile Include="Validation/MergeTests.fs" />
+    <!-- Affordance tests (merged from Frank.Affordances.Tests) -->
+    <Compile Include="Affordances/AffordanceMapTests.fs" />
+    <Compile Include="Affordances/AffordanceMiddlewareTests.fs" />
+    <Compile Include="Affordances/ProfileMiddlewareTests.fs" />
+    <Compile Include="Affordances/EmbeddingTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -67,6 +72,12 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
+  </ItemGroup>
+
+  <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Affordances/Fixtures/test-unified-state.bin"
+                      LogicalName="Frank.Affordances.unified-state.bin" />
   </ItemGroup>
 
 </Project>
