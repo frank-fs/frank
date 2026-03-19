@@ -212,7 +212,7 @@
 - [x] T046 Project ALPS profile (reuse `UnifiedAlpsGenerator` from WP05)
 - [x] T047 Project OWL ontology (call `TypeMapper.mapTypes`)
 - [x] T048 Project SHACL shapes (call `ShapeGenerator.generateShapes`)
-- [ ] T049 Project JSON Schema per resource via `FSharp.Data.JsonSchema.OpenApi`
+- [x] T049 Project JSON Schema per resource via `FSharp.Data.JsonSchema.OpenApi`
 - [ ] T050 Create `ProfileMiddleware.fs` — serve views at configured URLs via content negotiation
 - [ ] T051 Integration tests: different Accept headers → correct content types
 
