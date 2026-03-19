@@ -263,11 +263,11 @@
 **Estimated Size**: ~300 lines
 
 ### Included Subtasks
-- [ ] T057 Create `AffordanceHelper.fs` in `Frank.Datastar`
-- [ ] T058 Return `AffordanceResult` with `AllowedMethods`, `LinkRelations`, convenience booleans
-- [ ] T059 Permissive default when map not loaded
-- [ ] T060 Add to Frank.Datastar.fsproj (no new project references)
-- [ ] T061 Write tests with mock affordance map
+- [x] T057 Create `AffordanceHelper.fs` in `Frank.Datastar`
+- [x] T058 Return `AffordanceResult` with `AllowedMethods`, `LinkRelations`, convenience booleans
+- [x] T059 Permissive default when map not loaded
+- [x] T060 Add to Frank.Datastar.fsproj (no new project references)
+- [x] T061 Write tests with mock affordance map
 
 ### Dependencies
 - Depends on WP06 (affordance map types/format).
