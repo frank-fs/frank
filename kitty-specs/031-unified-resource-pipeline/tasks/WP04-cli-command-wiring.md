@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: CLI Command Wiring -- Unified Extract & Generate
-lane: "doing"
+lane: "done"
 dependencies:
 - WP02
 base_branch: 031-unified-resource-pipeline-WP02
@@ -19,8 +19,8 @@ phase: Phase 1 - Core Pipeline
 assignee: ''
 agent: "claude-opus"
 shell_pid: "23508"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-19T02:15:00Z'
   lane: planned
@@ -866,3 +866,4 @@ dotnet test
 - 2026-03-19T03:40:00Z – claude-opus – shell_pid=20684 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:47:34Z – claude-opus – shell_pid=20684 – lane=for_review – Ready for review: unified extract + generate commands, affordance-map format, cache integration, text/JSON output, help entries, backward compatible
 - 2026-03-19T03:50:34Z – claude-opus – shell_pid=23508 – lane=doing – Started review via workflow command
+- 2026-03-19T03:51:59Z – claude-opus – shell_pid=23508 – lane=done – Review passed: unified extract/generate commands wired, affordance-map format supported, backward compat verified, 36/36 tests, full solution builds
