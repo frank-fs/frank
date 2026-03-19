@@ -1,30 +1,33 @@
 ---
-work_package_id: "WP05"
+work_package_id: WP05
+title: Unified ALPS Generation -- Type + Behavior Descriptors
+lane: "doing"
+dependencies: [WP02]
+base_branch: 031-unified-resource-pipeline-WP02
+base_commit: 35175b217c2cce39589a312a0e8317e273430068
+created_at: '2026-03-19T03:40:19.974323+00:00'
 subtasks:
-  - "T026"
-  - "T027"
-  - "T028"
-  - "T029"
-  - "T030"
-  - "T031"
-requirement_refs:
-  - "FR-007"
-  - "FR-008"
-title: "Unified ALPS Generation -- Type + Behavior Descriptors"
-phase: "Phase 1 - Core Pipeline"
-lane: "planned"
-dependencies: ["WP02"]
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T026
+- T027
+- T028
+- T029
+- T030
+- T031
+phase: Phase 1 - Core Pipeline
+assignee: ''
+agent: ''
+shell_pid: "20809"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-19T02:15:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-19T02:15:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-007
+- FR-008
 ---
 
 # Work Package Prompt: WP05 -- Unified ALPS Generation -- Type + Behavior Descriptors
