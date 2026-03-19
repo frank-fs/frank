@@ -7,6 +7,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
+open Frank.Cli.Core.Unified
 
 /// Ambiguity detection command: identifies unmapped types and routes.
 module ClarifyCommand =
@@ -257,10 +258,10 @@ module ClarifyCommand =
         questions |> Seq.toList
 
     let execute (projectPath: string) : Result<ClarifyResult, string> =
-        let statePath = ExtractionState.defaultStatePath (Path.GetDirectoryName projectPath)
+        let projectDir = Path.GetDirectoryName projectPath
 
-        match ExtractionState.load statePath with
-        | Error e -> Error $"Failed to load state: {e}"
+        match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
+        | Error e -> Error e
         | Ok state ->
 
             let unmappedQuestions = unmappedTypeQuestions state

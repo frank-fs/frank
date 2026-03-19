@@ -8,6 +8,7 @@ open VDS.RDF.Parsing
 open VDS.RDF.Writing
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Output
+open Frank.Cli.Core.Unified
 
 /// Generates final OWL/XML and SHACL artifacts from extraction state.
 module CompileCommand =
@@ -50,10 +51,8 @@ module CompileCommand =
 
     let execute (projectPath: string) (outputDir: string option) : Result<CompileResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
-        let statePath = ExtractionState.defaultStatePath projectDir
-
-        match ExtractionState.load statePath with
-        | Error _ -> Error "No extraction state found. Run 'frank-cli extract' first."
+        match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
+        | Error e -> Error e
         | Ok state ->
 
             try
@@ -61,6 +60,7 @@ module CompileCommand =
                     outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
 
                 // Back up existing state before overwriting
+                let statePath = ExtractionState.defaultStatePath projectDir
                 backupState statePath
 
                 // Write all three artifacts via shared serializer

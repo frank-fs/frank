@@ -2,6 +2,7 @@ namespace Frank.Cli.Core.Commands
 
 open System.IO
 open Frank.Cli.Core.State
+open Frank.Cli.Core.Unified
 
 /// Structured diff between extraction states.
 module DiffCommand =
@@ -28,10 +29,8 @@ module DiffCommand =
 
     let execute (projectPath: string) (previousPath: string option) : Result<DiffCommandResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
-        let currentStatePath = ExtractionState.defaultStatePath projectDir
-
-        match ExtractionState.load currentStatePath with
-        | Error e -> Error $"Failed to load current state: {e}"
+        match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
+        | Error e -> Error e
         | Ok currentState ->
 
         let resolvedPrevious =
