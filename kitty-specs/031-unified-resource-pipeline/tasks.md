@@ -78,7 +78,7 @@
 - [x] T016 Implement cache read path: load `obj/frank-cli/unified-state.bin`
 - [x] T017 Implement cache write path: serialize and write after extraction
 - [x] T018 Implement `--force` flag to bypass cache
-- [ ] T018a Include tool version in cache header; detect version mismatch on load and re-extract automatically (FR-028)
+- [x] T018a Include tool version in cache header; detect version mismatch on load and re-extract automatically (FR-028)
 
 ### Dependencies
 - Depends on WP01 (types).
