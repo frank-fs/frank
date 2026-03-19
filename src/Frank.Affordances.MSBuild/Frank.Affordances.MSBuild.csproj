@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- This project produces no assembly; build-time-only package -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <!-- Package metadata -->
+    <PackageId>Frank.Affordances.MSBuild</PackageId>
+    <Description>MSBuild targets for embedding Frank unified state binary into assemblies</Description>
+    <PackageTags>msbuild;embedded-resource;affordances;frank</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pack the .targets file into buildTransitive/ so it auto-imports for all consuming projects -->
+    <None Include="build/Frank.Affordances.MSBuild.targets" Pack="true" PackagePath="buildTransitive/" />
+    <None Include="build/Frank.Affordances.MSBuild.targets" Pack="true" PackagePath="build/" />
+    <!-- Empty marker to prevent NuGet warnings about empty lib -->
+    <None Include="lib/netstandard2.0/_._" Pack="true" PackagePath="lib/netstandard2.0/" />
+  </ItemGroup>
+
+</Project>
