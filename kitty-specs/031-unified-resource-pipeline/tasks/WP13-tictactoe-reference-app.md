@@ -1,9 +1,12 @@
 ---
 work_package_id: WP13
 title: Tic-Tac-Toe Reference App & End-to-End Validation
-lane: planned
+lane: "doing"
 dependencies:
 - WP07
+base_branch: 031-unified-resource-pipeline-WP07
+base_commit: b9db0f0447b4f9f24313b68a6a272b4a3fa6e18f
+created_at: '2026-03-19T04:06:56.944778+00:00'
 subtasks:
 - T074
 - T075
@@ -15,7 +18,7 @@ subtasks:
 phase: Phase 4 - Validation
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "26479"
 review_status: ''
 reviewed_by: ''
 history:
