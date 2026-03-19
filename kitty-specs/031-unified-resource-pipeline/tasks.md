@@ -343,13 +343,13 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T074 Create minimal `sample/Frank.TicTacToe.Sample/` project (reuse existing test fixtures)
-- [ ] T075 Add Frank.Affordances + `useAffordances` in webHost CE
-- [ ] T076 Run `frank-cli extract`, verify unified extraction output
-- [ ] T077 Run `frank-cli generate --format alps`, verify ALPS has type + behavior descriptors
-- [ ] T078 Run `frank-cli generate --format affordance-map`, verify map entries
-- [ ] T079 Build, start TestHost, verify Link + Allow + profile + describedby headers per state
-- [ ] T080 Add Datastar SSE handler with `affordancesFor()`, verify state-aware fragments
+- [x] T074 Create minimal `sample/Frank.TicTacToe.Sample/` project (reuse existing test fixtures)
+- [x] T075 Add Frank.Affordances + `useAffordances` in webHost CE
+- [x] T076 Run `frank-cli extract`, verify unified extraction output
+- [x] T077 Run `frank-cli generate --format alps`, verify ALPS has type + behavior descriptors
+- [x] T078 Run `frank-cli generate --format affordance-map`, verify map entries
+- [x] T079 Build, start TestHost, verify Link + Allow + profile + describedby headers per state
+- [x] T080 Add Datastar SSE handler with `affordancesFor()`, verify state-aware fragments
 
 ### Dependencies
 - Depends on WP07 (middleware), WP08 (projections), WP09 (MSBuild), WP10 (Datastar helper).
