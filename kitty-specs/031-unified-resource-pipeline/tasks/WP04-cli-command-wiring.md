@@ -1,9 +1,12 @@
 ---
 work_package_id: WP04
 title: CLI Command Wiring -- Unified Extract & Generate
-lane: planned
+lane: "doing"
 dependencies:
 - WP02
+base_branch: 031-unified-resource-pipeline-WP02
+base_commit: 35175b217c2cce39589a312a0e8317e273430068
+created_at: '2026-03-19T03:40:00.241953+00:00'
 subtasks:
 - T019
 - T020
@@ -15,7 +18,7 @@ subtasks:
 phase: Phase 1 - Core Pipeline
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "20684"
 review_status: ''
 reviewed_by: ''
 history:
