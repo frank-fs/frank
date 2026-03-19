@@ -16,7 +16,7 @@ subtasks:
 - T073
 phase: Phase 3 - Integration
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "26347"
 review_status: ''
 reviewed_by: ''
@@ -558,3 +558,4 @@ spec-kitty implement WP12 --base WP02
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T04:06:50Z – claude-opus – shell_pid=26347 – lane=doing – Assigned agent via workflow command
