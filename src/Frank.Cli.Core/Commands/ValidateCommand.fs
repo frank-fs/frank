@@ -7,6 +7,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
+open Frank.Cli.Core.Unified
 
 /// Validates completeness and consistency of extracted semantic definitions.
 module ValidateCommand =
@@ -121,10 +122,10 @@ module ValidateCommand =
               Uri = None })
 
     let execute (projectPath: string) : Result<ValidateResult, string> =
-        let statePath = ExtractionState.defaultStatePath (Path.GetDirectoryName projectPath)
+        let projectDir = Path.GetDirectoryName projectPath
 
-        match ExtractionState.load statePath with
-        | Result.Error e -> Result.Error $"Failed to load state: {e}"
+        match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
+        | Result.Error e -> Result.Error e
         | Result.Ok state ->
 
             let owlClasses = findOwlClasses state.Ontology

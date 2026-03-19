@@ -37,6 +37,7 @@
     <Compile Include="Unified/UnifiedExtractorTests.fs" />
     <Compile Include="Unified/UnifiedAlpsGeneratorTests.fs" />
     <Compile Include="Unified/AffordanceMapGeneratorTests.fs" />
+    <Compile Include="Unified/ExtractionStateProjectorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
