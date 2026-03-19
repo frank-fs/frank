@@ -1,33 +1,36 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: Unified AST Walker
+lane: "doing"
+dependencies: [WP01]
+base_branch: 031-unified-resource-pipeline-WP01
+base_commit: bd0722e27d0fa12e9ab2ad5cdbbcb7b8e6d5fed6
+created_at: '2026-03-19T03:24:17.681895+00:00'
 subtasks:
-  - "T006"
-  - "T007"
-  - "T008"
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-requirement_refs:
-  - "FR-001"
-  - "FR-002"
-  - "FR-003"
-  - "FR-004"
-title: "Unified AST Walker"
-phase: "Phase 0 - Foundation"
-lane: "planned"  # DO NOT EDIT - use: spec-kitty agent tasks move-task <WPID> --to <lane>
-assignee: ""      # Optional friendly name when in doing/for_review
-agent: ""         # CLI agent identifier (claude, codex, etc.)
-shell_pid: ""     # PID captured when the task moved to the current lane
-review_status: "" # empty | has_feedback | acknowledged (populated by reviewers/implementers)
-reviewed_by: ""   # Agent ID of the reviewer (if reviewed)
-dependencies: ["WP01"]
+- T006
+- T007
+- T008
+- T009
+- T010
+- T011
+- T012
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "17534"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-19T02:15:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-19T02:15:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-001
+- FR-002
+- FR-003
+- FR-004
 ---
 
 # Work Package Prompt: WP02 -- Unified AST Walker
