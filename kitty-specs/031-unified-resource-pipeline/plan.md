@@ -10,7 +10,7 @@ Merge the semantic (OWL/SHACL) and statechart (state machine) CLI pipelines into
 ## Technical Context
 
 **Language/Version**: F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting for library projects, net10.0 for CLI/tests)
-**Primary Dependencies**: FSharp.Compiler.Service (FCS), dotNetRdf.Core, System.Text.Json, MemoryPack or MessagePack-CSharp (binary serialization — pending F# compatibility research), Microsoft.AspNetCore.App (framework reference)
+**Primary Dependencies**: FSharp.Compiler.Service (FCS), dotNetRdf.Core, System.Text.Json, MessagePack + MessagePack.FSharpExtensions (binary serialization), FSharp.Data.JsonSchema.OpenApi (canonical F# type-to-schema mapping), Microsoft.AspNetCore.App (framework reference)
 **Storage**: Binary embedded resource in assembly (MemoryPack/MessagePack), `obj/frank-cli/unified-state.bin` cache file
 **Testing**: Expecto (unit), Microsoft.AspNetCore.TestHost (integration), existing 1726-test baseline
 **Target Platform**: .NET 8.0+ server (ASP.NET Core)

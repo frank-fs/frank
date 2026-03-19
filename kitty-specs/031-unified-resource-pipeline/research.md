@@ -18,7 +18,34 @@
 - Protocol Buffers: Requires .proto schema files, heavy tooling, not idiomatic for F# records
 - CBOR (System.Formats.Cbor): Available in .NET but no high-level serializer for F# types — would require manual encoding
 
-**Action**: Add `MessagePack` NuGet package to `Frank.Cli.Core` and `Frank.Affordances`. If MemoryPack F# source generator support improves, can swap serializer without changing the architecture (both produce opaque binary blobs behind the same API boundary).
+**Action**: Add `MessagePack` + `MessagePack.FSharpExtensions` NuGet packages to `Frank.Cli.Core` and `Frank.Affordances`. If MemoryPack F# source generator support improves, can swap serializer without changing the architecture (both produce opaque binary blobs behind the same API boundary).
+
+## R6: FSharp.Data.JsonSchema as Canonical Type Mapping
+
+**Decision**: Use `FSharp.Data.JsonSchema.OpenApi` as the single opinion for how F# types map to JSON/schema representations across the entire unified pipeline.
+
+**Rationale**:
+- Already a dependency of `Frank.OpenApi` where it powers `FSharpSchemaTransformer()` for OpenAPI schema generation
+- Builds on top of `FSharp.SystemTextJson` and adds opinionated defaults for DU encoding, Option representation, record field naming, etc.
+- Using the same type mapping opinion everywhere ensures consistency: OpenAPI schemas, JSON Schema served via `rel="describedby"`, CLI JSON output, and affordance map display format all represent F# types identically
+- Without this, different parts of the pipeline could encode the same DU differently (e.g., OpenAPI says `oneOf`, CLI output says tagged union, affordance map uses something else)
+- JSON Schema can be served per-resource at dedicated URLs via `Link: <url>; rel="describedby"` headers, complementing the ALPS behavioral profile (`rel="profile"`) with structural self-description
+
+**What it provides**:
+- `FSharpSchemaTransformer`: Transforms OpenAPI/JSON Schema for F# types
+- Consistent DU-to-schema mapping (tagged unions as `oneOf` with discriminator)
+- Consistent Option-to-schema mapping (nullable rather than absent)
+- Consistent record-to-schema mapping (camelCase properties by default)
+
+**Impact on unified pipeline**:
+- `Frank.Cli.Core` adds `FSharp.Data.JsonSchema.OpenApi` as a dependency (currently only in `Frank.OpenApi`)
+- The unified extractor uses `FSharp.Data.JsonSchema` to generate per-resource JSON Schemas during extraction
+- The affordance middleware serves JSON Schema at per-resource URLs and adds `Link: <url>; rel="describedby"` headers
+- MessagePack binary serialization follows the same logical structure as the JSON Schema mapping (field names, nullability, DU encoding)
+
+**Alternatives considered**:
+- FSharp.SystemTextJson alone: Works but lacks the opinionated schema mapping — would need to replicate FSharp.Data.JsonSchema's decisions ad hoc
+- Independent schema generation: Reinventing what FSharp.Data.JsonSchema already provides, with risk of inconsistency with OpenAPI
 
 ## R2: Unified AST Walk Strategy
 

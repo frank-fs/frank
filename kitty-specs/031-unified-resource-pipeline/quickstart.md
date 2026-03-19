@@ -54,12 +54,18 @@ GET /games/42 HTTP/1.1
 HTTP/1.1 200 OK
 Allow: GET, POST
 Link: <https://example.com/alps/games>; rel="profile"
+Link: <https://example.com/schemas/game>; rel="describedby"
 Link: </games/42>; rel="self"
 Link: </games/42>; rel="https://example.com/alps/games#makeMove"; method="POST"
 Content-Type: application/json
 
 {"board": [...], "currentTurn": "X"}
 ```
+
+Three self-descriptive links:
+- `rel="profile"` → ALPS: what this resource **can do** (behavioral semantics)
+- `rel="describedby"` → JSON Schema: what this response **looks like** (structural schema)
+- `rel="self"` + transition links → what actions are **available now** (state-dependent affordances)
 
 When the game reaches Won state:
 
@@ -69,6 +75,7 @@ GET /games/42 HTTP/1.1
 HTTP/1.1 200 OK
 Allow: GET
 Link: <https://example.com/alps/games>; rel="profile"
+Link: <https://example.com/schemas/game>; rel="describedby"
 Link: </games/42>; rel="self"
 Content-Type: application/json
 

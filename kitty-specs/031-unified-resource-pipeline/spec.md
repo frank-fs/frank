@@ -200,7 +200,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 **Runtime Affordance Middleware**
 
 - **FR-017**: System MUST provide an `app.UseAffordances()` middleware extension that loads the affordance map at startup and injects affordance headers into responses for stateful resources
-- **FR-018**: The middleware MUST inject `Allow` headers reflecting the current state's permitted HTTP methods, `Link` headers describing available transitions using IANA-registered relations where applicable and ALPS profile fragment URIs for domain-specific transitions, and a `Link: <profile-url>; rel="profile"` header pointing to the ALPS profile
+- **FR-018**: The middleware MUST inject `Allow` headers reflecting the current state's permitted HTTP methods, `Link` headers describing available transitions using IANA-registered relations where applicable and ALPS profile fragment URIs for domain-specific transitions, a `Link: <profile-url>; rel="profile"` header pointing to the ALPS profile, and a `Link: <schema-url>; rel="describedby"` header pointing to the JSON Schema for the resource's response type
 - **FR-019**: The middleware MUST read the current state key from the statechart middleware's resolution (already in `HttpContext.Items`) and look up the affordance map entry
 - **FR-020**: The middleware MUST add zero per-request allocations beyond Link header string construction — all map lookups MUST be pre-computed at startup
 - **FR-021**: The middleware MUST degrade gracefully when no affordance map is loaded (log warning at startup, pass requests through unmodified)
@@ -210,6 +210,11 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 - **FR-022**: System MUST provide a helper function `affordancesFor(routeTemplate, stateKey, affordanceMap)` that returns the available methods and link relations for a given state, usable in Datastar SSE handlers
 - **FR-023**: The helper MUST enable Datastar handlers to conditionally render HTML controls based on state-dependent affordances (e.g., show/hide action buttons)
 - **FR-024**: When the affordance map is not loaded, the helper MUST return a permissive default (all methods available) rather than hiding controls
+
+**Type Consistency**
+
+- **FR-024a**: System MUST use `FSharp.Data.JsonSchema.OpenApi` as the canonical opinion for F# type-to-schema mapping across all projections: OpenAPI schemas, JSON Schema served via `rel="describedby"`, CLI JSON output, and affordance map display format
+- **FR-024b**: The affordance middleware MUST serve per-resource JSON Schema at dedicated URLs and include `Link: <schema-url>; rel="describedby"` headers in responses, complementing the ALPS `rel="profile"` link
 
 **FCS Caching**
 
