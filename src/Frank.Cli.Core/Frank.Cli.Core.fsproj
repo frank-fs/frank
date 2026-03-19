@@ -33,6 +33,7 @@
     <!-- Unified pipeline -->
     <Compile Include="Unified/UnifiedModel.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
+    <Compile Include="Unified/UnifiedAlpsGenerator.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
