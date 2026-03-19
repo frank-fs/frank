@@ -74,7 +74,7 @@
 ### Included Subtasks
 - [x] T013 Create `UnifiedCache.fs` — serialize/deserialize `UnifiedExtractionState` with MessagePack
 - [x] T014 Implement source hash computation (hash all .fs files in the project)
-- [ ] T015 Implement staleness detection: compare cached hash vs current
+- [x] T015 Implement staleness detection: compare cached hash vs current
 - [ ] T016 Implement cache read path: load `obj/frank-cli/unified-state.bin`
 - [ ] T017 Implement cache write path: serialize and write after extraction
 - [ ] T018 Implement `--force` flag to bypass cache
