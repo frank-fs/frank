@@ -1,7 +1,7 @@
 ---
 work_package_id: WP08
 title: Startup Projection -- Binary to In-Memory ALPS/OWL/SHACL/Schema
-lane: "doing"
+lane: "done"
 dependencies: [WP07]
 base_branch: 031-unified-resource-pipeline-WP07
 base_commit: b9db0f0447b4f9f24313b68a6a272b4a3fa6e18f
@@ -18,8 +18,8 @@ phase: Phase 2 - Runtime
 assignee: ''
 agent: "claude-opus-wp08-review"
 shell_pid: "23685"
-review_status: ''
-reviewed_by: ''
+review_status: "approved"
+reviewed_by: "Ryan Riley"
 history:
 - timestamp: '2026-03-19T02:15:00Z'
   lane: planned
@@ -421,3 +421,4 @@ dotnet test test/Frank.Affordances.Tests/ --filter "Profile"
 - 2026-03-19T03:41:37Z – claude-opus-wp08 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
 - 2026-03-19T03:49:21Z – claude-opus-wp08 – shell_pid=21017 – lane=for_review – Ready for review: startup projection with profile middleware, 33 tests passing, zero runtime deps on CLI
 - 2026-03-19T03:51:44Z – claude-opus-wp08-review – shell_pid=23685 – lane=doing – Started review via workflow command
+- 2026-03-19T03:54:16Z – claude-opus-wp08-review – shell_pid=23685 – lane=done – Review passed: All 33 tests pass, builds on net8.0/net9.0/net10.0, zero runtime deps on CLI/dotNetRdf, correct IANA content types, discovery endpoint at /.well-known/frank-profiles, ProjectedProfiles record with all four format maps, StartupProjection with serialize/deserialize/loadFromAssembly/loadFromFile
