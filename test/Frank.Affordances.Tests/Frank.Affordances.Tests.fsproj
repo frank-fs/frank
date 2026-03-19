@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="AffordanceMapTests.fs" />
+    <Compile Include="EmbeddingTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -19,6 +20,12 @@
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+  </ItemGroup>
+
+  <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures/test-unified-state.bin"
+                      LogicalName="Frank.Affordances.unified-state.bin" />
   </ItemGroup>
 
 </Project>
