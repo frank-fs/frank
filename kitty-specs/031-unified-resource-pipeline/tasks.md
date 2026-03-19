@@ -316,12 +316,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T068 Create `ExtractionStateProjector.fs` with `toExtractionState` function
-- [ ] T069 Project OWL graphs via `TypeMapper.mapTypes`
-- [ ] T070 Project `ExtractionState.SourceMap` from unified resource data
-- [ ] T071 Update `ClarifyCommand`, `ValidateCommand`, `CompileCommand`, `DiffCommand`
-- [ ] T072 Detect old `state.json` format, prompt re-extraction
-- [ ] T073 Write comparison tests: projected state matches old semantic extract output
+- [x] T068 Create `ExtractionStateProjector.fs` with `toExtractionState` function
+- [x] T069 Project OWL graphs via `TypeMapper.mapTypes`
+- [x] T070 Project `ExtractionState.SourceMap` from unified resource data
+- [x] T071 Update `ClarifyCommand`, `ValidateCommand`, `CompileCommand`, `DiffCommand`
+- [x] T072 Detect old `state.json` format, prompt re-extraction
+- [x] T073 Write comparison tests: projected state matches old semantic extract output
 
 ### Dependencies
 - Depends on WP02 (extractor) and WP03 (cache).
