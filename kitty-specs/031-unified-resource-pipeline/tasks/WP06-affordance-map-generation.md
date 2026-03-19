@@ -1,9 +1,12 @@
 ---
 work_package_id: WP06
 title: Affordance Map Generation
-lane: planned
+lane: "doing"
 dependencies:
 - WP02
+base_branch: 031-unified-resource-pipeline-WP02
+base_commit: 35175b217c2cce39589a312a0e8317e273430068
+created_at: '2026-03-19T03:41:36.075611+00:00'
 subtasks:
 - T032
 - T033
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 1 - Core Pipeline
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "21017"
 review_status: ''
 reviewed_by: ''
 history:
