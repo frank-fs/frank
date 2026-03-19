@@ -16,7 +16,7 @@ subtasks:
 - T051
 phase: Phase 2 - Runtime
 assignee: ''
-agent: ''
+agent: "claude-opus-wp08"
 shell_pid: "21017"
 review_status: ''
 reviewed_by: ''
@@ -418,3 +418,4 @@ dotnet test test/Frank.Affordances.Tests/ --filter "Profile"
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T03:41:37Z – claude-opus-wp08 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
