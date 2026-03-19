@@ -154,12 +154,12 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T032 Create `AffordanceMapGenerator.fs` — takes `UnifiedResource list`, produces map
-- [ ] T033 Implement composite key generation `"{routeTemplate}|{stateKey}"`
-- [ ] T034 Populate `AffordanceLinkRelation` entries with IANA-precedence relation types
-- [ ] T035 Add `profileUrl` per entry from `--base-uri` + resource slug
-- [ ] T036 Wire `--format affordance-map` output (JSON display + MessagePack binary)
-- [ ] T037 Write tests: verify map for tic-tac-toe states
+- [x] T032 Create `AffordanceMapGenerator.fs` — takes `UnifiedResource list`, produces map
+- [x] T033 Implement composite key generation `"{routeTemplate}|{stateKey}"`
+- [x] T034 Populate `AffordanceLinkRelation` entries with IANA-precedence relation types
+- [x] T035 Add `profileUrl` per entry from `--base-uri` + resource slug
+- [x] T036 Wire `--format affordance-map` output (JSON display + MessagePack binary)
+- [x] T037 Write tests: verify map for tic-tac-toe states
 
 ### Dependencies
 - Depends on WP02 (extractor) and WP05 (link relation derivation logic).
