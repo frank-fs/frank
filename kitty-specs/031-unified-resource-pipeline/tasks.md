@@ -21,7 +21,7 @@
 ### Included Subtasks
 - [x] T001 Create `UnifiedModel.fs` with `UnifiedResource`, `DerivedResourceFields`, `HttpCapability` types
 - [x] T002 Create `AffordanceMap.fs` types (`AffordanceMapEntry`, `AffordanceLinkRelation`)
-- [ ] T003 Create `Frank.Affordances` project (framework reference only, no Frank.Statecharts dependency)
+- [x] T003 Create `Frank.Affordances` project (framework reference only, no Frank.Statecharts dependency)
 - [ ] T004 Create `Frank.Affordances.Tests` test project
 - [ ] T005 Add MessagePack + MessagePack.FSharpExtensions to Frank.Cli.Core, verify F# DU serialization roundtrip
 
