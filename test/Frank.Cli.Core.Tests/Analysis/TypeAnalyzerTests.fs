@@ -531,7 +531,7 @@ type Account = { Id: int; Status: Status }
           testCaseAsync "constraint attributes extracted from fixture project"
           <| async {
               let fixturesPath =
-                  Path.Combine(__SOURCE_DIRECTORY__, "..", "Fixtures", "Fixtures.fsproj")
+                  Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "..", "Fixtures", "Fixtures.fsproj"))
 
               let! result = ProjectLoader.loadProject fixturesPath
 
