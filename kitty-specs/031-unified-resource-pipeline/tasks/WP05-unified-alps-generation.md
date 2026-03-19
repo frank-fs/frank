@@ -15,7 +15,7 @@ subtasks:
 - T031
 phase: Phase 1 - Core Pipeline
 assignee: ''
-agent: ''
+agent: "claude-opus-wp05"
 shell_pid: "20809"
 review_status: ''
 reviewed_by: ''
@@ -326,3 +326,4 @@ dotnet test test/Frank.Cli.Core.Tests/ --filter "UnifiedAlps"
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T03:40:20Z – claude-opus-wp05 – shell_pid=20809 – lane=doing – Assigned agent via workflow command
