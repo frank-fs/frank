@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>Frank.Cli.MSBuild</PackageId>
-    <Description>MSBuild integration for Frank.Cli: auto-embeds semantic artifacts into compiled assemblies.</Description>
+    <Description>MSBuild integration for Frank.Cli: auto-embeds unified state binary and semantic artifacts into compiled assemblies.</Description>
     <NoWarn>$(NoWarn);NU5128;NU5017</NoWarn>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <IncludeSymbols>false</IncludeSymbols>

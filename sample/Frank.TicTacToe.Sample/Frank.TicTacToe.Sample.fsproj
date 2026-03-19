@@ -17,11 +17,8 @@
     <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
   </ItemGroup>
 
-  <!-- Embed unified-state.bin produced by frank-cli extract.
-       Regenerate with: frank-cli extract - -project Frank.TicTacToe.Sample.fsproj -->
-  <ItemGroup Condition="Exists('obj/frank-cli/unified-state.bin')">
-    <EmbeddedResource Include="obj/frank-cli/unified-state.bin"
-                      LogicalName="Frank.Affordances.unified-state.bin" />
-  </ItemGroup>
+  <!-- Import Frank.Cli.MSBuild props/targets directly (same behavior as NuGet consumer) -->
+  <Import Project="../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.props" />
+  <Import Project="../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
 
 </Project>
