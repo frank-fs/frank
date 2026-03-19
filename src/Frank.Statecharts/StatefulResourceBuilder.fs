@@ -41,8 +41,6 @@ type TransitionAttemptResult =
 /// Helpers for communicating transition events between handlers and middleware via HttpContext.Items.
 module StateMachineContext =
     let private eventKey = "Frank.Statecharts.Event"
-    let internal stateKey = "Frank.Statecharts.State"
-    let internal contextKey = "Frank.Statecharts.Context"
 
     /// Set the event that should trigger a state transition after handler execution.
     let setEvent (ctx: HttpContext) (event: 'Event) = ctx.Items[eventKey] <- box event
