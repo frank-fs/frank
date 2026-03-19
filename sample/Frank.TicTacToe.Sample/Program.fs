@@ -9,8 +9,8 @@
 /// GET handlers exist as a degraded fallback for non-Datastar clients.
 ///
 /// Pipeline order (after routing):
-///   1. State key resolver — reads state from store, sets ctx.Items["statechart.stateKey"]
-///   2. Affordance middleware — reads Items key, injects Link + Allow headers
+///   1. State key resolver — reads state from store, sets IStatechartFeature on HttpContext.Features
+///   2. Affordance middleware — reads IStatechartFeature, injects Link + Allow headers
 ///   3. Statechart middleware — dispatches to state-specific handler
 module Frank.TicTacToe.Sample.Program
 
@@ -30,10 +30,10 @@ open Frank.TicTacToe.Sample.SseHandlers
 
 // === State key bridge middleware ===
 
-/// Resolves the statechart state key from the store and places it in
-/// HttpContext.Items so the affordance middleware can look it up.
+/// Resolves the statechart state key from the store and sets IStatechartFeature
+/// on HttpContext.Features so the affordance middleware can look it up.
 /// Must run AFTER routing (to have endpoint metadata) and BEFORE
-/// the affordance middleware (which reads the Items key).
+/// the affordance middleware (which reads the feature).
 let resolveStateKey (app: IApplicationBuilder) =
     app.Use(Func<HttpContext, Func<Task>, Task>(fun ctx next ->
         task {
@@ -44,8 +44,8 @@ let resolveStateKey (app: IApplicationBuilder) =
 
                 if not (obj.ReferenceEquals(metadata, null)) then
                     let instanceId = metadata.ResolveInstanceId ctx
-                    let! stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-                    ctx.Items.[AffordanceMap.StateKeyItemsKey] <- stateKey
+                    let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
+                    ()
 
             do! next.Invoke()
         }
@@ -138,9 +138,9 @@ let main args =
             services)
 
         // Pipeline order matters:
-        // 1. State key resolver (bridge between store and affordance Items convention)
+        // 1. State key resolver (reads store, sets IStatechartFeature on HttpContext.Features)
         plug resolveStateKey
-        // 2. Affordance middleware (injects Link + Allow headers)
+        // 2. Affordance middleware (reads IStatechartFeature, injects Link + Allow headers)
         useAffordances gameAffordanceMap
         // 3. Statechart middleware (state-dependent handler dispatch)
         useStatecharts
