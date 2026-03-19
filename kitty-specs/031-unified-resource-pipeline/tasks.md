@@ -107,7 +107,7 @@
 - [x] T022 Support `--format affordance-map` alongside existing formats (CLI flag wiring only — map generation logic is in WP06/T032-T036)
 - [x] T023 Update `HelpContent.fs` for unified extract command
 - [x] T024 Update `TextOutput.fs` and `JsonOutput.fs` for unified results
-- [ ] T025 Ensure existing `statechart parse` and `statechart validate` continue working
+- [x] T025 Ensure existing `statechart parse` and `statechart validate` continue working
 
 ### Dependencies
 - Depends on WP02 (extractor) and WP03 (caching).
