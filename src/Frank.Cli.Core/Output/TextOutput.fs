@@ -287,3 +287,59 @@ module TextOutput =
                     | None -> ()
                 sb.AppendLine() |> ignore
             sb.ToString()
+
+    let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =
+        let sb = System.Text.StringBuilder()
+        let appendLine (s: string) = sb.AppendLine(s) |> ignore
+
+        if result.FromCache then
+            appendLine "Loaded from cache (source unchanged)"
+        else
+            appendLine "Extracted from source"
+
+        appendLine ""
+        appendLine $"Resources: {result.ResourceCount}"
+        appendLine $"  Stateful: {result.StatefulResourceCount}"
+        appendLine $"  Plain: {result.PlainResourceCount}"
+        appendLine $"Types analyzed: {result.TypeCount}"
+
+        for resource in result.State.Resources do
+            appendLine ""
+            appendLine $"  {resource.RouteTemplate}"
+            appendLine $"    Slug: {resource.ResourceSlug}"
+            appendLine $"    Types: {resource.TypeInfo.Length}"
+
+            match resource.Statechart with
+            | None ->
+                let methods =
+                    resource.HttpCapabilities |> List.map _.Method |> String.concat ", "
+
+                appendLine $"    Methods: {methods}"
+            | Some sc ->
+                let stateList = sc.StateNames |> String.concat ", "
+                appendLine $"    States: {stateList}"
+                appendLine $"    Initial: {sc.InitialStateKey}"
+
+                if not sc.GuardNames.IsEmpty then
+                    let guardList = sc.GuardNames |> String.concat ", "
+                    appendLine $"    Guards: {guardList}"
+
+                for stateName in sc.StateNames do
+                    let methods =
+                        sc.StateMetadata
+                        |> Map.tryFind stateName
+                        |> Option.map (fun si -> si.AllowedMethods |> String.concat ", ")
+                        |> Option.defaultValue ""
+
+                    appendLine $"      {stateName}: {methods}"
+
+        if not result.Warnings.IsEmpty then
+            appendLine ""
+            appendLine "Warnings:"
+
+            for w in result.Warnings do
+                appendLine $"  - {w}"
+
+        appendLine ""
+        appendLine $"Cache: {result.CacheFilePath}"
+        sb.ToString()

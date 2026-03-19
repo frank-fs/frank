@@ -30,6 +30,10 @@
     <Compile Include="Statechart/FormatPipeline.fs" />
     <Compile Include="Statechart/StatechartDocumentJson.fs" />
     <Compile Include="Statechart/ValidationReportFormatter.fs" />
+    <!-- Unified pipeline -->
+    <Compile Include="Unified/UnifiedModel.fs" />
+    <Compile Include="Unified/UnifiedCache.fs" />
+    <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
@@ -47,6 +51,9 @@
     <Compile Include="Commands/StatechartGenerateCommand.fs" />
     <Compile Include="Commands/StatechartValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
+    <!-- Unified commands -->
+    <Compile Include="Commands/UnifiedExtractCommand.fs" />
+    <Compile Include="Commands/UnifiedGenerateCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />
   </ItemGroup>
@@ -56,6 +63,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Frank.Affordances/Frank.Affordances.fsproj" />
     <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
@@ -67,6 +75,8 @@
     <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
     <PackageReference Include="Ionide.ProjInfo" Version="0.74.2" />
     <PackageReference Include="Ionide.ProjInfo.FCS" Version="0.74.2" />
+    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="MessagePack.FSharpExtensions" Version="4.0.0" />
   </ItemGroup>
 
 </Project>

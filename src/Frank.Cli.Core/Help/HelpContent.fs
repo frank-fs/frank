@@ -286,11 +286,53 @@ informed decisions during extraction and clarification.
     // -- Lookup Functions --
 
     /// Total number of steps in the semantic pipeline (for "Step N of M" display).
+    let unifiedExtractHelp: CommandHelp =
+        { Name = "extract"
+          Summary = "Extract unified resource descriptions from F# source"
+          Examples =
+            [ { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj"
+                Description = "Extract type and behavioral data from all resources in the project." }
+              { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj --output-format json"
+                Description = "Output unified extraction in JSON format." }
+              { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj --force"
+                Description = "Force re-extraction, bypassing the cache." }
+              { Invocation = "frank-cli extract --project MyApp/MyApp.fsproj --base-uri https://api.example.com/"
+                Description = "Extract with a custom base URI for ALPS profiles." } ]
+          Workflow =
+            { StepNumber = 1
+              Prerequisites = []
+              NextSteps = [ "generate"; "semantic clarify"; "semantic validate" ]
+              IsOptional = false }
+          Context =
+            "The extract command replaces both 'semantic extract' and 'statechart extract'. It analyzes F# source code using FCS in a single pass, producing a unified resource description that includes type structure, behavioral semantics, and HTTP capabilities. Results are cached to obj/frank-cli/unified-state.bin for fast reuse. Use --force to bypass the cache." }
+
+    let unifiedGenerateHelp: CommandHelp =
+        { Name = "generate"
+          Summary = "Generate format artifacts from unified extraction"
+          Examples =
+            [ { Invocation = "frank-cli generate --project MyApp/MyApp.fsproj --format alps"
+                Description = "Generate ALPS profile with type and behavioral descriptors." }
+              { Invocation = "frank-cli generate --project MyApp/MyApp.fsproj --format affordance-map"
+                Description = "Generate machine-readable affordance map for runtime middleware." }
+              { Invocation = "frank-cli generate --project MyApp/MyApp.fsproj --format all --output ./docs"
+                Description = "Generate all statechart formats to an output directory." }
+              { Invocation = "frank-cli generate --project MyApp/MyApp.fsproj --format wsd --resource games"
+                Description = "Generate WSD for a specific resource." } ]
+          Workflow =
+            { StepNumber = 2
+              Prerequisites = [ "extract" ]
+              NextSteps = [ "semantic validate" ]
+              IsOptional = false }
+          Context =
+            "The generate command reads from the unified extraction cache and produces format artifacts. Supported formats: wsd, alps, alps-xml, scxml, smcat, xstate, affordance-map, all. If the cache is stale or missing, extraction runs automatically." }
+
     let pipelineStepCount = 5
 
     /// All command help records.
     let allCommands: CommandHelp list =
-        [ extractHelp
+        [ unifiedExtractHelp
+          unifiedGenerateHelp
+          extractHelp
           clarifyHelp
           validateHelp
           diffHelp

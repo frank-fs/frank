@@ -31,10 +31,15 @@
     <Compile Include="Commands/CompileCommandTests.fs" />
     <Compile Include="Output/JsonOutputTests.fs" />
     <Compile Include="Output/TextOutputTests.fs" />
+    <Compile Include="Unified/UnifiedModelTests.fs" />
+    <Compile Include="Unified/UnifiedCacheTests.fs" />
+    <Compile Include="Unified/UnifiedExtractorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="MessagePack.FSharpExtensions" Version="4.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />

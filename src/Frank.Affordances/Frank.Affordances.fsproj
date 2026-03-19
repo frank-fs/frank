@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>affordances;hateoas;hypermedia;link;middleware</PackageTags>
+    <Description>Runtime affordance middleware for Frank: injects Link and Allow headers based on resource state</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="AffordanceMap.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
