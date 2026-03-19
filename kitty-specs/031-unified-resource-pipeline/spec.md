@@ -26,7 +26,11 @@ This separation creates three gaps identified by the expert review panel:
 
 ## Clarifications
 
-*To be filled during `/spec-kitty.clarify`*
+### Session 2026-03-18
+
+- Q: How is the affordance map loaded into the running application at runtime? → A: Embedded resource via MSBuild target. The CLI generates `obj/frank-cli/affordance-map.json`; an MSBuild target auto-embeds it as `EmbeddedResource` with logical name `Frank.Affordances.affordance-map.json`. The middleware loads it via `Assembly.GetManifestResourceStream()` at startup and parses it once into a pre-computed dictionary lookup. Same pattern as existing semantic artifacts (`Frank.Semantic.ontology.owl.xml`). No resx — use `<EmbeddedResource>` directly.
+- Q: What link relation vocabulary do affordance Link headers use? → A: ALPS-derived relations with IANA precedence. Precedence: (1) IANA-registered relation if transition maps to one (self, edit, collection, etc.); (2) ALPS profile fragment URI for domain-specific transitions (e.g., `https://example.com/alps/games#move`); (3) never bare HTTP methods. Responses also include `Link: <profile-url>; rel="profile"` so agents can discover relation type definitions. The CLI pre-computes relation types into the affordance map using `--base-uri` as the ALPS profile namespace. No CE changes needed — relation types are auto-derived from (state, method, base URI). CE extensions deferred unless validation reveals the need.
+- Q: How do existing semantic subcommands (clarify, validate, compile, diff) read from the new unified state format? → A: Subcommands are updated to read `UnifiedExtractionState` via a projection function (`toExtractionState`) that calls existing pure functions (TypeMapper, ShapeGenerator) on the unified model's type data to produce OWL/SHACL graphs. One state file (`unified-state.json`), one format, one source of truth. Old `state.json` format detected at load time and prompts re-extraction. No dual-file writing.
 
 ## User Scenarios & Testing
 
@@ -107,7 +111,7 @@ A developer adds `app.UseAffordances()` to their Frank application's middleware 
 
 **Acceptance Scenarios**:
 
-1. **Given** a tic-tac-toe app with affordance middleware and the game in state `XTurn`, **When** a GET request is made, **Then** the response includes `Allow: GET, POST` and a `Link` header with `rel="move"` pointing to the POST action.
+1. **Given** a tic-tac-toe app with affordance middleware and the game in state `XTurn`, **When** a GET request is made, **Then** the response includes `Allow: GET, POST`, a `Link` header with `rel="https://example.com/alps/games#move"` pointing to the POST action, and `Link: <https://example.com/alps/games>; rel="profile"`.
 2. **Given** the game in state `Won`, **When** a GET request is made, **Then** the response includes `Allow: GET` only and no transition links.
 3. **Given** a plain `resource` (no statechart), **When** a request is made, **Then** the middleware passes through without modification (no affordance injection for non-stateful resources).
 4. **Given** an application without an affordance map loaded, **When** the middleware is registered, **Then** it logs a warning at startup and passes all requests through without modification (graceful degradation).
@@ -183,7 +187,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 - **FR-010**: The affordance map MUST be a JSON document keyed by `(routeTemplate, stateKey)` pairs, where each entry specifies: available HTTP methods, link relations, and transition target states
 - **FR-011**: For plain resources without statecharts, the affordance map MUST use a wildcard state key indicating the methods are always available
 - **FR-012**: The affordance map format MUST be versioned to support independent CLI and runtime library upgrades
-- **FR-013**: The affordance map MUST be loadable as ASP.NET Core endpoint metadata at application startup
+- **FR-013**: The affordance map MUST be auto-embedded into the application assembly via an MSBuild target (as `EmbeddedResource` with logical name `Frank.Affordances.affordance-map.json`) and loaded via `Assembly.GetManifestResourceStream()` at startup, parsed once into a pre-computed dictionary lookup indexed by `(routeTemplate, stateKey)`
 
 **OpenAPI Consistency**
 
@@ -194,7 +198,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 **Runtime Affordance Middleware**
 
 - **FR-017**: System MUST provide an `app.UseAffordances()` middleware extension that loads the affordance map at startup and injects affordance headers into responses for stateful resources
-- **FR-018**: The middleware MUST inject `Allow` headers reflecting the current state's permitted HTTP methods and `Link` headers describing available transitions with appropriate link relation types
+- **FR-018**: The middleware MUST inject `Allow` headers reflecting the current state's permitted HTTP methods, `Link` headers describing available transitions using IANA-registered relations where applicable and ALPS profile fragment URIs for domain-specific transitions, and a `Link: <profile-url>; rel="profile"` header pointing to the ALPS profile
 - **FR-019**: The middleware MUST read the current state key from the statechart middleware's resolution (already in `HttpContext.Items`) and look up the affordance map entry
 - **FR-020**: The middleware MUST add zero per-request allocations beyond Link header string construction — all map lookups MUST be pre-computed at startup
 - **FR-021**: The middleware MUST degrade gracefully when no affordance map is loaded (log warning at startup, pass requests through unmodified)
@@ -215,7 +219,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 **CLI Structure**
 
 - **FR-029**: The unified `extract` command MUST replace both `semantic extract` and `statechart extract` as a single top-level command: `frank-cli extract --project <fsproj>`
-- **FR-030**: Existing `semantic` subcommands (clarify, validate, compile, diff) MUST continue to function, reading from the unified extraction state
+- **FR-030**: Existing `semantic` subcommands (clarify, validate, compile, diff) MUST continue to function by reading from the unified extraction state via a projection function that produces the `ExtractionState` fields they expect (OWL graphs, SHACL shapes, source map, metadata). If an old-format `state.json` is detected, the CLI MUST prompt the user to re-extract
 - **FR-031**: The `statechart` subcommands (generate, validate, parse) MUST continue to function, reading behavioral data from the unified extraction state
 - **FR-032**: The `generate` command MUST support all existing formats plus `affordance-map`
 
@@ -242,7 +246,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 ## Assumptions
 
 - The existing `ProjectLoader.loadProject` infrastructure is sufficient for the unified extraction — no changes to Ionide.ProjInfo or FCS integration are needed
-- The existing semantic extraction modules (`TypeMapper`, `RouteMapper`, `VocabularyAligner`, `ShapeGenerator`) can be called from the unified extractor without modification — they operate on `AnalyzedType` lists which the unified extractor produces
+- The existing semantic extraction modules (`TypeMapper`, `RouteMapper`, `VocabularyAligner`, `ShapeGenerator`) can be called both from the unified extractor and from the `toExtractionState` projector without modification — they are pure functions operating on `AnalyzedType` lists
 - The existing statechart `StatechartSourceExtractor` module can be called from the unified extractor without modification — it operates on `LoadedProject` which the unified extractor produces
 - The `StateMachineMetadata` on endpoints (resolved by the statechart middleware) provides the current state key in `HttpContext.Items`, accessible to the affordance middleware
 - `Frank.OpenApi` generates OpenAPI schemas at runtime from endpoint metadata; the CLI can produce an equivalent schema from the unified model for comparison
