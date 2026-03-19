@@ -16,7 +16,7 @@ subtasks:
 - T012
 phase: Phase 0 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "17534"
 review_status: ''
 reviewed_by: ''
@@ -778,3 +778,4 @@ dotnet test
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T03:24:17Z – claude-opus – shell_pid=17534 – lane=doing – Assigned agent via workflow command
