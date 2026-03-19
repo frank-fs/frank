@@ -100,7 +100,8 @@ let testAffordanceMap: AffordanceMap =
 
 // === Handlers ===
 
-/// GET handler that exposes state key for affordance middleware.
+/// GET handler that returns current game state. The state key was already
+/// set on IStatechartFeature by resolveStateKeyMiddleware before this runs.
 let getGameState (ctx: HttpContext) : Task =
     task {
         let store =
@@ -116,8 +117,6 @@ let getGameState (ctx: HttpContext) : Task =
             | None -> (gameMachine.Initial, gameMachine.InitialContext)
 
         let key = stateKeyOf state
-        // Expose state key for affordance middleware
-        ctx.Items.[AffordanceMap.StateKeyItemsKey] <- key
         do! ctx.Response.WriteAsync($"state={key};moves={moveCount}")
     }
     :> Task
@@ -131,13 +130,11 @@ let handleMove (ctx: HttpContext) : Task =
         let instanceId = ctx.Request.RouteValues["gameId"] :?> string
         let! stateResult = store.GetState(instanceId)
 
-        let state, _ =
+        let _state, _ =
             match stateResult with
             | Some(s, c) -> (s, c)
             | None -> (gameMachine.Initial, gameMachine.InitialContext)
 
-        let key = stateKeyOf state
-        ctx.Items.[AffordanceMap.StateKeyItemsKey] <- key
         StateMachineContext.setEvent ctx (MakeMove 0)
     }
     :> Task
@@ -163,8 +160,8 @@ type TestEndpointDataSource(endpoints: Endpoint[]) =
     override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 /// Middleware shim that resolves the statechart state key from the store
-/// and places it in HttpContext.Items for the affordance middleware to read.
-/// This bridges the statechart store to the affordance middleware's Items convention.
+/// and sets IStatechartFeature on HttpContext.Features for the affordance middleware to read.
+/// GetCurrentStateKey calls SetStatechartState internally, so no explicit Items write is needed.
 let resolveStateKeyMiddleware (ctx: HttpContext) (next: Func<Task>) =
     task {
         let endpoint = ctx.GetEndpoint()
@@ -174,8 +171,8 @@ let resolveStateKeyMiddleware (ctx: HttpContext) (next: Func<Task>) =
 
             if not (obj.ReferenceEquals(metadata, null)) then
                 let instanceId = metadata.ResolveInstanceId ctx
-                let! stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-                ctx.Items.[AffordanceMap.StateKeyItemsKey] <- stateKey
+                let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
+                ()
 
         do! next.Invoke()
     }
@@ -193,11 +190,11 @@ let buildTestServer (resource: Resource) =
             .Configure(fun app ->
                 app.UseRouting() |> ignore
 
-                // 1. Resolve state key from store and set Items convention
+                // 1. Resolve state key from store and set IStatechartFeature
                 app.Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
                 |> ignore
 
-                // 2. Affordance middleware reads Items key and injects Link/Allow headers
+                // 2. Affordance middleware reads IStatechartFeature and injects Link/Allow headers
                 app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
 
                 // 3. Statechart middleware handles state-dependent dispatch

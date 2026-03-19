@@ -38,11 +38,9 @@ type TransitionAttemptResult =
     | Blocked of BlockReason
     | Invalid of message: string
 
-/// Helpers for communicating events between handlers and middleware via HttpContext.Items.
+/// Helpers for communicating transition events between handlers and middleware via HttpContext.Items.
 module StateMachineContext =
     let private eventKey = "Frank.Statecharts.Event"
-    let internal stateKey = "Frank.Statecharts.State"
-    let internal contextKey = "Frank.Statecharts.Context"
 
     /// Set the event that should trigger a state transition after handler execution.
     let setEvent (ctx: HttpContext) (event: 'Event) = ctx.Items[eventKey] <- box event
@@ -74,13 +72,13 @@ type StateMachineMetadata =
         /// Precomputed state metadata (IsFinal, AllowedMethods, Description) keyed by state string.
         /// Avoids runtime reflection on the boxed Machine.
         StateMetadataMap: Map<string, StateInfo>
-        /// Resolve state from store, cache in HttpContext.Items, return state key string.
+        /// Resolve state from store, set IStatechartFeature on HttpContext.Features, return state key string.
         GetCurrentStateKey: IServiceProvider -> HttpContext -> string -> Task<string>
-        /// Evaluate access-control guards using cached state from HttpContext.Items (pre-handler).
+        /// Evaluate access-control guards using state from IStatechartFeature (pre-handler).
         EvaluateGuards: HttpContext -> GuardResult
         /// Evaluate event-validation guards after the handler has set the event (post-handler).
         EvaluateEventGuards: HttpContext -> GuardResult
-        /// Post-handler: get event from HttpContext.Items, run transition, persist, return result.
+        /// Post-handler: get event from HttpContext.Items, read state/context from IStatechartFeature, run transition, persist, return result.
         ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>
     }
 
@@ -189,7 +187,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         let initialStateKey = stateKey machine.Initial
 
-        // Closure: resolve state from store, cache typed values in HttpContext.Items
+        // Closure: resolve state from store, set typed values on IStatechartFeature
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
             let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
 
@@ -198,12 +196,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                 match result with
                 | Some(state, context) ->
-                    ctx.Items[StateMachineContext.stateKey] <- box state
-                    ctx.Items[StateMachineContext.contextKey] <- box context
+                    ctx.SetStatechartState(stateKey state, state, context, instanceId)
                     return stateKey state
                 | None ->
-                    ctx.Items[StateMachineContext.stateKey] <- box machine.Initial
-                    ctx.Items[StateMachineContext.contextKey] <- box machine.InitialContext
+                    ctx.SetStatechartState(initialStateKey, machine.Initial, machine.InitialContext, instanceId)
                     return initialStateKey
             }
 
@@ -220,10 +216,11 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 | EventValidation(name, pred) -> Some(name, pred)
                 | _ -> None)
 
-        // Closure: evaluate access-control guards using cached typed state and context (pre-handler)
+        // Closure: evaluate access-control guards using state from IStatechartFeature (pre-handler)
         let evaluateGuards (ctx: HttpContext) : GuardResult =
-            let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
-            let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+            let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+            let state = feature.State.Value
+            let context = feature.Context.Value
 
             let guardCtx: AccessControlContext<'S, 'C> =
                 { User = ctx.User
@@ -239,8 +236,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         // Closure: evaluate event-validation guards after handler has set the event (post-handler)
         let evaluateEventGuards (ctx: HttpContext) : GuardResult =
-            let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
-            let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+            let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+            let state = feature.State.Value
+            let context = feature.Context.Value
 
             match StateMachineContext.tryGetEvent<'E> ctx with
             | None -> Allowed // No event set -- skip event guards
@@ -268,8 +266,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 match StateMachineContext.tryGetEvent<'E> ctx with
                 | None -> return TransitionAttemptResult.NoEvent
                 | Some event ->
-                    let state = ctx.Items[StateMachineContext.stateKey] :?> 'S
-                    let context = ctx.Items[StateMachineContext.contextKey] :?> 'C
+                    let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+                    let state = feature.State.Value
+                    let context = feature.Context.Value
                     let result = machine.Transition state event context
 
                     match result with

@@ -4,10 +4,11 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Frank.Statecharts
 
 /// ASP.NET Core convention-based middleware that injects Link and Allow headers
 /// based on pre-computed affordance data. Reads the current statechart state key
-/// from HttpContext.Items and looks up pre-computed header values by composite key.
+/// from HttpContext.Features and looks up pre-computed header values by composite key.
 ///
 /// The middleware is additive: it always calls next regardless of whether headers
 /// were injected. When no matching affordance entry exists, the request passes
@@ -26,9 +27,12 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
             if not (isNull routeTemplate) then
                 // Try stateful lookup first (state key from statechart middleware)
                 let stateKey =
-                    match ctx.Items.TryGetValue(AffordanceMap.StateKeyItemsKey) with
-                    | true, (:? string as key) -> key
-                    | _ -> null
+                    let f = ctx.Features.Get<IStatechartFeature>()
+                    if obj.ReferenceEquals(f, null) then null
+                    else
+                        match f.StateKey with
+                        | Some key -> key
+                        | None -> null
 
                 let compositeKey =
                     if not (isNull stateKey) then

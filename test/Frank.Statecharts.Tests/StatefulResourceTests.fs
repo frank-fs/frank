@@ -988,7 +988,8 @@ let getHierarchicalState (ctx: HttpContext) : Task =
 /// Combined handler for all Playing sub-states. POST dispatches based on actual sub-state
 /// since parameterized key extraction maps all Playing variants to the same key.
 let handlePlayingPost (ctx: HttpContext) : Task =
-    let state = ctx.Items.[StateMachineContext.stateKey] :?> HierarchicalGameState
+    let feature = ctx.Features.Get<IStatechartFeature<HierarchicalGameState, HierarchicalContext>>()
+    let state = feature.State.Value
 
     match state with
     | Playing XTurn -> handleHierarchicalMove ctx
@@ -999,7 +1000,8 @@ let handlePlayingPost (ctx: HttpContext) : Task =
         Task.CompletedTask
 
 let handlePlayingDelete (ctx: HttpContext) : Task =
-    let state = ctx.Items.[StateMachineContext.stateKey] :?> HierarchicalGameState
+    let feature = ctx.Features.Get<IStatechartFeature<HierarchicalGameState, HierarchicalContext>>()
+    let state = feature.State.Value
 
     match state with
     | Playing Draw -> handleDispose ctx
