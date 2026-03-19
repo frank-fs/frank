@@ -41,18 +41,18 @@ type SourceLocation =
     { File: string; Line: int; Column: int }
 
 type FieldKind =
-    | Primitive of xsdType: string
+    | Primitive of XsdType: string
     | Guid
-    | Optional of inner: FieldKind
-    | Collection of element: FieldKind
-    | Reference of typeName: string
+    | Optional of Inner: FieldKind
+    | Collection of Element: FieldKind
+    | Reference of TypeName: string
 
 type ConstraintAttribute =
-    | PatternAttr of regex: string
-    | MinInclusiveAttr of value: obj
-    | MaxInclusiveAttr of value: obj
-    | MinLengthAttr of length: int
-    | MaxLengthAttr of length: int
+    | PatternAttr of Regex: string
+    | MinInclusiveAttr of Value: obj
+    | MaxInclusiveAttr of Value: obj
+    | MinLengthAttr of Length: int
+    | MaxLengthAttr of Length: int
 
 type AnalyzedField =
     { Name: string
@@ -66,9 +66,9 @@ type DuCase =
       Fields: AnalyzedField list }
 
 type TypeKind =
-    | Record of fields: AnalyzedField list
-    | DiscriminatedUnion of cases: DuCase list
-    | Enum of values: string list
+    | Record of Fields: AnalyzedField list
+    | DiscriminatedUnion of Cases: DuCase list
+    | Enum of Values: string list
 
 type AnalyzedType =
     { FullName: string

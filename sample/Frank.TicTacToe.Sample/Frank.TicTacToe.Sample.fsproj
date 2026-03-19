@@ -17,7 +17,11 @@
     <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
   </ItemGroup>
 
-  <!-- Import MSBuild targets for embedding runtime state (runtime-state.json) -->
-  <Import Project="../../src/Frank.Affordances.MSBuild/build/Frank.Affordances.MSBuild.targets" />
+  <!-- Embed unified-state.bin produced by frank-cli extract.
+       Regenerate with: frank-cli extract - -project Frank.TicTacToe.Sample.fsproj -->
+  <ItemGroup Condition="Exists('obj/frank-cli/unified-state.bin')">
+    <EmbeddedResource Include="obj/frank-cli/unified-state.bin"
+                      LogicalName="Frank.Affordances.unified-state.bin" />
+  </ItemGroup>
 
 </Project>
