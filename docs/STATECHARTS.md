@@ -188,7 +188,7 @@ let turnGuard =
 
 SCXML parallel regions (e.g., a `PlayerIdentity` region tracking who has joined the game) are modeled as fields in the `'Context` type rather than as parallel states, since F# DUs naturally serialize/deserialize the state tree while context carries the orthogonal data.
 
-For a real-world example of this pattern, see the [tic-tac-toe SCXML](https://github.com/panesofglass/tic-tac-toe/blob/master/docs/game.scxml) and the corresponding [hierarchical statechart integration tests](../test/Frank.Statecharts.Tests/StatefulResourceTests.fs) (search for "Multi-level statecharts").
+For a real-world example of this pattern, see the [TicTacToe sample application](../sample/Frank.TicTacToe.Sample/) (stateful resource with affordance middleware, guards, and Datastar SSE), the [tic-tac-toe SCXML](https://github.com/panesofglass/tic-tac-toe/blob/master/docs/game.scxml), and the corresponding [hierarchical statechart integration tests](../test/Frank.Statecharts.Tests/StatefulResourceTests.fs) (search for "Multi-level statecharts").
 
 ## Test Coverage
 

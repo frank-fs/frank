@@ -43,7 +43,7 @@ The formats describe overlapping aspects of the same system, which enables cross
 - WSD actor lifelines must correspond to ALPS state descriptors
 - Guard annotations in WSD must appear in SCXML/XState guard definitions
 
-A cross-format validator (#91) checks these invariants and reports inconsistencies.
+The cross-format validator checks these invariants and reports inconsistencies. See `Validation/Validator.fs` and `Validation/Pipeline.fs` in `Frank.Statecharts`.
 
 ## Architecture
 
@@ -114,30 +114,21 @@ Starting from [Amundsen's onboarding example](https://mamund.site44.com/talks/20
 
 WSD parameters become ALPS semantic descriptors. WSD actor lifelines become ALPS state descriptors with available transitions nested inside. WSD target states become ALPS `rt` (return type).
 
-## Implementation Phases
+## Supported Formats
 
-The pipeline is tracked in [#57](https://github.com/frank-fs/frank/issues/57) with sub-issues per format.
+All formats are fully implemented with bidirectional support (parse and generate):
 
-### Priority Order
+| Format | Parser | Generator | Module |
+|--------|--------|-----------|--------|
+| **WSD** | Lexer + recursive descent | From `StateMachineMetadata` | `Frank.Statecharts.Wsd` |
+| **ALPS** | JSON + XML | JSON + XML | `Frank.Statecharts.Alps` |
+| **SCXML** | `System.Xml.Linq`-based | W3C-compliant XML | `Frank.Statecharts.Scxml` |
+| **smcat** | Lexer + label parser | Text serializer | `Frank.Statecharts.Smcat` |
+| **XState JSON** | Deserializer | Serializer | `Frank.Statecharts.XState` |
 
-1. **WSD Parser (#90)** — critical path, already partially exists in [wsd-gen F# fork](https://github.com/panesofglass/wsd-gen/tree/fsharp)
-2. **WSD Generator + Cross-Validator (#91)** — depends on #90, enables the verification loop for WSD
-3. **ALPS (#97), SCXML (#98), smcat (#100)** — bidirectional, depend only on the core runtime (#87). Can proceed in parallel with each other and with #90
-4. **frank-cli commands (#94)** — depends on all format issues; provides `extract`, `generate`, `validate`, `import` subcommands
-5. **Automatic ETag from state (#93)** — parallel with everything; no pipeline dependency
+All parsers produce a shared `StatechartDocument` AST (`Frank.Statecharts.Ast`). The cross-format validator and unified CLI operate on this common representation.
 
-### Dependency Graph
-
-```
-#90 WSD Parser ──────────────→ #91 WSD Generator + Cross-Validator ┐
-(P0, critical path)            (P1)                                 │
-                                                                    ├──→ #94 frank-cli Commands
-#87 Core Runtime ────────┬───→ #97 ALPS Parser + Generator ────────┤    (P3)
-(prerequisite, done)     ├───→ #98 SCXML Parser + Generator ───────┤
-                         ├───→ #100 smcat Parser + Generator ──────┘
-                         └───→ #93 ETag Generation
-                               (P2, parallel)
-```
+Implementation was tracked in [#57](https://github.com/frank-fs/frank/issues/57) with sub-issues per format (#90, #91, #93, #94, #95, #97, #98, #100, #111, #112).
 
 ## Round-Trip Expectations
 
@@ -147,12 +138,30 @@ What *should* be preserved is **structural equivalence** at the state machine le
 
 ## CLI Integration
 
-`frank-cli` (#94) provides commands that wrap the pipeline for common workflows:
+`frank-cli` provides commands organized into three tiers:
 
-- `frank extract` — generate spec documents from a compiled Frank application
-- `frank generate` — generate F# scaffolding from a spec document (LLM-assisted)
-- `frank validate` — cross-validate spec documents against each other and/or a running app
-- `frank import` — parse a spec document and produce the typed AST (useful for tooling)
+### Unified Commands (top-level)
+
+- `frank-cli extract` — single-pass extraction of both semantic (OWL/SHACL) and statechart metadata from a Frank application
+- `frank-cli generate` — generate spec documents in any supported format (WSD, ALPS, SCXML, smcat, XState, affordance-map, or all) from cached extraction state
+- `frank-cli status` — report extraction state and cache staleness
+- `frank-cli help` — command discovery with fuzzy matching
+
+### Statechart Commands
+
+- `frank-cli statechart extract` — extract state machines from Frank applications
+- `frank-cli statechart generate` — generate spec documents from statechart ASTs
+- `frank-cli statechart validate` — cross-validate spec formats against each other
+- `frank-cli statechart parse` — parse a single spec document and output its AST
+
+### Semantic Commands
+
+- `frank-cli semantic extract` — extract OWL ontologies and SHACL shapes from F# types
+- `frank-cli semantic validate` — validate semantic definitions against vocabularies
+- `frank-cli semantic compile` — compile OWL/SHACL to runtime shape graphs
+- `frank-cli semantic clarify` — identify ambiguities requiring human input
+- `frank-cli semantic diff` — compare semantic artifacts across time
+- `frank-cli semantic openapi-validate` — validate OpenAPI specs against semantic constraints
 
 ## References
 

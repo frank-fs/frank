@@ -20,9 +20,10 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.LinkedData** | Semantic RDF/Linked Data content negotiation middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.LinkedData)](https://www.nuget.org/packages/Frank.LinkedData/) |
 | **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
-| **Frank.Statecharts** | Application-level state machines for stateful hypermedia resources | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
+| **Frank.Statecharts** | Stateful resources with state machines, guards, multi-format parsers/generators (WSD, ALPS, SCXML, smcat, XState), and cross-format validation | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
+| **Frank.Affordances** | Runtime affordance middleware: injects Link and Allow headers based on resource state | [![NuGet](https://img.shields.io/nuget/v/Frank.Affordances)](https://www.nuget.org/packages/Frank.Affordances/) |
+| **Frank.Discovery** | OPTIONS-based link discovery and Link header middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.Discovery)](https://www.nuget.org/packages/Frank.Discovery/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
-| **Frank.Statecharts** | Stateful resources with state machines, guards, and WSD parser | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
 | **Frank.Validation** | SHACL shape validation derived from F# types | [![NuGet](https://img.shields.io/nuget/v/Frank.Validation)](https://www.nuget.org/packages/Frank.Validation/) |
 | **Frank.Provenance** | PROV-O provenance tracking for resource state changes | [![NuGet](https://img.shields.io/nuget/v/Frank.Provenance)](https://www.nuget.org/packages/Frank.Provenance/) |
 
@@ -41,7 +42,13 @@ Frank (core)
 ├── Frank.Datastar ────────────── Frank
 │
 ├── Frank.Statecharts ─────────── Frank
-│   └── WSD parser (internal)
+│   └── WSD, ALPS, SCXML, smcat, XState parsers/generators
+│   └── Cross-format validation pipeline
+│
+├── Frank.Affordances ─────────── Frank
+│   └── Link + Allow header middleware (works with Frank.Statecharts at runtime)
+│
+├── Frank.Discovery ───────────── Frank
 │
 ├── Frank.Validation ──────────── Frank.LinkedData + Frank.Auth
 │
@@ -467,12 +474,22 @@ Use `frank-cli` to extract an ontology from your F# types:
 
 ```bash
 dotnet tool install --global frank-cli
-frank-cli extract --project MyApp.fsproj --base-uri https://example.org/api
-frank-cli validate --project MyApp.fsproj
-frank-cli compile --project MyApp.fsproj
+frank-cli semantic extract --project MyApp.fsproj --base-uri https://example.org/api
+frank-cli semantic validate --project MyApp.fsproj
+frank-cli semantic compile --project MyApp.fsproj
 ```
 
 The compiled artifacts are automatically embedded by `Frank.Cli.MSBuild` and loaded at startup by `useLinkedData`.
+
+The CLI also provides unified commands for the full pipeline (semantic + statechart extraction):
+
+```bash
+frank-cli extract --project MyApp.fsproj --base-uri https://example.org/api
+frank-cli generate --project MyApp.fsproj --format all --output ./specs
+frank-cli status --project MyApp.fsproj
+```
+
+See [Spec Pipeline](docs/SPEC-PIPELINE.md) for the full CLI reference.
 
 ---
 
@@ -612,13 +629,14 @@ The `sample/` directory contains several example applications:
 | `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
 | `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
 | `Frank.LinkedData.Sample` | Linked Data content negotiation with semantic RDF responses |
+| `Frank.TicTacToe.Sample` | Stateful resource with affordance middleware, guards, and Datastar SSE |
 
 ---
 
 ## References
 
 - [Design Documents](docs/) — Design philosophy, vision, and architecture documents
-- [Frank.Statecharts Guide](docs/STATECHARTS.md) — Core concepts, hierarchical statechart support, and test coverage overview
+- [Frank.Statecharts Guide](docs/STATECHARTS.md) — Core concepts, hierarchical statechart support, guards, and test coverage overview
 - [Semantic Resources Vision](docs/SEMANTIC-RESOURCES.md) — Agent-legible applications and the self-describing app architecture
 - [Spec Pipeline](docs/SPEC-PIPELINE.md) — Bidirectional design spec pipeline (WSD, SCXML, ALPS)
 - [How is this different from Webmachine or Freya?](docs/COMPARISON.md) — Detailed comparison of Frank.Statecharts with Webmachine and Freya's approach to HTTP resource state machines

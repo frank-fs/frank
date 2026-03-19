@@ -7,7 +7,7 @@ Frank is a lightweight F# library for building hypermedia web applications on AS
 - **Resource-oriented** — HTTP resources are first-class citizens, defined as computation expressions with typed route patterns, method handlers, and metadata
 - **Library, not framework** — Frank wraps ASP.NET Core; it doesn't replace it. Authentication, routing, DI, and middleware are ASP.NET Core's responsibility. Frank adds the resource abstraction layer on top
 - **Idiomatic F#** — computation expressions, discriminated unions, pattern matching, and pure functions as the primary modeling tools
-- **Opt-in extensibility** — each extension (`Frank.Auth`, `Frank.OpenApi`, `Frank.Statecharts`, `Frank.LinkedData`, `Frank.Datastar`) is a separate package that adds capability without requiring the others
+- **Opt-in extensibility** — each extension (`Frank.Auth`, `Frank.OpenApi`, `Frank.Statecharts`, `Frank.Affordances`, `Frank.LinkedData`, `Frank.Datastar`, `Frank.Discovery`) is a separate package that adds capability without requiring the others
 
 ## Where Frank Is Heading
 
