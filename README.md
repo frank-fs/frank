@@ -4,9 +4,57 @@
 ![GitHub Release Date](https://img.shields.io/github/release-date/frank-fs/frank)
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
 
-[F#](https://fsharp.org/) [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions), or builders, for configuring the [`Microsoft.AspNetCore.Hosting.IWebHostBuilder`](https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.hosting.iwebhostbuilder?view=aspnetcore-2.0) and defining routes for HTTP resources using [`Microsoft.AspNetCore.Routing`](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/routing?view=aspnetcore-2.1).
+An [F#](https://fsharp.org/) web framework that makes HTTP APIs navigable by AI agents — without special integration, SDKs, or documentation. Just standard HTTP.
 
-This project was inspired by @filipw's [Building Microservices with ASP.NET Core (without MVC)](https://www.strathweb.com/2017/01/building-microservices-with-asp-net-core-without-mvc/).
+Frank uses [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) to define resources whose responses carry state-dependent affordances: `Link` headers tell clients where to go, `Allow` headers tell clients what's possible, and [ALPS](http://alps.io/) profiles tell clients what things mean. Statechart-enforced state machines prevent illegal transitions at the framework level. The result is an API that an agent can discover, understand, and navigate from a cold start — using the same HTTP standards that browsers have used for 30 years.
+
+```fsharp
+webHost args {
+    useDefaults
+    plug resolveStateKey           // 1. Resolve current state from store
+    useAffordances gameAffordanceMap  // 2. Inject Link + Allow headers per state
+    useStatecharts                 // 3. Dispatch to state-specific handlers
+
+    resource gameResource          // GET /games/{gameId}, POST /games/{gameId}
+    resource sseResource           // GET /games/{gameId}/sse (Datastar SSE)
+}
+```
+
+When an agent hits `/games/42` during X's turn, it gets back:
+```
+Allow: GET, POST
+Link: </games/42>; rel="self", </games/42>; rel="makeMove"; method="POST"
+Link: </alps/games>; rel="profile"
+```
+
+When the game is won, the response changes:
+```
+Allow: GET
+Link: </games/42>; rel="self"
+Link: </alps/games>; rel="profile"
+```
+
+No special client library. No out-of-band documentation. The API tells you what's possible right now, and the framework guarantees the response is correct.
+
+---
+
+## For AI Agents
+
+An agent encountering a Frank API for the first time can:
+
+1. **Discover** — `GET /.well-known/frank-profiles` returns all available resource profiles
+2. **Understand** — Dereference an ALPS profile to learn vocabulary (what "makeMove" means, what fields exist)
+3. **Navigate** — Follow `Link` headers from any response to related resources
+4. **Act** — Read `Allow` header to know which HTTP methods are available in the current state
+5. **React** — As state transitions occur, affordances change automatically — no polling, no cache invalidation
+
+This works because Frank computes affordances at build time and serves them at near-zero cost per request. State-dependent `Link` and `Allow` headers are pre-computed into immutable lookup tables. The Datastar SSE path goes further: HTML fragments include or exclude controls based on current state, achieving in-band hypermedia.
+
+---
+
+## Getting Started
+
+Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (without MVC)](https://www.strathweb.com/2017/01/building-microservices-with-asp-net-core-without-mvc/).
 
 ---
 
