@@ -1,7 +1,7 @@
 ---
 work_package_id: WP11
 title: OpenAPI Consistency Validation
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP02
 base_branch: 031-unified-resource-pipeline-WP02
@@ -531,3 +531,4 @@ spec-kitty implement WP11 --base WP02
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T04:06:36Z – claude-opus – shell_pid=26221 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T04:16:59Z – claude-opus – shell_pid=26221 – lane=for_review – Ready for review: OpenAPI consistency validator with 4 discrepancy types, camelCase normalization, CLI wiring, and 9 tests
