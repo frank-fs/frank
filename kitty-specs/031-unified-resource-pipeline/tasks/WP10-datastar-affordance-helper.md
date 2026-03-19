@@ -1,31 +1,34 @@
 ---
 work_package_id: WP10
 title: Datastar Affordance-Driven Fragments
-lane: "planned"
+lane: "doing"
 dependencies:
-  - WP06
+- WP06
+base_branch: 031-unified-resource-pipeline-WP06
+base_commit: 9f5d3ce27a5712da0e0822e1e9310a7eb3eadb9f
+created_at: '2026-03-19T04:06:23.256094+00:00'
 subtasks:
-  - T057
-  - T058
-  - T059
-  - T060
-  - T061
-requirement_refs:
-  - "FR-022"
-  - "FR-023"
-  - "FR-024"
-phase: "Phase 3 - Integration"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+- T057
+- T058
+- T059
+- T060
+- T061
+phase: Phase 3 - Integration
+assignee: ''
+agent: ''
+shell_pid: "26096"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-19T02:15:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-19T02:15:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs:
+- FR-022
+- FR-023
+- FR-024
 ---
 
 # Work Package Prompt: WP10 -- Datastar Affordance-Driven Fragments
