@@ -44,7 +44,7 @@
 **Estimated Size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T006 Create `UnifiedExtractor.fs` module with single-pass syntax AST walker
+- [x] T006 Create `UnifiedExtractor.fs` module with single-pass syntax AST walker
 - [ ] T007 Merge `AstAnalyzer.walkExpr` and `StatechartSourceExtractor.walkExprForStateful` into unified `walkExpr`
 - [ ] T008 Merge `TypeAnalyzer.collectEntities` and `StatechartSourceExtractor.findMachineBindings` into unified typed AST walk
 - [ ] T009 Cross-reference syntax CEs with typed bindings to produce `UnifiedResource` records
