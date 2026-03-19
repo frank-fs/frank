@@ -14,7 +14,7 @@ subtasks:
 - T005
 phase: Phase 0 - Foundation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "15168"
 review_status: ''
 reviewed_by: ''
@@ -592,3 +592,4 @@ dotnet test test/Frank.Affordances.Tests/
 
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
+- 2026-03-19T02:54:47Z – claude-opus – shell_pid=15168 – lane=doing – Assigned agent via workflow command
