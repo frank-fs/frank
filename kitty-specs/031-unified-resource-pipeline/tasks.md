@@ -23,7 +23,7 @@
 - [x] T002 Create `AffordanceMap.fs` types (`AffordanceMapEntry`, `AffordanceLinkRelation`)
 - [x] T003 Create `Frank.Affordances` project (framework reference only, no Frank.Statecharts dependency)
 - [x] T004 Create `Frank.Affordances.Tests` test project
-- [ ] T005 Add MessagePack + MessagePack.FSharpExtensions to Frank.Cli.Core, verify F# DU serialization roundtrip
+- [x] T005 Add MessagePack + MessagePack.FSharpExtensions to Frank.Cli.Core, verify F# DU serialization roundtrip
 
 ### Dependencies
 - None (starting package).
