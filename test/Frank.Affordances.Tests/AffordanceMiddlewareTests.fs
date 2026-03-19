@@ -14,6 +14,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Primitives
 open Frank.Affordances
+open Frank.Statecharts
 
 // -- Helpers --
 
@@ -52,7 +53,7 @@ let private buildTestServer
             .Configure(fun app ->
                 app.UseRouting() |> ignore
 
-                // Simulate statechart middleware by setting HttpContext.Items
+                // Simulate statechart middleware by setting IStatechartFeature
                 app.Use(fun ctx (next: Func<System.Threading.Tasks.Task>) ->
                     stateKeySetter ctx
                     next.Invoke())
@@ -110,7 +111,7 @@ let affordanceMiddlewareTests =
 
               use server =
                   buildTestServer lookup (fun ctx ->
-                      ctx.Items.[AffordanceMap.StateKeyItemsKey] <- "XTurn")
+                      ctx.SetStatechartState("XTurn", "XTurn", 0))
 
               use client = server.CreateClient()
 
@@ -147,7 +148,7 @@ let affordanceMiddlewareTests =
 
               use server =
                   buildTestServer lookup (fun ctx ->
-                      ctx.Items.[AffordanceMap.StateKeyItemsKey] <- "Won")
+                      ctx.SetStatechartState("Won", "Won", 0))
 
               use client = server.CreateClient()
 
@@ -200,7 +201,7 @@ let affordanceMiddlewareTests =
 
               use server =
                   buildTestServer lookup (fun ctx ->
-                      ctx.Items.[AffordanceMap.StateKeyItemsKey] <- "SomeState")
+                      ctx.SetStatechartState("SomeState", "SomeState", 0))
 
               use client = server.CreateClient()
 
@@ -233,7 +234,7 @@ let affordanceMiddlewareTests =
 
               use server =
                   buildTestServer lookup (fun ctx ->
-                      ctx.Items.[AffordanceMap.StateKeyItemsKey] <- "UnknownState")
+                      ctx.SetStatechartState("UnknownState", "UnknownState", 0))
 
               use client = server.CreateClient()
 
