@@ -48,6 +48,7 @@
     <Compile Include="Validation/Validator.fs" />
     <Compile Include="Validation/Pipeline.fs" />
     <!-- Builder and generators (depend on both core types and format types) -->
+    <Compile Include="StatechartFeature.fs" />
     <Compile Include="StatefulResourceBuilder.fs" />
     <Compile Include="Wsd/Generator.fs" />
     <Compile Include="Smcat/Generator.fs" />
