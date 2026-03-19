@@ -17,6 +17,11 @@ type LoadedProject = {
 
 module ProjectLoader =
 
+    /// Singleton FSharpChecker shared across all loadProject calls.
+    /// Creating a new checker per call is expensive (~5 min each); the checker
+    /// caches project snapshots internally, so reuse is both safe and fast.
+    let private checker = FSharpChecker.Create(keepAssemblyContents = true)
+
     let private parseSourceFile (checker: FSharpChecker) (sourceFile: string) =
         async {
             let sourceText = SourceText.ofString (File.ReadAllText sourceFile)
@@ -181,7 +186,6 @@ module ProjectLoader =
                         return Error $"No source files found in project: {fullPath}"
                     else
 
-                    let checker = FSharpChecker.Create()
                     let options = buildFcsOptions checker fullPath sourceFiles references defines otherFlags
 
                     let! projectResults = checker.ParseAndCheckProject(options)
