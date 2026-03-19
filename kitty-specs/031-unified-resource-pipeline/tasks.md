@@ -49,7 +49,7 @@
 - [x] T008 Merge `TypeAnalyzer.collectEntities` and `StatechartSourceExtractor.findMachineBindings` into unified typed AST walk
 - [x] T009 Cross-reference syntax CEs with typed bindings to produce `UnifiedResource` records
 - [x] T010 Compute `DerivedResourceFields` (orphan states, state-to-type mappings, type coverage)
-- [ ] T011 Handle plain `resource` CEs (type info only, no statechart)
+- [x] T011 Handle plain `resource` CEs (type info only, no statechart)
 - [ ] T012 Write comparison tests: old extractors vs unified, assert identical output
 
 ### Dependencies
