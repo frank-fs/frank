@@ -50,7 +50,7 @@
 - [x] T009 Cross-reference syntax CEs with typed bindings to produce `UnifiedResource` records
 - [x] T010 Compute `DerivedResourceFields` (orphan states, state-to-type mappings, type coverage)
 - [x] T011 Handle plain `resource` CEs (type info only, no statechart)
-- [ ] T012 Write comparison tests: old extractors vs unified, assert identical output
+- [x] T012 Write comparison tests: old extractors vs unified, assert identical output
 
 ### Dependencies
 - Depends on WP01 (type definitions).
