@@ -289,12 +289,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T062 Create `OpenApiConsistencyValidator.fs` in Frank.Cli.Core
-- [ ] T063 Generate expected JSON Schema from `UnifiedResource.TypeInfo` via `FSharp.Data.JsonSchema.OpenApi`
-- [ ] T064 Compare: match fields, report unmapped/orphan/type mismatches
-- [ ] T065 Wire `frank-cli validate --project <fsproj> --openapi` in Program.fs
-- [ ] T066 Format results using `ValidationReport` structure
-- [ ] T067 Write tests with intentional mismatches
+- [x] T062 Create `OpenApiConsistencyValidator.fs` in Frank.Cli.Core
+- [x] T063 Generate expected JSON Schema from `UnifiedResource.TypeInfo` via `FSharp.Data.JsonSchema.OpenApi`
+- [x] T064 Compare: match fields, report unmapped/orphan/type mismatches
+- [x] T065 Wire `frank-cli validate --project <fsproj> --openapi` in Program.fs
+- [x] T066 Format results using `ValidationReport` structure
+- [x] T067 Write tests with intentional mismatches
 
 ### Dependencies
 - Depends on WP02 (unified extractor).
