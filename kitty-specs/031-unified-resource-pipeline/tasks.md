@@ -429,12 +429,12 @@ Phase 4 (Validation):
 | T029 | Plain resource ALPS | WP05 | P1 | No |
 | T030 | ALPS roundtrip validation | WP05 | P1 | No |
 | T031 | ALPS tic-tac-toe tests | WP05 | P1 | No |
-| T032 | AffordanceMapGenerator.fs | WP06 | P1 | No |
-| T033 | Composite key generation | WP06 | P1 | No |
-| T034 | LinkRelation population | WP06 | P1 | No |
-| T035 | profileUrl derivation | WP06 | P1 | No |
-| T036 | --format affordance-map output | WP06 | P1 | No |
-| T037 | Affordance map tests | WP06 | P1 | No |
+| T032 | AffordanceMapGenerator.fs | WP06 | P1 | Yes |
+| T033 | Composite key generation | WP06 | P1 | Yes |
+| T034 | LinkRelation population | WP06 | P1 | Yes |
+| T035 | profileUrl derivation | WP06 | P1 | Yes |
+| T036 | --format affordance-map output | WP06 | P1 | Yes |
+| T037 | Affordance map tests | WP06 | P1 | Yes |
 | T038 | AffordanceMap.fs (deserialize) | WP07 | P1 | No |
 | T039 | AffordanceMiddleware.fs | WP07 | P1 | No |
 | T040 | Request-time header injection | WP07 | P1 | No |
