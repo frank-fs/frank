@@ -42,6 +42,12 @@ jobs:
           dotnet test test/Frank.Cli.IntegrationTests
           dotnet test test/Frank.LinkedData.Tests
           dotnet test test/Frank.LinkedData.Sample.Tests
+          dotnet test test/Frank.Provenance.Tests
+          dotnet test test/Frank.Validation.Tests
+          dotnet test test/Frank.Statecharts.Tests
+          dotnet test test/Frank.Statecharts.Sqlite.Tests
+          dotnet test test/Frank.Discovery.Tests
+          dotnet test test/Frank.TicTacToe.Tests
       - name: Pack
         run: |
           dotnet pack src/Frank -c Release --no-restore --include-symbols -o out
