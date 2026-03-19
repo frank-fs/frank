@@ -211,5 +211,5 @@ let tests =
               let result = execute "/nonexistent/Test.fsproj"
 
               match result with
-              | Result.Error msg -> Expect.stringContains msg "not found" "Should mention file not found"
+              | Result.Error msg -> Expect.stringContains msg "No extraction state found" "Should mention state not found"
               | Result.Ok _ -> failtest "Expected error for missing state" ]

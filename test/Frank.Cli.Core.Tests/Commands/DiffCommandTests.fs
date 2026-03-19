@@ -168,7 +168,7 @@ let tests =
               let result = execute "/nonexistent/Test.fsproj" None
 
               match result with
-              | Error msg -> Expect.stringContains msg "not found" "Should mention file not found"
+              | Error msg -> Expect.stringContains msg "No extraction state found" "Should mention state not found"
               | Ok _ -> failtest "Expected error for missing state"
 
           testCase "auto-detects latest backup"
