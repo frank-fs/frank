@@ -46,7 +46,7 @@
 ### Included Subtasks
 - [x] T006 Create `UnifiedExtractor.fs` module with single-pass syntax AST walker
 - [x] T007 Merge `AstAnalyzer.walkExpr` and `StatechartSourceExtractor.walkExprForStateful` into unified `walkExpr`
-- [ ] T008 Merge `TypeAnalyzer.collectEntities` and `StatechartSourceExtractor.findMachineBindings` into unified typed AST walk
+- [x] T008 Merge `TypeAnalyzer.collectEntities` and `StatechartSourceExtractor.findMachineBindings` into unified typed AST walk
 - [ ] T009 Cross-reference syntax CEs with typed bindings to produce `UnifiedResource` records
 - [ ] T010 Compute `DerivedResourceFields` (orphan states, state-to-type mappings, type coverage)
 - [ ] T011 Handle plain `resource` CEs (type info only, no statechart)
