@@ -1,9 +1,12 @@
 ---
 work_package_id: WP12
 title: Semantic Subcommand Backward Compatibility
-lane: planned
+lane: "doing"
 dependencies:
 - WP02
+base_branch: 031-unified-resource-pipeline-WP02
+base_commit: 35175b217c2cce39589a312a0e8317e273430068
+created_at: '2026-03-19T04:06:49.968743+00:00'
 subtasks:
 - T068
 - T069
@@ -14,7 +17,7 @@ subtasks:
 phase: Phase 3 - Integration
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "26347"
 review_status: ''
 reviewed_by: ''
 history:
