@@ -32,6 +32,7 @@
     <Compile Include="Output/JsonOutputTests.fs" />
     <Compile Include="Output/TextOutputTests.fs" />
     <Compile Include="Unified/UnifiedModelTests.fs" />
+    <Compile Include="Unified/OpenApiConsistencyValidatorTests.fs" />
     <Compile Include="Unified/UnifiedExtractorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

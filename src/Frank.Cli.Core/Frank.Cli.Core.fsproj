@@ -32,6 +32,7 @@
     <Compile Include="Statechart/ValidationReportFormatter.fs" />
     <!-- Unified pipeline -->
     <Compile Include="Unified/UnifiedModel.fs" />
+    <Compile Include="Unified/OpenApiConsistencyValidator.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
@@ -49,6 +50,7 @@
     <Compile Include="Commands/StatechartExtractCommand.fs" />
     <Compile Include="Commands/StatechartGenerateCommand.fs" />
     <Compile Include="Commands/StatechartValidateCommand.fs" />
+    <Compile Include="Commands/OpenApiValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />

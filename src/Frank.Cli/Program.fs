@@ -274,6 +274,54 @@ let main args =
 
     semanticCmd.Subcommands.Add(compileCmd)
 
+    // ── semantic openapi-validate ──
+    let openApiValCmd = Command("openapi-validate")
+    openApiValCmd.Description <- "Validate consistency between F# types and OpenAPI schema components"
+    let oavProjectOpt = Option<string>("--project")
+    oavProjectOpt.Description <- "Path to .fsproj file"
+    oavProjectOpt.Required <- true
+    let oavOpenApiOpt = Option<string>("--openapi")
+    oavOpenApiOpt.Description <- "Path to OpenAPI JSON document"
+    oavOpenApiOpt.Required <- true
+    let oavFormatOpt = Option<string>("--output-format")
+    oavFormatOpt.Description <- "Output format (text|json)"
+    oavFormatOpt.DefaultValueFactory <- (fun _ -> "text")
+    openApiValCmd.Options.Add(oavProjectOpt)
+    openApiValCmd.Options.Add(oavOpenApiOpt)
+    openApiValCmd.Options.Add(oavFormatOpt)
+
+    openApiValCmd.SetAction(fun parseResult ->
+        let project = parseResult.GetValue(oavProjectOpt)
+        let openApiPath = parseResult.GetValue(oavOpenApiOpt)
+        let format = parseResult.GetValue(oavFormatOpt)
+
+        let result = OpenApiValidateCommand.execute project openApiPath
+
+        match result with
+        | Ok r ->
+            let output =
+                if format = "json" then
+                    JsonOutput.formatOpenApiValidateResult r
+                else
+                    TextOutput.formatOpenApiValidateResult r
+
+            Console.WriteLine(output)
+
+            if r.Report.TotalFailures > 0 then
+                Environment.ExitCode <- 1
+        | Error e ->
+            Environment.ExitCode <- 1
+
+            let output =
+                if format = "json" then
+                    JsonOutput.formatError e
+                else
+                    TextOutput.formatError e
+
+            Console.Error.WriteLine(output))
+
+    semanticCmd.Subcommands.Add(openApiValCmd)
+
     // ── statechart (parent) ──
     let statechartCmd = Command("statechart")
     statechartCmd.Description <- "Statechart pipeline: extract, generate, validate, and parse state machine artifacts"

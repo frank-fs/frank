@@ -336,6 +336,9 @@ module JsonOutput =
         writer.Flush()
         Encoding.UTF8.GetString(stream.ToArray())
 
+    let formatOpenApiValidateResult (result: OpenApiValidateCommand.OpenApiValidateResult) : string =
+        Frank.Cli.Core.Statechart.ValidationReportFormatter.formatJson result.Report
+
     let formatStatechartGenerateResult (result: StatechartGenerateCommand.GenerateResult) : string =
         use stream = new MemoryStream()
         use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
