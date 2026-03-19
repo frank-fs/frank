@@ -1,9 +1,12 @@
 ---
 work_package_id: WP07
 title: Runtime Affordance Middleware -- Link + Allow Headers
-lane: planned
+lane: "doing"
 dependencies:
 - WP01
+base_branch: 031-unified-resource-pipeline-WP01
+base_commit: bd0722e27d0fa12e9ab2ad5cdbbcb7b8e6d5fed6
+created_at: '2026-03-19T03:24:56.162137+00:00'
 subtasks:
 - T038
 - T039
@@ -15,7 +18,7 @@ subtasks:
 phase: Phase 2 - Runtime
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "17777"
 review_status: ''
 reviewed_by: ''
 history:
