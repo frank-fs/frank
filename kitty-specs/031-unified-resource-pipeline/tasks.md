@@ -128,7 +128,7 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T026 Create `UnifiedAlpsGenerator.fs` — takes `UnifiedResource`, produces ALPS JSON
+- [x] T026 Create `UnifiedAlpsGenerator.fs` — takes `UnifiedResource`, produces ALPS JSON
 - [ ] T027 Implement Schema.org vocabulary alignment on type descriptors
 - [ ] T028 Implement IANA-precedence link relation derivation
 - [ ] T029 Handle plain resources (type descriptors + method transitions, no state)
