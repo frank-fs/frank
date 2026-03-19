@@ -195,7 +195,8 @@ module ProjectLoader =
                         return Error $"Type-check errors:\n{errors}"
                     else
                         let! parsedFiles =
-                            options.SourceFiles
+                            sourceFiles
+                            |> List.toArray
                             |> Array.map (parseSourceFile checker)
                             |> Async.Sequential
                         let parsedFiles = parsedFiles |> Array.choose id |> Array.toList
