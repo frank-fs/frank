@@ -132,7 +132,7 @@
 - [x] T027 Implement Schema.org vocabulary alignment on type descriptors
 - [x] T028 Implement IANA-precedence link relation derivation
 - [x] T029 Handle plain resources (type descriptors + method transitions, no state)
-- [ ] T030 Validate generated ALPS round-trips through `Alps.JsonParser.parseAlpsJson`
+- [x] T030 Validate generated ALPS round-trips through `Alps.JsonParser.parseAlpsJson`
 - [ ] T031 Write tests: ALPS for tic-tac-toe has both semantic and transition descriptors
 
 ### Dependencies
