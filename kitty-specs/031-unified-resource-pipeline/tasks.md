@@ -182,7 +182,7 @@
 ### Included Subtasks
 - [x] T038 Implement `AffordanceMap.fs` in `Frank.Affordances` — deserialize binary, build dictionary
 - [x] T039 Implement `AffordanceMiddleware.fs` with `useAffordances` custom operation on `webHost` CE (same pattern as `useOpenApi`)
-- [ ] T040 Request-time: read state key, lookup map, inject Allow + Link + profile + describedby headers
+- [x] T040 Request-time: read state key, lookup map, inject Allow + Link + profile + describedby headers
 - [ ] T041 Handle plain resources (wildcard state key lookup)
 - [ ] T042 Graceful degradation when no map loaded (log warning, pass through)
 - [ ] T043 Pre-compute Link header strings at startup (zero allocation per request)
