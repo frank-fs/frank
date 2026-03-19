@@ -19,7 +19,7 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 Create `UnifiedModel.fs` with `UnifiedResource`, `DerivedResourceFields`, `HttpCapability` types
+- [x] T001 Create `UnifiedModel.fs` with `UnifiedResource`, `DerivedResourceFields`, `HttpCapability` types
 - [ ] T002 Create `AffordanceMap.fs` types (`AffordanceMapEntry`, `AffordanceLinkRelation`)
 - [ ] T003 Create `Frank.Affordances` project (framework reference only, no Frank.Statecharts dependency)
 - [ ] T004 Create `Frank.Affordances.Tests` test project
