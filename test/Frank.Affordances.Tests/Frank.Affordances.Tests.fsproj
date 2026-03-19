@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="AffordanceMapTests.fs" />
+    <Compile Include="AffordanceMiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -19,6 +20,7 @@
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
   </ItemGroup>
 
 </Project>
