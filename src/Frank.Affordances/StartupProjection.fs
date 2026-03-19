@@ -5,36 +5,6 @@ open System.IO
 open System.Reflection
 open System.Text.Json
 
-/// Pre-generated profile strings for all formats, keyed by resource slug.
-/// All formats are pre-generated at CLI time (by frank-cli extract).
-/// The runtime deserializes this record and serves the strings directly --
-/// no dotNetRdf, FCS, or other CLI-only dependencies at runtime.
-type ProjectedProfiles =
-    { /// ALPS JSON per resource slug, served at GET /alps/{slug}
-      AlpsProfiles: Map<string, string>
-      /// OWL Turtle per resource slug, served at GET /ontology/{slug}
-      OwlOntologies: Map<string, string>
-      /// SHACL Turtle per resource slug, served at GET /shapes/{slug}
-      ShaclShapes: Map<string, string>
-      /// JSON Schema per resource slug, served at GET /schemas/{slug}
-      JsonSchemas: Map<string, string> }
-
-module ProjectedProfiles =
-
-    /// Empty profiles for when no embedded resource is available.
-    let empty: ProjectedProfiles =
-        { AlpsProfiles = Map.empty
-          OwlOntologies = Map.empty
-          ShaclShapes = Map.empty
-          JsonSchemas = Map.empty }
-
-    /// Check whether the projected profiles have any content.
-    let isEmpty (profiles: ProjectedProfiles) : bool =
-        Map.isEmpty profiles.AlpsProfiles
-        && Map.isEmpty profiles.OwlOntologies
-        && Map.isEmpty profiles.ShaclShapes
-        && Map.isEmpty profiles.JsonSchemas
-
 module StartupProjection =
 
     /// Default embedded resource name for the projected profiles JSON.
@@ -91,3 +61,53 @@ module StartupProjection =
             deserialize json
         else
             None
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RuntimeState: full startup state with resource data for AffordanceMap
+    // generation plus pre-computed profile strings.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /// Default embedded resource name for the runtime state JSON.
+    [<Literal>]
+    let DefaultRuntimeStateResourceName = "runtime-state.json"
+
+    /// Serialize runtime state to a JSON string.
+    /// Used by frank-cli at compile time to generate the embedded resource.
+    let serializeRuntimeState (state: RuntimeState) : string =
+        JsonSerializer.Serialize(state, jsonOptions)
+
+    /// Deserialize runtime state from a JSON string.
+    let deserializeRuntimeState (json: string) : RuntimeState option =
+        try
+            let state = JsonSerializer.Deserialize<RuntimeState>(json, jsonOptions)
+            Some state
+        with
+        | :? JsonException -> None
+        | :? ArgumentNullException -> None
+
+    /// Load runtime state from an embedded resource in the given assembly.
+    /// Returns None if the runtime state is not found or cannot be deserialized.
+    let loadRuntimeStateFromAssembly (assembly: Assembly) : RuntimeState option =
+        let resourceName =
+            assembly.GetManifestResourceNames()
+            |> Array.tryFind (fun name ->
+                name.EndsWith(DefaultRuntimeStateResourceName, StringComparison.OrdinalIgnoreCase))
+
+        match resourceName with
+        | None -> None
+        | Some name ->
+            use stream = assembly.GetManifestResourceStream(name)
+
+            if isNull stream then
+                None
+            else
+                use reader = new StreamReader(stream)
+                let json = reader.ReadToEnd()
+                deserializeRuntimeState json
+
+    /// Load an AffordanceMap from the runtime state embedded in the given assembly.
+    /// Deserializes the runtime state, then generates the AffordanceMap from
+    /// the embedded resource data. Returns None if no runtime state is found.
+    let loadAffordanceMapFromAssembly (assembly: Assembly) : AffordanceMap option =
+        loadRuntimeStateFromAssembly assembly
+        |> Option.map AffordanceMap.fromRuntimeState

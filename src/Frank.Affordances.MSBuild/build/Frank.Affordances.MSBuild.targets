@@ -1,8 +1,10 @@
 <Project>
-  <!-- Property: path to the unified state binary produced by frank-cli -->
+  <!-- Properties: paths to artifacts produced by frank-cli -->
   <PropertyGroup>
     <FrankUnifiedStatePath Condition="'$(FrankUnifiedStatePath)' == ''">$(BaseIntermediateOutputPath)frank-cli/unified-state.bin</FrankUnifiedStatePath>
     <FrankUnifiedStateLogicalName Condition="'$(FrankUnifiedStateLogicalName)' == ''">Frank.Affordances.unified-state.bin</FrankUnifiedStateLogicalName>
+    <FrankRuntimeStatePath Condition="'$(FrankRuntimeStatePath)' == ''">$(BaseIntermediateOutputPath)frank-cli/runtime-state.json</FrankRuntimeStatePath>
+    <FrankRuntimeStateLogicalName Condition="'$(FrankRuntimeStateLogicalName)' == ''">Frank.Affordances.runtime-state.json</FrankRuntimeStateLogicalName>
   </PropertyGroup>
 
   <!-- Target: embed the unified state binary if it exists -->
@@ -18,11 +20,24 @@
     </ItemGroup>
   </Target>
 
-  <!-- Target: informational message if the binary doesn't exist -->
-  <Target Name="WarnMissingFrankUnifiedState"
+  <!-- Target: embed the runtime state if it exists (produced by frank-cli compile) -->
+  <Target Name="EmbedFrankRuntimeState"
           BeforeTargets="CoreCompile"
-          Condition="!Exists('$(FrankUnifiedStatePath)')">
+          Condition="Exists('$(FrankRuntimeStatePath)')">
     <Message Importance="normal"
-             Text="Frank: No unified state binary found at '$(FrankUnifiedStatePath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
+             Text="Frank: Embedding runtime state from '$(FrankRuntimeStatePath)' as '$(FrankRuntimeStateLogicalName)'" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(FrankRuntimeStatePath)"
+                        LogicalName="$(FrankRuntimeStateLogicalName)"
+                        Link="frank-cli/runtime-state.json" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Target: informational message if neither artifact exists -->
+  <Target Name="WarnMissingFrankState"
+          BeforeTargets="CoreCompile"
+          Condition="!Exists('$(FrankUnifiedStatePath)') AND !Exists('$(FrankRuntimeStatePath)')">
+    <Message Importance="normal"
+             Text="Frank: No unified state found at '$(FrankUnifiedStatePath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' then 'frank-cli compile' to generate runtime state." />
   </Target>
 </Project>

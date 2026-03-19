@@ -51,6 +51,11 @@ module AffordanceMap =
     /// Current affordance map schema version.
     let currentVersion = "1.0"
 
+    /// An empty affordance map.
+    let empty: AffordanceMap =
+        { Version = currentVersion
+          Entries = [] }
+
     /// Wildcard state key for resources without statecharts.
     [<Literal>]
     let WildcardStateKey = "*"
@@ -103,3 +108,74 @@ module AffordanceMap =
                   LinkHeaderValues = linkHeader }
 
         dict
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Runtime generation from embedded resource data
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /// Derive the ALPS profile URL from a base URI and resource slug.
+    let private profileUrl (baseUri: string) (slug: string) : string =
+        let trimmed = baseUri.TrimEnd('/')
+        sprintf "%s/%s" trimmed slug
+
+    /// Build link relations from runtime HTTP capabilities.
+    let private buildLinkRelations
+        (routeTemplate: string)
+        (capabilities: RuntimeHttpCapability list)
+        : AffordanceLinkRelation list =
+        capabilities
+        |> List.map (fun cap ->
+            { Rel = cap.LinkRelation
+              Href = routeTemplate
+              Method = cap.Method
+              Title = None })
+
+    /// Build affordance map entries for a single runtime resource.
+    let private buildEntries (resource: RuntimeResource) (baseUri: string) : AffordanceMapEntry list =
+        let profile = profileUrl baseUri resource.ResourceSlug
+
+        match resource.StateNames with
+        | [] ->
+            // Stateless resource: single entry with wildcard state key
+            let methods =
+                resource.HttpCapabilities |> List.map _.Method |> List.distinct |> List.sort
+
+            let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
+
+            [ { RouteTemplate = resource.RouteTemplate
+                StateKey = WildcardStateKey
+                AllowedMethods = methods
+                LinkRelations = linkRels
+                ProfileUrl = profile } ]
+
+        | stateNames ->
+            // Stateful resource: one entry per state
+            stateNames
+            |> List.map (fun stateName ->
+                let capsForState =
+                    resource.HttpCapabilities
+                    |> List.filter (fun cap ->
+                        cap.StateKey = WildcardStateKey || cap.StateKey = stateName)
+
+                let methods =
+                    capsForState |> List.map _.Method |> List.distinct |> List.sort
+
+                let linkRels = buildLinkRelations resource.RouteTemplate capsForState
+
+                { RouteTemplate = resource.RouteTemplate
+                  StateKey = stateName
+                  AllowedMethods = methods
+                  LinkRelations = linkRels
+                  ProfileUrl = profile })
+
+    /// Generate an AffordanceMap from runtime resource data at startup.
+    /// This is the runtime equivalent of AffordanceMapGenerator.generateEntries,
+    /// using lightweight RuntimeResource types instead of CLI-only UnifiedResource.
+    let generateFromResources (resources: RuntimeResource list) (baseUri: string) : AffordanceMap =
+        let entries = resources |> List.collect (fun r -> buildEntries r baseUri)
+        { Version = currentVersion; Entries = entries }
+
+    /// Load an AffordanceMap from a RuntimeState.
+    /// Generates the map from the embedded resource data at startup.
+    let fromRuntimeState (state: RuntimeState) : AffordanceMap =
+        generateFromResources state.Resources state.BaseUri

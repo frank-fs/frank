@@ -6,6 +6,7 @@ open System.Text.Json
 open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Writing
+open Frank.Affordances
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Unified
@@ -17,6 +18,7 @@ module CompileCommand =
         { OntologyPath: string
           ShapesPath: string
           ManifestPath: string
+          RuntimeStatePath: string option
           EmbeddedResourceNames: string list }
 
     let private backupState (statePath: string) =
@@ -49,6 +51,20 @@ module CompileCommand =
         use _ = JsonDocument.Parse(manifestJson)
         ()
 
+    /// Generate and write the runtime state file from the unified extraction state.
+    /// Returns the path if successful, None if the unified state is not available.
+    let private generateRuntimeState (projectDir: string) (outDir: string) : string option =
+        let unifiedPath = Path.Combine(projectDir, "obj", "frank-cli", "unified-state.bin")
+
+        match UnifiedCache.load unifiedPath with
+        | Ok(Some unified) ->
+            let runtimeState = RuntimeProjector.toRuntimeState unified
+            let json = StartupProjection.serializeRuntimeState runtimeState
+            let runtimeStatePath = Path.Combine(outDir, StartupProjection.DefaultRuntimeStateResourceName)
+            File.WriteAllText(runtimeStatePath, json)
+            Some runtimeStatePath
+        | _ -> None
+
     let execute (projectPath: string) (outputDir: string option) : Result<CompileResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
         match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
@@ -70,10 +86,14 @@ module CompileCommand =
                 // Round-trip verification: re-parse each file to confirm validity
                 verifyRoundTrip ontologyPath shapesPath manifestPath
 
+                // Generate runtime state for embedded resource
+                let runtimeStatePath = generateRuntimeState projectDir outDir
+
                 Ok
                     { OntologyPath = ontologyPath
                       ShapesPath = shapesPath
                       ManifestPath = manifestPath
+                      RuntimeStatePath = runtimeStatePath
                       EmbeddedResourceNames =
                         [ "Frank.Semantic.ontology.owl.xml"
                           "Frank.Semantic.shapes.shacl.ttl"
@@ -123,11 +143,15 @@ module CompileCommand =
 
                         verifyRoundTrip ontologyPath shapesPath manifestPath
 
+                        // Generate runtime state for embedded resource
+                        let runtimeStatePath = generateRuntimeState projectDir outDir
+
                         return
                             Ok
                                 { OntologyPath = ontologyPath
                                   ShapesPath = shapesPath
                                   ManifestPath = manifestPath
+                                  RuntimeStatePath = runtimeStatePath
                                   EmbeddedResourceNames =
                                     [ "Frank.Semantic.ontology.owl.xml"
                                       "Frank.Semantic.shapes.shacl.ttl"

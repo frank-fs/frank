@@ -213,6 +213,10 @@ module JsonOutput =
         writeString writer "shapesPath" result.ShapesPath
         writeString writer "manifestPath" result.ManifestPath
 
+        match result.RuntimeStatePath with
+        | Some path -> writeString writer "runtimeStatePath" path
+        | None -> ()
+
         writer.WriteStartArray("embeddedResourceNames")
 
         for name in result.EmbeddedResourceNames do

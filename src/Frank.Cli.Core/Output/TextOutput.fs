@@ -130,9 +130,14 @@ module TextOutput =
         let sb = System.Text.StringBuilder()
         sb.AppendLine(bold "Compile Complete") |> ignore
         sb.AppendLine() |> ignore
-        sb.AppendLine(sprintf "Ontology: %s" result.OntologyPath) |> ignore
-        sb.AppendLine(sprintf "Shapes:   %s" result.ShapesPath) |> ignore
-        sb.AppendLine(sprintf "Manifest: %s" result.ManifestPath) |> ignore
+        sb.AppendLine(sprintf "Ontology:      %s" result.OntologyPath) |> ignore
+        sb.AppendLine(sprintf "Shapes:        %s" result.ShapesPath) |> ignore
+        sb.AppendLine(sprintf "Manifest:      %s" result.ManifestPath) |> ignore
+
+        match result.RuntimeStatePath with
+        | Some path -> sb.AppendLine(sprintf "Runtime State: %s" path) |> ignore
+        | None -> ()
+
         sb.AppendLine() |> ignore
         sb.AppendLine("Embed these resources in your project:") |> ignore
 
