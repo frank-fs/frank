@@ -27,6 +27,7 @@ requirement_refs:
 - FR-014
 - FR-015
 - FR-016
+- FR-033
 ---
 
 # Work Package Prompt: WP11 -- OpenAPI Consistency Validation

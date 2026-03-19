@@ -26,6 +26,8 @@ history:
 requirement_refs:
 - FR-013
 - FR-018
+- FR-033
+- FR-034
 ---
 
 # Work Package Prompt: WP08 -- Startup Projection -- Binary to In-Memory ALPS/OWL/SHACL/Schema

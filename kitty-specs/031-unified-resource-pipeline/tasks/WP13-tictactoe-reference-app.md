@@ -73,7 +73,7 @@ spec-kitty implement WP13 --base WP07
 ## Objectives & Success Criteria
 
 1. Create `sample/Frank.TicTacToe.Sample/` project with a complete tic-tac-toe stateful resource, reusing the domain types and transition logic from `test/Frank.Statecharts.Tests/StatefulResourceTests.fs`.
-2. Wire up `Frank.Affordances` middleware (`app.UseAffordances()`) and verify affordance map is loaded from embedded resource.
+2. Wire up `Frank.Affordances` middleware (`useAffordances`) and verify affordance map is loaded from embedded resource.
 3. Run the full unified CLI pipeline against the sample: `extract`, `generate --format alps`, `generate --format affordance-map`.
 4. Verify unified extraction contains both type and behavior data.
 5. Verify ALPS document contains both semantic and transition descriptors.
@@ -203,7 +203,7 @@ spec-kitty implement WP13 --base WP07
          app.UseStatecharts() |> ignore
 
          // Register affordance middleware (loads embedded affordance map)
-         app.UseAffordances() |> ignore
+         useAffordances |> ignore
 
          // Define the stateful resource
          let gameResource =
@@ -254,22 +254,22 @@ spec-kitty implement WP13 --base WP07
   - The `statefulResource` and `inState` CE syntax must match the current Frank.Statecharts API. Read `test/Frank.Statecharts.Tests/StatefulResourceTests.fs` for the exact CE usage pattern.
   - The `healthResource` provides test coverage for plain (non-stateful) resources in the unified pipeline.
 
-### Subtask T075 -- Add `Frank.Affordances` package reference and `app.UseAffordances()` middleware
+### Subtask T075 -- Add `Frank.Affordances` package reference and `useAffordances` middleware
 
 - **Purpose**: Wire the affordance middleware into the sample application so it loads the embedded affordance map at startup and injects `Link` + `Allow` headers at request time.
 
 - **Steps**:
   1. The project reference to `Frank.Affordances` was already added in T074's fsproj. Verify it exists.
 
-  2. In `Program.fs`, ensure `app.UseAffordances()` is called AFTER `app.UseStatecharts()` and BEFORE `app.MapResource()`:
+  2. In `Program.fs`, ensure `useAffordances` is called AFTER `app.UseStatecharts()` and BEFORE `app.MapResource()`:
      ```fsharp
      app.UseStatecharts() |> ignore       // Resolves current state into HttpContext.Items
-     app.UseAffordances() |> ignore       // Reads state from context, injects Link + Allow headers
+     useAffordances |> ignore       // Reads state from context, injects Link + Allow headers
      ```
 
   3. The middleware ordering is critical:
      - `UseStatecharts()` runs first and sets `StateMachineMetadata` (current state key) in `HttpContext.Items`
-     - `UseAffordances()` runs second and reads the state key from `HttpContext.Items` to look up the affordance map entry
+     - `useAffordances` runs second and reads the state key from `HttpContext.Items` to look up the affordance map entry
      - If the order is reversed, the affordance middleware will not find the state key
 
   4. Verify that the `Frank.Affordances.MSBuild` targets are triggered during build:
@@ -439,7 +439,7 @@ spec-kitty implement WP13 --base WP07
          // Configure the sample app identically to Program.fs
          let app = builder.Build()
          app.UseStatecharts() |> ignore
-         app.UseAffordances() |> ignore
+         useAffordances |> ignore
          // Map resources...
          let testServer = new TestServer(app.Services)
          testServer

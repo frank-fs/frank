@@ -27,23 +27,24 @@ frank-cli extract --project MyApp/MyApp.fsproj --force          # Force re-extra
 ```fsharp
 // In your Frank application's Program.fs:
 
-let app = builder.Build()
+let app =
+    webHost {
+        useOpenApi          // OpenAPI + Scalar UI
+        useAffordances      // Link + Allow headers + profile/schema serving
 
-// Add affordance middleware (reads embedded binary state, projects at startup)
-app.UseAffordances()   // Injects Link + Allow headers based on current state
+        resource "/games/{gameId}" {
+            name "Games"
+        }
 
-// Your stateful resource — unchanged
-app.MapStatefulResource(
-    statefulResource "/games/{gameId}" {
-        machine gameMachine
-        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
-        inState (forState XTurn [ StateHandlerBuilder.get getGame; StateHandlerBuilder.post makeMove ])
-        inState (forState OTurn [ StateHandlerBuilder.get getGame; StateHandlerBuilder.post makeMove ])
-        inState (forState (Won "X") [ StateHandlerBuilder.get getGame ])
-        inState (forState Draw [ StateHandlerBuilder.get getGame ])
-    })
-
-app.Run()
+        statefulResource "/games/{gameId}" {
+            machine gameMachine
+            resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+            inState (forState XTurn [ StateHandlerBuilder.get getGame; StateHandlerBuilder.post makeMove ])
+            inState (forState OTurn [ StateHandlerBuilder.get getGame; StateHandlerBuilder.post makeMove ])
+            inState (forState (Won "X") [ StateHandlerBuilder.get getGame ])
+            inState (forState Draw [ StateHandlerBuilder.get getGame ])
+        }
+    }
 ```
 
 **What happens at runtime:**
