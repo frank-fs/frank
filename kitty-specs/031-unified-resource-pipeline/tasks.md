@@ -208,7 +208,7 @@
 **Estimated Size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T045 Create `StartupProjection.fs` — deserialize binary, project all views
+- [x] T045 Create `StartupProjection.fs` — deserialize binary, project all views
 - [ ] T046 Project ALPS profile (reuse `UnifiedAlpsGenerator` from WP05)
 - [ ] T047 Project OWL ontology (call `TypeMapper.mapTypes`)
 - [ ] T048 Project SHACL shapes (call `ShapeGenerator.generateShapes`)
