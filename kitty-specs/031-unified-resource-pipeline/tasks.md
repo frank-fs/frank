@@ -102,7 +102,7 @@
 
 ### Included Subtasks
 - [x] T019 Create unified `ExtractCommand.fs` replacing both pipelines
-- [ ] T020 Wire `frank-cli extract --project` in Program.fs with `--output-format` and `--force`
+- [x] T020 Wire `frank-cli extract --project` in Program.fs with `--output-format` and `--force`
 - [ ] T021 Update `generate` command to read from unified extraction state (project UnifiedResource → ExtractedStatechart → StatechartDocument → format text via existing generators)
 - [ ] T022 Support `--format affordance-map` alongside existing formats (CLI flag wiring only — map generation logic is in WP06/T032-T036)
 - [ ] T023 Update `HelpContent.fs` for unified extract command
