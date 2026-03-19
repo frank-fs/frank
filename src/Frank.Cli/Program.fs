@@ -6,6 +6,7 @@ open Frank.Cli.Core.Commands
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Help
 open Frank.Cli.Core.Statechart
+open Frank.Cli.Core.Unified
 
 [<EntryPoint>]
 let main args =
@@ -483,6 +484,110 @@ let main args =
             Console.Error.WriteLine(output))
 
     statechartCmd.Subcommands.Add(scParseCmd)
+
+    // ── extract (top-level, unified) ──
+    let uniExtractCmd = Command("extract")
+    uniExtractCmd.Description <- "Extract unified resource descriptions from F# source (replaces semantic extract + statechart extract)"
+
+    let uniExtractProjectOpt = Option<string>("--project")
+    uniExtractProjectOpt.Description <- "Path to .fsproj file"
+    uniExtractProjectOpt.Required <- true
+    let uniExtractBaseUriOpt = Option<string>("--base-uri")
+    uniExtractBaseUriOpt.Description <- "Base URI for ALPS profiles"
+    uniExtractBaseUriOpt.DefaultValueFactory <- (fun _ -> "http://example.org/")
+    let uniExtractVocabOpt = Option<string array>("--vocabularies")
+    uniExtractVocabOpt.Description <- "Vocabulary namespaces to align"
+    uniExtractVocabOpt.DefaultValueFactory <- (fun _ -> [| "schema.org" |])
+    let uniExtractForceOpt = Option<bool>("--force")
+    uniExtractForceOpt.Description <- "Force re-extraction, bypassing cache"
+    uniExtractForceOpt.DefaultValueFactory <- (fun _ -> false)
+    let uniExtractFormatOpt = Option<string>("--output-format")
+    uniExtractFormatOpt.Description <- "Output format (text|json)"
+    uniExtractFormatOpt.DefaultValueFactory <- (fun _ -> "text")
+    uniExtractCmd.Options.Add(uniExtractProjectOpt)
+    uniExtractCmd.Options.Add(uniExtractBaseUriOpt)
+    uniExtractCmd.Options.Add(uniExtractVocabOpt)
+    uniExtractCmd.Options.Add(uniExtractForceOpt)
+    uniExtractCmd.Options.Add(uniExtractFormatOpt)
+
+    uniExtractCmd.SetAction(fun parseResult ->
+        let project = parseResult.GetValue(uniExtractProjectOpt)
+        let baseUri = parseResult.GetValue(uniExtractBaseUriOpt)
+        let vocabs = parseResult.GetValue(uniExtractVocabOpt) |> Array.toList
+        let force = parseResult.GetValue(uniExtractForceOpt)
+        let format = parseResult.GetValue(uniExtractFormatOpt)
+
+        let result =
+            UnifiedExtractCommand.execute project baseUri vocabs force
+            |> Async.RunSynchronously
+
+        match result with
+        | Ok extractResult ->
+            let output =
+                if format = "json" then
+                    JsonOutput.formatUnifiedExtractResult extractResult
+                else
+                    TextOutput.formatUnifiedExtractResult extractResult
+
+            Console.WriteLine(output)
+        | Error e ->
+            Environment.ExitCode <- 1
+            Console.Error.WriteLine(StatechartError.formatError e))
+
+    root.Subcommands.Add(uniExtractCmd)
+
+    // ── generate (top-level, unified) ──
+    let uniGenCmd = Command("generate")
+    uniGenCmd.Description <- "Generate format artifacts from unified extraction (wsd, alps, scxml, smcat, xstate, affordance-map, all)"
+
+    let uniGenProjectOpt = Option<string>("--project")
+    uniGenProjectOpt.Description <- "Path to .fsproj file"
+    uniGenProjectOpt.Required <- true
+    let uniGenFormatOpt = Option<string>("--format")
+    uniGenFormatOpt.Description <- "Target format (wsd|alps|alps-xml|scxml|smcat|xstate|affordance-map|all)"
+    uniGenFormatOpt.Required <- true
+    let uniGenOutputOpt = Option<string>("--output")
+    uniGenOutputOpt.Description <- "Output directory for generated artifacts"
+    let uniGenResourceOpt = Option<string>("--resource")
+    uniGenResourceOpt.Description <- "Generate for a specific resource only"
+    let uniGenForceOpt = Option<bool>("--force")
+    uniGenForceOpt.Description <- "Force re-extraction, bypassing cache"
+    uniGenForceOpt.DefaultValueFactory <- (fun _ -> false)
+    uniGenCmd.Options.Add(uniGenProjectOpt)
+    uniGenCmd.Options.Add(uniGenFormatOpt)
+    uniGenCmd.Options.Add(uniGenOutputOpt)
+    uniGenCmd.Options.Add(uniGenResourceOpt)
+    uniGenCmd.Options.Add(uniGenForceOpt)
+
+    uniGenCmd.SetAction(fun parseResult ->
+        let project = parseResult.GetValue(uniGenProjectOpt)
+        let format = parseResult.GetValue(uniGenFormatOpt)
+
+        let outputDir =
+            let v = parseResult.GetValue(uniGenOutputOpt)
+            if String.IsNullOrEmpty v then None else Some v
+
+        let resource =
+            let v = parseResult.GetValue(uniGenResourceOpt)
+            if String.IsNullOrEmpty v then None else Some v
+
+        let force = parseResult.GetValue(uniGenForceOpt)
+
+        let result =
+            UnifiedGenerateCommand.execute project format outputDir resource force
+            |> Async.RunSynchronously
+
+        match result with
+        | Ok genResult ->
+            for artifact in genResult.Artifacts do
+                match artifact.FilePath with
+                | Some fp -> Console.WriteLine($"Generated: {fp}")
+                | None -> Console.WriteLine(artifact.Content)
+        | Error e ->
+            Environment.ExitCode <- 1
+            Console.Error.WriteLine(StatechartError.formatError e))
+
+    root.Subcommands.Add(uniGenCmd)
 
     // ── status (top-level) ──
     let statusCmd = Command("status")

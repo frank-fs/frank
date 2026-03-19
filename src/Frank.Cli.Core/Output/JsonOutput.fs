@@ -416,3 +416,99 @@ module JsonOutput =
         writer.WriteEndObject()
         writer.Flush()
         Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "status" "ok"
+        writer.WriteBoolean("fromCache", result.FromCache)
+        writeNumber writer "resourceCount" result.ResourceCount
+        writeNumber writer "statefulResourceCount" result.StatefulResourceCount
+        writeNumber writer "plainResourceCount" result.PlainResourceCount
+        writeNumber writer "typeCount" result.TypeCount
+        writer.WriteStartArray("resources")
+
+        for r in result.State.Resources do
+            writer.WriteStartObject()
+            writeString writer "routeTemplate" r.RouteTemplate
+            writeString writer "resourceSlug" r.ResourceSlug
+            writeNumber writer "typeCount" r.TypeInfo.Length
+
+            match r.Statechart with
+            | None -> writer.WriteNull("statechart")
+            | Some sc ->
+                writer.WriteStartObject("statechart")
+                writeString writer "initialState" sc.InitialStateKey
+                writer.WriteStartArray("states")
+
+                for s in sc.StateNames do
+                    writer.WriteStringValue(s)
+
+                writer.WriteEndArray()
+                writer.WriteStartArray("guards")
+
+                for g in sc.GuardNames do
+                    writer.WriteStringValue(g)
+
+                writer.WriteEndArray()
+                writer.WriteStartObject("stateMetadata")
+
+                for kvp in sc.StateMetadata do
+                    writer.WriteStartObject(kvp.Key)
+                    writer.WriteStartArray("allowedMethods")
+
+                    for m in kvp.Value.AllowedMethods do
+                        writer.WriteStringValue(m)
+
+                    writer.WriteEndArray()
+                    writer.WriteBoolean("isFinal", kvp.Value.IsFinal)
+                    writer.WriteEndObject()
+
+                writer.WriteEndObject()
+                writer.WriteEndObject()
+
+            writer.WriteStartArray("httpCapabilities")
+
+            for cap in r.HttpCapabilities do
+                writer.WriteStartObject()
+                writeString writer "method" cap.Method
+
+                match cap.StateKey with
+                | Some sk -> writeString writer "stateKey" sk
+                | None -> writer.WriteNull("stateKey")
+
+                writeString writer "linkRelation" cap.LinkRelation
+                writer.WriteBoolean("isSafe", cap.IsSafe)
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+
+            writer.WriteStartObject("derivedFields")
+            writer.WriteStartArray("orphanStates")
+
+            for s in r.DerivedFields.OrphanStates do
+                writer.WriteStringValue(s)
+
+            writer.WriteEndArray()
+            writer.WriteStartArray("unhandledCases")
+
+            for c in r.DerivedFields.UnhandledCases do
+                writer.WriteStringValue(c)
+
+            writer.WriteEndArray()
+            writer.WriteNumber("typeCoverage", r.DerivedFields.TypeCoverage)
+            writer.WriteEndObject()
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteStartArray("warnings")
+
+        for w in result.Warnings do
+            writer.WriteStringValue(w)
+
+        writer.WriteEndArray()
+        writeString writer "cacheFilePath" result.CacheFilePath
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())

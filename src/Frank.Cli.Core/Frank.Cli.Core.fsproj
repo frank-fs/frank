@@ -51,6 +51,9 @@
     <Compile Include="Commands/StatechartGenerateCommand.fs" />
     <Compile Include="Commands/StatechartValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
+    <!-- Unified commands -->
+    <Compile Include="Commands/UnifiedExtractCommand.fs" />
+    <Compile Include="Commands/UnifiedGenerateCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />
   </ItemGroup>
@@ -60,6 +63,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Frank.Affordances/Frank.Affordances.fsproj" />
     <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
