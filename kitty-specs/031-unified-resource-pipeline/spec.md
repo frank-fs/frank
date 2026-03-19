@@ -30,7 +30,9 @@ This separation creates three gaps identified by the expert review panel:
 
 - Q: How is the affordance map loaded into the running application at runtime? → A: Embedded resource via MSBuild target. The CLI generates `obj/frank-cli/affordance-map.json`; an MSBuild target auto-embeds it as `EmbeddedResource` with logical name `Frank.Affordances.affordance-map.json`. The middleware loads it via `Assembly.GetManifestResourceStream()` at startup and parses it once into a pre-computed dictionary lookup. Same pattern as existing semantic artifacts (`Frank.Semantic.ontology.owl.xml`). No resx — use `<EmbeddedResource>` directly.
 - Q: What link relation vocabulary do affordance Link headers use? → A: ALPS-derived relations with IANA precedence. Precedence: (1) IANA-registered relation if transition maps to one (self, edit, collection, etc.); (2) ALPS profile fragment URI for domain-specific transitions (e.g., `https://example.com/alps/games#move`); (3) never bare HTTP methods. Responses also include `Link: <profile-url>; rel="profile"` so agents can discover relation type definitions. The CLI pre-computes relation types into the affordance map using `--base-uri` as the ALPS profile namespace. No CE changes needed — relation types are auto-derived from (state, method, base URI). CE extensions deferred unless validation reveals the need.
-- Q: How do existing semantic subcommands (clarify, validate, compile, diff) read from the new unified state format? → A: Subcommands are updated to read `UnifiedExtractionState` via a projection function (`toExtractionState`) that calls existing pure functions (TypeMapper, ShapeGenerator) on the unified model's type data to produce OWL/SHACL graphs. One state file (`unified-state.json`), one format, one source of truth. Old `state.json` format detected at load time and prompts re-extraction. No dual-file writing.
+- Q: How do existing semantic subcommands (clarify, validate, compile, diff) read from the new unified state format? → A: Subcommands are updated to read `UnifiedExtractionState` via a projection function (`toExtractionState`) that calls existing pure functions (TypeMapper, ShapeGenerator) on the unified model's type data to produce OWL/SHACL graphs. One state file (`unified-state.bin`), one format, one source of truth. Old `state.json` format detected at load time and prompts re-extraction. No dual-file writing.
+- Q: What serialization format for the cache and embedded resource? → A: Binary (MemoryPack, or MessagePack as fallback for F# DU compatibility). Both the `obj/frank-cli/unified-state.bin` cache and the assembly-embedded resource use the same binary format. JSON is only for CLI display output (`--output-format json`). Human-readable served formats (ALPS, OWL/XML, SHACL Turtle) are NOT embedded as separate files — they are projected at startup from the deserialized binary unified state and served from memory via content negotiation. One embedded binary artifact, zero static files in deployment.
+- Q: Should served formats (ALPS, OWL, SHACL) be embedded files or computed at startup? → A: Computed at startup from the single embedded binary unified state. The middleware deserializes the binary, projects ALPS/OWL/SHACL into memory, and serves via content negotiation. No static files, no generated files in deployment. Same projection functions the CLI uses. Single source of truth prevents drift between formats.
 
 ## User Scenarios & Testing
 
@@ -187,7 +189,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 - **FR-010**: The affordance map MUST be a JSON document keyed by `(routeTemplate, stateKey)` pairs, where each entry specifies: available HTTP methods, link relations, and transition target states
 - **FR-011**: For plain resources without statecharts, the affordance map MUST use a wildcard state key indicating the methods are always available
 - **FR-012**: The affordance map format MUST be versioned to support independent CLI and runtime library upgrades
-- **FR-013**: The affordance map MUST be auto-embedded into the application assembly via an MSBuild target (as `EmbeddedResource` with logical name `Frank.Affordances.affordance-map.json`) and loaded via `Assembly.GetManifestResourceStream()` at startup, parsed once into a pre-computed dictionary lookup indexed by `(routeTemplate, stateKey)`
+- **FR-013**: The unified state MUST be serialized to a binary format (MemoryPack or MessagePack) and auto-embedded into the application assembly via an MSBuild target as a single `EmbeddedResource`. At startup, the middleware deserializes the binary into memory and projects all runtime views (affordance map lookup, ALPS profile, OWL/SHACL graphs) from it. No separate embedded files for each format
 
 **OpenAPI Consistency**
 
@@ -211,7 +213,7 @@ A developer runs `frank-cli extract`, then `frank-cli generate`, then `frank-cli
 
 **FCS Caching**
 
-- **FR-025**: System MUST cache the unified extraction state (including full unified model and source hash) to `obj/frank-cli/unified-state.json`
+- **FR-025**: System MUST cache the unified extraction state (including full unified model and source hash) to `obj/frank-cli/unified-state.bin` using the same binary format as the embedded resource
 - **FR-026**: All commands that consume the unified model (generate, validate) MUST check the cache first and skip FCS analysis when the source hash matches
 - **FR-027**: System MUST support a `--force` flag to bypass cache and re-run FCS analysis
 - **FR-028**: Cache format MUST be forward-compatible — newer CLI versions MUST be able to read caches produced by older versions (or detect incompatibility and re-extract)
