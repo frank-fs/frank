@@ -1,7 +1,7 @@
 ---
 work_package_id: WP09
 title: MSBuild Target for Binary Embedding
-lane: "doing"
+lane: "for_review"
 dependencies: [WP03]
 base_branch: 031-unified-resource-pipeline-WP03
 base_commit: 80c92fa5cc9a58f84715b0f763f317b04ae09435
@@ -381,3 +381,4 @@ dotnet test test/Frank.Affordances.Tests/ --filter "Embedding"
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:41:38Z – claude-opus-wp09 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:59:15Z – claude-opus-wp09 – shell_pid=21017 – lane=for_review – Ready for review: MSBuild target for binary embedding, NuGet package layout verified, 3 embedding tests passing
