@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="Consts.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="AffordanceHelper.fs" />
     <Compile Include="ServerSentEvent.fs" />
     <Compile Include="SseDataLineWriter.fs" />
     <Compile Include="SseDataLineStream.fs" />

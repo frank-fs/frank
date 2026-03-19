@@ -35,6 +35,7 @@
     <Compile Include="Unified/UnifiedCache.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Unified/UnifiedAlpsGenerator.fs" />
+    <Compile Include="Unified/AffordanceMapGenerator.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />
     <Compile Include="Help/HelpContent.fs" />
