@@ -17,4 +17,7 @@
     <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
   </ItemGroup>
 
+  <!-- Import MSBuild targets for embedding runtime state (runtime-state.json) -->
+  <Import Project="../../src/Frank.Affordances.MSBuild/build/Frank.Affordances.MSBuild.targets" />
+
 </Project>

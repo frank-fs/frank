@@ -1,7 +1,12 @@
-/// Datastar SSE handler that uses affordance data for conditional rendering.
-/// Demonstrates how the affordance middleware's headers can inform SSE responses.
+/// Datastar SSE handler demonstrating the correct push pattern:
+/// - Long-lived SSE connection via store.Subscribe + Channel<T>
+/// - Affordance-driven conditional rendering (POST allowed = show move button)
+/// - No polling — state changes push through the MailboxProcessorStore's
+///   BehaviorSubject subscription directly to the SSE response.
 module Frank.TicTacToe.Sample.SseHandlers
 
+open System
+open System.Threading.Channels
 open System.Threading.Tasks
 open FSharp.Reflection
 open Microsoft.AspNetCore.Http
@@ -53,23 +58,45 @@ let renderBoard (stateKey: string) (moveCount: int) : string =
         {moveButtons}
     </div>"""
 
-/// SSE handler that streams the current game board.
-/// Reads state from the store and uses the affordance map to determine rendering.
+/// Long-lived SSE handler that subscribes to the store for state change notifications.
+/// The store's BehaviorSubject semantics ensure the current state is sent immediately
+/// on subscribe, then updates are pushed on every state transition.
+///
+/// Flow: POST -> statechart middleware -> store.SetState -> subscriber.OnNext -> Channel -> SSE push
 let streamGameBoard (ctx: HttpContext) : Task =
     task {
         let store =
             ctx.RequestServices.GetService(typeof<IStateMachineStore<TicTacToeState, int>>)
             :?> IStateMachineStore<TicTacToeState, int>
 
-        let! stateResult = store.GetState "game1"
+        let channel = Channel.CreateUnbounded<string>()
 
-        let state, moveCount =
-            match stateResult with
-            | Some(s, c) -> (s, c)
-            | None -> (gameMachine.Initial, gameMachine.InitialContext)
+        // Subscribe to the store for "game1". BehaviorSubject semantics:
+        // if state already exists, we get it immediately via OnNext.
+        // Every subsequent SetState (from statechart middleware after a move)
+        // triggers another OnNext.
+        let subscription =
+            store.Subscribe
+                "game1"
+                { new IObserver<TicTacToeState * int> with
+                    member _.OnNext((state, moveCount)) =
+                        let key = stateKeyOf state
+                        let html = renderBoard key moveCount
+                        channel.Writer.TryWrite(html) |> ignore
 
-        let key = stateKeyOf state
-        let html = renderBoard key moveCount
-        do! Frank.Datastar.Datastar.patchElements html ctx
+                    member _.OnError(_) = channel.Writer.Complete()
+                    member _.OnCompleted() = channel.Writer.Complete() }
+
+        try
+            // Loop until the client disconnects. Each channel read blocks
+            // until the store notifies us of a state change.
+            while not ctx.RequestAborted.IsCancellationRequested do
+                let! html = channel.Reader.ReadAsync(ctx.RequestAborted).AsTask()
+                do! Frank.Datastar.Datastar.patchElements html ctx
+        with
+        | :? OperationCanceledException -> ()
+        | :? ChannelClosedException -> ()
+
+        subscription.Dispose()
     }
     :> Task

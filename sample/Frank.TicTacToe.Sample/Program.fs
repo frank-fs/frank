@@ -3,6 +3,11 @@
 /// - Affordance middleware for Link/Allow headers (Frank.Affordances)
 /// - Datastar SSE handler for reactive UI updates (Frank.Datastar)
 ///
+/// The Datastar SSE path is the primary consumption channel. POST handlers
+/// are fire-and-forget (202 Accepted) — state updates push through the
+/// store's BehaviorSubject subscription to all connected SSE clients.
+/// GET handlers exist as a degraded fallback for non-Datastar clients.
+///
 /// Pipeline order (after routing):
 ///   1. State key resolver — reads state from store, sets ctx.Items["statechart.stateKey"]
 ///   2. Affordance middleware — reads Items key, injects Link + Allow headers
@@ -15,6 +20,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Frank.Builder
 open Frank.Datastar
 open Frank.Statecharts
@@ -48,6 +54,8 @@ let resolveStateKey (app: IApplicationBuilder) =
 // === Handlers ===
 
 /// GET handler: returns the current game state as text.
+/// This is a degraded fallback for non-Datastar clients (curl, direct URL access).
+/// The primary consumption path is the SSE endpoint.
 let getGameState (ctx: HttpContext) : Task =
     task {
         let store =
@@ -66,9 +74,13 @@ let getGameState (ctx: HttpContext) : Task =
     }
     :> Task
 
-/// POST handler: triggers a move event.
+/// POST handler: triggers a move event. Fire-and-forget (202 Accepted).
+/// The statechart middleware processes the transition and calls store.SetState,
+/// which notifies all SSE subscribers via the store's BehaviorSubject.
+/// No broadcast code here — the store subscription handles delivery.
 let handleMove (ctx: HttpContext) : Task =
     StateMachineContext.setEvent ctx (MakeMove 0)
+    ctx.Response.StatusCode <- 202
     Task.CompletedTask
 
 // === Resource definition ===
@@ -85,6 +97,8 @@ let gameResource =
     }
 
 /// SSE endpoint for streaming game board updates via Datastar.
+/// Long-lived connection: subscribes to the store and pushes HTML fragments
+/// on every state change until the client disconnects.
 let sseResource =
     resource "/games/{gameId}/sse" {
         name "GameSSE"
@@ -92,6 +106,25 @@ let sseResource =
         datastar (fun (ctx: HttpContext) ->
             task { do! streamGameBoard ctx })
     }
+
+// === Seed initial game state ===
+
+/// Seeds the initial game state into the store on application startup.
+/// Without this, the first SSE subscriber would see no state until
+/// the first POST creates it via the statechart middleware.
+let seedInitialState (app: IApplicationBuilder) =
+    let lifetime =
+        app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
+
+    let store =
+        app.ApplicationServices.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+
+    lifetime.ApplicationStarted.Register(fun () ->
+        store.SetState "game1" gameMachine.Initial gameMachine.InitialContext
+        |> fun t -> t.Wait())
+    |> ignore
+
+    app
 
 // === Application entry point ===
 
@@ -111,6 +144,9 @@ let main args =
         useAffordances gameAffordanceMap
         // 3. Statechart middleware (state-dependent handler dispatch)
         useStatecharts
+
+        // Seed game state after services are built
+        plug seedInitialState
 
         resource gameResource
         resource sseResource
