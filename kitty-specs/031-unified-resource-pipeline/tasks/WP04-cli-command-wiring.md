@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: CLI Command Wiring -- Unified Extract & Generate
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP02
 base_branch: 031-unified-resource-pipeline-WP02
@@ -864,3 +864,4 @@ dotnet test
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:40:00Z – claude-opus – shell_pid=20684 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:47:34Z – claude-opus – shell_pid=20684 – lane=for_review – Ready for review: unified extract + generate commands, affordance-map format, cache integration, text/JSON output, help entries, backward compatible
