@@ -33,6 +33,7 @@
     <!-- Unified pipeline -->
     <Compile Include="Unified/UnifiedModel.fs" />
     <Compile Include="Unified/UnifiedCache.fs" />
+    <Compile Include="Unified/OpenApiConsistencyValidator.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Unified/UnifiedAlpsGenerator.fs" />
     <Compile Include="Unified/AffordanceMapGenerator.fs" />
@@ -52,6 +53,7 @@
     <Compile Include="Commands/StatechartExtractCommand.fs" />
     <Compile Include="Commands/StatechartGenerateCommand.fs" />
     <Compile Include="Commands/StatechartValidateCommand.fs" />
+    <Compile Include="Commands/OpenApiValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
     <!-- Unified commands -->
     <Compile Include="Commands/UnifiedExtractCommand.fs" />

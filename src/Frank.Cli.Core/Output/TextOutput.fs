@@ -220,6 +220,9 @@ module TextOutput =
         sb.AppendLine("Use 'frank-cli help' to see all commands and topics.") |> ignore
         sb.ToString()
 
+    let formatOpenApiValidateResult (result: OpenApiValidateCommand.OpenApiValidateResult) : string =
+        Frank.Cli.Core.Statechart.ValidationReportFormatter.formatText result.Report
+
     let formatStatechartGenerateResult (result: StatechartGenerateCommand.GenerateResult) : string =
         if result.Artifacts |> List.isEmpty && result.GenerationErrors |> List.isEmpty then
             "No state machines found in the assembly."
