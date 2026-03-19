@@ -16,8 +16,8 @@ subtasks:
 - T037
 phase: Phase 1 - Core Pipeline
 assignee: ''
-agent: "claude-opus-wp06"
-shell_pid: "21017"
+agent: "claude-opus-wp06-review"
+shell_pid: "23922"
 review_status: ''
 reviewed_by: ''
 history:
@@ -325,3 +325,5 @@ dotnet test test/Frank.Cli.Core.Tests/ --filter "AffordanceMap"
 **Initial entry**:
 - 2026-03-19T02:15:00Z -- system -- lane=planned -- Prompt created.
 - 2026-03-19T03:41:36Z – claude-opus-wp06 – shell_pid=21017 – lane=doing – Assigned agent via workflow command
+- 2026-03-19T03:48:49Z -- claude-opus-wp06 -- lane=for_review -- Implementation complete: T032-T037 all done. AffordanceMapGenerator.fs created, CLI wired, 27/27 tests pass. Committed as 9f5d3ce.
+- 2026-03-19T03:52:40Z – claude-opus-wp06-review – shell_pid=23922 – lane=doing – Started review via workflow command
