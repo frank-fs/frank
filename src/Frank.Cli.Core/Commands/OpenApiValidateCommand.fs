@@ -23,7 +23,7 @@ module OpenApiValidateCommand =
 
         // Load unified extraction state
         let unifiedPath =
-            Path.Combine(projectDir, "obj", "frank-cli", "descriptors.bin")
+            Path.Combine(projectDir, "obj", "frank-cli", "model.bin")
 
         if not (File.Exists unifiedPath) then
             Result.Error

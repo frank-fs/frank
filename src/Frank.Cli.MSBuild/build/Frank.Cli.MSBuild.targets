@@ -1,22 +1,22 @@
 <Project>
   <!-- ================================================================
-       Unified state binary (produced by frank-cli extract)
+       Resource model binary (produced by frank-cli extract)
        ================================================================
        Static item group: evaluated at project load time, before the F#
        SDK collects resources. A dynamic Target with
        BeforeTargets="CoreCompile" fires too late — the F# compiler
        never sees the resource. -->
-  <ItemGroup Condition="Exists('$(FrankDescriptorsPath)')">
-    <EmbeddedResource Include="$(FrankDescriptorsPath)"
-                      LogicalName="$(FrankDescriptorsLogicalName)"
-                      Link="frank-cli/descriptors.bin" />
+  <ItemGroup Condition="Exists('$(FrankResourcesPath)')">
+    <EmbeddedResource Include="$(FrankResourcesPath)"
+                      LogicalName="$(FrankResourcesLogicalName)"
+                      Link="frank-cli/model.bin" />
   </ItemGroup>
 
-  <Target Name="WarnMissingFrankDescriptors"
+  <Target Name="WarnMissingFrankResources"
           BeforeTargets="CoreCompile"
-          Condition="!Exists('$(FrankDescriptorsPath)')">
+          Condition="!Exists('$(FrankResourcesPath)')">
     <Message Importance="normal"
-             Text="Frank: No unified state binary found at '$(FrankDescriptorsPath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
+             Text="Frank: No unified resource model binary found at '$(FrankResourcesPath)'. Run 'frank-cli extract --project $(MSBuildProjectFullPath)' to generate it." />
   </Target>
 
   <!-- ================================================================

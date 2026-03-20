@@ -100,8 +100,10 @@ Frank (core)
 │   └── WSD, ALPS, SCXML, smcat, XState parsers/generators
 │   └── Cross-format validation pipeline
 │   └── Affordance middleware (Link + Allow headers per state)
+│   └── Profile discovery (/.well-known/frank-profiles, ALPS/OWL/SHACL/JSON Schema endpoints)
 │
 ├── Frank.Discovery ───────────── Frank
+│   └── HTTP-level discovery: OPTIONS/Allow headers, RFC 8288 Link headers
 │
 ├── Frank.Validation ──────────── Frank.LinkedData + Frank.Auth
 │
