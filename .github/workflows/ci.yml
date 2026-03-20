@@ -44,6 +44,7 @@ jobs:
           dotnet test test/Frank.LinkedData.Sample.Tests
           dotnet test test/Frank.Provenance.Tests
           dotnet test test/Frank.Validation.Tests
+          dotnet test test/Frank.Resources.Model.Tests
           dotnet test test/Frank.Statecharts.Tests
           dotnet test test/Frank.Statecharts.Sqlite.Tests
           dotnet test test/Frank.Discovery.Tests
@@ -55,6 +56,7 @@ jobs:
           dotnet pack src/Frank.Auth -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.OpenApi -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Datastar -c Release --no-restore --include-symbols -o out
+          dotnet pack src/Frank.Resources.Model -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.LinkedData -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Cli.MSBuild -c Release -o out
       - name: Upload artifact

@@ -42,9 +42,11 @@ dotnet test test/Frank.LinkedData.Tests
 dotnet test test/Frank.LinkedData.Sample.Tests
 dotnet test test/Frank.Provenance.Tests
 dotnet test test/Frank.Validation.Tests
+dotnet test test/Frank.Resources.Model.Tests
 dotnet test test/Frank.Statecharts.Tests
 dotnet test test/Frank.Statecharts.Sqlite.Tests
 dotnet test test/Frank.Discovery.Tests
 dotnet test test/Frank.TicTacToe.Tests
+dotnet pack -c Release src/Frank.Resources.Model /p:Version=$version$versionSuffix -o $psscriptroot/bin
 dotnet pack -c Release src/Frank.LinkedData /p:Version=$version$versionSuffix -o $psscriptroot/bin
 dotnet pack -c Release src/Frank.Cli.MSBuild -o $psscriptroot/bin
