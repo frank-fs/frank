@@ -12,12 +12,17 @@ type RuntimeHttpCapability =
       IsSafe: bool }
 
 /// Per-state metadata for statechart format generation.
+/// This is a runtime-optimized projection of StateInfo. Key difference:
+/// StateInfo.Description is string option (semantically correct — "not provided"
+/// differs from "empty"). RuntimeStateInfo.Description is string (flattened via
+/// Option.defaultValue "" in StartupProjection for zero-allocation runtime matching).
 type RuntimeStateInfo =
     { /// HTTP methods allowed in this state
       AllowedMethods: string list
       /// Whether this is a final/terminal state
       IsFinal: bool
-      /// Human-readable description (empty string if none)
+      /// Human-readable description, or empty string if none was provided.
+      /// Flattened from StateInfo.Description (string option) for runtime efficiency.
       Description: string }
 
 /// Statechart data for runtime format generation (smcat, SCXML, XState, WSD).
