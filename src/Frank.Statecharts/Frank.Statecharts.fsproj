@@ -12,8 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Shared AST types (spec 020) -->
-    <Compile Include="Ast/Types.fs" />
     <!-- Core domain types -->
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
@@ -78,6 +76,7 @@
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
     <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
+    <ProjectReference Include="../Frank.Statecharts.Core/Frank.Statecharts.Core.fsproj" />
   </ItemGroup>
 
 </Project>
