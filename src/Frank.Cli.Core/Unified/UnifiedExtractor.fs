@@ -546,7 +546,7 @@ let private buildUnifiedResources
     |> List.map (fun finding ->
         match finding with
         | FoundPlainResource ar ->
-            let slug = UnifiedModel.resourceSlug ar.RouteTemplate
+            let slug = ResourceModel.resourceSlug ar.RouteTemplate
 
             let methodStrings =
                 ar.HttpMethods
@@ -573,10 +573,10 @@ let private buildUnifiedResources
               TypeInfo = []
               Statechart = None
               HttpCapabilities = capabilities
-              DerivedFields = UnifiedModel.emptyDerivedFields }
+              DerivedFields = ResourceModel.emptyDerivedFields }
 
         | FoundStatefulResource(route, machineName, stateHandlers) ->
-            let slug = UnifiedModel.resourceSlug route
+            let slug = ResourceModel.resourceSlug route
 
             let machineInfo =
                 machineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
@@ -631,7 +631,7 @@ let private buildUnifiedResources
               TypeInfo = []
               Statechart = Some statechart
               HttpCapabilities = capabilities
-              DerivedFields = UnifiedModel.emptyDerivedFields })
+              DerivedFields = ResourceModel.emptyDerivedFields })
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Type association
@@ -680,7 +680,7 @@ let private associateTypes (resources: UnifiedResource list) (allTypes: Analyzed
 
 let computeDerivedFields (resource: UnifiedResource) (allTypes: AnalyzedType list) : DerivedResourceFields =
     match resource.Statechart with
-    | None -> UnifiedModel.emptyDerivedFields
+    | None -> ResourceModel.emptyDerivedFields
     | Some sc ->
         let stateDuCases =
             allTypes

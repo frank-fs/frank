@@ -9,20 +9,20 @@ let resourceSlugTests =
         "resourceSlug"
         [ testCase "derives slug from simple route"
           <| fun _ ->
-              let slug = UnifiedModel.resourceSlug "/health"
+              let slug = ResourceModel.resourceSlug "/health"
               Expect.equal slug "health" "Simple route"
 
           testCase "derives slug from parameterized route"
           <| fun _ ->
-              let slug = UnifiedModel.resourceSlug "/games/{gameId}"
+              let slug = ResourceModel.resourceSlug "/games/{gameId}"
               Expect.equal slug "games" "Parameterized route"
 
           testCase "derives slug from root route"
           <| fun _ ->
-              let slug = UnifiedModel.resourceSlug "/"
+              let slug = ResourceModel.resourceSlug "/"
               Expect.equal slug "root" "Root route"
 
           testCase "derives slug from nested route"
           <| fun _ ->
-              let slug = UnifiedModel.resourceSlug "/api/games"
+              let slug = ResourceModel.resourceSlug "/api/games"
               Expect.equal slug "api" "Nested route uses first segment" ]

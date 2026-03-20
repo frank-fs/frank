@@ -72,7 +72,7 @@ let private ticTacToeResource: UnifiedResource =
             StateKey = Some "Draw"
             LinkRelation = "self"
             IsSafe = true } ]
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 /// Simple stateless health check resource.
 let private healthResource: UnifiedResource =
@@ -85,7 +85,7 @@ let private healthResource: UnifiedResource =
             StateKey = None
             LinkRelation = "self"
             IsSafe = true } ]
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 /// Resource with no HTTP capabilities (edge case).
 let private emptyResource: UnifiedResource =
@@ -94,7 +94,7 @@ let private emptyResource: UnifiedResource =
       TypeInfo = []
       Statechart = None
       HttpCapabilities = []
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 let private baseUri = "https://example.com/alps"
 

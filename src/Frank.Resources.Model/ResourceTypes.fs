@@ -34,6 +34,8 @@ module ProjectedProfiles =
         && Map.isEmpty profiles.JsonSchemas
 
 /// Structured representation of a single stateful resource extracted from source.
+/// String keys (StateNames, InitialStateKey, GuardNames) are F# DU case names
+/// derived from the state type at compile time (e.g., "XTurn", "GameOver").
 type ExtractedStatechart =
     { RouteTemplate: string
       StateNames: string list
@@ -95,7 +97,7 @@ type UnifiedExtractionState =
       /// Pre-computed profile strings for runtime serving (ALPS, OWL, SHACL, JSON Schema)
       Profiles: ProjectedProfiles }
 
-module UnifiedModel =
+module ResourceModel =
 
     /// Derive a filename-safe slug from a route template.
     /// "/games/{gameId}" -> "games", "/health" -> "health"

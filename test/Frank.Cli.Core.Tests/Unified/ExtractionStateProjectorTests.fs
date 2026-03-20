@@ -34,7 +34,7 @@ let private testUnifiedState types : UnifiedExtractionState =
               TypeInfo = types
               Statechart = None
               HttpCapabilities = []
-              DerivedFields = UnifiedModel.emptyDerivedFields } ]
+              DerivedFields = ResourceModel.emptyDerivedFields } ]
       SourceHash = "abc123"
       BaseUri = "http://example.com/ontology"
       Vocabularies = [ "https://schema.org" ]
@@ -101,13 +101,13 @@ let extractionStateProjectorTests =
                             TypeInfo = [ sharedType ]
                             Statechart = None
                             HttpCapabilities = []
-                            DerivedFields = UnifiedModel.emptyDerivedFields }
+                            DerivedFields = ResourceModel.emptyDerivedFields }
                           { RouteTemplate = "/resource2"
                             ResourceSlug = "resource2"
                             TypeInfo = [ sharedType ]
                             Statechart = None
                             HttpCapabilities = []
-                            DerivedFields = UnifiedModel.emptyDerivedFields } ] }
+                            DerivedFields = ResourceModel.emptyDerivedFields } ] }
 
             let projected = toExtractionState unified
 

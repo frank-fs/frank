@@ -104,7 +104,7 @@ let private ticTacToeResource: UnifiedResource =
             StateKey = Some "Draw"
             LinkRelation = "self"
             IsSafe = true } ]
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 let private plainHealthResource: UnifiedResource =
     { RouteTemplate = "/health"
@@ -125,7 +125,7 @@ let private plainHealthResource: UnifiedResource =
             StateKey = None
             LinkRelation = "self"
             IsSafe = true } ]
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 let private minimalResource: UnifiedResource =
     { RouteTemplate = "/ping"
@@ -137,7 +137,7 @@ let private minimalResource: UnifiedResource =
             StateKey = None
             LinkRelation = "self"
             IsSafe = true } ]
-      DerivedFields = UnifiedModel.emptyDerivedFields }
+      DerivedFields = ResourceModel.emptyDerivedFields }
 
 // ============================================================================
 // Helper: Parse JSON and find descriptors

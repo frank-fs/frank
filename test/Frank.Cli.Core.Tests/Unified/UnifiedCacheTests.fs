@@ -339,7 +339,7 @@ let unifiedCacheTests =
                                         StateKey = None
                                         LinkRelation = "self"
                                         IsSafe = true } ]
-                                DerivedFields = UnifiedModel.emptyDerivedFields } ]
+                                DerivedFields = ResourceModel.emptyDerivedFields } ]
 
                         let result =
                             UnifiedCache.saveExtractionState dir resources "https://example.com/" [ "schema.org" ]

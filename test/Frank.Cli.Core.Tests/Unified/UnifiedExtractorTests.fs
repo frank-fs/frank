@@ -190,7 +190,7 @@ let game = statefulResource "/games/{gameId}" {
                                 StateKey = None
                                 LinkRelation = "self"
                                 IsSafe = true } ]
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let result = computeDerivedFields resource []
                     Expect.equal result.OrphanStates [] "No orphan states for plain resource"
@@ -224,7 +224,7 @@ let game = statefulResource "/games/{gameId}" {
                                 StateKey = Some "XTurn"
                                 LinkRelation = "post"
                                 IsSafe = false } ]
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let result = computeDerivedFields resource []
                     Expect.contains result.OrphanStates "OTurn" "OTurn should be orphan"
@@ -260,7 +260,7 @@ let game = statefulResource "/games/{gameId}" {
                           TypeInfo = []
                           Statechart = Some statechart
                           HttpCapabilities = []
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let result = computeDerivedFields resource [ stateType ]
                     Expect.contains result.UnhandledCases "Won" "Won should be unhandled"
@@ -304,7 +304,7 @@ let game = statefulResource "/games/{gameId}" {
                           TypeInfo = []
                           Statechart = Some statechart
                           HttpCapabilities = []
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let result = computeDerivedFields resource [ stateType ]
                     Expect.isTrue (Map.containsKey "Playing" result.StateStructure) "Should have Playing entry"
@@ -343,7 +343,7 @@ let game = statefulResource "/games/{gameId}" {
                           TypeInfo = []
                           Statechart = Some statechart
                           HttpCapabilities = []
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let result = computeDerivedFields resource [ stateType ]
                     Expect.equal result.TypeCoverage 1.0 "Coverage should be 1.0" ]

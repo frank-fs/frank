@@ -33,7 +33,7 @@ let unifiedModelTests =
                                 StateKey = None
                                 LinkRelation = "self"
                                 IsSafe = true } ]
-                          DerivedFields = UnifiedModel.emptyDerivedFields }
+                          DerivedFields = ResourceModel.emptyDerivedFields }
 
                     let bytes = MessagePackSerializer.Serialize(resource, options)
 
