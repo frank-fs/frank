@@ -57,6 +57,7 @@ jobs:
           dotnet pack src/Frank.OpenApi -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Datastar -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Resources.Model -c Release --no-restore --include-symbols -o out
+          dotnet pack src/Frank.Statecharts.Core -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.LinkedData -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Cli.MSBuild -c Release -o out
       - name: Upload artifact
