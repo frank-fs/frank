@@ -68,8 +68,8 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.LinkedData** | Semantic RDF/Linked Data content negotiation middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.LinkedData)](https://www.nuget.org/packages/Frank.LinkedData/) |
 | **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
-| **Frank.Statecharts** | Stateful resources with state machines, guards, multi-format parsers/generators (WSD, ALPS, SCXML, smcat, XState), and cross-format validation | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
-| **Frank.Affordances** | Runtime affordance middleware: injects Link and Allow headers based on resource state | [![NuGet](https://img.shields.io/nuget/v/Frank.Affordances)](https://www.nuget.org/packages/Frank.Affordances/) |
+| **Frank.Resources.Model** | Pure resource model types: type analysis, capabilities, affordances, and runtime projections (zero dependencies) | [![NuGet](https://img.shields.io/nuget/v/Frank.Resources.Model)](https://www.nuget.org/packages/Frank.Resources.Model/) |
+| **Frank.Statecharts** | Stateful resources with state machines, guards, affordance middleware (Link + Allow headers), multi-format parsers/generators (WSD, ALPS, SCXML, smcat, XState), and cross-format validation | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
 | **Frank.Discovery** | OPTIONS-based link discovery and Link header middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.Discovery)](https://www.nuget.org/packages/Frank.Discovery/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 | **Frank.Validation** | SHACL shape validation derived from F# types | [![NuGet](https://img.shields.io/nuget/v/Frank.Validation)](https://www.nuget.org/packages/Frank.Validation/) |
@@ -81,6 +81,9 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 Frank (core)
 │   ETag / conditional request middleware
 │
+├── Frank.Resources.Model ────── (zero dependencies)
+│   └── Resource types, affordance map, runtime projections
+│
 ├── Frank.Auth
 │
 ├── Frank.LinkedData ──────────── Frank
@@ -89,12 +92,10 @@ Frank (core)
 │
 ├── Frank.Datastar ────────────── Frank
 │
-├── Frank.Statecharts ─────────── Frank
+├── Frank.Statecharts ─────────── Frank + Frank.Resources.Model
 │   └── WSD, ALPS, SCXML, smcat, XState parsers/generators
 │   └── Cross-format validation pipeline
-│
-├── Frank.Affordances ─────────── Frank
-│   └── Link + Allow header middleware (works with Frank.Statecharts at runtime)
+│   └── Affordance middleware (Link + Allow headers per state)
 │
 ├── Frank.Discovery ───────────── Frank
 │
