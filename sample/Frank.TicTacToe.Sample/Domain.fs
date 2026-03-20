@@ -98,6 +98,7 @@ let gameMachine: StateMachine<TicTacToeState, TicTacToeEvent, int> =
 
 open System.Reflection
 open Frank.Affordances
+open Frank.Resources.Model
 
 /// Load the affordance map from the embedded runtime state at startup.
 /// Falls back to an empty map if the resource is not found (e.g., during tests).

@@ -25,6 +25,7 @@ open Frank.Builder
 open Frank.Datastar
 open Frank.Statecharts
 open Frank.Affordances
+open Frank.Resources.Model
 open Frank.TicTacToe.Sample.Domain
 open Frank.TicTacToe.Sample.SseHandlers
 

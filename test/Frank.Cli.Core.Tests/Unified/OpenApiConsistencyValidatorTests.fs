@@ -2,7 +2,7 @@ module OpenApiConsistencyValidatorTests
 
 open System.Text.Json
 open Expecto
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Unified.OpenApiConsistencyValidator
 open Frank.Statecharts.Validation

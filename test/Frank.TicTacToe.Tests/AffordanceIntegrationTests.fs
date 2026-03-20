@@ -21,6 +21,7 @@ open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Statecharts
 open Frank.Affordances
+open Frank.Resources.Model
 
 // === Domain types (self-contained for tests) ===
 
@@ -179,7 +180,7 @@ let resolveStateKeyMiddleware (ctx: HttpContext) (next: Func<Task>) =
     :> Task
 
 let buildTestServer (resource: Resource) =
-    let preComputed = AffordanceMap.preCompute testAffordanceMap
+    let preComputed = AffordancePreCompute.preCompute testAffordanceMap
 
     let builder =
         Microsoft.AspNetCore.Hosting.WebHostBuilder()

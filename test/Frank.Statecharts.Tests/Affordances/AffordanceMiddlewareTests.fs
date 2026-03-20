@@ -14,6 +14,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Primitives
 open Frank.Affordances
+open Frank.Resources.Model
 open Frank.Statecharts
 
 // -- Helpers --
@@ -248,7 +249,7 @@ let affordanceMiddlewareTests =
 [<Tests>]
 let preComputeTests =
     testList
-        "AffordanceMap.preCompute"
+        "AffordancePreCompute.preCompute"
         [ testCase "produces correct Allow header"
           <| fun _ ->
               let map =
@@ -260,7 +261,7 @@ let preComputeTests =
                           LinkRelations = []
                           ProfileUrl = "https://example.com/alps/games" } ] }
 
-              let result = AffordanceMap.preCompute map
+              let result = AffordancePreCompute.preCompute map
               let key = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"
               Expect.isTrue (result.ContainsKey(key)) "Should contain the key"
               let entry = result.[key]
@@ -281,7 +282,7 @@ let preComputeTests =
                                 Title = Some "Make a move" } ]
                           ProfileUrl = "https://example.com/alps/games" } ] }
 
-              let result = AffordanceMap.preCompute map
+              let result = AffordancePreCompute.preCompute map
               let key = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"
               let entry = result.[key]
               let linkValues = entry.LinkHeaderValues.ToArray()
@@ -308,7 +309,7 @@ let preComputeTests =
                           LinkRelations = []
                           ProfileUrl = "" } ] }
 
-              let result = AffordanceMap.preCompute map
+              let result = AffordancePreCompute.preCompute map
               let key = AffordanceMap.lookupKey "/health" "*"
               let entry = result.[key]
               let linkValues = entry.LinkHeaderValues.ToArray()
@@ -330,7 +331,7 @@ let preComputeTests =
                           LinkRelations = []
                           ProfileUrl = "https://example.com/alps/games" } ] }
 
-              let result = AffordanceMap.preCompute map
+              let result = AffordancePreCompute.preCompute map
               Expect.equal result.Count 2 "Should have two entries"
 
               let xTurnKey = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"

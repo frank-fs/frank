@@ -11,7 +11,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Frank.Affordances
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 
 // -- Test Fixtures --
 

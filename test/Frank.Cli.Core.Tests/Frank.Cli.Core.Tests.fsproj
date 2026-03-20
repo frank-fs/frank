@@ -51,6 +51,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli.Core/Frank.Cli.Core.fsproj" />
+    <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
   </ItemGroup>
 
 </Project>

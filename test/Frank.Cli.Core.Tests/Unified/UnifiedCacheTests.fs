@@ -3,7 +3,7 @@ module Frank.Cli.Core.Tests.Unified.UnifiedCacheTests
 open System
 open System.IO
 open Expecto
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Unified
 
 /// Create a temporary project directory with some .fs files and a .fsproj.

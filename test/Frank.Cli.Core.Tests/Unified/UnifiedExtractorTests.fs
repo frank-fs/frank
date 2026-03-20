@@ -4,7 +4,7 @@ open Expecto
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open Frank.Statecharts
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Unified.UnifiedExtractor
@@ -198,7 +198,7 @@ let game = statefulResource "/games/{gameId}" {
 
                 testCase "identifies orphan states"
                 <| fun _ ->
-                    let statechart: Frank.Statecharts.Unified.ExtractedStatechart =
+                    let statechart: Frank.Resources.Model.ExtractedStatechart =
                         { RouteTemplate = "/games/{gameId}"
                           StateNames = [ "XTurn"; "OTurn"; "Won"; "Draw" ]
                           InitialStateKey = "XTurn"
@@ -234,7 +234,7 @@ let game = statefulResource "/games/{gameId}" {
 
                 testCase "identifies unhandled DU cases"
                 <| fun _ ->
-                    let statechart: Frank.Statecharts.Unified.ExtractedStatechart =
+                    let statechart: Frank.Resources.Model.ExtractedStatechart =
                         { RouteTemplate = "/games/{gameId}"
                           StateNames = [ "XTurn"; "OTurn" ]
                           InitialStateKey = "XTurn"
@@ -268,7 +268,7 @@ let game = statefulResource "/games/{gameId}" {
 
                 testCase "computes state structure from DU fields"
                 <| fun _ ->
-                    let statechart: Frank.Statecharts.Unified.ExtractedStatechart =
+                    let statechart: Frank.Resources.Model.ExtractedStatechart =
                         { RouteTemplate = "/games/{gameId}"
                           StateNames = [ "Playing"; "Won" ]
                           InitialStateKey = "Playing"
@@ -320,7 +320,7 @@ let game = statefulResource "/games/{gameId}" {
 
                 testCase "type coverage is 1.0 when all states have type info"
                 <| fun _ ->
-                    let statechart: Frank.Statecharts.Unified.ExtractedStatechart =
+                    let statechart: Frank.Resources.Model.ExtractedStatechart =
                         { RouteTemplate = "/test"
                           StateNames = [ "A"; "B" ]
                           InitialStateKey = "A"

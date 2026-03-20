@@ -10,7 +10,7 @@ open System.Threading.Channels
 open System.Threading.Tasks
 open FSharp.Reflection
 open Microsoft.AspNetCore.Http
-open Frank.Affordances
+open Frank.Resources.Model
 open Frank.Statecharts
 open Frank.TicTacToe.Sample.Domain
 
