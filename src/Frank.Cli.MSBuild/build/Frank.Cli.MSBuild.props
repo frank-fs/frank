@@ -4,8 +4,8 @@
     <!-- Set to 'true' to opt out of automatic shape generation during build. -->
     <FrankCliBaseUri Condition="'$(FrankCliBaseUri)' == ''">urn:frank:$(AssemblyName)/</FrankCliBaseUri>
     <FrankCliSkipGeneration Condition="'$(FrankCliSkipGeneration)' == ''">false</FrankCliSkipGeneration>
-    <!-- Unified state binary produced by frank-cli extract -->
-    <FrankDescriptorsPath Condition="'$(FrankDescriptorsPath)' == ''">$(BaseIntermediateOutputPath)frank-cli/descriptors.bin</FrankDescriptorsPath>
-    <FrankDescriptorsLogicalName Condition="'$(FrankDescriptorsLogicalName)' == ''">Frank.Affordances.descriptors.bin</FrankDescriptorsLogicalName>
+    <!-- Unified resource model binary produced by frank-cli extract -->
+    <FrankResourcesPath Condition="'$(FrankResourcesPath)' == ''">$(BaseIntermediateOutputPath)frank-cli/model.bin</FrankResourcesPath>
+    <FrankResourcesLogicalName Condition="'$(FrankResourcesLogicalName)' == ''">Frank.Resources.model.bin</FrankResourcesLogicalName>
   </PropertyGroup>
 </Project>

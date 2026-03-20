@@ -7,11 +7,11 @@ open System.Text.Json
 open System.Threading
 open Expecto
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Frank.Validation
 
@@ -48,43 +48,42 @@ let private buildTestHost
 
     let preloadedShapes = preloadTypes |> List.map ShapeBuilder.deriveShapeDefault
 
-    let builder =
-        WebHostBuilder()
-            .UseTestServer()
-            .ConfigureServices(fun services ->
-                services.AddSingleton<ShapeCache>() |> ignore
-                services.AddRouting() |> ignore
-                services.AddLogging() |> ignore)
-            .Configure(fun (app: IApplicationBuilder) ->
-                let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                shapeCache.LoadAll(preloadedShapes)
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton<ShapeCache>() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
+    let app = builder.Build()
 
-                app.UseRouting() |> ignore
+    let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+    shapeCache.LoadAll(preloadedShapes)
 
-                app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                    let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+    app.UseRouting() |> ignore
 
-                    let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+    (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+        let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
 
-                    let logger = loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+        let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                    let typedLogger =
-                        { new ILogger<ValidationMiddleware> with
-                            member _.Log(logLevel, eventId, state, ex, formatter) =
-                                logger.Log(logLevel, eventId, state, ex, formatter)
+        let logger = loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                            member _.IsEnabled(logLevel) = logger.IsEnabled(logLevel)
-                            member _.BeginScope(state) = logger.BeginScope(state) }
+        let typedLogger =
+            { new ILogger<ValidationMiddleware> with
+                member _.Log(logLevel, eventId, state, ex, formatter) =
+                    logger.Log(logLevel, eventId, state, ex, formatter)
 
-                    let middleware = ValidationMiddleware(next, sc, typedLogger)
-                    middleware.InvokeAsync(ctx))
-                |> ignore
+                member _.IsEnabled(logLevel) = logger.IsEnabled(logLevel)
+                member _.BeginScope(state) = logger.BeginScope(state) }
 
-                app.UseEndpoints(fun endpoints -> configureEndpoints counter endpoints)
-                |> ignore)
+        let middleware = ValidationMiddleware(next, sc, typedLogger)
+        middleware.InvokeAsync(ctx))
+    |> ignore
 
-    let server = new TestServer(builder)
-    counter, server.CreateClient()
+    app.UseEndpoints(fun endpoints -> configureEndpoints counter endpoints)
+    |> ignore
+
+    app.Start()
+    counter, app.GetTestClient()
 
 /// Create a POST endpoint with ValidationMarker metadata (keyed by shape URI).
 let private mapValidatedPost<'T> (pattern: string) (counter: HandlerCounter) (endpoints: IEndpointRouteBuilder) =

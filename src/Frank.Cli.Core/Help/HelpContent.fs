@@ -304,7 +304,7 @@ informed decisions during extraction and clarification.
               NextSteps = [ "generate"; "semantic clarify"; "semantic validate" ]
               IsOptional = false }
           Context =
-            "The extract command replaces both 'semantic extract' and 'statechart extract'. It analyzes F# source code using FCS in a single pass, producing a unified resource description that includes type structure, behavioral semantics, and HTTP capabilities. Results are cached to obj/frank-cli/descriptors.bin for fast reuse. Use --force to bypass the cache." }
+            "The extract command replaces both 'semantic extract' and 'statechart extract'. It analyzes F# source code using FCS in a single pass, producing a unified resource description that includes type structure, behavioral semantics, and HTTP capabilities. Results are cached to obj/frank-cli/model.bin for fast reuse. Use --force to bypass the cache." }
 
     let unifiedGenerateHelp: CommandHelp =
         { Name = "generate"

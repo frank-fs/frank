@@ -7,11 +7,11 @@ open System.Net
 open System.Net.Http
 open Expecto
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 open Frank.Affordances
 open Frank.Resources.Model
@@ -49,37 +49,39 @@ let private buildTestServer
     (lookup: Dictionary<string, PreComputedAffordance>)
     (stateKeySetter: HttpContext -> unit)
     =
-    let builder =
-        WebHostBuilder()
-            .Configure(fun app ->
-                app.UseRouting() |> ignore
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
 
-                // Simulate statechart middleware by setting IStatechartFeature
-                app.Use(fun ctx (next: Func<System.Threading.Tasks.Task>) ->
-                    stateKeySetter ctx
-                    next.Invoke())
-                |> ignore
+    app.UseRouting() |> ignore
 
-                // Register the affordance middleware with pre-computed lookup
-                app.UseMiddleware<AffordanceMiddleware>(lookup) |> ignore
+    // Simulate statechart middleware by setting IStatechartFeature
+    (app :> IApplicationBuilder).Use(fun ctx (next: Func<System.Threading.Tasks.Task>) ->
+        stateKeySetter ctx
+        next.Invoke())
+    |> ignore
 
-                // Endpoints
-                app.UseEndpoints(fun endpoints ->
-                    endpoints.MapGet(
-                        "/games/{gameId}",
-                        RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
-                    )
-                    |> ignore
+    // Register the affordance middleware with pre-computed lookup
+    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(lookup) |> ignore
 
-                    endpoints.MapGet(
-                        "/health",
-                        RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy"))
-                    )
-                    |> ignore)
-                |> ignore)
-            .ConfigureServices(fun services -> services.AddRouting() |> ignore)
+    // Endpoints
+    app.UseEndpoints(fun endpoints ->
+        endpoints.MapGet(
+            "/games/{gameId}",
+            RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
+        )
+        |> ignore
 
-    new TestServer(builder)
+        endpoints.MapGet(
+            "/health",
+            RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy"))
+        )
+        |> ignore)
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 let private xTurnAffordance =
     { AllowHeaderValue = StringValues("GET, POST")

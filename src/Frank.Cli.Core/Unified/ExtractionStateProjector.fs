@@ -78,7 +78,7 @@ let toExtractionState (unified: UnifiedExtractionState) : ExtractionState =
 module UnifiedStateLoader =
 
     let private unifiedStatePath (projectDir: string) : string =
-        Path.Combine(projectDir, "obj", "frank-cli", "descriptors.bin")
+        Path.Combine(projectDir, "obj", "frank-cli", "model.bin")
 
     /// Load extraction state from unified binary or detect old format.
     let loadExtractionState (projectDir: string) : Result<ExtractionState, string> =

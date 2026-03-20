@@ -176,7 +176,7 @@ let withGameServer (resource: Resource) configUser (f: TestServer -> HttpClient 
 
 let prePopulateState (server: TestServer) instanceId (state: TicTacToeState) (moveCount: int) =
     let store =
-        server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+        server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
     (store.SetState instanceId state moveCount).GetAwaiter().GetResult()
 
@@ -479,7 +479,7 @@ let transitionHookTests =
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", content)
 
                       let store =
-                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
                       let! stateOpt = store.GetState "game1"
                       Expect.isSome stateOpt "Store should have state for game1"
@@ -536,7 +536,7 @@ let storeLifecycleTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
                       // Move 1: XTurn -> OTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
@@ -586,7 +586,7 @@ let multipleInstanceTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
                       // Move game1: XTurn -> OTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
@@ -819,7 +819,7 @@ let observerResilienceTests =
 
                       // Verify state was still persisted
                       let store =
-                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
                       let! stateOpt = store.GetState "game1"
                       Expect.equal (fst stateOpt.Value) OTurn "Transition should still be persisted"
@@ -1046,7 +1046,7 @@ let withHierarchicalServer (resource: Resource) configUser (f: TestServer -> Htt
 
 let prePopulateHierarchical (server: TestServer) instanceId (state: HierarchicalGameState) (ctx: HierarchicalContext) =
     let store =
-        server.Host.Services.GetRequiredService<IStateMachineStore<HierarchicalGameState, HierarchicalContext>>()
+        server.Services.GetRequiredService<IStateMachineStore<HierarchicalGameState, HierarchicalContext>>()
 
     (store.SetState instanceId state ctx).GetAwaiter().GetResult()
 
@@ -1077,7 +1077,7 @@ let hierarchicalStatechartTests =
                       Expect.equal response.StatusCode HttpStatusCode.OK "POST should succeed"
 
                       let store =
-                          server.Host.Services.GetRequiredService<
+                          server.Services.GetRequiredService<
                               IStateMachineStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
@@ -1097,7 +1097,7 @@ let hierarchicalStatechartTests =
                       let! (_: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
 
                       let store =
-                          server.Host.Services.GetRequiredService<
+                          server.Services.GetRequiredService<
                               IStateMachineStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
@@ -1130,7 +1130,7 @@ let hierarchicalStatechartTests =
                       Expect.equal response.StatusCode HttpStatusCode.OK "DELETE should trigger dispose"
 
                       let store =
-                          server.Host.Services.GetRequiredService<
+                          server.Services.GetRequiredService<
                               IStateMachineStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
@@ -1222,7 +1222,7 @@ let hierarchicalStatechartTests =
               (withHierarchicalServer res (Some(playerX ())) (fun server client ->
                   task {
                       let store =
-                          server.Host.Services.GetRequiredService<
+                          server.Services.GetRequiredService<
                               IStateMachineStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
@@ -1425,7 +1425,7 @@ let parameterizedStateKeyTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
                       // Play through 5 moves to reach Won "X"
                       for _ in 1..5 do

@@ -7,10 +7,10 @@ open System.Threading.Tasks
 open Expecto
 open Frank.Provenance
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
 // -- Test helpers --
@@ -72,23 +72,24 @@ type private TestProvenanceStore(records: ProvenanceRecord list) =
         member _.Dispose() = ()
 
 let private createTestServer (store: IProvenanceStore) =
-    let builder =
-        WebHostBuilder()
-            .ConfigureServices(fun services ->
-                services.AddSingleton<IProvenanceStore>(store) |> ignore
-                services.AddLogging() |> ignore)
-            .Configure(fun (app: IApplicationBuilder) ->
-                let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    builder.Services.AddLogging() |> ignore
+    let app = builder.Build()
 
-                app.Use(
-                    Func<RequestDelegate, RequestDelegate>(fun next ->
-                        ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
-                )
-                |> ignore
+    let loggerFactory = app.Services.GetRequiredService<ILoggerFactory>()
 
-                app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore)
+    (app :> IApplicationBuilder).Use(
+        Func<RequestDelegate, RequestDelegate>(fun next ->
+            ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
+    )
+    |> ignore
 
-    new TestServer(builder)
+    app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 [<Tests>]
 let middlewareTests =

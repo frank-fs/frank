@@ -5,11 +5,11 @@ open System.Threading.Tasks
 open Expecto
 open Frank.Provenance
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.DependencyInjection.Extensions
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
 // ---------------------------------------------------------------------------
@@ -109,24 +109,23 @@ let customStoreTests =
               [ testAsync "Custom IProvenanceStore registered before useProvenance receives all Append calls" {
                     let customStore = TestCustomStore()
 
-                    let builder =
-                        WebHostBuilder()
-                            .ConfigureServices(fun services ->
-                                services.AddLogging() |> ignore
-                                // Register the custom store BEFORE TryAddSingleton from useProvenance.
-                                // AddSingleton takes precedence over TryAddSingleton.
-                                services.AddSingleton<IProvenanceStore>(customStore :> IProvenanceStore)
-                                |> ignore
-                                // Simulate what useProvenance does — TryAddSingleton should be a no-op.
-                                services.TryAddSingleton<IProvenanceStore>(fun sp ->
-                                    let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
+                    let appBuilder = WebApplication.CreateBuilder([||])
+                    appBuilder.WebHost.UseTestServer() |> ignore
+                    appBuilder.Services.AddLogging() |> ignore
+                    // Register the custom store BEFORE TryAddSingleton from useProvenance.
+                    // AddSingleton takes precedence over TryAddSingleton.
+                    appBuilder.Services.AddSingleton<IProvenanceStore>(customStore :> IProvenanceStore)
+                    |> ignore
+                    // Simulate what useProvenance does — TryAddSingleton should be a no-op.
+                    appBuilder.Services.TryAddSingleton<IProvenanceStore>(fun sp ->
+                        let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
 
-                                    new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger)
-                                    :> IProvenanceStore))
-                            .Configure(fun (app: IApplicationBuilder) ->
-                                app.Run(fun ctx -> ctx.Response.WriteAsync("ok")) |> ignore)
-
-                    use server = new TestServer(builder)
+                        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger)
+                        :> IProvenanceStore)
+                    let app = appBuilder.Build()
+                    app.Run(fun ctx -> ctx.Response.WriteAsync("ok")) |> ignore
+                    app.Start()
+                    use server = app.GetTestServer()
 
                     let store = server.Services.GetRequiredService<IProvenanceStore>()
                     let baseTime = DateTimeOffset(2025, 10, 1, 12, 0, 0, TimeSpan.Zero)

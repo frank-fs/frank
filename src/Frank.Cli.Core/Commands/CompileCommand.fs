@@ -52,7 +52,7 @@ module CompileCommand =
 
     /// Populate the Profiles field on the unified extraction state binary.
     /// Generates ALPS per resource and serializes OWL/SHACL as whole-project strings.
-    /// Re-saves the descriptors.bin with the populated profiles.
+    /// Re-saves the model.bin with the populated profiles.
     let private populateProfilesInBinary
         (projectDir: string)
         (legacyState: ExtractionState option)

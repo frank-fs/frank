@@ -9,9 +9,9 @@ open MessagePack.FSharp
 
 module StartupProjection =
 
-    /// Embedded resource logical name for the unified state binary.
+    /// Embedded resource logical name for the resource model binary.
     [<Literal>]
-    let DefaultEmbeddedResourceName = "Frank.Descriptors.bin"
+    let DefaultEmbeddedResourceName = "Frank.Resources.model.bin"
 
     /// MessagePack deserialization options matching the CLI's serialization.
     let private msgpackOptions =
@@ -54,7 +54,7 @@ module StartupProjection =
         let resourceName =
             assembly.GetManifestResourceNames()
             |> Array.tryFind (fun name ->
-                name.EndsWith("Descriptors.bin", StringComparison.OrdinalIgnoreCase))
+                name.EndsWith("model.bin", StringComparison.OrdinalIgnoreCase))
 
         match resourceName with
         | None -> None
