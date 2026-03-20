@@ -9,12 +9,12 @@ open Expecto
 open Frank.Builder
 open Frank.Statecharts
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 
 // --- Test domain ---
@@ -74,29 +74,30 @@ let buildTestServer
     (configureServices: IServiceCollection -> unit)
     (configureUser: ClaimsPrincipal option)
     =
-    let builder =
-        (WebHostBuilder())
-            .ConfigureServices(fun services ->
-                services.AddRouting() |> ignore
-                services.AddLogging() |> ignore
-                configureServices services)
-            .Configure(fun app ->
-                match configureUser with
-                | Some user ->
-                    app.Use(fun ctx (next: RequestDelegate) ->
-                        ctx.User <- user
-                        next.Invoke(ctx))
-                    |> ignore
-                | None -> ()
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
+    configureServices builder.Services
+    let app = builder.Build()
 
-                app.UseRouting() |> ignore
-                app.UseMiddleware<StateMachineMiddleware>() |> ignore
+    match configureUser with
+    | Some user ->
+        (app :> IApplicationBuilder).Use(fun ctx (next: RequestDelegate) ->
+            ctx.User <- user
+            next.Invoke(ctx))
+        |> ignore
+    | None -> ()
 
-                app.UseEndpoints(fun endpoints ->
-                    endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
-                |> ignore)
+    app.UseRouting() |> ignore
+    (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
 
-    new TestServer(builder)
+    app.UseEndpoints(fun endpoints ->
+        endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 let adminUser () =
     ClaimsPrincipal(ClaimsIdentity([| Claim(ClaimTypes.Role, "admin"); Claim("owner", "true") |], "test"))

@@ -11,12 +11,12 @@ open System.Threading.Tasks
 open FSharp.Reflection
 open Expecto
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Statecharts
@@ -182,34 +182,35 @@ let resolveStateKeyMiddleware (ctx: HttpContext) (next: Func<Task>) =
 let buildTestServer (resource: Resource) =
     let preComputed = AffordancePreCompute.preCompute testAffordanceMap
 
-    let builder =
-        Microsoft.AspNetCore.Hosting.WebHostBuilder()
-            .ConfigureServices(fun services ->
-                services.AddRouting() |> ignore
-                services.AddLogging() |> ignore
-                services.AddStateMachineStore<TicTacToeState, int>() |> ignore)
-            .Configure(fun app ->
-                app.UseRouting() |> ignore
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
+    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    let app = builder.Build()
 
-                // 1. Resolve state key from store and set IStatechartFeature
-                app.Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
-                |> ignore
+    app.UseRouting() |> ignore
 
-                // 2. Affordance middleware reads IStatechartFeature and injects Link/Allow headers
-                app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
+    // 1. Resolve state key from store and set IStatechartFeature
+    (app :> IApplicationBuilder).Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
+    |> ignore
 
-                // 3. Statechart middleware handles state-dependent dispatch
-                app.UseMiddleware<StateMachineMiddleware>() |> ignore
+    // 2. Affordance middleware reads IStatechartFeature and injects Link/Allow headers
+    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
 
-                app.UseEndpoints(fun endpoints ->
-                    endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
-                |> ignore)
+    // 3. Statechart middleware handles state-dependent dispatch
+    (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
 
-    new TestServer(builder)
+    app.UseEndpoints(fun endpoints ->
+        endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 let prePopulateState (server: TestServer) instanceId (state: TicTacToeState) (moveCount: int) =
     let store =
-        server.Host.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+        server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
 
     (store.SetState instanceId state moveCount).GetAwaiter().GetResult()
 

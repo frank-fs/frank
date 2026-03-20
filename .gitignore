@@ -51,6 +51,7 @@ Thumbs.db
 *.user
 launchSettings.json
 .entire/
+.worktrees/
 nupkg/
 
 # Added by Spec Kitty CLI (auto-managed)

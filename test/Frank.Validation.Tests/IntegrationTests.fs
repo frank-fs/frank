@@ -16,11 +16,11 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Expecto
 open Frank.Validation
@@ -114,55 +114,55 @@ let private buildTestHost
     let counter = HandlerCounter()
     let preloadedShapes = preloadTypes |> List.map ShapeBuilder.deriveShapeDefault
 
-    let builder =
-        WebHostBuilder()
-            .UseTestServer()
-            .ConfigureServices(fun services ->
-                services.AddSingleton<ShapeCache>() |> ignore
-                services.AddRouting() |> ignore
-                services.AddLogging() |> ignore
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton<ShapeCache>() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
 
-                if withAuth then
-                    services
-                        .AddAuthentication(TestScheme)
-                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
-                    |> ignore)
-            .Configure(fun (app: IApplicationBuilder) ->
-                // Pre-populate the shape cache before middleware runs.
-                let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                shapeCache.LoadAll(preloadedShapes)
+    if withAuth then
+        builder.Services
+            .AddAuthentication(TestScheme)
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
+        |> ignore
 
-                app.UseRouting() |> ignore
+    let app = builder.Build()
 
-                if withAuth then
-                    app.UseAuthentication() |> ignore
+    // Pre-populate the shape cache before middleware runs.
+    let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+    shapeCache.LoadAll(preloadedShapes)
 
-                // Wire ValidationMiddleware manually so tests work without
-                // GetEntryAssembly (which is null in test hosts).
-                app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                    let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
-                    let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+    app.UseRouting() |> ignore
 
-                    let innerLogger =
-                        loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+    if withAuth then
+        app.UseAuthentication() |> ignore
 
-                    let typedLogger =
-                        { new ILogger<ValidationMiddleware> with
-                            member _.Log(logLevel, eventId, state, ex, formatter) =
-                                innerLogger.Log(logLevel, eventId, state, ex, formatter)
+    // Wire ValidationMiddleware manually so tests work without
+    // GetEntryAssembly (which is null in test hosts).
+    (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+        let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+        let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                            member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
-                            member _.BeginScope(state) = innerLogger.BeginScope(state) }
+        let innerLogger =
+            loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                    let middleware = ValidationMiddleware(next, sc, typedLogger)
-                    middleware.InvokeAsync(ctx))
-                |> ignore
+        let typedLogger =
+            { new ILogger<ValidationMiddleware> with
+                member _.Log(logLevel, eventId, state, ex, formatter) =
+                    innerLogger.Log(logLevel, eventId, state, ex, formatter)
 
-                app.UseEndpoints(fun endpoints -> configureEndpoints counter endpoints)
-                |> ignore)
+                member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
+                member _.BeginScope(state) = innerLogger.BeginScope(state) }
 
-    let server = new TestServer(builder)
-    counter, server.CreateClient()
+        let middleware = ValidationMiddleware(next, sc, typedLogger)
+        middleware.InvokeAsync(ctx))
+    |> ignore
+
+    app.UseEndpoints(fun endpoints -> configureEndpoints counter endpoints)
+    |> ignore
+
+    app.Start()
+    counter, app.GetTestClient()
 
 /// Register a validated POST endpoint for type 'T at the given pattern.
 let private mapValidatedPost<'T>
@@ -628,58 +628,57 @@ let customConstraintTests =
               // Build a test host that preloads the merged shape.
               let counter = HandlerCounter()
 
-              let builder =
-                  WebHostBuilder()
-                      .UseTestServer()
-                      .ConfigureServices(fun services ->
-                          services.AddSingleton<ShapeCache>() |> ignore
-                          services.AddRouting() |> ignore
-                          services.AddLogging() |> ignore)
-                      .Configure(fun (app: IApplicationBuilder) ->
-                          let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                          shapeCache.LoadAll [ shapeWithPattern ]
+              let appBuilder = WebApplication.CreateBuilder([||])
+              appBuilder.WebHost.UseTestServer() |> ignore
+              appBuilder.Services.AddSingleton<ShapeCache>() |> ignore
+              appBuilder.Services.AddRouting() |> ignore
+              appBuilder.Services.AddLogging() |> ignore
+              let app = appBuilder.Build()
 
-                          app.UseRouting() |> ignore
+              let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+              shapeCache.LoadAll [ shapeWithPattern ]
 
-                          app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                              let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
-                              let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+              app.UseRouting() |> ignore
 
-                              let innerLogger =
-                                  loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+              (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                  let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+                  let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                              let typedLogger =
-                                  { new ILogger<ValidationMiddleware> with
-                                      member _.Log(logLevel, eventId, state, ex, formatter) =
-                                          innerLogger.Log(logLevel, eventId, state, ex, formatter)
+                  let innerLogger =
+                      loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                                      member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
-                                      member _.BeginScope(state) = innerLogger.BeginScope(state) }
+                  let typedLogger =
+                      { new ILogger<ValidationMiddleware> with
+                          member _.Log(logLevel, eventId, state, ex, formatter) =
+                              innerLogger.Log(logLevel, eventId, state, ex, formatter)
 
-                              let middleware = ValidationMiddleware(next, sc, typedLogger)
-                              middleware.InvokeAsync(ctx))
-                          |> ignore
+                          member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
+                          member _.BeginScope(state) = innerLogger.BeginScope(state) }
 
-                          app.UseEndpoints(fun endpoints ->
-                              endpoints
-                                  .MapPost(
-                                      "/customers",
-                                      RequestDelegate(fun ctx ->
-                                          counter.Increment()
-                                          ctx.Response.StatusCode <- 200
-                                          Task.CompletedTask)
-                                  )
-                                  .WithMetadata(
-                                      { ShapeUri = shapeWithPattern.NodeShapeUri
-                                        CustomConstraints = []
-                                        ResolverConfig = None }
-                                      : ValidationMarker
-                                  )
-                              |> ignore)
-                          |> ignore)
+                  let middleware = ValidationMiddleware(next, sc, typedLogger)
+                  middleware.InvokeAsync(ctx))
+              |> ignore
 
-              let server = new TestServer(builder)
-              let client = server.CreateClient()
+              app.UseEndpoints(fun endpoints ->
+                  endpoints
+                      .MapPost(
+                          "/customers",
+                          RequestDelegate(fun ctx ->
+                              counter.Increment()
+                              ctx.Response.StatusCode <- 200
+                              Task.CompletedTask)
+                      )
+                      .WithMetadata(
+                          { ShapeUri = shapeWithPattern.NodeShapeUri
+                            CustomConstraints = []
+                            ResolverConfig = None }
+                          : ValidationMarker
+                      )
+                  |> ignore)
+              |> ignore
+
+              app.Start()
+              let client = app.GetTestClient()
 
               // Invalid email (no domain extension).
               let badJson = """{"Name":"Alice","Email":"notanemail","Age":30,"Notes":null}"""
@@ -703,58 +702,57 @@ let customConstraintTests =
 
               let counter = HandlerCounter()
 
-              let builder =
-                  WebHostBuilder()
-                      .UseTestServer()
-                      .ConfigureServices(fun services ->
-                          services.AddSingleton<ShapeCache>() |> ignore
-                          services.AddRouting() |> ignore
-                          services.AddLogging() |> ignore)
-                      .Configure(fun (app: IApplicationBuilder) ->
-                          let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                          shapeCache.LoadAll [ shapeWithPattern ]
+              let appBuilder = WebApplication.CreateBuilder([||])
+              appBuilder.WebHost.UseTestServer() |> ignore
+              appBuilder.Services.AddSingleton<ShapeCache>() |> ignore
+              appBuilder.Services.AddRouting() |> ignore
+              appBuilder.Services.AddLogging() |> ignore
+              let app = appBuilder.Build()
 
-                          app.UseRouting() |> ignore
+              let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+              shapeCache.LoadAll [ shapeWithPattern ]
 
-                          app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                              let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
-                              let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+              app.UseRouting() |> ignore
 
-                              let innerLogger =
-                                  loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+              (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                  let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+                  let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                              let typedLogger =
-                                  { new ILogger<ValidationMiddleware> with
-                                      member _.Log(logLevel, eventId, state, ex, formatter) =
-                                          innerLogger.Log(logLevel, eventId, state, ex, formatter)
+                  let innerLogger =
+                      loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                                      member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
-                                      member _.BeginScope(state) = innerLogger.BeginScope(state) }
+                  let typedLogger =
+                      { new ILogger<ValidationMiddleware> with
+                          member _.Log(logLevel, eventId, state, ex, formatter) =
+                              innerLogger.Log(logLevel, eventId, state, ex, formatter)
 
-                              let middleware = ValidationMiddleware(next, sc, typedLogger)
-                              middleware.InvokeAsync(ctx))
-                          |> ignore
+                          member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
+                          member _.BeginScope(state) = innerLogger.BeginScope(state) }
 
-                          app.UseEndpoints(fun endpoints ->
-                              endpoints
-                                  .MapPost(
-                                      "/customers",
-                                      RequestDelegate(fun ctx ->
-                                          counter.Increment()
-                                          ctx.Response.StatusCode <- 200
-                                          Task.CompletedTask)
-                                  )
-                                  .WithMetadata(
-                                      { ShapeUri = shapeWithPattern.NodeShapeUri
-                                        CustomConstraints = []
-                                        ResolverConfig = None }
-                                      : ValidationMarker
-                                  )
-                              |> ignore)
-                          |> ignore)
+                  let middleware = ValidationMiddleware(next, sc, typedLogger)
+                  middleware.InvokeAsync(ctx))
+              |> ignore
 
-              let server = new TestServer(builder)
-              let client = server.CreateClient()
+              app.UseEndpoints(fun endpoints ->
+                  endpoints
+                      .MapPost(
+                          "/customers",
+                          RequestDelegate(fun ctx ->
+                              counter.Increment()
+                              ctx.Response.StatusCode <- 200
+                              Task.CompletedTask)
+                      )
+                      .WithMetadata(
+                          { ShapeUri = shapeWithPattern.NodeShapeUri
+                            CustomConstraints = []
+                            ResolverConfig = None }
+                          : ValidationMarker
+                      )
+                  |> ignore)
+              |> ignore
+
+              app.Start()
+              let client = app.GetTestClient()
 
               let goodJson =
                   """{"Name":"Alice","Email":"alice@example.com","Age":30,"Notes":null}"""
@@ -777,58 +775,57 @@ let customConstraintTests =
 
               let counter = HandlerCounter()
 
-              let builder =
-                  WebHostBuilder()
-                      .UseTestServer()
-                      .ConfigureServices(fun services ->
-                          services.AddSingleton<ShapeCache>() |> ignore
-                          services.AddRouting() |> ignore
-                          services.AddLogging() |> ignore)
-                      .Configure(fun (app: IApplicationBuilder) ->
-                          let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                          shapeCache.LoadAll [ shapeWithMin ]
+              let appBuilder = WebApplication.CreateBuilder([||])
+              appBuilder.WebHost.UseTestServer() |> ignore
+              appBuilder.Services.AddSingleton<ShapeCache>() |> ignore
+              appBuilder.Services.AddRouting() |> ignore
+              appBuilder.Services.AddLogging() |> ignore
+              let app = appBuilder.Build()
 
-                          app.UseRouting() |> ignore
+              let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+              shapeCache.LoadAll [ shapeWithMin ]
 
-                          app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                              let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
-                              let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+              app.UseRouting() |> ignore
 
-                              let innerLogger =
-                                  loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+              (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                  let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+                  let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                              let typedLogger =
-                                  { new ILogger<ValidationMiddleware> with
-                                      member _.Log(logLevel, eventId, state, ex, formatter) =
-                                          innerLogger.Log(logLevel, eventId, state, ex, formatter)
+                  let innerLogger =
+                      loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                                      member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
-                                      member _.BeginScope(state) = innerLogger.BeginScope(state) }
+                  let typedLogger =
+                      { new ILogger<ValidationMiddleware> with
+                          member _.Log(logLevel, eventId, state, ex, formatter) =
+                              innerLogger.Log(logLevel, eventId, state, ex, formatter)
 
-                              let middleware = ValidationMiddleware(next, sc, typedLogger)
-                              middleware.InvokeAsync(ctx))
-                          |> ignore
+                          member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
+                          member _.BeginScope(state) = innerLogger.BeginScope(state) }
 
-                          app.UseEndpoints(fun endpoints ->
-                              endpoints
-                                  .MapPost(
-                                      "/orders",
-                                      RequestDelegate(fun ctx ->
-                                          counter.Increment()
-                                          ctx.Response.StatusCode <- 200
-                                          Task.CompletedTask)
-                                  )
-                                  .WithMetadata(
-                                      { ShapeUri = shapeWithMin.NodeShapeUri
-                                        CustomConstraints = []
-                                        ResolverConfig = None }
-                                      : ValidationMarker
-                                  )
-                              |> ignore)
-                          |> ignore)
+                  let middleware = ValidationMiddleware(next, sc, typedLogger)
+                  middleware.InvokeAsync(ctx))
+              |> ignore
 
-              let server = new TestServer(builder)
-              let client = server.CreateClient()
+              app.UseEndpoints(fun endpoints ->
+                  endpoints
+                      .MapPost(
+                          "/orders",
+                          RequestDelegate(fun ctx ->
+                              counter.Increment()
+                              ctx.Response.StatusCode <- 200
+                              Task.CompletedTask)
+                      )
+                      .WithMetadata(
+                          { ShapeUri = shapeWithMin.NodeShapeUri
+                            CustomConstraints = []
+                            ResolverConfig = None }
+                          : ValidationMarker
+                      )
+                  |> ignore)
+              |> ignore
+
+              app.Start()
+              let client = app.GetTestClient()
 
               // Age 16 < MinInclusive 18.
               let json = """{"Name":"Young","Email":"young@example.com","Age":16,"Notes":null}"""
@@ -849,58 +846,57 @@ let customConstraintTests =
 
               let counter = HandlerCounter()
 
-              let builder =
-                  WebHostBuilder()
-                      .UseTestServer()
-                      .ConfigureServices(fun services ->
-                          services.AddSingleton<ShapeCache>() |> ignore
-                          services.AddRouting() |> ignore
-                          services.AddLogging() |> ignore)
-                      .Configure(fun (app: IApplicationBuilder) ->
-                          let shapeCache = app.ApplicationServices.GetRequiredService<ShapeCache>()
-                          shapeCache.LoadAll [ mergedShape ]
+              let appBuilder = WebApplication.CreateBuilder([||])
+              appBuilder.WebHost.UseTestServer() |> ignore
+              appBuilder.Services.AddSingleton<ShapeCache>() |> ignore
+              appBuilder.Services.AddRouting() |> ignore
+              appBuilder.Services.AddLogging() |> ignore
+              let app = appBuilder.Build()
 
-                          app.UseRouting() |> ignore
+              let shapeCache = app.Services.GetRequiredService<ShapeCache>()
+              shapeCache.LoadAll [ mergedShape ]
 
-                          app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                              let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
-                              let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+              app.UseRouting() |> ignore
 
-                              let innerLogger =
-                                  loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
+              (app :> IApplicationBuilder).Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                  let sc = ctx.RequestServices.GetRequiredService<ShapeCache>()
+                  let loggerFactory = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
 
-                              let typedLogger =
-                                  { new ILogger<ValidationMiddleware> with
-                                      member _.Log(logLevel, eventId, state, ex, formatter) =
-                                          innerLogger.Log(logLevel, eventId, state, ex, formatter)
+                  let innerLogger =
+                      loggerFactory.CreateLogger("Frank.Validation.ValidationMiddleware")
 
-                                      member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
-                                      member _.BeginScope(state) = innerLogger.BeginScope(state) }
+                  let typedLogger =
+                      { new ILogger<ValidationMiddleware> with
+                          member _.Log(logLevel, eventId, state, ex, formatter) =
+                              innerLogger.Log(logLevel, eventId, state, ex, formatter)
 
-                              let middleware = ValidationMiddleware(next, sc, typedLogger)
-                              middleware.InvokeAsync(ctx))
-                          |> ignore
+                          member _.IsEnabled(logLevel) = innerLogger.IsEnabled(logLevel)
+                          member _.BeginScope(state) = innerLogger.BeginScope(state) }
 
-                          app.UseEndpoints(fun endpoints ->
-                              endpoints
-                                  .MapPost(
-                                      "/customers",
-                                      RequestDelegate(fun ctx ->
-                                          counter.Increment()
-                                          ctx.Response.StatusCode <- 200
-                                          Task.CompletedTask)
-                                  )
-                                  .WithMetadata(
-                                      { ShapeUri = mergedShape.NodeShapeUri
-                                        CustomConstraints = []
-                                        ResolverConfig = None }
-                                      : ValidationMarker
-                                  )
-                              |> ignore)
-                          |> ignore)
+                  let middleware = ValidationMiddleware(next, sc, typedLogger)
+                  middleware.InvokeAsync(ctx))
+              |> ignore
 
-              let server = new TestServer(builder)
-              let client = server.CreateClient()
+              app.UseEndpoints(fun endpoints ->
+                  endpoints
+                      .MapPost(
+                          "/customers",
+                          RequestDelegate(fun ctx ->
+                              counter.Increment()
+                              ctx.Response.StatusCode <- 200
+                              Task.CompletedTask)
+                      )
+                      .WithMetadata(
+                          { ShapeUri = mergedShape.NodeShapeUri
+                            CustomConstraints = []
+                            ResolverConfig = None }
+                          : ValidationMarker
+                      )
+                  |> ignore)
+              |> ignore
+
+              app.Start()
+              let client = app.GetTestClient()
 
               // Missing Name (auto-derived minCount) AND invalid Email (custom pattern).
               let json = """{"Email":"notvalid","Age":30}"""

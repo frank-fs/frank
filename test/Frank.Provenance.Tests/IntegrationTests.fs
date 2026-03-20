@@ -8,11 +8,11 @@ open System.Threading.Tasks
 open Expecto
 open Frank.Provenance
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.DependencyInjection.Extensions
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
 // ---------------------------------------------------------------------------
@@ -109,72 +109,72 @@ let private makeRecord (resourceUri: string) (prevState: string) (newState: stri
 let private createFullPipelineServer () =
     let subject = TransitionSubject()
 
-    let builder =
-        WebHostBuilder()
-            .ConfigureServices(fun services ->
-                services.AddLogging() |> ignore
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddLogging() |> ignore
 
-                services.AddSingleton<IObservable<TransitionEvent>>(subject :> IObservable<TransitionEvent>)
-                |> ignore
+    builder.Services.AddSingleton<IObservable<TransitionEvent>>(subject :> IObservable<TransitionEvent>)
+    |> ignore
 
-                services.TryAddSingleton<IProvenanceStore>(fun sp ->
-                    let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
-                    new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger) :> IProvenanceStore)
+    builder.Services.TryAddSingleton<IProvenanceStore>(fun sp ->
+        let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, logger) :> IProvenanceStore)
 
-                services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore)
-            .Configure(fun (app: IApplicationBuilder) ->
-                let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+    builder.Services.AddHostedService<ProvenanceSubscriptionManager>() |> ignore
 
-                app.Use(
-                    Func<RequestDelegate, RequestDelegate>(fun next ->
-                        ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
-                )
-                |> ignore
+    let app = builder.Build()
+    let loggerFactory = app.Services.GetRequiredService<ILoggerFactory>()
 
-                app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore)
+    (app :> IApplicationBuilder).Use(
+        Func<RequestDelegate, RequestDelegate>(fun next ->
+            ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
+    )
+    |> ignore
 
-    let server = new TestServer(builder)
-    server, subject
+    app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore
+
+    app.Start()
+    app.GetTestServer(), subject
 
 /// Creates a test server pre-seeded with a read-only in-memory store.
 /// Useful for testing the middleware's content-negotiation in isolation.
 let private createSeededServer (records: ProvenanceRecord list) =
-    let builder =
-        WebHostBuilder()
-            .ConfigureServices(fun services ->
-                services.AddLogging() |> ignore
+    let store =
+        { new IProvenanceStore with
+            member _.Append(_) = ()
 
-                let store =
-                    { new IProvenanceStore with
-                        member _.Append(_) = ()
+            member _.QueryByResource(uri) =
+                records |> List.filter (fun r -> r.ResourceUri = uri) |> Task.FromResult
 
-                        member _.QueryByResource(uri) =
-                            records |> List.filter (fun r -> r.ResourceUri = uri) |> Task.FromResult
+            member _.QueryByAgent(id) =
+                records |> List.filter (fun r -> r.Agent.Id = id) |> Task.FromResult
 
-                        member _.QueryByAgent(id) =
-                            records |> List.filter (fun r -> r.Agent.Id = id) |> Task.FromResult
+            member _.QueryByTimeRange(s, e) =
+                records
+                |> List.filter (fun r -> r.RecordedAt >= s && r.RecordedAt <= e)
+                |> Task.FromResult
 
-                        member _.QueryByTimeRange(s, e) =
-                            records
-                            |> List.filter (fun r -> r.RecordedAt >= s && r.RecordedAt <= e)
-                            |> Task.FromResult
+          interface IDisposable with
+              member _.Dispose() = () }
 
-                      interface IDisposable with
-                          member _.Dispose() = () }
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddLogging() |> ignore
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    let app = builder.Build()
 
-                services.AddSingleton<IProvenanceStore>(store) |> ignore)
-            .Configure(fun (app: IApplicationBuilder) ->
-                let loggerFactory = app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+    let loggerFactory = app.Services.GetRequiredService<ILoggerFactory>()
 
-                app.Use(
-                    Func<RequestDelegate, RequestDelegate>(fun next ->
-                        ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
-                )
-                |> ignore
+    (app :> IApplicationBuilder).Use(
+        Func<RequestDelegate, RequestDelegate>(fun next ->
+            ProvenanceMiddleware.createProvenanceMiddleware loggerFactory next)
+    )
+    |> ignore
 
-                app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore)
+    app.Run(fun ctx -> ctx.Response.WriteAsync("normal response")) |> ignore
 
-    new TestServer(builder)
+    app.Start()
+    app.GetTestServer()
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -402,20 +402,18 @@ let integrationTests =
                         { MaxRecords = 50
                           EvictionBatchSize = 5 }
 
-                    let builder =
-                        WebHostBuilder()
-                            .ConfigureServices(fun services ->
-                                services.AddLogging() |> ignore
-                                // Manually replicate what useProvenanceWith does:
-                                // register the store with customConfig.
-                                services.TryAddSingleton<IProvenanceStore>(fun sp ->
-                                    let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
-
-                                    new MailboxProcessorProvenanceStore(customConfig, logger) :> IProvenanceStore))
-                            .Configure(fun (app: IApplicationBuilder) ->
-                                app.Run(fun ctx -> ctx.Response.WriteAsync("ok")) |> ignore)
-
-                    use server = new TestServer(builder)
+                    let appBuilder = WebApplication.CreateBuilder([||])
+                    appBuilder.WebHost.UseTestServer() |> ignore
+                    appBuilder.Services.AddLogging() |> ignore
+                    // Manually replicate what useProvenanceWith does:
+                    // register the store with customConfig.
+                    appBuilder.Services.TryAddSingleton<IProvenanceStore>(fun sp ->
+                        let logger = sp.GetRequiredService<ILogger<MailboxProcessorProvenanceStore>>()
+                        new MailboxProcessorProvenanceStore(customConfig, logger) :> IProvenanceStore)
+                    let app = appBuilder.Build()
+                    app.Run(fun ctx -> ctx.Response.WriteAsync("ok")) |> ignore
+                    app.Start()
+                    use server = app.GetTestServer()
 
                     let store = server.Services.GetRequiredService<IProvenanceStore>()
                     let istore = store :> IProvenanceStore

@@ -6,10 +6,10 @@ open System.Net.Http
 open System.Text.Json
 open Expecto
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Frank.Affordances
 open Frank.Resources.Model
 
@@ -86,18 +86,20 @@ let private testProfiles: ProjectedProfiles =
 // -- Helpers --
 
 let private buildTestServer (profiles: ProjectedProfiles) =
-    let builder =
-        WebHostBuilder()
-            .Configure(fun app ->
-                app.UseRouting() |> ignore
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
 
-                app.UseEndpoints(fun endpoints ->
-                    endpoints.MapProfiles(profiles)
-                    endpoints.MapProfileDiscovery(profiles))
-                |> ignore)
-            .ConfigureServices(fun services -> services.AddRouting() |> ignore)
+    app.UseRouting() |> ignore
 
-    new TestServer(builder)
+    app.UseEndpoints(fun endpoints ->
+        endpoints.MapProfiles(profiles)
+        endpoints.MapProfileDiscovery(profiles))
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 // -- Tests --
 
