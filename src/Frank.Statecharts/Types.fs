@@ -1,6 +1,7 @@
 namespace Frank.Statecharts
 
 open System.Security.Claims
+open Frank.Resources.Model
 
 /// Why a guard blocked a transition. Maps to HTTP status codes in middleware.
 [<Struct>]
@@ -37,12 +38,6 @@ type Guard<'State, 'Event, 'Context> =
     | AccessControl of name: string * predicate: (AccessControlContext<'State, 'Context> -> GuardResult)
     /// Runs post-handler. Receives the actual event set by the handler.
     | EventValidation of name: string * predicate: (EventValidationContext<'State, 'Event, 'Context> -> GuardResult)
-
-/// Metadata about a single state (HTTP configuration).
-type StateInfo =
-    { AllowedMethods: string list
-      IsFinal: bool
-      Description: string option }
 
 /// The outcome of a transition attempt.
 [<RequireQualifiedAccess>]

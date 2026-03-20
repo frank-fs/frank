@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Smcat.Generator
 
+open Frank.Resources.Model
 open Frank.Statecharts
 open Frank.Statecharts.Ast
 

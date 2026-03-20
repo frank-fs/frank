@@ -1,7 +1,7 @@
 namespace Frank.Affordances
 
 open System
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing

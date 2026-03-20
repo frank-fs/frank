@@ -2,7 +2,7 @@ namespace Frank.Affordances
 
 open System
 open System.Reflection
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open MessagePack
 open MessagePack.Resolvers
 open MessagePack.FSharp
@@ -41,7 +41,7 @@ module StartupProjection =
                   GuardNames = sc.GuardNames
                   StateMetadata =
                     sc.StateMetadata
-                    |> Map.map (fun _ (v: Frank.Statecharts.StateInfo) ->
+                    |> Map.map (fun _ (v: StateInfo) ->
                         { AllowedMethods = v.AllowedMethods
                           IsFinal = v.IsFinal
                           Description = v.Description |> Option.defaultValue "" }) }

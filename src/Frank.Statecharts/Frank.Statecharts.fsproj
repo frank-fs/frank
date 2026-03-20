@@ -57,10 +57,7 @@
     <Compile Include="StatechartETagProvider.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
-    <!-- Unified model types (shared with Frank.Cli.Core for runtime deserialization) -->
-    <Compile Include="UnifiedModel.fs" />
     <!-- Affordances (merged from Frank.Affordances) -->
-    <Compile Include="Affordances/RuntimeProjection.fs" />
     <Compile Include="Affordances/AffordanceMap.fs" />
     <Compile Include="Affordances/AffordanceMiddleware.fs" />
     <Compile Include="Affordances/StartupProjection.fs" />
@@ -80,6 +77,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
+    <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
+open Frank.Resources.Model
 open Frank.Builder
 
 /// Cached, thread-safe state key extraction using FSharpValue.PreComputeUnionTagReader.

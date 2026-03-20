@@ -2,6 +2,7 @@ namespace Frank.Affordances
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.Logging
+open Frank.Resources.Model
 open Frank.Builder
 
 [<AutoOpen>]
@@ -14,7 +15,7 @@ module WebHostBuilderExtensions =
         /// Middleware runs after routing (and after statechart middleware if present).
         [<CustomOperation("useAffordances")>]
         member _.UseAffordances(spec: WebHostSpec, map: AffordanceMap) : WebHostSpec =
-            let preComputed = AffordanceMap.preCompute map
+            let preComputed = AffordancePreCompute.preCompute map
 
             if preComputed.Count = 0 then
                 spec

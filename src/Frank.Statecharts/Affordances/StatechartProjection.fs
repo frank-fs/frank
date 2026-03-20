@@ -1,5 +1,6 @@
 namespace Frank.Affordances
 
+open Frank.Resources.Model
 open Frank.Statecharts.Ast
 
 /// Runtime projection of statechart formats from the canonical RuntimeStatechart data.

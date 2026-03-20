@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Frank.Resources.Model
 open Frank.Statecharts
 
 /// ASP.NET Core convention-based middleware that injects Link and Allow headers

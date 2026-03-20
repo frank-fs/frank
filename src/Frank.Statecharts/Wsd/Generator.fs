@@ -1,5 +1,6 @@
 module internal Frank.Statecharts.Wsd.Generator
 
+open Frank.Resources.Model
 open Frank.Statecharts
 open Frank.Statecharts.Ast
 
