@@ -2,7 +2,7 @@ module Frank.Cli.Core.Commands.UnifiedExtractCommand
 
 open System
 open System.IO
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart.StatechartError
 

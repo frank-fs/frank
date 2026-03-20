@@ -4,8 +4,7 @@ open System
 open System.IO
 open System.Text
 open System.Text.Json
-open Frank.Affordances
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Composite Key Generation (T033)

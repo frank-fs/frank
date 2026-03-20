@@ -1,7 +1,7 @@
 namespace Frank.Cli.Core.Statechart
 
 open Frank.Statecharts
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 
 /// Helpers for constructing ExtractedStatechart values.
 module StatechartExtractor =

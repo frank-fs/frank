@@ -6,8 +6,7 @@ open System.Text.Json
 open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Writing
-open Frank.Affordances
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Unified

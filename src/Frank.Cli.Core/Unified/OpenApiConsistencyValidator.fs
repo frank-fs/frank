@@ -3,7 +3,7 @@ module Frank.Cli.Core.Unified.OpenApiConsistencyValidator
 open System
 open System.Text.Json
 open Frank.Cli.Core.Analysis
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Statecharts.Validation
 
 type FieldDiscrepancy =

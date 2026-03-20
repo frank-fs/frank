@@ -2,7 +2,7 @@ module Frank.Cli.Core.Unified.ExtractionStateProjector
 
 open System
 open System.IO
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Extraction
 open Frank.Cli.Core.State

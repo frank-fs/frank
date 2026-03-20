@@ -3,7 +3,7 @@ namespace Frank.Cli.Core.Extraction
 open System
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 
 /// Shared URI construction helpers for extraction modules.
 /// Constitution VIII: No Duplicated Logic.

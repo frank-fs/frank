@@ -3,7 +3,7 @@ namespace Frank.Cli.Core.Analysis
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Text
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 
 module TypeAnalyzer =
 

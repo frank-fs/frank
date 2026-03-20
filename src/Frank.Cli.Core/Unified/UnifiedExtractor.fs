@@ -6,7 +6,7 @@ open FSharp.Compiler.Text
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.CodeAnalysis
 open Frank.Statecharts
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
@@ -362,7 +362,7 @@ let private tryGetFullName (td: FSharpEntity) =
     with _ ->
         None
 
-let private entityToSourceLocation (entity: FSharpEntity) : Frank.Statecharts.Unified.SourceLocation option =
+let private entityToSourceLocation (entity: FSharpEntity) : Frank.Resources.Model.SourceLocation option =
     try
         let r = entity.DeclarationLocation
 

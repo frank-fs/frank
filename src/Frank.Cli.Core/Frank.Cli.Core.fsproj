@@ -31,7 +31,6 @@
     <Compile Include="Statechart/StatechartDocumentJson.fs" />
     <Compile Include="Statechart/ValidationReportFormatter.fs" />
     <!-- Unified pipeline -->
-    <Compile Include="Unified/UnifiedModel.fs" />
     <Compile Include="Unified/UnifiedCache.fs" />
     <Compile Include="Unified/OpenApiConsistencyValidator.fs" />
     <Compile Include="Unified/UnifiedExtractor.fs" />
@@ -68,6 +67,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
     <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 

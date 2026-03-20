@@ -3,7 +3,7 @@ namespace Frank.Cli.Core.Commands
 open System
 open System.IO
 open System.Text.Json
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Unified
 open Frank.Statecharts.Validation
 

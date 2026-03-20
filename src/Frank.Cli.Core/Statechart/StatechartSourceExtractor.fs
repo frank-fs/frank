@@ -4,7 +4,7 @@ open System.IO
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
 open Frank.Statecharts
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Statechart.StatechartError
 

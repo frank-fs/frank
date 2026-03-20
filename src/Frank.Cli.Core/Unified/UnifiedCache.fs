@@ -3,8 +3,7 @@ module Frank.Cli.Core.Unified.UnifiedCache
 open System
 open System.IO
 open System.Security.Cryptography
-open Frank.Affordances
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open MessagePack
 open MessagePack.Resolvers
 open MessagePack.FSharp

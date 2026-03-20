@@ -1,7 +1,7 @@
 module Frank.Cli.Core.Commands.StatechartGenerateCommand
 
 open System.IO
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError

@@ -2,7 +2,7 @@ module Frank.Cli.Core.Commands.UnifiedGenerateCommand
 
 open System.IO
 open System.Text.Json
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart
@@ -40,7 +40,7 @@ let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri
     use stream = new MemoryStream()
     use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
     writer.WriteStartObject()
-    writer.WriteString("version", Frank.Affordances.AffordanceMap.currentVersion)
+    writer.WriteString("version", Frank.Resources.Model.AffordanceMap.currentVersion)
     writer.WriteStartArray("entries")
 
     for resource in resources do
@@ -69,7 +69,7 @@ let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri
         | None ->
             writer.WriteStartObject()
             writer.WriteString("routeTemplate", resource.RouteTemplate)
-            writer.WriteString("stateKey", Frank.Affordances.AffordanceMap.WildcardStateKey)
+            writer.WriteString("stateKey", Frank.Resources.Model.AffordanceMap.WildcardStateKey)
             writer.WriteStartArray("allowedMethods")
 
             for cap in resource.HttpCapabilities do

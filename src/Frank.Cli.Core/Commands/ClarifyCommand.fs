@@ -6,7 +6,7 @@ open VDS.RDF
 open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Unified
 

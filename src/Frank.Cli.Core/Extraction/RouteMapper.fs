@@ -6,7 +6,7 @@ open Frank.Cli.Core.Rdf
 open Frank.Cli.Core.Rdf.FSharpRdf
 open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.Analysis
-open Frank.Statecharts.Unified
+open Frank.Resources.Model
 open Frank.Cli.Core.Extraction.UriHelpers
 
 /// Maps Frank routes to RDF resource identities.
