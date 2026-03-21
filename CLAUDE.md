@@ -63,6 +63,9 @@ These principles govern all code changes. See `.kittify/memory/constitution.md` 
 - **`IWebHostBuilder.Configure`**: Requires `open Microsoft.AspNetCore.Hosting` — it's an extension method, not on the interface directly.
 - **Testing `WebHostSpec`**: `WebHostBuilder.Run()` blocks (starts the app). To test, build the spec manually: `ceBuilder.Yield() |> fun s -> ceBuilder.UseJsonHome(s) |> fun s -> ceBuilder.Resource(s, res)`.
 - **fsproj compile order matters**: Types must be defined before use. Add new files in dependency order.
+- **`Allow` is a content header**: Use `resp.Content.Headers.Allow` not `resp.Headers.Contains("Allow")`. The latter throws `Misused header name` at runtime.
+- **CE delegation for bundles**: `spec |> this.UseJsonHome |> this.UseDiscoveryHeaders` — compose CE operations via member calls without inline duplication. Each writes to a different `WebHostSpec` field. Precedent: `Frank.Provenance`.
+- **`useX`/`useXWith` naming convention**: Zero-arg auto-load operations use `useX`; explicit-arg overloads use `useXWith`. Established by: `useValidation`/`useValidationWith`, `useLinkedData`/`useLinkedDataWith`, `useAffordances`/`useAffordancesWith`. Do not attempt same-name CE overloading at different arities.
 
 ## Workflow Rules
 
