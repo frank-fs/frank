@@ -108,4 +108,4 @@ module JsonHomeDocument =
 
         w.WriteEndObject()
         w.Flush()
-        System.Text.Encoding.UTF8.GetString(stream.ToArray())
+        System.Text.Encoding.UTF8.GetString(stream.GetBuffer(), 0, int stream.Length)

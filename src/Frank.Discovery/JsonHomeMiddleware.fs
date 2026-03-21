@@ -5,7 +5,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Frank.Builder
 
-/// Middleware that serves a pre-computed JSON Home document at GET /
+/// Middleware that serves a pre-computed JSON Home document at GET or HEAD /
 /// when the client sends Accept: application/json-home (exact match).
 /// Positioned before routing to avoid route conflicts with user-defined root resources.
 ///
@@ -41,7 +41,9 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
                 && header.MediaType.Equals(jsonHomeMediaType, System.StringComparison.OrdinalIgnoreCase))
 
     member _.Invoke(ctx: HttpContext) : Task =
-        if ctx.Request.Method <> HttpMethods.Get then
+        let isGet = ctx.Request.Method = HttpMethods.Get
+        let isHead = ctx.Request.Method = HttpMethods.Head
+        if not isGet && not isHead then
             next.Invoke(ctx)
         elif ctx.Request.Path.Value <> "/" then
             next.Invoke(ctx)
@@ -60,4 +62,7 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
                 ctx.Response.Headers.Append("Link", $"<{url}>; rel=\"describedby\"")
             | None -> ()
 
-            ctx.Response.WriteAsync(json)
+            if isHead then
+                Task.CompletedTask
+            else
+                ctx.Response.WriteAsync(json)

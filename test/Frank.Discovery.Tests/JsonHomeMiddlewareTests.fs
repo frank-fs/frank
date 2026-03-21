@@ -26,7 +26,7 @@ let private buildTestServer () =
     let itemsRes = resource "/items" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items list"))) }
     let dataSource = MiddlewareTestDataSource(itemsRes.Endpoints)
 
-    let builder =
+    let host =
         Host.CreateDefaultBuilder([||])
             .ConfigureWebHost(fun webBuilder ->
                 webBuilder
@@ -44,8 +44,8 @@ let private buildTestServer () =
                 |> ignore)
             .Build()
 
-    builder.Start()
-    builder.GetTestClient()
+    host.Start()
+    host.GetTestClient()
 
 [<Tests>]
 let tests =
@@ -122,6 +122,19 @@ let tests =
             let! (resp: HttpResponseMessage) = client.SendAsync(req)
             Expect.equal resp.StatusCode HttpStatusCode.OK "should match json-home in multi-value Accept"
             Expect.equal (resp.Content.Headers.ContentType.MediaType) "application/json-home" "content type"
+        }
+
+        testTask "HEAD / with Accept: application/json-home returns headers with no body" {
+            let client = buildTestServer ()
+            let req = new HttpRequestMessage(HttpMethod.Head, "/")
+            req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+            let! (resp: HttpResponseMessage) = client.SendAsync(req)
+            Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200"
+            Expect.equal (resp.Content.Headers.ContentType.MediaType) "application/json-home" "content type"
+            Expect.isTrue (resp.Headers.Contains("Vary")) "should have Vary header"
+            Expect.isTrue (resp.Headers.Contains("Cache-Control")) "should have Cache-Control"
+            let! (body: string) = resp.Content.ReadAsStringAsync()
+            Expect.equal body "" "HEAD should have empty body"
         }
     ]
 
@@ -205,7 +218,7 @@ let metadataTests =
                   AlpsBaseUri = Some "http://example.com/alps/games"
                   AlpsDescriptors = Some (Map.ofList [ "games", Map.ofList [ "gameId", "http://example.com/alps/games#gameId" ] ]) }
 
-            let builder =
+            let host =
                 Host.CreateDefaultBuilder([||])
                     .ConfigureWebHost(fun webBuilder ->
                         webBuilder
@@ -221,9 +234,8 @@ let metadataTests =
                                     endpoints.DataSources.Add(dataSource)) |> ignore)
                         |> ignore)
                     .Build()
-
-            builder.Start()
-            let client = builder.GetTestClient()
+            host.Start()
+            let client = host.GetTestClient()
 
             let req = new HttpRequestMessage(HttpMethod.Get, "/")
             req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
