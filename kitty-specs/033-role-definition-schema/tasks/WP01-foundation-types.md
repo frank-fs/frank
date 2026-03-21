@@ -1,30 +1,33 @@
 ---
-work_package_id: "WP01"
-subtasks:
-  - "T001"
-  - "T002"
-  - "T003"
-  - "T004"
-  - "T005"
-  - "T006"
-  - "T007"
-  - "T008"
-title: "Foundation Types & Compilation Fixes"
-phase: "Phase 0 - Foundation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
+work_package_id: WP01
+title: Foundation Types & Compilation Fixes
+lane: "doing"
 dependencies: []
-requirement_refs: ["FR-001", "FR-003", "FR-004", "FR-007", "FR-008", "FR-010"]
+base_branch: master
+base_commit: 0e0df98aa30b8773d78dcaa11f11eac841a09de5
+created_at: '2026-03-21T19:15:20.344707+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
+- T008
+phase: Phase 0 - Foundation
+assignee: ''
+agent: ''
+shell_pid: "96979"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-21T18:59:09Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-21T18:59:09Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-003, FR-004, FR-007, FR-008, FR-010]
 ---
 
 # Work Package Prompt: WP01 – Foundation Types & Compilation Fixes
