@@ -56,6 +56,7 @@ nupkg/
 
 # Added by Spec Kitty CLI (auto-managed)
 .claude/
+!.claude/settings.json
 .codex/
 .opencode/
 .windsurf/

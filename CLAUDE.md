@@ -1,74 +1,119 @@
-# frank Development Guidelines
+# Frank
 
-Auto-generated from all feature plans. Last updated: 2026-01-25
-
-## Active Technologies
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + ASP.NET Core (Microsoft.AspNetCore.*) (011-middleware-before-endpoints)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.5.0+ (core, modified), Microsoft.AspNetCore.Authorization (framework reference) (013-frank-auth)
-- N/A (no persistence — metadata is compile-time/startup-time configuration) (013-frank-auth)
-- F# 8.0+ targeting .NET 10.0 (single target, down from multi-target) + Frank 7.0.0 (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Extensions.Primitives (for StringTokenizer, included in framework) (014-datastar-native-sse)
-- N/A (no persistence) (014-datastar-native-sse)
-- F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 (multi-targeting: `net8.0;net9.0;net10.0`) (014-datastar-native-sse)
-- N/A (stateless SSE event streaming) (014-datastar-native-sse)
-- F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool) (015-datastar-streaming-html)
-- F# 8.0+ targeting .NET 9.0 and .NET 10.0 (multi-targeting) + Frank 7.1.0 (project reference), FSharp.Data.JsonSchema.OpenApi 3.0.0 (NuGet), Microsoft.AspNetCore.OpenApi (9.0.x / 10.0.x conditional), Microsoft.AspNetCore.App (framework reference) (016-openapi)
-
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp (latest), ASP.NET Core (002-datastar-sample)
-- In-memory (Dictionary, ResizeArray) - demo purposes only (002-datastar-sample)
-- F# 8.0+ targeting .NET 10.0 + Frank 6.x, Hox 3.x, StarFederation.Datastar.FSharp (via Frank.Datastar project reference) (003-datastar-hox-sample)
-- F# 8.0+ targeting .NET 10.0 + Frank 6.x, Oxpecker.ViewEngine 2.x, StarFederation.Datastar.FSharp (via Frank.Datastar project reference) (004-datastar-oxpecker-sample)
-- Bash (POSIX-compatible shell scripting) + curl (HTTP client), grep/sed (text parsing), standard Unix tools (005-fix-sample-tests)
-- N/A (tests read from sample applications' in-memory stores) (005-fix-sample-tests)
-- F# 8.0+ targeting .NET 10.0 (matching sample projects) + Microsoft.Playwright.NUnit (1.57.0+), NUnit (3.x/4.x) (005-fix-sample-tests)
-- F# 8.0+ targeting .NET 10.0 + Frank 6.x, StarFederation.Datastar.FSharp (via Frank.Datastar project reference), ASP.NET Core (006-fix-datastar-basic-tests)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp, ASP.NET Core (010-datastar-patch-mode)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank) + FSharp.Analyzers.SDK (0.35.0+), FSharp.Compiler.Service (bundled with SDK) (009-resourcebuilder-handler-guardrails)
-- N/A (static analysis tool, no persistence) (009-resourcebuilder-handler-guardrails)
-
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + Frank 6.x, StarFederation.Datastar.FSharp (latest) (001-datastar-support)
-
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank 6.x (project reference), Microsoft.AspNetCore.App (framework reference), Microsoft.Data.Sqlite (for SQLite project only), FSharp.Reflection (in FSharp.Core) (010-statecharts-production-readiness)
-- SQLite via Microsoft.Data.Sqlite (new `Frank.Statecharts.Sqlite` project); in-memory MailboxProcessor (existing, unchanged) (010-statecharts-production-readiness)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
-- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
-- F# 8.0+ targeting .NET 10.0 (single target, matching existing test projects) + dotNetRdf.Core 3.5.1 (already a Frank dependency -- provides RDF parsing, in-memory SPARQL via `LeviathanQueryProcessor`/`InMemoryDataset`), Microsoft.AspNetCore.TestHost 10.0.0, Expecto 10.2.3, YoloDev.Expecto.TestSdk 0.14.3, Microsoft.NET.Test.Sdk 17.14.1 (015-rdf-sparql-validation)
-- N/A (in-memory dotNetRdf graphs only) (015-rdf-sparql-validation)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
-- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project reference -- same project, internal modules) (013-smcat-parser-generator)
-- N/A (stateless text parsing) (013-smcat-parser-generator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
-- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + No new NuGet dependencies; reuses Wsd.Types from #90, FSharp.Reflection (in FSharp.Core) for boxed Machine inspection (017-wsd-generator-cross-validator)
-- N/A (pure function, stateless -- StateMachineMetadata in, WSD text out) (017-wsd-generator-cross-validator)
-- F# 8.0+ targeting .NET 10.0 (single target, matching Frank.Cli and Frank.Cli.Core) + System.CommandLine 2.0.3 (added to Frank.Cli.Core), existing Frank.Cli.Core infrastructure (016-frank-cli-help-system)
-- N/A -- reads existing `obj/frank-cli/state.json` (ExtractionState) for status command; no new persistence (016-frank-cli-help-system)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
-- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + `System.Xml.Linq` (in-framework), `System.Xml` (for `IXmlLineInfo`, `XmlException`) (018-scxml-parser-generator)
-- N/A (stateless parser/generator library) (018-scxml-parser-generator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace) (021-cross-format-validator)
-- N/A (stateless validation -- pure functions, no persistence) (021-cross-format-validator)
-- F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank core (project reference), Microsoft.AspNetCore.App (framework reference) (019-options-link-discovery)
-- N/A (metadata is compile-time/startup-time configuration) (019-options-link-discovery)
-## Project Structure
-
-```text
-src/
-tests/
-```
+F# web framework proving that HATEOAS, statecharts, and semantic discovery compose into a pit of success for hypermedia APIs.
 
 ## Commands
 
-# Add commands for F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting)
+```bash
+# Build
+dotnet build Frank.sln
 
-## Code Style
+# Test (excludes sample apps)
+dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"
 
-F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
+# Test single project
+dotnet test test/Frank.Discovery.Tests/
 
-## Recent Changes
-- 019-options-link-discovery: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank core) + Frank core (project reference), Microsoft.AspNetCore.App (framework reference)
-- 021-cross-format-validator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting, matching Frank.Statecharts) + Frank.Statecharts (project-internal -- shared AST types from spec 020 in `Frank.Statecharts.Ast` namespace)
-- 018-scxml-parser-generator: Added F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting) + `System.Xml.Linq` (in-framework), `System.Xml` (for `IXmlLineInfo`, `XmlException`)
-<!-- MANUAL ADDITIONS START -->
-<!-- MANUAL ADDITIONS END -->
+# Format check (Fantomas 7.0.5)
+dotnet fantomas --check src/
+
+# Frank.Tests is NOT in Frank.sln — test it separately
+dotnet test test/Frank.Tests/
+```
+
+Always run `dotnet build Frank.sln` and `dotnet test` before claiming work is complete.
+
+## Project Structure
+
+- `src/` — Library projects, multi-target net8.0/net9.0/net10.0
+- `test/` — Test projects, target net10.0 only
+- `sample/` — Sample apps (TicTacToe, Datastar variants)
+- `.worktrees/` — Git worktrees for feature branches (gitignored)
+- `hooks/` — Git hooks (Fantomas pre-commit, Entire CLI)
+
+16 projects. Key assemblies:
+- `Frank` — Core CE builders (`resource`, `webHost`), metadata types
+- `Frank.Discovery` — OPTIONS, Link headers, JSON Home middlewares
+- `Frank.Statecharts` — Parser/generator suite, runtime, affordances
+- `Frank.Statecharts.Core` — Zero-dep AST types (`Frank.Statecharts.Ast`)
+- `Frank.Resources.Model` — Zero-dep resource model, affordance map
+
+## Constitution (non-negotiable)
+
+These principles govern all code changes. See `.kittify/memory/constitution.md` for full rationale.
+
+1. **Resource-Oriented Design.** Resources are the primary abstraction, not URL patterns with handlers. The `resource` CE is the central API. Hypermedia over static specs.
+2. **Idiomatic F#.** CEs for config, DUs for choices, Option over null, pipeline-friendly signatures, declarative over imperative.
+3. **Library, Not Framework.** No view engine, no ORM, no auth system. Compose with ASP.NET Core, don't replace it.
+4. **ASP.NET Core Native.** Expose `HttpContext` directly. Don't hide the platform behind abstractions.
+5. **Performance Parity.** No runtime overhead vs raw ASP.NET Core routing. Avoid allocations in hot paths. Benchmark perf-sensitive changes.
+6. **Resource Disposal Discipline.** All `IDisposable` values MUST use `use` bindings. No exceptions.
+7. **No Silent Exception Swallowing.** Middleware/request code MUST log via `ILogger`. No bare `with _ ->` catch-alls.
+8. **No Duplicated Logic.** Same function in 2+ modules → extract to shared module before merge. Copy-paste is a review blocker.
+
+## F# Patterns
+
+- **CE builders**: `ResourceBuilder`, `WebHostBuilder` — the CE ceremony IS the pit of success. Never suggest simplifying it.
+- **Extensions**: `[<AutoOpen>] module` + `type X with [<CustomOperation>]`
+- **Tests**: Expecto + ASP.NET TestHost. Use `testTask` for async, `testCase` for pure.
+- **Type annotations needed**: `let! (resp: HttpResponseMessage) = client.SendAsync(req)` — F# needs explicit types on `let!` bindings in task CEs.
+- **Handler overloads**: Wrap lambdas in `RequestDelegate(fun ctx -> ...)` to resolve `ResourceBuilder.Get` overload ambiguity.
+- **`use` in task CEs**: Requires `IAsyncDisposable`. `IHost`/`IDisposable` types need `let` not `use` in `task { }`.
+- **`ResourceEndpointDataSource` is internal**: Tests create their own `EndpointDataSource` subclass.
+- **fsproj compile order matters**: Types must be defined before use. Add new files in dependency order.
+
+## Workflow Rules
+
+### Git workflow
+- **Keep master clean by working on a worktree within `.worktrees/`.** Every change — features, fixes, docs, config — follows: create worktree → work on branch → push → create PR → merge on approval. This keeps master free of in-progress commits (spec-kitty status, partial work) so parallel branches can always use local master as a clean base.
+- **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
+- **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
+
+### Planning and communication
+- **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
+- **Report autonomous decisions.** Maintain a running decisions table (Decision, Rationale, Impact) when making choices without explicit user confirmation.
+- **Use reviewer-informed questions.** Draw on the expert panel perspectives when asking clarifying questions. "What do my experts recommend?" = consult the reviewer panel.
+
+### Implementation
+- **Always use spec-kitty commands** for pipeline work. Never bypass by generating artifacts manually.
+- **Never blame pre-existing issues.** Surface, investigate, and file issues. Never dismiss problems as "not my change."
+- **Portable concept filter.** When scoping work, ask: "Is this a portable concept or an F#-specific detail?" Portable concepts (statechart semantics, ALPS discovery, affordance projection) get full investment. F#-specific details (CE syntax, DU encoding, .NET middleware) are implemented but not over-invested.
+- **No lightweight API.** Never suggest a simplified `frank.get "/path" handler` alternative. The CE is the design. On-ramp is solved by docs/examples.
+- **Prefer skills over commands.** Use `.claude/skills/` (portable across repos via plugins) rather than `.claude/commands/` (repo-local only). Skills support YAML frontmatter, model selection, and isolation modes.
+
+### Strategy (Phase 1: demonstrate the thesis)
+- Prove the ideas work: naive-client demo, generated-artifact reference app, blog series
+- Don't optimize prematurely (that's Phase 2)
+- Don't abstract for portability prematurely (that's Phase 3)
+- The "is this portable?" filter avoids dead ends but doesn't drive new work
+
+## Recurring Skills
+
+Run these at the suggested cadence to maintain quality and capture learning.
+
+| Skill | When to run | What it does |
+|-------|-------------|--------------|
+| `/context-dump` | Start of session, after a break, or "where are we?" | Aggregates GitHub issues, PRs, milestones, recent activity into a briefing |
+| `/retrospective` | End of every session or major task | Mines session for CLAUDE.md rules, skill candidates, agent candidates |
+| `/simplify` | After completing a feature (post-commit, pre-PR) | Parallel agents review changed code for reuse, quality, efficiency |
+| `/techdebt` | Weekly or before cleanup sprints | Scans code + GitHub for tech debt, categorizes by priority, proposes fixes |
+| `/expert-review` | Before merging any PR or "what do my experts think?" | Dispatches 2-4 expert agents in parallel for multi-perspective review |
+| `/spec-kitty.status` | Start of session when resuming pipeline work | Kanban board showing work package progress |
+
+**Not recurring but important to remember:**
+- `/spec-kitty.specify` → `/spec-kitty.plan` → `/spec-kitty.tasks` — full pipeline for new features
+- `superpowers:brainstorming` — before any creative/design work
+- `superpowers:systematic-debugging` — before proposing fixes for any bug
+
+## Expert Panel
+
+"My experts" = 10 reviewer agents in `~/.claude/agents/expert-*.md`. Dispatch via `/expert-review`.
+
+| Tier | Experts | Focus |
+|------|---------|-------|
+| 1 (highest gap) | Fielding, Darrel Miller | HATEOAS, API discovery, HTTP standards |
+| 2 (active) | Fowler, @7sharp9 | ASP.NET Core, F# performance |
+| 3 (long-term) | Harel, Seemann, Don Syme | Statecharts, purity, F# API design |
+| 4 (domain) | Amundsen, Wlaschin, Claude-agent | ALPS, F# DX, agentic consumption |
+
+Dispatch 2-4 per review based on change type. Don't dispatch all 10.
