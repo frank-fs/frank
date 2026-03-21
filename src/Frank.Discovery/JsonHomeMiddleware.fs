@@ -12,7 +12,7 @@ open Frank.Builder
 /// Receives EndpointDataSource via DI constructor injection. Lazily computes the
 /// JSON Home document on first request (after all endpoints are finalized) and
 /// caches the result forever.
-type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource) =
+type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, serviceProvider: System.IServiceProvider) =
 
     static let jsonHomeMediaType = "application/json-home"
 
@@ -25,7 +25,10 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource) =
         if isNull cachedJson then
             lock lockObj (fun () ->
                 if isNull cachedJson then
-                    let metadata: JsonHomeMetadata option = None
+                    let metadata =
+                        match serviceProvider.GetService(typeof<JsonHomeMetadata>) with
+                        | :? JsonHomeMetadata as m -> Some m
+                        | _ -> None
                     let assemblyName =
                         let asm = System.Reflection.Assembly.GetEntryAssembly()
                         if isNull asm then "Frank" else asm.GetName().Name

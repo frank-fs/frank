@@ -182,3 +182,47 @@ let ceTests =
             Expect.notEqual contentType "application/json-home" "should not be json-home"
         }
     ]
+
+[<Tests>]
+let metadataTests =
+    testList "JsonHomeMiddleware with metadata" [
+        testTask "resolves JsonHomeMetadata from DI for ALPS enrichment" {
+            let gamesRes = resource "/games/{gameId}" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game"))) }
+            let dataSource = MiddlewareTestDataSource(gamesRes.Endpoints)
+
+            let metadata: JsonHomeMetadata =
+                { Title = Some "Game API"
+                  DocsUrl = Some "/scalar/v1"
+                  AlpsBaseUri = Some "http://example.com/alps/games"
+                  AlpsDescriptors = Some (Map.ofList [ "games", Map.ofList [ "gameId", "http://example.com/alps/games#gameId" ] ]) }
+
+            let builder =
+                Host.CreateDefaultBuilder([||])
+                    .ConfigureWebHost(fun webBuilder ->
+                        webBuilder
+                            .UseTestServer()
+                            .ConfigureServices(fun services ->
+                                services.AddRouting() |> ignore
+                                services.AddSingleton<EndpointDataSource>(dataSource) |> ignore
+                                services.AddSingleton<JsonHomeMetadata>(metadata) |> ignore)
+                            .Configure(fun app ->
+                                app.UseMiddleware<JsonHomeMiddleware>() |> ignore
+                                app.UseRouting() |> ignore
+                                app.UseEndpoints(fun endpoints ->
+                                    endpoints.DataSources.Add(dataSource)) |> ignore)
+                        |> ignore)
+                    .Build()
+
+            builder.Start()
+            let client = builder.GetTestClient()
+
+            let req = new HttpRequestMessage(HttpMethod.Get, "/")
+            req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+            let! (resp: HttpResponseMessage) = client.SendAsync(req)
+            let! (body: string) = resp.Content.ReadAsStringAsync()
+            Expect.isTrue (body.Contains("Game API")) "should use metadata title"
+            Expect.isTrue (body.Contains("http://example.com/alps/games#games")) "should have ALPS relation"
+            Expect.isTrue (body.Contains("http://example.com/alps/games#gameId")) "should have ALPS hrefVar"
+            Expect.isTrue (body.Contains("/scalar/v1")) "should have docs URL"
+        }
+    ]
