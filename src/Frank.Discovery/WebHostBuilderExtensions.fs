@@ -31,9 +31,11 @@ module WebHostBuilderExtensions =
                         app.UseMiddleware<LinkHeaderMiddleware>() |> ignore
                         app }
 
-        /// Convenience: registers both OPTIONS discovery and Link header middlewares.
-        [<CustomOperation("useDiscovery")>]
-        member _.UseDiscovery(spec: WebHostSpec) : WebHostSpec =
+        /// Registers OPTIONS discovery and Link header middlewares (without JSON Home).
+        /// Responses lack API-level discovery — clients must know the root URL.
+        /// For the full discovery bundle including JSON Home, use useDiscovery.
+        [<CustomOperation("useDiscoveryHeaders")>]
+        member _.UseDiscoveryHeaders(spec: WebHostSpec) : WebHostSpec =
             { spec with
                 Middleware =
                     spec.Middleware
@@ -56,3 +58,13 @@ module WebHostBuilderExtensions =
                     >> fun app ->
                         app.UseMiddleware<JsonHomeMiddleware>() |> ignore
                         app }
+
+        /// Registers all three discovery middlewares: OPTIONS responses, Link headers,
+        /// and JSON Home at the root. This is the recommended default.
+        /// JSON Home middleware runs before routing (to avoid root route conflicts);
+        /// OPTIONS and Link header middlewares run after routing.
+        [<CustomOperation("useDiscovery")>]
+        member this.UseDiscovery(spec: WebHostSpec) : WebHostSpec =
+            // UseJsonHome → BeforeRoutingMiddleware; UseDiscoveryHeaders → Middleware.
+            // Order here is documentation, not semantics — they write to different pipeline slots.
+            spec |> this.UseJsonHome |> this.UseDiscoveryHeaders
