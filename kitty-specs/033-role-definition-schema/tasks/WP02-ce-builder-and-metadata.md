@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: CE Builder & Metadata Construction
-lane: "for_review"
+lane: "doing"
 dependencies: [WP01]
 base_branch: 033-role-definition-schema-WP01
 base_commit: 053c53f26a85877e2e8bf21d29c9ca7013d8efc4
@@ -15,8 +15,8 @@ subtasks:
 - T014
 phase: Phase 1 - Core Implementation
 assignee: ''
-agent: "claude-opus"
-shell_pid: "2394"
+agent: "claude-opus-reviewer"
+shell_pid: "5871"
 review_status: ''
 reviewed_by: ''
 history:
@@ -234,3 +234,4 @@ Depends on WP01 (needs `RoleDefinition`, `RoleInfo`, `IRoleFeature` types).
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
 - 2026-03-21T20:19:35Z – claude-opus – shell_pid=2394 – lane=doing – Assigned agent via workflow command
 - 2026-03-21T23:10:09Z – claude-opus – shell_pid=2394 – lane=for_review – All 6 subtasks complete. role CE operation, duplicate validation, ResolveRoles closure with per-role exception handling. Build + all 1030+ tests pass.
+- 2026-03-21T23:10:26Z – claude-opus-reviewer – shell_pid=5871 – lane=doing – Started review via workflow command
