@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP02"
+work_package_id: WP02
+title: CE Builder & Metadata Construction
+lane: "doing"
+dependencies: [WP01]
+base_branch: 033-role-definition-schema-WP01
+base_commit: 053c53f26a85877e2e8bf21d29c9ca7013d8efc4
+created_at: '2026-03-21T20:19:35.147868+00:00'
 subtasks:
-  - "T009"
-  - "T010"
-  - "T011"
-  - "T012"
-  - "T013"
-  - "T014"
-title: "CE Builder & Metadata Construction"
-phase: "Phase 1 - Core Implementation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP01"]
-requirement_refs: ["FR-001", "FR-005", "FR-006"]
+- T009
+- T010
+- T011
+- T012
+- T013
+- T014
+phase: Phase 1 - Core Implementation
+assignee: ''
+agent: ''
+shell_pid: "2394"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-21T18:59:09Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-21T18:59:09Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-005, FR-006]
 ---
 
 # Work Package Prompt: WP02 – CE Builder & Metadata Construction
