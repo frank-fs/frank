@@ -16,25 +16,18 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
 
     static let jsonHomeMediaType = "application/json-home"
 
-    // Lazy computation: built on first request, cached forever
-    let mutable cachedJson: string = null
-    let mutable cachedDescribedByUrl: string option = None
-    let lockObj = obj ()
-
-    let ensureComputed () =
-        if isNull cachedJson then
-            lock lockObj (fun () ->
-                if isNull cachedJson then
-                    let metadata =
-                        match serviceProvider.GetService(typeof<JsonHomeMetadata>) with
-                        | :? JsonHomeMetadata as m -> Some m
-                        | _ -> None
-                    let assemblyName =
-                        let asm = System.Reflection.Assembly.GetEntryAssembly()
-                        if isNull asm then "Frank" else asm.GetName().Name
-                    let input = JsonHomeProjection.project dataSource metadata assemblyName
-                    cachedDescribedByUrl <- input.DescribedByUrl
-                    cachedJson <- JsonHomeDocument.build input)
+    // Lazy computation: thread-safe via Lazy<T> (ExecutionAndPublication mode).
+    // Built on first request after all endpoints are finalized, cached forever.
+    let computed = lazy(
+        let metadata =
+            match serviceProvider.GetService(typeof<JsonHomeMetadata>) with
+            | :? JsonHomeMetadata as m -> Some m
+            | _ -> None
+        let assemblyName =
+            let asm = System.Reflection.Assembly.GetEntryAssembly()
+            if isNull asm then "Frank" else asm.GetName().Name
+        let input = JsonHomeProjection.project dataSource metadata assemblyName
+        input.DescribedByUrl, JsonHomeDocument.build input)
 
     let isJsonHomeAccept (ctx: HttpContext) =
         let acceptHeaders = ctx.Request.GetTypedHeaders().Accept
@@ -55,16 +48,16 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
         elif not (isJsonHomeAccept ctx) then
             next.Invoke(ctx)
         else
-            ensureComputed ()
+            let describedByUrl, json = computed.Value
 
             ctx.Response.StatusCode <- 200
             ctx.Response.ContentType <- jsonHomeMediaType
             ctx.Response.Headers["Vary"] <- "Accept"
             ctx.Response.Headers["Cache-Control"] <- "max-age=3600"
 
-            match cachedDescribedByUrl with
+            match describedByUrl with
             | Some url ->
                 ctx.Response.Headers.Append("Link", $"<{url}>; rel=\"describedby\"")
             | None -> ()
 
-            ctx.Response.WriteAsync(cachedJson)
+            ctx.Response.WriteAsync(json)

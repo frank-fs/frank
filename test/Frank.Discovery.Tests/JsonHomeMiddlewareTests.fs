@@ -114,6 +114,15 @@ let tests =
             let! (resp: HttpResponseMessage) = client.SendAsync(req)
             Expect.equal resp.StatusCode HttpStatusCode.OK "should match ignoring parameters"
         }
+
+        testTask "Accept with multiple types and quality values selects json-home" {
+            let client = buildTestServer ()
+            let req = new HttpRequestMessage(HttpMethod.Get, "/")
+            req.Headers.TryAddWithoutValidation("Accept", "application/json-home, text/html;q=0.9") |> ignore
+            let! (resp: HttpResponseMessage) = client.SendAsync(req)
+            Expect.equal resp.StatusCode HttpStatusCode.OK "should match json-home in multi-value Accept"
+            Expect.equal (resp.Content.Headers.ContentType.MediaType) "application/json-home" "content type"
+        }
     ]
 
 /// Build a test server from a WebHostSpec, replicating the CE Run pipeline with TestServer.

@@ -8,14 +8,15 @@ open Frank.Builder
 module JsonHomeProjection =
 
     /// Route prefixes that indicate framework-internal endpoints (not user resources).
+    /// Matched against the route template after stripping the leading '/'.
     let private internalPrefixes =
-        [| ".well-known"; "alps/"; "/alps/"; "ontology/"; "/ontology/"
-           "shapes/"; "/shapes/"; "schemas/"; "/schemas/"
-           "scalar/"; "/scalar/"; "openapi/"; "/openapi/" |]
+        [| ".well-known/"; "alps/"; "ontology/"; "shapes/"
+           "schemas/"; "scalar/"; "openapi/" |]
 
     let private isInternalEndpoint (rawText: string) =
+        let normalized = rawText.TrimStart('/')
         internalPrefixes |> Array.exists (fun prefix ->
-            rawText.Contains(prefix))
+            normalized.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
 
     /// Extract route variable names from a RouteEndpoint using RoutePattern.Parameters.
     let private extractRouteVariables
