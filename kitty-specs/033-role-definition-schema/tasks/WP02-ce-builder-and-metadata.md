@@ -15,7 +15,7 @@ subtasks:
 - T014
 phase: Phase 1 - Core Implementation
 assignee: ''
-agent: ''
+agent: "claude-opus"
 shell_pid: "2394"
 review_status: ''
 reviewed_by: ''
@@ -232,3 +232,4 @@ Depends on WP01 (needs `RoleDefinition`, `RoleInfo`, `IRoleFeature` types).
 ## Activity Log
 
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
+- 2026-03-21T20:19:35Z – claude-opus – shell_pid=2394 – lane=doing – Assigned agent via workflow command
