@@ -614,7 +614,7 @@ let private buildUnifiedResources
                 |> Map.ofList
 
             let statechart =
-                StatechartExtractor.toExtractedStatechart route stateNames initialStateKey guardNames stateMetadata
+                StatechartExtractor.toExtractedStatechart route stateNames initialStateKey guardNames stateMetadata []
 
             let capabilities =
                 stateHandlers

@@ -14,6 +14,11 @@ type IStatechartFeature<'S, 'C> =
     abstract State: 'S option
     abstract Context: 'C option
 
+/// Typed feature for resolved roles, registered on HttpContext.Features.
+/// Non-generic — roles are always Set<string>.
+type IRoleFeature =
+    abstract Roles: Set<string>
+
 /// Extension methods for reading/writing statechart state via HttpContext.Features.
 [<AutoOpen>]
 module HttpContextStatechartExtensions =
@@ -25,6 +30,13 @@ module HttpContextStatechartExtensions =
         member ctx.GetStatechartFeature<'S, 'C>() : IStatechartFeature<'S, 'C> option =
             let f = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
             if obj.ReferenceEquals(f, null) then None else Some f
+
+        member ctx.SetRoles(roles: Set<string>) =
+            let feature =
+                { new IRoleFeature with
+                    member _.Roles = roles }
+
+            ctx.Features.Set<IRoleFeature>(feature)
 
         member ctx.SetStatechartState<'S, 'C>(stateKey: string, state: 'S, context: 'C, ?instanceId: string) =
             let feature =

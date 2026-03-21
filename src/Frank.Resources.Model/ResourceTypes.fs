@@ -33,6 +33,12 @@ module ProjectedProfiles =
         && Map.isEmpty profiles.ShaclShapes
         && Map.isEmpty profiles.JsonSchemas
 
+/// Portable, zero-dependency role representation for spec pipeline consumers.
+/// Hierarchy-neutral — does not assume flat or hierarchical state structures.
+type RoleInfo =
+    { Name: string
+      Description: string option }
+
 /// Structured representation of a single stateful resource extracted from source.
 /// String keys (StateNames, InitialStateKey, GuardNames) are F# DU case names
 /// derived from the state type at compile time (e.g., "XTurn", "GameOver").
@@ -41,7 +47,8 @@ type ExtractedStatechart =
       StateNames: string list
       InitialStateKey: string
       GuardNames: string list
-      StateMetadata: Map<string, StateInfo> }
+      StateMetadata: Map<string, StateInfo>
+      Roles: RoleInfo list }
 
 /// HTTP capability for a resource, optionally scoped to a state.
 type HttpCapability =

@@ -72,7 +72,8 @@ let private ticTacToeStatechart: ExtractedStatechart =
           { IsFinal = true
             AllowedMethods = [ "GET" ]
             Description = None } ]
-        |> Map.ofList }
+        |> Map.ofList
+      Roles = [] }
 
 let private ticTacToeResource: UnifiedResource =
     { RouteTemplate = "/games/{gameId}"

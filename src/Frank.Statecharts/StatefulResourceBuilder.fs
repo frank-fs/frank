@@ -226,7 +226,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
             let guardCtx: AccessControlContext<'S, 'C> =
                 { User = ctx.User
                   CurrentState = state
-                  Context = context }
+                  Context = context
+                  Roles = Set.empty }
 
             accessGuards
             |> List.tryPick (fun (_, pred) ->
@@ -248,7 +249,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     { User = ctx.User
                       CurrentState = state
                       Event = event
-                      Context = context }
+                      Context = context
+                      Roles = Set.empty }
 
                 eventGuards
                 |> List.tryPick (fun (_, pred) ->

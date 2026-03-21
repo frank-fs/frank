@@ -22,14 +22,26 @@ type GuardResult =
 type AccessControlContext<'State, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
-      Context: 'Context }
+      Context: 'Context
+      Roles: Set<string> }
+
+    member this.HasRole(roleName: string) = this.Roles.Contains(roleName)
 
 /// Context for event-validation guards (post-handler). Event is the actual value set by the handler.
 type EventValidationContext<'State, 'Event, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
       Event: 'Event
-      Context: 'Context }
+      Context: 'Context
+      Roles: Set<string> }
+
+    member this.HasRole(roleName: string) = this.Roles.Contains(roleName)
+
+/// Named role with identity-matching predicate.
+/// Per-resource, not global. The predicate is the source of truth for runtime evaluation.
+type RoleDefinition =
+    { Name: string
+      ClaimsPredicate: ClaimsPrincipal -> bool }
 
 /// A guard that controls access to state transitions.
 /// The DU case determines both execution phase and type signature.
