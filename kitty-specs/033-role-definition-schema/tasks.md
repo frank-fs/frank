@@ -17,14 +17,14 @@
 **Estimated Size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T001 [P] Add `RoleInfo` type to `src/Frank.Resources.Model/ResourceTypes.fs`
-- [ ] T002 Add `Roles: RoleInfo list` field to `ExtractedStatechart` in `src/Frank.Resources.Model/ResourceTypes.fs`
-- [ ] T003 Update `StatechartExtractor.toExtractedStatechart` factory to accept `roles` parameter
-- [ ] T004 [P] Update call sites in `UnifiedExtractor.fs` and `StatechartSourceExtractor.fs` to pass `Roles = []`
-- [ ] T005 [P] Add `RoleDefinition` type to `src/Frank.Statecharts/Types.fs`
-- [ ] T006 Add `Roles: Set<string>` field + `HasRole` member to `AccessControlContext` in `Types.fs`; update `evaluateGuards` closure construction with `Roles = Set.empty`
-- [ ] T007 Add `Roles: Set<string>` field + `HasRole` member to `EventValidationContext` in `Types.fs`; update `evaluateEventGuards` closure construction with `Roles = Set.empty`
-- [ ] T008 [P] Add `IRoleFeature` interface + `SetRoles` extension method to `src/Frank.Statecharts/StatechartFeature.fs`
+- [x] T001 [P] Add `RoleInfo` type to `src/Frank.Resources.Model/ResourceTypes.fs`
+- [x] T002 Add `Roles: RoleInfo list` field to `ExtractedStatechart` in `src/Frank.Resources.Model/ResourceTypes.fs`
+- [x] T003 Update `StatechartExtractor.toExtractedStatechart` factory to accept `roles` parameter
+- [x] T004 [P] Update call sites in `UnifiedExtractor.fs` and `StatechartSourceExtractor.fs` to pass `Roles = []`
+- [x] T005 [P] Add `RoleDefinition` type to `src/Frank.Statecharts/Types.fs`
+- [x] T006 Add `Roles: Set<string>` field + `HasRole` member to `AccessControlContext` in `Types.fs`; update `evaluateGuards` closure construction with `Roles = Set.empty`
+- [x] T007 Add `Roles: Set<string>` field + `HasRole` member to `EventValidationContext` in `Types.fs`; update `evaluateEventGuards` closure construction with `Roles = Set.empty`
+- [x] T008 [P] Add `IRoleFeature` interface + `SetRoles` extension method to `src/Frank.Statecharts/StatechartFeature.fs`
 
 ### Implementation Notes
 - All new record fields initialize with empty defaults (`[]`, `Set.empty`) at existing construction sites
