@@ -47,33 +47,52 @@ module WebHostBuilderExtensions =
         /// model.bin lives in a library assembly, use useAffordancesWith.
         [<CustomOperation("useAffordances")>]
         member this.UseAffordances(spec: WebHostSpec) : WebHostSpec =
-            let logAtStartup (level: string) (msg: string) =
+            let logWarn (msg: string) =
                 { spec with
                     Middleware =
                         spec.Middleware
                         >> fun app ->
-                            let logger =
-                                app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-                                    .CreateLogger<AffordanceMiddleware>()
+                            app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+                                .CreateLogger<AffordanceMiddleware>()
+                                .LogWarning(msg)
 
-                            if level = "warn" then
-                                logger.LogWarning(msg)
-                            else
-                                logger.LogInformation(msg)
+                            app }
+
+            let logInfo (msg: string) =
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+                                .CreateLogger<AffordanceMiddleware>()
+                                .LogInformation(msg)
 
                             app }
 
             match Assembly.GetEntryAssembly() with
             | null ->
-                logAtStartup
-                    "warn"
+                logWarn
                     "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map."
             | assembly ->
                 match StartupProjection.loadAffordanceMapFromAssembly assembly with
-                | Some map -> this.UseAffordancesWith(spec, map)
+                | Some map ->
+                    let loaded =
+                        { spec with
+                            Middleware =
+                                spec.Middleware
+                                >> fun app ->
+                                    app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+                                        .CreateLogger<AffordanceMiddleware>()
+                                        .LogInformation(
+                                            "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
+                                            assembly.GetName().Name,
+                                            map.Entries.Length)
+
+                                    app }
+
+                    this.UseAffordancesWith(loaded, map)
                 | None ->
-                    logAtStartup
-                        "info"
+                    logInfo
                         (sprintf
                             "model.bin not found or unreadable in assembly '%s'; affordances not loaded. Use useAffordancesWith to supply an explicit map."
                             (assembly.GetName().Name))
