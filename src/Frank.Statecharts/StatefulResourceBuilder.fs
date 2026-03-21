@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Frank.Resources.Model
 open Frank.Builder
 
@@ -81,6 +82,10 @@ type StateMachineMetadata =
         EvaluateEventGuards: HttpContext -> GuardResult
         /// Post-handler: get event from HttpContext.Items, read state/context from IStatechartFeature, run transition, persist, return result.
         ExecuteTransition: IServiceProvider -> HttpContext -> string -> Task<TransitionAttemptResult>
+        /// Role definitions for this resource (for spec pipeline extraction).
+        Roles: RoleDefinition list
+        /// Closure: evaluates role predicates against ctx.User, returns Set<string> of matching role names.
+        ResolveRoles: HttpContext -> Set<string>
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -105,7 +110,8 @@ type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'St
       StateHandlerMap: Map<string, (string * RequestDelegate) list>
       TransitionObservers: (TransitionEvent<'State, 'Event, 'Context> -> unit) list
       ResolveInstanceId: (HttpContext -> string) option
-      Metadata: (EndpointBuilder -> unit) list }
+      Metadata: (EndpointBuilder -> unit) list
+      Roles: RoleDefinition list }
 
 /// Helper functions for building per-state handler lists.
 [<RequireQualifiedAccess>]
@@ -141,7 +147,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
           StateHandlerMap = Map.empty
           TransitionObservers = []
           ResolveInstanceId = None
-          Metadata = [] }
+          Metadata = []
+          Roles = [] }
 
     /// Register a pre-built state machine definition.
     [<CustomOperation("machine")>]
@@ -171,6 +178,12 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with
             ResolveInstanceId = Some resolver }
 
+    /// Declare a named role with an identity-matching predicate.
+    [<CustomOperation("role")>]
+    member _.Role(spec: StatefulResourceSpec<'S, 'E, 'C>, name: string, predicate: ClaimsPrincipal -> bool) =
+        { spec with
+            Roles = { Name = name; ClaimsPredicate = predicate } :: spec.Roles }
+
     member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : Resource =
         let machine =
             spec.Machine
@@ -182,6 +195,49 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 fun (ctx: HttpContext) ->
                     let routeData = ctx.GetRouteData()
                     routeData.Values.Values |> Seq.head |> string)
+
+        // Validate role definitions — fail fast on duplicates or empty names
+        let emptyNames = spec.Roles |> List.filter (fun r -> String.IsNullOrWhiteSpace r.Name)
+
+        if not (List.isEmpty emptyNames) then
+            failwithf "Empty role name on resource '%s'" routeTemplate
+
+        let roleNames = spec.Roles |> List.map (fun r -> r.Name)
+
+        let duplicates =
+            roleNames
+            |> List.groupBy id
+            |> List.filter (fun (_, g) -> g.Length > 1)
+            |> List.map fst
+
+        if not (List.isEmpty duplicates) then
+            failwithf "Duplicate role names on resource '%s': %s" routeTemplate (String.concat ", " duplicates)
+
+        // Closure: evaluate role predicates against ctx.User, catch exceptions per-role
+        let resolveRoles (ctx: HttpContext) : Set<string> =
+            if List.isEmpty spec.Roles then
+                Set.empty
+            else
+                let logger =
+                    ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Statecharts.RoleResolution")
+
+                spec.Roles
+                |> List.choose (fun role ->
+                    try
+                        if role.ClaimsPredicate ctx.User then
+                            Some role.Name
+                        else
+                            None
+                    with ex ->
+                        logger.LogWarning(
+                            ex,
+                            "Role predicate '{RoleName}' threw an exception for resource '{RouteTemplate}'",
+                            role.Name,
+                            routeTemplate
+                        )
+
+                        None)
+                |> Set.ofList
 
         // Precomputed state key extractor: DU case name for unions, ToString() for others.
         let stateKey (state: 'S) = StateKeyExtractor.keyOf state
@@ -318,7 +374,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
               GetCurrentStateKey = getCurrentStateKey
               EvaluateGuards = evaluateGuards
               EvaluateEventGuards = evaluateEventGuards
-              ExecuteTransition = executeTransition }
+              ExecuteTransition = executeTransition
+              Roles = spec.Roles
+              ResolveRoles = resolveRoles }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.
