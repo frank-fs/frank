@@ -32,7 +32,7 @@ module StatusCommand =
             Error $"Project file not found: {projectPath}"
         else
             let projectDir = Path.GetDirectoryName(projectPath)
-            let stateDir = Path.Combine(projectDir, "obj", "frank-cli")
+            let stateDir = Path.Combine(projectDir, "obj", "frank")
             let statePath = ExtractionState.defaultStatePath projectDir
 
             let extraction =

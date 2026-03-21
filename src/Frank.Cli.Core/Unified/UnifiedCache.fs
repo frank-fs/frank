@@ -24,7 +24,7 @@ let cacheFileName = "model.bin"
 
 /// Compute the full cache path for a project directory.
 let cachePath (projectDir: string) : string =
-    Path.Combine(projectDir, "obj", "frank-cli", cacheFileName)
+    Path.Combine(projectDir, "obj", "frank", cacheFileName)
 
 /// Serialize and write UnifiedExtractionState to binary cache file.
 let save (path: string) (state: UnifiedExtractionState) : Result<unit, string> =
@@ -131,7 +131,7 @@ let tryLoadFresh (projectDir: string) (force: bool) : Result<UnifiedExtractionSt
     checkStaleness projectDir force cached
 
 /// Save unified extraction state to cache and return the state.
-/// Creates the obj/frank-cli/ directory if needed.
+/// Creates the obj/frank/ directory if needed.
 let saveExtractionState
     (projectDir: string)
     (resources: UnifiedResource list)

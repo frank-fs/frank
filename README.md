@@ -525,13 +525,13 @@ Clients request RDF formats via the `Accept` header:
 
 ### Semantic Toolchain
 
-Use `frank-cli` to extract an ontology from your F# types:
+Use `frank` to extract an ontology from your F# types:
 
 ```bash
-dotnet tool install --global frank-cli
-frank-cli semantic extract --project MyApp.fsproj --base-uri https://example.org/api
-frank-cli semantic validate --project MyApp.fsproj
-frank-cli semantic compile --project MyApp.fsproj
+dotnet tool install --global frank
+frank semantic extract --project MyApp.fsproj --base-uri https://example.org/api
+frank semantic validate --project MyApp.fsproj
+frank semantic compile --project MyApp.fsproj
 ```
 
 The compiled artifacts are automatically embedded by `Frank.Cli.MSBuild` and loaded at startup by `useLinkedData`.
@@ -539,9 +539,9 @@ The compiled artifacts are automatically embedded by `Frank.Cli.MSBuild` and loa
 The CLI also provides unified commands for the full pipeline (semantic + statechart extraction):
 
 ```bash
-frank-cli extract --project MyApp.fsproj --base-uri https://example.org/api
-frank-cli generate --project MyApp.fsproj --format all --output ./specs
-frank-cli status --project MyApp.fsproj
+frank extract --project MyApp.fsproj --base-uri https://example.org/api
+frank generate --project MyApp.fsproj --format all --output ./specs
+frank status --project MyApp.fsproj
 ```
 
 See [Spec Pipeline](docs/SPEC-PIPELINE.md) for the full CLI reference.

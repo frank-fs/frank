@@ -99,7 +99,7 @@ let tests =
                       "Error should mention the expected resource name"
 
                   Expect.stringContains msg (assembly.GetName().Name) "Error should mention the assembly name"
-                  Expect.stringContains msg "frank-cli compile" "Error should suggest running frank-cli compile"
+                  Expect.stringContains msg "frank compile" "Error should suggest running frank compile"
               | _ -> failwith "unreachable"
 
           testCase "loadConfig failure wraps as InvalidOperationException per useLinkedData contract"
@@ -127,8 +127,8 @@ let tests =
 
                   Expect.stringContains
                       ex.Message
-                      "frank-cli compile"
-                      "Exception should suggest running frank-cli compile"
+                      "frank compile"
+                      "Exception should suggest running frank compile"
               | _ -> failwith "unreachable"
 
           testCase "useLinkedData fails with descriptive message when GetEntryAssembly returns null"

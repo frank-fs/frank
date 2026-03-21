@@ -36,13 +36,13 @@ let private findSampleProject () =
 let tests =
     testList
         "E2E"
-        [ testCase "frank-cli extract → compile against sample project"
+        [ testCase "frank extract → compile against sample project"
           <| fun _ ->
               let fsproj = findSampleProject ()
               let projectDir = Path.GetDirectoryName fsproj
 
               // Clean any prior state
-              let frankCliDir = Path.Combine(projectDir, "obj", "frank-cli")
+              let frankCliDir = Path.Combine(projectDir, "obj", "frank")
 
               if Directory.Exists frankCliDir then
                   Directory.Delete(frankCliDir, true)

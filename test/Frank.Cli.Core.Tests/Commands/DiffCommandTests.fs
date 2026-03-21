@@ -51,7 +51,7 @@ let tests =
                   ExtractionState.save statePath newState |> ignore
 
                   // Save old state as a backup
-                  let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                  let backupDir = Path.Combine(tempDir, "obj", "frank", "backups")
                   Directory.CreateDirectory(backupDir) |> ignore
                   let backupPath = Path.Combine(backupDir, "extraction-state-20260101T000000Z.json")
                   ExtractionState.save backupPath oldState |> ignore
@@ -198,7 +198,7 @@ let tests =
                   let statePath = ExtractionState.defaultStatePath tempDir
                   ExtractionState.save statePath newState |> ignore
 
-                  let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                  let backupDir = Path.Combine(tempDir, "obj", "frank", "backups")
                   Directory.CreateDirectory(backupDir) |> ignore
 
                   // Older backup

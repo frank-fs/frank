@@ -1,11 +1,11 @@
 <Project>
   <PropertyGroup>
-    <FrankCliOutputPath Condition="'$(FrankCliOutputPath)' == ''">$(IntermediateOutputPath)frank-cli/</FrankCliOutputPath>
+    <FrankCliOutputPath Condition="'$(FrankCliOutputPath)' == ''">$(IntermediateOutputPath)frank/</FrankCliOutputPath>
     <!-- Set to 'true' to opt out of automatic shape generation during build. -->
     <FrankCliBaseUri Condition="'$(FrankCliBaseUri)' == ''">urn:frank:$(AssemblyName)/</FrankCliBaseUri>
     <FrankCliSkipGeneration Condition="'$(FrankCliSkipGeneration)' == ''">false</FrankCliSkipGeneration>
-    <!-- Unified resource model binary produced by frank-cli extract -->
-    <FrankResourcesPath Condition="'$(FrankResourcesPath)' == ''">$(BaseIntermediateOutputPath)frank-cli/model.bin</FrankResourcesPath>
+    <!-- Unified resource model binary produced by frank extract -->
+    <FrankResourcesPath Condition="'$(FrankResourcesPath)' == ''">$(BaseIntermediateOutputPath)frank/model.bin</FrankResourcesPath>
     <FrankResourcesLogicalName Condition="'$(FrankResourcesLogicalName)' == ''">Frank.Resources.model.bin</FrankResourcesLogicalName>
   </PropertyGroup>
 </Project>

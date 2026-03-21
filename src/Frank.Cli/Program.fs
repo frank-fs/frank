@@ -11,7 +11,7 @@ open Frank.Cli.Core.Unified
 [<EntryPoint>]
 let main args =
     let root =
-        RootCommand("frank-cli: Semantic resource extraction for Frank applications")
+        RootCommand("frank: Semantic resource extraction for Frank applications")
 
     // ── semantic (parent) ──
     let semanticCmd = Command("semantic")

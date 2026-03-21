@@ -78,7 +78,7 @@ let toExtractionState (unified: UnifiedExtractionState) : ExtractionState =
 module UnifiedStateLoader =
 
     let private unifiedStatePath (projectDir: string) : string =
-        Path.Combine(projectDir, "obj", "frank-cli", "model.bin")
+        Path.Combine(projectDir, "obj", "frank", "model.bin")
 
     /// Load extraction state from unified binary or detect old format.
     let loadExtractionState (projectDir: string) : Result<ExtractionState, string> =
@@ -100,7 +100,7 @@ module UnifiedStateLoader =
                 // Unified file exists but is corrupt -- check for legacy fallback
                 if File.Exists legacyPath then
                     Error
-                        $"Unified state file is unreadable (%s{ex.Message}). Please re-extract: frank-cli semantic extract --project <fsproj>"
+                        $"Unified state file is unreadable (%s{ex.Message}). Please re-extract: frank semantic extract --project <fsproj>"
                 else
                     Error $"Unified state file is unreadable: %s{ex.Message}"
         elif File.Exists legacyPath then
@@ -114,4 +114,4 @@ module UnifiedStateLoader =
                 Error $"Failed to load state: %s{e}"
         else
             Error
-                "No extraction state found. Run: frank-cli semantic extract --project <fsproj> --base-uri <URI>"
+                "No extraction state found. Run: frank semantic extract --project <fsproj> --base-uri <URI>"

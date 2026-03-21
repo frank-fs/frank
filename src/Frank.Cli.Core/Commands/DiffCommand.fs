@@ -13,7 +13,7 @@ module DiffCommand =
           FormattedDiff: string }
 
     let private findLatestBackup (projectDir: string) : string option =
-        let backupDir = Path.Combine(projectDir, "obj", "frank-cli", "backups")
+        let backupDir = Path.Combine(projectDir, "obj", "frank", "backups")
         if Directory.Exists backupDir then
             Directory.GetFiles(backupDir, "extraction-state-*.json")
             |> Array.sortDescending

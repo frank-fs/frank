@@ -18,7 +18,7 @@
 
 **Frank.Cli - Semantic Resource Extraction Toolchain**
 
-- **New Tool:** `frank-cli` command-line tool for extracting semantic definitions from F# source code
+- **New Tool:** `frank` command-line tool for extracting semantic definitions from F# source code
 - **Commands:**
   - `extract --project <path> --base-uri <uri>` — extract OWL ontology and SHACL shapes from F# types
   - `clarify --project <path>` — identify ambiguities requiring human input

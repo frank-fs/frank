@@ -32,7 +32,7 @@ module GraphLoader =
     let private missingResourceError (assembly: Assembly) (resource: string) =
         let msg =
             sprintf
-                "Assembly '%s' does not contain embedded resource '%s'. Run 'frank-cli compile' and add the output files as EmbeddedResource items."
+                "Assembly '%s' does not contain embedded resource '%s'. Run 'frank compile' and add the output files as EmbeddedResource items."
                 (assembly.GetName().Name)
                 resource
 

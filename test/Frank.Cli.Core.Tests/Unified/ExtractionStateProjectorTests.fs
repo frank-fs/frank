@@ -138,7 +138,7 @@ let extractionStateProjectorTests =
 
         testCase "Old-format detection with temp directory" <| fun () ->
             let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
-            let frankCliDir = Path.Combine(tempDir, "obj", "frank-cli")
+            let frankCliDir = Path.Combine(tempDir, "obj", "frank")
 
             try
                 Directory.CreateDirectory(frankCliDir) |> ignore

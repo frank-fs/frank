@@ -189,5 +189,5 @@ let tests =
 
               Expect.stringEnds
                   path
-                  (Path.Combine("obj", "frank-cli", "state.json"))
-                  "Should end with obj/frank-cli/state.json" ]
+                  (Path.Combine("obj", "frank", "state.json"))
+                  "Should end with obj/frank/state.json" ]

@@ -12,7 +12,7 @@ open Frank.Cli.Core.Rdf.Vocabularies
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Commands
 
-/// Creates an extraction state matching what frank-cli extract would produce
+/// Creates an extraction state matching what frank extract would produce
 /// for the Frank.LinkedData.Sample project's Product domain model.
 let private createProductExtractionState () =
     let ontology = createGraph ()
@@ -210,7 +210,7 @@ let tests =
                   CompileCommand.execute fakeProjectPath None |> ignore
 
                   // Save backup before modifying state
-                  let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                  let backupDir = Path.Combine(tempDir, "obj", "frank", "backups")
 
                   if not (Directory.Exists backupDir) then
                       Directory.CreateDirectory backupDir |> ignore

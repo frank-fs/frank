@@ -23,11 +23,11 @@ module OpenApiValidateCommand =
 
         // Load unified extraction state
         let unifiedPath =
-            Path.Combine(projectDir, "obj", "frank-cli", "model.bin")
+            Path.Combine(projectDir, "obj", "frank", "model.bin")
 
         if not (File.Exists unifiedPath) then
             Result.Error
-                "No unified extraction state found. Run: frank-cli semantic extract --project <fsproj>"
+                "No unified extraction state found. Run: frank semantic extract --project <fsproj>"
         else
 
         // Load the OpenAPI document

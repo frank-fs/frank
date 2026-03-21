@@ -84,7 +84,7 @@ let unifiedCacheTests =
 
                     try
                         let state = createSampleState "abc123"
-                        let path = Path.Combine(dir, "obj", "frank-cli", "descriptors.bin")
+                        let path = Path.Combine(dir, "obj", "frank", "descriptors.bin")
                         let result = UnifiedCache.save path state
                         Expect.isOk result "save should create directories and succeed"
                         Expect.isTrue (File.Exists(path)) "File should exist after save"

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageTags>rdf;owl;shacl;cli;semantic-web</PackageTags>
-    <Description>Core extraction library for frank-cli: derives OWL ontology and SHACL shapes from F# source definitions</Description>
+    <Description>Core extraction library for frank: derives OWL ontology and SHACL shapes from F# source definitions</Description>
   </PropertyGroup>
 
   <ItemGroup>

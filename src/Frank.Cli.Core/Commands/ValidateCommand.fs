@@ -137,7 +137,7 @@ module ValidateCommand =
                 match StalenessChecker.checkStaleness state with
                 | Stale ->
                     [ { Severity = Warning
-                        Message = "Source files have changed since last extraction. Run 'frank-cli extract' to update."
+                        Message = "Source files have changed since last extraction. Run 'frank extract' to update."
                         Uri = None } ]
                 | Fresh
                 | Indeterminate -> []

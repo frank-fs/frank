@@ -167,7 +167,7 @@ let tests =
                   assertTriple state2.Ontology (newClass, rdfType, owlClass)
 
                   // Save the backup before overwriting
-                  let backupDir = Path.Combine(tempDir, "obj", "frank-cli", "backups")
+                  let backupDir = Path.Combine(tempDir, "obj", "frank", "backups")
 
                   if not (Directory.Exists backupDir) then
                       Directory.CreateDirectory backupDir |> ignore
@@ -240,7 +240,7 @@ let tests =
 
               try
                   let state = createRealisticState tempDir
-                  let outputDir = Path.Combine(tempDir, "frank-cli-out")
+                  let outputDir = Path.Combine(tempDir, "frank-out")
 
                   let (ontologyPath, shapesPath, manifestPath) =
                       ArtifactSerializer.writeArtifacts state outputDir
@@ -281,11 +281,11 @@ let tests =
                   let statePath = ExtractionState.defaultStatePath tempDir
                   ExtractionState.save statePath state |> ignore
 
-                  let outputDir = Path.Combine(tempDir, "frank-cli-out")
+                  let outputDir = Path.Combine(tempDir, "frank-out")
 
                   // Simulate what the MSBuild target does: call ArtifactSerializer.writeArtifacts
-                  // directly (since we can't execute frank-cli as an external process in unit tests).
-                  // The real MSBuild path calls: dotnet frank-cli compile --project ... --base-uri ... --output ...
+                  // directly (since we can't execute frank as an external process in unit tests).
+                  // The real MSBuild path calls: dotnet frank compile --project ... --base-uri ... --output ...
                   let (ontologyPath, shapesPath, manifestPath) =
                       ArtifactSerializer.writeArtifacts state outputDir
 
@@ -334,10 +334,10 @@ let tests =
                   let statePath = ExtractionState.defaultStatePath tempDir
                   ExtractionState.save statePath state |> ignore
 
-                  let outputDir = Path.Combine(tempDir, "frank-cli-out")
+                  let outputDir = Path.Combine(tempDir, "frank-out")
 
                   // When FrankCliSkipGeneration=true, the MSBuild target is skipped entirely.
-                  // The MSBuild target calls: dotnet frank-cli compile --project ... --base-uri ... --output ...
+                  // The MSBuild target calls: dotnet frank compile --project ... --base-uri ... --output ...
                   // When skipped, no artifact files are written.
                   // Verify that without calling writeArtifacts the output directory is empty.
                   Expect.isFalse (Directory.Exists outputDir) "Output dir should not exist before explicit emit"
