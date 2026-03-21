@@ -58,12 +58,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T009 Add `Roles: RoleDefinition list` to `StatefulResourceSpec<'S,'E,'C>` + update `Yield()` with `Roles = []`
-- [ ] T010 Add `role` custom operation to `StatefulResourceBuilder` (name + predicate → append to `spec.Roles`)
-- [ ] T011 Add duplicate role name validation in `Run()` — fail-fast with descriptive error if duplicate names detected
-- [ ] T012 Add `Roles: RoleDefinition list` + `ResolveRoles: HttpContext -> Set<string>` to `StateMachineMetadata`; update metadata construction with defaults
-- [ ] T013 Create `ResolveRoles` closure in `Run()` — evaluate predicates against `ctx.User`, catch exceptions per-role (log via `ILogger`), return `Set<string>` of matching role names
-- [ ] T014 Extract role names as `RoleInfo list` from `spec.Roles` for `StateMachineMetadata.Roles` and wire into `ExtractedStatechart`-compatible metadata
+- [x] T009 Add `Roles: RoleDefinition list` to `StatefulResourceSpec<'S,'E,'C>` + update `Yield()` with `Roles = []`
+- [x] T010 Add `role` custom operation to `StatefulResourceBuilder` (name + predicate → append to `spec.Roles`)
+- [x] T011 Add duplicate role name validation in `Run()` — fail-fast with descriptive error if duplicate names detected
+- [x] T012 Add `Roles: RoleDefinition list` + `ResolveRoles: HttpContext -> Set<string>` to `StateMachineMetadata`; update metadata construction with defaults
+- [x] T013 Create `ResolveRoles` closure in `Run()` — evaluate predicates against `ctx.User`, catch exceptions per-role (log via `ILogger`), return `Set<string>` of matching role names
+- [x] T014 Extract role names as `RoleInfo list` from `spec.Roles` for `StateMachineMetadata.Roles` and wire into `ExtractedStatechart`-compatible metadata
 
 ### Implementation Notes
 - `role` custom operation follows the same pattern as `onTransition`: takes spec, appends to list, returns updated spec
