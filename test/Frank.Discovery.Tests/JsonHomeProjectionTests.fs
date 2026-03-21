@@ -8,19 +8,14 @@ open Microsoft.Extensions.FileProviders
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-
-/// Simple endpoint data source for projection tests.
-type ProjectionTestDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+open Frank.Discovery.Tests.OptionsDiscoveryTests
 
 [<Tests>]
 let tests =
     testList "JsonHomeProjection" [
         testCase "projects resource with href (no variables)" <| fun _ ->
             let res = resource "/health" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
-            let dataSource = ProjectionTestDataSource(res.Endpoints)
+            let dataSource = TestEndpointDataSource(res.Endpoints)
             let result = JsonHomeProjection.project dataSource None "TestApp"
             Expect.equal result.Title "TestApp" "should use assembly name"
             Expect.equal result.Resources.Length 1 "should have one resource"
@@ -31,7 +26,7 @@ let tests =
 
         testCase "projects resource with template variables using RoutePattern.Parameters" <| fun _ ->
             let res = resource "/games/{gameId}" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
-            let dataSource = ProjectionTestDataSource(res.Endpoints)
+            let dataSource = TestEndpointDataSource(res.Endpoints)
             let result = JsonHomeProjection.project dataSource None "TestApp"
             let r = result.Resources.[0]
             Expect.equal r.RouteVariables.Count 1 "should have one variable"
@@ -40,7 +35,7 @@ let tests =
 
         testCase "ALPS enrichment uses AlpsBaseUri for link relation" <| fun _ ->
             let res = resource "/games/{gameId}" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
-            let dataSource = ProjectionTestDataSource(res.Endpoints)
+            let dataSource = TestEndpointDataSource(res.Endpoints)
             let metadata: JsonHomeMetadata =
                 { Title = Some "My Game API"
                   DocsUrl = Some "/scalar/v1"
@@ -57,7 +52,7 @@ let tests =
                 get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("list")))
                 post (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("create")))
             }
-            let dataSource = ProjectionTestDataSource(res.Endpoints)
+            let dataSource = TestEndpointDataSource(res.Endpoints)
             let result = JsonHomeProjection.project dataSource None "TestApp"
             let r = result.Resources.[0]
             Expect.contains r.Hints.Allow "GET" "should have GET"
@@ -72,19 +67,19 @@ let tests =
                     0)
                     .Build()
             let allEndpoints = Array.append userRes.Endpoints [| internalEndpoint |]
-            let dataSource = ProjectionTestDataSource(allEndpoints)
+            let dataSource = TestEndpointDataSource(allEndpoints)
             let result = JsonHomeProjection.project dataSource None "TestApp"
             Expect.equal result.Resources.Length 1 "should only have user resource"
             Expect.equal result.Resources.[0].RouteTemplate "/items" "should be items"
 
         testCase "empty data source produces empty resources" <| fun _ ->
-            let dataSource = ProjectionTestDataSource([||])
+            let dataSource = TestEndpointDataSource([||])
             let result = JsonHomeProjection.project dataSource None "TestApp"
             Expect.isEmpty result.Resources "should have no resources"
 
         testCase "docsUrl from metadata flows to hints" <| fun _ ->
             let res = resource "/items" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
-            let dataSource = ProjectionTestDataSource(res.Endpoints)
+            let dataSource = TestEndpointDataSource(res.Endpoints)
             let metadata: JsonHomeMetadata =
                 { JsonHomeMetadata.Empty with DocsUrl = Some "/scalar/v1" }
             let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
@@ -99,7 +94,7 @@ let tests =
                     0)
                     .Build()
             let allEndpoints = Array.append userRes.Endpoints [| profilesEndpoint |]
-            let dataSource = ProjectionTestDataSource(allEndpoints)
+            let dataSource = TestEndpointDataSource(allEndpoints)
             let result = JsonHomeProjection.project dataSource None "TestApp"
             Expect.equal result.DescribedByUrl (Some "/.well-known/frank-profiles") "should detect profiles endpoint"
     ]

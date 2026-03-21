@@ -60,6 +60,8 @@ These principles govern all code changes. See `.kittify/memory/constitution.md` 
 - **Handler overloads**: Wrap lambdas in `RequestDelegate(fun ctx -> ...)` to resolve `ResourceBuilder.Get` overload ambiguity.
 - **`use` in task CEs**: Requires `IAsyncDisposable`. `IHost`/`IDisposable` types need `let` not `use` in `task { }`.
 - **`ResourceEndpointDataSource` is internal**: Tests create their own `EndpointDataSource` subclass.
+- **`IWebHostBuilder.Configure`**: Requires `open Microsoft.AspNetCore.Hosting` — it's an extension method, not on the interface directly.
+- **Testing `WebHostSpec`**: `WebHostBuilder.Run()` blocks (starts the app). To test, build the spec manually: `ceBuilder.Yield() |> fun s -> ceBuilder.UseJsonHome(s) |> fun s -> ceBuilder.Resource(s, res)`.
 - **fsproj compile order matters**: Types must be defined before use. Add new files in dependency order.
 
 ## Workflow Rules

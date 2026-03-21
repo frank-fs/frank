@@ -28,6 +28,14 @@ type JsonHomeInput =
 
 module JsonHomeDocument =
 
+    let private writeOptionalArray (w: Utf8JsonWriter) (name: string) (types: string list option) =
+        match types with
+        | Some ts when not ts.IsEmpty ->
+            w.WriteStartArray(name)
+            for t in ts do w.WriteStringValue(t)
+            w.WriteEndArray()
+        | _ -> ()
+
     let private writeHints (w: Utf8JsonWriter) (hints: JsonHomeHints) =
         w.WriteStartObject("hints")
 
@@ -42,26 +50,9 @@ module JsonHomeDocument =
                 w.WriteEndObject()
             w.WriteEndObject()
 
-        match hints.AcceptPost with
-        | Some types when not types.IsEmpty ->
-            w.WriteStartArray("accept-post")
-            for t in types do w.WriteStringValue(t)
-            w.WriteEndArray()
-        | _ -> ()
-
-        match hints.AcceptPut with
-        | Some types when not types.IsEmpty ->
-            w.WriteStartArray("accept-put")
-            for t in types do w.WriteStringValue(t)
-            w.WriteEndArray()
-        | _ -> ()
-
-        match hints.AcceptPatch with
-        | Some types when not types.IsEmpty ->
-            w.WriteStartArray("accept-patch")
-            for t in types do w.WriteStringValue(t)
-            w.WriteEndArray()
-        | _ -> ()
+        writeOptionalArray w "accept-post" hints.AcceptPost
+        writeOptionalArray w "accept-put" hints.AcceptPut
+        writeOptionalArray w "accept-patch" hints.AcceptPatch
 
         match hints.DocsUrl with
         | Some url -> w.WriteString("docs", url)

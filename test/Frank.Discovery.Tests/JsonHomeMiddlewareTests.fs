@@ -15,16 +15,11 @@ open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-
-/// Simple endpoint data source for middleware tests.
-type MiddlewareTestDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+open Frank.Discovery.Tests.OptionsDiscoveryTests
 
 let private buildTestServer () =
     let itemsRes = resource "/items" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items list"))) }
-    let dataSource = MiddlewareTestDataSource(itemsRes.Endpoints)
+    let dataSource = TestEndpointDataSource(itemsRes.Endpoints)
 
     let host =
         Host.CreateDefaultBuilder([||])
@@ -144,7 +139,7 @@ let private buildCeTestServer (spec: WebHostSpec) =
     builder.WebHost.UseTestServer() |> ignore
     spec.Services(builder.Services) |> ignore
     let app = builder.Build()
-    let dataSource = MiddlewareTestDataSource(spec.Endpoints)
+    let dataSource = TestEndpointDataSource(spec.Endpoints)
     (app :> IApplicationBuilder)
     |> spec.BeforeRoutingMiddleware
     |> fun app -> app.UseRouting()
@@ -210,7 +205,7 @@ let metadataTests =
     testList "JsonHomeMiddleware with metadata" [
         testTask "resolves JsonHomeMetadata from DI for ALPS enrichment" {
             let gamesRes = resource "/games/{gameId}" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game"))) }
-            let dataSource = MiddlewareTestDataSource(gamesRes.Endpoints)
+            let dataSource = TestEndpointDataSource(gamesRes.Endpoints)
 
             let metadata: JsonHomeMetadata =
                 { Title = Some "Game API"
