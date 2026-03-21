@@ -142,7 +142,7 @@ let main args =
         // 1. State key resolver (reads store, sets IStatechartFeature on HttpContext.Features)
         plug resolveStateKey
         // 2. Affordance middleware (reads IStatechartFeature, injects Link + Allow headers)
-        useAffordances gameAffordanceMap
+        useAffordancesWith gameAffordanceMap
         // 3. Statechart middleware (state-dependent handler dispatch)
         useStatecharts
 
