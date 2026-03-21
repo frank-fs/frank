@@ -24,6 +24,26 @@ module Builder =
           /// The link relation type for Link header generation (e.g., "describedby").
           Rel: string }
 
+    /// Metadata contributed by extension packages for JSON Home document generation.
+    /// Register via DI; Frank.Discovery reads it at startup to build the home document.
+    type JsonHomeMetadata =
+        { /// API title (e.g., from OpenAPI info)
+          Title: string option
+          /// URL for API documentation (e.g., Scalar UI at /scalar/v1)
+          DocsUrl: string option
+          /// Base URI for ALPS profiles (e.g., "http://example.com/alps/games").
+          /// Used to build link relation URIs: {AlpsBaseUri}#{resourceSlug}
+          AlpsBaseUri: string option
+          /// ALPS descriptor URIs keyed by (resourceSlug, descriptorId).
+          /// Enables semantic hrefVars in JSON Home.
+          AlpsDescriptors: Map<string, Map<string, string>> option }
+
+        static member Empty =
+            { Title = None
+              DocsUrl = None
+              AlpsBaseUri = None
+              AlpsDescriptors = None }
+
     type ResourceSpec =
         { Name: string
           Handlers: (string * RequestDelegate) list
