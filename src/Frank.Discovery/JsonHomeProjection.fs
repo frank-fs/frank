@@ -1,0 +1,150 @@
+namespace Frank.Discovery
+
+open Microsoft.AspNetCore.Routing
+open Frank.Builder
+
+/// Pure projection from EndpointDataSource + optional metadata to JsonHomeInput.
+/// No side effects, no DI — receives all data as parameters.
+module JsonHomeProjection =
+
+    /// Route prefixes that indicate framework-internal endpoints (not user resources).
+    let private internalPrefixes =
+        [| ".well-known"; "alps/"; "/alps/"; "ontology/"; "/ontology/"
+           "shapes/"; "/shapes/"; "schemas/"; "/schemas/"
+           "scalar/"; "/scalar/"; "openapi/"; "/openapi/" |]
+
+    let private isInternalEndpoint (rawText: string) =
+        internalPrefixes |> Array.exists (fun prefix ->
+            rawText.Contains(prefix))
+
+    /// Extract route variable names from a RouteEndpoint using RoutePattern.Parameters.
+    let private extractRouteVariables
+        (endpoint: RouteEndpoint)
+        (slug: string)
+        (alpsDescriptors: Map<string, Map<string, string>>)
+        (assemblyName: string)
+        =
+        endpoint.RoutePattern.Parameters
+        |> Seq.map (fun param ->
+            let varName = param.Name
+            let uri =
+                match Map.tryFind slug alpsDescriptors with
+                | Some descriptors -> Map.tryFind varName descriptors
+                | None -> None
+                |> Option.defaultValue (sprintf "urn:frank:%s/param/%s" assemblyName varName)
+            varName, uri)
+        |> Map.ofSeq
+
+    /// Derive the link relation type for a resource.
+    let private deriveRelationType
+        (slug: string)
+        (routeTemplate: string)
+        (alpsBaseUri: string option)
+        (alpsDescriptors: Map<string, Map<string, string>>)
+        (assemblyName: string)
+        =
+        match alpsBaseUri, Map.tryFind slug alpsDescriptors with
+        | Some baseUri, Some _ -> sprintf "%s#%s" baseUri slug
+        | _ -> sprintf "urn:frank:%s%s" assemblyName routeTemplate
+
+    /// Project an EndpointDataSource into a JsonHomeInput.
+    let project
+        (dataSource: EndpointDataSource)
+        (metadata: JsonHomeMetadata option)
+        (assemblyName: string)
+        : JsonHomeInput =
+
+        let title =
+            metadata |> Option.bind (fun m -> m.Title)
+            |> Option.defaultValue assemblyName
+
+        let docsUrl = metadata |> Option.bind (fun m -> m.DocsUrl)
+
+        let alpsBaseUri = metadata |> Option.bind (fun m -> m.AlpsBaseUri)
+
+        let alpsDescriptors =
+            metadata |> Option.bind (fun m -> m.AlpsDescriptors)
+            |> Option.defaultValue Map.empty
+
+        // Detect /.well-known/frank-profiles endpoint
+        let describedByUrl =
+            dataSource.Endpoints
+            |> Seq.exists (fun ep ->
+                match ep with
+                | :? RouteEndpoint as re ->
+                    let raw = re.RoutePattern.RawText
+                    not (isNull raw) && raw.Contains(".well-known/frank-profiles")
+                | _ -> false)
+            |> fun found -> if found then Some "/.well-known/frank-profiles" else None
+
+        // Project user resources
+        let resources =
+            dataSource.Endpoints
+            |> Seq.choose (fun ep ->
+                match ep with
+                | :? RouteEndpoint as re ->
+                    let rawText = re.RoutePattern.RawText
+                    if isNull rawText || isInternalEndpoint rawText then None
+                    else Some (rawText, re)
+                | _ -> None)
+            |> Seq.groupBy fst
+            |> Seq.map (fun (routeTemplate, endpoints) ->
+                let allEndpoints = endpoints |> Seq.map snd |> Seq.toList
+                let slug = routeTemplate.TrimStart('/').Split('/') |> Array.head
+
+                // Use RoutePattern.Parameters for clean variable extraction
+                let routeVars =
+                    allEndpoints
+                    |> List.tryHead
+                    |> Option.map (fun ep -> extractRouteVariables ep slug alpsDescriptors assemblyName)
+                    |> Option.defaultValue Map.empty
+
+                let allMethods =
+                    allEndpoints
+                    |> List.collect (fun ep ->
+                        let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+                        if isNull meta then [] else meta.HttpMethods |> Seq.toList)
+                    |> List.distinct
+                    |> List.sort
+
+                let getFormats =
+                    allEndpoints
+                    |> List.filter (fun ep ->
+                        let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+                        not (isNull meta) && meta.HttpMethods |> Seq.exists (fun m -> m = "GET" || m = "HEAD"))
+                    |> List.collect (fun ep ->
+                        ep.Metadata
+                        |> Seq.choose (fun m -> match m with | :? DiscoveryMediaType as d -> Some d.MediaType | _ -> None)
+                        |> Seq.toList)
+                    |> List.distinct
+
+                let collectAcceptTypes methodName =
+                    let types =
+                        allEndpoints
+                        |> List.filter (fun ep ->
+                            let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+                            not (isNull meta) && meta.HttpMethods |> Seq.exists (fun m -> m = methodName))
+                        |> List.collect (fun ep ->
+                            ep.Metadata
+                            |> Seq.choose (fun m -> match m with | :? DiscoveryMediaType as d -> Some d.MediaType | _ -> None)
+                            |> Seq.toList)
+                        |> List.distinct
+                    if types.IsEmpty then None else Some types
+
+                let relationType = deriveRelationType slug routeTemplate alpsBaseUri alpsDescriptors assemblyName
+
+                { RelationType = relationType
+                  RouteTemplate = routeTemplate
+                  RouteVariables = routeVars
+                  Hints =
+                    { Allow = allMethods
+                      Formats = getFormats
+                      AcceptPost = collectAcceptTypes "POST"
+                      AcceptPut = collectAcceptTypes "PUT"
+                      AcceptPatch = collectAcceptTypes "PATCH"
+                      DocsUrl = docsUrl } })
+            |> Seq.toList
+
+        { Title = title
+          DescribedByUrl = describedByUrl
+          Resources = resources }
