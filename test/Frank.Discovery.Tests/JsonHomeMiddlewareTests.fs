@@ -115,3 +115,70 @@ let tests =
             Expect.equal resp.StatusCode HttpStatusCode.OK "should match ignoring parameters"
         }
     ]
+
+/// Build a test server from a WebHostSpec, replicating the CE Run pipeline with TestServer.
+let private buildCeTestServer (spec: WebHostSpec) =
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    spec.Services(builder.Services) |> ignore
+    let app = builder.Build()
+    let dataSource = MiddlewareTestDataSource(spec.Endpoints)
+    (app :> IApplicationBuilder)
+    |> spec.BeforeRoutingMiddleware
+    |> fun app -> app.UseRouting()
+    |> spec.Middleware
+    |> ignore
+    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
+    app.Start()
+    app.GetTestClient()
+
+[<Tests>]
+let ceTests =
+    testList "useJsonHome CE operation" [
+        testTask "useJsonHome with webHost CE serves home document for registered resources" {
+            let testResource =
+                resource "/items" {
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
+                }
+
+            // Build the spec the same way the CE does, but without calling Run
+            let ceBuilder = WebHostBuilder([||])
+            let spec =
+                ceBuilder.Yield()
+                |> fun s -> ceBuilder.UseJsonHome(s)
+                |> fun s -> ceBuilder.Resource(s, testResource)
+
+            let client = buildCeTestServer spec
+
+            let req = new HttpRequestMessage(HttpMethod.Get, "/")
+            req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+            let! (resp: HttpResponseMessage) = client.SendAsync(req)
+            Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
+            let! (body: string) = resp.Content.ReadAsStringAsync()
+            Expect.isTrue (body.Contains("/items")) "should contain items resource"
+            Expect.isTrue (body.Contains("urn:frank:")) "should have URN relation"
+        }
+
+        testTask "useJsonHome passes through non-json-home Accept at root" {
+            let testResource =
+                resource "/items" {
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
+                }
+
+            let ceBuilder = WebHostBuilder([||])
+            let spec =
+                ceBuilder.Yield()
+                |> fun s -> ceBuilder.UseJsonHome(s)
+                |> fun s -> ceBuilder.Resource(s, testResource)
+
+            let client = buildCeTestServer spec
+
+            let req = new HttpRequestMessage(HttpMethod.Get, "/")
+            req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("text/html"))
+            let! (resp: HttpResponseMessage) = client.SendAsync(req)
+            // Should pass through — Accept is text/html, not application/json-home
+            let contentType =
+                if isNull resp.Content.Headers.ContentType then "" else resp.Content.Headers.ContentType.MediaType
+            Expect.notEqual contentType "application/json-home" "should not be json-home"
+        }
+    ]
