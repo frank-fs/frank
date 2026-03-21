@@ -3,6 +3,7 @@ namespace Frank.Discovery
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.Logging
 open Frank.Builder
 
 /// Middleware that serves a pre-computed JSON Home document at GET or HEAD /
@@ -12,7 +13,7 @@ open Frank.Builder
 /// Receives EndpointDataSource via DI constructor injection. Lazily computes the
 /// JSON Home document on first request (after all endpoints are finalized) and
 /// caches the result forever.
-type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, serviceProvider: System.IServiceProvider) =
+type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, serviceProvider: System.IServiceProvider, logger: ILogger<JsonHomeMiddleware>) =
 
     static let jsonHomeMediaType = "application/json-home"
 
@@ -27,7 +28,10 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
             let asm = System.Reflection.Assembly.GetEntryAssembly()
             if isNull asm then "Frank" else asm.GetName().Name
         let input = JsonHomeProjection.project dataSource metadata assemblyName
-        input.DescribedByUrl, JsonHomeDocument.build input)
+        let linkHeader =
+            input.DescribedByUrl
+            |> Option.map (fun url -> $"<{url}>; rel=\"describedby\"")
+        linkHeader, JsonHomeDocument.build input)
 
     let isJsonHomeAccept (ctx: HttpContext) =
         let acceptHeaders = ctx.Request.GetTypedHeaders().Accept
@@ -41,8 +45,8 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
                 && header.MediaType.Equals(jsonHomeMediaType, System.StringComparison.OrdinalIgnoreCase))
 
     member _.Invoke(ctx: HttpContext) : Task =
-        let isGet = ctx.Request.Method = HttpMethods.Get
-        let isHead = ctx.Request.Method = HttpMethods.Head
+        let isGet = HttpMethods.IsGet(ctx.Request.Method)
+        let isHead = HttpMethods.IsHead(ctx.Request.Method)
         if not isGet && not isHead then
             next.Invoke(ctx)
         elif ctx.Request.Path.Value <> "/" then
@@ -50,16 +54,15 @@ type JsonHomeMiddleware(next: RequestDelegate, dataSource: EndpointDataSource, s
         elif not (isJsonHomeAccept ctx) then
             next.Invoke(ctx)
         else
-            let describedByUrl, json = computed.Value
+            let linkHeader, json = computed.Value
 
             ctx.Response.StatusCode <- 200
             ctx.Response.ContentType <- jsonHomeMediaType
             ctx.Response.Headers["Vary"] <- "Accept"
             ctx.Response.Headers["Cache-Control"] <- "max-age=3600"
 
-            match describedByUrl with
-            | Some url ->
-                ctx.Response.Headers.Append("Link", $"<{url}>; rel=\"describedby\"")
+            match linkHeader with
+            | Some link -> ctx.Response.Headers.Append("Link", link)
             | None -> ()
 
             if isHead then

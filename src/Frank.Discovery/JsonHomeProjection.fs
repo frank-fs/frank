@@ -67,7 +67,6 @@ module JsonHomeProjection =
             metadata |> Option.bind (fun m -> m.AlpsDescriptors)
             |> Option.defaultValue Map.empty
 
-        // Detect /.well-known/frank-profiles endpoint
         let describedByUrl =
             dataSource.Endpoints
             |> Seq.exists (fun ep ->
@@ -78,7 +77,6 @@ module JsonHomeProjection =
                 | _ -> false)
             |> fun found -> if found then Some "/.well-known/frank-profiles" else None
 
-        // Project user resources
         let resources =
             dataSource.Endpoints
             |> Seq.choose (fun ep ->
@@ -93,43 +91,37 @@ module JsonHomeProjection =
                 let allEndpoints = endpoints |> Seq.map snd |> Seq.toList
                 let slug = routeTemplate.TrimStart('/').Split('/') |> Array.head
 
-                // Use RoutePattern.Parameters for clean variable extraction
                 let routeVars =
                     allEndpoints
                     |> List.tryHead
                     |> Option.map (fun ep -> extractRouteVariables ep slug alpsDescriptors assemblyName)
                     |> Option.defaultValue Map.empty
 
+                let getHttpMethods (ep: RouteEndpoint) =
+                    let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+                    if isNull meta then [] else meta.HttpMethods |> Seq.toList
+
+                let getMediaTypes (ep: RouteEndpoint) =
+                    ep.Metadata
+                    |> Seq.choose (fun m -> match m with | :? DiscoveryMediaType as d -> Some d.MediaType | _ -> None)
+                    |> Seq.toList
+
                 let allMethods =
                     allEndpoints
-                    |> List.collect (fun ep ->
-                        let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
-                        if isNull meta then [] else meta.HttpMethods |> Seq.toList)
+                    |> List.collect getHttpMethods
                     |> List.distinct
                     |> List.sort
 
-                let getFormats =
+                let collectMediaTypes methodPredicate =
                     allEndpoints
-                    |> List.filter (fun ep ->
-                        let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
-                        not (isNull meta) && meta.HttpMethods |> Seq.exists (fun m -> m = "GET" || m = "HEAD"))
-                    |> List.collect (fun ep ->
-                        ep.Metadata
-                        |> Seq.choose (fun m -> match m with | :? DiscoveryMediaType as d -> Some d.MediaType | _ -> None)
-                        |> Seq.toList)
+                    |> List.filter (fun ep -> getHttpMethods ep |> List.exists methodPredicate)
+                    |> List.collect getMediaTypes
                     |> List.distinct
 
+                let getFormats = collectMediaTypes (fun m -> m = "GET" || m = "HEAD")
+
                 let collectAcceptTypes methodName =
-                    let types =
-                        allEndpoints
-                        |> List.filter (fun ep ->
-                            let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
-                            not (isNull meta) && meta.HttpMethods |> Seq.exists (fun m -> m = methodName))
-                        |> List.collect (fun ep ->
-                            ep.Metadata
-                            |> Seq.choose (fun m -> match m with | :? DiscoveryMediaType as d -> Some d.MediaType | _ -> None)
-                            |> Seq.toList)
-                        |> List.distinct
+                    let types = collectMediaTypes (fun m -> m = methodName)
                     if types.IsEmpty then None else Some types
 
                 let relationType = deriveRelationType slug routeTemplate alpsBaseUri alpsDescriptors assemblyName
