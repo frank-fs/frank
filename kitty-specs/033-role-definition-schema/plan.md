@@ -17,7 +17,7 @@ Add declarative role definitions to the `statefulResource` CE that map authentic
 **Project Type**: Multi-project F# library
 **Performance Goals**: Zero additional allocations beyond the `Set<string>` for resolved roles. O(n) predicate evaluation where n is typically 2-5 roles per resource — negligible vs HTTP stack overhead.
 **Constraints**: No new project dependencies. No breaking changes to existing `statefulResource` API (FR-010). No `obj` boxing for role data (Wadler: typed boundary).
-**Scale/Scope**: 3 assemblies modified, ~200-300 lines of new code, ~150 lines of tests
+**Scale/Scope**: 3 assemblies modified, ~300-400 lines of new code, ~200 lines of tests
 
 ## Constitution Check
 
@@ -83,4 +83,4 @@ test/Frank.Statecharts.Tests/
 | `EventValidationContext` construction | `StatefulResourceBuilder.fs` | ~247-251 | Add `Roles` field from `IRoleFeature` |
 | `StatefulResourceSpec.Yield()` | `StatefulResourceBuilder.fs` | ~138-144 | Add `Roles = []` |
 | Guard name extraction | `StatefulResourceBuilder.fs` | ~294-298 | Follow same pattern for role names |
-| Feature registration | `StatechartFeature.fs` | ~29-38 | Follow dual-registration pattern |
+| Feature registration | `StatechartFeature.fs` | ~29-38 | Follow single-registration pattern (non-generic) |

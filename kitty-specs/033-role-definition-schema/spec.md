@@ -67,7 +67,7 @@ The spec pipeline can extract role definitions from a running application's meta
 **Acceptance Scenarios**:
 
 1. **Given** a stateful resource with role declarations, **When** the spec pipeline extracts metadata, **Then** role names are included in the extracted specification.
-2. **Given** a stateful resource with roles, **When** unified resource extraction runs, **Then** role information is included alongside state and capability data.
+2. **Given** a stateful resource with roles, **When** role metadata is extracted from the running application's endpoint metadata, **Then** role information is included alongside state and capability data.
 
 ---
 
@@ -89,7 +89,7 @@ The spec pipeline can extract role definitions from a running application's meta
 - **FR-004**: System MUST provide a mechanism for guard predicates to check role membership by name.
 - **FR-005**: System MUST reject duplicate role names on the same resource at startup (fail-fast).
 - **FR-006**: System MUST include role definitions in endpoint metadata so the spec pipeline can extract them.
-- **FR-007**: System MUST provide a portable, zero-dependency role representation (name and descriptive metadata) for spec pipeline consumers, separate from the runtime predicate.
+- **FR-007**: System MUST provide a portable, zero-dependency role representation (name and optional human-readable description) for spec pipeline consumers, separate from the runtime predicate.
 - **FR-008**: The portable role representation MUST be hierarchy-neutral — it must not assume flat or hierarchical state structures.
 - **FR-009**: System MUST support users holding multiple roles simultaneously (union semantics).
 - **FR-010**: Stateful resources without role declarations MUST continue to function unchanged (backward compatibility).
@@ -116,6 +116,7 @@ The spec pipeline can extract role definitions from a running application's meta
 - The projection operator (#107) and progress analysis (#108) will consume role definitions as inputs but are not part of this feature's scope.
 - Role definitions are per-resource. There is no global role registry.
 - The predicate is the source of truth. Role names are labels for documentation, projection, and cross-validation.
+- CLI source extraction of role declarations from F# source code is not in scope. Role names are available via runtime endpoint metadata (same current status as guard name extraction from source).
 
 ## Dependencies
 
