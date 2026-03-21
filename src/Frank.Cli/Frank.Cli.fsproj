@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>frank-cli</ToolCommandName>
+    <ToolCommandName>frank</ToolCommandName>
     <PackageTags>rdf;owl;shacl;cli;semantic-web;dotnet-tool</PackageTags>
     <Description>CLI tool that derives OWL ontology and SHACL shapes from Frank F# web applications</Description>
   </PropertyGroup>

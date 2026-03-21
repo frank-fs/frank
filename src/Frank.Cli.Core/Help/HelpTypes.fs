@@ -2,7 +2,7 @@ namespace Frank.Cli.Core.Help
 
 /// A concrete invocation example for a command.
 type CommandExample =
-    { /// The full command-line invocation (e.g., "frank-cli extract --project MyApp.fsproj --base-uri http://example.org/")
+    { /// The full command-line invocation (e.g., "frank extract --project MyApp.fsproj --base-uri http://example.org/")
       Invocation: string
       /// Brief description of what this example demonstrates
       Description: string }
@@ -34,7 +34,7 @@ type CommandHelp =
 
 /// A standalone help topic (e.g., "workflows", "concepts").
 type HelpTopic =
-    { /// The topic identifier used in `frank-cli help <topic>` (e.g., "workflows")
+    { /// The topic identifier used in `frank help <topic>` (e.g., "workflows")
       Name: string
       /// One-line summary shown in topic listings
       Summary: string
@@ -91,5 +91,5 @@ type ProjectStatus =
       Artifacts: ArtifactStatus
       /// Recommended next action
       RecommendedAction: RecommendedAction
-      /// Path to the state directory (obj/frank-cli/)
+      /// Path to the state directory (obj/frank/)
       StateDirectory: string }

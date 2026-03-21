@@ -1,6 +1,6 @@
 namespace Frank.Cli.Core.Help
 
-/// Resolution logic for the `frank-cli help <arg>` subcommand.
+/// Resolution logic for the `frank help <arg>` subcommand.
 /// Resolves arguments to commands, topics, or fuzzy suggestions.
 module HelpSubcommand =
 
@@ -33,7 +33,7 @@ module HelpSubcommand =
           Topics: (string * string) list }
 
     /// List all commands and topics for the help index display.
-    /// Called when `frank-cli help` is invoked with no argument.
+    /// Called when `frank help` is invoked with no argument.
     let listAll () : HelpIndex =
         { Commands =
             HelpContent.allCommands

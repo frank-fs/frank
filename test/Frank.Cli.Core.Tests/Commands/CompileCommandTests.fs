@@ -110,8 +110,8 @@ let tests =
                   match result with
                   | Error e -> failtest $"Expected Ok but got Error: {e}"
                   | Ok r ->
-                      // Default output dir should be obj/frank-cli/
-                      let expectedDir = Path.Combine(tempDir, "obj", "frank-cli")
+                      // Default output dir should be obj/frank/
+                      let expectedDir = Path.Combine(tempDir, "obj", "frank")
                       Expect.stringContains r.OntologyPath expectedDir "Should use default output dir"
                       Expect.isTrue (File.Exists r.OntologyPath) "ontology file should exist"
                       Expect.isTrue (File.Exists r.ShapesPath) "shapes file should exist"

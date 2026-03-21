@@ -184,4 +184,4 @@ module ExtractionState =
             Error ex.Message
 
     let defaultStatePath (projectDir: string) : string =
-        Path.Combine(projectDir, "obj", "frank-cli", "state.json")
+        Path.Combine(projectDir, "obj", "frank", "state.json")

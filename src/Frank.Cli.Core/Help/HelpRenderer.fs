@@ -6,7 +6,7 @@ open System.Text.Json
 
 /// Renders help content in text and JSON formats.
 /// Handles enriched --help sections (WORKFLOW, EXAMPLES, CONTEXT)
-/// and full command help for `frank-cli help <command>`.
+/// and full command help for `frank help <command>`.
 module HelpRenderer =
 
     // --- Text Rendering ---

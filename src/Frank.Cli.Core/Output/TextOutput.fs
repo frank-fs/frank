@@ -168,21 +168,21 @@ module TextOutput =
         let actionText =
             match result.RecommendedAction with
             | RecommendedAction.RunExtract ->
-                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>'"
+                $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
             | RecommendedAction.ReExtract ->
-                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>'"
+                $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
             | RecommendedAction.RunCompile ->
-                $"run 'frank-cli compile --project {result.ProjectPath}'"
+                $"run 'frank compile --project {result.ProjectPath}'"
             | RecommendedAction.UpToDate -> "up to date (no action needed)"
             | RecommendedAction.RecoverExtract _ ->
-                $"run 'frank-cli extract --project {result.ProjectPath} --base-uri <URI>' to recover"
+                $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>' to recover"
         sb.AppendLine($"Recommended action: {actionText}") |> ignore
 
         sb.ToString()
 
     let formatHelpIndex (index: HelpSubcommand.HelpIndex) : string =
         let sb = System.Text.StringBuilder()
-        sb.AppendLine("frank-cli: Semantic resource extraction for Frank applications") |> ignore
+        sb.AppendLine("frank: Semantic resource extraction for Frank applications") |> ignore
         sb.AppendLine() |> ignore
         sb.AppendLine("COMMANDS") |> ignore
         for (name, summary) in index.Commands do
@@ -192,8 +192,8 @@ module TextOutput =
         for (name, summary) in index.Topics do
             sb.AppendLine(sprintf "  %-12s%s" name summary) |> ignore
         sb.AppendLine() |> ignore
-        sb.AppendLine("Use 'frank-cli help <command>' for detailed help on a command.") |> ignore
-        sb.AppendLine("Use 'frank-cli help <topic>' for topic documentation.") |> ignore
+        sb.AppendLine("Use 'frank help <command>' for detailed help on a command.") |> ignore
+        sb.AppendLine("Use 'frank help <topic>' for topic documentation.") |> ignore
         sb.ToString()
 
     let formatTopicText (topic: HelpTopic) : string =
@@ -217,7 +217,7 @@ module TextOutput =
                     | Some topic -> sb.AppendLine(sprintf "  %-12s%s" name topic.Summary) |> ignore
                     | None -> sb.AppendLine($"  {name}") |> ignore
         sb.AppendLine() |> ignore
-        sb.AppendLine("Use 'frank-cli help' to see all commands and topics.") |> ignore
+        sb.AppendLine("Use 'frank help' to see all commands and topics.") |> ignore
         sb.ToString()
 
     let formatOpenApiValidateResult (result: OpenApiValidateCommand.OpenApiValidateResult) : string =

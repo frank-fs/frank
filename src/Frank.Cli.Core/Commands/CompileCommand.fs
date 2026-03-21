@@ -105,7 +105,7 @@ module CompileCommand =
 
             try
                 let outDir =
-                    outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
+                    outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank"))
 
                 // Back up existing state before overwriting
                 let statePath = ExtractionState.defaultStatePath projectDir
@@ -167,7 +167,7 @@ module CompileCommand =
                         let projectDir = Path.GetDirectoryName projectPath
 
                         let outDir =
-                            outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank-cli"))
+                            outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank"))
 
                         let (ontologyPath, shapesPath, manifestPath) =
                             ArtifactSerializer.writeArtifacts state outDir
