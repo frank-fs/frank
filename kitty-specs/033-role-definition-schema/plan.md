@@ -1,108 +1,86 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Role Definition Schema
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `033-role-definition-schema` | **Date**: 2026-03-21 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `kitty-specs/033-role-definition-schema/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Add declarative role definitions to the `statefulResource` CE that map authentication claims to named protocol roles. Two-tier type design: portable `RoleInfo` in `Frank.Resources.Model` (zero-dep, hierarchy-neutral), platform-specific `RoleDefinition` in `Frank.Statecharts` (carries `ClaimsPrincipal -> bool` predicate). Roles resolved eagerly per request via separate `IRoleFeature` typed feature interface. Guard context extended with `Roles: Set<string>` field and `HasRole` member method. Spec pipeline integration via `ExtractedStatechart.Roles` field.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: F# 8.0+ on .NET 8.0/9.0/10.0 (multi-target for src/, net10.0 for tests)
+**Primary Dependencies**: ASP.NET Core (`HttpContext.Features`, `ClaimsPrincipal`), Expecto (testing)
+**Storage**: N/A (roles are in-memory per-resource declarations, resolved per-request)
+**Testing**: Expecto + ASP.NET Core TestHost (`testTask` for async, `testCase` for pure)
+**Target Platform**: .NET 8.0+ (LTS), cross-platform
+**Project Type**: Multi-project F# library
+**Performance Goals**: Zero additional allocations beyond the `Set<string>` for resolved roles. O(n) predicate evaluation where n is typically 2-5 roles per resource — negligible vs HTTP stack overhead.
+**Constraints**: No new project dependencies. No breaking changes to existing `statefulResource` API (FR-010). No `obj` boxing for role data (Wadler: typed boundary).
+**Scale/Scope**: 3 assemblies modified, ~200-300 lines of new code, ~150 lines of tests
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Resource-Oriented Design | PASS | Roles enhance resource definitions via `statefulResource` CE. `role` operation is a resource-level declaration. |
+| II. Idiomatic F# | PASS | CE custom operation `role`, record types for `RoleDefinition`/`RoleInfo`, `Set<string>` for resolved roles, member method `HasRole` on record. |
+| III. Library, Not Framework | PASS | Uses ASP.NET Core's `ClaimsPrincipal` directly. No separate auth system. Roles are declarative labels, not an authorization framework. |
+| IV. ASP.NET Core Native | PASS | `IRoleFeature` on `HttpContext.Features` follows standard typed feature pattern (Fowler). `ClaimsPrincipal` is the identity authority. |
+| V. Performance Parity | PASS | Eager resolution adds O(n) predicate calls (n=2-5) once per request. Resolved `Set<string>` is immutable, zero-alloc lookups via `Contains`. No hot-path allocations beyond initial set construction. |
+| VI. Resource Disposal Discipline | PASS | No `IDisposable` types introduced. |
+| VII. No Silent Exception Swallowing | PASS | Role predicate exceptions logged via `ILogger` (spec edge case). No bare `with _ ->`. |
+| VIII. No Duplicated Logic | PASS | Single `RoleDefinition` type, single resolution point in middleware. Guard name extraction pattern reused for role names in spec pipeline. |
+
+No violations. No complexity tracking needed.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/033-role-definition-schema/
+├── plan.md              # This file
+├── research.md          # Phase 0: integration point analysis
+├── data-model.md        # Phase 1: type definitions
+├── quickstart.md        # Phase 1: usage examples
+└── tasks.md             # Phase 2 output (created by /spec-kitty.tasks)
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Source Code (files modified)
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+src/Frank.Resources.Model/
+└── ResourceTypes.fs          # Add RoleInfo type, add Roles field to ExtractedStatechart
 
-tests/
-├── contract/
-├── integration/
-└── unit/
+src/Frank.Statecharts/
+├── Types.fs                  # Add RoleDefinition type (alongside Guard, AccessControlContext)
+├── StatechartFeature.fs      # Add IRoleFeature interface, SetRoles extension method
+├── StatefulResourceBuilder.fs # Add role CE operation, update StatefulResourceSpec accumulator,
+│                              # update StateMachineMetadata, update evaluateGuards closure
+└── Middleware.fs              # Add role resolution step (between state resolution and guard eval)
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+src/Frank.Cli.Core/
+├── Statechart/StatechartSourceExtractor.fs  # Thread role names through extraction
+└── Unified/UnifiedExtractor.fs              # Thread role names through unified extraction
 
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+test/Frank.Statecharts.Tests/
+└── StatefulResourceTests.fs   # Test role declaration, resolution, guard integration
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: No new projects. Changes are additive to existing files across 3 assemblies (`Frank.Resources.Model`, `Frank.Statecharts`, `Frank.Cli.Core`) plus tests. Follows the established pattern where portable types live in `Frank.Resources.Model` and platform-specific types live in `Frank.Statecharts`.
 
-## Complexity Tracking
+### Key Integration Points
 
-*Fill ONLY if Constitution Check has violations that must be justified*
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Component | File | Lines | Pattern to Follow |
+|-----------|------|-------|-------------------|
+| `ExtractedStatechart` construction (factory) | `StatechartExtractor.fs` | ~10-21 | Add `roles` parameter |
+| `ExtractedStatechart` construction (unified) | `UnifiedExtractor.fs` | ~617 | Pass role names |
+| `ExtractedStatechart` construction (source) | `StatechartSourceExtractor.fs` | ~331 | Pass role names |
+| `AccessControlContext` construction | `StatefulResourceBuilder.fs` | ~226-229 | Add `Roles` field from `IRoleFeature` |
+| `EventValidationContext` construction | `StatefulResourceBuilder.fs` | ~247-251 | Add `Roles` field from `IRoleFeature` |
+| `StatefulResourceSpec.Yield()` | `StatefulResourceBuilder.fs` | ~138-144 | Add `Roles = []` |
+| Guard name extraction | `StatefulResourceBuilder.fs` | ~294-298 | Follow same pattern for role names |
+| Feature registration | `StatechartFeature.fs` | ~29-38 | Follow dual-registration pattern |
