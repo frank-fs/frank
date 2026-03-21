@@ -19,6 +19,7 @@ type GuardResult =
     | Blocked of reason: BlockReason
 
 /// Context for access-control guards (pre-handler). No event available.
+[<NoEquality; NoComparison>]
 type AccessControlContext<'State, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
@@ -28,6 +29,7 @@ type AccessControlContext<'State, 'Context> =
     member this.HasRole(roleName: string) = this.Roles.Contains(roleName)
 
 /// Context for event-validation guards (post-handler). Event is the actual value set by the handler.
+[<NoEquality; NoComparison>]
 type EventValidationContext<'State, 'Event, 'Context> =
     { User: ClaimsPrincipal
       CurrentState: 'State
@@ -39,6 +41,7 @@ type EventValidationContext<'State, 'Event, 'Context> =
 
 /// Named role with identity-matching predicate.
 /// Per-resource, not global. The predicate is the source of truth for runtime evaluation.
+[<NoEquality; NoComparison>]
 type RoleDefinition =
     { Name: string
       ClaimsPredicate: ClaimsPrincipal -> bool }

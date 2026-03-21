@@ -35,6 +35,7 @@ module ProjectedProfiles =
 
 /// Portable, zero-dependency role representation for spec pipeline consumers.
 /// Hierarchy-neutral — does not assume flat or hierarchical state structures.
+[<Struct>]
 type RoleInfo =
     { Name: string
       Description: string option }
