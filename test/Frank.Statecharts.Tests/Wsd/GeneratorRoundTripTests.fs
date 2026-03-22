@@ -46,7 +46,9 @@ let private makeMetadata
       GetCurrentStateKey = fun _ _ _ -> Task.FromResult(initialKey)
       EvaluateGuards = fun _ -> Allowed
       EvaluateEventGuards = fun _ -> Allowed
-      ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent) }
+      ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent)
+      Roles = []
+      ResolveRoles = fun _ -> Set.empty }
 
 let private dummyHandler = RequestDelegate(fun _ -> Task.CompletedTask)
 
