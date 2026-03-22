@@ -402,6 +402,72 @@ let amundsenOnboardingAlpsJson = """{
   }
 }"""
 
+/// Golden file exercising all typed ALPS extension vocabulary terms:
+/// guard, projectedRole, protocolState, clientObligation, advancesProtocol,
+/// dualOf, cutPoint, availableInStates.
+[<Literal>]
+let roleExtensionsAlpsJson = """{
+  "alps": {
+    "version": "1.0",
+    "doc": { "format": "text", "value": "Protocol with role extensions" },
+    "descriptor": [
+      {
+        "id": "payload",
+        "type": "semantic"
+      },
+      {
+        "id": "Idle",
+        "type": "semantic",
+        "ext": [
+          { "id": "projectedRole", "value": "server" },
+          { "id": "availableInStates", "value": "Idle" }
+        ],
+        "descriptor": [
+          {
+            "id": "start",
+            "type": "unsafe",
+            "rt": "#Active",
+            "ext": [
+              { "id": "guard", "value": "isReady" },
+              { "id": "clientObligation", "value": "must-ack" },
+              { "id": "advancesProtocol", "value": "true" }
+            ],
+            "descriptor": [
+              { "href": "#payload" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Active",
+        "type": "semantic",
+        "ext": [
+          { "id": "projectedRole", "value": "client" },
+          { "id": "protocolState", "value": "running" }
+        ],
+        "descriptor": [
+          {
+            "id": "complete",
+            "type": "safe",
+            "rt": "#Done",
+            "ext": [
+              { "id": "dualOf", "value": "start" },
+              { "id": "cutPoint", "value": "true" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Done",
+        "type": "semantic",
+        "ext": [
+          { "id": "availableInStates", "value": "Done" }
+        ]
+      }
+    ]
+  }
+}"""
+
 [<Literal>]
 let onboardingAlpsXml = """<?xml version="1.0" encoding="UTF-8"?>
 <alps version="1.0">

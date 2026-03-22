@@ -64,12 +64,28 @@ let tryGetDocAnnotation (annotations: Annotation list) : (string option * string
         | AlpsAnnotation(AlpsDocumentation(fmt, value)) -> Some(fmt, value)
         | _ -> None)
 
-/// Extract non-guard extension annotations from an annotation list.
+/// Extract extension annotations from an annotation list as (id, href, value) triples.
+/// Typed AlpsMeta cases are emitted back as triples for round-trip fidelity.
+/// Uses exhaustive match on AlpsMeta so the compiler flags unhandled cases when new ones are added.
 let getExtAnnotations (annotations: Annotation list) : (string * string option * string option) list =
     annotations
     |> List.choose (fun a ->
         match a with
-        | AlpsAnnotation(AlpsExtension(id, href, value)) -> Some(id, href, value)
+        | AlpsAnnotation meta ->
+            match meta with
+            | AlpsExtension(id, href, value) -> Some(id, href, value)
+            | AlpsRole(id, value) -> Some(id, None, Some value)
+            | AlpsGuardExt value -> Some(Classification.GuardExtId, None, Some value)
+            | AlpsDuality(id, value) -> Some(id, None, Some value)
+            | AlpsAvailableInStates states ->
+                // Normalized: no spaces (classifyExtension trims on parse)
+                Some(Classification.AvailableInStatesExtId, None, Some(states |> String.concat ","))
+            | AlpsTransitionType _
+            | AlpsDescriptorHref _
+            | AlpsDocumentation _
+            | AlpsLink _
+            | AlpsDataDescriptor _
+            | AlpsVersion _ -> None
         | _ -> None)
 
 /// Extract link annotations from an annotation list.

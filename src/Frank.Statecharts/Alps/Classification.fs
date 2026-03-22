@@ -82,6 +82,34 @@ let buildDescriptorIndex (descriptors: ParsedDescriptor list) : Map<string, Pars
     collectAll Map.empty descriptors
 
 // ---------------------------------------------------------------------------
+// ALPS extension vocabulary IDs (T008)
+// ---------------------------------------------------------------------------
+
+[<Literal>]
+let GuardExtId = "guard"
+
+[<Literal>]
+let ProjectedRoleExtId = "projectedRole"
+
+[<Literal>]
+let ProtocolStateExtId = "protocolState"
+
+[<Literal>]
+let AvailableInStatesExtId = "availableInStates"
+
+[<Literal>]
+let ClientObligationExtId = "clientObligation"
+
+[<Literal>]
+let AdvancesProtocolExtId = "advancesProtocol"
+
+[<Literal>]
+let DualOfExtId = "dualOf"
+
+[<Literal>]
+let CutPointExtId = "cutPoint"
+
+// ---------------------------------------------------------------------------
 // Transition extraction (T006, ported from Mapper.fs)
 // ---------------------------------------------------------------------------
 
@@ -92,7 +120,7 @@ let resolveRt (rt: string option) : string option =
 /// Extract a guard label from ext elements (first ext with id="guard").
 let extractGuard (exts: ParsedExtension list) : string option =
     exts
-    |> List.tryFind (fun e -> e.Id = "guard")
+    |> List.tryFind (fun e -> e.Id = GuardExtId)
     |> Option.bind (fun e -> e.Value)
 
 /// Extract parameter descriptor ids from a descriptor's children.
@@ -112,6 +140,30 @@ let toTransitionKind (typeStr: string option) : AlpsTransitionKind =
     | _ -> AlpsTransitionKind.Unsafe // default
 
 // ---------------------------------------------------------------------------
+// Extension classification (T008)
+// ---------------------------------------------------------------------------
+
+/// Classify a parsed extension into a typed AlpsMeta DU case.
+/// Known extension ids get typed cases; unknown fall back to AlpsExtension.
+/// Note: these extension types do not carry href in the ALPS extension vocabulary;
+/// href is preserved only for unknown extensions via AlpsExtension fallback.
+let classifyExtension (ext: ParsedExtension) : Annotation =
+    let value = ext.Value |> Option.defaultValue ""
+
+    match ext.Id with
+    | GuardExtId -> AlpsAnnotation(AlpsGuardExt value)
+    | ProjectedRoleExtId | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ext.Id, value))
+    | AvailableInStatesExtId ->
+        let states =
+            value.Split(',', System.StringSplitOptions.RemoveEmptyEntries ||| System.StringSplitOptions.TrimEntries)
+            |> Array.toList
+
+        AlpsAnnotation(AlpsAvailableInStates states)
+    | ClientObligationExtId | AdvancesProtocolExtId | DualOfExtId | CutPointExtId ->
+        AlpsAnnotation(AlpsDuality(ext.Id, value))
+    | _ -> AlpsAnnotation(AlpsExtension(ext.Id, ext.Href, ext.Value))
+
+// ---------------------------------------------------------------------------
 // Annotation extraction (T007)
 // ---------------------------------------------------------------------------
 
@@ -123,8 +175,7 @@ let buildStateAnnotations (d: ParsedDescriptor) : Annotation list =
         | None -> []
 
     let extAnnotations =
-        d.Extensions
-        |> List.map (fun e -> AlpsAnnotation(AlpsExtension(e.Id, e.Href, e.Value)))
+        d.Extensions |> List.map classifyExtension
 
     let linkAnnotations =
         d.Links
@@ -153,11 +204,12 @@ let buildTransitionAnnotations
         | Some value -> [ AlpsAnnotation(AlpsDocumentation(resolved.DocFormat, value)) ]
         | None -> []
 
-    // 4. AlpsExtension -- in document order, excluding guards
+    // 4. Typed extensions -- in document order, excluding guards
+    //    (guards flow through TransitionEdge.Guard; AlpsGuardExt is for state/doc-level only)
     let extAnnotations =
         resolved.Extensions
-        |> List.filter (fun e -> e.Id <> "guard")
-        |> List.map (fun e -> AlpsAnnotation(AlpsExtension(e.Id, e.Href, e.Value)))
+        |> List.filter (fun e -> e.Id <> GuardExtId)
+        |> List.map classifyExtension
 
     typeAnnotation @ hrefAnnotation @ docAnnotation @ extAnnotations
 
@@ -263,8 +315,7 @@ let classifyDescriptors
         |> List.map (fun l -> AlpsAnnotation(AlpsLink(l.Rel, l.Href)))
 
     let extAnnotations =
-        rootExtensions
-        |> List.map (fun e -> AlpsAnnotation(AlpsExtension(e.Id, e.Href, e.Value)))
+        rootExtensions |> List.map classifyExtension
 
     let dataDescriptorAnnotations =
         nonStateDescriptors

@@ -348,7 +348,7 @@ let jsonParserEdgeCaseTests =
               // href-only descriptor with no id won't become a state or data descriptor
               Expect.isEmpty (getStates doc) "no states"
 
-          testCase "multiple ext elements on a single descriptor produce extension annotations"
+          testCase "multiple ext elements on a single descriptor produce typed annotations"
           <| fun _ ->
               // Build a state with two ext elements and a transition child so it's classified as a state
               let json =
@@ -359,15 +359,24 @@ let jsonParserEdgeCaseTests =
 
               let stateA = states |> List.find (fun s -> s.Identifier = Some "StateA")
 
-              // State annotations should include the extensions
-              let extAnnotations =
+              // guard ext should be classified as AlpsGuardExt
+              let hasGuard =
                   stateA.Annotations
-                  |> List.choose (fun a ->
+                  |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsExtension(id, _, _)) -> Some id
-                      | _ -> None)
+                      | AlpsAnnotation(AlpsGuardExt "role=X") -> true
+                      | _ -> false)
 
-              Expect.containsAll (Set.ofList extAnnotations) (Set.ofList [ "guard"; "meta" ]) "both extensions present"
+              // unknown ext should remain as AlpsExtension
+              let hasMeta =
+                  stateA.Annotations
+                  |> List.exists (fun a ->
+                      match a with
+                      | AlpsAnnotation(AlpsExtension("meta", _, Some "info")) -> true
+                      | _ -> false)
+
+              Expect.isTrue hasGuard "guard classified as AlpsGuardExt"
+              Expect.isTrue hasMeta "meta remains AlpsExtension"
 
           testCase "unicode characters in descriptor ids"
           <| fun _ ->

@@ -533,4 +533,11 @@ let amundsenRoundTripTests =
               let generated = generateAlpsJson result1.Document
               let result2 = parseAlpsJson generated
               Expect.isEmpty result2.Errors "re-parse succeeds"
-              Expect.equal result1.Document result2.Document "idempotent transition roundtrips" ]
+              Expect.equal result1.Document result2.Document "idempotent transition roundtrips"
+
+          testCase "role extensions golden file roundtrips"
+          <| fun _ ->
+              let original = parseOk roleExtensionsAlpsJson "parse failed"
+              let generated = generateAlpsJson original
+              let roundTripped = parseOk generated "re-parse failed"
+              Expect.equal roundTripped original "role extensions round-trip preserves AST" ]
