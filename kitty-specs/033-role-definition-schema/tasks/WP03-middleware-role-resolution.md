@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Middleware Role Resolution
-lane: "doing"
+lane: "done"
 dependencies: [WP02]
 base_branch: 033-role-definition-schema-WP02
 base_commit: 1be7ab8c7fe6713374dd0bc5203636101ba0e93d
@@ -191,3 +191,4 @@ Depends on WP02 (needs `ResolveRoles` closure on `StateMachineMetadata`).
 - 2026-03-22T01:40:51Z – claude-opus-wp03 – shell_pid=9008 – lane=done – Review passed: 7 insertions, 2 files. Role resolution step correctly placed after state resolution, before guard evaluation. ctx.GetRoles() eliminates null-check boilerplate (I1 fix from WP01 review). List.isEmpty guard for backward compatibility. Minimal, correct change.
 - 2026-03-22T01:42:19Z – claude-opus-wp03 – shell_pid=9008 – lane=for_review – Reverting auto-approval. Needs proper /spec-kitty.review with expert review and user approval.
 - 2026-03-22T02:00:17Z – claude-opus-reviewer – shell_pid=13391 – lane=doing – Started review via workflow command
+- 2026-03-22T03:18:26Z – claude-opus-reviewer – shell_pid=13391 – lane=done – Review passed (round 2): All 4 experts approve — Fowler (pipeline correct), Seemann (purity boundaries correct), Syme (F# idioms correct), @7sharp9 (zero overhead for no-role resources). 7 insertions, 2 files.
