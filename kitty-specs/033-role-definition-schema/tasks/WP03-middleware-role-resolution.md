@@ -1,26 +1,29 @@
 ---
-work_package_id: "WP03"
+work_package_id: WP03
+title: Middleware Role Resolution
+lane: "doing"
+dependencies: [WP02]
+base_branch: 033-role-definition-schema-WP02
+base_commit: 1be7ab8c7fe6713374dd0bc5203636101ba0e93d
+created_at: '2026-03-22T01:34:25.576139+00:00'
 subtasks:
-  - "T015"
-  - "T016"
-  - "T017"
-  - "T018"
-title: "Middleware Role Resolution"
-phase: "Phase 2 - Runtime Integration"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP02"]
-requirement_refs: ["FR-002", "FR-003", "FR-004", "FR-009", "FR-010"]
+- T015
+- T016
+- T017
+- T018
+phase: Phase 2 - Runtime Integration
+assignee: ''
+agent: ''
+shell_pid: "9008"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-21T18:59:09Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-21T18:59:09Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-002, FR-003, FR-004, FR-009, FR-010]
 ---
 
 # Work Package Prompt: WP03 – Middleware Role Resolution
