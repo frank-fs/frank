@@ -1832,4 +1832,68 @@ let roleDefinitionTests =
                       Expect.isFalse (parts.Contains "BadRole") "BadRole should be skipped on exception"
                   }))
                   .GetAwaiter()
-                  .GetResult() ]
+                  .GetResult()
+
+          testCase "GAP-1: EventValidation guard context receives resolved roles"
+          <| fun () ->
+              let guardCalled = ref false
+              let receivedRoles = ref Set.empty
+
+              let evGuard: Guard<MiddlewareTests.TestState, MiddlewareTests.TestEvent, int> =
+                  EventValidation(
+                      "CheckRoles",
+                      fun ctx ->
+                          guardCalled.Value <- true
+                          receivedRoles.Value <- ctx.Roles
+                          Allowed
+                  )
+
+              let evGuardMachine =
+                  { MiddlewareTests.testMachine with
+                      Guards = [ evGuard ] }
+
+              let resource =
+                  statefulResource "/ev-guard/{id}" {
+                      machine evGuardMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "TestRole" (fun _ -> true)
+
+                      inState (
+                          forState
+                              MiddlewareTests.Active
+                              [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask)
+                                StateHandlerBuilder.post (fun ctx ->
+                                    StateMachineContext.setEvent ctx MiddlewareTests.DoAction
+                                    Task.CompletedTask) ]
+                      )
+                  }
+
+              (withRoleServer resource None (fun client ->
+                  task {
+                      let! (_: HttpResponseMessage) = client.PostAsync("/ev-guard/1", new StringContent(""))
+                      Expect.isTrue guardCalled.Value "EventValidation guard should have been called"
+
+                      Expect.isTrue
+                          (receivedRoles.Value.Contains("TestRole"))
+                          "EventValidation guard ctx.Roles should contain resolved roles"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "GAP-3: empty role name rejected at startup"
+          <| fun () ->
+              try
+                  statefulResource "/test/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "" (fun _ -> true)
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask) ]
+                      )
+                  }
+                  |> ignore
+
+                  failtest "should have thrown for empty role name"
+              with ex ->
+                  Expect.stringContains ex.Message "Empty role name" "error should mention empty name" ]
