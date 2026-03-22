@@ -93,10 +93,10 @@
 **Estimated Size**: ~300 lines
 
 ### Included Subtasks
-- [ ] T015 Add role resolution step in `Middleware.fs` — call `meta.ResolveRoles(ctx)` between state resolution (step 1) and guard evaluation (step 3); cache result via `ctx.SetRoles(resolvedRoles)`
-- [ ] T016 Update `evaluateGuards` closure to read `IRoleFeature` from `ctx.Features` and populate `AccessControlContext.Roles` with resolved role set
-- [ ] T017 Update `evaluateEventGuards` closure to read `IRoleFeature` from `ctx.Features` and populate `EventValidationContext.Roles` with resolved role set
-- [ ] T018 Handle edge cases: skip role resolution when `meta.Roles` is empty (backward compatibility); handle `IRoleFeature` being null when no roles declared (guards get `Set.empty`)
+- [x] T015 Add role resolution step in `Middleware.fs` — call `meta.ResolveRoles(ctx)` between state resolution (step 1) and guard evaluation (step 3); cache result via `ctx.SetRoles(resolvedRoles)`
+- [x] T016 Update `evaluateGuards` closure to read `IRoleFeature` from `ctx.Features` and populate `AccessControlContext.Roles` with resolved role set
+- [x] T017 Update `evaluateEventGuards` closure to read `IRoleFeature` from `ctx.Features` and populate `EventValidationContext.Roles` with resolved role set
+- [x] T018 Handle edge cases: skip role resolution when `meta.Roles` is empty (backward compatibility); handle `IRoleFeature` being null when no roles declared (guards get `Set.empty`)
 
 ### Implementation Notes
 - Role resolution placement: AFTER state resolution (step 1), BEFORE method filtering (step 2). This ensures roles are available to all subsequent steps.
