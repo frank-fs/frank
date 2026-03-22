@@ -328,7 +328,7 @@ let private buildExtractedStatecharts
                   Description = None })
             |> Map.ofList
 
-        StatechartExtractor.toExtractedStatechart sr.RouteTemplate stateNames initialStateKey guardNames stateMetadata)
+        StatechartExtractor.toExtractedStatechart sr.RouteTemplate stateNames initialStateKey guardNames stateMetadata [])
 
 // ── Public API ──
 

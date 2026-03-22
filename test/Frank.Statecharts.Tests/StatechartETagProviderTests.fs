@@ -210,7 +210,9 @@ let factoryTests =
                     EvaluateGuards = fun _ -> Allowed
                     EvaluateEventGuards = fun _ -> Allowed
                     ExecuteTransition =
-                      fun _ _ _ -> System.Threading.Tasks.Task.FromResult(TransitionAttemptResult.NoEvent) }
+                      fun _ _ _ -> System.Threading.Tasks.Task.FromResult(TransitionAttemptResult.NoEvent)
+                    Roles = []
+                    ResolveRoles = fun _ -> Set.empty }
 
               let endpoint =
                   Endpoint(null, EndpointMetadataCollection(metadata :> obj), "test-endpoint")
