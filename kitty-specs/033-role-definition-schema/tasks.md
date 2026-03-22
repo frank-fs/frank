@@ -125,12 +125,12 @@
 **Estimated Size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T019 Test role declaration via CE — define `statefulResource` with roles, verify roles appear in `StateMachineMetadata` on endpoint
-- [ ] T020 Test duplicate role name rejection — define resource with duplicate role names, verify startup fails with descriptive error
-- [ ] T021 Test role resolution — send requests with different `ClaimsPrincipal` identities; verify correct role sets resolved (multi-role, no-role, anonymous)
-- [ ] T022 Test `HasRole` in guards — create guard using `ctx.HasRole "RoleName"`, verify allows/blocks based on resolved roles
-- [ ] T023 Test backward compatibility — define `statefulResource` with NO role declarations, verify existing behavior unchanged and `HasRole` returns `false`
-- [ ] T024 Test predicate exception handling — create role with throwing predicate, verify role is not resolved (graceful degradation) and request proceeds
+- [x] T019 Test role declaration via CE — define `statefulResource` with roles, verify roles appear in `StateMachineMetadata` on endpoint
+- [x] T020 Test duplicate role name rejection — define resource with duplicate role names, verify startup fails with descriptive error
+- [x] T021 Test role resolution — send requests with different `ClaimsPrincipal` identities; verify correct role sets resolved (multi-role, no-role, anonymous)
+- [x] T022 Test `HasRole` in guards — create guard using `ctx.HasRole "RoleName"`, verify allows/blocks based on resolved roles
+- [x] T023 Test backward compatibility — define `statefulResource` with NO role declarations, verify existing behavior unchanged and `HasRole` returns `false`
+- [x] T024 Test predicate exception handling — create role with throwing predicate, verify role is not resolved (graceful degradation) and request proceeds
 
 ### Implementation Notes
 - Follow existing test patterns in `test/Frank.Statecharts.Tests/StatefulResourceTests.fs`
