@@ -1,28 +1,31 @@
 ---
-work_package_id: "WP04"
+work_package_id: WP04
+title: Integration Tests
+lane: "doing"
+dependencies: [WP03]
+base_branch: 033-role-definition-schema-WP03
+base_commit: 9f3cefd11303950a30be8c0fec5b4b323e805bde
+created_at: '2026-03-22T01:43:35.015332+00:00'
 subtasks:
-  - "T019"
-  - "T020"
-  - "T021"
-  - "T022"
-  - "T023"
-  - "T024"
-title: "Integration Tests"
-phase: "Phase 3 - Validation"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP03"]
-requirement_refs: ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005", "FR-009", "FR-010"]
+- T019
+- T020
+- T021
+- T022
+- T023
+- T024
+phase: Phase 3 - Validation
+assignee: ''
+agent: ''
+shell_pid: "11112"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-03-21T18:59:09Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-03-21T18:59:09Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
+requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-005, FR-009, FR-010]
 ---
 
 # Work Package Prompt: WP04 – Integration Tests
