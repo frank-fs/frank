@@ -78,6 +78,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Affordances/Fixtures/test-descriptors.bin"
                       LogicalName="Frank.Descriptors.bin" />
+    <EmbeddedResource Include="Affordances/Fixtures/corrupt-model.bin"
+                      LogicalName="Frank.Corrupt.model.bin" />
   </ItemGroup>
 
 </Project>

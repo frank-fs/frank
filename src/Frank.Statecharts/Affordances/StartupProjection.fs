@@ -2,6 +2,7 @@ namespace Frank.Affordances
 
 open System
 open System.Reflection
+open Microsoft.Extensions.Logging
 open Frank.Resources.Model
 open MessagePack
 open MessagePack.Resolvers
@@ -50,7 +51,7 @@ module StartupProjection =
 
     /// Load the UnifiedExtractionState from the embedded binary resource.
     /// Returns None if the resource is not found or cannot be deserialized.
-    let loadUnifiedStateFromAssembly (assembly: Assembly) : UnifiedExtractionState option =
+    let loadUnifiedStateFromAssembly (logger: ILogger) (assembly: Assembly) : UnifiedExtractionState option =
         let resourceName =
             assembly.GetManifestResourceNames()
             |> Array.tryFind (fun name ->
@@ -67,14 +68,15 @@ module StartupProjection =
                 else
                     let state = MessagePackSerializer.Deserialize<UnifiedExtractionState>(stream, msgpackOptions)
                     Some state
-            with _ ->
+            with ex ->
+                logger.LogWarning(ex, "Failed to deserialize model.bin from {AssemblyName}", assembly.GetName().Name)
                 None
 
     /// Load an AffordanceMap from the unified state embedded in the given assembly.
     /// Deserializes the binary, projects resources to runtime types, and generates
     /// the AffordanceMap. Returns None if no unified state is found.
-    let loadAffordanceMapFromAssembly (assembly: Assembly) : AffordanceMap option =
-        match loadUnifiedStateFromAssembly assembly with
+    let loadAffordanceMapFromAssembly (logger: ILogger) (assembly: Assembly) : AffordanceMap option =
+        match loadUnifiedStateFromAssembly logger assembly with
         | None -> None
         | Some state ->
             let runtimeResources = state.Resources |> List.map projectResource
@@ -83,8 +85,8 @@ module StartupProjection =
     /// Load a full RuntimeState from the unified state embedded in the given assembly.
     /// Includes both runtime resource data (for AffordanceMap/statechart format generation)
     /// and pre-computed profile strings (ALPS, OWL, SHACL, JSON Schema).
-    let loadRuntimeStateFromAssembly (assembly: Assembly) : RuntimeState option =
-        match loadUnifiedStateFromAssembly assembly with
+    let loadRuntimeStateFromAssembly (logger: ILogger) (assembly: Assembly) : RuntimeState option =
+        match loadUnifiedStateFromAssembly logger assembly with
         | None -> None
         | Some state ->
             let runtimeResources = state.Resources |> List.map projectResource

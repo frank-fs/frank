@@ -97,11 +97,12 @@ let gameMachine: StateMachine<TicTacToeState, TicTacToeEvent, int> =
 // Resource model is embedded by Frank.Cli.MSBuild targets.
 
 open System.Reflection
+open Microsoft.Extensions.Logging.Abstractions
 open Frank.Affordances
 open Frank.Resources.Model
 
 /// Load the affordance map from the embedded runtime state at startup.
 /// Falls back to an empty map if the resource is not found (e.g., during tests).
 let gameAffordanceMap: AffordanceMap =
-    StartupProjection.loadAffordanceMapFromAssembly (Assembly.GetExecutingAssembly())
+    StartupProjection.loadAffordanceMapFromAssembly NullLogger.Instance (Assembly.GetExecutingAssembly())
     |> Option.defaultValue AffordanceMap.empty
