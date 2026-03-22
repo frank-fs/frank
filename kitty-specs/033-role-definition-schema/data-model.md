@@ -54,7 +54,7 @@ Non-generic typed feature for resolved roles, registered on `HttpContext.Feature
 |--------|------|-------------|
 | Roles | Set\<string\> | Unordered set of role names the current user holds |
 
-**Lives in**: `src/Frank.Statecharts/StatechartFeature.fs`
+**Lives in**: `src/Frank.Statecharts/RoleFeature.fs`
 
 **Registration**: Single registration via `ctx.Features.Set<IRoleFeature>(feature)`. No generic variant needed — roles are always `Set<string>`.
 
