@@ -1,5 +1,6 @@
 namespace Frank.Affordances
 
+open System.Collections.Generic
 open System.Reflection
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
@@ -9,6 +10,25 @@ open Frank.Builder
 
 [<AutoOpen>]
 module WebHostBuilderExtensions =
+
+    let private getAffordanceLogger (app: IApplicationBuilder) =
+        app.ApplicationServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger<AffordanceMiddleware>()
+
+    let private registerAffordanceMiddleware
+        (logger: ILogger)
+        (preComputed: Dictionary<string, PreComputedAffordance>)
+        (version: string)
+        (app: IApplicationBuilder)
+        =
+        if version <> AffordanceMap.currentVersion then
+            logger.LogWarning(
+                "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
+                version,
+                AffordanceMap.currentVersion)
+
+        app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
+
     type WebHostBuilder with
 
         /// Register the affordance middleware with an explicit AffordanceMap.
@@ -27,18 +47,7 @@ module WebHostBuilderExtensions =
                     Middleware =
                         spec.Middleware
                         >> fun app ->
-                            if version <> AffordanceMap.currentVersion then
-                                let logger =
-                                    app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-                                        .CreateLogger<AffordanceMiddleware>()
-
-                                logger.LogWarning(
-                                    "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
-                                    version,
-                                    AffordanceMap.currentVersion
-                                )
-
-                            app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
+                            registerAffordanceMiddleware (getAffordanceLogger app) preComputed version app
                             app }
 
         /// Auto-load the AffordanceMap from the entry assembly's embedded model.bin.
@@ -46,53 +55,39 @@ module WebHostBuilderExtensions =
         /// or model.bin is not found/readable. For multi-project solutions where
         /// model.bin lives in a library assembly, use useAffordancesWith.
         [<CustomOperation("useAffordances")>]
-        member this.UseAffordances(spec: WebHostSpec) : WebHostSpec =
-            let logWarn (msg: string) =
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-                                .CreateLogger<AffordanceMiddleware>()
-                                .LogWarning(msg)
-
-                            app }
-
-            let logInfo (msg: string) =
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-                                .CreateLogger<AffordanceMiddleware>()
-                                .LogInformation(msg)
-
-                            app }
-
+        member _.UseAffordances(spec: WebHostSpec) : WebHostSpec =
             match Assembly.GetEntryAssembly() with
             | null ->
-                logWarn
-                    "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map."
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            (getAffordanceLogger app).LogWarning(
+                                "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map.")
+
+                            app }
             | assembly ->
-                match StartupProjection.loadAffordanceMapFromAssembly assembly with
-                | Some map ->
-                    let loaded =
-                        { spec with
-                            Middleware =
-                                spec.Middleware
-                                >> fun app ->
-                                    app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-                                        .CreateLogger<AffordanceMiddleware>()
-                                        .LogInformation(
-                                            "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
-                                            assembly.GetName().Name,
-                                            map.Entries.Length)
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            let logger = getAffordanceLogger app
 
-                                    app }
+                            match StartupProjection.loadAffordanceMapFromAssembly logger assembly with
+                            | Some map ->
+                                logger.LogInformation(
+                                    "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
+                                    assembly.GetName().Name,
+                                    map.Entries.Length)
 
-                    this.UseAffordancesWith(loaded, map)
-                | None ->
-                    logInfo
-                        (sprintf
-                            "model.bin not found or unreadable in assembly '%s'; affordances not loaded. Use useAffordancesWith to supply an explicit map."
-                            (assembly.GetName().Name))
+                                let preComputed = AffordancePreCompute.preCompute map
+
+                                if preComputed.Count > 0 then
+                                    registerAffordanceMiddleware logger preComputed map.Version app
+
+                            | None ->
+                                logger.LogInformation(
+                                    "model.bin not found or unreadable in assembly '{AssemblyName}'; affordances not loaded. Use useAffordancesWith to supply an explicit map.",
+                                    assembly.GetName().Name)
+
+                            app }

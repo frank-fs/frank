@@ -10,6 +10,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging.Abstractions
 open Frank.Affordances
 open Frank.Resources.Model
 
@@ -320,7 +321,7 @@ let startupProjectionTests =
           <| fun _ ->
               // Use an assembly that doesn't have a descriptors.bin embedded
               let assembly = typeof<obj>.Assembly
-              let result = StartupProjection.loadRuntimeStateFromAssembly assembly
+              let result = StartupProjection.loadRuntimeStateFromAssembly NullLogger.Instance assembly
               Expect.isNone result "Should return None when no embedded resource"
 
           testCase "ProjectedProfiles.isEmpty returns true for empty profiles"
