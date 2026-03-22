@@ -5,7 +5,6 @@
       "Bash(fantomas:*)",
       "Bash(git:*)",
       "Bash(gh:*)",
-      "Bash(spec-kitty:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",

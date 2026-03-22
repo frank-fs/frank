@@ -54,7 +54,7 @@ launchSettings.json
 .worktrees/
 nupkg/
 
-# Added by Spec Kitty CLI (auto-managed)
+# AI tool config directories
 .claude/
 !.claude/settings.json
 .codex/
@@ -68,6 +68,3 @@ nupkg/
 .roo/
 .amazonq/
 .github/copilot/
-.kittify/.dashboard
-.kittify/missions/__pycache__/
-.kittify/workspaces

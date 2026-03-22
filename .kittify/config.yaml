@@ -1,5 +1,0 @@
-vcs:
-  type: git
-agents:
-  available:
-  - claude
