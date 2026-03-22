@@ -4,9 +4,41 @@
 ![GitHub Release Date](https://img.shields.io/github/release-date/frank-fs/frank)
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
 
-An [F#](https://fsharp.org/) web framework that makes HTTP APIs navigable by AI agents — without special integration, SDKs, or documentation. Just standard HTTP.
+A web framework for building applications where resources are the primary abstraction, invalid states are structurally impossible, and the application itself is the API documentation. Frank uses [F#](https://fsharp.org/) [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) as a declarative, extensible layer over [ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/).
 
-Frank uses [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) to define resources whose responses carry state-dependent affordances: `Link` headers tell clients where to go, `Allow` headers tell clients what's possible, and [ALPS](http://alps.io/) profiles tell clients what things mean. Statechart-enforced state machines prevent illegal transitions at the framework level. The result is an API that an agent can discover, understand, and navigate from a cold start — using the same HTTP standards that browsers have used for 30 years.
+Frank is built on four ideas:
+
+**Resources, not routes.** HTTP resources are the unit of design. You define what a resource is and what it can do — the framework handles routing, method dispatch, and metadata. This is REST as Fielding described it, not the "REST" that became a synonym for JSON-over-HTTP.
+
+**Make invalid states impossible.** Statechart-enforced state machines govern resource behavior at the framework level. If a transition isn't legal, it isn't available — in the response headers, in the HTML controls, in the API surface. No defensive coding required.
+
+**Built for the age of agents.** Frank provides CLI tooling and extension libraries that layer semantic metadata onto your application — ALPS profiles, Link headers, JSON Home documents, OWL ontologies. Developers and agents can reflect on a running application, understand its capabilities, and refine it continuously.
+
+**Discovery is a first-class concern.** A Frank application is understandable from a cold start. JSON Home documents advertise available resources. `Link` headers connect them. `Allow` headers declare what's possible in the current state. ALPS profiles define what things mean. Semantic web vocabularies give structure a shared language. No SDK, no out-of-band documentation — the application explains itself through standard HTTP, content negotiation, and open standards that clients (human or machine) can navigate without prior knowledge.
+
+```fsharp
+let home =
+    resource "/" {
+        name "Home"
+
+        get (fun (ctx: HttpContext) ->
+            ctx.Response.WriteAsync("Welcome!"))
+    }
+
+[<EntryPoint>]
+let main args =
+    webHost args {
+        useDefaults
+        resource home
+    }
+    0
+```
+
+---
+
+## What This Looks Like in Practice
+
+When you combine statecharts, affordances, and discovery, a Frank application tells clients exactly what's possible at every point in a protocol. Here's a TicTacToe game wired with affordance middleware:
 
 ```fsharp
 webHost args {
@@ -35,20 +67,6 @@ Link: </alps/games>; rel="profile"
 ```
 
 No special client library. No out-of-band documentation. The API tells you what's possible right now, and the framework guarantees the response is correct.
-
----
-
-## For AI Agents
-
-An agent encountering a Frank API for the first time can:
-
-1. **Discover** — `GET /.well-known/frank-profiles` returns all available resource profiles
-2. **Understand** — Dereference an ALPS profile to learn vocabulary (what "makeMove" means, what fields exist)
-3. **Navigate** — Follow `Link` headers from any response to related resources
-4. **Act** — Read `Allow` header to know which HTTP methods are available in the current state
-5. **React** — As state transitions occur, affordances change automatically — no polling, no cache invalidation
-
-This works because Frank computes affordances at build time and serves them at near-zero cost per request. State-dependent `Link` and `Allow` headers are pre-computed into immutable lookup tables. The Datastar SSE path goes further: HTML fragments include or exclude controls based on current state, achieving in-band hypermedia.
 
 ---
 
