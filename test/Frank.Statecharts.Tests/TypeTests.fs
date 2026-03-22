@@ -173,7 +173,8 @@ let guardTests =
               let ctx: AccessControlContext<TurnstileState, unit> =
                   { User = adminPrincipal
                     CurrentState = Locked
-                    Context = () }
+                    Context = ()
+                    Roles = Set.empty }
 
               match adminGuard with
               | AccessControl(_, pred) -> Expect.equal (pred ctx) Allowed "admin should be allowed"
@@ -197,7 +198,8 @@ let guardTests =
               let ctx: AccessControlContext<TurnstileState, unit> =
                   { User = userPrincipal
                     CurrentState = Locked
-                    Context = () }
+                    Context = ()
+                    Roles = Set.empty }
 
               match adminGuard with
               | AccessControl(_, pred) -> Expect.equal (pred ctx) (Blocked(NotAllowed)) "non-admin should be blocked"
@@ -221,7 +223,8 @@ let guardTests =
                   { User = principal
                     CurrentState = Locked
                     Event = Coin
-                    Context = () }
+                    Context = ()
+                    Roles = Set.empty }
 
               match eventGuard with
               | EventValidation(_, pred) -> Expect.equal (pred ctx) Allowed "Coin should be allowed"

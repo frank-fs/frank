@@ -13,9 +13,11 @@ module StatechartExtractor =
         (initialStateKey: string)
         (guardNames: string list)
         (stateMetadata: Map<string, StateInfo>)
+        (roles: RoleInfo list)
         =
         { RouteTemplate = routeTemplate
           StateNames = stateNames
           InitialStateKey = initialStateKey
           GuardNames = guardNames
-          StateMetadata = stateMetadata }
+          StateMetadata = stateMetadata
+          Roles = roles }
