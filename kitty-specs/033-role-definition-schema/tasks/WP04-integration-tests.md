@@ -15,7 +15,7 @@ subtasks:
 - T024
 phase: Phase 3 - Validation
 assignee: ''
-agent: ''
+agent: "claude-opus-wp04"
 shell_pid: "11112"
 review_status: ''
 reviewed_by: ''
@@ -244,3 +244,4 @@ Depends on WP03 (needs full middleware pipeline for integration tests).
 ## Activity Log
 
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
+- 2026-03-22T01:43:35Z – claude-opus-wp04 – shell_pid=11112 – lane=doing – Assigned agent via workflow command
