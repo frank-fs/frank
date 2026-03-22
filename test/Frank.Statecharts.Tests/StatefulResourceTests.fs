@@ -1560,20 +1560,22 @@ let roleDefinitionTests =
 
           testCase "T020: duplicate role names rejected at startup"
           <| fun () ->
-              Expect.throws
-                  (fun () ->
-                      statefulResource "/test/{id}" {
-                          machine MiddlewareTests.testMachine
-                          resolveInstanceId (fun ctx -> "1")
-                          role "Same" (fun _ -> true)
-                          role "Same" (fun _ -> false)
+              try
+                  statefulResource "/test/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun ctx -> "1")
+                      role "Same" (fun _ -> true)
+                      role "Same" (fun _ -> false)
 
-                          inState (
-                              forState MiddlewareTests.Active [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask) ]
-                          )
-                      }
-                      |> ignore)
-                  "should throw on duplicate role names"
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask) ]
+                      )
+                  }
+                  |> ignore
+
+                  failtest "should have thrown on duplicate role names"
+              with ex ->
+                  Expect.stringContains ex.Message "Duplicate role names" "error should mention duplicate names"
 
           testCase "T021: role resolution with different identities"
           <| fun () ->
@@ -1620,6 +1622,66 @@ let roleDefinitionTests =
                       Expect.isTrue (parts.Contains "RoleB") "RoleB should be resolved for role=b"
                       Expect.isTrue (parts.Contains "Observer") "Observer should always resolve"
                       Expect.isFalse (parts.Contains "RoleA") "RoleA should not resolve for role=b"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "T021B: anonymous user matches only predicate-based roles"
+          <| fun () ->
+              let resource =
+                  statefulResource "/roles/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "RoleA" (fun claims -> claims.HasClaim("role", "a"))
+                      role "RoleB" (fun claims -> claims.HasClaim("role", "b"))
+                      role "Observer" (fun _ -> true)
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get getRolesHandler ]
+                      )
+                  }
+
+              // Anonymous user (no auth type) should match only Observer
+              let anonymous = ClaimsPrincipal(ClaimsIdentity())
+
+              (withRoleServer resource (Some anonymous) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for anonymous user"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      let parts = body.Split(',') |> Array.filter (fun s -> s <> "") |> Set.ofArray
+                      Expect.isTrue (parts.Contains "Observer") "Observer should resolve for anonymous user"
+                      Expect.isFalse (parts.Contains "RoleA") "RoleA should not resolve for anonymous user"
+                      Expect.isFalse (parts.Contains "RoleB") "RoleB should not resolve for anonymous user"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "T021C: user with all claims matches all roles"
+          <| fun () ->
+              let resource =
+                  statefulResource "/roles/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "RoleA" (fun claims -> claims.HasClaim("role", "a"))
+                      role "RoleB" (fun claims -> claims.HasClaim("role", "b"))
+                      role "Observer" (fun _ -> true)
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get getRolesHandler ]
+                      )
+                  }
+
+              // User with both claims should match all three roles
+              let superUser =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("role", "a"); Claim("role", "b") |], "test"))
+
+              (withRoleServer resource (Some superUser) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for user with all claims"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      Expect.equal body "Observer,RoleA,RoleB" "all three roles should be resolved and sorted"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -1671,6 +1733,45 @@ let roleDefinitionTests =
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/guarded-role/1")
                       Expect.equal resp.StatusCode HttpStatusCode.Forbidden "denied user should get 403"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "T022C: HasRole with undeclared role name always blocks"
+          <| fun () ->
+              let undeclaredRoleGuardMachine: StateMachine<MiddlewareTests.TestState, MiddlewareTests.TestEvent, int> =
+                  { MiddlewareTests.testMachine with
+                      Guards =
+                          [ AccessControl(
+                                "RequireNonexistent",
+                                fun ctx ->
+                                    if ctx.HasRole "NonexistentRole" then
+                                        Allowed
+                                    else
+                                        Blocked NotAllowed
+                            ) ] }
+
+              let resource =
+                  statefulResource "/undeclared-role/{id}" {
+                      machine undeclaredRoleGuardMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "Allowed" (fun claims -> claims.HasClaim("access", "granted"))
+
+                      inState (
+                          forState
+                              MiddlewareTests.Active
+                              [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("ok")) ]
+                      )
+                  }
+
+              // Even a user with access=granted should get 403 because NonexistentRole is never declared
+              let allowedUser =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("access", "granted") |], "test"))
+
+              (withRoleServer resource (Some allowedUser) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/undeclared-role/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.Forbidden "undeclared role should never match -> 403"
                   }))
                   .GetAwaiter()
                   .GetResult()
