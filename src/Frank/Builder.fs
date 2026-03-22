@@ -12,6 +12,56 @@ module Builder =
     open Microsoft.Extensions.FileProviders
     open Microsoft.Extensions.Hosting
 
+    let private rootName = "Root"
+
+    let private isRouteParam (seg: string) =
+        seg.StartsWith('{') && seg.EndsWith('}')
+
+    let private titleCase (s: string) =
+        if String.IsNullOrEmpty s then
+            s
+        else
+            string (Char.ToUpperInvariant s[0]) + s.Substring(1).ToLowerInvariant()
+
+    let private singularize (s: string) =
+        if
+            s.Length > 1
+            && s.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+            && not (s.EndsWith("ss", StringComparison.OrdinalIgnoreCase))
+        then
+            s.Substring(0, s.Length - 1)
+        else
+            s
+
+    let private inferNameFromRoute (routeTemplate: string) =
+        let trimmed = routeTemplate.TrimStart('/')
+
+        if String.IsNullOrEmpty trimmed then
+            rootName
+        else
+            let segments = trimmed.Split('/', StringSplitOptions.RemoveEmptyEntries)
+
+            // Singularize collection segments that precede a path parameter,
+            // so /users/{id} becomes "User" not "Users"
+            let processed =
+                segments
+                |> Array.indexed
+                |> Array.collect (fun (i, seg) ->
+                    if isRouteParam seg then
+                        Array.empty
+                    else
+                        let nextIsParam = i + 1 < segments.Length && isRouteParam segments[i + 1]
+
+                        let normalized = if nextIsParam then singularize seg else seg
+
+                        normalized.Split([| '-'; '_' |], StringSplitOptions.RemoveEmptyEntries)
+                        |> Array.map titleCase)
+
+            if Array.isEmpty processed then
+                rootName
+            else
+                String.Join(" ", processed)
+
     [<Struct>]
     type Resource = { Endpoints: Endpoint[] }
 
@@ -19,24 +69,28 @@ module Builder =
     /// Extensions add instances to endpoint metadata to advertise supported content types.
     [<Struct>]
     type DiscoveryMediaType =
-        { /// The content type string (e.g., "application/ld+json", "text/turtle").
-          MediaType: string
-          /// The link relation type for Link header generation (e.g., "describedby").
-          Rel: string }
+        {
+            /// The content type string (e.g., "application/ld+json", "text/turtle").
+            MediaType: string
+            /// The link relation type for Link header generation (e.g., "describedby").
+            Rel: string
+        }
 
     /// Metadata contributed by extension packages for JSON Home document generation.
     /// Register via DI; Frank.Discovery reads it at startup to build the home document.
     type JsonHomeMetadata =
-        { /// API title (e.g., from OpenAPI info)
-          Title: string option
-          /// URL for API documentation (e.g., Scalar UI at /scalar/v1)
-          DocsUrl: string option
-          /// Base URI for ALPS profiles (e.g., "http://example.com/alps/games").
-          /// Used to build link relation URIs: {AlpsBaseUri}#{resourceSlug}
-          AlpsBaseUri: string option
-          /// ALPS descriptor URIs keyed by (resourceSlug, descriptorId).
-          /// Enables semantic hrefVars in JSON Home.
-          AlpsDescriptors: Map<string, Map<string, string>> option }
+        {
+            /// API title (e.g., from OpenAPI info)
+            Title: string option
+            /// URL for API documentation (e.g., Scalar UI at /scalar/v1)
+            DocsUrl: string option
+            /// Base URI for ALPS profiles (e.g., "http://example.com/alps/games").
+            /// Used to build link relation URIs: {AlpsBaseUri}#{resourceSlug}
+            AlpsBaseUri: string option
+            /// ALPS descriptor URIs keyed by (resourceSlug, descriptorId).
+            /// Enables semantic hrefVars in JSON Home.
+            AlpsDescriptors: Map<string, Map<string, string>> option
+        }
 
         static member Empty =
             { Title = None
@@ -45,12 +99,12 @@ module Builder =
               AlpsDescriptors = None }
 
     type ResourceSpec =
-        { Name: string
+        { Name: string option
           Handlers: (string * RequestDelegate) list
           Metadata: (EndpointBuilder -> unit) list }
 
         static member Empty =
-            { Name = Unchecked.defaultof<_>
+            { Name = None
               Handlers = []
               Metadata = [] }
 
@@ -60,12 +114,16 @@ module Builder =
                   Metadata = metadata } =
                 spec
 
+            let resolvedName =
+                match name with
+                | Some n -> n
+                | None -> inferNameFromRoute routeTemplate
+
             let routePattern = Patterns.RoutePatternFactory.Parse routeTemplate
 
             let endpoints =
                 [| for httpMethod, handler in handlers ->
-                       let displayName =
-                           httpMethod + " " + (if String.IsNullOrEmpty name then routeTemplate else name)
+                       let displayName = httpMethod + " " + resolvedName
 
                        let builder = RouteEndpointBuilder(handler, routePattern, 0)
                        builder.DisplayName <- displayName
@@ -90,7 +148,7 @@ module Builder =
         member __.Yield(_) = ResourceSpec.Empty
 
         [<CustomOperation("name")>]
-        member __.Name(spec, name) = { spec with Name = name }
+        member __.Name(spec, name) = { spec with Name = Some name }
 
         static member AddMetadata(spec: ResourceSpec, convention: EndpointBuilder -> unit) : ResourceSpec =
             { spec with
