@@ -4,7 +4,7 @@
 ![GitHub Release Date](https://img.shields.io/github/release-date/frank-fs/frank)
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
 
-A web framework for building applications where resources are the primary abstraction, invalid states are structurally impossible, and the application itself is the API documentation. Frank uses [F#](https://fsharp.org/) [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) as a declarative, extensible layer over [ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/) — keeping the full power of the platform without hiding it behind abstractions.
+A web framework for building applications where resources are the primary abstraction, invalid states are structurally impossible, and the application itself is the API documentation. Frank uses [F#](https://fsharp.org/) [computation expressions](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) as a declarative, extensible layer over [ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/).
 
 Frank is built on four ideas:
 
