@@ -1,7 +1,7 @@
 ---
 work_package_id: WP04
 title: Integration Tests
-lane: "for_review"
+lane: "doing"
 dependencies: [WP03]
 base_branch: 033-role-definition-schema-WP03
 base_commit: 9f3cefd11303950a30be8c0fec5b4b323e805bde
@@ -15,8 +15,8 @@ subtasks:
 - T024
 phase: Phase 3 - Validation
 assignee: ''
-agent: "claude-opus-wp04"
-shell_pid: "11112"
+agent: "claude-opus-reviewer-r2"
+shell_pid: "17950"
 review_status: ''
 reviewed_by: ''
 history:
@@ -246,3 +246,4 @@ Depends on WP03 (needs full middleware pipeline for integration tests).
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
 - 2026-03-22T01:43:35Z – claude-opus-wp04 – shell_pid=11112 – lane=doing – Assigned agent via workflow command
 - 2026-03-22T02:40:03Z – claude-opus-wp04 – shell_pid=11112 – lane=for_review – All 6 subtasks + 3 gap fixes complete. 1041 tests (11 new). Spec compliant. EventValidation guard test, empty name test, anonymous/all-roles scenarios all covered.
+- 2026-03-22T02:40:35Z – claude-opus-reviewer-r2 – shell_pid=17950 – lane=doing – Started review via workflow command
