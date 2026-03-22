@@ -40,7 +40,7 @@ Always run `dotnet build Frank.sln` and `dotnet test` before claiming work is co
 
 ## Constitution (non-negotiable)
 
-These principles govern all code changes. See `.kittify/memory/constitution.md` for full rationale.
+These principles govern all code changes.
 
 1. **Resource-Oriented Design.** Resources are the primary abstraction, not URL patterns with handlers. The `resource` CE is the central API. Hypermedia over static specs.
 2. **Idiomatic F#.** CEs for config, DUs for choices, Option over null, pipeline-friendly signatures, declarative over imperative.
@@ -70,7 +70,7 @@ These principles govern all code changes. See `.kittify/memory/constitution.md` 
 ## Workflow Rules
 
 ### Git workflow
-- **Keep master clean by working on a worktree within `.worktrees/`.** Every change — features, fixes, docs, config — follows: create worktree → work on branch → push → create PR → merge on approval. This keeps master free of in-progress commits (spec-kitty status, partial work) so parallel branches can always use local master as a clean base.
+- **Keep master clean by working on a worktree within `.worktrees/`.** Every change — features, fixes, docs, config — follows: create worktree → work on branch → push → create PR → merge on approval. This keeps master free of in-progress commits so parallel branches can always use local master as a clean base.
 - **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
 - **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
 
@@ -80,7 +80,6 @@ These principles govern all code changes. See `.kittify/memory/constitution.md` 
 - **Use reviewer-informed questions.** Draw on the expert panel perspectives when asking clarifying questions. "What do my experts recommend?" = consult the reviewer panel.
 
 ### Implementation
-- **Always use spec-kitty commands** for pipeline work. Never bypass by generating artifacts manually.
 - **Never blame pre-existing issues.** Surface, investigate, and file issues. Never dismiss problems as "not my change."
 - **Portable concept filter.** When scoping work, ask: "Is this a portable concept or an F#-specific detail?" Portable concepts (statechart semantics, ALPS discovery, affordance projection) get full investment. F#-specific details (CE syntax, DU encoding, .NET middleware) are implemented but not over-invested.
 - **No lightweight API.** Never suggest a simplified `frank.get "/path" handler` alternative. The CE is the design. On-ramp is solved by docs/examples.
@@ -103,10 +102,8 @@ Run these at the suggested cadence to maintain quality and capture learning.
 | `/simplify` | After completing a feature (post-commit, pre-PR) | Parallel agents review changed code for reuse, quality, efficiency |
 | `/techdebt` | Weekly or before cleanup sprints | Scans code + GitHub for tech debt, categorizes by priority, proposes fixes |
 | `/expert-review` | Before merging any PR or "what do my experts think?" | Dispatches 2-4 expert agents in parallel for multi-perspective review |
-| `/spec-kitty.status` | Start of session when resuming pipeline work | Kanban board showing work package progress |
 
 **Not recurring but important to remember:**
-- `/spec-kitty.specify` → `/spec-kitty.plan` → `/spec-kitty.tasks` — full pipeline for new features
 - `superpowers:brainstorming` — before any creative/design work
 - `superpowers:systematic-debugging` — before proposing fixes for any bug
 
