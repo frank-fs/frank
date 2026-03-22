@@ -1511,3 +1511,224 @@ let simpleDuBackwardCompatibilityTests =
                   "Playing (Won X) -> Playing"
 
               Expect.equal (stateKeyOf Disposed) "Disposed" "Disposed -> Disposed" ]
+
+// === Role Definition Tests ===
+
+let private getRolesHandler (ctx: HttpContext) : Task =
+    let roles = ctx.GetRoles()
+    ctx.Response.WriteAsync(String.Join(",", roles |> Set.toList |> List.sort))
+
+let private addRoleTestStore (services: IServiceCollection) =
+    services.AddStateMachineStore<MiddlewareTests.TestState, int>() |> ignore
+
+let private withRoleServer (resource: Resource) configUser (f: HttpClient -> Task) =
+    task {
+        let server = MiddlewareTests.buildTestServer resource addRoleTestStore configUser
+        let client = server.CreateClient()
+
+        try
+            do! f client
+        finally
+            client.Dispose()
+            server.Dispose()
+    }
+    :> Task
+
+[<Tests>]
+let roleDefinitionTests =
+    testList
+        "Role definitions"
+        [ testCase "T019: role declarations appear in endpoint metadata"
+          <| fun () ->
+              let resource =
+                  statefulResource "/test/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun ctx -> "1")
+                      role "RoleA" (fun claims -> claims.HasClaim("role", "a"))
+                      role "RoleB" (fun claims -> claims.HasClaim("role", "b"))
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask) ]
+                      )
+                  }
+
+              let endpoint = resource.Endpoints[0]
+              let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
+              Expect.isNotNull (box metadata) "should have StateMachineMetadata"
+              let roleNames = metadata.Roles |> List.map (fun r -> r.Name) |> List.sort
+              Expect.equal roleNames [ "RoleA"; "RoleB" ] "should have both roles"
+
+          testCase "T020: duplicate role names rejected at startup"
+          <| fun () ->
+              Expect.throws
+                  (fun () ->
+                      statefulResource "/test/{id}" {
+                          machine MiddlewareTests.testMachine
+                          resolveInstanceId (fun ctx -> "1")
+                          role "Same" (fun _ -> true)
+                          role "Same" (fun _ -> false)
+
+                          inState (
+                              forState MiddlewareTests.Active [ StateHandlerBuilder.get (fun _ -> Task.CompletedTask) ]
+                          )
+                      }
+                      |> ignore)
+                  "should throw on duplicate role names"
+
+          testCase "T021: role resolution with different identities"
+          <| fun () ->
+              let resource =
+                  statefulResource "/roles/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "RoleA" (fun claims -> claims.HasClaim("role", "a"))
+                      role "RoleB" (fun claims -> claims.HasClaim("role", "b"))
+                      role "Observer" (fun _ -> true)
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get getRolesHandler ]
+                      )
+                  }
+
+              // User with role=a should get RoleA and Observer
+              let userA =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("role", "a") |], "test"))
+
+              (withRoleServer resource (Some userA) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for role=a user"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      let parts = body.Split(',') |> Set.ofArray
+                      Expect.isTrue (parts.Contains "RoleA") "RoleA should be resolved for role=a"
+                      Expect.isTrue (parts.Contains "Observer") "Observer should always resolve"
+                      Expect.isFalse (parts.Contains "RoleB") "RoleB should not resolve for role=a"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+              // User with role=b should get RoleB and Observer
+              let userB =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("role", "b") |], "test"))
+
+              (withRoleServer resource (Some userB) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for role=b user"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      let parts = body.Split(',') |> Set.ofArray
+                      Expect.isTrue (parts.Contains "RoleB") "RoleB should be resolved for role=b"
+                      Expect.isTrue (parts.Contains "Observer") "Observer should always resolve"
+                      Expect.isFalse (parts.Contains "RoleA") "RoleA should not resolve for role=b"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "T022: HasRole in guards allows matching role and blocks others"
+          <| fun () ->
+              let roleGuardMachine: StateMachine<MiddlewareTests.TestState, MiddlewareTests.TestEvent, int> =
+                  { MiddlewareTests.testMachine with
+                      Guards =
+                          [ AccessControl(
+                                "RequireAllowed",
+                                fun ctx ->
+                                    if ctx.HasRole "Allowed" then
+                                        Allowed
+                                    else
+                                        Blocked NotAllowed
+                            ) ] }
+
+              let resource =
+                  statefulResource "/guarded-role/{id}" {
+                      machine roleGuardMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "Allowed" (fun claims -> claims.HasClaim("access", "granted"))
+
+                      inState (
+                          forState
+                              MiddlewareTests.Active
+                              [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("ok")) ]
+                      )
+                  }
+
+              // User with access=granted should get Allowed role -> 200
+              let allowedUser =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("access", "granted") |], "test"))
+
+              (withRoleServer resource (Some allowedUser) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/guarded-role/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "allowed user should get 200"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+              // User without access=granted should not get Allowed role -> 403
+              let deniedUser =
+                  ClaimsPrincipal(ClaimsIdentity([| Claim("access", "denied") |], "test"))
+
+              (withRoleServer resource (Some deniedUser) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/guarded-role/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.Forbidden "denied user should get 403"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "T023: backward compatibility — resource without roles"
+          <| fun () ->
+              let resource =
+                  statefulResource "/noRoles/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get getRolesHandler ]
+                      )
+                  }
+
+              (withRoleServer resource None (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/noRoles/1")
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "no-role resource should be 200"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      Expect.equal body "" "GetRoles() should return empty set when no roles declared"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+              // Also verify HasRole returns false
+              let metadata =
+                  resource.Endpoints[0].Metadata.GetMetadata<StateMachineMetadata>()
+
+              Expect.isEmpty metadata.Roles "Roles list should be empty"
+
+          testCase "T024: predicate exception handling — bad predicate skipped, good role still resolves"
+          <| fun () ->
+              let resource =
+                  statefulResource "/exception-role/{id}" {
+                      machine MiddlewareTests.testMachine
+                      resolveInstanceId (fun _ -> "1")
+                      role "BadRole" (fun _ -> failwith "boom")
+                      role "GoodRole" (fun _ -> true)
+
+                      inState (
+                          forState MiddlewareTests.Active [ StateHandlerBuilder.get getRolesHandler ]
+                      )
+                  }
+
+              let user = ClaimsPrincipal(ClaimsIdentity([||], "test"))
+
+              (withRoleServer resource (Some user) (fun client ->
+                  task {
+                      let! (resp: HttpResponseMessage) = client.GetAsync("/exception-role/1")
+                      // Request should still succeed — bad predicate is logged and skipped
+                      Expect.equal resp.StatusCode HttpStatusCode.OK "request should succeed despite bad predicate"
+                      let! body = resp.Content.ReadAsStringAsync()
+                      // GoodRole should resolve; BadRole should be absent
+                      let parts = body.Split(',') |> Array.filter (fun s -> s <> "") |> Set.ofArray
+                      Expect.isTrue (parts.Contains "GoodRole") "GoodRole should still resolve"
+                      Expect.isFalse (parts.Contains "BadRole") "BadRole should be skipped on exception"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]
