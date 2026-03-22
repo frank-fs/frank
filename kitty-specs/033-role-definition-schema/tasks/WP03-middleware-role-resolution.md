@@ -1,7 +1,7 @@
 ---
 work_package_id: WP03
 title: Middleware Role Resolution
-lane: "doing"
+lane: "for_review"
 dependencies: [WP02]
 base_branch: 033-role-definition-schema-WP02
 base_commit: 1be7ab8c7fe6713374dd0bc5203636101ba0e93d
@@ -187,3 +187,4 @@ Depends on WP02 (needs `ResolveRoles` closure on `StateMachineMetadata`).
 
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
 - 2026-03-22T01:34:25Z – claude-opus-wp03 – shell_pid=9008 – lane=doing – Assigned agent via workflow command
+- 2026-03-22T01:40:44Z – claude-opus-wp03 – shell_pid=9008 – lane=for_review – All 4 subtasks complete. Role resolution in middleware, guard closures use ctx.GetRoles(). 2 files, 7 insertions. Build + all 1030+ tests pass.
