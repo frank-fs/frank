@@ -71,9 +71,13 @@ let autoLoadTests =
             app.Start()
             let client = app.GetTestClient()
 
-            let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/items"))
-            Expect.equal resp.StatusCode HttpStatusCode.OK "GET should return 200"
-            let! (body: string) = resp.Content.ReadAsStringAsync()
-            Expect.equal body "items" "should get handler response"
+            try
+                let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/items"))
+                Expect.equal resp.StatusCode HttpStatusCode.OK "GET should return 200"
+                let! (body: string) = resp.Content.ReadAsStringAsync()
+                Expect.equal body "items" "should get handler response"
+            finally
+                client.Dispose()
+                (app :> System.IDisposable).Dispose()
         }
     ]

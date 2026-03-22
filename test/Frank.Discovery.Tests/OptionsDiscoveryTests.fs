@@ -2,6 +2,7 @@ module Frank.Discovery.Tests.OptionsDiscoveryTests
 
 open System.Net
 open System.Net.Http
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
@@ -34,64 +35,54 @@ module TestResourceBuilderExtensions =
 let simpleHandler : RequestDelegate =
     RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
 
-/// Creates a test server with the OPTIONS discovery middleware enabled.
-let createDiscoveryTestServer (resources: Resource list) =
-    let allEndpoints =
-        resources
-        |> List.collect (fun r -> r.Endpoints |> Array.toList)
-        |> List.toArray
+/// Run a test against a Host-based test server with configurable middleware, ensuring proper disposal.
+let withTestHost (configureApp: IApplicationBuilder -> unit) (resources: Resource list) (f: HttpClient -> Task) =
+    task {
+        let allEndpoints =
+            resources
+            |> List.collect (fun r -> r.Endpoints |> Array.toList)
+            |> List.toArray
 
-    let dataSource = TestEndpointDataSource(allEndpoints)
+        let dataSource = TestEndpointDataSource(allEndpoints)
 
-    let builder =
-        Host.CreateDefaultBuilder([||])
-            .ConfigureWebHost(fun webBuilder ->
-                webBuilder
-                    .UseTestServer()
-                    .ConfigureServices(fun services ->
-                        services.AddRouting() |> ignore
-                        services.AddSingleton<EndpointDataSource>(dataSource) |> ignore)
-                    .Configure(fun app ->
-                        app
-                            .UseRouting()
-                            .UseMiddleware<OptionsDiscoveryMiddleware>()
-                            .UseEndpoints(fun endpoints ->
+        let host =
+            Host.CreateDefaultBuilder([||])
+                .ConfigureWebHost(fun webBuilder ->
+                    webBuilder
+                        .UseTestServer()
+                        .ConfigureServices(fun services ->
+                            services.AddRouting() |> ignore
+                            services.AddSingleton<EndpointDataSource>(dataSource) |> ignore)
+                        .Configure(fun app ->
+                            app.UseRouting() |> ignore
+                            configureApp app
+                            app.UseEndpoints(fun endpoints ->
                                 endpoints.DataSources.Add(dataSource))
-                        |> ignore)
-                |> ignore)
+                            |> ignore)
+                    |> ignore)
+                .Build()
 
-    let host = builder.Build()
-    host.Start()
-    host.GetTestClient()
+        host.Start()
 
-/// Creates a test server WITHOUT the OPTIONS discovery middleware (for test 4).
-let createTestServerWithoutDiscovery (resources: Resource list) =
-    let allEndpoints =
-        resources
-        |> List.collect (fun r -> r.Endpoints |> Array.toList)
-        |> List.toArray
+        try
+            let client = host.GetTestClient()
 
-    let dataSource = TestEndpointDataSource(allEndpoints)
+            try
+                do! f client
+            finally
+                client.Dispose()
+        finally
+            (host :> System.IDisposable).Dispose()
+    }
+    :> Task
 
-    let builder =
-        Host.CreateDefaultBuilder([||])
-            .ConfigureWebHost(fun webBuilder ->
-                webBuilder
-                    .UseTestServer()
-                    .ConfigureServices(fun services ->
-                        services.AddRouting() |> ignore
-                        services.AddSingleton<EndpointDataSource>(dataSource) |> ignore)
-                    .Configure(fun app ->
-                        app
-                            .UseRouting()
-                            .UseEndpoints(fun endpoints ->
-                                endpoints.DataSources.Add(dataSource))
-                        |> ignore)
-                |> ignore)
+/// Runs a test against a server with the OPTIONS discovery middleware enabled.
+let withDiscoveryServer resources f =
+    withTestHost (fun app -> app.UseMiddleware<OptionsDiscoveryMiddleware>() |> ignore) resources f
 
-    let host = builder.Build()
-    host.Start()
-    host.GetTestClient()
+/// Runs a test against a server WITHOUT the OPTIONS discovery middleware.
+let withServerWithoutDiscovery resources f =
+    withTestHost ignore resources f
 
 // ===== US1: Agent Discovers Available Media Types via OPTIONS =====
 
@@ -106,19 +97,20 @@ let us1Tests =
                     post (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("created")))
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/items")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/items")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
 
-            let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
-            Expect.contains allowHeader "GET" "Allow header should contain GET"
-            Expect.contains allowHeader "POST" "Allow header should contain POST"
-            Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
+                let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
+                Expect.contains allowHeader "GET" "Allow header should contain GET"
+                Expect.contains allowHeader "POST" "Allow header should contain POST"
+                Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
 
-            let! body = response.Content.ReadAsStringAsync()
-            Expect.equal body "" "Response body should be empty"
+                let! body = response.Content.ReadAsStringAsync()
+                Expect.equal body "" "Response body should be empty"
+            })
         }
 
         testTask "resource with GET only returns Allow header with GET, OPTIONS" {
@@ -128,19 +120,20 @@ let us1Tests =
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy")))
                 }
 
-            let client = createDiscoveryTestServer [ healthResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/health")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ healthResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/health")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
 
-            let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
-            Expect.contains allowHeader "GET" "Allow header should contain GET"
-            Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
-            Expect.equal (Set.count allowHeader) 2 "Allow header should contain exactly GET and OPTIONS"
+                let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
+                Expect.contains allowHeader "GET" "Allow header should contain GET"
+                Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
+                Expect.equal (Set.count allowHeader) 2 "Allow header should contain exactly GET and OPTIONS"
 
-            let! body = response.Content.ReadAsStringAsync()
-            Expect.equal body "" "Response body should be empty"
+                let! body = response.Content.ReadAsStringAsync()
+                Expect.equal body "" "Response body should be empty"
+            })
         }
 
         testTask "CORS preflight passes through without discovery response" {
@@ -150,17 +143,18 @@ let us1Tests =
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/items")
-            request.Headers.Add("Access-Control-Request-Method", "GET")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/items")
+                request.Headers.Add("Access-Control-Request-Method", "GET")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            // The middleware should pass through for CORS preflights.
-            // Without CORS middleware registered, the response won't be 200 from our middleware.
-            // ASP.NET Core routing may return 405 with its own Allow header, but the key is
-            // our discovery middleware did NOT handle it (no 200 from us).
-            Expect.notEqual response.StatusCode HttpStatusCode.OK
-                "CORS preflight should not be handled by discovery middleware"
+                // The middleware should pass through for CORS preflights.
+                // Without CORS middleware registered, the response won't be 200 from our middleware.
+                // ASP.NET Core routing may return 405 with its own Allow header, but the key is
+                // our discovery middleware did NOT handle it (no 200 from us).
+                Expect.notEqual response.StatusCode HttpStatusCode.OK
+                    "CORS preflight should not be handled by discovery middleware"
+            })
         }
 
         testTask "no discovery effect when middleware is not registered" {
@@ -170,14 +164,15 @@ let us1Tests =
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
                 }
 
-            let client = createTestServerWithoutDiscovery [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/items")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withServerWithoutDiscovery [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/items")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            // Without the discovery middleware, OPTIONS should not return 200.
-            // ASP.NET Core routing may return 405 for method not allowed.
-            Expect.notEqual response.StatusCode HttpStatusCode.OK
-                "Without discovery middleware, OPTIONS should not return 200"
+                // Without the discovery middleware, OPTIONS should not return 200.
+                // ASP.NET Core routing may return 405 for method not allowed.
+                Expect.notEqual response.StatusCode HttpStatusCode.OK
+                    "Without discovery middleware, OPTIONS should not return 200"
+            })
         }
 
         testTask "resource with DiscoveryMediaType metadata returns Link headers" {
@@ -189,27 +184,28 @@ let us1Tests =
                     discoveryMediaType "application/ld+json" "describedby"
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/items")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/items")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
 
-            let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
-            Expect.contains allowHeader "GET" "Allow header should contain GET"
-            Expect.contains allowHeader "POST" "Allow header should contain POST"
-            Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
+                let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
+                Expect.contains allowHeader "GET" "Allow header should contain GET"
+                Expect.contains allowHeader "POST" "Allow header should contain POST"
+                Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
 
-            // Verify Link header is emitted for the DiscoveryMediaType
-            let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
-            Expect.isNonEmpty linkHeaders "Link headers should be present"
-            let linkValue = linkHeaders |> String.concat ", "
-            Expect.stringContains linkValue "</items>" "Link header should contain the resource path"
-            Expect.stringContains linkValue "rel=\"describedby\"" "Link header should contain rel=describedby"
-            Expect.stringContains linkValue "type=\"application/ld+json\"" "Link header should contain media type"
+                // Verify Link header is emitted for the DiscoveryMediaType
+                let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
+                Expect.isNonEmpty linkHeaders "Link headers should be present"
+                let linkValue = linkHeaders |> String.concat ", "
+                Expect.stringContains linkValue "</items>" "Link header should contain the resource path"
+                Expect.stringContains linkValue "rel=\"describedby\"" "Link header should contain rel=describedby"
+                Expect.stringContains linkValue "type=\"application/ld+json\"" "Link header should contain media type"
 
-            let! body = response.Content.ReadAsStringAsync()
-            Expect.equal body "" "Response body should be empty (FR-013)"
+                let! body = response.Content.ReadAsStringAsync()
+                Expect.equal body "" "Response body should be empty (FR-013)"
+            })
         }
 
         testTask "unmatched route passes through" {
@@ -219,13 +215,14 @@ let us1Tests =
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/nonexistent")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/nonexistent")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            // Unmatched route should not produce a 200 with Allow header
-            let hasAllow = response.Content.Headers.Allow.Count > 0
-            Expect.isFalse hasAllow "Unmatched route should not trigger discovery"
+                // Unmatched route should not produce a 200 with Allow header
+                let hasAllow = response.Content.Headers.Allow.Count > 0
+                Expect.isFalse hasAllow "Unmatched route should not trigger discovery"
+            })
         }
 
         testTask "resource with explicit OPTIONS handler is not overridden" {
@@ -238,12 +235,13 @@ let us1Tests =
                         ctx.Response.WriteAsync("explicit-options")))
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource ]
-            let request = new HttpRequestMessage(HttpMethod.Options, "/items")
-            let! (response: HttpResponseMessage) = client.SendAsync(request)
+            do! withDiscoveryServer [ itemsResource ] (fun client -> task {
+                let request = new HttpRequestMessage(HttpMethod.Options, "/items")
+                let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-            let! body = response.Content.ReadAsStringAsync()
-            Expect.equal body "explicit-options" "Explicit OPTIONS handler should take precedence"
+                let! body = response.Content.ReadAsStringAsync()
+                Expect.equal body "explicit-options" "Explicit OPTIONS handler should take precedence"
+            })
         }
 
         testTask "multiple resources at different routes each get correct Allow headers" {
@@ -261,25 +259,25 @@ let us1Tests =
                     get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy")))
                 }
 
-            let client = createDiscoveryTestServer [ itemsResource; healthResource ]
+            do! withDiscoveryServer [ itemsResource; healthResource ] (fun client -> task {
+                // Check /items
+                let request1 = new HttpRequestMessage(HttpMethod.Options, "/items")
+                let! (response1: HttpResponseMessage) = client.SendAsync(request1)
+                Expect.equal response1.StatusCode HttpStatusCode.OK "OPTIONS /items should return 200"
+                let allow1 = response1.Content.Headers.Allow |> Set.ofSeq
+                Expect.contains allow1 "GET" "/items Allow should contain GET"
+                Expect.contains allow1 "POST" "/items Allow should contain POST"
+                Expect.contains allow1 "DELETE" "/items Allow should contain DELETE"
+                Expect.contains allow1 "OPTIONS" "/items Allow should contain OPTIONS"
 
-            // Check /items
-            let request1 = new HttpRequestMessage(HttpMethod.Options, "/items")
-            let! (response1: HttpResponseMessage) = client.SendAsync(request1)
-            Expect.equal response1.StatusCode HttpStatusCode.OK "OPTIONS /items should return 200"
-            let allow1 = response1.Content.Headers.Allow |> Set.ofSeq
-            Expect.contains allow1 "GET" "/items Allow should contain GET"
-            Expect.contains allow1 "POST" "/items Allow should contain POST"
-            Expect.contains allow1 "DELETE" "/items Allow should contain DELETE"
-            Expect.contains allow1 "OPTIONS" "/items Allow should contain OPTIONS"
-
-            // Check /health
-            let request2 = new HttpRequestMessage(HttpMethod.Options, "/health")
-            let! (response2: HttpResponseMessage) = client.SendAsync(request2)
-            Expect.equal response2.StatusCode HttpStatusCode.OK "OPTIONS /health should return 200"
-            let allow2 = response2.Content.Headers.Allow |> Set.ofSeq
-            Expect.contains allow2 "GET" "/health Allow should contain GET"
-            Expect.contains allow2 "OPTIONS" "/health Allow should contain OPTIONS"
-            Expect.equal (Set.count allow2) 2 "/health Allow should contain exactly GET and OPTIONS"
+                // Check /health
+                let request2 = new HttpRequestMessage(HttpMethod.Options, "/health")
+                let! (response2: HttpResponseMessage) = client.SendAsync(request2)
+                Expect.equal response2.StatusCode HttpStatusCode.OK "OPTIONS /health should return 200"
+                let allow2 = response2.Content.Headers.Allow |> Set.ofSeq
+                Expect.contains allow2 "GET" "/health Allow should contain GET"
+                Expect.contains allow2 "OPTIONS" "/health Allow should contain OPTIONS"
+                Expect.equal (Set.count allow2) 2 "/health Allow should contain exactly GET and OPTIONS"
+            })
         }
     ]
