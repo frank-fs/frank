@@ -50,6 +50,11 @@ type StateMachineMiddleware(next: RequestDelegate) =
             // Step 1: Look up current state from store (caches typed state in HttpContext.Items)
             let! stateKey = meta.GetCurrentStateKey ctx.RequestServices ctx instanceId
 
+            // Step 1.5: Resolve roles for current user (skip if no roles declared)
+            if not (List.isEmpty meta.Roles) then
+                let resolvedRoles = meta.ResolveRoles ctx
+                ctx.SetRoles(resolvedRoles)
+
             // Step 2: Check if HTTP method is allowed in current state
             match Map.tryFind stateKey meta.StateHandlerMap with
             | None -> ctx.Response.StatusCode <- 405

@@ -283,7 +283,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 { User = ctx.User
                   CurrentState = state
                   Context = context
-                  Roles = Set.empty }
+                  Roles = ctx.GetRoles() }
 
             accessGuards
             |> List.tryPick (fun (_, pred) ->
@@ -306,7 +306,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                       CurrentState = state
                       Event = event
                       Context = context
-                      Roles = Set.empty }
+                      Roles = ctx.GetRoles() }
 
                 eventGuards
                 |> List.tryPick (fun (_, pred) ->
