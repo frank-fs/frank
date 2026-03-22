@@ -6,6 +6,7 @@ open System.Text.Json
 open System.Text.RegularExpressions
 open Frank.Cli.Core.Analysis
 open Frank.Resources.Model
+open Frank.Statecharts.Alps.Classification
 
 // ============================================================================
 // Schema.org Vocabulary Alignment (T027)
@@ -306,6 +307,21 @@ let generate (resource: UnifiedResource) (baseUri: string) : Result<string, stri
                 writeTransitionDescriptor writer descriptorId transType semanticIds rel
 
         writer.WriteEndArray()
+
+    // ── Role extensions from statechart ──
+    match resource.Statechart with
+    | Some sc when not sc.Roles.IsEmpty ->
+        writer.WritePropertyName("ext")
+        writer.WriteStartArray()
+
+        for role in sc.Roles do
+            writer.WriteStartObject()
+            writer.WriteString("id", ProjectedRoleExtId)
+            writer.WriteString("value", role.Name)
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+    | _ -> ()
 
     writer.WriteEndObject()
     writer.WriteEndObject()
