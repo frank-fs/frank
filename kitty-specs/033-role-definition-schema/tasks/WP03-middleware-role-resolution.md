@@ -13,7 +13,7 @@ subtasks:
 - T018
 phase: Phase 2 - Runtime Integration
 assignee: ''
-agent: ''
+agent: "claude-opus-wp03"
 shell_pid: "9008"
 review_status: ''
 reviewed_by: ''
@@ -186,3 +186,4 @@ Depends on WP02 (needs `ResolveRoles` closure on `StateMachineMetadata`).
 ## Activity Log
 
 - 2026-03-21T18:59:09Z – system – lane=planned – Prompt created.
+- 2026-03-22T01:34:25Z – claude-opus-wp03 – shell_pid=9008 – lane=doing – Assigned agent via workflow command
