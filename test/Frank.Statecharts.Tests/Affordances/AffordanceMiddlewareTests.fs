@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Linq
 open System.Net
 open System.Net.Http
+open System.Threading.Tasks
 open Expecto
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
@@ -44,44 +45,53 @@ let private getHeaderValues (response: HttpResponseMessage) (name: string) : str
 let private hasHeader (response: HttpResponseMessage) (name: string) : bool =
     getHeaderValues response name |> List.isEmpty |> not
 
-/// Create a test server with the affordance middleware and configurable state key injection.
-let private buildTestServer
+/// Run a test against a configured test server, disposing all resources on completion.
+let private withServer
     (lookup: Dictionary<string, PreComputedAffordance>)
     (stateKeySetter: HttpContext -> unit)
+    (f: HttpClient -> Task)
     =
-    let builder = WebApplication.CreateBuilder([||])
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
+    task {
+        let builder = WebApplication.CreateBuilder([||])
+        builder.WebHost.UseTestServer() |> ignore
+        builder.Services.AddRouting() |> ignore
+        let app = builder.Build()
 
-    app.UseRouting() |> ignore
+        app.UseRouting() |> ignore
 
-    // Simulate statechart middleware by setting IStatechartFeature
-    (app :> IApplicationBuilder).Use(fun ctx (next: Func<System.Threading.Tasks.Task>) ->
-        stateKeySetter ctx
-        next.Invoke())
-    |> ignore
-
-    // Register the affordance middleware with pre-computed lookup
-    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(lookup) |> ignore
-
-    // Endpoints
-    app.UseEndpoints(fun endpoints ->
-        endpoints.MapGet(
-            "/games/{gameId}",
-            RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
-        )
+        (app :> IApplicationBuilder).Use(fun ctx (next: Func<System.Threading.Tasks.Task>) ->
+            stateKeySetter ctx
+            next.Invoke())
         |> ignore
 
-        endpoints.MapGet(
-            "/health",
-            RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy"))
-        )
-        |> ignore)
-    |> ignore
+        (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(lookup) |> ignore
 
-    app.Start()
-    app.GetTestServer()
+        app.UseEndpoints(fun endpoints ->
+            endpoints.MapGet(
+                "/games/{gameId}",
+                RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
+            )
+            |> ignore
+
+            endpoints.MapGet(
+                "/health",
+                RequestDelegate(fun ctx -> ctx.Response.WriteAsync("healthy"))
+            )
+            |> ignore)
+        |> ignore
+
+        app.Start()
+        let server = app.GetTestServer()
+        let client = server.CreateClient()
+
+        try
+            do! f client
+        finally
+            client.Dispose()
+            server.Dispose()
+            (app :> System.IDisposable).Dispose()
+    }
+    :> Task
 
 let private xTurnAffordance =
     { AllowHeaderValue = StringValues("GET, POST")
@@ -112,36 +122,33 @@ let affordanceMiddlewareTests =
               let lookup =
                   buildLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
 
-              use server =
-                  buildTestServer lookup (fun ctx ->
-                      ctx.SetStatechartState("XTurn", "XTurn", 0))
+              (withServer lookup (fun ctx -> ctx.SetStatechartState("XTurn", "XTurn", 0)) (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
 
-              use client = server.CreateClient()
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
 
-              let response =
-                  client.GetAsync("/games/abc").Result
+                  let allow = getHeaderValues response "Allow"
+                  Expect.isNonEmpty allow "Should have Allow header"
+                  let allowValue = allow |> String.concat ", "
 
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                  Expect.isTrue
+                      (allowValue.Contains("GET") && allowValue.Contains("POST"))
+                      "Allow header should list GET and POST for XTurn state"
 
-              let allow = getHeaderValues response "Allow"
-              Expect.isNonEmpty allow "Should have Allow header"
-              let allowValue = allow |> String.concat ", "
+                  let links = getHeaderValues response "Link"
+                  Expect.isNonEmpty links "Should have Link header"
+                  let allLinks = links |> String.concat " "
 
-              Expect.isTrue
-                  (allowValue.Contains("GET") && allowValue.Contains("POST"))
-                  "Allow header should list GET and POST for XTurn state"
+                  Expect.isTrue
+                      (allLinks.Contains("rel=\"profile\""))
+                      "Should contain profile link"
 
-              let links = getHeaderValues response "Link"
-              Expect.isNonEmpty links "Should have Link header"
-              let allLinks = links |> String.concat " "
-
-              Expect.isTrue
-                  (allLinks.Contains("rel=\"profile\""))
-                  "Should contain profile link"
-
-              Expect.isTrue
-                  (allLinks.Contains("rel=\"makeMove\""))
-                  "Should contain makeMove transition link"
+                  Expect.isTrue
+                      (allLinks.Contains("rel=\"makeMove\""))
+                      "Should contain makeMove transition link"
+              }))
+                  .GetAwaiter()
+                  .GetResult()
 
           // T040: Different state yields different headers
           testCase "injects correct headers for Won state (no POST)"
@@ -149,28 +156,25 @@ let affordanceMiddlewareTests =
               let lookup =
                   buildLookup [ "/games/{gameId}|Won", wonAffordance ]
 
-              use server =
-                  buildTestServer lookup (fun ctx ->
-                      ctx.SetStatechartState("Won", "Won", 0))
+              (withServer lookup (fun ctx -> ctx.SetStatechartState("Won", "Won", 0)) (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
 
-              use client = server.CreateClient()
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
 
-              let response =
-                  client.GetAsync("/games/abc").Result
+                  let allow = getHeaderValues response "Allow"
+                  Expect.isNonEmpty allow "Should have Allow header"
+                  let allowValue = allow |> String.concat ", "
+                  Expect.isTrue (allowValue.Contains("GET")) "Allow header should list GET"
+                  Expect.isFalse (allowValue.Contains("POST")) "Allow header should NOT list POST for Won state"
 
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
-
-              let allow = getHeaderValues response "Allow"
-              Expect.isNonEmpty allow "Should have Allow header"
-              let allowValue = allow |> String.concat ", "
-              Expect.isTrue (allowValue.Contains("GET")) "Allow header should list GET"
-              Expect.isFalse (allowValue.Contains("POST")) "Allow header should NOT list POST for Won state"
-
-              let links = getHeaderValues response "Link"
-              Expect.isNonEmpty links "Should have Link header"
-              let allLinks = links |> String.concat " "
-              Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile link"
-              Expect.isFalse (allLinks.Contains("makeMove")) "Should NOT contain makeMove link"
+                  let links = getHeaderValues response "Link"
+                  Expect.isNonEmpty links "Should have Link header"
+                  let allLinks = links |> String.concat " "
+                  Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile link"
+                  Expect.isFalse (allLinks.Contains("makeMove")) "Should NOT contain makeMove link"
+              }))
+                  .GetAwaiter()
+                  .GetResult()
 
           // T041: Plain resource uses wildcard state key
           testCase "uses wildcard state key for plain resources"
@@ -178,23 +182,23 @@ let affordanceMiddlewareTests =
               let lookup =
                   buildLookup [ "/health|*", healthAffordance ]
 
-              use server = buildTestServer lookup ignore
-              use client = server.CreateClient()
+              (withServer lookup ignore (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/health")
 
-              let response =
-                  client.GetAsync("/health").Result
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
 
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                  let allow = getHeaderValues response "Allow"
+                  Expect.isNonEmpty allow "Should have Allow header"
+                  let allowValue = allow |> String.concat ", "
+                  Expect.isTrue (allowValue.Contains("GET")) "Allow header should list GET for health endpoint"
 
-              let allow = getHeaderValues response "Allow"
-              Expect.isNonEmpty allow "Should have Allow header"
-              let allowValue = allow |> String.concat ", "
-              Expect.isTrue (allowValue.Contains("GET")) "Allow header should list GET for health endpoint"
-
-              let links = getHeaderValues response "Link"
-              Expect.isNonEmpty links "Should have Link header"
-              let allLinks = links |> String.concat " "
-              Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile link for health"
+                  let links = getHeaderValues response "Link"
+                  Expect.isNonEmpty links "Should have Link header"
+                  let allLinks = links |> String.concat " "
+                  Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile link for health"
+              }))
+                  .GetAwaiter()
+                  .GetResult()
 
           // T042: Graceful degradation -- no matching entry
           testCase "passes through when no matching affordance entry exists"
@@ -202,30 +206,28 @@ let affordanceMiddlewareTests =
               let lookup =
                   buildLookup [ "/other|*", healthAffordance ]
 
-              use server =
-                  buildTestServer lookup (fun ctx ->
-                      ctx.SetStatechartState("SomeState", "SomeState", 0))
+              (withServer lookup (fun ctx -> ctx.SetStatechartState("SomeState", "SomeState", 0)) (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
 
-              use client = server.CreateClient()
-
-              let response =
-                  client.GetAsync("/games/abc").Result
-
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
-              Expect.isFalse (hasHeader response "Link") "Should not have Link header"
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                  Expect.isFalse (hasHeader response "Link") "Should not have Link header"
+              }))
+                  .GetAwaiter()
+                  .GetResult()
 
           // T042: Graceful degradation -- empty lookup
           testCase "passes through with empty affordance lookup"
           <| fun _ ->
               let lookup = buildLookup []
-              use server = buildTestServer lookup ignore
-              use client = server.CreateClient()
 
-              let response =
-                  client.GetAsync("/games/abc").Result
+              (withServer lookup ignore (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
 
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
-              Expect.isFalse (hasHeader response "Link") "Should not have Link header"
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                  Expect.isFalse (hasHeader response "Link") "Should not have Link header"
+              }))
+                  .GetAwaiter()
+                  .GetResult()
 
           // T040: Unknown state key -- no fallback to wildcard
           testCase "does not fall back to wildcard when state key is present but unmatched"
@@ -235,18 +237,15 @@ let affordanceMiddlewareTests =
                       [ "/games/{gameId}|XTurn", xTurnAffordance
                         "/games/{gameId}|*", wonAffordance ]
 
-              use server =
-                  buildTestServer lookup (fun ctx ->
-                      ctx.SetStatechartState("UnknownState", "UnknownState", 0))
+              (withServer lookup (fun ctx -> ctx.SetStatechartState("UnknownState", "UnknownState", 0)) (fun client -> task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
 
-              use client = server.CreateClient()
-
-              let response =
-                  client.GetAsync("/games/abc").Result
-
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
-              // Should NOT use the wildcard entry -- state key was present but didn't match
-              Expect.isFalse (hasHeader response "Link") "Should not have Link header for unknown state" ]
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+                  // Should NOT use the wildcard entry -- state key was present but didn't match
+                  Expect.isFalse (hasHeader response "Link") "Should not have Link header for unknown state"
+              }))
+                  .GetAwaiter()
+                  .GetResult() ]
 
 [<Tests>]
 let preComputeTests =
