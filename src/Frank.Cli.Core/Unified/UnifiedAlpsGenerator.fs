@@ -3,42 +3,10 @@ module Frank.Cli.Core.Unified.UnifiedAlpsGenerator
 open System.IO
 open System.Text
 open System.Text.Json
-open System.Text.RegularExpressions
 open Frank.Cli.Core.Analysis
+open Frank.Cli.Core.Shared
 open Frank.Resources.Model
 open Frank.Statecharts.Alps.Classification
-
-// ============================================================================
-// Schema.org Vocabulary Alignment (T027)
-//
-// Extracted from VocabularyAligner.fs -- pure data + pure function, no RDF graph
-// mutation. Shared logic so both VocabularyAligner and this module can use it.
-// ============================================================================
-
-let private splitCamelCase (name: string) =
-    Regex.Replace(name, "([a-z])([A-Z])", "$1 $2").ToLowerInvariant()
-
-let private normalizeFieldName (name: string) =
-    splitCamelCase(name).Replace(" ", "").ToLowerInvariant()
-
-let private alignmentMap: (string list * string) list =
-    [ ([ "name"; "title" ], "https://schema.org/name")
-      ([ "description"; "summary"; "body" ], "https://schema.org/description")
-      ([ "email"; "emailaddress" ], "https://schema.org/email")
-      ([ "url"; "uri"; "website"; "homepage" ], "https://schema.org/url")
-      ([ "price"; "cost"; "amount" ], "https://schema.org/price")
-      ([ "createdat"; "datecreated"; "created" ], "https://schema.org/dateCreated")
-      ([ "updatedat"; "datemodified"; "modified" ], "https://schema.org/dateModified")
-      ([ "image"; "imageurl"; "photo" ], "https://schema.org/image")
-      ([ "telephone"; "phone" ], "https://schema.org/telephone") ]
-
-/// Try to find a Schema.org alignment for a field name.
-let tryFindAlignment (fieldName: string) : string option =
-    let normalized = normalizeFieldName fieldName
-
-    alignmentMap
-    |> List.tryFind (fun (names, _) -> names |> List.contains normalized)
-    |> Option.map snd
 
 // ============================================================================
 // IANA-Precedence Link Relation Derivation (T028)
@@ -49,29 +17,14 @@ let tryFindAlignment (fieldName: string) : string option =
 /// `create` and `delete` are NOT IANA-registered -- use ALPS fragment URIs for those.
 let private ianaRelationForMethod (method: string) (isSingleResource: bool) : string option =
     match method.ToUpperInvariant() with
-    | "GET" when isSingleResource -> Some "self"
-    | "GET" -> Some "collection"
-    | "PUT" -> Some "edit"
-    | "PATCH" -> Some "edit"
+    | "GET" when isSingleResource -> Some RelSelf
+    | "GET" -> Some RelCollection
+    | "PUT" -> Some RelEdit
+    | "PATCH" -> Some RelEdit
     | _ -> None
 
 /// Determine if a route template represents a single resource (has a parameter).
-let private isSingleResourceRoute (routeTemplate: string) : bool =
-    routeTemplate.Contains("{")
-
-/// Derive a link relation type for a given HTTP method and resource context.
-/// IANA-registered relations take precedence; otherwise use ALPS fragment URIs.
-let deriveRelationType (baseUri: string) (resourceSlug: string) (method: string) (stateKey: string option) : string =
-    let isSingle = isSingleResourceRoute ""  // Will be called with route info separately
-    match ianaRelationForMethod method isSingle with
-    | Some rel -> rel
-    | None ->
-        let descriptorId =
-            match stateKey with
-            | Some state -> $"{state}-{method.ToLowerInvariant()}{resourceSlug}"
-            | None -> $"{method.ToLowerInvariant()}{resourceSlug}"
-
-        $"{baseUri}/{resourceSlug}#{descriptorId}"
+let private isSingleResourceRoute (routeTemplate: string) : bool = routeTemplate.Contains("{")
 
 /// Derive a link relation type using full route context.
 let deriveRelationTypeForRoute
@@ -88,8 +41,10 @@ let deriveRelationTypeForRoute
     | None ->
         let descriptorId =
             match stateKey with
-            | Some state -> $"{state}-{method.ToLowerInvariant()}{resourceSlug |> fun s -> s.Substring(0, 1).ToUpperInvariant() + s.Substring(1)}"
-            | None -> $"{method.ToLowerInvariant()}{resourceSlug |> fun s -> s.Substring(0, 1).ToUpperInvariant() + s.Substring(1)}"
+            | Some state ->
+                $"{state}-{method.ToLowerInvariant()}{resourceSlug |> fun s -> s.Substring(0, 1).ToUpperInvariant() + s.Substring(1)}"
+            | None ->
+                $"{method.ToLowerInvariant()}{resourceSlug |> fun s -> s.Substring(0, 1).ToUpperInvariant() + s.Substring(1)}"
 
         $"{baseUri}/{resourceSlug}#{descriptorId}"
 
@@ -121,8 +76,12 @@ let private transitionDescriptorId (method: string) (resourceSlug: string) (stat
 /// Map an HTTP method to an ALPS transition type string.
 let private alpsTransitionType (method: string) : string =
     match method.ToUpperInvariant() with
-    | "GET" | "HEAD" | "OPTIONS" -> "safe"
-    | "PUT" | "DELETE" | "PATCH" -> "idempotent"
+    | "GET"
+    | "HEAD"
+    | "OPTIONS" -> "safe"
+    | "PUT"
+    | "DELETE"
+    | "PATCH" -> "idempotent"
     | "POST" -> "unsafe"
     | _ -> "unsafe"
 
@@ -136,7 +95,7 @@ let private writeFieldDescriptor (writer: Utf8JsonWriter) (field: AnalyzedField)
     writer.WriteString("id", field.Name)
     writer.WriteString("type", "semantic")
 
-    match tryFindAlignment field.Name with
+    match SchemaAlignment.tryFindPropertyAlignment field.Name with
     | Some schemaUri -> writer.WriteString("href", schemaUri)
     | None -> ()
 
@@ -159,6 +118,7 @@ let private writeTransitionDescriptor
     (transitionType: string)
     (semanticIds: string list)
     (rel: string)
+    (stateKey: string option)
     =
     writer.WriteStartObject()
     writer.WriteString("id", descriptorId)
@@ -166,10 +126,7 @@ let private writeTransitionDescriptor
 
     // rt links to semantic descriptors
     if not semanticIds.IsEmpty then
-        let rtValue =
-            semanticIds
-            |> List.map (fun id -> "#" + id)
-            |> String.concat " "
+        let rtValue = semanticIds |> List.map (fun id -> "#" + id) |> String.concat " "
 
         writer.WriteString("rt", rtValue)
 
@@ -183,15 +140,36 @@ let private writeTransitionDescriptor
         writer.WriteEndObject()
         writer.WriteEndArray()
 
+    // availableInStates extension
+    match stateKey with
+    | Some state ->
+        writer.WritePropertyName("ext")
+        writer.WriteStartArray()
+        writer.WriteStartObject()
+        writer.WriteString("id", AvailableInStatesExtId)
+        writer.WriteString("value", state)
+        writer.WriteEndObject()
+        writer.WriteEndArray()
+    | None -> ()
+
     writer.WriteEndObject()
 
 // ============================================================================
 // Core ALPS Generation (T026, T029)
 // ============================================================================
 
-/// Generate an ALPS JSON document from a UnifiedResource and base URI.
-/// Returns Ok with the ALPS JSON string, or Error with parse failure messages.
-let generate (resource: UnifiedResource) (baseUri: string) : Result<string, string list> =
+/// Context for per-role profile generation. None fields = global profile.
+type ProjectionContext =
+    { ProjectedRole: string option
+      RelatedProfileSlugs: string list
+      ProfileSlug: string option }
+
+/// Generate with optional projection context for per-role profiles.
+let generateWithContext
+    (resource: UnifiedResource)
+    (baseUri: string)
+    (projectionContext: ProjectionContext option)
+    : Result<string, string list> =
     use stream = new MemoryStream()
     use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
 
@@ -273,20 +251,14 @@ let generate (resource: UnifiedResource) (baseUri: string) : Result<string, stri
         | None ->
             // Plain resource (T029): emit transitions without state scoping
             for cap in resource.HttpCapabilities do
-                let descriptorId =
-                    transitionDescriptorId cap.Method resource.ResourceSlug None
+                let descriptorId = transitionDescriptorId cap.Method resource.ResourceSlug None
 
                 let transType = alpsTransitionType cap.Method
 
                 let rel =
-                    deriveRelationTypeForRoute
-                        baseUri
-                        resource.ResourceSlug
-                        resource.RouteTemplate
-                        cap.Method
-                        None
+                    deriveRelationTypeForRoute baseUri resource.ResourceSlug resource.RouteTemplate cap.Method None
 
-                writeTransitionDescriptor writer descriptorId transType semanticIds rel
+                writeTransitionDescriptor writer descriptorId transType semanticIds rel None
 
         | Some _sc ->
             // Stateful resource: emit state-scoped transitions
@@ -304,24 +276,62 @@ let generate (resource: UnifiedResource) (baseUri: string) : Result<string, stri
                         cap.Method
                         cap.StateKey
 
-                writeTransitionDescriptor writer descriptorId transType semanticIds rel
+                writeTransitionDescriptor writer descriptorId transType semanticIds rel cap.StateKey
 
         writer.WriteEndArray()
+
+    // ── Document-level links (cross-linking) ──
+    match projectionContext with
+    | Some ctx ->
+        let hasLinks = not ctx.RelatedProfileSlugs.IsEmpty || ctx.ProfileSlug.IsSome
+
+        if hasLinks then
+            writer.WritePropertyName("link")
+            writer.WriteStartArray()
+
+            for slug in ctx.RelatedProfileSlugs do
+                writer.WriteStartObject()
+                writer.WriteString("rel", RelRelated)
+                writer.WriteString("href", $"{baseUri}/{slug}")
+                writer.WriteEndObject()
+
+            match ctx.ProfileSlug with
+            | Some slug ->
+                writer.WriteStartObject()
+                writer.WriteString("rel", RelProfile)
+                writer.WriteString("href", $"{baseUri}/{slug}")
+                writer.WriteEndObject()
+            | None -> ()
+
+            writer.WriteEndArray()
+    | None -> ()
 
     // ── Role extensions from statechart ──
-    match resource.Statechart with
-    | Some sc when not sc.Roles.IsEmpty ->
+    match projectionContext with
+    | Some { ProjectedRole = Some role } ->
+        // Projected profile: emit only the projected role
         writer.WritePropertyName("ext")
         writer.WriteStartArray()
-
-        for role in sc.Roles do
-            writer.WriteStartObject()
-            writer.WriteString("id", ProjectedRoleExtId)
-            writer.WriteString("value", role.Name)
-            writer.WriteEndObject()
-
+        writer.WriteStartObject()
+        writer.WriteString("id", ProjectedRoleExtId)
+        writer.WriteString("value", role)
+        writer.WriteEndObject()
         writer.WriteEndArray()
-    | _ -> ()
+    | _ ->
+        // Global profile: emit all roles from statechart
+        match resource.Statechart with
+        | Some sc when not sc.Roles.IsEmpty ->
+            writer.WritePropertyName("ext")
+            writer.WriteStartArray()
+
+            for role in sc.Roles do
+                writer.WriteStartObject()
+                writer.WriteString("id", ProjectedRoleExtId)
+                writer.WriteString("value", role.Name)
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+        | _ -> ()
 
     writer.WriteEndObject()
     writer.WriteEndObject()
@@ -330,14 +340,16 @@ let generate (resource: UnifiedResource) (baseUri: string) : Result<string, stri
     let json = Encoding.UTF8.GetString(stream.ToArray())
 
     // ── Round-trip validation (T030) ──
-    let parseResult =
-        Frank.Statecharts.Alps.JsonParser.parseAlpsJson json
+    let parseResult = Frank.Statecharts.Alps.JsonParser.parseAlpsJson json
 
     if parseResult.Errors.IsEmpty then
         Ok json
     else
-        let errorMessages =
-            parseResult.Errors
-            |> List.map (fun e -> e.Description)
+        let errorMessages = parseResult.Errors |> List.map (fun e -> e.Description)
 
         Error errorMessages
+
+/// Generate an ALPS JSON document from a UnifiedResource and base URI.
+/// Returns Ok with the ALPS JSON string, or Error with parse failure messages.
+let generate (resource: UnifiedResource) (baseUri: string) : Result<string, string list> =
+    generateWithContext resource baseUri None

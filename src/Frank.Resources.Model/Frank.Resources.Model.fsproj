@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="TypeAnalysis.fs" />
     <Compile Include="ResourceTypes.fs" />
+    <Compile Include="Projection.fs" />
     <Compile Include="RuntimeTypes.fs" />
     <Compile Include="AffordanceTypes.fs" />
   </ItemGroup>

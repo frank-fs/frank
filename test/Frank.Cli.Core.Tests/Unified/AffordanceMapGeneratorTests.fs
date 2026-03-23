@@ -42,7 +42,8 @@ let private ticTacToeResource: UnifiedResource =
                 AllowedMethods = [ "GET" ]
                 Description = None } ]
             |> Map.ofList
-          Roles = [] }
+          Roles = []
+          Transitions = [] }
 
     { RouteTemplate = "/games/{gameId}"
       ResourceSlug = "games"

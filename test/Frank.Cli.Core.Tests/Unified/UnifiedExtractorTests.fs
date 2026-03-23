@@ -209,7 +209,8 @@ let game = statefulResource "/games/{gameId}" {
                               "Won", { IsFinal = true; AllowedMethods = [ "GET" ]; Description = None }
                               "Draw", { IsFinal = true; AllowedMethods = [ "GET" ]; Description = None } ]
                             |> Map.ofList
-                          Roles = [] }
+                          Roles = []
+                          Transitions = [] }
 
                     let resource =
                         { RouteTemplate = "/games/{gameId}"
@@ -241,7 +242,8 @@ let game = statefulResource "/games/{gameId}" {
                           InitialStateKey = "XTurn"
                           GuardNames = []
                           StateMetadata = Map.empty
-                          Roles = [] }
+                          Roles = []
+                          Transitions = [] }
 
                     let stateType =
                         { FullName = "Test.GameState"
@@ -276,7 +278,8 @@ let game = statefulResource "/games/{gameId}" {
                           InitialStateKey = "Playing"
                           GuardNames = []
                           StateMetadata = Map.empty
-                          Roles = [] }
+                          Roles = []
+                          Transitions = [] }
 
                     let stateType =
                         { FullName = "Test.GameState"
@@ -329,7 +332,8 @@ let game = statefulResource "/games/{gameId}" {
                           InitialStateKey = "A"
                           GuardNames = []
                           StateMetadata = Map.empty
-                          Roles = [] }
+                          Roles = []
+                          Transitions = [] }
 
                     let stateType =
                         { FullName = "Test.State"

@@ -1,0 +1,26 @@
+title Tic-Tac-Toe State Machine
+
+participant XTurn
+participant OTurn
+participant XWins
+participant OWins
+participant Draw
+
+# getGame: self-loop on all states (unguarded, all roles can observe)
+XTurn->XTurn: getGame
+OTurn->OTurn: getGame
+XWins->XWins: getGame
+OWins->OWins: getGame
+Draw->Draw: getGame
+
+# makeMove from XTurn (role=PlayerX, guarded by TurnGuard)
+note over XTurn: [guard: role=PlayerX, guard=TurnGuard]
+XTurn->OTurn: makeMove(position, player)
+XTurn->XWins: makeMove(position, player)
+XTurn->Draw: makeMove(position, player)
+
+# makeMove from OTurn (role=PlayerO, guarded by TurnGuard)
+note over OTurn: [guard: role=PlayerO, guard=TurnGuard]
+OTurn->XTurn: makeMove(position, player)
+OTurn->OWins: makeMove(position, player)
+OTurn->Draw: makeMove(position, player)

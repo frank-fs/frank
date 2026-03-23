@@ -87,7 +87,7 @@ let computeSourceHash (projectDir: string) : string =
 
 /// CLI version for cache compatibility checking.
 /// Update this when UnifiedExtractionState schema changes.
-let currentToolVersion = "7.3.0"
+let currentToolVersion = "7.3.1"
 
 /// Reason why the cache is stale and re-extraction is needed.
 type StalenessReason =
