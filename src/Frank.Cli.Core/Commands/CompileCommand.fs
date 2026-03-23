@@ -33,41 +33,65 @@ module CompileCommand =
             File.Copy(statePath, backupPath)
 
     let private verifyRoundTrip (ontologyPath: string) (shapesPath: string) (manifestPath: string) =
-        // Re-parse ontology
-        let ontologyGraph = new Graph()
+        use ontologyGraph = new Graph()
         let rdfXmlParser = RdfXmlParser()
         use ontologyReader = new StreamReader(ontologyPath)
         rdfXmlParser.Load(ontologyGraph, ontologyReader)
 
-        // Re-parse shapes
-        let shapesGraph = new Graph()
+        use shapesGraph = new Graph()
         let turtleParser = TurtleParser()
         use shapesReader = new StreamReader(shapesPath)
         turtleParser.Load(shapesGraph, shapesReader)
 
-        // Re-parse manifest
         let manifestJson = File.ReadAllText(manifestPath)
         use _ = JsonDocument.Parse(manifestJson)
         ()
 
     /// Populate the Profiles field on the unified extraction state binary.
-    /// Generates ALPS per resource and serializes OWL/SHACL as whole-project strings.
-    /// Re-saves the model.bin with the populated profiles.
-    let private populateProfilesInBinary
-        (projectDir: string)
-        (legacyState: ExtractionState option)
-        : unit =
+    /// Generates ALPS per resource, runs per-role projection where applicable,
+    /// serializes OWL/SHACL as whole-project strings, and re-saves model.bin.
+    let private populateProfilesInBinary (projectDir: string) (legacyState: ExtractionState option) : unit =
         let unifiedPath = UnifiedCache.cachePath projectDir
 
         match UnifiedCache.load unifiedPath with
         | Ok(Some unified) ->
+            // Run projection first so we know which resource slugs get
+            // their global profile overridden with cross-links.
+            let batchResult, projectionResults =
+                ProjectionPipeline.projectAllResources unified.Resources unified.BaseUri
+
+            for result in projectionResults do
+                for err in result.Errors do
+                    eprintfn "%s" err
+
+                for orphan in result.Orphans do
+                    eprintfn
+                        "Warning: transition '%s' (%s -> %s) is not covered by any role projection"
+                        orphan.Event
+                        orphan.Source
+                        orphan.Target
+
+            // Generate plain ALPS for resources that did NOT receive projection treatment.
             let alpsProfiles =
                 unified.Resources
                 |> List.choose (fun resource ->
-                    match UnifiedAlpsGenerator.generate resource unified.BaseUri with
-                    | Ok alpsJson -> Some(resource.ResourceSlug, alpsJson)
-                    | Error _ -> None)
+                    if Set.contains resource.ResourceSlug batchResult.ProjectedSlugs then
+                        None
+                    else
+                        match UnifiedAlpsGenerator.generate resource unified.BaseUri with
+                        | Ok alpsJson -> Some(resource.ResourceSlug, alpsJson)
+                        | Error errs ->
+                            eprintfn
+                                "Warning: failed to generate ALPS profile for %s: %s"
+                                resource.ResourceSlug
+                                (String.concat "; " errs)
+
+                            None)
                 |> Map.ofList
+
+            let mergedAlpsProfiles =
+                batchResult.GlobalProfileOverrides
+                |> Map.fold (fun acc k v -> Map.add k v acc) alpsProfiles
 
             let owlTurtle =
                 match legacyState with
@@ -80,7 +104,8 @@ module CompileCommand =
                 | None -> ""
 
             let profiles: ProjectedProfiles =
-                { AlpsProfiles = alpsProfiles
+                { AlpsProfiles = mergedAlpsProfiles
+                  RoleAlpsProfiles = batchResult.RoleAlpsProfiles
                   OwlOntologies =
                     if String.IsNullOrEmpty owlTurtle then
                         Map.empty
@@ -99,6 +124,7 @@ module CompileCommand =
 
     let execute (projectPath: string) (outputDir: string option) : Result<CompileResult, string> =
         let projectDir = Path.GetDirectoryName projectPath
+
         match ExtractionStateProjector.UnifiedStateLoader.loadExtractionState projectDir with
         | Error e -> Error e
         | Ok state ->
@@ -107,18 +133,13 @@ module CompileCommand =
                 let outDir =
                     outputDir |> Option.defaultValue (Path.Combine(projectDir, "obj", "frank"))
 
-                // Back up existing state before overwriting
                 let statePath = ExtractionState.defaultStatePath projectDir
                 backupState statePath
 
-                // Write all three artifacts via shared serializer
                 let (ontologyPath, shapesPath, manifestPath) =
                     ArtifactSerializer.writeArtifacts state outDir
 
-                // Round-trip verification: re-parse each file to confirm validity
                 verifyRoundTrip ontologyPath shapesPath manifestPath
-
-                // Populate profiles in the unified state binary
                 populateProfilesInBinary projectDir (Some state)
 
                 Ok
@@ -173,8 +194,6 @@ module CompileCommand =
                             ArtifactSerializer.writeArtifacts state outDir
 
                         verifyRoundTrip ontologyPath shapesPath manifestPath
-
-                        // Populate profiles in the unified state binary
                         populateProfilesInBinary projectDir (Some state)
 
                         return

@@ -20,4 +20,5 @@ module StatechartExtractor =
           InitialStateKey = initialStateKey
           GuardNames = guardNames
           StateMetadata = stateMetadata
-          Roles = roles }
+          Roles = roles
+          Transitions = [] }

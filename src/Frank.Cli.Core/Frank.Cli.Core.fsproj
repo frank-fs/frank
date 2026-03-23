@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="Rdf/FSharpRdf.fs" />
     <Compile Include="Rdf/Vocabularies.fs" />
+    <!-- Shared utilities -->
+    <Compile Include="Shared/SchemaAlignment.fs" />
     <Compile Include="Analysis/AstAnalyzer.fs" />
     <Compile Include="Analysis/TypeAnalyzer.fs" />
     <Compile Include="Extraction/UriHelpers.fs" />
@@ -36,6 +38,7 @@
     <Compile Include="Unified/UnifiedExtractor.fs" />
     <Compile Include="Unified/UnifiedAlpsGenerator.fs" />
     <Compile Include="Unified/AffordanceMapGenerator.fs" />
+    <Compile Include="Unified/ProjectionPipeline.fs" />
     <Compile Include="Unified/ExtractionStateProjector.fs" />
     <Compile Include="Help/HelpTypes.fs" />
     <Compile Include="Help/FuzzyMatch.fs" />

@@ -5,6 +5,7 @@ open System.Text.Json
 open Frank.Resources.Model
 open Frank.Statecharts.Validation
 open Frank.Cli.Core.Unified
+open Frank.Cli.Core.Unified.ProjectionPipeline
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
 
@@ -33,8 +34,7 @@ let private parseFormat (s: string) : Result<FormatTag list, StatechartError> =
     | "all" -> Ok FormatPipeline.allFormats
     | other -> Error(UnknownFormat other)
 
-let private isAffordanceMapFormat (s: string) : bool =
-    s.ToLowerInvariant() = "affordance-map"
+let private isAffordanceMapFormat (s: string) : bool = s.ToLowerInvariant() = "affordance-map"
 
 let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri: string) : string =
     use stream = new MemoryStream()
@@ -133,8 +133,7 @@ let execute
                 match! getResources projectPath force with
                 | Error e -> return Error e
                 | Ok(resources, fromCache) ->
-                    let machines =
-                        resources |> List.choose (fun r -> r.Statechart)
+                    let machines = resources |> List.choose (fun r -> r.Statechart)
 
                     let filtered =
                         match resourceFilter with
@@ -152,35 +151,127 @@ let execute
 
                         return Error(ResourceNotFound(name, available))
                     | _ ->
-                        let mutable generationErrors = []
-
-                        let artifacts =
+                        let formatResults =
                             [ for m in filtered do
                                   let slug = FormatPipeline.resourceSlug m.RouteTemplate
 
                                   for fmt in formats do
                                       match FormatPipeline.generateFormatFromExtracted fmt slug m with
                                       | Ok content ->
-                                          { ResourceSlug = slug
-                                            RouteTemplate = m.RouteTemplate
-                                            Format = fmt
-                                            Content = content
-                                            FilePath = None }
-                                      | Error err -> generationErrors <- err :: generationErrors ]
+                                          Ok
+                                              { ResourceSlug = slug
+                                                RouteTemplate = m.RouteTemplate
+                                                Format = fmt
+                                                Content = content
+                                                FilePath = None }
+                                      | Error err -> Error err ]
+
+                        let artifacts =
+                            formatResults
+                            |> List.choose (function
+                                | Ok a -> Some a
+                                | Error _ -> None)
+
+                        let formatErrors =
+                            formatResults
+                            |> List.choose (function
+                                | Error e -> Some e
+                                | Ok _ -> None)
+
+                        let projectionArtifacts, projectionErrors, projectedSlugs =
+                            if formats |> List.contains Alps then
+                                // Find UnifiedResources that match the filtered statecharts
+                                let filteredRoutes = filtered |> List.map (fun m -> m.RouteTemplate) |> Set.ofList
+
+                                let matchingResources =
+                                    resources |> List.filter (fun r -> Set.contains r.RouteTemplate filteredRoutes)
+
+                                let batchResult, projectionResults =
+                                    ProjectionPipeline.projectAllResources matchingResources ""
+
+                                // Print warnings from projection
+                                for result in projectionResults do
+                                    for err in result.Errors do
+                                        eprintfn "%s" err
+
+                                    for orphan in result.Orphans do
+                                        eprintfn
+                                            "Warning: transition '%s' (%s -> %s) is not covered by any role projection"
+                                            orphan.Event
+                                            orphan.Source
+                                            orphan.Target
+
+                                // Build artifacts from projection results
+                                let projResults =
+                                    [ for result in projectionResults do
+                                          for KeyValue(rSlug, content) in result.RoleProfiles do
+                                              Ok
+                                                  { ResourceSlug = rSlug
+                                                    RouteTemplate = "*"
+                                                    Format = Alps
+                                                    Content = content
+                                                    FilePath = None }
+
+                                          for err in result.Errors do
+                                              Error(GenerationFailed(Alps, "projection", err)) ]
+
+                                // Add global profile overrides as artifacts
+                                let globalArts =
+                                    batchResult.GlobalProfileOverrides
+                                    |> Map.toList
+                                    |> List.choose (fun (slug, content) ->
+                                        let route =
+                                            matchingResources
+                                            |> List.tryFind (fun r -> r.ResourceSlug = slug)
+                                            |> Option.map _.RouteTemplate
+                                            |> Option.defaultValue "*"
+
+                                        Some
+                                            { ResourceSlug = slug
+                                              RouteTemplate = route
+                                              Format = Alps
+                                              Content = content
+                                              FilePath = None })
+
+                                let arts =
+                                    projResults
+                                    |> List.choose (function
+                                        | Ok a -> Some a
+                                        | Error _ -> None)
+
+                                let errs =
+                                    projResults
+                                    |> List.choose (function
+                                        | Error e -> Some e
+                                        | Ok _ -> None)
+
+                                (arts @ globalArts, errs, batchResult.ProjectedSlugs)
+                            else
+                                ([], [], Set.empty)
+
+                        let generationErrors = List.rev formatErrors @ List.rev projectionErrors
+
+                        let mergedArtifacts =
+                            let baseArtifacts =
+                                artifacts
+                                |> List.filter (fun a ->
+                                    not (a.Format = Alps && Set.contains a.ResourceSlug projectedSlugs))
+
+                            baseArtifacts @ projectionArtifacts
 
                         match outputDir with
                         | None ->
                             return
                                 Ok
-                                    { Artifacts = artifacts
+                                    { Artifacts = mergedArtifacts
                                       OutputDirectory = None
-                                      GenerationErrors = List.rev generationErrors
+                                      GenerationErrors = generationErrors
                                       FromCache = fromCache }
                         | Some dir ->
                             Directory.CreateDirectory(dir) |> ignore
 
                             let written =
-                                artifacts
+                                mergedArtifacts
                                 |> List.map (fun a ->
                                     let fileName =
                                         sprintf "%s%s" a.ResourceSlug (FormatDetector.formatExtension a.Format)
@@ -193,6 +284,6 @@ let execute
                                 Ok
                                     { Artifacts = written
                                       OutputDirectory = Some dir
-                                      GenerationErrors = List.rev generationErrors
+                                      GenerationErrors = generationErrors
                                       FromCache = fromCache }
     }

@@ -23,9 +23,7 @@ and ParsedExtension =
       Href: string option
       Value: string option }
 
-and ParsedLink =
-    { Rel: string
-      Href: string }
+and ParsedLink = { Rel: string; Href: string }
 
 // ---------------------------------------------------------------------------
 // Pass 2: State classification heuristics (T005, ported from Mapper.fs)
@@ -34,7 +32,9 @@ and ParsedLink =
 /// Check whether a raw type string represents a transition type.
 let isTransitionTypeStr (typeStr: string option) =
     match typeStr with
-    | Some "safe" | Some "unsafe" | Some "idempotent" -> true
+    | Some "safe"
+    | Some "unsafe"
+    | Some "idempotent" -> true
     | _ -> false
 
 /// Collect the set of descriptor ids that are referenced as rt targets.
@@ -80,6 +80,25 @@ let buildDescriptorIndex (descriptors: ParsedDescriptor list) : Map<string, Pars
             acc
 
     collectAll Map.empty descriptors
+
+// ---------------------------------------------------------------------------
+// IANA link relation constants
+// ---------------------------------------------------------------------------
+
+[<Literal>]
+let RelSelf = "self"
+
+[<Literal>]
+let RelEdit = "edit"
+
+[<Literal>]
+let RelCollection = "collection"
+
+[<Literal>]
+let RelRelated = "related"
+
+[<Literal>]
+let RelProfile = "profile"
 
 // ---------------------------------------------------------------------------
 // ALPS extension vocabulary IDs (T008)
@@ -152,15 +171,22 @@ let classifyExtension (ext: ParsedExtension) : Annotation =
 
     match ext.Id with
     | GuardExtId -> AlpsAnnotation(AlpsGuardExt value)
-    | ProjectedRoleExtId | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ext.Id, value))
+    | ProjectedRoleExtId
+    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ext.Id, value))
     | AvailableInStatesExtId ->
         let states =
-            value.Split(',', System.StringSplitOptions.RemoveEmptyEntries ||| System.StringSplitOptions.TrimEntries)
+            value.Split(
+                ',',
+                System.StringSplitOptions.RemoveEmptyEntries
+                ||| System.StringSplitOptions.TrimEntries
+            )
             |> Array.toList
 
         AlpsAnnotation(AlpsAvailableInStates states)
-    | ClientObligationExtId | AdvancesProtocolExtId | DualOfExtId | CutPointExtId ->
-        AlpsAnnotation(AlpsDuality(ext.Id, value))
+    | ClientObligationExtId
+    | AdvancesProtocolExtId
+    | DualOfExtId
+    | CutPointExtId -> AlpsAnnotation(AlpsDuality(ext.Id, value))
     | _ -> AlpsAnnotation(AlpsExtension(ext.Id, ext.Href, ext.Value))
 
 // ---------------------------------------------------------------------------
@@ -174,12 +200,10 @@ let buildStateAnnotations (d: ParsedDescriptor) : Annotation list =
         | Some value -> [ AlpsAnnotation(AlpsDocumentation(d.DocFormat, value)) ]
         | None -> []
 
-    let extAnnotations =
-        d.Extensions |> List.map classifyExtension
+    let extAnnotations = d.Extensions |> List.map classifyExtension
 
     let linkAnnotations =
-        d.Links
-        |> List.map (fun l -> AlpsAnnotation(AlpsLink(l.Rel, l.Href)))
+        d.Links |> List.map (fun l -> AlpsAnnotation(AlpsLink(l.Rel, l.Href)))
 
     docAnnotation @ extAnnotations @ linkAnnotations
 
@@ -277,8 +301,7 @@ let classifyDescriptors
     let rtTargets = collectRtTargets descriptors
     let index = buildDescriptorIndex descriptors
 
-    let stateDescriptors =
-        descriptors |> List.filter (isStateDescriptor rtTargets)
+    let stateDescriptors = descriptors |> List.filter (isStateDescriptor rtTargets)
 
     let nonStateDescriptors =
         descriptors
@@ -288,8 +311,7 @@ let classifyDescriptors
             && (d.Type.IsNone || d.Type = Some "semantic"))
 
     // Build state elements
-    let stateElements =
-        stateDescriptors |> List.map (fun d -> StateDecl(toStateNode d))
+    let stateElements = stateDescriptors |> List.map (fun d -> StateDecl(toStateNode d))
 
     // Build transition elements from each state's children
     let transitionElements =
@@ -311,11 +333,9 @@ let classifyDescriptors
         | None -> []
 
     let linkAnnotations =
-        rootLinks
-        |> List.map (fun l -> AlpsAnnotation(AlpsLink(l.Rel, l.Href)))
+        rootLinks |> List.map (fun l -> AlpsAnnotation(AlpsLink(l.Rel, l.Href)))
 
-    let extAnnotations =
-        rootExtensions |> List.map classifyExtension
+    let extAnnotations = rootExtensions |> List.map classifyExtension
 
     let dataDescriptorAnnotations =
         nonStateDescriptors

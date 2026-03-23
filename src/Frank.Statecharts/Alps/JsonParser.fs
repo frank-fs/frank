@@ -1,4 +1,4 @@
-module internal Frank.Statecharts.Alps.JsonParser
+module Frank.Statecharts.Alps.JsonParser
 
 open System.Text.Json
 open Frank.Statecharts.Ast

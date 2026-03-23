@@ -1,0 +1,20 @@
+# Tic-Tac-Toe state machine with role-based transitions
+initial => XTurn;
+XTurn, OTurn, XWins, OWins, Draw;
+
+# getGame: self-loop on all states (unguarded, all roles)
+XTurn => XTurn: getGame;
+OTurn => OTurn: getGame;
+XWins => XWins: getGame;
+OWins => OWins: getGame;
+Draw => Draw: getGame;
+
+# makeMove from XTurn (role=PlayerX, guard=TurnGuard)
+XTurn => OTurn: makeMove [TurnGuard];
+XTurn => XWins: makeMove [TurnGuard];
+XTurn => Draw: makeMove [TurnGuard];
+
+# makeMove from OTurn (role=PlayerO, guard=TurnGuard)
+OTurn => XTurn: makeMove [TurnGuard];
+OTurn => OWins: makeMove [TurnGuard];
+OTurn => Draw: makeMove [TurnGuard];

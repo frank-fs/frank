@@ -80,6 +80,7 @@ let private jsonSchemaFixture =
 
 let private testProfiles: ProjectedProfiles =
     { AlpsProfiles = Map.ofList [ ("games", alpsJsonFixture) ]
+      RoleAlpsProfiles = Map.empty
       OwlOntologies = Map.ofList [ ("games", owlTurtleFixture) ]
       ShaclShapes = Map.ofList [ ("games", shaclTurtleFixture) ]
       JsonSchemas = Map.ofList [ ("games", jsonSchemaFixture) ] }

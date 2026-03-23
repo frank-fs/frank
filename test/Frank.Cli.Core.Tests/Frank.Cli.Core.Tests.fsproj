@@ -37,6 +37,7 @@
     <Compile Include="Unified/UnifiedAlpsGeneratorTests.fs" />
     <Compile Include="Unified/AffordanceMapGeneratorTests.fs" />
     <Compile Include="Unified/ExtractionStateProjectorTests.fs" />
+    <Compile Include="Unified/ProjectionIntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -51,6 +52,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli.Core/Frank.Cli.Core.fsproj" />
     <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
+    <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
 </Project>

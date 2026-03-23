@@ -46,6 +46,10 @@ module ProfileMiddlewareExtensions =
             for slug, alpsJson in Map.toSeq profiles.AlpsProfiles do
                 mapProfileEndpoint endpoints "/alps" slug alpsJson "application/alps+json"
 
+            // Per-role ALPS endpoints
+            for slug, alpsJson in Map.toSeq profiles.RoleAlpsProfiles do
+                mapProfileEndpoint endpoints "/alps" slug alpsJson "application/alps+json"
+
             // OWL ontology endpoints
             for slug, owlTurtle in Map.toSeq profiles.OwlOntologies do
                 mapProfileEndpoint endpoints "/ontology" slug owlTurtle "text/turtle"
@@ -63,24 +67,27 @@ module ProfileMiddlewareExtensions =
         member endpoints.MapProfileDiscovery(profiles: ProjectedProfiles) =
             let discoveryJson =
                 let alps =
-                    profiles.AlpsProfiles
-                    |> Map.toList
-                    |> List.map (fun (slug, _) -> sprintf """{"slug":"%s","url":"/alps/%s","type":"application/alps+json"}""" slug slug)
+                    (Map.toList profiles.AlpsProfiles @ Map.toList profiles.RoleAlpsProfiles)
+                    |> List.map (fun (slug, _) ->
+                        sprintf """{"slug":"%s","url":"/alps/%s","type":"application/alps+json"}""" slug slug)
 
                 let ontology =
                     profiles.OwlOntologies
                     |> Map.toList
-                    |> List.map (fun (slug, _) -> sprintf """{"slug":"%s","url":"/ontology/%s","type":"text/turtle"}""" slug slug)
+                    |> List.map (fun (slug, _) ->
+                        sprintf """{"slug":"%s","url":"/ontology/%s","type":"text/turtle"}""" slug slug)
 
                 let shapes =
                     profiles.ShaclShapes
                     |> Map.toList
-                    |> List.map (fun (slug, _) -> sprintf """{"slug":"%s","url":"/shapes/%s","type":"text/turtle"}""" slug slug)
+                    |> List.map (fun (slug, _) ->
+                        sprintf """{"slug":"%s","url":"/shapes/%s","type":"text/turtle"}""" slug slug)
 
                 let schemas =
                     profiles.JsonSchemas
                     |> Map.toList
-                    |> List.map (fun (slug, _) -> sprintf """{"slug":"%s","url":"/schemas/%s","type":"application/schema+json"}""" slug slug)
+                    |> List.map (fun (slug, _) ->
+                        sprintf """{"slug":"%s","url":"/schemas/%s","type":"application/schema+json"}""" slug slug)
 
                 let all = alps @ ontology @ shapes @ schemas
 

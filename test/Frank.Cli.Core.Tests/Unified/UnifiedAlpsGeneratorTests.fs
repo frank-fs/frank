@@ -6,6 +6,7 @@ open Frank.Statecharts
 open Frank.Resources.Model
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Statechart
+open Frank.Cli.Core.Shared.SchemaAlignment
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Unified.UnifiedAlpsGenerator
 
@@ -73,7 +74,8 @@ let private ticTacToeStatechart: ExtractedStatechart =
             AllowedMethods = [ "GET" ]
             Description = None } ]
         |> Map.ofList
-      Roles = [] }
+      Roles = []
+      Transitions = [] }
 
 let private ticTacToeResource: UnifiedResource =
     { RouteTemplate = "/games/{gameId}"
@@ -181,38 +183,50 @@ let unifiedAlpsGeneratorTests =
           // ── T027: Vocabulary Alignment ──
           testList
               "vocabularyAlignment"
-              [ testCase "tryFindAlignment matches known Schema.org fields"
-                <| fun _ ->
-                    Expect.equal (tryFindAlignment "name") (Some "https://schema.org/name") "name -> schema.org/name"
-                    Expect.equal (tryFindAlignment "description") (Some "https://schema.org/description") "description"
-                    Expect.equal (tryFindAlignment "email") (Some "https://schema.org/email") "email"
-                    Expect.equal (tryFindAlignment "url") (Some "https://schema.org/url") "url"
-                    Expect.equal (tryFindAlignment "price") (Some "https://schema.org/price") "price"
-                    Expect.equal (tryFindAlignment "image") (Some "https://schema.org/image") "image"
-                    Expect.equal (tryFindAlignment "telephone") (Some "https://schema.org/telephone") "telephone"
-
-                testCase "tryFindAlignment handles camelCase splitting"
+              [ testCase "tryFindPropertyAlignment matches known Schema.org fields"
                 <| fun _ ->
                     Expect.equal
-                        (tryFindAlignment "emailAddress")
+                        (tryFindPropertyAlignment "name")
+                        (Some "https://schema.org/name")
+                        "name -> schema.org/name"
+
+                    Expect.equal
+                        (tryFindPropertyAlignment "description")
+                        (Some "https://schema.org/description")
+                        "description"
+
+                    Expect.equal (tryFindPropertyAlignment "email") (Some "https://schema.org/email") "email"
+                    Expect.equal (tryFindPropertyAlignment "url") (Some "https://schema.org/url") "url"
+                    Expect.equal (tryFindPropertyAlignment "price") (Some "https://schema.org/price") "price"
+                    Expect.equal (tryFindPropertyAlignment "image") (Some "https://schema.org/image") "image"
+
+                    Expect.equal
+                        (tryFindPropertyAlignment "telephone")
+                        (Some "https://schema.org/telephone")
+                        "telephone"
+
+                testCase "tryFindPropertyAlignment handles camelCase splitting"
+                <| fun _ ->
+                    Expect.equal
+                        (tryFindPropertyAlignment "emailAddress")
                         (Some "https://schema.org/email")
                         "emailAddress -> email"
 
                     Expect.equal
-                        (tryFindAlignment "createdAt")
+                        (tryFindPropertyAlignment "createdAt")
                         (Some "https://schema.org/dateCreated")
                         "createdAt -> dateCreated"
 
                     Expect.equal
-                        (tryFindAlignment "dateModified")
+                        (tryFindPropertyAlignment "dateModified")
                         (Some "https://schema.org/dateModified")
                         "dateModified"
 
-                testCase "tryFindAlignment returns None for unknown fields"
+                testCase "tryFindPropertyAlignment returns None for unknown fields"
                 <| fun _ ->
-                    Expect.isNone (tryFindAlignment "board") "board has no Schema.org alignment"
-                    Expect.isNone (tryFindAlignment "winner") "winner has no Schema.org alignment"
-                    Expect.isNone (tryFindAlignment "cells") "cells has no Schema.org alignment" ]
+                    Expect.isNone (tryFindPropertyAlignment "board") "board has no Schema.org alignment"
+                    Expect.isNone (tryFindPropertyAlignment "winner") "winner has no Schema.org alignment"
+                    Expect.isNone (tryFindPropertyAlignment "cells") "cells has no Schema.org alignment" ]
 
           // ── T028: Link Relation Derivation ──
           testList
@@ -284,26 +298,17 @@ let unifiedAlpsGeneratorTests =
                         let descriptors = getDescriptors json
 
                         // Should have semantic descriptors for fields
-                        let semanticDescs =
-                            descriptors |> List.filter (descriptorHasType "semantic")
+                        let semanticDescs = descriptors |> List.filter (descriptorHasType "semantic")
 
-                        Expect.isGreaterThan
-                            semanticDescs.Length
-                            0
-                            "Should have at least one semantic descriptor"
+                        Expect.isGreaterThan semanticDescs.Length 0 "Should have at least one semantic descriptor"
 
                         // Should have safe descriptor for GET
-                        let safeDescs =
-                            descriptors |> List.filter (descriptorHasType "safe")
+                        let safeDescs = descriptors |> List.filter (descriptorHasType "safe")
 
-                        Expect.isGreaterThan
-                            safeDescs.Length
-                            0
-                            "Should have at least one safe descriptor"
+                        Expect.isGreaterThan safeDescs.Length 0 "Should have at least one safe descriptor"
 
                         // Check status field is present
-                        let hasStatus =
-                            descriptors |> List.exists (descriptorHasId "status")
+                        let hasStatus = descriptors |> List.exists (descriptorHasId "status")
 
                         Expect.isTrue hasStatus "Should have 'status' descriptor"
 
@@ -317,8 +322,7 @@ let unifiedAlpsGeneratorTests =
                         let descriptors = getDescriptors json
 
                         // The 'name' field should have an href to schema.org
-                        let nameDesc =
-                            descriptors |> List.tryFind (descriptorHasId "name")
+                        let nameDesc = descriptors |> List.tryFind (descriptorHasId "name")
 
                         Expect.isSome nameDesc "Should have 'name' descriptor"
 
@@ -326,10 +330,7 @@ let unifiedAlpsGeneratorTests =
 
                         match nameElem.TryGetProperty("href") with
                         | true, href ->
-                            Expect.equal
-                                (href.GetString())
-                                "https://schema.org/name"
-                                "name should link to Schema.org"
+                            Expect.equal (href.GetString()) "https://schema.org/name" "name should link to Schema.org"
                         | _ -> failtest "name descriptor should have href"
 
                 testCase "plain resource has no state-dependent transition descriptors"
@@ -340,13 +341,9 @@ let unifiedAlpsGeneratorTests =
                     | Error errors -> failtest $"Generation failed: {errors}"
                     | Ok json ->
                         // Should not contain any state-prefixed descriptor ids
-                        Expect.isFalse
-                            (json.Contains("XTurn"))
-                            "Plain resource should not contain state names"
+                        Expect.isFalse (json.Contains("XTurn")) "Plain resource should not contain state names"
 
-                        Expect.isFalse
-                            (json.Contains("OTurn"))
-                            "Plain resource should not contain state names"
+                        Expect.isFalse (json.Contains("OTurn")) "Plain resource should not contain state names"
 
                 testCase "minimal resource with no type info produces valid ALPS"
                 <| fun _ ->
@@ -358,18 +355,11 @@ let unifiedAlpsGeneratorTests =
                         let descriptors = getDescriptors json
 
                         // Should have at least the transition descriptor
-                        Expect.isGreaterThan
-                            descriptors.Length
-                            0
-                            "Should have at least one descriptor"
+                        Expect.isGreaterThan descriptors.Length 0 "Should have at least one descriptor"
 
-                        let safeDescs =
-                            descriptors |> List.filter (descriptorHasType "safe")
+                        let safeDescs = descriptors |> List.filter (descriptorHasType "safe")
 
-                        Expect.isGreaterThan
-                            safeDescs.Length
-                            0
-                            "Should have safe descriptor for GET"
+                        Expect.isGreaterThan safeDescs.Length 0 "Should have safe descriptor for GET"
 
                 testCase "tic-tac-toe resource contains semantic descriptors"
                 <| fun _ ->
@@ -382,19 +372,14 @@ let unifiedAlpsGeneratorTests =
 
                         // Should have the DU type descriptor
                         let hasTicTacToeState =
-                            descriptors
-                            |> List.exists (descriptorHasId "TicTacToeState")
+                            descriptors |> List.exists (descriptorHasId "TicTacToeState")
 
                         Expect.isTrue hasTicTacToeState "Should have TicTacToeState descriptor"
 
                         // Should have semantic descriptors
-                        let semanticDescs =
-                            descriptors |> List.filter (descriptorHasType "semantic")
+                        let semanticDescs = descriptors |> List.filter (descriptorHasType "semantic")
 
-                        Expect.isGreaterThan
-                            semanticDescs.Length
-                            0
-                            "Should have semantic descriptors"
+                        Expect.isGreaterThan semanticDescs.Length 0 "Should have semantic descriptors"
 
                 testCase "tic-tac-toe resource contains safe and unsafe transition descriptors"
                 <| fun _ ->
@@ -406,22 +391,14 @@ let unifiedAlpsGeneratorTests =
                         let descriptors = getDescriptors json
 
                         // Should have safe descriptors (GET)
-                        let safeDescs =
-                            descriptors |> List.filter (descriptorHasType "safe")
+                        let safeDescs = descriptors |> List.filter (descriptorHasType "safe")
 
-                        Expect.isGreaterThan
-                            safeDescs.Length
-                            0
-                            "Should have safe descriptors for GET"
+                        Expect.isGreaterThan safeDescs.Length 0 "Should have safe descriptors for GET"
 
                         // Should have unsafe descriptors (POST)
-                        let unsafeDescs =
-                            descriptors |> List.filter (descriptorHasType "unsafe")
+                        let unsafeDescs = descriptors |> List.filter (descriptorHasType "unsafe")
 
-                        Expect.isGreaterThan
-                            unsafeDescs.Length
-                            0
-                            "Should have unsafe descriptors for POST"
+                        Expect.isGreaterThan unsafeDescs.Length 0 "Should have unsafe descriptors for POST"
 
                 testCase "tic-tac-toe transitions include state-scoped descriptor ids"
                 <| fun _ ->
@@ -455,11 +432,9 @@ let unifiedAlpsGeneratorTests =
                     | Ok json ->
                         let descriptors = getDescriptors json
 
-                        let hasCells =
-                            descriptors |> List.exists (descriptorHasId "cells")
+                        let hasCells = descriptors |> List.exists (descriptorHasId "cells")
 
-                        let hasSize =
-                            descriptors |> List.exists (descriptorHasId "size")
+                        let hasSize = descriptors |> List.exists (descriptorHasId "size")
 
                         Expect.isTrue hasCells "Should have 'cells' descriptor from Board record"
                         Expect.isTrue hasSize "Should have 'size' descriptor from Board record" ]
