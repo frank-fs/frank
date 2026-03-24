@@ -768,7 +768,7 @@ let private enrichWithDerivedFields (allTypes: AnalyzedType list) (resources: Un
 
 let internal specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
 
-let internal tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.StatechartDocument option =
+let internal tryParseSpecFile (filePath: string) : Result<Frank.Statecharts.Ast.StatechartDocument, string> =
     try
         let text = File.ReadAllText(filePath)
         let ext = Path.GetExtension(filePath).ToLowerInvariant()
@@ -787,10 +787,11 @@ let internal tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.Statech
             else
                 None
 
-        parseResult |> Option.map _.Document
+        match parseResult with
+        | Some r -> Ok r.Document
+        | None -> Error $"Unsupported spec file format: '{filePath}'"
     with ex ->
-        eprintfn "Warning: failed to parse spec file '%s': %s" filePath ex.Message
-        None
+        Error $"Failed to parse spec file '{filePath}': {ex.Message}"
 
 /// Find all spec files in {projectDir}/specs/ directory.
 let internal findSpecFiles (projectDir: string) : string list =
@@ -805,19 +806,20 @@ let internal findSpecFiles (projectDir: string) : string list =
         []
 
 /// Extract state names from a StatechartDocument for matching against resources.
+/// Collects both source and target states from transitions, plus explicit state declarations.
 let internal documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) : Set<string> =
     doc.Elements
-    |> List.choose (fun elem ->
+    |> List.collect (fun elem ->
         match elem with
-        | Frank.Statecharts.Ast.StateDecl node -> node.Identifier
-        | Frank.Statecharts.Ast.TransitionElement edge -> Some edge.Source
-        | _ -> None)
+        | Frank.Statecharts.Ast.StateDecl node -> node.Identifier |> Option.toList
+        | Frank.Statecharts.Ast.TransitionElement edge -> edge.Source :: (edge.Target |> Option.toList)
+        | _ -> [])
     |> Set.ofList
 
 /// Check if a spec document's states overlap sufficiently with a resource's states.
 let internal statesOverlap (docStates: Set<string>) (resourceStates: Set<string>) : bool =
     let overlap = Set.intersect resourceStates docStates
-    overlap.Count > 0 && overlap.Count >= resourceStates.Count / 2
+    overlap.Count > 0 && overlap.Count * 2 >= resourceStates.Count
 
 /// Match a parsed spec document to a resource by state name overlap.
 let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
@@ -830,16 +832,28 @@ let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) 
         | None -> false)
 
 /// Co-extract transitions from spec files and merge into resources.
-let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list =
+/// Returns enriched resources and any parse warnings.
+let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list * string list =
     let specFiles = findSpecFiles projectDir
 
     if specFiles.IsEmpty then
-        resources
+        resources, []
     else
+        let parseResults = specFiles |> List.map (fun f -> f, tryParseSpecFile f)
+
+        let parseWarnings =
+            parseResults
+            |> List.choose (fun (_, r) ->
+                match r with
+                | Error msg -> Some msg
+                | Ok _ -> None)
+
         let parsedDocs =
-            specFiles
-            |> List.choose (fun f ->
-                tryParseSpecFile f |> Option.map (fun doc -> f, doc, documentStateNames doc))
+            parseResults
+            |> List.choose (fun (f, r) ->
+                match r with
+                | Ok doc -> Some(f, doc, documentStateNames doc)
+                | Error _ -> None)
 
         resources
         |> List.map (fun r ->
@@ -859,8 +873,8 @@ let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedR
                     let specRoles = TransitionExtractor.extractRoles doc
 
                     let mergedRoles =
-                        if sc.Roles.IsEmpty && not specRoles.IsEmpty then specRoles
-                        elif not sc.Roles.IsEmpty then sc.Roles
+                        if not sc.Roles.IsEmpty then sc.Roles
+                        elif not specRoles.IsEmpty then specRoles
                         else []
 
                     { r with
@@ -870,7 +884,8 @@ let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedR
                                     Transitions = transitions
                                     Roles = mergedRoles } }
                 | None -> r
-            | _ -> r)
+            | _ -> r),
+        parseWarnings
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -897,7 +912,7 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
 
                 // Phase 3.5: Co-extract transitions from spec files
                 let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-                let withTransitions = enrichWithSpecTransitions projectDir resources
+                let withTransitions, _specWarnings = enrichWithSpecTransitions projectDir resources
 
                 // Phase 4: Associate types with resources
                 let withTypes = associateTypes withTransitions typedResult.AnalyzedTypes

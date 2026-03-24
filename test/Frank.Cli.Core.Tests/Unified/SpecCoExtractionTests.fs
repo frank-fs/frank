@@ -123,11 +123,11 @@ let specCoExtractionTests =
                         let filePath = Path.Combine(dir, "test.smcat")
                         File.WriteAllText(filePath, tictactoeSmcat)
                         let result = tryParseSpecFile filePath
-                        Expect.isSome result "Should parse smcat file"
+                        Expect.isOk result "Should parse smcat file"
                     finally
                         cleanup dir
 
-                testCase "returns None for unknown extension"
+                testCase "returns Error for unknown extension"
                 <| fun _ ->
                     let dir = setupTempDir ()
 
@@ -135,14 +135,14 @@ let specCoExtractionTests =
                         let filePath = Path.Combine(dir, "test.txt")
                         File.WriteAllText(filePath, "not a spec")
                         let result = tryParseSpecFile filePath
-                        Expect.isNone result "Should return None for .txt"
+                        Expect.isError result "Should return Error for .txt"
                     finally
                         cleanup dir
 
-                testCase "returns None for nonexistent file"
+                testCase "returns Error for nonexistent file"
                 <| fun _ ->
                     let result = tryParseSpecFile "/nonexistent/path/file.smcat"
-                    Expect.isNone result "Should return None for nonexistent file" ]
+                    Expect.isError result "Should return Error for nonexistent file" ]
 
           testList
               "documentStateNames"
@@ -155,11 +155,11 @@ let specCoExtractionTests =
                         File.WriteAllText(filePath, tictactoeSmcat)
 
                         match tryParseSpecFile filePath with
-                        | Some doc ->
+                        | Ok doc ->
                             let names = documentStateNames doc
                             Expect.isTrue (names.Contains "XTurn") "Should contain XTurn"
                             Expect.isTrue (names.Contains "OTurn") "Should contain OTurn"
-                        | None -> failtest "Should parse the smcat file"
+                        | Error msg -> failtest $"Should parse the smcat file: {msg}"
                     finally
                         cleanup dir ]
 
@@ -175,7 +175,7 @@ let specCoExtractionTests =
                         File.WriteAllText(Path.Combine(specsDir, "game.smcat"), tictactoeSmcat)
 
                         let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] []
-                        let enriched = enrichWithSpecTransitions dir [ resource ]
+                        let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
                         | Some sc ->
@@ -194,7 +194,7 @@ let specCoExtractionTests =
 
                     try
                         let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] []
-                        let enriched = enrichWithSpecTransitions dir [ resource ]
+                        let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
                         | Some sc -> Expect.isEmpty sc.Transitions "Transitions should remain empty"
@@ -212,7 +212,7 @@ let specCoExtractionTests =
                         File.WriteAllText(Path.Combine(specsDir, "game.smcat"), tictactoeSmcat)
 
                         let resource = makeResourceWithStates [ "Active"; "Completed" ] []
-                        let enriched = enrichWithSpecTransitions dir [ resource ]
+                        let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
                         | Some sc -> Expect.isEmpty sc.Transitions "Transitions should remain empty when no overlap"
@@ -237,7 +237,7 @@ let specCoExtractionTests =
                               Constraint = Unrestricted }
 
                         let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] [ existingTransition ]
-                        let enriched = enrichWithSpecTransitions dir [ resource ]
+                        let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
                         | Some sc ->
@@ -256,13 +256,13 @@ let specCoExtractionTests =
                         File.WriteAllText(filePath, tictactoeSmcat)
 
                         match tryParseSpecFile filePath with
-                        | Some doc ->
+                        | Ok doc ->
                             let matching = makeResourceWithStates [ "XTurn"; "OTurn" ] []
                             let nonMatching = makeResourceWithStates [ "Active"; "Done" ] []
 
                             let result = matchDocToResource doc [ nonMatching; matching ]
                             Expect.isSome result "Should find matching resource"
                             Expect.equal result.Value.ResourceSlug "games" "Should match the games resource"
-                        | None -> failtest "Should parse smcat"
+                        | Error msg -> failtest $"Should parse smcat: {msg}"
                     finally
                         cleanup dir ] ]
