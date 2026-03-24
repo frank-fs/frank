@@ -37,6 +37,8 @@
     <Compile Include="Unified/UnifiedAlpsGeneratorTests.fs" />
     <Compile Include="Unified/AffordanceMapGeneratorTests.fs" />
     <Compile Include="Unified/ExtractionStateProjectorTests.fs" />
+    <Compile Include="Unified/ProjectionPipelineTests.fs" />
+    <Compile Include="Unified/SpecCoExtractionTests.fs" />
     <Compile Include="Unified/ProjectionIntegrationTests.fs" />
     <Compile Include="Unified/RoleAwareShapeTests.fs" />
     <Compile Include="Program.fs" />

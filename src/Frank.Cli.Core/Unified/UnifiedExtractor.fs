@@ -766,9 +766,9 @@ let private enrichWithDerivedFields (allTypes: AnalyzedType list) (resources: Un
 // Spec file co-extraction: bridge transitions from spec files into extracted statecharts
 // ══════════════════════════════════════════════════════════════════════════════
 
-let private specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+let internal specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
 
-let private tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.StatechartDocument option =
+let internal tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.StatechartDocument option =
     try
         let text = File.ReadAllText(filePath)
         let ext = Path.GetExtension(filePath).ToLowerInvariant()
@@ -792,7 +792,7 @@ let private tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.Statecha
         None
 
 /// Find all spec files in {projectDir}/specs/ directory.
-let private findSpecFiles (projectDir: string) : string list =
+let internal findSpecFiles (projectDir: string) : string list =
     let specsDir = Path.Combine(projectDir, "specs")
 
     if Directory.Exists(specsDir) then
@@ -804,7 +804,7 @@ let private findSpecFiles (projectDir: string) : string list =
         []
 
 /// Extract state names from a StatechartDocument for matching against resources.
-let private documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) : Set<string> =
+let internal documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) : Set<string> =
     doc.Elements
     |> List.choose (fun elem ->
         match elem with
@@ -814,7 +814,7 @@ let private documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) :
     |> Set.ofList
 
 /// Match a parsed spec document to a resource by state name overlap.
-let private matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
+let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
     resources
     |> List.tryFind (fun r ->
         match r.Statechart with
@@ -827,7 +827,7 @@ let private matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (
         | None -> false)
 
 /// Co-extract transitions from spec files and merge into resources.
-let private enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list =
+let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list =
     let specFiles = findSpecFiles projectDir
 
     if specFiles.IsEmpty then

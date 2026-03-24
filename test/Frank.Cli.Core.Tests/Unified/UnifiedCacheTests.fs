@@ -352,4 +352,92 @@ let unifiedCacheTests =
                             Expect.equal state.Resources.[0].RouteTemplate "/games/{gameId}" "Route preserved"
                         | Error msg -> failtest $"Expected Ok, got Error: {msg}"
                     finally
+                        cleanup dir
+
+                testCase "roundtrips transitions and roles through cache"
+                <| fun _ ->
+                    let dir = setupTempProject ()
+
+                    try
+                        let transitions =
+                            [ { Event = "MakeMove"
+                                Source = "XTurn"
+                                Target = "OTurn"
+                                Guard = Some "TurnGuard"
+                                Constraint = RestrictedTo [ "PlayerX" ] }
+                              { Event = "MakeMove"
+                                Source = "OTurn"
+                                Target = "XTurn"
+                                Guard = Some "TurnGuard"
+                                Constraint = RestrictedTo [ "PlayerO" ] } ]
+
+                        let roles: RoleInfo list =
+                            [ { Name = "PlayerX"; Description = None }
+                              { Name = "PlayerO"; Description = None }
+                              { Name = "Spectator"
+                                Description = Some "Observes only" } ]
+
+                        let resources: UnifiedResource list =
+                            [ { RouteTemplate = "/games/{gameId}"
+                                ResourceSlug = "games"
+                                TypeInfo = []
+                                Statechart =
+                                    Some
+                                        { RouteTemplate = "/games/{gameId}"
+                                          StateNames = [ "XTurn"; "OTurn"; "Won"; "Draw" ]
+                                          InitialStateKey = "XTurn"
+                                          GuardNames = [ "TurnGuard" ]
+                                          StateMetadata = Map.empty
+                                          Roles = roles
+                                          Transitions = transitions }
+                                HttpCapabilities =
+                                    [ { Method = "GET"
+                                        StateKey = Some "XTurn"
+                                        LinkRelation = "self"
+                                        IsSafe = true }
+                                      { Method = "POST"
+                                        StateKey = Some "XTurn"
+                                        LinkRelation = "makeMove"
+                                        IsSafe = false } ]
+                                DerivedFields = ResourceModel.emptyDerivedFields } ]
+
+                        let state =
+                            { createSampleState "transitions-test" with
+                                Resources = resources }
+
+                        let path = UnifiedCache.cachePath dir
+                        let saveResult = UnifiedCache.save path state
+                        Expect.isOk saveResult "save should succeed"
+
+                        let loadResult = UnifiedCache.load path
+                        Expect.isOk loadResult "load should succeed"
+
+                        match loadResult with
+                        | Ok(Some loaded) ->
+                            let sc = loaded.Resources.[0].Statechart
+                            Expect.isSome sc "Should have statechart after reload"
+
+                            let chart = sc.Value
+                            Expect.equal chart.Transitions.Length 2 "Should preserve 2 transitions"
+                            Expect.equal chart.Roles.Length 3 "Should preserve 3 roles"
+
+                            let t0 = chart.Transitions.[0]
+                            Expect.equal t0.Event "MakeMove" "Event preserved"
+                            Expect.equal t0.Source "XTurn" "Source preserved"
+                            Expect.equal t0.Target "OTurn" "Target preserved"
+                            Expect.equal t0.Guard (Some "TurnGuard") "Guard preserved"
+                            Expect.equal t0.Constraint (RestrictedTo [ "PlayerX" ]) "Constraint preserved"
+
+                            let spectator = chart.Roles |> List.find (fun r -> r.Name = "Spectator")
+                            Expect.equal spectator.Description (Some "Observes only") "Role description preserved"
+
+                            let caps = loaded.Resources.[0].HttpCapabilities
+                            Expect.equal caps.Length 2 "Should preserve capabilities"
+
+                            let postCap = caps |> List.find (fun c -> c.Method = "POST")
+                            Expect.equal postCap.StateKey (Some "XTurn") "StateKey preserved"
+                            Expect.equal postCap.IsSafe false "IsSafe preserved"
+                        | Ok None -> failtest "Expected Some state, got None"
+                        | Error msg -> failtest $"Expected Ok, got Error: {msg}"
+                    finally
                         cleanup dir ] ]

@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Frank.Cli.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="Rdf/FSharpRdf.fs" />
     <Compile Include="Rdf/Vocabularies.fs" />
     <!-- Shared utilities -->

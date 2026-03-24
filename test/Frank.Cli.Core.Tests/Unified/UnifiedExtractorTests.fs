@@ -357,6 +357,80 @@ let game = statefulResource "/games/{gameId}" {
                     Expect.equal result.TypeCoverage 1.0 "Coverage should be 1.0" ]
 
           testList
+              "role extraction"
+              [ testCaseAsync "extracts role names from statefulResource CE"
+                <| async {
+                    let source =
+                        """
+module Test
+let game = statefulResource "/games/{gameId}" {
+    machine gameMachine
+    role "PlayerX" (fun user -> user.HasClaim("player", "X"))
+    role "PlayerO" (fun user -> user.HasClaim("player", "O"))
+    role "Spectator" (fun _user -> true)
+    inState (forState XTurn [ get handler; post handler ])
+    inState (forState OTurn [ get handler; post handler ])
+}
+"""
+
+                    let! ast = parseSource source
+                    let findings = findResourcesInParsedInput ast
+
+                    Expect.equal findings.Length 1 "Should find 1 resource"
+
+                    match findings.[0] with
+                    | FoundStatefulResource(_route, _machineName, _stateHandlers, roleNames) ->
+                        Expect.equal roleNames.Length 3 "Should have 3 roles"
+                        Expect.contains roleNames "PlayerX" "Should contain PlayerX"
+                        Expect.contains roleNames "PlayerO" "Should contain PlayerO"
+                        Expect.contains roleNames "Spectator" "Should contain Spectator"
+                    | _ -> failtest "Expected FoundStatefulResource"
+                }
+
+                testCaseAsync "statefulResource without roles returns empty role list"
+                <| async {
+                    let source =
+                        """
+module Test
+let game = statefulResource "/games/{gameId}" {
+    machine gameMachine
+    inState (forState Playing [ get handler; post handler ])
+    inState (forState Finished [ get handler ])
+}
+"""
+
+                    let! ast = parseSource source
+                    let findings = findResourcesInParsedInput ast
+
+                    match findings.[0] with
+                    | FoundStatefulResource(_route, _machineName, _stateHandlers, roleNames) ->
+                        Expect.isEmpty roleNames "Should have no roles"
+                    | _ -> failtest "Expected FoundStatefulResource"
+                }
+
+                testCaseAsync "role extraction preserves order"
+                <| async {
+                    let source =
+                        """
+module Test
+let game = statefulResource "/games/{gameId}" {
+    machine gameMachine
+    role "Admin" (fun user -> user.IsInRole("admin"))
+    role "User" (fun _user -> true)
+    inState (forState Active [ get handler ])
+}
+"""
+
+                    let! ast = parseSource source
+                    let findings = findResourcesInParsedInput ast
+
+                    match findings.[0] with
+                    | FoundStatefulResource(_, _, _, roleNames) ->
+                        Expect.equal roleNames [ "Admin"; "User" ] "Roles should be in declaration order"
+                    | _ -> failtest "Expected FoundStatefulResource"
+                } ]
+
+          testList
               "comparison with old extractors"
               [ testCaseAsync "unified walker finds same plain resources as AstAnalyzer"
                 <| async {
