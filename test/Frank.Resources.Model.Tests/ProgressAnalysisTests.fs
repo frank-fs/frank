@@ -249,6 +249,34 @@ let private disconnectedChart: ExtractedStatechart =
 // -- Tests --
 
 [<Tests>]
+let readOnlyRoleTests =
+    testList
+        "identifyReadOnlyRoles"
+        [ testCase "Spectator in TicTacToe is read-only"
+          <| fun _ ->
+              let projections = Projection.projectAll ticTacToeChart
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              Expect.contains readOnly "Spectator" "Spectator is read-only"
+
+          testCase "PlayerX in TicTacToe is not read-only"
+          <| fun _ ->
+              let projections = Projection.projectAll ticTacToeChart
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              Expect.isFalse (List.contains "PlayerX" readOnly) "PlayerX is not read-only"
+
+          testCase "all-unrestricted chart has no read-only roles"
+          <| fun _ ->
+              let projections = Projection.projectAll allUnrestrictedChart
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              Expect.isEmpty readOnly "No read-only roles when all unrestricted"
+
+          testCase "role with only dead transitions is read-only"
+          <| fun _ ->
+              let projections = Projection.projectAll deadTransitionDeadlockChart
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              Expect.contains readOnly "Admin" "Admin with only dead advancing transition is read-only" ]
+
+[<Tests>]
 let predicateTests =
     testList
         "predicates"

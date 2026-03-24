@@ -39,3 +39,14 @@ module ProgressAnalysis =
           HasWarnings: bool
           StatesAnalyzed: int
           RolesAnalyzed: string list }
+
+    /// Roles with zero advancing+live transitions — they can only observe, not advance.
+    let identifyReadOnlyRoles (projections: Map<string, ExtractedStatechart>) : string list =
+        projections
+        |> Map.toList
+        |> List.choose (fun (role, chart) ->
+            let hasAdvancing =
+                chart.Transitions
+                |> List.exists (fun t -> isAdvancing t && isLive t)
+
+            if hasAdvancing then None else Some role)
