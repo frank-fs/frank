@@ -60,7 +60,8 @@ type EventBuilder() =
           Timestamp = defaultArg timestamp (DateTimeOffset(2025, 7, 1, 12, 0, 0, TimeSpan.Zero))
           User = user
           HttpMethod = defaultArg httpMethod "POST"
-          Headers = defaultArg headers Map.empty }
+          Headers = defaultArg headers Map.empty
+          Roles = [] }
 
 let private createLogger () =
     let factory: ILoggerFactory =

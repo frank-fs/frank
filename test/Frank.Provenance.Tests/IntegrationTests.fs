@@ -58,7 +58,8 @@ let private makeTransitionEvent
       Timestamp = DateTimeOffset.UtcNow
       User = user
       HttpMethod = "POST"
-      Headers = Map.empty }
+      Headers = Map.empty
+      Roles = [] }
 
 /// Builds a minimal ProvenanceRecord for seeding read-only tests.
 let private makeRecord (resourceUri: string) (prevState: string) (newState: string) (agentId: string) =
@@ -96,7 +97,8 @@ let private makeRecord (resourceUri: string) (prevState: string) (newState: stri
       Activity = activity
       Agent = agent
       GeneratedEntity = generatedEntity
-      UsedEntity = usedEntity }
+      UsedEntity = usedEntity
+      ActingRoles = [] }
 
 /// Creates a full-pipeline test server with:
 ///   - a real MailboxProcessorProvenanceStore (default config)
@@ -447,7 +449,8 @@ let integrationTests =
                                 { ProvenanceEntity.Id = $"gen-{i}"
                                   ResourceUri = "/test/config"
                                   StateName = "B"
-                                  CapturedAt = baseTime.AddSeconds(float i) } }
+                                  CapturedAt = baseTime.AddSeconds(float i) }
+                              ActingRoles = [] }
                         )
 
                     do! Async.Sleep 150

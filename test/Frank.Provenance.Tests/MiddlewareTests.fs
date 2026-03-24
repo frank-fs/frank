@@ -50,7 +50,8 @@ let private makeRecord resourceUri =
       Activity = activity
       Agent = agent
       GeneratedEntity = generatedEntity
-      UsedEntity = usedEntity }
+      UsedEntity = usedEntity
+      ActingRoles = [] }
 
 /// A simple in-memory IProvenanceStore for testing.
 type private TestProvenanceStore(records: ProvenanceRecord list) =

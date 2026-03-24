@@ -130,7 +130,8 @@ let typeTests =
                           Activity = activity
                           Agent = agent
                           GeneratedEntity = generatedEntity
-                          UsedEntity = usedEntity }
+                          UsedEntity = usedEntity
+                          ActingRoles = [] }
 
                     Expect.equal record.Id "record-1" "Id"
                     Expect.equal record.ResourceUri "/orders/123" "ResourceUri"

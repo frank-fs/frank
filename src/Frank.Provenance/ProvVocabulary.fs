@@ -100,6 +100,9 @@ module ProvVocabulary =
         [<Literal>]
         let agentModel = FrankNamespace + "agentModel"
 
+        [<Literal>]
+        let actingRole = FrankNamespace + "actingRole"
+
     /// RDF vocabulary constants.
     [<RequireQualifiedAccess>]
     module Rdf =

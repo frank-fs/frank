@@ -25,6 +25,8 @@ type TransitionEvent =
         HttpMethod: string
         /// HTTP headers from the triggering request.
         Headers: Map<string, string>
+        /// Protocol roles held by the acting principal.
+        Roles: string list
     }
 
 /// Private module for extracting a ProvenanceAgent from request context.
@@ -120,7 +122,8 @@ type TransitionObserver(store: IProvenanceStore, logger: ILogger<TransitionObser
           Activity = activity
           Agent = agent
           GeneratedEntity = generatedEntity
-          UsedEntity = usedEntity }
+          UsedEntity = usedEntity
+          ActingRoles = event.Roles }
 
     interface IObserver<TransitionEvent> with
 

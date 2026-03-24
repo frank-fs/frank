@@ -80,7 +80,8 @@ let private makeTestProvenanceRecords (resourceUri: string) : ProvenanceRecord l
           Activity = activity
           Agent = agent
           GeneratedEntity = generatedEntity
-          UsedEntity = usedEntity }
+          UsedEntity = usedEntity
+          ActingRoles = [] }
 
     let record2 =
         let activity =
@@ -111,7 +112,8 @@ let private makeTestProvenanceRecords (resourceUri: string) : ProvenanceRecord l
           Activity = activity
           Agent = agent
           GeneratedEntity = generatedEntity
-          UsedEntity = usedEntity }
+          UsedEntity = usedEntity
+          ActingRoles = [] }
 
     [ record1; record2 ]
 

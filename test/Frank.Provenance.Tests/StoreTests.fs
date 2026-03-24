@@ -46,7 +46,8 @@ let private makeRecord id resourceUri agentId (recordedAt: DateTimeOffset) =
       Activity = activity
       Agent = agent
       GeneratedEntity = generatedEntity
-      UsedEntity = usedEntity }
+      UsedEntity = usedEntity
+      ActingRoles = [] }
 
 let private defaultConfig = ProvenanceStoreConfig.defaults
 
