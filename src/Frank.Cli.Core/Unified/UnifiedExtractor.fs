@@ -102,7 +102,10 @@ let private tryExtractResource (expr: SynExpr) (file: string) : AnalyzedResource
         Some
             { RouteTemplate = routeTemplate
               Name = result.Name
-              HttpMethods = result.Methods |> List.rev |> List.choose (fun s -> AstAnalyzer.parseHttpMethod (s.ToLowerInvariant()))
+              HttpMethods =
+                result.Methods
+                |> List.rev
+                |> List.choose (fun s -> AstAnalyzer.parseHttpMethod (s.ToLowerInvariant()))
               HasLinkedData = result.HasLinkedData
               Location =
                 { File = file
@@ -115,8 +118,7 @@ let private tryExtractResource (expr: SynExpr) (file: string) : AnalyzedResource
 let rec private tryExtractStateCaseName (expr: SynExpr) : string option =
     match expr with
     | SynExpr.Ident ident -> Some ident.idText
-    | SynExpr.LongIdent(longDotId = SynLongIdent(id = ids)) ->
-        ids |> List.tryLast |> Option.map _.idText
+    | SynExpr.LongIdent(longDotId = SynLongIdent(id = ids)) -> ids |> List.tryLast |> Option.map _.idText
     | SynExpr.App(funcExpr = funcExpr) -> tryExtractStateCaseName funcExpr
     | SynExpr.Paren(expr = inner) -> tryExtractStateCaseName inner
     | _ -> None
@@ -133,9 +135,7 @@ let rec private extractHttpMethods (expr: SynExpr) : string list =
 and private extractSingleMethod (expr: SynExpr) : string option =
     match expr with
     | SynExpr.App(funcExpr = SynExpr.LongIdent(longDotId = SynLongIdent(id = ids))) ->
-        ids
-        |> List.tryLast
-        |> Option.bind (fun id -> httpMethodToString id.idText)
+        ids |> List.tryLast |> Option.bind (fun id -> httpMethodToString id.idText)
     | SynExpr.App(funcExpr = SynExpr.Ident ident) -> httpMethodToString ident.idText
     | SynExpr.Paren(expr = inner) -> extractSingleMethod inner
     | _ -> None
@@ -191,15 +191,15 @@ let rec private walkStatefulCeBody (acc: StatefulCeAccum) (expr: SynExpr) : Stat
         let machineName =
             match argExpr with
             | SynExpr.Ident id -> Some id.idText
-            | SynExpr.LongIdent(longDotId = SynLongIdent(id = ids)) ->
-                ids |> List.tryLast |> Option.map _.idText
+            | SynExpr.LongIdent(longDotId = SynLongIdent(id = ids)) -> ids |> List.tryLast |> Option.map _.idText
             | _ -> None
 
         { acc with MachineName = machineName }
 
     // role "PlayerX" (fun user -> ...)
     | SynExpr.App(
-        funcExpr = SynExpr.App(funcExpr = SynExpr.Ident ident; argExpr = SynExpr.Const(SynConst.String(roleName, _, _), _))) when
+        funcExpr = SynExpr.App(
+            funcExpr = SynExpr.Ident ident; argExpr = SynExpr.Const(SynConst.String(roleName, _, _), _))) when
         ident.idText = "role"
         ->
         { acc with
@@ -219,8 +219,7 @@ let private tryExtractStatefulResource (expr: SynExpr) : SyntaxStatefulResource 
     match expr with
     | SynExpr.App(
         funcExpr = SynExpr.App(
-            funcExpr = SynExpr.Ident ident
-            argExpr = SynExpr.Const(SynConst.String(routeTemplate, _, _), _))
+            funcExpr = SynExpr.Ident ident; argExpr = SynExpr.Const(SynConst.String(routeTemplate, _, _), _))
         argExpr = SynExpr.ComputationExpr(expr = ceBody)) when ident.idText = "statefulResource" ->
         let acc = walkStatefulCeBody emptyStatefulCeAccum ceBody
 
@@ -351,8 +350,7 @@ let private tryExtractStateMachineInfo (fsharpType: FSharpType) : (string list) 
             let stateType = fsharpType.GenericArguments.[0]
 
             if stateType.HasTypeDefinition && stateType.TypeDefinition.IsFSharpUnion then
-                let cases =
-                    stateType.TypeDefinition.UnionCases |> Seq.map _.Name |> Seq.toList
+                let cases = stateType.TypeDefinition.UnionCases |> Seq.map _.Name |> Seq.toList
 
                 Some cases
             else
@@ -594,8 +592,7 @@ let private buildUnifiedResources
         | FoundStatefulResource(route, machineName, stateHandlers, roleNames) ->
             let slug = ResourceModel.resourceSlug route
 
-            let machineInfo =
-                machineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
+            let machineInfo = machineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
 
             let stateNames =
                 match machineInfo with
@@ -614,14 +611,12 @@ let private buildUnifiedResources
                 | Some info -> info.GuardNames
                 | None -> []
 
-            let stateHttpMethods =
-                stateHandlers |> Map.ofList
+            let stateHttpMethods = stateHandlers |> Map.ofList
 
             let stateMetadata =
                 stateNames
                 |> List.map (fun name ->
-                    let methods =
-                        Map.tryFind name stateHttpMethods |> Option.defaultValue []
+                    let methods = Map.tryFind name stateHttpMethods |> Option.defaultValue []
 
                     name,
                     { IsFinal = false
@@ -634,7 +629,13 @@ let private buildUnifiedResources
                 |> List.map (fun name -> { Name = name; Description = None }: RoleInfo)
 
             let statechart =
-                StatechartExtractor.toExtractedStatechart route stateNames initialStateKey guardNames stateMetadata roles
+                StatechartExtractor.toExtractedStatechart
+                    route
+                    stateNames
+                    initialStateKey
+                    guardNames
+                    stateMetadata
+                    roles
 
             let capabilities =
                 stateHandlers
@@ -687,8 +688,7 @@ let private associateTypes (resources: UnifiedResource list) (allTypes: Analyzed
                 |> List.distinct
 
             let referencedTypes =
-                allTypes
-                |> List.filter (fun t -> List.contains t.ShortName referencedTypeNames)
+                allTypes |> List.filter (fun t -> List.contains t.ShortName referencedTypeNames)
 
             { r with
                 TypeInfo = stateTypes @ referencedTypes |> List.distinctBy _.FullName }
@@ -720,8 +720,7 @@ let computeDerivedFields (resource: UnifiedResource) (allTypes: AnalyzedType lis
             resource.HttpCapabilities |> List.choose _.StateKey |> List.distinct
 
         let orphanStates =
-            sc.StateNames
-            |> List.filter (fun s -> not (List.contains s handledStates))
+            sc.StateNames |> List.filter (fun s -> not (List.contains s handledStates))
 
         let unhandledCases =
             stateDuCases
@@ -756,7 +755,10 @@ let computeDerivedFields (resource: UnifiedResource) (allTypes: AnalyzedType lis
           StateStructure = stateStructure
           TypeCoverage = typeCoverage }
 
-let private enrichWithDerivedFields (allTypes: AnalyzedType list) (resources: UnifiedResource list) : UnifiedResource list =
+let private enrichWithDerivedFields
+    (allTypes: AnalyzedType list)
+    (resources: UnifiedResource list)
+    : UnifiedResource list =
     resources
     |> List.map (fun r ->
         { r with
@@ -766,7 +768,8 @@ let private enrichWithDerivedFields (allTypes: AnalyzedType list) (resources: Un
 // Spec file co-extraction: bridge transitions from spec files into extracted statecharts
 // ══════════════════════════════════════════════════════════════════════════════
 
-let internal specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+let internal specExtensions =
+    [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
 
 let internal tryParseSpecFile (filePath: string) : Result<Frank.Statecharts.Ast.StatechartDocument, string> =
     try
@@ -800,7 +803,8 @@ let internal findSpecFiles (projectDir: string) : string list =
     if Directory.Exists(specsDir) then
         Directory.GetFiles(specsDir)
         |> Array.filter (fun f ->
-            specExtensions |> List.exists (fun ext -> f.EndsWith(ext, System.StringComparison.OrdinalIgnoreCase)))
+            specExtensions
+            |> List.exists (fun ext -> f.EndsWith(ext, System.StringComparison.OrdinalIgnoreCase)))
         |> Array.toList
     else
         []
@@ -821,19 +825,26 @@ let internal statesOverlap (docStates: Set<string>) (resourceStates: Set<string>
     let overlap = Set.intersect resourceStates docStates
     overlap.Count > 0 && overlap.Count * 2 >= resourceStates.Count
 
-/// Match a parsed spec document to a resource by state name overlap.
-let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
-    let docStates = documentStateNames doc
+/// Check if a parsed spec document matches a single resource by state name overlap.
+let internal matchesResource (docStates: Set<string>) (resource: UnifiedResource) : bool =
+    match resource.Statechart with
+    | Some sc -> statesOverlap docStates (Set.ofList sc.StateNames)
+    | None -> false
 
-    resources
-    |> List.tryFind (fun r ->
-        match r.Statechart with
-        | Some sc -> statesOverlap docStates (Set.ofList sc.StateNames)
-        | None -> false)
+/// Match a parsed spec document to a resource by state name overlap.
+let internal matchDocToResource
+    (doc: Frank.Statecharts.Ast.StatechartDocument)
+    (resources: UnifiedResource list)
+    : UnifiedResource option =
+    let docStates = documentStateNames doc
+    resources |> List.tryFind (matchesResource docStates)
 
 /// Co-extract transitions from spec files and merge into resources.
 /// Returns enriched resources and any parse warnings.
-let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list * string list =
+let internal enrichWithSpecTransitions
+    (projectDir: string)
+    (resources: UnifiedResource list)
+    : UnifiedResource list * string list =
     let specFiles = findSpecFiles projectDir
 
     if specFiles.IsEmpty then
@@ -859,12 +870,10 @@ let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedR
         |> List.map (fun r ->
             match r.Statechart with
             | Some sc when sc.Transitions.IsEmpty ->
-                let resourceStates = Set.ofList sc.StateNames
-
                 let matchingDoc =
                     parsedDocs
                     |> List.tryPick (fun (_path, doc, docStates) ->
-                        if statesOverlap docStates resourceStates then Some doc else None)
+                        if matchesResource docStates r then Some doc else None)
 
                 match matchingDoc with
                 | Some doc ->
@@ -925,10 +934,7 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
 
 /// Load resources from cache if fresh, otherwise extract from source.
 /// Shared by all commands that need resources (extract, generate, validate, project).
-let loadOrExtract
-    (projectPath: string)
-    (force: bool)
-    : Async<Result<UnifiedResource list * bool, StatechartError>> =
+let loadOrExtract (projectPath: string) (force: bool) : Async<Result<UnifiedResource list * bool, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)
