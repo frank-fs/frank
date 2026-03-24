@@ -33,9 +33,7 @@ let private parseLink (elem: XElement) : ParsedLink option =
 /// Parse a <doc> child element to (format option * value option).
 /// In ALPS XML, <doc format="text">value text</doc> — format is attribute, value is text content.
 let private parseDocElement (parent: XElement) : string option * string option =
-    let docElem =
-        parent.Elements()
-        |> Seq.tryFind (fun e -> e.Name.LocalName = "doc")
+    let docElem = parent.Elements() |> Seq.tryFind (fun e -> e.Name.LocalName = "doc")
 
     match docElem with
     | None -> None, None
@@ -73,6 +71,7 @@ let rec private parseDescriptor (elem: XElement) : ParsedDescriptor =
     { Id = attrValue "id" elem
       Type = attrValue "type" elem
       Href = attrValue "href" elem
+      Def = attrValue "def" elem
       ReturnType = attrValue "rt" elem
       DocFormat = docFormat
       DocValue = docValue
@@ -85,7 +84,7 @@ let rec private parseDescriptor (elem: XElement) : ParsedDescriptor =
 // ---------------------------------------------------------------------------
 
 /// An empty StatechartDocument used as best-effort in error cases.
-let private emptyDoc : StatechartDocument =
+let private emptyDoc: StatechartDocument =
     { Title = None
       InitialStateId = None
       Elements = []
@@ -101,11 +100,13 @@ let parseAlpsXml (xml: string) : ParseResult =
         if root = null || root.Name.LocalName <> "alps" then
             { Document = emptyDoc
               Errors =
-                  [ { Position = None
-                      Description = "Expected root element <alps>, got " + (if root = null then "null" else root.Name.LocalName)
-                      Expected = "<alps> root element"
-                      Found = if root = null then "null" else root.Name.LocalName
-                      CorrectiveExample = """<alps version="1.0"><descriptor id="StateA" type="semantic"/></alps>""" } ]
+                [ { Position = None
+                    Description =
+                      "Expected root element <alps>, got "
+                      + (if root = null then "null" else root.Name.LocalName)
+                    Expected = "<alps> root element"
+                    Found = if root = null then "null" else root.Name.LocalName
+                    CorrectiveExample = """<alps version="1.0"><descriptor id="StateA" type="semantic"/></alps>""" } ]
               Warnings = [] }
         else
             // -- Pass 1: Parse XML to intermediate records --
@@ -142,9 +143,9 @@ let parseAlpsXml (xml: string) : ParseResult =
     with :? XmlException as ex ->
         { Document = emptyDoc
           Errors =
-              [ { Position = None
-                  Description = ex.Message
-                  Expected = "valid ALPS XML"
-                  Found = "malformed XML"
-                  CorrectiveExample = """<alps version="1.0"><descriptor id="StateA" type="semantic"/></alps>""" } ]
+            [ { Position = None
+                Description = ex.Message
+                Expected = "valid ALPS XML"
+                Found = "malformed XML"
+                CorrectiveExample = """<alps version="1.0"><descriptor id="StateA" type="semantic"/></alps>""" } ]
           Warnings = [] }

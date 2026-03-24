@@ -17,8 +17,7 @@ let private tryGetString (elem: JsonElement) (name: string) : string option =
 /// Try to get an array property from a JSON element, returning empty list if missing.
 let private tryGetArray (elem: JsonElement) (name: string) : JsonElement list =
     match elem.TryGetProperty(name) with
-    | true, prop when prop.ValueKind = JsonValueKind.Array ->
-        [ for item in prop.EnumerateArray() -> item ]
+    | true, prop when prop.ValueKind = JsonValueKind.Array -> [ for item in prop.EnumerateArray() -> item ]
     | _ -> []
 
 /// Parse an ALPS extension element to intermediate type.
@@ -43,6 +42,7 @@ let rec private parseDescriptor (elem: JsonElement) : ParsedDescriptor =
     { Id = tryGetString elem "id"
       Type = tryGetString elem "type"
       Href = tryGetString elem "href"
+      Def = tryGetString elem "def"
       ReturnType = tryGetString elem "rt"
       DocFormat = docFormat
       DocValue = docValue
@@ -55,7 +55,7 @@ let rec private parseDescriptor (elem: JsonElement) : ParsedDescriptor =
 // ---------------------------------------------------------------------------
 
 /// An empty StatechartDocument used as best-effort in error cases.
-let private emptyDoc : StatechartDocument =
+let private emptyDoc: StatechartDocument =
     { Title = None
       InitialStateId = None
       Elements = []
@@ -71,11 +71,11 @@ let parseAlpsJson (json: string) : ParseResult =
         if root.ValueKind <> JsonValueKind.Object then
             { Document = emptyDoc
               Errors =
-                  [ { Position = None
-                      Description = "Expected JSON object at root, got " + root.ValueKind.ToString()
-                      Expected = "JSON object"
-                      Found = root.ValueKind.ToString()
-                      CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
+                [ { Position = None
+                    Description = "Expected JSON object at root, got " + root.ValueKind.ToString()
+                    Expected = "JSON object"
+                    Found = root.ValueKind.ToString()
+                    CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
               Warnings = [] }
         else
             match root.TryGetProperty("alps") with
@@ -104,18 +104,18 @@ let parseAlpsJson (json: string) : ParseResult =
             | false, _ ->
                 { Document = emptyDoc
                   Errors =
-                      [ { Position = None
-                          Description = "Missing 'alps' root object"
-                          Expected = "'alps' property"
-                          Found = "JSON object without 'alps'"
-                          CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
+                    [ { Position = None
+                        Description = "Missing 'alps' root object"
+                        Expected = "'alps' property"
+                        Found = "JSON object without 'alps'"
+                        CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
                   Warnings = [] }
     with :? JsonException as ex ->
         { Document = emptyDoc
           Errors =
-              [ { Position = None
-                  Description = ex.Message
-                  Expected = "valid JSON"
-                  Found = "malformed JSON"
-                  CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
+            [ { Position = None
+                Description = ex.Message
+                Expected = "valid JSON"
+                Found = "malformed JSON"
+                CorrectiveExample = """{"alps": {"version": "1.0", "descriptor": [...]}}""" } ]
           Warnings = [] }

@@ -15,9 +15,7 @@ module ShapeGenerator =
     let private baseStr (config: TypeMapper.MappingConfig) = config.BaseUri.ToString().TrimEnd('/')
 
     // Validation-style URIs (urn:frank:* scheme matching Frank.Validation conventions)
-    let private validationShapeUri (fullName: string) =
-        let encoded = Uri.EscapeDataString(fullName)
-        Uri(sprintf "urn:frank:shape:%s" encoded)
+    let private validationShapeUri (fullName: string) = Uri(ShapeUri.buildShapeUri fullName)
 
     let private validationPropertyUri (fieldName: string) =
         Uri(sprintf "urn:frank:property:%s" fieldName)

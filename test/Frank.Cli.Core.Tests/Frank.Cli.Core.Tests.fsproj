@@ -38,6 +38,7 @@
     <Compile Include="Unified/AffordanceMapGeneratorTests.fs" />
     <Compile Include="Unified/ExtractionStateProjectorTests.fs" />
     <Compile Include="Unified/ProjectionIntegrationTests.fs" />
+    <Compile Include="Unified/RoleAwareShapeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
