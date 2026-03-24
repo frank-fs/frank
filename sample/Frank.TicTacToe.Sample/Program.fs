@@ -90,6 +90,9 @@ let gameResource =
     statefulResource "/games/{gameId}" {
         machine gameMachine
         resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+        role "PlayerX" (fun user -> user.HasClaim("player", "X"))
+        role "PlayerO" (fun user -> user.HasClaim("player", "O"))
+        role "Spectator" (fun _user -> true)
         inState (forState XTurn [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ])
         inState (forState OTurn [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ])
         inState (forState (Won "X") [ StateHandlerBuilder.get getGameState ])

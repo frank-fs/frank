@@ -168,11 +168,13 @@ let rec private tryExtractForState (expr: SynExpr) : ForStateInfo option =
 
 type private StatefulCeAccum =
     { StateHandlers: ForStateInfo list
-      MachineName: string option }
+      MachineName: string option
+      RoleNames: string list }
 
 let private emptyStatefulCeAccum =
     { StateHandlers = []
-      MachineName = None }
+      MachineName = None
+      RoleNames = [] }
 
 let rec private walkStatefulCeBody (acc: StatefulCeAccum) (expr: SynExpr) : StatefulCeAccum =
     match expr with
@@ -195,6 +197,14 @@ let rec private walkStatefulCeBody (acc: StatefulCeAccum) (expr: SynExpr) : Stat
 
         { acc with MachineName = machineName }
 
+    // role "PlayerX" (fun user -> ...)
+    | SynExpr.App(
+        funcExpr = SynExpr.App(funcExpr = SynExpr.Ident ident; argExpr = SynExpr.Const(SynConst.String(roleName, _, _), _))) when
+        ident.idText = "role"
+        ->
+        { acc with
+            RoleNames = roleName :: acc.RoleNames }
+
     | SynExpr.LetOrUse(body = body) -> walkStatefulCeBody acc body
     | SynExpr.Paren(expr = inner) -> walkStatefulCeBody acc inner
     | _ -> acc
@@ -202,7 +212,8 @@ let rec private walkStatefulCeBody (acc: StatefulCeAccum) (expr: SynExpr) : Stat
 type private SyntaxStatefulResource =
     { RouteTemplate: string
       MachineName: string option
-      StateHandlers: ForStateInfo list }
+      StateHandlers: ForStateInfo list
+      RoleNames: string list }
 
 let private tryExtractStatefulResource (expr: SynExpr) : SyntaxStatefulResource option =
     match expr with
@@ -216,7 +227,8 @@ let private tryExtractStatefulResource (expr: SynExpr) : SyntaxStatefulResource 
         Some
             { RouteTemplate = routeTemplate
               MachineName = acc.MachineName
-              StateHandlers = List.rev acc.StateHandlers }
+              StateHandlers = List.rev acc.StateHandlers
+              RoleNames = List.rev acc.RoleNames }
     | _ -> None
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -225,7 +237,11 @@ let private tryExtractStatefulResource (expr: SynExpr) : SyntaxStatefulResource 
 
 type SyntaxFinding =
     | FoundPlainResource of resource: AnalyzedResource
-    | FoundStatefulResource of route: string * machineName: string option * stateHandlers: (string * string list) list
+    | FoundStatefulResource of
+        route: string *
+        machineName: string option *
+        stateHandlers: (string * string list) list *
+        roleNames: string list
 
 /// Single-pass expression walker that dispatches to both resource and statefulResource extraction.
 let rec private walkExpr (file: string) (results: ResizeArray<SyntaxFinding>) (expr: SynExpr) =
@@ -233,7 +249,7 @@ let rec private walkExpr (file: string) (results: ResizeArray<SyntaxFinding>) (e
     match tryExtractStatefulResource expr with
     | Some sr ->
         let handlers = sr.StateHandlers |> List.map (fun fs -> fs.CaseName, fs.Methods)
-        results.Add(FoundStatefulResource(sr.RouteTemplate, sr.MachineName, handlers))
+        results.Add(FoundStatefulResource(sr.RouteTemplate, sr.MachineName, handlers, sr.RoleNames))
     | None ->
         // Try plain resource
         match tryExtractResource expr file with
@@ -575,7 +591,7 @@ let private buildUnifiedResources
               HttpCapabilities = capabilities
               DerivedFields = ResourceModel.emptyDerivedFields }
 
-        | FoundStatefulResource(route, machineName, stateHandlers) ->
+        | FoundStatefulResource(route, machineName, stateHandlers, roleNames) ->
             let slug = ResourceModel.resourceSlug route
 
             let machineInfo =
@@ -613,8 +629,12 @@ let private buildUnifiedResources
                       Description = None })
                 |> Map.ofList
 
+            let roles =
+                roleNames
+                |> List.map (fun name -> { Name = name; Description = None }: RoleInfo)
+
             let statechart =
-                StatechartExtractor.toExtractedStatechart route stateNames initialStateKey guardNames stateMetadata []
+                StatechartExtractor.toExtractedStatechart route stateNames initialStateKey guardNames stateMetadata roles
 
             let capabilities =
                 stateHandlers
@@ -743,6 +763,131 @@ let private enrichWithDerivedFields (allTypes: AnalyzedType list) (resources: Un
             DerivedFields = computeDerivedFields r allTypes })
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Spec file co-extraction: bridge transitions from spec files into extracted statecharts
+// ══════════════════════════════════════════════════════════════════════════════
+
+let internal specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+
+let internal tryParseSpecFile (filePath: string) : Result<Frank.Statecharts.Ast.StatechartDocument, string> =
+    try
+        let text = File.ReadAllText(filePath)
+        let ext = Path.GetExtension(filePath).ToLowerInvariant()
+
+        let parseResult =
+            if ext = ".wsd" then
+                Some(Frank.Statecharts.Wsd.Parser.parseWsd text)
+            elif filePath.EndsWith(".alps.json", System.StringComparison.OrdinalIgnoreCase) then
+                Some(Frank.Statecharts.Alps.JsonParser.parseAlpsJson text)
+            elif filePath.EndsWith(".alps.xml", System.StringComparison.OrdinalIgnoreCase) then
+                Some(Frank.Statecharts.Alps.XmlParser.parseAlpsXml text)
+            elif ext = ".smcat" then
+                Some(Frank.Statecharts.Smcat.Parser.parseSmcat text)
+            elif ext = ".scxml" then
+                Some(Frank.Statecharts.Scxml.Parser.parseString text)
+            else
+                None
+
+        match parseResult with
+        | Some r -> Ok r.Document
+        | None -> Error $"Unsupported spec file format: '{filePath}'"
+    with ex ->
+        Error $"Failed to parse spec file '{filePath}': {ex.Message}"
+
+/// Find all spec files in {projectDir}/specs/ directory.
+let internal findSpecFiles (projectDir: string) : string list =
+    let specsDir = Path.Combine(projectDir, "specs")
+
+    if Directory.Exists(specsDir) then
+        Directory.GetFiles(specsDir)
+        |> Array.filter (fun f ->
+            specExtensions |> List.exists (fun ext -> f.EndsWith(ext, System.StringComparison.OrdinalIgnoreCase)))
+        |> Array.toList
+    else
+        []
+
+/// Extract state names from a StatechartDocument for matching against resources.
+/// Collects both source and target states from transitions, plus explicit state declarations.
+let internal documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) : Set<string> =
+    doc.Elements
+    |> List.collect (fun elem ->
+        match elem with
+        | Frank.Statecharts.Ast.StateDecl node -> node.Identifier |> Option.toList
+        | Frank.Statecharts.Ast.TransitionElement edge -> edge.Source :: (edge.Target |> Option.toList)
+        | _ -> [])
+    |> Set.ofList
+
+/// Check if a spec document's states overlap sufficiently with a resource's states.
+let internal statesOverlap (docStates: Set<string>) (resourceStates: Set<string>) : bool =
+    let overlap = Set.intersect resourceStates docStates
+    overlap.Count > 0 && overlap.Count * 2 >= resourceStates.Count
+
+/// Match a parsed spec document to a resource by state name overlap.
+let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
+    let docStates = documentStateNames doc
+
+    resources
+    |> List.tryFind (fun r ->
+        match r.Statechart with
+        | Some sc -> statesOverlap docStates (Set.ofList sc.StateNames)
+        | None -> false)
+
+/// Co-extract transitions from spec files and merge into resources.
+/// Returns enriched resources and any parse warnings.
+let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedResource list) : UnifiedResource list * string list =
+    let specFiles = findSpecFiles projectDir
+
+    if specFiles.IsEmpty then
+        resources, []
+    else
+        let parseResults = specFiles |> List.map (fun f -> f, tryParseSpecFile f)
+
+        let parseWarnings =
+            parseResults
+            |> List.choose (fun (_, r) ->
+                match r with
+                | Error msg -> Some msg
+                | Ok _ -> None)
+
+        let parsedDocs =
+            parseResults
+            |> List.choose (fun (f, r) ->
+                match r with
+                | Ok doc -> Some(f, doc, documentStateNames doc)
+                | Error _ -> None)
+
+        resources
+        |> List.map (fun r ->
+            match r.Statechart with
+            | Some sc when sc.Transitions.IsEmpty ->
+                let resourceStates = Set.ofList sc.StateNames
+
+                let matchingDoc =
+                    parsedDocs
+                    |> List.tryPick (fun (_path, doc, docStates) ->
+                        if statesOverlap docStates resourceStates then Some doc else None)
+
+                match matchingDoc with
+                | Some doc ->
+                    let transitions = TransitionExtractor.extract doc
+
+                    let specRoles = TransitionExtractor.extractRoles doc
+
+                    let mergedRoles =
+                        if not sc.Roles.IsEmpty then sc.Roles
+                        elif not specRoles.IsEmpty then specRoles
+                        else []
+
+                    { r with
+                        Statechart =
+                            Some
+                                { sc with
+                                    Transitions = transitions
+                                    Roles = mergedRoles } }
+                | None -> r
+            | _ -> r),
+        parseWarnings
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Public API
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -765,11 +910,35 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 // Phase 3: Cross-reference and build UnifiedResource records
                 let resources = buildUnifiedResources syntaxFindings typedResult
 
+                // Phase 3.5: Co-extract transitions from spec files
+                let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
+                let withTransitions, _specWarnings = enrichWithSpecTransitions projectDir resources
+
                 // Phase 4: Associate types with resources
-                let withTypes = associateTypes resources typedResult.AnalyzedTypes
+                let withTypes = associateTypes withTransitions typedResult.AnalyzedTypes
 
                 // Phase 5: Compute derived fields
                 let enriched = enrichWithDerivedFields typedResult.AnalyzedTypes withTypes
 
                 return Ok enriched
+    }
+
+/// Load resources from cache if fresh, otherwise extract from source.
+/// Shared by all commands that need resources (extract, generate, validate, project).
+let loadOrExtract
+    (projectPath: string)
+    (force: bool)
+    : Async<Result<UnifiedResource list * bool, StatechartError>> =
+    async {
+        if not (File.Exists projectPath) then
+            return Error(FileNotFound projectPath)
+        else
+            let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
+
+            match UnifiedCache.tryLoadFresh projectDir force with
+            | Ok state -> return Ok(state.Resources, true)
+            | Error _ ->
+                match! extract projectPath with
+                | Ok resources -> return Ok(resources, false)
+                | Error e -> return Error e
     }

@@ -599,16 +599,16 @@ let main args =
         let format = parseResult.GetValue(uniExtractFormatOpt)
 
         let result =
-            UnifiedExtractCommand.execute project baseUri vocabs force
+            ExtractResourcesCommand.execute project baseUri vocabs force
             |> Async.RunSynchronously
 
         match result with
         | Ok extractResult ->
             let output =
                 if format = "json" then
-                    JsonOutput.formatUnifiedExtractResult extractResult
+                    JsonOutput.formatResourceExtractResult extractResult
                 else
-                    TextOutput.formatUnifiedExtractResult extractResult
+                    TextOutput.formatResourceExtractResult extractResult
 
             Console.WriteLine(output)
         | Error e ->
@@ -657,7 +657,7 @@ let main args =
         let force = parseResult.GetValue(uniGenForceOpt)
 
         let result =
-            UnifiedGenerateCommand.execute project format outputDir resource force
+            GenerateArtifactsCommand.execute project format outputDir resource force
             |> Async.RunSynchronously
 
         match result with
@@ -716,16 +716,16 @@ let main args =
             Environment.ExitCode <- 1
         else
             let result =
-                UnifiedValidateCommand.execute project force checkProjection checkProgress
+                ValidateResourcesCommand.execute project force checkProjection checkProgress
                 |> Async.RunSynchronously
 
             match result with
             | Ok valResult ->
                 let output =
                     if format = "json" then
-                        JsonOutput.formatUnifiedValidateResult valResult
+                        JsonOutput.formatResourceValidateResult valResult
                     else
-                        TextOutput.formatUnifiedValidateResult valResult
+                        TextOutput.formatResourceValidateResult valResult
 
                 Console.WriteLine(output)
 
@@ -736,6 +736,65 @@ let main args =
                 Console.Error.WriteLine(StatechartError.formatError e))
 
     root.Subcommands.Add(uniValCmd)
+
+    // ── project (top-level, unified) ──
+    let uniProjCmd = Command("project")
+
+    uniProjCmd.Description <-
+        "Generate per-role ALPS profiles from stateful resources using the projection operator"
+
+    let uniProjProjectOpt = Option<string>("--project")
+    uniProjProjectOpt.Description <- "Path to .fsproj file"
+    uniProjProjectOpt.Required <- true
+    let uniProjOutputOpt = Option<string>("--output")
+    uniProjOutputOpt.Description <- "Output directory for projected ALPS profiles"
+    let uniProjResourceOpt = Option<string>("--resource")
+    uniProjResourceOpt.Description <- "Project for a specific resource only"
+    let uniProjForceOpt = Option<bool>("--force")
+    uniProjForceOpt.Description <- "Force re-extraction, bypassing cache"
+    uniProjForceOpt.DefaultValueFactory <- (fun _ -> false)
+    uniProjCmd.Options.Add(uniProjProjectOpt)
+    uniProjCmd.Options.Add(uniProjOutputOpt)
+    uniProjCmd.Options.Add(uniProjResourceOpt)
+    uniProjCmd.Options.Add(uniProjForceOpt)
+
+    uniProjCmd.SetAction(fun parseResult ->
+        let project = parseResult.GetValue(uniProjProjectOpt)
+
+        let outputDir =
+            let v = parseResult.GetValue(uniProjOutputOpt)
+            if String.IsNullOrEmpty v then None else Some v
+
+        let resource =
+            let v = parseResult.GetValue(uniProjResourceOpt)
+            if String.IsNullOrEmpty v then None else Some v
+
+        let force = parseResult.GetValue(uniProjForceOpt)
+
+        let result =
+            ProjectCommand.execute project outputDir resource force
+            |> Async.RunSynchronously
+
+        match result with
+        | Ok projResult ->
+            for warn in projResult.OrphanWarnings do
+                Console.Error.WriteLine(warn)
+
+            for err in projResult.Errors do
+                Console.Error.WriteLine(err)
+
+            for artifact in projResult.Artifacts do
+                match artifact.FilePath with
+                | Some fp ->
+                    let kind = if artifact.IsGlobalOverride then "global" else "role"
+                    Console.WriteLine($"Projected ({kind}): {fp}")
+                | None ->
+                    Console.WriteLine(artifact.Content)
+        | Error e ->
+            Environment.ExitCode <- 1
+            Console.Error.WriteLine(StatechartError.formatError e))
+
+    root.Subcommands.Add(uniProjCmd)
 
     // ── status (top-level) ──
     let statusCmd = Command("status")

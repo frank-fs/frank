@@ -369,7 +369,7 @@ module TextOutput =
 
         sb.ToString()
 
-    let formatUnifiedValidateResult (result: UnifiedValidateCommand.UnifiedValidateResult) : string =
+    let formatResourceValidateResult (result: ValidateResourcesCommand.ValidateResult) : string =
         let sb = System.Text.StringBuilder()
         let appendLine (s: string) = sb.AppendLine(s) |> ignore
 
@@ -410,7 +410,7 @@ module TextOutput =
 
         sb.ToString()
 
-    let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =
+    let formatResourceExtractResult (result: ExtractResourcesCommand.ExtractResult) : string =
         let sb = System.Text.StringBuilder()
         let appendLine (s: string) = sb.AppendLine(s) |> ignore
 

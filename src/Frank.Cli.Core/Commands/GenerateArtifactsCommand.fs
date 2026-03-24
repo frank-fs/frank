@@ -1,4 +1,4 @@
-module Frank.Cli.Core.Commands.UnifiedGenerateCommand
+module Frank.Cli.Core.Commands.GenerateArtifactsCommand
 
 open System.IO
 open System.Text.Json
@@ -86,21 +86,6 @@ let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri
     writer.Flush()
     System.Text.Encoding.UTF8.GetString(stream.ToArray())
 
-let private getResources
-    (projectPath: string)
-    (force: bool)
-    : Async<Result<UnifiedResource list * bool, StatechartError>> =
-    async {
-        let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-
-        match UnifiedCache.tryLoadFresh projectDir force with
-        | Ok state -> return Ok(state.Resources, true)
-        | Error _ ->
-            match! UnifiedExtractor.extract projectPath with
-            | Ok resources -> return Ok(resources, false)
-            | Error e -> return Error e
-    }
-
 let execute
     (projectPath: string)
     (format: string)
@@ -110,7 +95,7 @@ let execute
     : Async<Result<GenerateResult, StatechartError>> =
     async {
         if isAffordanceMapFormat format then
-            match! getResources projectPath force with
+            match! UnifiedExtractor.loadOrExtract projectPath force with
             | Error e -> return Error e
             | Ok(resources, fromCache) ->
                 let mapContent = generateAffordanceMapJson resources ""
@@ -130,7 +115,7 @@ let execute
             match parseFormat format with
             | Error e -> return Error e
             | Ok formats ->
-                match! getResources projectPath force with
+                match! UnifiedExtractor.loadOrExtract projectPath force with
                 | Error e -> return Error e
                 | Ok(resources, fromCache) ->
                     let machines = resources |> List.choose (fun r -> r.Statechart)

@@ -455,7 +455,7 @@ module JsonOutput =
         writer.Flush()
         Encoding.UTF8.GetString(stream.ToArray())
 
-    let formatUnifiedValidateResult (result: UnifiedValidateCommand.UnifiedValidateResult) : string =
+    let formatResourceValidateResult (result: ValidateResourcesCommand.ValidateResult) : string =
         use stream = new MemoryStream()
         use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
         writer.WriteStartObject()
@@ -564,7 +564,7 @@ module JsonOutput =
 
         Encoding.UTF8.GetString(stream.ToArray())
 
-    let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =
+    let formatResourceExtractResult (result: ExtractResourcesCommand.ExtractResult) : string =
         use stream = new MemoryStream()
         use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
         writer.WriteStartObject()
@@ -613,6 +613,46 @@ module JsonOutput =
                     writer.WriteEndObject()
 
                 writer.WriteEndObject()
+
+                writer.WriteStartArray("roles")
+
+                for role in sc.Roles do
+                    writer.WriteStartObject()
+                    writeString writer "name" role.Name
+
+                    match role.Description with
+                    | Some d -> writeString writer "description" d
+                    | None -> ()
+
+                    writer.WriteEndObject()
+
+                writer.WriteEndArray()
+
+                writer.WriteStartArray("transitions")
+
+                for t in sc.Transitions do
+                    writer.WriteStartObject()
+                    writeString writer "event" t.Event
+                    writeString writer "source" t.Source
+                    writeString writer "target" t.Target
+
+                    match t.Guard with
+                    | Some g -> writeString writer "guard" g
+                    | None -> ()
+
+                    match t.Constraint with
+                    | Frank.Resources.Model.Unrestricted -> writeString writer "constraint" "unrestricted"
+                    | Frank.Resources.Model.RestrictedTo roles ->
+                        writer.WriteStartArray("restrictedTo")
+
+                        for role in roles do
+                            writer.WriteStringValue(role)
+
+                        writer.WriteEndArray()
+
+                    writer.WriteEndObject()
+
+                writer.WriteEndArray()
                 writer.WriteEndObject()
 
             writer.WriteStartArray("httpCapabilities")

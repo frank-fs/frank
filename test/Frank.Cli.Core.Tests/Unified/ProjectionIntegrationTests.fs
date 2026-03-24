@@ -1,11 +1,13 @@
 module Frank.Cli.Core.Tests.Unified.ProjectionIntegrationTests
 
+open System.Text.Json
 open Expecto
 open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.TransitionExtractor
 open Frank.Resources.Model
 open Frank.Resources.Model.Projection
+open Frank.Cli.Core.Unified.ProjectionPipeline
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Shared ALPS JSON fixture (TicTacToe with role-based projection)
@@ -362,4 +364,278 @@ let projectionIntegrationTests =
                 <| fun _ ->
                     let doc = parseDocument ()
                     let roles = extractRoles doc
-                    Expect.equal roles.Length 3 "Should extract exactly 3 roles" ] ]
+                    Expect.equal roles.Length 3 "Should extract exactly 3 roles" ]
+
+          testList
+              "End-to-end extract -> project -> per-role ALPS"
+              [ testCase "projectResource produces role profiles for all 3 roles"
+                <| fun _ ->
+                    let doc = parseDocument ()
+                    let sc = buildStatechart doc
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities =
+                            [ { Method = "GET"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "POST"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "makeMove"
+                                IsSafe = false }
+                              { Method = "GET"
+                                StateKey = Some "OTurn"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "POST"
+                                StateKey = Some "OTurn"
+                                LinkRelation = "makeMove"
+                                IsSafe = false }
+                              { Method = "GET"
+                                StateKey = Some "XWins"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "GET"
+                                StateKey = Some "OWins"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "GET"
+                                StateKey = Some "Draw"
+                                LinkRelation = "self"
+                                IsSafe = true } ]
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+
+                    Expect.equal result.RoleProfiles.Count 3 "Should produce 3 role profiles"
+
+                    Expect.isTrue
+                        (result.RoleProfiles.ContainsKey "games-playerx")
+                        "Should have PlayerX profile"
+
+                    Expect.isTrue
+                        (result.RoleProfiles.ContainsKey "games-playero")
+                        "Should have PlayerO profile"
+
+                    Expect.isTrue
+                        (result.RoleProfiles.ContainsKey "games-spectator")
+                        "Should have Spectator profile"
+
+                testCase "PlayerX profile is valid ALPS JSON with descriptors"
+                <| fun _ ->
+                    let doc = parseDocument ()
+                    let sc = buildStatechart doc
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities =
+                            [ { Method = "GET"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "POST"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "makeMove"
+                                IsSafe = false }
+                              { Method = "GET"
+                                StateKey = Some "OTurn"
+                                LinkRelation = "self"
+                                IsSafe = true }
+                              { Method = "POST"
+                                StateKey = Some "OTurn"
+                                LinkRelation = "makeMove"
+                                IsSafe = false } ]
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+                    let json = result.RoleProfiles.["games-playerx"]
+                    use jsonDoc = JsonDocument.Parse(json)
+                    let alps = jsonDoc.RootElement.GetProperty("alps")
+
+                    match alps.TryGetProperty("descriptor") with
+                    | true, descriptors ->
+                        Expect.isGreaterThan (descriptors.GetArrayLength()) 0 "Should have descriptors"
+                    | _ -> failtest "Should have descriptors"
+
+                testCase "capability filtering removes Spectator POST with restricted-only transitions"
+                <| fun _ ->
+                    // Use a fixture with only role-restricted transitions (no unrestricted getGame)
+                    let sc: ExtractedStatechart =
+                        { RouteTemplate = "/games/{gameId}"
+                          StateNames = [ "XTurn"; "OTurn"; "Won"; "Draw" ]
+                          InitialStateKey = "XTurn"
+                          GuardNames = []
+                          StateMetadata = Map.empty
+                          Roles =
+                            [ { Name = "PlayerX"; Description = None }
+                              { Name = "PlayerO"; Description = None }
+                              { Name = "Spectator"; Description = None } ]
+                          Transitions =
+                            [ { Event = "MakeMove"
+                                Source = "XTurn"
+                                Target = "OTurn"
+                                Guard = None
+                                Constraint = RestrictedTo [ "PlayerX" ] }
+                              { Event = "MakeMove"
+                                Source = "OTurn"
+                                Target = "XTurn"
+                                Guard = None
+                                Constraint = RestrictedTo [ "PlayerO" ] } ] }
+
+                    let caps =
+                        [ { Method = "GET"
+                            StateKey = Some "XTurn"
+                            LinkRelation = "self"
+                            IsSafe = true }
+                          { Method = "POST"
+                            StateKey = Some "XTurn"
+                            LinkRelation = "makeMove"
+                            IsSafe = false }
+                          { Method = "GET"
+                            StateKey = Some "OTurn"
+                            LinkRelation = "self"
+                            IsSafe = true }
+                          { Method = "POST"
+                            StateKey = Some "OTurn"
+                            LinkRelation = "makeMove"
+                            IsSafe = false } ]
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities = caps
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+
+                    // Spectator has no transitions, so no unsafe capabilities survive
+                    let spectatorJson = result.RoleProfiles.["games-spectator"]
+                    use spectatorDoc = JsonDocument.Parse(spectatorJson)
+                    let alps = spectatorDoc.RootElement.GetProperty("alps")
+
+                    match alps.TryGetProperty("descriptor") with
+                    | true, descriptors ->
+                        let rec findUnsafe (elem: JsonElement) =
+                            [ match elem.TryGetProperty("type") with
+                              | true, t when t.GetString() = "unsafe" ->
+                                  match elem.TryGetProperty("id") with
+                                  | true, id -> yield id.GetString()
+                                  | _ -> ()
+                              | _ -> ()
+                              match elem.TryGetProperty("descriptor") with
+                              | true, children when children.ValueKind = JsonValueKind.Array ->
+                                  for child in children.EnumerateArray() do
+                                      yield! findUnsafe child
+                              | _ -> () ]
+
+                        let unsafeIds =
+                            [ for d in descriptors.EnumerateArray() do
+                                  yield! findUnsafe d ]
+
+                        Expect.isEmpty unsafeIds "Spectator should have no unsafe descriptors"
+                    | _ -> ()
+
+                testCase "no orphaned transitions in TicTacToe projection"
+                <| fun _ ->
+                    let doc = parseDocument ()
+                    let sc = buildStatechart doc
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities = []
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+                    Expect.isEmpty result.Orphans "Should have no orphaned transitions"
+                    Expect.isEmpty result.Errors "Should have no errors"
+
+                testCase "global profile is regenerated with cross-links"
+                <| fun _ ->
+                    let doc = parseDocument ()
+                    let sc = buildStatechart doc
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities =
+                            [ { Method = "GET"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "self"
+                                IsSafe = true } ]
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+                    Expect.isSome result.UpdatedGlobalProfile "Should regenerate global profile"
+
+                testCase "resource without roles produces empty projection result"
+                <| fun _ ->
+                    let noRolesSc =
+                        { RouteTemplate = "/items"
+                          StateNames = [ "Active" ]
+                          InitialStateKey = "Active"
+                          GuardNames = []
+                          StateMetadata = Map.empty
+                          Roles = []
+                          Transitions = [] }
+
+                    let resource: UnifiedResource =
+                        { RouteTemplate = "/items"
+                          ResourceSlug = "items"
+                          TypeInfo = []
+                          Statechart = Some noRolesSc
+                          HttpCapabilities = []
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let result = projectResource resource ""
+                    Expect.isEmpty result.RoleProfiles "Should have no role profiles"
+                    Expect.isNone result.UpdatedGlobalProfile "Should not regenerate global"
+
+                testCase "projectAllResources merges multiple resources"
+                <| fun _ ->
+                    let doc = parseDocument ()
+                    let sc = buildStatechart doc
+
+                    let resource1: UnifiedResource =
+                        { RouteTemplate = "/games/{gameId}"
+                          ResourceSlug = "games"
+                          TypeInfo = []
+                          Statechart = Some sc
+                          HttpCapabilities =
+                            [ { Method = "GET"
+                                StateKey = Some "XTurn"
+                                LinkRelation = "self"
+                                IsSafe = true } ]
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let plainResource: UnifiedResource =
+                        { RouteTemplate = "/health"
+                          ResourceSlug = "health"
+                          TypeInfo = []
+                          Statechart = None
+                          HttpCapabilities =
+                            [ { Method = "GET"
+                                StateKey = None
+                                LinkRelation = "self"
+                                IsSafe = true } ]
+                          DerivedFields = ResourceModel.emptyDerivedFields }
+
+                    let batchResult, results = projectAllResources [ resource1; plainResource ] ""
+
+                    Expect.equal batchResult.RoleAlpsProfiles.Count 3 "Should have 3 role profiles from games"
+                    Expect.isTrue (batchResult.ProjectedSlugs.Contains "games") "games should be projected"
+                    Expect.isFalse (batchResult.ProjectedSlugs.Contains "health") "health should not be projected"
+                    Expect.equal results.Length 2 "Should have results for both resources" ] ]

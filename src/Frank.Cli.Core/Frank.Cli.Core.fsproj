@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Frank.Cli.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="Rdf/FSharpRdf.fs" />
     <Compile Include="Rdf/Vocabularies.fs" />
     <!-- Shared utilities -->
@@ -58,10 +62,11 @@
     <Compile Include="Commands/StatechartValidateCommand.fs" />
     <Compile Include="Commands/OpenApiValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
-    <!-- Unified commands -->
-    <Compile Include="Commands/UnifiedExtractCommand.fs" />
-    <Compile Include="Commands/UnifiedGenerateCommand.fs" />
-    <Compile Include="Commands/UnifiedValidateCommand.fs" />
+    <!-- Top-level commands -->
+    <Compile Include="Commands/ExtractResourcesCommand.fs" />
+    <Compile Include="Commands/GenerateArtifactsCommand.fs" />
+    <Compile Include="Commands/ProjectCommand.fs" />
+    <Compile Include="Commands/ValidateResourcesCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />
   </ItemGroup>

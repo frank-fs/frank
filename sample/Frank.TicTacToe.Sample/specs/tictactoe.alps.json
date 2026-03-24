@@ -37,9 +37,9 @@
             ]
           },
           {
-            "id": "makeMove-XTurn-XWins",
+            "id": "makeMove-XTurn-Won",
             "type": "unsafe",
-            "rt": "#XWins",
+            "rt": "#Won",
             "doc": { "format": "text", "value": "Player X makes a winning move" },
             "descriptor": [
               { "href": "#position" },
@@ -90,9 +90,9 @@
             ]
           },
           {
-            "id": "makeMove-OTurn-OWins",
+            "id": "makeMove-OTurn-Won",
             "type": "unsafe",
-            "rt": "#OWins",
+            "rt": "#Won",
             "doc": { "format": "text", "value": "Player O makes a winning move" },
             "descriptor": [
               { "href": "#position" },
@@ -123,17 +123,9 @@
         ]
       },
       {
-        "id": "XWins",
+        "id": "Won",
         "type": "semantic",
-        "doc": { "format": "text", "value": "State: Player X has won" },
-        "descriptor": [
-          { "href": "#getGame" }
-        ]
-      },
-      {
-        "id": "OWins",
-        "type": "semantic",
-        "doc": { "format": "text", "value": "State: Player O has won" },
+        "doc": { "format": "text", "value": "State: Game over — a player has won" },
         "descriptor": [
           { "href": "#getGame" }
         ]
