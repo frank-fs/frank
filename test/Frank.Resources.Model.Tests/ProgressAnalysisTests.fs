@@ -75,7 +75,8 @@ let private deadTransitionDeadlockChart: ExtractedStatechart =
         [ mkTransition "view" "Active" "Active" None Unrestricted
           mkTransition "archive" "Active" "Archived" None (RestrictedTo []) ] }
 
-/// Role permanently excluded after a state on all forward paths.
+/// Role permanently excluded after Phase1 on all forward paths.
+/// Worker can initiate (Phase1→Phase2 unrestricted) but is locked out of Phase2 onward.
 let private starvationChart: ExtractedStatechart =
     { RouteTemplate = "/workflow"
       StateNames = [ "Phase1"; "Phase2"; "Phase3"; "Done" ]
@@ -91,7 +92,7 @@ let private starvationChart: ExtractedStatechart =
         [ { Name = "Admin"; Description = None }
           { Name = "Worker"; Description = None } ]
       Transitions =
-        [ mkTransition "start" "Phase1" "Phase2" None (RestrictedTo [ "Admin" ])
+        [ mkTransition "start" "Phase1" "Phase2" None Unrestricted
           mkTransition "advance" "Phase2" "Phase3" None (RestrictedTo [ "Admin" ])
           mkTransition "complete" "Phase3" "Done" None (RestrictedTo [ "Admin" ])
           mkTransition "view" "Phase1" "Phase1" None Unrestricted
@@ -208,7 +209,8 @@ let private reachableDeadEndChart: ExtractedStatechart =
         [ mkTransition "enter" "Start" "DeadEnd" None Unrestricted
           mkTransition "skip" "Start" "Done" None Unrestricted ] }
 
-/// Same role excluded from two independent states — two diagnostics.
+/// Same role excluded from two independent branch states — two starvation diagnostics.
+/// RoleB can join the workflow at Start (unrestricted entry) but both branches exclude it.
 let private multipleStarvationChart: ExtractedStatechart =
     { RouteTemplate = "/multi-starve"
       StateNames = [ "Start"; "Branch1"; "Branch2"; "End1"; "End2" ]
@@ -225,8 +227,8 @@ let private multipleStarvationChart: ExtractedStatechart =
         [ { Name = "RoleA"; Description = None }
           { Name = "RoleB"; Description = None } ]
       Transitions =
-        [ mkTransition "go1" "Start" "Branch1" None (RestrictedTo [ "RoleA" ])
-          mkTransition "go2" "Start" "Branch2" None (RestrictedTo [ "RoleA" ])
+        [ mkTransition "go1" "Start" "Branch1" None Unrestricted
+          mkTransition "go2" "Start" "Branch2" None Unrestricted
           mkTransition "end1" "Branch1" "End1" None (RestrictedTo [ "RoleA" ])
           mkTransition "end2" "Branch2" "End2" None (RestrictedTo [ "RoleA" ]) ] }
 
@@ -365,3 +367,96 @@ let deadlockTests =
           <| fun _ ->
               let deadlocks = ProgressAnalysis.detectDeadlocks cycleNoFinalChart
               Expect.isEmpty deadlocks "Cycle with advancing transitions is not deadlock" ]
+
+[<Tests>]
+let starvationTests =
+    testList
+        "detectStarvation"
+        [ testCase "TicTacToe PlayerX in OTurn is NOT starvation"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates ticTacToeChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              Expect.isEmpty starvation "Turn-taking is not starvation"
+
+          testCase "Worker permanently excluded is starvation"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates starvationChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              let workerDiags =
+                  starvation
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Starvation(r, _, _) when r = "Worker" -> Some d
+                      | _ -> None)
+              Expect.isNonEmpty workerDiags "Worker is starved"
+
+          testCase "read-only roles excluded from analysis"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates ticTacToeChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              let spectatorDiags =
+                  starvation
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Starvation(r, _, _) when r = "Spectator" -> Some d
+                      | _ -> None)
+              Expect.isEmpty spectatorDiags "Spectator excluded from starvation analysis"
+
+          testCase "all-unrestricted has no starvation"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates allUnrestrictedChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              Expect.isEmpty starvation "All-unrestricted has no starvation"
+
+          testCase "dead transition in forward path still reports starvation"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates deadTransitionForwardPathChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              let roleBDiags =
+                  starvation
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
+                      | _ -> None)
+              Expect.isNonEmpty roleBDiags "RoleB starved — recovery only via dead transition"
+
+          testCase "diamond topology is NOT starvation"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates diamondChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              let roleBDiags =
+                  starvation
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
+                      | _ -> None)
+              Expect.isEmpty roleBDiags "RoleB recovers at D via diamond paths"
+
+          testCase "multiple starvation entry points emit two diagnostics"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates multipleStarvationChart
+              let projections = Projection.projectAll pruned
+              let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
+              let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+              let roleBDiags =
+                  starvation
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
+                      | _ -> None)
+              Expect.isGreaterThanOrEqual
+                  (List.length roleBDiags)
+                  2
+                  "RoleB starved from both Branch1 and Branch2" ]

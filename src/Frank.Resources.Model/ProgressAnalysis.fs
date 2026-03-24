@@ -87,3 +87,90 @@ module ProgressAnalysis =
                 |> List.exists (fun t -> isAdvancing t && isLive t)
 
             if hasAdvancing then None else Some role)
+
+    /// Build adjacency map using only live transitions (dead transitions excluded from BFS).
+    /// Harel soundness fix: dead transitions can't be traversed, so they don't count as escape paths.
+    let private buildLiveAdjacency (transitions: TransitionSpec list) : Map<string, string list> =
+        transitions
+        |> List.filter isLive
+        |> List.groupBy (fun t -> t.Source)
+        |> List.map (fun (k, ts) -> k, ts |> List.map (fun t -> t.Target) |> List.distinct)
+        |> Map.ofList
+
+    /// BFS forward reachability from a start state using the given adjacency map.
+    let private forwardReachable (adjacency: Map<string, string list>) (start: string) : Set<string> =
+        let rec bfs (visited: Set<string>) (frontier: string list) =
+            match frontier with
+            | [] -> visited
+            | state :: rest ->
+                if Set.contains state visited then
+                    bfs visited rest
+                else
+                    let visited' = Set.add state visited
+
+                    let neighbors =
+                        adjacency
+                        |> Map.tryFind state
+                        |> Option.defaultValue []
+                        |> List.filter (fun s -> not (Set.contains s visited'))
+
+                    bfs visited' (neighbors @ rest)
+
+        bfs Set.empty [ start ]
+
+    /// Roles permanently excluded on ALL forward paths from a non-final reachable state.
+    /// Only strong starvation reported: excluded on every path, not just some paths.
+    /// Read-only roles are excluded from analysis (they're expected observers).
+    let detectStarvation
+        (statechart: ExtractedStatechart)
+        (projections: Map<string, ExtractedStatechart>)
+        (readOnlyRoles: string list)
+        : ProgressDiagnostic list =
+        let isFinal state =
+            statechart.StateMetadata
+            |> Map.tryFind state
+            |> Option.map (fun si -> si.IsFinal)
+            |> Option.defaultValue false
+
+        let adjacency = buildLiveAdjacency statechart.Transitions
+
+        let roleNames =
+            projections
+            |> Map.keys
+            |> Seq.filter (fun r -> not (List.contains r readOnlyRoles))
+            |> Seq.toList
+
+        roleNames
+        |> List.collect (fun role ->
+            let roleChart =
+                projections
+                |> Map.tryFind role
+                |> Option.defaultValue statechart
+
+            let activeStates =
+                roleChart.Transitions
+                |> List.filter isAdvancing
+                |> List.map (fun t -> t.Source)
+                |> Set.ofList
+
+            let nonFinalStates =
+                statechart.StateNames
+                |> List.filter (fun s -> not (isFinal s))
+
+            nonFinalStates
+            |> List.choose (fun state ->
+                if Set.contains state activeStates then
+                    None
+                else
+                    let reachable = forwardReachable adjacency state
+
+                    if Set.intersect reachable activeStates |> Set.isEmpty then
+                        let excludedStates =
+                            reachable
+                            |> Set.toList
+                            |> List.filter (fun s ->
+                                s <> state && not (isFinal s) && not (Set.contains s activeStates))
+
+                        Some(Starvation(role, state, excludedStates))
+                    else
+                        None))
