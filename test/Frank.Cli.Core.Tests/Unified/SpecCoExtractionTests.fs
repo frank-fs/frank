@@ -29,13 +29,19 @@ OTurn => XTurn: makeMove;
 """
 
 /// A resource with a statechart whose state names overlap with the smcat file.
-let private makeResourceWithStates (stateNames: string list) (transitions: TransitionSpec list) : UnifiedResource =
-    { RouteTemplate = "/games/{gameId}"
-      ResourceSlug = "games"
+let private makeResourceWithStates
+    (slug: string)
+    (stateNames: string list)
+    (transitions: TransitionSpec list)
+    : UnifiedResource =
+    let route = $"/{slug}/{{id}}"
+
+    { RouteTemplate = route
+      ResourceSlug = slug
       TypeInfo = []
       Statechart =
         Some
-            { RouteTemplate = "/games/{gameId}"
+            { RouteTemplate = route
               StateNames = stateNames
               InitialStateKey = stateNames |> List.tryHead |> Option.defaultValue "Unknown"
               GuardNames = []
@@ -106,7 +112,8 @@ let specCoExtractionTests =
 
                         File.WriteAllText(
                             Path.Combine(specsDir, "game.alps.json"),
-                            """{"alps":{"version":"1.0","descriptor":[]}}""")
+                            """{"alps":{"version":"1.0","descriptor":[]}}"""
+                        )
 
                         let files = findSpecFiles dir
                         Expect.equal files.Length 1 "Should find alps.json file"
@@ -174,7 +181,7 @@ let specCoExtractionTests =
                         Directory.CreateDirectory(specsDir) |> ignore
                         File.WriteAllText(Path.Combine(specsDir, "game.smcat"), tictactoeSmcat)
 
-                        let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] []
+                        let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
                         let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
@@ -193,7 +200,7 @@ let specCoExtractionTests =
                     let dir = setupTempDir ()
 
                     try
-                        let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] []
+                        let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
                         let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
@@ -211,7 +218,7 @@ let specCoExtractionTests =
                         Directory.CreateDirectory(specsDir) |> ignore
                         File.WriteAllText(Path.Combine(specsDir, "game.smcat"), tictactoeSmcat)
 
-                        let resource = makeResourceWithStates [ "Active"; "Completed" ] []
+                        let resource = makeResourceWithStates "tasks" [ "Active"; "Completed" ] []
                         let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
@@ -236,7 +243,9 @@ let specCoExtractionTests =
                               Guard = None
                               Constraint = Unrestricted }
 
-                        let resource = makeResourceWithStates [ "XTurn"; "OTurn" ] [ existingTransition ]
+                        let resource =
+                            makeResourceWithStates "games" [ "XTurn"; "OTurn" ] [ existingTransition ]
+
                         let enriched, _warnings = enrichWithSpecTransitions dir [ resource ]
 
                         match enriched.[0].Statechart with
@@ -247,22 +256,34 @@ let specCoExtractionTests =
                     finally
                         cleanup dir
 
-                testCase "matchDocToResource matches by state name overlap"
+                testCase "matches correct resource by state name overlap"
                 <| fun _ ->
                     let dir = setupTempDir ()
 
                     try
-                        let filePath = Path.Combine(dir, "test.smcat")
-                        File.WriteAllText(filePath, tictactoeSmcat)
+                        let specsDir = Path.Combine(dir, "specs")
+                        Directory.CreateDirectory(specsDir) |> ignore
+                        File.WriteAllText(Path.Combine(specsDir, "game.smcat"), tictactoeSmcat)
 
-                        match tryParseSpecFile filePath with
-                        | Ok doc ->
-                            let matching = makeResourceWithStates [ "XTurn"; "OTurn" ] []
-                            let nonMatching = makeResourceWithStates [ "Active"; "Done" ] []
+                        let matching = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
+                        let nonMatching = makeResourceWithStates "tasks" [ "Active"; "Done" ] []
 
-                            let result = matchDocToResource doc [ nonMatching; matching ]
-                            Expect.isSome result "Should find matching resource"
-                            Expect.equal result.Value.ResourceSlug "games" "Should match the games resource"
-                        | Error msg -> failtest $"Should parse smcat: {msg}"
+                        let enriched, _warnings = enrichWithSpecTransitions dir [ nonMatching; matching ]
+
+                        Expect.equal enriched.[0].ResourceSlug "tasks" "Non-matching resource preserved"
+
+                        match enriched.[0].Statechart with
+                        | Some sc -> Expect.isEmpty sc.Transitions "Non-matching resource should have no transitions"
+                        | None -> failtest "Should have statechart"
+
+                        Expect.equal enriched.[1].ResourceSlug "games" "Matching resource preserved"
+
+                        match enriched.[1].Statechart with
+                        | Some sc ->
+                            Expect.isGreaterThan
+                                sc.Transitions.Length
+                                0
+                                "Matching resource should have transitions after enrichment"
+                        | None -> failtest "Should have statechart"
                     finally
                         cleanup dir ] ]
