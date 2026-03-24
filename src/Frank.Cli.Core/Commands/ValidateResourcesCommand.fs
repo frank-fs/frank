@@ -72,15 +72,7 @@ let execute
     (checkProgress: bool)
     : Async<Result<ValidateResult, StatechartError>> =
     async {
-        if not (File.Exists projectPath) then
-            return Error(FileNotFound projectPath)
-        else
-            let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-
-            match UnifiedCache.tryLoadFresh projectDir force with
-            | Ok state -> return Ok(buildResult true state.Resources checkProjection checkProgress)
-            | Error _ ->
-                match! UnifiedExtractor.extract projectPath with
-                | Error e -> return Error e
-                | Ok resources -> return Ok(buildResult false resources checkProjection checkProgress)
+        match! UnifiedExtractor.loadOrExtract projectPath force with
+        | Error e -> return Error e
+        | Ok(resources, fromCache) -> return Ok(buildResult fromCache resources checkProjection checkProgress)
     }

@@ -788,7 +788,8 @@ let internal tryParseSpecFile (filePath: string) : Frank.Statecharts.Ast.Statech
                 None
 
         parseResult |> Option.map _.Document
-    with _ ->
+    with ex ->
+        eprintfn "Warning: failed to parse spec file '%s': %s" filePath ex.Message
         None
 
 /// Find all spec files in {projectDir}/specs/ directory.
@@ -813,17 +814,19 @@ let internal documentStateNames (doc: Frank.Statecharts.Ast.StatechartDocument) 
         | _ -> None)
     |> Set.ofList
 
+/// Check if a spec document's states overlap sufficiently with a resource's states.
+let internal statesOverlap (docStates: Set<string>) (resourceStates: Set<string>) : bool =
+    let overlap = Set.intersect resourceStates docStates
+    overlap.Count > 0 && overlap.Count >= resourceStates.Count / 2
+
 /// Match a parsed spec document to a resource by state name overlap.
 let internal matchDocToResource (doc: Frank.Statecharts.Ast.StatechartDocument) (resources: UnifiedResource list) : UnifiedResource option =
+    let docStates = documentStateNames doc
+
     resources
     |> List.tryFind (fun r ->
         match r.Statechart with
-        | Some sc ->
-            let resourceStates = Set.ofList sc.StateNames
-            let docStates = documentStateNames doc
-            // Match if the majority of resource states appear in the document
-            let overlap = Set.intersect resourceStates docStates
-            overlap.Count > 0 && overlap.Count >= resourceStates.Count / 2
+        | Some sc -> statesOverlap docStates (Set.ofList sc.StateNames)
         | None -> false)
 
 /// Co-extract transitions from spec files and merge into resources.
@@ -836,24 +839,18 @@ let internal enrichWithSpecTransitions (projectDir: string) (resources: UnifiedR
         let parsedDocs =
             specFiles
             |> List.choose (fun f ->
-                tryParseSpecFile f |> Option.map (fun doc -> f, doc))
+                tryParseSpecFile f |> Option.map (fun doc -> f, doc, documentStateNames doc))
 
-        // For each resource with a statechart, try to find a matching spec document
         resources
         |> List.map (fun r ->
             match r.Statechart with
             | Some sc when sc.Transitions.IsEmpty ->
+                let resourceStates = Set.ofList sc.StateNames
+
                 let matchingDoc =
                     parsedDocs
-                    |> List.tryPick (fun (_path, doc) ->
-                        let docStates = documentStateNames doc
-                        let resourceStates = Set.ofList sc.StateNames
-                        let overlap = Set.intersect resourceStates docStates
-
-                        if overlap.Count > 0 && overlap.Count >= resourceStates.Count / 2 then
-                            Some doc
-                        else
-                            None)
+                    |> List.tryPick (fun (_path, doc, docStates) ->
+                        if statesOverlap docStates resourceStates then Some doc else None)
 
                 match matchingDoc with
                 | Some doc ->
@@ -909,4 +906,24 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 let enriched = enrichWithDerivedFields typedResult.AnalyzedTypes withTypes
 
                 return Ok enriched
+    }
+
+/// Load resources from cache if fresh, otherwise extract from source.
+/// Shared by all commands that need resources (extract, generate, validate, project).
+let loadOrExtract
+    (projectPath: string)
+    (force: bool)
+    : Async<Result<UnifiedResource list * bool, StatechartError>> =
+    async {
+        if not (File.Exists projectPath) then
+            return Error(FileNotFound projectPath)
+        else
+            let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
+
+            match UnifiedCache.tryLoadFresh projectDir force with
+            | Ok state -> return Ok(state.Resources, true)
+            | Error _ ->
+                match! extract projectPath with
+                | Ok resources -> return Ok(resources, false)
+                | Error e -> return Error e
     }

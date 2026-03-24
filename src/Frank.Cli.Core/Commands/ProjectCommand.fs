@@ -25,17 +25,7 @@ let execute
     (force: bool)
     : Async<Result<ProjectResult, StatechartError>> =
     async {
-        let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-
-        let! resourcesResult =
-            async {
-                match UnifiedCache.tryLoadFresh projectDir force with
-                | Ok state -> return Ok(state.Resources, true)
-                | Error _ ->
-                    match! UnifiedExtractor.extract projectPath with
-                    | Ok resources -> return Ok(resources, false)
-                    | Error e -> return Error e
-            }
+        let! resourcesResult = UnifiedExtractor.loadOrExtract projectPath force
 
         match resourcesResult with
         | Error e -> return Error e
