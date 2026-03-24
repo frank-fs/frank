@@ -20,6 +20,7 @@ type ProjectResult =
 
 let execute
     (projectPath: string)
+    (baseUri: string)
     (outputDir: string option)
     (resourceFilter: string option)
     (force: bool)
@@ -35,15 +36,14 @@ let execute
                 | None -> resources
                 | Some name ->
                     resources
-                    |> List.filter (fun r ->
-                        r.ResourceSlug = name || r.RouteTemplate.Contains(name))
+                    |> List.filter (fun r -> r.ResourceSlug = name || r.RouteTemplate.Contains(name))
 
             match resourceFilter, filtered with
             | Some name, [] ->
                 let available = resources |> List.map _.ResourceSlug
                 return Error(ResourceNotFound(name, available))
             | _ ->
-                let batchResult, projectionResults = projectAllResources filtered ""
+                let batchResult, projectionResults = projectAllResources filtered baseUri
 
                 let orphanWarnings =
                     [ for result in projectionResults do

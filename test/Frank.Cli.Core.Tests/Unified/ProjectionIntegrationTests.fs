@@ -240,7 +240,10 @@ let projectionIntegrationTests =
                     Expect.isGreaterThan xTurnMoves.Length 0 "Should have makeMove transitions from XTurn"
 
                     for t in xTurnMoves do
-                        Expect.equal t.Constraint (RestrictedTo [ "PlayerX" ]) $"XTurn transition %s{t.Event} should be restricted to PlayerX"
+                        Expect.equal
+                            t.Constraint
+                            (RestrictedTo [ "PlayerX" ])
+                            $"XTurn transition %s{t.Event} should be restricted to PlayerX"
 
                 testCase "OTurn makeMove transitions are restricted to PlayerO"
                 <| fun _ ->
@@ -254,7 +257,10 @@ let projectionIntegrationTests =
                     Expect.isGreaterThan oTurnMoves.Length 0 "Should have makeMove transitions from OTurn"
 
                     for t in oTurnMoves do
-                        Expect.equal t.Constraint (RestrictedTo [ "PlayerO" ]) $"OTurn transition %s{t.Event} should be restricted to PlayerO"
+                        Expect.equal
+                            t.Constraint
+                            (RestrictedTo [ "PlayerO" ])
+                            $"OTurn transition %s{t.Event} should be restricted to PlayerO"
 
                 testCase "getGame transitions from states are unrestricted"
                 <| fun _ ->
@@ -262,8 +268,7 @@ let projectionIntegrationTests =
                     let transitions = extract doc
 
                     let getGameTransitions =
-                        transitions
-                        |> List.filter (fun t -> t.Event.StartsWith("getGame"))
+                        transitions |> List.filter (fun t -> t.Event.StartsWith("getGame"))
 
                     Expect.isGreaterThan getGameTransitions.Length 0 "Should have getGame transitions"
 
@@ -279,13 +284,15 @@ let projectionIntegrationTests =
                     let projected = projectForRole "PlayerX" statechart
 
                     let makeMoves =
-                        projected.Transitions
-                        |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
+                        projected.Transitions |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
 
                     Expect.isGreaterThan makeMoves.Length 0 "PlayerX should have makeMove transitions"
 
                     for t in makeMoves do
-                        Expect.equal t.Source "XTurn" $"PlayerX makeMove transition should be from XTurn, got %s{t.Source}"
+                        Expect.equal
+                            t.Source
+                            "XTurn"
+                            $"PlayerX makeMove transition should be from XTurn, got %s{t.Source}"
 
                 testCase "PlayerO projection includes only OTurn makeMove transitions"
                 <| fun _ ->
@@ -294,13 +301,15 @@ let projectionIntegrationTests =
                     let projected = projectForRole "PlayerO" statechart
 
                     let makeMoves =
-                        projected.Transitions
-                        |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
+                        projected.Transitions |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
 
                     Expect.isGreaterThan makeMoves.Length 0 "PlayerO should have makeMove transitions"
 
                     for t in makeMoves do
-                        Expect.equal t.Source "OTurn" $"PlayerO makeMove transition should be from OTurn, got %s{t.Source}"
+                        Expect.equal
+                            t.Source
+                            "OTurn"
+                            $"PlayerO makeMove transition should be from OTurn, got %s{t.Source}"
 
                 testCase "Spectator projection has no makeMove transitions"
                 <| fun _ ->
@@ -309,8 +318,7 @@ let projectionIntegrationTests =
                     let projected = projectForRole "Spectator" statechart
 
                     let makeMoves =
-                        projected.Transitions
-                        |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
+                        projected.Transitions |> List.filter (fun t -> t.Event.StartsWith("makeMove"))
 
                     Expect.isEmpty makeMoves "Spectator should have no makeMove transitions"
 
@@ -323,8 +331,7 @@ let projectionIntegrationTests =
                         let projected = projectForRole role statechart
 
                         let getGames =
-                            projected.Transitions
-                            |> List.filter (fun t -> t.Event.StartsWith("getGame"))
+                            projected.Transitions |> List.filter (fun t -> t.Event.StartsWith("getGame"))
 
                         Expect.isGreaterThan getGames.Length 0 $"%s{role} should retain getGame transitions" ]
 
@@ -409,21 +416,15 @@ let projectionIntegrationTests =
                                 IsSafe = true } ]
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
 
                     Expect.equal result.RoleProfiles.Count 3 "Should produce 3 role profiles"
 
-                    Expect.isTrue
-                        (result.RoleProfiles.ContainsKey "games-playerx")
-                        "Should have PlayerX profile"
+                    Expect.isTrue (result.RoleProfiles.ContainsKey "games-playerx") "Should have PlayerX profile"
 
-                    Expect.isTrue
-                        (result.RoleProfiles.ContainsKey "games-playero")
-                        "Should have PlayerO profile"
+                    Expect.isTrue (result.RoleProfiles.ContainsKey "games-playero") "Should have PlayerO profile"
 
-                    Expect.isTrue
-                        (result.RoleProfiles.ContainsKey "games-spectator")
-                        "Should have Spectator profile"
+                    Expect.isTrue (result.RoleProfiles.ContainsKey "games-spectator") "Should have Spectator profile"
 
                 testCase "PlayerX profile is valid ALPS JSON with descriptors"
                 <| fun _ ->
@@ -454,7 +455,7 @@ let projectionIntegrationTests =
                                 IsSafe = false } ]
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
                     let json = result.RoleProfiles.["games-playerx"]
                     use jsonDoc = JsonDocument.Parse(json)
                     let alps = jsonDoc.RootElement.GetProperty("alps")
@@ -476,7 +477,8 @@ let projectionIntegrationTests =
                           Roles =
                             [ { Name = "PlayerX"; Description = None }
                               { Name = "PlayerO"; Description = None }
-                              { Name = "Spectator"; Description = None } ]
+                              { Name = "Spectator"
+                                Description = None } ]
                           Transitions =
                             [ { Event = "MakeMove"
                                 Source = "XTurn"
@@ -515,7 +517,7 @@ let projectionIntegrationTests =
                           HttpCapabilities = caps
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
 
                     // Spectator has no transitions, so no unsafe capabilities survive
                     let spectatorJson = result.RoleProfiles.["games-spectator"]
@@ -557,7 +559,7 @@ let projectionIntegrationTests =
                           HttpCapabilities = []
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
                     Expect.isEmpty result.Orphans "Should have no orphaned transitions"
                     Expect.isEmpty result.Errors "Should have no errors"
 
@@ -578,7 +580,7 @@ let projectionIntegrationTests =
                                 IsSafe = true } ]
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
                     Expect.isSome result.UpdatedGlobalProfile "Should regenerate global profile"
 
                 testCase "resource without roles produces empty projection result"
@@ -600,7 +602,7 @@ let projectionIntegrationTests =
                           HttpCapabilities = []
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let result = projectResource resource ""
+                    let result = projectResource resource "http://example.org"
                     Expect.isEmpty result.RoleProfiles "Should have no role profiles"
                     Expect.isNone result.UpdatedGlobalProfile "Should not regenerate global"
 
@@ -633,7 +635,8 @@ let projectionIntegrationTests =
                                 IsSafe = true } ]
                           DerivedFields = ResourceModel.emptyDerivedFields }
 
-                    let batchResult, results = projectAllResources [ resource1; plainResource ] ""
+                    let batchResult, results =
+                        projectAllResources [ resource1; plainResource ] "http://example.org"
 
                     Expect.equal batchResult.RoleAlpsProfiles.Count 3 "Should have 3 role profiles from games"
                     Expect.isTrue (batchResult.ProjectedSlugs.Contains "games") "games should be projected"

@@ -64,7 +64,7 @@ let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri
                 writer.WriteEndArray()
                 writer.WriteStartArray("linkRelations")
                 writer.WriteEndArray()
-                writer.WriteString("profileUrl", $"{baseUri}{resource.ResourceSlug}")
+                writer.WriteString("profileUrl", $"{baseUri}/{resource.ResourceSlug}")
                 writer.WriteEndObject()
         | None ->
             writer.WriteStartObject()
@@ -89,6 +89,7 @@ let private generateAffordanceMapJson (resources: UnifiedResource list) (baseUri
 let execute
     (projectPath: string)
     (format: string)
+    (baseUri: string)
     (outputDir: string option)
     (resourceFilter: string option)
     (force: bool)
@@ -98,7 +99,7 @@ let execute
             match! UnifiedExtractor.loadOrExtract projectPath force with
             | Error e -> return Error e
             | Ok(resources, fromCache) ->
-                let mapContent = generateAffordanceMapJson resources ""
+                let mapContent = generateAffordanceMapJson resources baseUri
 
                 return
                     Ok
@@ -172,7 +173,7 @@ let execute
                                     resources |> List.filter (fun r -> Set.contains r.RouteTemplate filteredRoutes)
 
                                 let batchResult, projectionResults =
-                                    ProjectionPipeline.projectAllResources matchingResources ""
+                                    ProjectionPipeline.projectAllResources matchingResources baseUri
 
                                 // Print warnings from projection
                                 for result in projectionResults do
