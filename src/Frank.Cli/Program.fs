@@ -675,7 +675,7 @@ let main args =
     // ── validate (top-level, unified) ──
     let uniValCmd = Command("validate")
 
-    uniValCmd.Description <- "Validate projection consistency for stateful resources with roles"
+    uniValCmd.Description <- "Validate stateful resources: projection consistency and progress properties"
 
     let uniValProjectOpt = Option<string>("--project")
     uniValProjectOpt.Description <- "Path to .fsproj file"
@@ -686,6 +686,11 @@ let main args =
         "Run projection consistency checks (connectedness, mixed-choice, completeness, deadlock)"
 
     uniValCheckProjectionOpt.DefaultValueFactory <- (fun _ -> false)
+    let uniValCheckProgressOpt = Option<bool>("--check-progress")
+
+    uniValCheckProgressOpt.Description <- "Run deadlock and starvation analysis on per-role projections"
+
+    uniValCheckProgressOpt.DefaultValueFactory <- (fun _ -> false)
     let uniValForceOpt = Option<bool>("--force")
     uniValForceOpt.Description <- "Force re-extraction, bypassing cache"
     uniValForceOpt.DefaultValueFactory <- (fun _ -> false)
@@ -694,21 +699,25 @@ let main args =
     uniValFormatOpt.DefaultValueFactory <- (fun _ -> "text")
     uniValCmd.Options.Add(uniValProjectOpt)
     uniValCmd.Options.Add(uniValCheckProjectionOpt)
+    uniValCmd.Options.Add(uniValCheckProgressOpt)
     uniValCmd.Options.Add(uniValForceOpt)
     uniValCmd.Options.Add(uniValFormatOpt)
 
     uniValCmd.SetAction(fun parseResult ->
         let project = parseResult.GetValue(uniValProjectOpt)
         let checkProjection = parseResult.GetValue(uniValCheckProjectionOpt)
+        let checkProgress = parseResult.GetValue(uniValCheckProgressOpt)
         let force = parseResult.GetValue(uniValForceOpt)
         let format = parseResult.GetValue(uniValFormatOpt)
 
-        if not checkProjection then
-            Console.Error.WriteLine("No checks specified. Available flags: --check-projection")
+        if not checkProjection && not checkProgress then
+            Console.Error.WriteLine("No checks specified. Available flags: --check-projection, --check-progress")
 
             Environment.ExitCode <- 1
         else
-            let result = UnifiedValidateCommand.execute project force |> Async.RunSynchronously
+            let result =
+                UnifiedValidateCommand.execute project force checkProgress
+                |> Async.RunSynchronously
 
             match result with
             | Ok valResult ->
@@ -720,7 +729,7 @@ let main args =
 
                 Console.WriteLine(output)
 
-                if valResult.TotalErrors > 0 then
+                if valResult.TotalErrors > 0 || valResult.HasProgressErrors then
                     Environment.ExitCode <- 1
             | Error e ->
                 Environment.ExitCode <- 1

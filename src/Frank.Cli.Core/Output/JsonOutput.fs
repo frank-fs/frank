@@ -459,13 +459,21 @@ module JsonOutput =
         use stream = new MemoryStream()
         use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
         writer.WriteStartObject()
-        writeString writer "status" (if result.TotalErrors > 0 then "fail" else "ok")
+
+        writeString
+            writer
+            "status"
+            (if result.TotalErrors > 0 || result.HasProgressErrors then
+                 "fail"
+             else
+                 "ok")
+
         writer.WriteBoolean("fromCache", result.FromCache)
         writeNumber writer "resourcesChecked" result.ResourcesChecked
         writeNumber writer "totalIssues" result.TotalIssues
         writeNumber writer "totalErrors" result.TotalErrors
         writeNumber writer "totalWarnings" result.TotalWarnings
-        writer.WriteStartArray("results")
+        writer.WriteStartArray("projectionResults")
 
         for r in result.ProjectionResults do
             writer.WriteStartObject()
@@ -494,8 +502,66 @@ module JsonOutput =
             writer.WriteEndObject()
 
         writer.WriteEndArray()
+
+        writer.WriteBoolean("hasProgressErrors", result.HasProgressErrors)
+        writer.WriteStartArray("progressReports")
+
+        for report in result.ProgressReports do
+            writer.WriteStartObject()
+            writeString writer "route" report.Route
+            writeNumber writer "statesAnalyzed" report.StatesAnalyzed
+            writer.WriteBoolean("hasErrors", report.HasErrors)
+            writer.WriteBoolean("hasWarnings", report.HasWarnings)
+
+            writer.WriteStartArray("rolesAnalyzed")
+
+            for role in report.RolesAnalyzed do
+                writer.WriteStringValue(role)
+
+            writer.WriteEndArray()
+
+            writer.WriteStartArray("diagnostics")
+
+            for diag in report.Diagnostics do
+                writer.WriteStartObject()
+
+                writeString writer "severity" (Frank.Resources.Model.ProgressAnalysis.ProgressDiagnostic.severity diag)
+
+                match diag with
+                | Frank.Resources.Model.ProgressAnalysis.Deadlock(state, selfLoops) ->
+                    writeString writer "kind" "deadlock"
+                    writeString writer "state" state
+
+                    writer.WriteStartArray("selfLoopEvents")
+
+                    for ev in selfLoops do
+                        writer.WriteStringValue(ev)
+
+                    writer.WriteEndArray()
+                | Frank.Resources.Model.ProgressAnalysis.Starvation(role, excludedAfter, excludedStates) ->
+                    writeString writer "kind" "starvation"
+                    writeString writer "role" role
+                    writeString writer "excludedAfter" excludedAfter
+
+                    writer.WriteStartArray("excludedStates")
+
+                    for s in excludedStates do
+                        writer.WriteStringValue(s)
+
+                    writer.WriteEndArray()
+                | Frank.Resources.Model.ProgressAnalysis.ReadOnlyRole role ->
+                    writeString writer "kind" "readOnlyRole"
+                    writeString writer "role" role
+
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
         writer.WriteEndObject()
         writer.Flush()
+
         Encoding.UTF8.GetString(stream.ToArray())
 
     let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =

@@ -12,9 +12,15 @@ type UnifiedValidateResult =
       TotalErrors: int
       TotalWarnings: int
       ResourcesChecked: int
+      ProgressReports: ProgressAnalysis.ProgressReport list
+      HasProgressErrors: bool
       FromCache: bool }
 
-let private buildResult (fromCache: bool) (resources: UnifiedResource list) : UnifiedValidateResult =
+let private buildResult
+    (fromCache: bool)
+    (resources: UnifiedResource list)
+    (checkProgress: bool)
+    : UnifiedValidateResult =
     let withRoles =
         resources
         |> List.choose (fun r ->
@@ -33,14 +39,29 @@ let private buildResult (fromCache: bool) (resources: UnifiedResource list) : Un
         results
         |> List.sumBy (fun r -> r.Issues |> List.filter (fun i -> i.Severity = Severity.Warning) |> List.length)
 
+    let progressReports =
+        if checkProgress then
+            resources
+            |> List.choose (fun r -> r.Statechart |> Option.map ProgressAnalysis.analyzeProgress)
+        else
+            []
+
+    let hasProgressErrors = progressReports |> List.exists (fun r -> r.HasErrors)
+
     { ProjectionResults = results
       TotalIssues = totalIssues
       TotalErrors = totalErrors
       TotalWarnings = totalWarnings
       ResourcesChecked = withRoles.Length
+      ProgressReports = progressReports
+      HasProgressErrors = hasProgressErrors
       FromCache = fromCache }
 
-let execute (projectPath: string) (force: bool) : Async<Result<UnifiedValidateResult, StatechartError>> =
+let execute
+    (projectPath: string)
+    (force: bool)
+    (checkProgress: bool)
+    : Async<Result<UnifiedValidateResult, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)
@@ -48,9 +69,9 @@ let execute (projectPath: string) (force: bool) : Async<Result<UnifiedValidateRe
             let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
 
             match UnifiedCache.tryLoadFresh projectDir force with
-            | Ok state -> return Ok(buildResult true state.Resources)
+            | Ok state -> return Ok(buildResult true state.Resources checkProgress)
             | Error _ ->
                 match! UnifiedExtractor.extract projectPath with
                 | Error e -> return Error e
-                | Ok resources -> return Ok(buildResult false resources)
+                | Ok resources -> return Ok(buildResult false resources checkProgress)
     }
