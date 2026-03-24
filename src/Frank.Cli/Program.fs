@@ -716,7 +716,7 @@ let main args =
             Environment.ExitCode <- 1
         else
             let result =
-                UnifiedValidateCommand.execute project force checkProgress
+                UnifiedValidateCommand.execute project force checkProjection checkProgress
                 |> Async.RunSynchronously
 
             match result with

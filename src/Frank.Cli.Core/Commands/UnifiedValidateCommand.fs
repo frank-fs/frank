@@ -19,6 +19,7 @@ type UnifiedValidateResult =
 let private buildResult
     (fromCache: bool)
     (resources: UnifiedResource list)
+    (checkProjection: bool)
     (checkProgress: bool)
     : UnifiedValidateResult =
     let withRoles =
@@ -27,7 +28,11 @@ let private buildResult
             r.Statechart
             |> Option.bind (fun sc -> if sc.Roles.IsEmpty then None else Some(r.RouteTemplate, sc)))
 
-    let results = withRoles |> List.map (fun (route, sc) -> validateProjection route sc)
+    let results =
+        if checkProjection then
+            withRoles |> List.map (fun (route, sc) -> validateProjection route sc)
+        else
+            []
 
     let totalIssues = results |> List.sumBy (fun r -> r.Issues.Length)
 
@@ -60,6 +65,7 @@ let private buildResult
 let execute
     (projectPath: string)
     (force: bool)
+    (checkProjection: bool)
     (checkProgress: bool)
     : Async<Result<UnifiedValidateResult, StatechartError>> =
     async {
@@ -69,9 +75,9 @@ let execute
             let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
 
             match UnifiedCache.tryLoadFresh projectDir force with
-            | Ok state -> return Ok(buildResult true state.Resources checkProgress)
+            | Ok state -> return Ok(buildResult true state.Resources checkProjection checkProgress)
             | Error _ ->
                 match! UnifiedExtractor.extract projectPath with
                 | Error e -> return Error e
-                | Ok resources -> return Ok(buildResult false resources checkProgress)
+                | Ok resources -> return Ok(buildResult false resources checkProjection checkProgress)
     }

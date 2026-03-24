@@ -2,15 +2,9 @@ module Frank.Resources.Model.Tests.ProjectionTests
 
 open Expecto
 open Frank.Resources.Model
+open Frank.Resources.Model.Tests.TestHelpers
 
 // -- Test fixtures --
-
-let private mkTransition event source target guard roleConstraint =
-    { Event = event
-      Source = source
-      Target = target
-      Guard = guard
-      Constraint = roleConstraint }
 
 /// TicTacToe-like statechart with two players and a spectator.
 let private ticTacToeChart: ExtractedStatechart =
@@ -20,15 +14,33 @@ let private ticTacToeChart: ExtractedStatechart =
       GuardNames = [ "TurnGuard" ]
       StateMetadata =
         Map.ofList
-            [ "XTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "OTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "XWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "OWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "Draw", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "XTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "OTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "XWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "OWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Draw",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles =
-        [ { Name = "PlayerX"; Description = Some "Player X" }
-          { Name = "PlayerO"; Description = Some "Player O" }
-          { Name = "Spectator"; Description = Some "Observer" } ]
+        [ { Name = "PlayerX"
+            Description = Some "Player X" }
+          { Name = "PlayerO"
+            Description = Some "Player O" }
+          { Name = "Spectator"
+            Description = Some "Observer" } ]
       Transitions =
         [ // Unguarded GET — all roles can observe
           mkTransition "getGame" "XTurn" "XTurn" None Unrestricted
@@ -52,8 +64,14 @@ let private deadTransitionChart: ExtractedStatechart =
       GuardNames = [ "DeadGuard" ]
       StateMetadata =
         Map.ofList
-            [ "Active", { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None }
-              "Archived", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Active",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = None }
+              "Archived",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles = [ { Name = "Admin"; Description = None } ]
       Transitions =
         [ mkTransition "getItem" "Active" "Active" None Unrestricted
@@ -67,9 +85,18 @@ let private disconnectedChart: ExtractedStatechart =
       GuardNames = []
       StateMetadata =
         Map.ofList
-            [ "Draft", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "Published", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "Orphan", { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None } ]
+            [ "Draft",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Published",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Orphan",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = None } ]
       Roles = [ { Name = "Editor"; Description = None } ]
       Transitions =
         [ mkTransition "publish" "Draft" "Published" None Unrestricted
@@ -87,7 +114,10 @@ let filterTransitionsByRoleTests =
         [ testCase "keeps unrestricted transitions for all roles"
           <| fun _ ->
               let projected = Projection.filterTransitionsByRole "PlayerX" ticTacToeChart
-              let getTransitions = projected.Transitions |> List.filter (fun t -> t.Event = "getGame")
+
+              let getTransitions =
+                  projected.Transitions |> List.filter (fun t -> t.Event = "getGame")
+
               Expect.equal (List.length getTransitions) 5 "All 5 getGame transitions survive"
 
           testCase "keeps restricted transitions only for permitted roles"

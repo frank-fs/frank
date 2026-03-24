@@ -2,15 +2,9 @@ module Frank.Resources.Model.Tests.ProgressAnalysisTests
 
 open Expecto
 open Frank.Resources.Model
+open Frank.Resources.Model.Tests.TestHelpers
 
 // -- Helpers --
-
-let private mkTransition event source target guard roleConstraint =
-    { Event = event
-      Source = source
-      Target = target
-      Guard = guard
-      Constraint = roleConstraint }
 
 let private mkState isFinal =
     { AllowedMethods = [ "GET" ]

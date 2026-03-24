@@ -40,21 +40,21 @@ module ProgressAnalysis =
           StatesAnalyzed: int
           RolesAnalyzed: string list }
 
+    let private isFinal (statechart: ExtractedStatechart) (state: string) : bool =
+        statechart.StateMetadata
+        |> Map.tryFind state
+        |> Option.map (fun si -> si.IsFinal)
+        |> Option.defaultValue false
+
     /// Non-final states where no role has an advancing+live transition out.
     /// Caller is responsible for pruning unreachable states first; see analyzeProgress.
     let detectDeadlocks (statechart: ExtractedStatechart) : ProgressDiagnostic list =
-        let isFinal state =
-            statechart.StateMetadata
-            |> Map.tryFind state
-            |> Option.map (fun si -> si.IsFinal)
-            |> Option.defaultValue false
-
         let transitionsBySource =
             statechart.Transitions |> List.groupBy (fun t -> t.Source) |> Map.ofList
 
         statechart.StateNames
         |> List.choose (fun state ->
-            if isFinal state then
+            if isFinal statechart state then
                 None
             else
                 let transitions = transitionsBySource |> Map.tryFind state |> Option.defaultValue []
@@ -120,18 +120,16 @@ module ProgressAnalysis =
         (projections: Map<string, ExtractedStatechart>)
         (readOnlyRoles: string list)
         : ProgressDiagnostic list =
-        let isFinal state =
-            statechart.StateMetadata
-            |> Map.tryFind state
-            |> Option.map (fun si -> si.IsFinal)
-            |> Option.defaultValue false
-
         let adjacency = buildLiveAdjacency statechart.Transitions
+        let readOnlySet = Set.ofList readOnlyRoles
+
+        let nonFinalStates =
+            statechart.StateNames |> List.filter (fun s -> not (isFinal statechart s))
 
         let roleNames =
             projections
             |> Map.keys
-            |> Seq.filter (fun r -> not (List.contains r readOnlyRoles))
+            |> Seq.filter (fun r -> not (Set.contains r readOnlySet))
             |> Seq.toList
 
         roleNames
@@ -143,8 +141,6 @@ module ProgressAnalysis =
                 |> List.filter (fun t -> isAdvancing t && isLive t)
                 |> List.map (fun t -> t.Source)
                 |> Set.ofList
-
-            let nonFinalStates = statechart.StateNames |> List.filter (fun s -> not (isFinal s))
 
             nonFinalStates
             |> List.choose (fun state ->
@@ -158,7 +154,7 @@ module ProgressAnalysis =
                             reachable
                             |> Set.toList
                             |> List.filter (fun s ->
-                                s <> state && not (isFinal s) && not (Set.contains s activeStates))
+                                s <> state && not (isFinal statechart s) && not (Set.contains s activeStates))
 
                         Some(Starvation(role, state, excludedStates))
                     else
@@ -168,7 +164,11 @@ module ProgressAnalysis =
     /// Prunes unreachable states first to avoid false positives from disconnected fragments.
     let analyzeProgress (statechart: ExtractedStatechart) : ProgressReport =
         let pruned = Projection.pruneUnreachableStates statechart
-        let projections = Projection.projectAll pruned
+
+        let projections =
+            statechart.Roles
+            |> List.map (fun r -> r.Name, Projection.filterTransitionsByRole r.Name pruned)
+            |> Map.ofList
 
         let readOnlyRoles = identifyReadOnlyRoles projections
         let deadlocks = detectDeadlocks pruned
