@@ -11,6 +11,7 @@ type ParsedDescriptor =
     { Id: string option
       Type: string option // raw string, not DU
       Href: string option
+      Def: string option
       ReturnType: string option
       DocFormat: string option
       DocValue: string option

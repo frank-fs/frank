@@ -111,6 +111,31 @@ let private collectSemanticIds (typeInfo: AnalyzedType list) : string list =
         | Enum _values -> [ t.ShortName ])
     |> List.distinct
 
+/// For a capability in a given state, find the unique shape URI from
+/// transitions originating in that state. Returns None for safe methods,
+/// missing statecharts, or ambiguous mappings (multiple different shapes).
+let private resolveDefUri
+    (eventShapeMap: Map<string, string>)
+    (statechart: ExtractedStatechart option)
+    (cap: HttpCapability)
+    : string option =
+    if cap.IsSafe then
+        None
+    else
+        match statechart with
+        | None -> None
+        | Some sc ->
+            sc.Transitions
+            |> List.filter (fun t ->
+                match cap.StateKey with
+                | Some sk -> t.Source = sk
+                | None -> true)
+            |> List.choose (fun t -> Map.tryFind t.Event eventShapeMap)
+            |> List.distinct
+            |> function
+                | [ single ] -> Some single
+                | _ -> None
+
 /// Write a transition descriptor.
 let private writeTransitionDescriptor
     (writer: Utf8JsonWriter)
@@ -119,10 +144,16 @@ let private writeTransitionDescriptor
     (semanticIds: string list)
     (rel: string)
     (stateKey: string option)
+    (defUri: string option)
     =
     writer.WriteStartObject()
     writer.WriteString("id", descriptorId)
     writer.WriteString("type", transitionType)
+
+    // def links to SHACL shape definition
+    match defUri with
+    | Some uri -> writer.WriteString("def", uri)
+    | None -> ()
 
     // rt links to semantic descriptors
     if not semanticIds.IsEmpty then
@@ -180,6 +211,9 @@ let generateWithContext
 
     // Collect all semantic descriptor ids for rt references
     let semanticIds = collectSemanticIds resource.TypeInfo
+
+    // Build event→shape URI map for def resolution
+    let eventShapeMap = ShapeUri.resolveEventShapeMap resource.TypeInfo
 
     let hasTypeDescriptors = not resource.TypeInfo.IsEmpty
     let hasTransitions = not resource.HttpCapabilities.IsEmpty
@@ -258,7 +292,8 @@ let generateWithContext
                 let rel =
                     deriveRelationTypeForRoute baseUri resource.ResourceSlug resource.RouteTemplate cap.Method None
 
-                writeTransitionDescriptor writer descriptorId transType semanticIds rel None
+                let defUri = resolveDefUri eventShapeMap resource.Statechart cap
+                writeTransitionDescriptor writer descriptorId transType semanticIds rel None defUri
 
         | Some _sc ->
             // Stateful resource: emit state-scoped transitions
@@ -276,7 +311,8 @@ let generateWithContext
                         cap.Method
                         cap.StateKey
 
-                writeTransitionDescriptor writer descriptorId transType semanticIds rel cap.StateKey
+                let defUri = resolveDefUri eventShapeMap resource.Statechart cap
+                writeTransitionDescriptor writer descriptorId transType semanticIds rel cap.StateKey defUri
 
         writer.WriteEndArray()
 
