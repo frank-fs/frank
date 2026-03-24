@@ -10,8 +10,7 @@ open Frank.Cli.Core.Unified
 
 [<EntryPoint>]
 let main args =
-    let root =
-        RootCommand("frank: Semantic resource extraction for Frank applications")
+    let root = RootCommand("frank: Semantic resource extraction for Frank applications")
 
     // ── semantic (parent) ──
     let semanticCmd = Command("semantic")
@@ -361,8 +360,10 @@ let main args =
             Environment.ExitCode <- 1
 
             let output =
-                if format = "json" then JsonOutput.formatStatechartError e
-                else TextOutput.formatStatechartError e
+                if format = "json" then
+                    JsonOutput.formatStatechartError e
+                else
+                    TextOutput.formatStatechartError e
 
             Console.Error.WriteLine(output))
 
@@ -413,7 +414,11 @@ let main args =
 
         let genBaseUri =
             let v = parseResult.GetValue(scGenBaseUriOpt)
-            if String.IsNullOrEmpty v then "http://localhost:5000/alps" else v
+
+            if String.IsNullOrEmpty v then
+                "http://localhost:5000/alps"
+            else
+                v
 
         let outputFormat = parseResult.GetValue(scGenOutputFormatOpt)
 
@@ -425,8 +430,7 @@ let main args =
         | Ok r ->
             // If affordance-map JSON is present, output it directly
             match r.AffordanceMapJson with
-            | Some json ->
-                Console.WriteLine(json)
+            | Some json -> Console.WriteLine(json)
             | None ->
                 if outputDir.IsNone then
                     for artifact in r.Artifacts do
@@ -446,14 +450,17 @@ let main args =
             // Report generation errors
             if not r.GenerationErrors.IsEmpty then
                 Environment.ExitCode <- 1
+
                 for err in r.GenerationErrors do
                     Console.Error.WriteLine(StatechartError.formatError err)
         | Error e ->
             Environment.ExitCode <- 1
 
             let output =
-                if outputFormat = "json" then JsonOutput.formatStatechartError e
-                else TextOutput.formatStatechartError e
+                if outputFormat = "json" then
+                    JsonOutput.formatStatechartError e
+                else
+                    TextOutput.formatStatechartError e
 
             Console.Error.WriteLine(output))
 
@@ -495,8 +502,10 @@ let main args =
             Environment.ExitCode <- 1
 
             let output =
-                if format = "json" then JsonOutput.formatStatechartError e
-                else TextOutput.formatStatechartError e
+                if format = "json" then
+                    JsonOutput.formatStatechartError e
+                else
+                    TextOutput.formatStatechartError e
 
             Console.Error.WriteLine(output))
 
@@ -511,7 +520,10 @@ let main args =
     scParseCmd.Arguments.Add(scParseFileArg)
 
     let scParseFormatOpt = Option<string>("--format")
-    scParseFormatOpt.Description <- "Notation format override (wsd|alps|scxml|smcat|xstate) for ambiguous file extensions"
+
+    scParseFormatOpt.Description <-
+        "Notation format override (wsd|alps|scxml|smcat|xstate) for ambiguous file extensions"
+
     scParseCmd.Options.Add(scParseFormatOpt)
 
     let scParseOutputFormatOpt = Option<string>("--output-format")
@@ -532,7 +544,9 @@ let main args =
         match result with
         | Ok r ->
             // Parse output is always JSON (the document IS the content)
-            let output = StatechartDocumentJson.serializeParseResultWithFormat r.ParseResult r.Format
+            let output =
+                StatechartDocumentJson.serializeParseResultWithFormat r.ParseResult r.Format
+
             Console.WriteLine(output)
 
             if r.HasErrors then
@@ -541,8 +555,10 @@ let main args =
             Environment.ExitCode <- 1
 
             let output =
-                if outputFormat = "json" then JsonOutput.formatStatechartError e
-                else TextOutput.formatStatechartError e
+                if outputFormat = "json" then
+                    JsonOutput.formatStatechartError e
+                else
+                    TextOutput.formatStatechartError e
 
             Console.Error.WriteLine(output))
 
@@ -550,7 +566,9 @@ let main args =
 
     // ── extract (top-level, unified) ──
     let uniExtractCmd = Command("extract")
-    uniExtractCmd.Description <- "Extract unified resource descriptions from F# source (replaces semantic extract + statechart extract)"
+
+    uniExtractCmd.Description <-
+        "Extract unified resource descriptions from F# source (replaces semantic extract + statechart extract)"
 
     let uniExtractProjectOpt = Option<string>("--project")
     uniExtractProjectOpt.Description <- "Path to .fsproj file"
@@ -601,7 +619,9 @@ let main args =
 
     // ── generate (top-level, unified) ──
     let uniGenCmd = Command("generate")
-    uniGenCmd.Description <- "Generate format artifacts from unified extraction (wsd, alps, scxml, smcat, xstate, affordance-map, all)"
+
+    uniGenCmd.Description <-
+        "Generate format artifacts from unified extraction (wsd, alps, scxml, smcat, xstate, affordance-map, all)"
 
     let uniGenProjectOpt = Option<string>("--project")
     uniGenProjectOpt.Description <- "Path to .fsproj file"
@@ -651,6 +671,62 @@ let main args =
             Console.Error.WriteLine(StatechartError.formatError e))
 
     root.Subcommands.Add(uniGenCmd)
+
+    // ── validate (top-level, unified) ──
+    let uniValCmd = Command("validate")
+
+    uniValCmd.Description <- "Validate projection consistency for stateful resources with roles"
+
+    let uniValProjectOpt = Option<string>("--project")
+    uniValProjectOpt.Description <- "Path to .fsproj file"
+    uniValProjectOpt.Required <- true
+    let uniValCheckProjectionOpt = Option<bool>("--check-projection")
+
+    uniValCheckProjectionOpt.Description <-
+        "Run projection consistency checks (connectedness, mixed-choice, completeness, deadlock)"
+
+    uniValCheckProjectionOpt.DefaultValueFactory <- (fun _ -> false)
+    let uniValForceOpt = Option<bool>("--force")
+    uniValForceOpt.Description <- "Force re-extraction, bypassing cache"
+    uniValForceOpt.DefaultValueFactory <- (fun _ -> false)
+    let uniValFormatOpt = Option<string>("--output-format")
+    uniValFormatOpt.Description <- "Output format (text|json)"
+    uniValFormatOpt.DefaultValueFactory <- (fun _ -> "text")
+    uniValCmd.Options.Add(uniValProjectOpt)
+    uniValCmd.Options.Add(uniValCheckProjectionOpt)
+    uniValCmd.Options.Add(uniValForceOpt)
+    uniValCmd.Options.Add(uniValFormatOpt)
+
+    uniValCmd.SetAction(fun parseResult ->
+        let project = parseResult.GetValue(uniValProjectOpt)
+        let checkProjection = parseResult.GetValue(uniValCheckProjectionOpt)
+        let force = parseResult.GetValue(uniValForceOpt)
+        let format = parseResult.GetValue(uniValFormatOpt)
+
+        if not checkProjection then
+            Console.Error.WriteLine("No checks specified. Available flags: --check-projection")
+
+            Environment.ExitCode <- 1
+        else
+            let result = UnifiedValidateCommand.execute project force |> Async.RunSynchronously
+
+            match result with
+            | Ok valResult ->
+                let output =
+                    if format = "json" then
+                        JsonOutput.formatUnifiedValidateResult valResult
+                    else
+                        TextOutput.formatUnifiedValidateResult valResult
+
+                Console.WriteLine(output)
+
+                if valResult.TotalErrors > 0 then
+                    Environment.ExitCode <- 1
+            | Error e ->
+                Environment.ExitCode <- 1
+                Console.Error.WriteLine(StatechartError.formatError e))
+
+    root.Subcommands.Add(uniValCmd)
 
     // ── status (top-level) ──
     let statusCmd = Command("status")

@@ -55,6 +55,8 @@
     <Compile Include="Validation/PipelineIntegrationTests.fs" />
     <Compile Include="Validation/NearMatchTests.fs" />
     <Compile Include="Validation/MergeTests.fs" />
+    <!-- Analysis tests -->
+    <Compile Include="Analysis/ProjectionValidatorTests.fs" />
     <!-- Affordance tests (merged from Frank.Affordances.Tests) -->
     <Compile Include="Affordances/AffordanceTestHelpers.fs" />
     <Compile Include="Affordances/AffordanceMiddlewareTests.fs" />

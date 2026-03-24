@@ -61,6 +61,7 @@
     <!-- Unified commands -->
     <Compile Include="Commands/UnifiedExtractCommand.fs" />
     <Compile Include="Commands/UnifiedGenerateCommand.fs" />
+    <Compile Include="Commands/UnifiedValidateCommand.fs" />
     <Compile Include="Output/JsonOutput.fs" />
     <Compile Include="Output/TextOutput.fs" />
   </ItemGroup>
