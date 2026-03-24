@@ -174,3 +174,26 @@ module ProgressAnalysis =
                         Some(Starvation(role, state, excludedStates))
                     else
                         None))
+
+    /// Run all progress checks on a statechart.
+    /// Prunes unreachable states first to avoid false positives from disconnected fragments.
+    let analyzeProgress (statechart: ExtractedStatechart) : ProgressReport =
+        let pruned = Projection.pruneUnreachableStates statechart
+        let projections = Projection.projectAll pruned
+
+        let readOnlyRoles = identifyReadOnlyRoles projections
+        let deadlocks = detectDeadlocks pruned
+        let starvation = detectStarvation pruned projections readOnlyRoles
+
+        let readOnlyDiagnostics =
+            readOnlyRoles |> List.map ReadOnlyRole
+
+        let allDiagnostics =
+            deadlocks @ starvation @ readOnlyDiagnostics
+
+        { Route = statechart.RouteTemplate
+          Diagnostics = allDiagnostics
+          HasErrors = deadlocks |> List.isEmpty |> not
+          HasWarnings = starvation |> List.isEmpty |> not
+          StatesAnalyzed = pruned.StateNames.Length
+          RolesAnalyzed = statechart.Roles |> List.map (fun r -> r.Name) }

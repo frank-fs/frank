@@ -460,3 +460,50 @@ let starvationTests =
                   (List.length roleBDiags)
                   2
                   "RoleB starved from both Branch1 and Branch2" ]
+
+[<Tests>]
+let analyzeProgressTests =
+    testList
+        "analyzeProgress"
+        [ testCase "TicTacToe: no errors, no warnings, 1 read-only"
+          <| fun _ ->
+              let report = ProgressAnalysis.analyzeProgress ticTacToeChart
+              Expect.isFalse report.HasErrors "No errors"
+              Expect.isFalse report.HasWarnings "No warnings"
+              Expect.equal report.StatesAnalyzed 5 "5 states analyzed"
+              Expect.equal report.Route "/games/{gameId}" "Route preserved"
+              let readOnlyDiags =
+                  report.Diagnostics
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.ReadOnlyRole r -> Some r
+                      | _ -> None)
+              Expect.equal readOnlyDiags [ "Spectator" ] "Spectator is read-only"
+
+          testCase "deadlock chart has errors"
+          <| fun _ ->
+              let report = ProgressAnalysis.analyzeProgress deadlockSelfLoopChart
+              Expect.isTrue report.HasErrors "Has errors"
+
+          testCase "starvation chart has warnings"
+          <| fun _ ->
+              let report = ProgressAnalysis.analyzeProgress starvationChart
+              Expect.isTrue report.HasWarnings "Has warnings"
+
+          testCase "disconnected chart: pruning prevents false deadlock"
+          <| fun _ ->
+              let report = ProgressAnalysis.analyzeProgress disconnectedChart
+              let orphanDeadlocks =
+                  report.Diagnostics
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Deadlock(s, _) when s = "Orphan" -> Some s
+                      | _ -> None)
+              Expect.isEmpty orphanDeadlocks "Orphan state pruned, no false deadlock"
+
+          testCase "RolesAnalyzed populated correctly"
+          <| fun _ ->
+              let report = ProgressAnalysis.analyzeProgress ticTacToeChart
+              Expect.hasLength report.RolesAnalyzed 3 "3 roles"
+              Expect.contains report.RolesAnalyzed "PlayerX" "PlayerX in list"
+              Expect.contains report.RolesAnalyzed "Spectator" "Spectator in list" ]
