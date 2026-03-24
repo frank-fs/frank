@@ -40,6 +40,43 @@ module ProgressAnalysis =
           StatesAnalyzed: int
           RolesAnalyzed: string list }
 
+    /// Non-final states where no role has an advancing+live transition out.
+    let detectDeadlocks (statechart: ExtractedStatechart) : ProgressDiagnostic list =
+        let isFinal state =
+            statechart.StateMetadata
+            |> Map.tryFind state
+            |> Option.map (fun si -> si.IsFinal)
+            |> Option.defaultValue false
+
+        let transitionsBySource =
+            statechart.Transitions
+            |> List.groupBy (fun t -> t.Source)
+            |> Map.ofList
+
+        statechart.StateNames
+        |> List.choose (fun state ->
+            if isFinal state then
+                None
+            else
+                let transitions =
+                    transitionsBySource
+                    |> Map.tryFind state
+                    |> Option.defaultValue []
+
+                let advancingLive =
+                    transitions |> List.filter (fun t -> isAdvancing t && isLive t)
+
+                if List.isEmpty advancingLive then
+                    let selfLoopEvents =
+                        transitions
+                        |> List.filter (fun t -> t.Source = t.Target)
+                        |> List.map (fun t -> t.Event)
+                        |> List.distinct
+
+                    Some(Deadlock(state, selfLoopEvents))
+                else
+                    None)
+
     /// Roles with zero advancing+live transitions — they can only observe, not advance.
     let identifyReadOnlyRoles (projections: Map<string, ExtractedStatechart>) : string list =
         projections

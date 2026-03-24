@@ -304,3 +304,64 @@ let predicateTests =
           <| fun _ ->
               let t = mkTransition "go" "A" "B" None (RestrictedTo [])
               Expect.isFalse (ProgressAnalysis.isLive t) "RestrictedTo [] is dead" ]
+
+[<Tests>]
+let deadlockTests =
+    testList
+        "detectDeadlocks"
+        [ testCase "TicTacToe has no deadlocks"
+          <| fun _ ->
+              let pruned = Projection.pruneUnreachableStates ticTacToeChart
+              let deadlocks = ProgressAnalysis.detectDeadlocks pruned
+              Expect.isEmpty deadlocks "TicTacToe has no deadlocks"
+
+          testCase "self-loop-only state is deadlock with selfLoopEvents"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks deadlockSelfLoopChart
+              Expect.hasLength deadlocks 1 "One deadlock"
+              match deadlocks.[0] with
+              | ProgressAnalysis.Deadlock(state, selfLoops) ->
+                  Expect.equal state "Stuck" "Deadlock at Stuck"
+                  Expect.contains selfLoops "refresh" "Self-loop event reported"
+              | _ -> failtest "Expected Deadlock diagnostic"
+
+          testCase "dead transition state is deadlock"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks deadTransitionDeadlockChart
+              Expect.hasLength deadlocks 1 "One deadlock"
+              match deadlocks.[0] with
+              | ProgressAnalysis.Deadlock(state, selfLoops) ->
+                  Expect.equal state "Active" "Deadlock at Active"
+                  Expect.contains selfLoops "view" "Self-loop reported"
+              | _ -> failtest "Expected Deadlock diagnostic"
+
+          testCase "final state with no transitions is not deadlock"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks singleFinalChart
+              Expect.isEmpty deadlocks "Final state is not a deadlock"
+
+          testCase "empty transitions from initial is deadlock"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks emptyTransitionsChart
+              Expect.hasLength deadlocks 1 "One deadlock"
+              match deadlocks.[0] with
+              | ProgressAnalysis.Deadlock(state, selfLoops) ->
+                  Expect.equal state "Idle" "Deadlock at Idle"
+                  Expect.isEmpty selfLoops "No self-loops"
+              | _ -> failtest "Expected Deadlock diagnostic"
+
+          testCase "reachable dead-end is deadlock"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks reachableDeadEndChart
+              let deadEndDiags =
+                  deadlocks
+                  |> List.choose (fun d ->
+                      match d with
+                      | ProgressAnalysis.Deadlock(s, _) when s = "DeadEnd" -> Some d
+                      | _ -> None)
+              Expect.hasLength deadEndDiags 1 "DeadEnd is a deadlock"
+
+          testCase "cycle without final states is NOT deadlock"
+          <| fun _ ->
+              let deadlocks = ProgressAnalysis.detectDeadlocks cycleNoFinalChart
+              Expect.isEmpty deadlocks "Cycle with advancing transitions is not deadlock" ]
