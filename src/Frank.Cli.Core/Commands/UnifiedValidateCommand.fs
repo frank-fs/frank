@@ -47,7 +47,10 @@ let private buildResult
     let progressReports =
         if checkProgress then
             resources
-            |> List.choose (fun r -> r.Statechart |> Option.map ProgressAnalysis.analyzeProgress)
+            |> List.choose (fun r ->
+                r.Statechart
+                |> Option.bind (fun sc -> if sc.Roles.IsEmpty then None else Some sc)
+                |> Option.map ProgressAnalysis.analyzeProgress)
         else
             []
 

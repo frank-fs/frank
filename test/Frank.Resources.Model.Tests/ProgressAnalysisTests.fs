@@ -456,7 +456,8 @@ let starvationTests =
                       | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
                       | _ -> None)
 
-              Expect.isGreaterThanOrEqual (List.length roleBDiags) 2 "RoleB starved from both Branch1 and Branch2" ]
+              // RoleB can act at Start (go1/go2 are Unrestricted) but is excluded from Branch1 and Branch2
+              Expect.equal (List.length roleBDiags) 2 "RoleB starved from Branch1 and Branch2" ]
 
 [<Tests>]
 let analyzeProgressTests =

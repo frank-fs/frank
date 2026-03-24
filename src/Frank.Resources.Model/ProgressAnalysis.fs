@@ -91,7 +91,8 @@ module ProgressAnalysis =
         |> List.map (fun (k, ts) -> k, ts |> List.map (fun t -> t.Target) |> List.distinct)
         |> Map.ofList
 
-    /// BFS forward reachability from a start state using the given adjacency map.
+    /// Forward reachability from a start state using the given adjacency map.
+    /// Traversal order is immaterial — only the reachable set matters.
     let private forwardReachable (adjacency: Map<string, string list>) (start: string) : Set<string> =
         let rec bfs (visited: Set<string>) (frontier: string list) =
             match frontier with
@@ -134,7 +135,12 @@ module ProgressAnalysis =
 
         roleNames
         |> List.collect (fun role ->
-            let roleChart = projections |> Map.tryFind role |> Option.defaultValue statechart
+            // roleNames is drawn from projections keys, so tryFind always succeeds.
+            // Fallback to empty-transition chart ensures starvation is reported if invariant breaks.
+            let roleChart =
+                projections
+                |> Map.tryFind role
+                |> Option.defaultValue { statechart with Transitions = [] }
 
             let activeStates =
                 roleChart.Transitions
@@ -150,6 +156,7 @@ module ProgressAnalysis =
                     let reachable = forwardReachable adjacency state
 
                     if Set.intersect reachable activeStates |> Set.isEmpty then
+                        // reachable includes start state itself; exclude it since it's already named in excludedAfter
                         let excludedStates =
                             reachable
                             |> Set.toList
@@ -164,11 +171,7 @@ module ProgressAnalysis =
     /// Prunes unreachable states first to avoid false positives from disconnected fragments.
     let analyzeProgress (statechart: ExtractedStatechart) : ProgressReport =
         let pruned = Projection.pruneUnreachableStates statechart
-
-        let projections =
-            statechart.Roles
-            |> List.map (fun r -> r.Name, Projection.filterTransitionsByRole r.Name pruned)
-            |> Map.ofList
+        let projections = Projection.projectAll pruned
 
         let readOnlyRoles = identifyReadOnlyRoles projections
         let deadlocks = detectDeadlocks pruned
