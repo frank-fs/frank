@@ -1,4 +1,4 @@
-module Frank.Cli.Core.Commands.UnifiedValidateCommand
+module Frank.Cli.Core.Commands.ValidateResourcesCommand
 
 open System.IO
 open Frank.Resources.Model
@@ -6,7 +6,7 @@ open Frank.Statecharts.Analysis.ProjectionValidator
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart.StatechartError
 
-type UnifiedValidateResult =
+type ValidateResult =
     { ProjectionResults: ProjectionCheckResult list
       TotalIssues: int
       TotalErrors: int
@@ -21,7 +21,7 @@ let private buildResult
     (resources: UnifiedResource list)
     (checkProjection: bool)
     (checkProgress: bool)
-    : UnifiedValidateResult =
+    : ValidateResult =
     let withRoles =
         resources
         |> List.choose (fun r ->
@@ -70,7 +70,7 @@ let execute
     (force: bool)
     (checkProjection: bool)
     (checkProgress: bool)
-    : Async<Result<UnifiedValidateResult, StatechartError>> =
+    : Async<Result<ValidateResult, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)

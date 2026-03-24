@@ -1,4 +1,4 @@
-module Frank.Cli.Core.Commands.UnifiedGenerateCommand
+module Frank.Cli.Core.Commands.GenerateArtifactsCommand
 
 open System.IO
 open System.Text.Json

@@ -1,4 +1,4 @@
-module Frank.Cli.Core.Commands.UnifiedExtractCommand
+module Frank.Cli.Core.Commands.ExtractResourcesCommand
 
 open System
 open System.IO
@@ -6,7 +6,7 @@ open Frank.Resources.Model
 open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Statechart.StatechartError
 
-type UnifiedExtractResult =
+type ExtractResult =
     { ResourceCount: int
       StatefulResourceCount: int
       PlainResourceCount: int
@@ -36,7 +36,7 @@ let execute
     (baseUri: string)
     (vocabularies: string list)
     (force: bool)
-    : Async<Result<UnifiedExtractResult, StatechartError>> =
+    : Async<Result<ExtractResult, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)

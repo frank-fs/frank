@@ -17,6 +17,26 @@ let filterCapabilitiesByStates (stateNames: string list) (capabilities: HttpCapa
         | None -> true
         | Some sk -> Set.contains sk stateSet)
 
+/// Filter capabilities by projected transitions: only keep unsafe capabilities
+/// (POST, PUT, PATCH, DELETE) in states where the role has an unsafe transition.
+/// Safe capabilities (GET, HEAD, OPTIONS) always survive — all roles can observe.
+let filterCapabilitiesByTransitions (transitions: TransitionSpec list) (capabilities: HttpCapability list) : HttpCapability list =
+    // States where this role has an unsafe (non-self-loop) transition
+    let unsafeTransitionSources =
+        transitions
+        |> List.filter (fun t -> t.Source <> t.Target) // exclude self-loops (getGame)
+        |> List.map _.Source
+        |> Set.ofList
+
+    capabilities
+    |> List.filter (fun cap ->
+        if cap.IsSafe then
+            true // Safe methods always available (observation)
+        else
+            match cap.StateKey with
+            | None -> true // No state scope — keep it
+            | Some sk -> Set.contains sk unsafeTransitionSources)
+
 /// Result of running the projection pipeline for a single resource.
 type ProjectionResult =
     { RoleProfiles: Map<string, string>
@@ -50,7 +70,9 @@ let projectResource (resource: UnifiedResource) (baseUri: string) : ProjectionRe
                             ResourceSlug = slug
                             Statechart = Some projectedChart
                             HttpCapabilities =
-                                filterCapabilitiesByStates projectedChart.StateNames resource.HttpCapabilities }
+                                resource.HttpCapabilities
+                                |> filterCapabilitiesByStates projectedChart.StateNames
+                                |> filterCapabilitiesByTransitions projectedChart.Transitions }
 
                     let ctx: UnifiedAlpsGenerator.ProjectionContext =
                         { ProjectedRole = Some roleName
