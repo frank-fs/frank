@@ -316,6 +316,59 @@ module TextOutput =
 
             sb.ToString()
 
+    let formatProgressReport (report: Frank.Resources.Model.ProgressAnalysis.ProgressReport) : string =
+        let sb = System.Text.StringBuilder()
+
+        sb.AppendLine(
+            bold (
+                sprintf
+                    "Progress analysis for %s (%d states, %d roles)"
+                    report.Route
+                    report.StatesAnalyzed
+                    (List.length report.RolesAnalyzed)
+            )
+        )
+        |> ignore
+
+        if List.isEmpty report.Diagnostics then
+            sb.AppendLine(green "  No progress issues detected") |> ignore
+        else
+            for diag in report.Diagnostics do
+                match diag with
+                | Frank.Resources.Model.ProgressAnalysis.Deadlock(state, selfLoops) ->
+                    let loopInfo =
+                        if List.isEmpty selfLoops then
+                            ""
+                        else
+                            sprintf " (self-loops: %s)" (String.concat ", " selfLoops)
+
+                    sb.AppendLine(
+                        red (sprintf "  [error] Deadlock: state %s has no advancing transitions%s" state loopInfo)
+                    )
+                    |> ignore
+                | Frank.Resources.Model.ProgressAnalysis.Starvation(role, excludedAfter, excludedStates) ->
+                    let statesInfo =
+                        if List.isEmpty excludedStates then
+                            ""
+                        else
+                            sprintf " (excluded from: %s)" (String.concat ", " excludedStates)
+
+                    sb.AppendLine(
+                        yellow (
+                            sprintf
+                                "  [warn]  Starvation: role %s excluded after state %s%s"
+                                role
+                                excludedAfter
+                                statesInfo
+                        )
+                    )
+                    |> ignore
+                | Frank.Resources.Model.ProgressAnalysis.ReadOnlyRole role ->
+                    sb.AppendLine(sprintf "  [info]  Read-only role: %s (expected for observers)" role)
+                    |> ignore
+
+        sb.ToString()
+
     let formatUnifiedValidateResult (result: UnifiedValidateCommand.UnifiedValidateResult) : string =
         let sb = System.Text.StringBuilder()
         let appendLine (s: string) = sb.AppendLine(s) |> ignore
@@ -344,6 +397,12 @@ module TextOutput =
 
                     let checkName = ProjectionValidator.ProjectionCheckKind.toString issue.Check
                     appendLine $"    [%s{prefix}] %s{checkName}: %s{issue.Message}"
+
+        if not (List.isEmpty result.ProgressReports) then
+            appendLine ""
+
+            for report in result.ProgressReports do
+                sb.Append(formatProgressReport report: string) |> ignore
 
         if result.FromCache then
             appendLine ""
