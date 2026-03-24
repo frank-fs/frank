@@ -235,32 +235,42 @@ module JsonOutput =
         writeString writer "stateDirectory" result.StateDirectory
 
         writer.WriteStartObject("extraction")
+
         let extractionState =
             match result.Extraction with
             | ExtractionStatus.NotExtracted -> "not_extracted"
             | ExtractionStatus.Current -> "current"
             | ExtractionStatus.Stale -> "stale"
             | ExtractionStatus.Unreadable _ -> "unreadable"
+
         writeString writer "state" extractionState
         writer.WriteEndObject()
 
         writer.WriteStartObject("artifacts")
+
         let artifactState =
             match result.Artifacts with
             | ArtifactStatus.Present -> "present"
             | ArtifactStatus.Missing _ -> "missing"
+
         writeString writer "state" artifactState
+
         match result.Artifacts with
         | ArtifactStatus.Present ->
             writer.WriteStartArray("files")
             writer.WriteEndArray()
         | ArtifactStatus.Missing missing ->
             writer.WriteStartArray("missingFiles")
-            for f in missing do writer.WriteStringValue(f)
+
+            for f in missing do
+                writer.WriteStringValue(f)
+
             writer.WriteEndArray()
+
         writer.WriteEndObject()
 
         writer.WriteStartObject("recommendedAction")
+
         let (action, message) =
             match result.RecommendedAction with
             | RecommendedAction.RunExtract -> ("run_extract", "Run extract to begin")
@@ -268,6 +278,7 @@ module JsonOutput =
             | RecommendedAction.RunCompile -> ("run_compile", "Run compile to generate artifacts")
             | RecommendedAction.UpToDate -> ("up_to_date", "No action needed")
             | RecommendedAction.RecoverExtract reason -> ("recover_extract", $"Re-extract to recover: {reason}")
+
         writeString writer "action" action
         writeString writer "message" message
         writer.WriteEndObject()
@@ -281,18 +292,22 @@ module JsonOutput =
         use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
         writer.WriteStartObject()
         writer.WriteStartArray("commands")
+
         for (name, summary) in index.Commands do
             writer.WriteStartObject()
             writeString writer "name" name
             writeString writer "summary" summary
             writer.WriteEndObject()
+
         writer.WriteEndArray()
         writer.WriteStartArray("topics")
+
         for (name, summary) in index.Topics do
             writer.WriteStartObject()
             writeString writer "name" name
             writeString writer "summary" summary
             writer.WriteEndObject()
+
         writer.WriteEndArray()
         writer.WriteEndObject()
         writer.Flush()
@@ -316,6 +331,7 @@ module JsonOutput =
         writeString writer "status" "not_found"
         writeString writer "query" query
         writer.WriteStartArray("suggestions")
+
         for name in suggestions do
             writer.WriteStartObject()
             writeString writer "name" name
@@ -330,7 +346,9 @@ module JsonOutput =
                     writeString writer "summary" topic.Summary
                     writeString writer "type" "topic"
                 | None -> ()
+
             writer.WriteEndObject()
+
         writer.WriteEndArray()
         writer.WriteEndObject()
         writer.Flush()
@@ -362,8 +380,10 @@ module JsonOutput =
 
         if not result.GenerationErrors.IsEmpty then
             writer.WriteStartArray("generationErrors")
+
             for err in result.GenerationErrors do
                 writer.WriteStringValue(Frank.Cli.Core.Statechart.StatechartError.formatError err)
+
             writer.WriteEndArray()
 
         writer.WriteEndObject()
@@ -392,29 +412,87 @@ module JsonOutput =
         writer.WriteStartObject()
         writeString writer "status" "ok"
         writer.WriteStartArray("stateMachines")
+
         for sm in result.StateMachines do
             writer.WriteStartObject()
             writeString writer "routeTemplate" sm.RouteTemplate
             writeString writer "initialState" sm.InitialStateKey
             writer.WriteStartArray("states")
-            for s in sm.StateNames do writer.WriteStringValue(s)
+
+            for s in sm.StateNames do
+                writer.WriteStringValue(s)
+
             writer.WriteEndArray()
             writer.WriteStartArray("guards")
-            for g in sm.GuardNames do writer.WriteStringValue(g)
+
+            for g in sm.GuardNames do
+                writer.WriteStringValue(g)
+
             writer.WriteEndArray()
             writer.WriteStartObject("stateMetadata")
+
             for KeyValue(name, info) in sm.StateMetadata do
                 writer.WriteStartObject(name)
                 writer.WriteStartArray("allowedMethods")
-                for m in info.AllowedMethods do writer.WriteStringValue(m)
+
+                for m in info.AllowedMethods do
+                    writer.WriteStringValue(m)
+
                 writer.WriteEndArray()
                 writer.WriteBoolean("isFinal", info.IsFinal)
+
                 match info.Description with
                 | Some d -> writeString writer "description" d
                 | None -> writer.WriteNull("description")
+
                 writer.WriteEndObject()
+
             writer.WriteEndObject()
             writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
+        Encoding.UTF8.GetString(stream.ToArray())
+
+    let formatUnifiedValidateResult (result: UnifiedValidateCommand.UnifiedValidateResult) : string =
+        use stream = new MemoryStream()
+        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        writer.WriteStartObject()
+        writeString writer "status" (if result.TotalErrors > 0 then "fail" else "ok")
+        writer.WriteBoolean("fromCache", result.FromCache)
+        writeNumber writer "resourcesChecked" result.ResourcesChecked
+        writeNumber writer "totalIssues" result.TotalIssues
+        writeNumber writer "totalErrors" result.TotalErrors
+        writeNumber writer "totalWarnings" result.TotalWarnings
+        writer.WriteStartArray("results")
+
+        for r in result.ProjectionResults do
+            writer.WriteStartObject()
+            writeString writer "resourceRoute" r.ResourceRoute
+            writeNumber writer "checksRun" r.ChecksRun
+            writer.WriteStartArray("issues")
+
+            for issue in r.Issues do
+                writer.WriteStartObject()
+
+                writeString
+                    writer
+                    "check"
+                    (Frank.Statecharts.Analysis.ProjectionValidator.ProjectionCheckKind.toString issue.Check)
+
+                let severity =
+                    match issue.Severity with
+                    | Frank.Statecharts.Analysis.ProjectionValidator.Severity.Error -> "error"
+                    | Frank.Statecharts.Analysis.ProjectionValidator.Severity.Warning -> "warning"
+
+                writeString writer "severity" severity
+                writeString writer "message" issue.Message
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+            writer.WriteEndObject()
+
         writer.WriteEndArray()
         writer.WriteEndObject()
         writer.Flush()

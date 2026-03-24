@@ -6,6 +6,7 @@ open Frank.Cli.Core.Help
 
 module TextOutput =
 
+    open Frank.Statecharts.Analysis
     open Frank.Cli.Core.Output.AnsiColors
 
     let formatExtractResult (result: ExtractCommand.ExtractResult) : string =
@@ -154,6 +155,7 @@ module TextOutput =
             | ExtractionStatus.Current -> "current"
             | ExtractionStatus.Stale -> "stale (source files changed since extraction)"
             | ExtractionStatus.Unreadable reason -> $"unreadable ({reason})"
+
         sb.AppendLine($"Extraction: {extractionText}") |> ignore
 
         let artifactText =
@@ -163,36 +165,45 @@ module TextOutput =
                 | ExtractionStatus.Stale -> "present (may be outdated)"
                 | _ -> "present"
             | ArtifactStatus.Missing _ -> "not present"
+
         sb.AppendLine($"Artifacts: {artifactText}") |> ignore
 
         let actionText =
             match result.RecommendedAction with
-            | RecommendedAction.RunExtract ->
-                $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
-            | RecommendedAction.ReExtract ->
-                $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
-            | RecommendedAction.RunCompile ->
-                $"run 'frank compile --project {result.ProjectPath}'"
+            | RecommendedAction.RunExtract -> $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
+            | RecommendedAction.ReExtract -> $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>'"
+            | RecommendedAction.RunCompile -> $"run 'frank compile --project {result.ProjectPath}'"
             | RecommendedAction.UpToDate -> "up to date (no action needed)"
             | RecommendedAction.RecoverExtract _ ->
                 $"run 'frank extract --project {result.ProjectPath} --base-uri <URI>' to recover"
+
         sb.AppendLine($"Recommended action: {actionText}") |> ignore
 
         sb.ToString()
 
     let formatHelpIndex (index: HelpSubcommand.HelpIndex) : string =
         let sb = System.Text.StringBuilder()
-        sb.AppendLine("frank: Semantic resource extraction for Frank applications") |> ignore
+
+        sb.AppendLine("frank: Semantic resource extraction for Frank applications")
+        |> ignore
+
         sb.AppendLine() |> ignore
         sb.AppendLine("COMMANDS") |> ignore
+
         for (name, summary) in index.Commands do
             sb.AppendLine(sprintf "  %-12s%s" name summary) |> ignore
+
         sb.AppendLine() |> ignore
         sb.AppendLine("TOPICS") |> ignore
+
         for (name, summary) in index.Topics do
             sb.AppendLine(sprintf "  %-12s%s" name summary) |> ignore
+
         sb.AppendLine() |> ignore
-        sb.AppendLine("Use 'frank help <command>' for detailed help on a command.") |> ignore
+
+        sb.AppendLine("Use 'frank help <command>' for detailed help on a command.")
+        |> ignore
+
         sb.AppendLine("Use 'frank help <topic>' for topic documentation.") |> ignore
         sb.ToString()
 
@@ -206,9 +217,11 @@ module TextOutput =
     let formatNoMatch (query: string) (suggestions: string list) : string =
         let sb = System.Text.StringBuilder()
         sb.AppendLine($"Unknown command or topic: '{query}'") |> ignore
+
         if not suggestions.IsEmpty then
             sb.AppendLine() |> ignore
             sb.AppendLine("Did you mean?") |> ignore
+
             for name in suggestions do
                 match HelpContent.findCommand name with
                 | Some cmd -> sb.AppendLine(sprintf "  %-12s%s" name cmd.Summary) |> ignore
@@ -216,6 +229,7 @@ module TextOutput =
                     match HelpContent.findTopic name with
                     | Some topic -> sb.AppendLine(sprintf "  %-12s%s" name topic.Summary) |> ignore
                     | None -> sb.AppendLine($"  {name}") |> ignore
+
         sb.AppendLine() |> ignore
         sb.AppendLine("Use 'frank help' to see all commands and topics.") |> ignore
         sb.ToString()
@@ -248,9 +262,13 @@ module TextOutput =
 
             if not result.GenerationErrors.IsEmpty then
                 sb.AppendLine() |> ignore
-                sb.AppendLine(red (sprintf "Generation errors (%d):" result.GenerationErrors.Length)) |> ignore
+
+                sb.AppendLine(red (sprintf "Generation errors (%d):" result.GenerationErrors.Length))
+                |> ignore
+
                 for err in result.GenerationErrors do
-                    sb.AppendLine(sprintf "  - %s" (Frank.Cli.Core.Statechart.StatechartError.formatError err)) |> ignore
+                    sb.AppendLine(sprintf "  - %s" (Frank.Cli.Core.Statechart.StatechartError.formatError err))
+                    |> ignore
 
             sb.ToString()
 
@@ -270,26 +288,68 @@ module TextOutput =
             "No state machines found in the assembly."
         else
             let sb = System.Text.StringBuilder()
+
             for sm in result.StateMachines do
                 let header = bold (sprintf "Statechart: %s" sm.RouteTemplate)
                 sb.AppendLine(header) |> ignore
                 sb.AppendLine(sprintf "  Initial State: %s" sm.InitialStateKey) |> ignore
                 let stateList = sm.StateNames |> String.concat ", "
                 sb.AppendLine(sprintf "  States: %s" stateList) |> ignore
+
                 if not sm.GuardNames.IsEmpty then
                     let guardList = sm.GuardNames |> String.concat ", "
                     sb.AppendLine(sprintf "  Guards: %s" guardList) |> ignore
+
                 sb.AppendLine("  State Details:") |> ignore
+
                 for KeyValue(name, info) in sm.StateMetadata do
                     sb.AppendLine(sprintf "    %s:" name) |> ignore
                     let methods = info.AllowedMethods |> String.concat ", "
                     sb.AppendLine(sprintf "      Methods: %s" methods) |> ignore
                     sb.AppendLine(sprintf "      Final: %b" info.IsFinal) |> ignore
+
                     match info.Description with
                     | Some desc -> sb.AppendLine(sprintf "      Description: %s" desc) |> ignore
                     | None -> ()
+
                 sb.AppendLine() |> ignore
+
             sb.ToString()
+
+    let formatUnifiedValidateResult (result: UnifiedValidateCommand.UnifiedValidateResult) : string =
+        let sb = System.Text.StringBuilder()
+        let appendLine (s: string) = sb.AppendLine(s) |> ignore
+
+        let statusText = if result.TotalErrors > 0 then red "FAIL" else green "PASS"
+
+        appendLine (bold (sprintf "Projection Validation: %s" statusText))
+        appendLine ""
+        appendLine $"Resources checked: {result.ResourcesChecked}"
+
+        let totalChecks = result.ProjectionResults |> List.sumBy _.ChecksRun
+
+        appendLine $"Checks run: {totalChecks}"
+        appendLine $"Issues: {result.TotalIssues} ({result.TotalErrors} errors, {result.TotalWarnings} warnings)"
+
+        for r in result.ProjectionResults do
+            if not r.Issues.IsEmpty then
+                appendLine ""
+                appendLine $"  {r.ResourceRoute}:"
+
+                for issue in r.Issues do
+                    let prefix =
+                        match issue.Severity with
+                        | ProjectionValidator.Severity.Error -> red "ERROR"
+                        | ProjectionValidator.Severity.Warning -> yellow "WARN"
+
+                    let checkName = ProjectionValidator.ProjectionCheckKind.toString issue.Check
+                    appendLine $"    [%s{prefix}] %s{checkName}: %s{issue.Message}"
+
+        if result.FromCache then
+            appendLine ""
+            appendLine "(from cache)"
+
+        sb.ToString()
 
     let formatUnifiedExtractResult (result: UnifiedExtractCommand.UnifiedExtractResult) : string =
         let sb = System.Text.StringBuilder()
@@ -314,8 +374,7 @@ module TextOutput =
 
             match resource.Statechart with
             | None ->
-                let methods =
-                    resource.HttpCapabilities |> List.map _.Method |> String.concat ", "
+                let methods = resource.HttpCapabilities |> List.map _.Method |> String.concat ", "
 
                 appendLine $"    Methods: {methods}"
             | Some sc ->
