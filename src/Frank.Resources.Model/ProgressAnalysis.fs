@@ -41,6 +41,7 @@ module ProgressAnalysis =
           RolesAnalyzed: string list }
 
     /// Non-final states where no role has an advancing+live transition out.
+    /// Caller is responsible for pruning unreachable states first; see analyzeProgress.
     let detectDeadlocks (statechart: ExtractedStatechart) : ProgressDiagnostic list =
         let isFinal state =
             statechart.StateMetadata
@@ -49,22 +50,16 @@ module ProgressAnalysis =
             |> Option.defaultValue false
 
         let transitionsBySource =
-            statechart.Transitions
-            |> List.groupBy (fun t -> t.Source)
-            |> Map.ofList
+            statechart.Transitions |> List.groupBy (fun t -> t.Source) |> Map.ofList
 
         statechart.StateNames
         |> List.choose (fun state ->
             if isFinal state then
                 None
             else
-                let transitions =
-                    transitionsBySource
-                    |> Map.tryFind state
-                    |> Option.defaultValue []
+                let transitions = transitionsBySource |> Map.tryFind state |> Option.defaultValue []
 
-                let advancingLive =
-                    transitions |> List.filter (fun t -> isAdvancing t && isLive t)
+                let advancingLive = transitions |> List.filter (fun t -> isAdvancing t && isLive t)
 
                 if List.isEmpty advancingLive then
                     let selfLoopEvents =
@@ -83,8 +78,7 @@ module ProgressAnalysis =
         |> Map.toList
         |> List.choose (fun (role, chart) ->
             let hasAdvancing =
-                chart.Transitions
-                |> List.exists (fun t -> isAdvancing t && isLive t)
+                chart.Transitions |> List.exists (fun t -> isAdvancing t && isLive t)
 
             if hasAdvancing then None else Some role)
 
@@ -142,20 +136,15 @@ module ProgressAnalysis =
 
         roleNames
         |> List.collect (fun role ->
-            let roleChart =
-                projections
-                |> Map.tryFind role
-                |> Option.defaultValue statechart
+            let roleChart = projections |> Map.tryFind role |> Option.defaultValue statechart
 
             let activeStates =
                 roleChart.Transitions
-                |> List.filter isAdvancing
+                |> List.filter (fun t -> isAdvancing t && isLive t)
                 |> List.map (fun t -> t.Source)
                 |> Set.ofList
 
-            let nonFinalStates =
-                statechart.StateNames
-                |> List.filter (fun s -> not (isFinal s))
+            let nonFinalStates = statechart.StateNames |> List.filter (fun s -> not (isFinal s))
 
             nonFinalStates
             |> List.choose (fun state ->
@@ -185,11 +174,9 @@ module ProgressAnalysis =
         let deadlocks = detectDeadlocks pruned
         let starvation = detectStarvation pruned projections readOnlyRoles
 
-        let readOnlyDiagnostics =
-            readOnlyRoles |> List.map ReadOnlyRole
+        let readOnlyDiagnostics = readOnlyRoles |> List.map ReadOnlyRole
 
-        let allDiagnostics =
-            deadlocks @ starvation @ readOnlyDiagnostics
+        let allDiagnostics = deadlocks @ starvation @ readOnlyDiagnostics
 
         { Route = statechart.RouteTemplate
           Diagnostics = allDiagnostics

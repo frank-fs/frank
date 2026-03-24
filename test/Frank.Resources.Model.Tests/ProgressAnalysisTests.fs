@@ -34,9 +34,12 @@ let private ticTacToeChart: ExtractedStatechart =
               "OWins", mkState true
               "Draw", mkState true ]
       Roles =
-        [ { Name = "PlayerX"; Description = Some "Player X" }
-          { Name = "PlayerO"; Description = Some "Player O" }
-          { Name = "Spectator"; Description = Some "Observer" } ]
+        [ { Name = "PlayerX"
+            Description = Some "Player X" }
+          { Name = "PlayerO"
+            Description = Some "Player O" }
+          { Name = "Spectator"
+            Description = Some "Observer" } ]
       Transitions =
         [ mkTransition "getGame" "XTurn" "XTurn" None Unrestricted
           mkTransition "getGame" "OTurn" "OTurn" None Unrestricted
@@ -56,11 +59,9 @@ let private deadlockSelfLoopChart: ExtractedStatechart =
       StateNames = [ "Stuck"; "Done" ]
       InitialStateKey = "Stuck"
       GuardNames = []
-      StateMetadata =
-        Map.ofList [ "Stuck", mkState false; "Done", mkState true ]
+      StateMetadata = Map.ofList [ "Stuck", mkState false; "Done", mkState true ]
       Roles = [ { Name = "Admin"; Description = None } ]
-      Transitions =
-        [ mkTransition "refresh" "Stuck" "Stuck" None Unrestricted ] }
+      Transitions = [ mkTransition "refresh" "Stuck" "Stuck" None Unrestricted ] }
 
 /// Only advancing transition is RestrictedTo [] (dead).
 let private deadTransitionDeadlockChart: ExtractedStatechart =
@@ -68,8 +69,7 @@ let private deadTransitionDeadlockChart: ExtractedStatechart =
       StateNames = [ "Active"; "Archived" ]
       InitialStateKey = "Active"
       GuardNames = []
-      StateMetadata =
-        Map.ofList [ "Active", mkState false; "Archived", mkState true ]
+      StateMetadata = Map.ofList [ "Active", mkState false; "Archived", mkState true ]
       Roles = [ { Name = "Admin"; Description = None } ]
       Transitions =
         [ mkTransition "view" "Active" "Active" None Unrestricted
@@ -127,8 +127,7 @@ let private allUnrestrictedChart: ExtractedStatechart =
       StateNames = [ "A"; "B"; "Done" ]
       InitialStateKey = "A"
       GuardNames = []
-      StateMetadata =
-        Map.ofList [ "A", mkState false; "B", mkState false; "Done", mkState true ]
+      StateMetadata = Map.ofList [ "A", mkState false; "B", mkState false; "Done", mkState true ]
       Roles =
         [ { Name = "User"; Description = None }
           { Name = "Admin"; Description = None } ]
@@ -199,11 +198,7 @@ let private reachableDeadEndChart: ExtractedStatechart =
       StateNames = [ "Start"; "DeadEnd"; "Done" ]
       InitialStateKey = "Start"
       GuardNames = []
-      StateMetadata =
-        Map.ofList
-            [ "Start", mkState false
-              "DeadEnd", mkState false
-              "Done", mkState true ]
+      StateMetadata = Map.ofList [ "Start", mkState false; "DeadEnd", mkState false; "Done", mkState true ]
       Roles = [ { Name = "User"; Description = None } ]
       Transitions =
         [ mkTransition "enter" "Start" "DeadEnd" None Unrestricted
@@ -238,11 +233,7 @@ let private disconnectedChart: ExtractedStatechart =
       StateNames = [ "Start"; "Done"; "Orphan" ]
       InitialStateKey = "Start"
       GuardNames = []
-      StateMetadata =
-        Map.ofList
-            [ "Start", mkState false
-              "Done", mkState true
-              "Orphan", mkState false ]
+      StateMetadata = Map.ofList [ "Start", mkState false; "Done", mkState true; "Orphan", mkState false ]
       Roles = [ { Name = "User"; Description = None } ]
       Transitions =
         [ mkTransition "finish" "Start" "Done" None Unrestricted
@@ -321,6 +312,7 @@ let deadlockTests =
           <| fun _ ->
               let deadlocks = ProgressAnalysis.detectDeadlocks deadlockSelfLoopChart
               Expect.hasLength deadlocks 1 "One deadlock"
+
               match deadlocks.[0] with
               | ProgressAnalysis.Deadlock(state, selfLoops) ->
                   Expect.equal state "Stuck" "Deadlock at Stuck"
@@ -331,6 +323,7 @@ let deadlockTests =
           <| fun _ ->
               let deadlocks = ProgressAnalysis.detectDeadlocks deadTransitionDeadlockChart
               Expect.hasLength deadlocks 1 "One deadlock"
+
               match deadlocks.[0] with
               | ProgressAnalysis.Deadlock(state, selfLoops) ->
                   Expect.equal state "Active" "Deadlock at Active"
@@ -346,6 +339,7 @@ let deadlockTests =
           <| fun _ ->
               let deadlocks = ProgressAnalysis.detectDeadlocks emptyTransitionsChart
               Expect.hasLength deadlocks 1 "One deadlock"
+
               match deadlocks.[0] with
               | ProgressAnalysis.Deadlock(state, selfLoops) ->
                   Expect.equal state "Idle" "Deadlock at Idle"
@@ -355,12 +349,14 @@ let deadlockTests =
           testCase "reachable dead-end is deadlock"
           <| fun _ ->
               let deadlocks = ProgressAnalysis.detectDeadlocks reachableDeadEndChart
+
               let deadEndDiags =
                   deadlocks
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Deadlock(s, _) when s = "DeadEnd" -> Some d
                       | _ -> None)
+
               Expect.hasLength deadEndDiags 1 "DeadEnd is a deadlock"
 
           testCase "cycle without final states is NOT deadlock"
@@ -386,12 +382,14 @@ let starvationTests =
               let projections = Projection.projectAll pruned
               let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
               let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+
               let workerDiags =
                   starvation
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Starvation(r, _, _) when r = "Worker" -> Some d
                       | _ -> None)
+
               Expect.isNonEmpty workerDiags "Worker is starved"
 
           testCase "read-only roles excluded from analysis"
@@ -400,12 +398,14 @@ let starvationTests =
               let projections = Projection.projectAll pruned
               let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
               let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+
               let spectatorDiags =
                   starvation
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Starvation(r, _, _) when r = "Spectator" -> Some d
                       | _ -> None)
+
               Expect.isEmpty spectatorDiags "Spectator excluded from starvation analysis"
 
           testCase "all-unrestricted has no starvation"
@@ -422,12 +422,14 @@ let starvationTests =
               let projections = Projection.projectAll pruned
               let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
               let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+
               let roleBDiags =
                   starvation
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
                       | _ -> None)
+
               Expect.isNonEmpty roleBDiags "RoleB starved — recovery only via dead transition"
 
           testCase "diamond topology is NOT starvation"
@@ -436,12 +438,14 @@ let starvationTests =
               let projections = Projection.projectAll pruned
               let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
               let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+
               let roleBDiags =
                   starvation
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
                       | _ -> None)
+
               Expect.isEmpty roleBDiags "RoleB recovers at D via diamond paths"
 
           testCase "multiple starvation entry points emit two diagnostics"
@@ -450,16 +454,15 @@ let starvationTests =
               let projections = Projection.projectAll pruned
               let readOnly = ProgressAnalysis.identifyReadOnlyRoles projections
               let starvation = ProgressAnalysis.detectStarvation pruned projections readOnly
+
               let roleBDiags =
                   starvation
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Starvation(r, _, _) when r = "RoleB" -> Some d
                       | _ -> None)
-              Expect.isGreaterThanOrEqual
-                  (List.length roleBDiags)
-                  2
-                  "RoleB starved from both Branch1 and Branch2" ]
+
+              Expect.isGreaterThanOrEqual (List.length roleBDiags) 2 "RoleB starved from both Branch1 and Branch2" ]
 
 [<Tests>]
 let analyzeProgressTests =
@@ -472,12 +475,14 @@ let analyzeProgressTests =
               Expect.isFalse report.HasWarnings "No warnings"
               Expect.equal report.StatesAnalyzed 5 "5 states analyzed"
               Expect.equal report.Route "/games/{gameId}" "Route preserved"
+
               let readOnlyDiags =
                   report.Diagnostics
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.ReadOnlyRole r -> Some r
                       | _ -> None)
+
               Expect.equal readOnlyDiags [ "Spectator" ] "Spectator is read-only"
 
           testCase "deadlock chart has errors"
@@ -493,12 +498,14 @@ let analyzeProgressTests =
           testCase "disconnected chart: pruning prevents false deadlock"
           <| fun _ ->
               let report = ProgressAnalysis.analyzeProgress disconnectedChart
+
               let orphanDeadlocks =
                   report.Diagnostics
                   |> List.choose (fun d ->
                       match d with
                       | ProgressAnalysis.Deadlock(s, _) when s = "Orphan" -> Some s
                       | _ -> None)
+
               Expect.isEmpty orphanDeadlocks "Orphan state pruned, no false deadlock"
 
           testCase "RolesAnalyzed populated correctly"
