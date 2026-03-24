@@ -12,8 +12,7 @@ open Frank.Builder
 module WebHostBuilderExtensions =
 
     let private getAffordanceLogger (app: IApplicationBuilder) =
-        app.ApplicationServices.GetRequiredService<ILoggerFactory>()
-            .CreateLogger<AffordanceMiddleware>()
+        app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger<AffordanceMiddleware>()
 
     let private registerAffordanceMiddleware
         (logger: ILogger)
@@ -25,7 +24,8 @@ module WebHostBuilderExtensions =
             logger.LogWarning(
                 "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
                 version,
-                AffordanceMap.currentVersion)
+                AffordanceMap.currentVersion
+            )
 
         app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
 
@@ -62,8 +62,10 @@ module WebHostBuilderExtensions =
                     Middleware =
                         spec.Middleware
                         >> fun app ->
-                            (getAffordanceLogger app).LogWarning(
-                                "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map.")
+                            (getAffordanceLogger app)
+                                .LogWarning(
+                                    "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map."
+                                )
 
                             app }
             | assembly ->
@@ -78,7 +80,8 @@ module WebHostBuilderExtensions =
                                 logger.LogInformation(
                                     "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
                                     assembly.GetName().Name,
-                                    map.Entries.Length)
+                                    map.Entries.Length
+                                )
 
                                 let preComputed = AffordancePreCompute.preCompute map
 
@@ -88,6 +91,69 @@ module WebHostBuilderExtensions =
                             | None ->
                                 logger.LogInformation(
                                     "model.bin not found or unreadable in assembly '{AssemblyName}'; affordances not loaded. Use useAffordancesWith to supply an explicit map.",
-                                    assembly.GetName().Name)
+                                    assembly.GetName().Name
+                                )
+
+                            app }
+
+        /// Register the projected profile middleware with an explicit RuntimeState.
+        /// Swaps the global ALPS profile Link header for a role-specific one when
+        /// the authenticated user has resolved roles. Runs after affordance middleware.
+        [<CustomOperation("useProjectedProfilesWith")>]
+        member _.UseProjectedProfilesWith(spec: WebHostSpec, state: RuntimeState) : WebHostSpec =
+            let roleLookup = RoleProfileOverlay.build state
+
+            if roleLookup.Count = 0 then
+                spec
+            else
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            app.UseMiddleware<ProjectedProfileMiddleware>(roleLookup) |> ignore
+                            app }
+
+        /// Auto-load projected profile data from the entry assembly's embedded model.bin.
+        /// Falls back to no-op when the entry assembly is null or model.bin is not found.
+        /// For multi-project solutions, use useProjectedProfilesWith.
+        [<CustomOperation("useProjectedProfiles")>]
+        member _.UseProjectedProfiles(spec: WebHostSpec) : WebHostSpec =
+            match Assembly.GetEntryAssembly() with
+            | null ->
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            (getAffordanceLogger app)
+                                .LogWarning(
+                                    "Assembly.GetEntryAssembly() returned null; cannot auto-load projected profiles. Use useProjectedProfilesWith to supply an explicit RuntimeState."
+                                )
+
+                            app }
+            | assembly ->
+                { spec with
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            let logger = getAffordanceLogger app
+
+                            match StartupProjection.loadRuntimeStateFromAssembly logger assembly with
+                            | Some state ->
+                                let roleLookup = RoleProfileOverlay.build state
+
+                                if roleLookup.Count > 0 then
+                                    logger.LogInformation(
+                                        "Projected profiles loaded from assembly '{AssemblyName}' ({RouteCount} routes with role projections).",
+                                        assembly.GetName().Name,
+                                        roleLookup.Count
+                                    )
+
+                                    app.UseMiddleware<ProjectedProfileMiddleware>(roleLookup) |> ignore
+
+                            | None ->
+                                logger.LogInformation(
+                                    "model.bin not found or unreadable in assembly '{AssemblyName}'; projected profiles not loaded.",
+                                    assembly.GetName().Name
+                                )
 
                             app }

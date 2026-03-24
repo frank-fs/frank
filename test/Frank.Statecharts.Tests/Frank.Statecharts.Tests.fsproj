@@ -56,10 +56,12 @@
     <Compile Include="Validation/NearMatchTests.fs" />
     <Compile Include="Validation/MergeTests.fs" />
     <!-- Affordance tests (merged from Frank.Affordances.Tests) -->
+    <Compile Include="Affordances/AffordanceTestHelpers.fs" />
     <Compile Include="Affordances/AffordanceMiddlewareTests.fs" />
     <Compile Include="Affordances/ProfileMiddlewareTests.fs" />
     <Compile Include="Affordances/EmbeddingTests.fs" />
     <Compile Include="Affordances/AutoLoadTests.fs" />
+    <Compile Include="Affordances/ProjectedProfileMiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
