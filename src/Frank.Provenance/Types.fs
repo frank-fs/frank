@@ -72,6 +72,8 @@ type ProvenanceRecord =
         GeneratedEntity: ProvenanceEntity
         /// The entity used (input) by this activity.
         UsedEntity: ProvenanceEntity
+        /// Protocol roles held by the acting principal at the time of the transition.
+        ActingRoles: string list
     }
 
 /// A collection of provenance records for a resource.

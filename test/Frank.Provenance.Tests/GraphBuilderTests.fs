@@ -55,7 +55,8 @@ let private makeRecord (agent: ProvenanceAgent) =
       Activity = activity
       Agent = agent
       GeneratedEntity = generatedEntity
-      UsedEntity = usedEntity }
+      UsedEntity = usedEntity
+      ActingRoles = [] }
 
 let private personAgent =
     { ProvenanceAgent.Id = "urn:frank:agent:alice"
@@ -150,6 +151,35 @@ let graphBuilderTests =
                     Expect.isTrue
                         (hasLiteralTriple graph record.Activity.Id ProvVocabulary.Frank.eventName "Submit")
                         "Activity should have frank:eventName"
+                }
+
+                test "activity has frank:actingRole triples for each role" {
+                    let record =
+                        { makeRecord personAgent with
+                            ActingRoles = [ "PlayerX"; "Spectator" ] }
+
+                    let graph = GraphBuilder.toGraph [ record ]
+
+                    Expect.isTrue
+                        (hasLiteralTriple graph record.Activity.Id ProvVocabulary.Frank.actingRole "PlayerX")
+                        "Activity should have frank:actingRole PlayerX"
+
+                    Expect.isTrue
+                        (hasLiteralTriple graph record.Activity.Id ProvVocabulary.Frank.actingRole "Spectator")
+                        "Activity should have frank:actingRole Spectator"
+                }
+
+                test "activity with no roles emits no frank:actingRole triples" {
+                    let record = makeRecord personAgent
+                    let graph = GraphBuilder.toGraph [ record ]
+
+                    let activityNode = graph.CreateUriNode(UriFactory.Create(record.Activity.Id))
+
+                    let rolePred =
+                        graph.CreateUriNode(UriFactory.Create(ProvVocabulary.Frank.actingRole))
+
+                    let triples = graph.GetTriplesWithSubjectPredicate(activityNode, rolePred).Count()
+                    Expect.equal triples 0 "Activity with no roles should have no frank:actingRole triples"
                 } ]
 
           testList

@@ -87,7 +87,8 @@ let private makeRecord (id: string) (resourceUri: string) (agentId: string) (rec
       Activity = activity
       Agent = agent
       GeneratedEntity = generatedEntity
-      UsedEntity = usedEntity }
+      UsedEntity = usedEntity
+      ActingRoles = [] }
 
 let private createLogger () =
     let factory: ILoggerFactory =

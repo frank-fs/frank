@@ -28,7 +28,8 @@ let private makeEvent (user: ClaimsPrincipal option) (headers: Map<string, strin
       Timestamp = DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
       User = user
       HttpMethod = "POST"
-      Headers = headers }
+      Headers = headers
+      Roles = [] }
 
 let private authenticatedPrincipal name identifier =
     let claims =

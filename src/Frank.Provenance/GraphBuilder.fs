@@ -90,6 +90,11 @@ module GraphBuilder =
             (uriNode graph ProvVocabulary.Frank.eventName)
             (plainLiteral graph activity.EventName)
 
+        let actingRolePred = uriNode graph ProvVocabulary.Frank.actingRole
+
+        for role in record.ActingRoles do
+            assertTriple graph activityNode actingRolePred (plainLiteral graph role)
+
     let private addUsedEntity (graph: IGraph) (record: ProvenanceRecord) =
         let entity = record.UsedEntity
         let entityNode = uriNode graph entity.Id
