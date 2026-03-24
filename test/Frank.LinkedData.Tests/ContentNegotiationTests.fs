@@ -385,4 +385,24 @@ let tests =
               request.Headers.Add("Accept", "text/turtle")
               let response: HttpResponseMessage = client.SendAsync(request).Result
               let body = response.Content.ReadAsStringAsync().Result
-              Expect.stringContains body "not valid json" "Should pass through original response on projection failure" ]
+              Expect.stringContains body "not valid json" "Should pass through original response on projection failure"
+
+          // Pragmatic choice: malformed Accept passes through to downstream handler (serves JSON)
+          // rather than 400. The middleware cannot know if the downstream handler prefers to 400.
+          // RFC 9110 Section 12.5.1 allows ignoring an unparseable Accept header.
+          testCase "middleware passes through when Accept header is malformed"
+          <| fun _ ->
+              let ontology = makeOntologyWithNameAndAge ()
+              let config = makeConfig ontology
+              use host = createTestHost config true
+              let server = host.GetTestServer()
+              use client = server.CreateClient()
+
+              use request = new HttpRequestMessage(HttpMethod.Get, "/person/1")
+
+              request.Headers.TryAddWithoutValidation("Accept", ";;;not-a-media-type;;;")
+              |> ignore
+
+              let (response: HttpResponseMessage) = client.SendAsync(request).Result
+              let body = response.Content.ReadAsStringAsync().Result
+              Expect.stringContains body "Alice" "Malformed Accept should fall through to original handler" ]

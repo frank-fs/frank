@@ -22,22 +22,22 @@ module WebHostBuilderExtensions =
         [ "application/ld+json"; "text/turtle"; "application/rdf+xml" ]
 
     /// Determines the RDF media type from the Accept header, if any.
-    /// Uses MediaTypeHeaderValue for proper RFC 7231 parsing with quality factors.
+    /// Uses MediaTypeHeaderValue for proper RFC 9110 Section 12.5.1 parsing with quality factors.
     let negotiateRdfType (accept: string) =
         if String.IsNullOrWhiteSpace accept then
             None
         else
-            let mediaTypes =
-                try
-                    MediaTypeHeaderValue.ParseList(Microsoft.Extensions.Primitives.StringValues(accept))
-                with _ ->
-                    System.Collections.Generic.List<MediaTypeHeaderValue>()
+            let (success, mediaTypes) =
+                MediaTypeHeaderValue.TryParseList(Microsoft.Extensions.Primitives.StringValues(accept))
 
-            mediaTypes
-            |> Seq.sortByDescending (fun mt -> mt.Quality |> Option.ofNullable |> Option.defaultValue 1.0)
-            |> Seq.tryPick (fun mt ->
-                supportedMediaTypes
-                |> List.tryFind (fun s -> mt.MediaType.Equals(s, StringComparison.OrdinalIgnoreCase)))
+            if not success || isNull mediaTypes then
+                None
+            else
+                mediaTypes
+                |> Seq.sortByDescending (fun mt -> mt.Quality |> Option.ofNullable |> Option.defaultValue 1.0)
+                |> Seq.tryPick (fun mt ->
+                    supportedMediaTypes
+                    |> List.tryFind (fun s -> mt.MediaType.Equals(s, StringComparison.OrdinalIgnoreCase)))
 
     /// Writes an IGraph to the stream in the specified RDF media type.
     let writeRdf (mediaType: string) (graph: IGraph) (stream: Stream) =
