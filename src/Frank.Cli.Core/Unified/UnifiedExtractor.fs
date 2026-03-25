@@ -7,6 +7,7 @@ open FSharp.Compiler.Symbols
 open FSharp.Compiler.CodeAnalysis
 open Frank.Statecharts
 open Frank.Resources.Model
+open Frank.Cli.Core.Shared
 open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
@@ -371,21 +372,16 @@ let private emptyTypedResult =
 // Type analysis helpers (duplicated from TypeAnalyzer since they are private)
 
 let private tryGetFullName (td: FSharpEntity) =
-    try
-        Some td.FullName
-    with _ ->
-        None
+    tryFcs None (fun () -> Some td.FullName)
 
 let private entityToSourceLocation (entity: FSharpEntity) : Frank.Resources.Model.SourceLocation option =
-    try
+    tryFcs None (fun () ->
         let r = entity.DeclarationLocation
 
         Some
             { File = r.FileName
               Line = r.StartLine
-              Column = r.StartColumn }
-    with _ ->
-        None
+              Column = r.StartColumn })
 
 let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
     let kind = TypeAnalyzer.mapFieldType fsharpType
@@ -407,14 +403,10 @@ let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
       Constraints = [] }
 
 let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
-    try
+    tryFcs [] (fun () ->
         Seq.append field.FieldAttributes field.PropertyAttributes
         |> Seq.choose (fun attr ->
-            let attrName =
-                try
-                    attr.AttributeType.DisplayName
-                with _ ->
-                    ""
+            let attrName = tryFcs "" (fun () -> attr.AttributeType.DisplayName)
 
             match attrName with
             | "PatternAttribute"
@@ -443,9 +435,7 @@ let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribu
                 | Some(_, (:? int as n)) -> Some(MaxLengthAttr n)
                 | _ -> None
             | _ -> None)
-        |> Seq.toList
-    with _ ->
-        []
+        |> Seq.toList)
 
 let private makeFieldFromFSharpField (field: FSharpField) : AnalyzedField =
     let baseField = makeField field.Name field.FieldType

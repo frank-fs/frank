@@ -4,14 +4,12 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Text
 open Frank.Resources.Model
+open Frank.Cli.Core.Shared
 
 module TypeAnalyzer =
 
     let private tryGetFullName (td: FSharpEntity) =
-        try
-            Some td.FullName
-        with _ ->
-            None
+        tryFcs None (fun () -> Some td.FullName)
 
     let rec mapFieldType (fsharpType: FSharpType) : FieldKind =
         if fsharpType.HasTypeDefinition then
@@ -60,11 +58,7 @@ module TypeAnalyzer =
                             if elem.HasTypeDefinition then
                                 let dn = elem.TypeDefinition.DisplayName
 
-                                let fn =
-                                    try
-                                        elem.TypeDefinition.FullName
-                                    with _ ->
-                                        ""
+                                let fn = tryFcs "" (fun () -> elem.TypeDefinition.FullName)
 
                                 fn = "System.Byte" || dn = "Byte" || dn = "byte"
                             else
@@ -84,11 +78,7 @@ module TypeAnalyzer =
                             if elem.HasTypeDefinition then
                                 let dn = elem.TypeDefinition.DisplayName
 
-                                let fn =
-                                    try
-                                        elem.TypeDefinition.FullName
-                                    with _ ->
-                                        ""
+                                let fn = tryFcs "" (fun () -> elem.TypeDefinition.FullName)
 
                                 fn = "System.Byte" || dn = "Byte" || dn = "byte"
                             else
@@ -108,14 +98,10 @@ module TypeAnalyzer =
             Reference(fsharpType.Format(FSharpDisplayContext.Empty))
 
     let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
-        try
+        tryFcs [] (fun () ->
             Seq.append field.FieldAttributes field.PropertyAttributes
             |> Seq.choose (fun attr ->
-                let attrName =
-                    try
-                        attr.AttributeType.DisplayName
-                    with _ ->
-                        ""
+                let attrName = tryFcs "" (fun () -> attr.AttributeType.DisplayName)
 
                 match attrName with
                 | "PatternAttribute"
@@ -144,9 +130,7 @@ module TypeAnalyzer =
                     | Some(_, (:? int as n)) -> Some(MaxLengthAttr n)
                     | _ -> None
                 | _ -> None)
-            |> Seq.toList
-        with _ ->
-            []
+            |> Seq.toList)
 
     let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
         let kind = mapFieldType fsharpType
@@ -175,22 +159,17 @@ module TypeAnalyzer =
             Constraints = constraints }
 
     let private entityToSourceLocation (entity: FSharpEntity) : SourceLocation option =
-        try
+        tryFcs None (fun () ->
             let r = entity.DeclarationLocation
 
             Some
                 { File = r.FileName
                   Line = r.StartLine
-                  Column = r.StartColumn }
-        with _ ->
-            None
+                  Column = r.StartColumn })
 
     let rec collectEntities (entity: FSharpEntity) : AnalyzedType list =
         let nested =
-            try
-                entity.NestedEntities |> Seq.collect collectEntities |> Seq.toList
-            with _ ->
-                []
+            tryFcs [] (fun () -> entity.NestedEntities |> Seq.collect collectEntities |> Seq.toList)
 
         let entityFullName = tryGetFullName entity |> Option.defaultValue entity.DisplayName
 
