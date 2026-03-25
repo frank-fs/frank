@@ -35,17 +35,17 @@ let execute
 
         match resourcesResult with
         | Error e -> return Error e
-        | Ok(resources, fromCache) ->
+        | Ok result ->
             let filtered =
                 match resourceFilter with
-                | None -> resources
+                | None -> result.Resources
                 | Some name ->
-                    resources
+                    result.Resources
                     |> List.filter (fun r -> r.ResourceSlug = name || r.RouteTemplate.Contains(name))
 
             match resourceFilter, filtered with
             | Some name, [] ->
-                let available = resources |> List.map _.ResourceSlug
+                let available = result.Resources |> List.map _.ResourceSlug
                 return Error(ResourceNotFound(name, available))
             | _ ->
                 let batchResult, projectionResults = projectAllResources filtered baseUri
@@ -93,7 +93,7 @@ let execute
                               OrphanWarnings = orphanWarnings
                               Errors = errors
                               OutputDirectory = None
-                              FromCache = fromCache }
+                              FromCache = result.FromCache }
                 | Some dir ->
                     Directory.CreateDirectory(dir) |> ignore
 
@@ -110,5 +110,5 @@ let execute
                               OrphanWarnings = orphanWarnings
                               Errors = errors
                               OutputDirectory = Some dir
-                              FromCache = fromCache }
+                              FromCache = result.FromCache }
     }

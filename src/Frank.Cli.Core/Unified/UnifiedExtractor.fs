@@ -850,9 +850,15 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 return Ok enriched
     }
 
-/// Load resources from cache if fresh, otherwise extract from source.
-/// Shared by all commands that need resources (extract, generate, validate, project).
-let loadOrExtract (projectPath: string) (force: bool) : Async<Result<UnifiedResource list * bool, StatechartError>> =
+/// Result of loading or extracting resources.
+type LoadResult =
+    { Resources: UnifiedResource list
+      FromCache: bool }
+
+/// Load resources from cache if fresh, otherwise extract from source and write cache.
+/// Shared by all commands that need resources (generate, validate, project).
+/// Cache write failures are logged but do not fail the operation.
+let loadOrExtract (projectPath: string) (force: bool) : Async<Result<LoadResult, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)
@@ -860,9 +866,21 @@ let loadOrExtract (projectPath: string) (force: bool) : Async<Result<UnifiedReso
             let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
 
             match UnifiedCache.tryLoadFresh projectDir force with
-            | Ok state -> return Ok(state.Resources, true)
+            | Ok state ->
+                return
+                    Ok
+                        { Resources = state.Resources
+                          FromCache = true }
             | Error _ ->
                 match! extract projectPath with
-                | Ok resources -> return Ok(resources, false)
+                | Ok resources ->
+                    match UnifiedCache.saveExtractionState projectDir resources "" [] with
+                    | Ok _ -> ()
+                    | Error msg -> eprintfn "Warning: failed to write cache: %s" msg
+
+                    return
+                        Ok
+                            { Resources = resources
+                              FromCache = false }
                 | Error e -> return Error e
     }

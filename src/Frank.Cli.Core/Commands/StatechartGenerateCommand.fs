@@ -88,8 +88,8 @@ let execute
             | Ok formats ->
                 match! UnifiedExtractor.loadOrExtract projectPath false with
                 | Error e -> return Error e
-                | Ok(resources, _) ->
-                    let machines = resources |> List.choose _.Statechart
+                | Ok result ->
+                    let machines = result.Resources |> List.choose _.Statechart
 
                     let filtered =
                         match resourceFilter with

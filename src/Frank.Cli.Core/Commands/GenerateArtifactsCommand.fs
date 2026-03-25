@@ -98,8 +98,8 @@ let execute
         if isAffordanceMapFormat format then
             match! UnifiedExtractor.loadOrExtract projectPath force with
             | Error e -> return Error e
-            | Ok(resources, fromCache) ->
-                let mapContent = generateAffordanceMapJson resources baseUri
+            | Ok result ->
+                let mapContent = generateAffordanceMapJson result.Resources baseUri
 
                 return
                     Ok
@@ -111,15 +111,15 @@ let execute
                                 FilePath = None } ]
                           OutputDirectory = outputDir
                           GenerationErrors = []
-                          FromCache = fromCache }
+                          FromCache = result.FromCache }
         else
             match parseFormat format with
             | Error e -> return Error e
             | Ok formats ->
                 match! UnifiedExtractor.loadOrExtract projectPath force with
                 | Error e -> return Error e
-                | Ok(resources, fromCache) ->
-                    let machines = resources |> List.choose (fun r -> r.Statechart)
+                | Ok result ->
+                    let machines = result.Resources |> List.choose (fun r -> r.Statechart)
 
                     let filtered =
                         match resourceFilter with
@@ -170,7 +170,8 @@ let execute
                                 let filteredRoutes = filtered |> List.map (fun m -> m.RouteTemplate) |> Set.ofList
 
                                 let matchingResources =
-                                    resources |> List.filter (fun r -> Set.contains r.RouteTemplate filteredRoutes)
+                                    result.Resources
+                                    |> List.filter (fun r -> Set.contains r.RouteTemplate filteredRoutes)
 
                                 let batchResult, projectionResults =
                                     ProjectionPipeline.projectAllResources matchingResources baseUri
@@ -252,7 +253,7 @@ let execute
                                     { Artifacts = mergedArtifacts
                                       OutputDirectory = None
                                       GenerationErrors = generationErrors
-                                      FromCache = fromCache }
+                                      FromCache = result.FromCache }
                         | Some dir ->
                             Directory.CreateDirectory(dir) |> ignore
 
@@ -271,5 +272,5 @@ let execute
                                     { Artifacts = written
                                       OutputDirectory = Some dir
                                       GenerationErrors = generationErrors
-                                      FromCache = fromCache }
+                                      FromCache = result.FromCache }
     }
