@@ -14,6 +14,7 @@
     <Compile Include="Rdf/FSharpRdf.fs" />
     <Compile Include="Rdf/Vocabularies.fs" />
     <!-- Shared utilities -->
+    <Compile Include="Shared/FcsHelpers.fs" />
     <Compile Include="Shared/SchemaAlignment.fs" />
     <Compile Include="Analysis/AstAnalyzer.fs" />
     <Compile Include="Analysis/TypeAnalyzer.fs" />

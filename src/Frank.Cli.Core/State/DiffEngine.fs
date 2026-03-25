@@ -1,6 +1,7 @@
 namespace Frank.Cli.Core.State
 
 open System
+open System.Diagnostics
 open System.Text
 open VDS.RDF
 
@@ -97,7 +98,8 @@ module DiffEngine =
             let subjectUri =
                 try
                     Uri(s)
-                with _ ->
+                with ex ->
+                    Debug.WriteLine($"Uri parse: {ex.Message}")
                     Uri("urn:blank:" + s)
 
             if hasAdded && hasRemoved then
