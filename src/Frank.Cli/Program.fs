@@ -3,6 +3,7 @@ module Program
 open System
 open System.CommandLine
 open Frank.Cli.Core.Commands
+open Frank.Cli.Core.Commands.ProjectCommand
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Help
 open Frank.Cli.Core.Statechart
@@ -804,7 +805,11 @@ let main args =
             for artifact in projResult.Artifacts do
                 match artifact.FilePath with
                 | Some fp ->
-                    let kind = if artifact.IsGlobalOverride then "global" else "role"
+                    let kind =
+                        match artifact.Kind with
+                        | GlobalOverride -> "global"
+                        | RoleProfile _ -> "role"
+
                     Console.WriteLine($"Projected ({kind}): {fp}")
                 | None -> Console.WriteLine(artifact.Content)
         | Error e ->

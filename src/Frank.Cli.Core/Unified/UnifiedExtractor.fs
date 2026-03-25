@@ -13,7 +13,7 @@ open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Syntax AST extraction helpers (merged from AstAnalyzer + StatechartSourceExtractor)
+// Syntax AST extraction helpers (merged from AstAnalyzer)
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── HTTP method helpers ──
@@ -114,7 +114,7 @@ let private tryExtractResource (expr: SynExpr) (file: string) : AnalyzedResource
                   Column = r.StartColumn } }
     | _ -> None
 
-// ── Stateful resource CE helpers (from StatechartSourceExtractor) ──
+// ── Stateful resource CE helpers ──
 
 let rec private tryExtractStateCaseName (expr: SynExpr) : string option =
     match expr with
@@ -141,7 +141,7 @@ and private extractSingleMethod (expr: SynExpr) : string option =
     | SynExpr.Paren(expr = inner) -> extractSingleMethod inner
     | _ -> None
 
-type private ForStateInfo =
+type internal ForStateInfo =
     { CaseName: string
       Methods: string list }
 
@@ -210,7 +210,7 @@ let rec private walkStatefulCeBody (acc: StatefulCeAccum) (expr: SynExpr) : Stat
     | SynExpr.Paren(expr = inner) -> walkStatefulCeBody acc inner
     | _ -> acc
 
-type private SyntaxStatefulResource =
+type internal SyntaxStatefulResource =
     { RouteTemplate: string
       MachineName: string option
       StateHandlers: ForStateInfo list
@@ -235,21 +235,15 @@ let private tryExtractStatefulResource (expr: SynExpr) : SyntaxStatefulResource 
 // Unified single-pass syntax AST walker
 // ══════════════════════════════════════════════════════════════════════════════
 
-type SyntaxFinding =
+type internal SyntaxFinding =
     | FoundPlainResource of resource: AnalyzedResource
-    | FoundStatefulResource of
-        route: string *
-        machineName: string option *
-        stateHandlers: (string * string list) list *
-        roleNames: string list
+    | FoundStatefulResource of resource: SyntaxStatefulResource
 
 /// Single-pass expression walker that dispatches to both resource and statefulResource extraction.
 let rec private walkExpr (file: string) (results: ResizeArray<SyntaxFinding>) (expr: SynExpr) =
     // Try statefulResource first (more specific pattern)
     match tryExtractStatefulResource expr with
-    | Some sr ->
-        let handlers = sr.StateHandlers |> List.map (fun fs -> fs.CaseName, fs.Methods)
-        results.Add(FoundStatefulResource(sr.RouteTemplate, sr.MachineName, handlers, sr.RoleNames))
+    | Some sr -> results.Add(FoundStatefulResource sr)
     | None ->
         // Try plain resource
         match tryExtractResource expr file with
@@ -318,7 +312,7 @@ let private findAllResources (parsedFiles: (string * ParsedInput) list) : Syntax
     results |> Seq.toList
 
 /// Find resources from a single parsed input (for testing).
-let findResourcesInParsedInput (parsedInput: ParsedInput) : SyntaxFinding list =
+let internal findResourcesInParsedInput (parsedInput: ParsedInput) : SyntaxFinding list =
     let results = ResizeArray<SyntaxFinding>()
     let fileName = parsedInput.FileName
 
@@ -334,7 +328,7 @@ let findResourcesInParsedInput (parsedInput: ParsedInput) : SyntaxFinding list =
     results |> Seq.toList
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Typed AST walking (merged from TypeAnalyzer + StatechartSourceExtractor)
+// Typed AST walking
 // ══════════════════════════════════════════════════════════════════════════════
 
 type private TypedMachineBinding =
@@ -369,83 +363,9 @@ let private emptyTypedResult =
     { AnalyzedTypes = []
       MachineBindings = [] }
 
-// Type analysis helpers (duplicated from TypeAnalyzer since they are private)
-
-let private tryGetFullName (td: FSharpEntity) =
-    tryFcs None (fun () -> Some td.FullName)
-
-let private entityToSourceLocation (entity: FSharpEntity) : Frank.Resources.Model.SourceLocation option =
-    tryFcs None (fun () ->
-        let r = entity.DeclarationLocation
-
-        Some
-            { File = r.FileName
-              Line = r.StartLine
-              Column = r.StartColumn })
-
-let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
-    let kind = TypeAnalyzer.mapFieldType fsharpType
-
-    let isRequired =
-        match kind with
-        | Optional _ -> false
-        | _ -> true
-
-    let isScalar =
-        match kind with
-        | Collection _ -> false
-        | _ -> true
-
-    { Name = name
-      Kind = kind
-      IsRequired = isRequired
-      IsScalar = isScalar
-      Constraints = [] }
-
-let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
-    tryFcs [] (fun () ->
-        Seq.append field.FieldAttributes field.PropertyAttributes
-        |> Seq.choose (fun attr ->
-            let attrName = tryFcs "" (fun () -> attr.AttributeType.DisplayName)
-
-            match attrName with
-            | "PatternAttribute"
-            | "Pattern" ->
-                match attr.ConstructorArguments |> Seq.tryHead with
-                | Some(_, (:? string as regex)) -> Some(PatternAttr regex)
-                | _ -> None
-            | "MinInclusiveAttribute"
-            | "MinInclusive" ->
-                match attr.ConstructorArguments |> Seq.tryHead with
-                | Some(_, value) -> Some(MinInclusiveAttr value)
-                | _ -> None
-            | "MaxInclusiveAttribute"
-            | "MaxInclusive" ->
-                match attr.ConstructorArguments |> Seq.tryHead with
-                | Some(_, value) -> Some(MaxInclusiveAttr value)
-                | _ -> None
-            | "MinLengthAttribute"
-            | "MinLength" ->
-                match attr.ConstructorArguments |> Seq.tryHead with
-                | Some(_, (:? int as n)) -> Some(MinLengthAttr n)
-                | _ -> None
-            | "MaxLengthAttribute"
-            | "MaxLength" ->
-                match attr.ConstructorArguments |> Seq.tryHead with
-                | Some(_, (:? int as n)) -> Some(MaxLengthAttr n)
-                | _ -> None
-            | _ -> None)
-        |> Seq.toList)
-
-let private makeFieldFromFSharpField (field: FSharpField) : AnalyzedField =
-    let baseField = makeField field.Name field.FieldType
-    let constraints = extractConstraintAttributes field
-
-    { baseField with
-        Constraints = constraints }
-
 let private collectEntityType (entity: FSharpEntity) : AnalyzedType list =
-    let entityFullName = tryGetFullName entity |> Option.defaultValue entity.DisplayName
+    let entityFullName =
+        TypeAnalyzer.tryGetFullName entity |> Option.defaultValue entity.DisplayName
 
     if entity.DisplayName.StartsWith("<") then
         []
@@ -454,23 +374,29 @@ let private collectEntityType (entity: FSharpEntity) : AnalyzedType list =
             entity.UnionCases
             |> Seq.map (fun uc ->
                 { Name = uc.Name
-                  Fields = uc.Fields |> Seq.map (fun f -> makeField f.Name f.FieldType) |> Seq.toList })
+                  Fields =
+                    uc.Fields
+                    |> Seq.map (fun f -> TypeAnalyzer.makeField f.Name f.FieldType)
+                    |> Seq.toList })
             |> Seq.toList
 
         [ { FullName = entityFullName
             ShortName = entity.DisplayName
             Kind = DiscriminatedUnion cases
             GenericParameters = entity.GenericParameters |> Seq.map (fun p -> p.Name) |> Seq.toList
-            SourceLocation = entityToSourceLocation entity
+            SourceLocation = TypeAnalyzer.entityToSourceLocation entity
             IsClosed = false } ]
     elif entity.IsFSharpRecord then
-        let fields = entity.FSharpFields |> Seq.map makeFieldFromFSharpField |> Seq.toList
+        let fields =
+            entity.FSharpFields
+            |> Seq.map TypeAnalyzer.makeFieldFromFSharpField
+            |> Seq.toList
 
         [ { FullName = entityFullName
             ShortName = entity.DisplayName
             Kind = Record fields
             GenericParameters = entity.GenericParameters |> Seq.map (fun p -> p.Name) |> Seq.toList
-            SourceLocation = entityToSourceLocation entity
+            SourceLocation = TypeAnalyzer.entityToSourceLocation entity
             IsClosed = true } ]
     elif entity.IsEnum then
         let values =
@@ -483,7 +409,7 @@ let private collectEntityType (entity: FSharpEntity) : AnalyzedType list =
             ShortName = entity.DisplayName
             Kind = Enum values
             GenericParameters = []
-            SourceLocation = entityToSourceLocation entity
+            SourceLocation = TypeAnalyzer.entityToSourceLocation entity
             IsClosed = false } ]
     else
         []
@@ -579,15 +505,16 @@ let private buildUnifiedResources
               HttpCapabilities = capabilities
               DerivedFields = ResourceModel.emptyDerivedFields }
 
-        | FoundStatefulResource(route, machineName, stateHandlers, roleNames) ->
-            let slug = ResourceModel.resourceSlug route
+        | FoundStatefulResource sr ->
+            let slug = ResourceModel.resourceSlug sr.RouteTemplate
 
-            let machineInfo = machineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
+            let machineInfo =
+                sr.MachineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
 
             let stateNames =
                 match machineInfo with
                 | Some info -> info.StateTypeCases
-                | None -> stateHandlers |> List.map fst |> List.distinct
+                | None -> sr.StateHandlers |> List.map _.CaseName |> List.distinct
 
             let initialStateKey =
                 match machineInfo with
@@ -601,7 +528,8 @@ let private buildUnifiedResources
                 | Some info -> info.GuardNames
                 | None -> []
 
-            let stateHttpMethods = stateHandlers |> Map.ofList
+            let stateHttpMethods =
+                sr.StateHandlers |> List.map (fun fs -> fs.CaseName, fs.Methods) |> Map.ofList
 
             let stateMetadata =
                 stateNames
@@ -615,12 +543,12 @@ let private buildUnifiedResources
                 |> Map.ofList
 
             let roles =
-                roleNames
+                sr.RoleNames
                 |> List.map (fun name -> { Name = name; Description = None }: RoleInfo)
 
             let statechart =
                 StatechartExtractor.toExtractedStatechart
-                    route
+                    sr.RouteTemplate
                     stateNames
                     initialStateKey
                     guardNames
@@ -628,16 +556,16 @@ let private buildUnifiedResources
                     roles
 
             let capabilities =
-                stateHandlers
-                |> List.collect (fun (caseName, methods) ->
-                    methods
+                sr.StateHandlers
+                |> List.collect (fun fs ->
+                    fs.Methods
                     |> List.map (fun m ->
                         { Method = m
-                          StateKey = Some caseName
+                          StateKey = Some fs.CaseName
                           LinkRelation = if m = "GET" then "self" else m.ToLowerInvariant()
                           IsSafe = m = "GET" || m = "HEAD" || m = "OPTIONS" }))
 
-            { RouteTemplate = route
+            { RouteTemplate = sr.RouteTemplate
               ResourceSlug = slug
               TypeInfo = []
               Statechart = Some statechart

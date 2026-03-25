@@ -14,7 +14,11 @@ let private checker = FSharpChecker.Create()
 let private parseSource (source: string) =
     async {
         let sourceText = SourceText.ofString source
-        let parsingOptions = { FSharpParsingOptions.Default with SourceFiles = [| "test.fs" |] }
+
+        let parsingOptions =
+            { FSharpParsingOptions.Default with
+                SourceFiles = [| "test.fs" |] }
+
         let! parseResult = checker.ParseFile("test.fs", sourceText, parsingOptions)
         return parseResult.ParseTree
     }
@@ -63,15 +67,15 @@ let game = statefulResource "/games/{gameId}" {
                     Expect.equal findings.Length 1 "Should find 1 resource"
 
                     match findings.[0] with
-                    | FoundStatefulResource(route, machineName, stateHandlers, _roleNames) ->
-                        Expect.equal route "/games/{gameId}" "Route should match"
-                        Expect.equal machineName (Some "gameMachine") "Machine name should be gameMachine"
-                        Expect.equal stateHandlers.Length 2 "Should have 2 state handlers"
+                    | FoundStatefulResource sr ->
+                        Expect.equal sr.RouteTemplate "/games/{gameId}" "Route should match"
+                        Expect.equal sr.MachineName (Some "gameMachine") "Machine name should be gameMachine"
+                        Expect.equal sr.StateHandlers.Length 2 "Should have 2 state handlers"
 
-                        let (case1, methods1) = stateHandlers.[0]
-                        Expect.equal case1 "XTurn" "First case should be XTurn"
-                        Expect.contains methods1 "GET" "XTurn should have GET"
-                        Expect.contains methods1 "POST" "XTurn should have POST"
+                        let fs0 = sr.StateHandlers.[0]
+                        Expect.equal fs0.CaseName "XTurn" "First case should be XTurn"
+                        Expect.contains fs0.Methods "GET" "XTurn should have GET"
+                        Expect.contains fs0.Methods "POST" "XTurn should have POST"
                     | _ -> failtest "Expected FoundStatefulResource"
                 }
 
@@ -103,7 +107,7 @@ let game = statefulResource "/games/{gameId}" {
                         findings
                         |> List.exists (fun f ->
                             match f with
-                            | FoundStatefulResource(route, _, _, _) -> route = "/games/{gameId}"
+                            | FoundStatefulResource sr -> sr.RouteTemplate = "/games/{gameId}"
                             | _ -> false)
 
                     Expect.isTrue hasPlain "Should find plain resource"
@@ -170,9 +174,9 @@ let game = statefulResource "/games/{gameId}" {
                     let findings = findResourcesInParsedInput ast
 
                     match findings.[0] with
-                    | FoundStatefulResource(_, machineName, stateHandlers, _) ->
-                        Expect.isNone machineName "Machine name should be None"
-                        Expect.equal stateHandlers.Length 2 "Should have 2 state handlers"
+                    | FoundStatefulResource sr ->
+                        Expect.isNone sr.MachineName "Machine name should be None"
+                        Expect.equal sr.StateHandlers.Length 2 "Should have 2 state handlers"
                     | _ -> failtest "Expected FoundStatefulResource"
                 } ]
 
@@ -204,10 +208,22 @@ let game = statefulResource "/games/{gameId}" {
                           InitialStateKey = "XTurn"
                           GuardNames = []
                           StateMetadata =
-                            [ "XTurn", { IsFinal = false; AllowedMethods = [ "GET"; "POST" ]; Description = None }
-                              "OTurn", { IsFinal = false; AllowedMethods = [ "GET"; "POST" ]; Description = None }
-                              "Won", { IsFinal = true; AllowedMethods = [ "GET" ]; Description = None }
-                              "Draw", { IsFinal = true; AllowedMethods = [ "GET" ]; Description = None } ]
+                            [ "XTurn",
+                              { IsFinal = false
+                                AllowedMethods = [ "GET"; "POST" ]
+                                Description = None }
+                              "OTurn",
+                              { IsFinal = false
+                                AllowedMethods = [ "GET"; "POST" ]
+                                Description = None }
+                              "Won",
+                              { IsFinal = true
+                                AllowedMethods = [ "GET" ]
+                                Description = None }
+                              "Draw",
+                              { IsFinal = true
+                                AllowedMethods = [ "GET" ]
+                                Description = None } ]
                             |> Map.ofList
                           Roles = []
                           Transitions = [] }
@@ -338,9 +354,7 @@ let game = statefulResource "/games/{gameId}" {
                     let stateType =
                         { FullName = "Test.State"
                           ShortName = "State"
-                          Kind =
-                            DiscriminatedUnion
-                                [ { Name = "A"; Fields = [] }; { Name = "B"; Fields = [] } ]
+                          Kind = DiscriminatedUnion [ { Name = "A"; Fields = [] }; { Name = "B"; Fields = [] } ]
                           GenericParameters = []
                           SourceLocation = None
                           IsClosed = false }
@@ -379,11 +393,11 @@ let game = statefulResource "/games/{gameId}" {
                     Expect.equal findings.Length 1 "Should find 1 resource"
 
                     match findings.[0] with
-                    | FoundStatefulResource(_route, _machineName, _stateHandlers, roleNames) ->
-                        Expect.equal roleNames.Length 3 "Should have 3 roles"
-                        Expect.contains roleNames "PlayerX" "Should contain PlayerX"
-                        Expect.contains roleNames "PlayerO" "Should contain PlayerO"
-                        Expect.contains roleNames "Spectator" "Should contain Spectator"
+                    | FoundStatefulResource sr ->
+                        Expect.equal sr.RoleNames.Length 3 "Should have 3 roles"
+                        Expect.contains sr.RoleNames "PlayerX" "Should contain PlayerX"
+                        Expect.contains sr.RoleNames "PlayerO" "Should contain PlayerO"
+                        Expect.contains sr.RoleNames "Spectator" "Should contain Spectator"
                     | _ -> failtest "Expected FoundStatefulResource"
                 }
 
@@ -403,8 +417,7 @@ let game = statefulResource "/games/{gameId}" {
                     let findings = findResourcesInParsedInput ast
 
                     match findings.[0] with
-                    | FoundStatefulResource(_route, _machineName, _stateHandlers, roleNames) ->
-                        Expect.isEmpty roleNames "Should have no roles"
+                    | FoundStatefulResource sr -> Expect.isEmpty sr.RoleNames "Should have no roles"
                     | _ -> failtest "Expected FoundStatefulResource"
                 }
 
@@ -425,8 +438,8 @@ let game = statefulResource "/games/{gameId}" {
                     let findings = findResourcesInParsedInput ast
 
                     match findings.[0] with
-                    | FoundStatefulResource(_, _, _, roleNames) ->
-                        Expect.equal roleNames [ "Admin"; "User" ] "Roles should be in declaration order"
+                    | FoundStatefulResource sr ->
+                        Expect.equal sr.RoleNames [ "Admin"; "User" ] "Roles should be in declaration order"
                     | _ -> failtest "Expected FoundStatefulResource"
                 } ]
 
@@ -469,5 +482,9 @@ let items = resource "/items" {
                         let m = matching.Value
                         Expect.equal m.HttpMethods old.HttpMethods $"Methods should match for {old.RouteTemplate}"
                         Expect.equal m.Name old.Name $"Name should match for {old.RouteTemplate}"
-                        Expect.equal m.HasLinkedData old.HasLinkedData $"LinkedData should match for {old.RouteTemplate}"
+
+                        Expect.equal
+                            m.HasLinkedData
+                            old.HasLinkedData
+                            $"LinkedData should match for {old.RouteTemplate}"
                 } ] ]

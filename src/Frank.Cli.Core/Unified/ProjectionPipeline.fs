@@ -20,7 +20,10 @@ let filterCapabilitiesByStates (stateNames: string list) (capabilities: HttpCapa
 /// Filter capabilities by projected transitions: only keep unsafe capabilities
 /// (POST, PUT, PATCH, DELETE) in states where the role has an unsafe transition.
 /// Safe capabilities (GET, HEAD, OPTIONS) always survive — all roles can observe.
-let filterCapabilitiesByTransitions (transitions: TransitionSpec list) (capabilities: HttpCapability list) : HttpCapability list =
+let filterCapabilitiesByTransitions
+    (transitions: TransitionSpec list)
+    (capabilities: HttpCapability list)
+    : HttpCapability list =
     // States where this role has an unsafe (non-self-loop) transition
     let unsafeTransitionSources =
         transitions
@@ -39,7 +42,9 @@ let filterCapabilitiesByTransitions (transitions: TransitionSpec list) (capabili
 
 /// Result of running the projection pipeline for a single resource.
 type ProjectionResult =
-    { RoleProfiles: Map<string, string>
+    { ResourceSlug: string
+      RoleProfiles: Map<string, string>
+      RoleNameByProfileSlug: Map<string, string>
       UpdatedGlobalProfile: string option
       Orphans: TransitionSpec list
       Errors: string list }
@@ -58,11 +63,11 @@ let projectResource (resource: UnifiedResource) (baseUri: string) : ProjectionRe
             |> Map.toList
             |> List.map (fun (roleName, _) -> roleSlug resource.ResourceSlug roleName)
 
-        let roleProfiles, errors =
+        let roleProfiles, roleNameMap, errors =
             projections
             |> Map.toList
             |> List.fold
-                (fun (profiles, errs) (roleName, projectedChart) ->
+                (fun (profiles, names, errs) (roleName, projectedChart) ->
                     let slug = roleSlug resource.ResourceSlug roleName
 
                     let projectedResource =
@@ -80,12 +85,12 @@ let projectResource (resource: UnifiedResource) (baseUri: string) : ProjectionRe
                           ProfileSlug = Some resource.ResourceSlug }
 
                     match UnifiedAlpsGenerator.generateWithContext projectedResource baseUri (Some ctx) with
-                    | Ok alpsJson -> (Map.add slug alpsJson profiles, errs)
+                    | Ok alpsJson -> (Map.add slug alpsJson profiles, Map.add slug roleName names, errs)
                     | Error genErrs ->
                         let detail = String.concat "; " genErrs
                         let msg = $"Warning: failed to generate role profile for {slug}: {detail}"
-                        (profiles, msg :: errs))
-                (Map.empty, [])
+                        (profiles, names, msg :: errs))
+                (Map.empty, Map.empty, [])
 
         let orphans = Projection.findOrphanedTransitions sc projections
 
@@ -105,13 +110,17 @@ let projectResource (resource: UnifiedResource) (baseUri: string) : ProjectionRe
 
                 (None, [ msg ])
 
-        { RoleProfiles = roleProfiles
+        { ResourceSlug = resource.ResourceSlug
+          RoleProfiles = roleProfiles
+          RoleNameByProfileSlug = roleNameMap
           UpdatedGlobalProfile = updatedGlobal
           Orphans = orphans
           Errors = List.rev errors @ globalErrors }
 
     | _ ->
-        { RoleProfiles = Map.empty
+        { ResourceSlug = resource.ResourceSlug
+          RoleProfiles = Map.empty
+          RoleNameByProfileSlug = Map.empty
           UpdatedGlobalProfile = None
           Orphans = []
           Errors = [] }

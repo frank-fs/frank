@@ -1,8 +1,8 @@
 module Frank.Cli.Core.Commands.StatechartExtractCommand
 
 open Frank.Resources.Model
-open Frank.Cli.Core.Statechart
 open Frank.Cli.Core.Statechart.StatechartError
+open Frank.Cli.Core.Unified
 
 type ExtractResult =
     { StateMachines: ExtractedStatechart list }
@@ -10,7 +10,9 @@ type ExtractResult =
 /// Extract statechart metadata from an F# project using the compiler.
 let execute (projectPath: string) : Async<Result<ExtractResult, StatechartError>> =
     async {
-        match! StatechartSourceExtractor.extract projectPath with
-        | Ok machines -> return Ok { StateMachines = machines }
+        match! UnifiedExtractor.loadOrExtract projectPath false with
+        | Ok(resources, _) ->
+            let machines = resources |> List.choose _.Statechart
+            return Ok { StateMachines = machines }
         | Error e -> return Error e
     }

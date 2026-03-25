@@ -86,9 +86,11 @@ let execute
             match parseFormat format with
             | Error e -> return Error e
             | Ok formats ->
-                match! StatechartSourceExtractor.extract projectPath with
+                match! UnifiedExtractor.loadOrExtract projectPath false with
                 | Error e -> return Error e
-                | Ok machines ->
+                | Ok(resources, _) ->
+                    let machines = resources |> List.choose _.Statechart
+
                     let filtered =
                         match resourceFilter with
                         | None -> machines
