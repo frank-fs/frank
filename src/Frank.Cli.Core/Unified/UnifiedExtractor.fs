@@ -757,8 +757,48 @@ let internal matchDocToResource
     let docStates = documentStateNames doc
     resources |> List.tryFind (matchesResource docStates)
 
+/// Pure function: merge transitions from pre-parsed spec documents into resources.
+/// For resources with statecharts that have empty transitions, find a matching
+/// spec document by state name overlap and apply its transitions and roles.
+let internal applySpecTransitions
+    (docs: Frank.Statecharts.Ast.StatechartDocument list)
+    (resources: UnifiedResource list)
+    : UnifiedResource list =
+    if docs.IsEmpty then
+        resources
+    else
+        let docsWithStates = docs |> List.map (fun doc -> doc, documentStateNames doc)
+
+        resources
+        |> List.map (fun r ->
+            match r.Statechart with
+            | Some sc when sc.Transitions.IsEmpty ->
+                let matchingDoc =
+                    docsWithStates
+                    |> List.tryPick (fun (doc, docStates) -> if matchesResource docStates r then Some doc else None)
+
+                match matchingDoc with
+                | Some doc ->
+                    let transitions = TransitionExtractor.extract doc
+                    let specRoles = TransitionExtractor.extractRoles doc
+
+                    let mergedRoles =
+                        if not sc.Roles.IsEmpty then sc.Roles
+                        elif not specRoles.IsEmpty then specRoles
+                        else []
+
+                    { r with
+                        Statechart =
+                            Some
+                                { sc with
+                                    Transitions = transitions
+                                    Roles = mergedRoles } }
+                | None -> r
+            | _ -> r)
+
 /// Co-extract transitions from spec files and merge into resources.
 /// Returns enriched resources and any parse warnings.
+/// This is the impure shell: does file I/O, then delegates to pure applySpecTransitions.
 let internal enrichWithSpecTransitions
     (projectDir: string)
     (resources: UnifiedResource list)
@@ -777,42 +817,14 @@ let internal enrichWithSpecTransitions
                 | Error msg -> Some msg
                 | Ok _ -> None)
 
-        let parsedDocs =
+        let docs =
             parseResults
-            |> List.choose (fun (f, r) ->
+            |> List.choose (fun (_, r) ->
                 match r with
-                | Ok doc -> Some(f, doc, documentStateNames doc)
+                | Ok doc -> Some doc
                 | Error _ -> None)
 
-        resources
-        |> List.map (fun r ->
-            match r.Statechart with
-            | Some sc when sc.Transitions.IsEmpty ->
-                let matchingDoc =
-                    parsedDocs
-                    |> List.tryPick (fun (_path, doc, docStates) ->
-                        if matchesResource docStates r then Some doc else None)
-
-                match matchingDoc with
-                | Some doc ->
-                    let transitions = TransitionExtractor.extract doc
-
-                    let specRoles = TransitionExtractor.extractRoles doc
-
-                    let mergedRoles =
-                        if not sc.Roles.IsEmpty then sc.Roles
-                        elif not specRoles.IsEmpty then specRoles
-                        else []
-
-                    { r with
-                        Statechart =
-                            Some
-                                { sc with
-                                    Transitions = transitions
-                                    Roles = mergedRoles } }
-                | None -> r
-            | _ -> r),
-        parseWarnings
+        applySpecTransitions docs resources, parseWarnings
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Public API
