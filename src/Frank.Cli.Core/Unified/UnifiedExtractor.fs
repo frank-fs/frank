@@ -901,6 +901,7 @@ let loadOrExtract (projectPath: string) (force: bool) : Async<Result<LoadResult,
             | Error _ ->
                 match! extract projectPath with
                 | Ok resources ->
+                    // baseUri/vocabularies are projection config, not extraction data — use defaults for cache
                     match UnifiedCache.saveExtractionState projectDir resources "" [] with
                     | Ok _ -> ()
                     | Error msg -> eprintfn "Warning: failed to write cache: %s" msg
