@@ -63,6 +63,44 @@ The remaining ~20% splits between two work items:
 
 2. **Client dual derivation** (~5pp) — [v7.4.0 milestone](MULTI-PARTY_SESSIONS.md). Mechanically derives the client's protocol obligations from the server's session type.
 
+## The LLM Discovery Problem
+
+Will an LLM even know to look for `Link` headers, ALPS profiles, or JSON Home? **No — not without prompting.**
+
+LLMs are trained overwhelmingly on OpenAPI/Swagger patterns: `GET /api/v1/things`, JSON bodies, static schemas. They don't naturally reach for `Link` headers, `rel="profile"`, or JSON Home because those patterns barely exist in training data. If you point Claude or GPT at `http://localhost:5000` and say "play tic-tac-toe," it will try to guess URLs like `/api/games` or `/moves`, not parse `Link` headers from the response.
+
+However, LLMs *can* use these standards effectively when told to. The RFCs are well-documented in training data. The question isn't capability — it's default behavior.
+
+### The Three-Level Demo
+
+The strongest demonstration shows the **same agent, same game, with progressively less hand-holding**:
+
+| Level | Agent Setup | What It Proves | Expected Success |
+|---|---|---|---|
+| **Zero prompting** | Just a URL | How discoverable is the API to a naive agent? | ~30-40% — reads bodies and guesses, skips headers |
+| **"Follow HTTP standards"** | ~3-sentence system prompt | Can a minimally-instructed agent use the discovery loop? | ~80% — the target from the probability table |
+| **MCP tool-augmented** | `fetch_and_parse_links` tool | Can a tool-augmented agent achieve near-perfect play? | ~95% — tool handles header parsing mechanically |
+
+Example system prompt for Level 2:
+
+> "You are an HTTP client. Start at the root URL. Read response headers — follow `Link` relations, respect `Allow` methods, fetch `rel="profile"` for semantics. Never guess URLs."
+
+### What Each Level Proves
+
+The **gap between Level 1 and Level 2** proves that Frank's headers are doing real work. The server is emitting useful discovery information that an agent can act on — but only if it knows to look.
+
+The **small gap between Level 2 and Level 3** proves that HTTP standards are sufficient without custom tooling. The agent doesn't need a bespoke SDK or hand-written tool definitions — three sentences of instruction close most of the remaining distance.
+
+### The Deeper Argument
+
+HATEOAS was designed for browsers that understood link relations natively. LLMs are the first new "browser" in 30 years — but they need a nudge to act like one. The critical question for the thesis is whether that nudge is **3 sentences or 300 lines of tool definitions**.
+
+If 3 sentences of "follow HTTP standards" gets an LLM to ~80% success, Frank wins the argument against schema-first approaches (OpenAPI + tool-calling). The server does the work; the agent just needs to be a competent HTTP client.
+
+If it takes 300 lines of custom tooling, the HATEOAS thesis is academically correct but practically irrelevant — and OpenAPI + tool-calling wins by default because the ecosystem already exists.
+
+The demo must answer this question empirically.
+
 ## Methodology
 
 These probabilities are qualitative estimates based on:
