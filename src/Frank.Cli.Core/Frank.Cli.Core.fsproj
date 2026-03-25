@@ -33,8 +33,7 @@
     <Compile Include="Statechart/FormatDetector.fs" />
     <Compile Include="Statechart/StatechartError.fs" />
     <Compile Include="Statechart/StatechartExtractor.fs" />
-    <Compile Include="Statechart/StatechartSourceExtractor.fs" />
-    <Compile Include="Statechart/FormatPipeline.fs" />
+<Compile Include="Statechart/FormatPipeline.fs" />
     <Compile Include="Statechart/StatechartDocumentJson.fs" />
     <Compile Include="Statechart/ValidationReportFormatter.fs" />
     <!-- Unified pipeline -->

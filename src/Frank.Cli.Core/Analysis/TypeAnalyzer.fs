@@ -8,7 +8,7 @@ open Frank.Cli.Core.Shared
 
 module TypeAnalyzer =
 
-    let private tryGetFullName (td: FSharpEntity) =
+    let internal tryGetFullName (td: FSharpEntity) =
         tryFcs None (fun () -> Some td.FullName)
 
     let rec mapFieldType (fsharpType: FSharpType) : FieldKind =
@@ -97,7 +97,7 @@ module TypeAnalyzer =
         else
             Reference(fsharpType.Format(FSharpDisplayContext.Empty))
 
-    let private extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
+    let internal extractConstraintAttributes (field: FSharpField) : ConstraintAttribute list =
         tryFcs [] (fun () ->
             Seq.append field.FieldAttributes field.PropertyAttributes
             |> Seq.choose (fun attr ->
@@ -132,7 +132,7 @@ module TypeAnalyzer =
                 | _ -> None)
             |> Seq.toList)
 
-    let private makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
+    let internal makeField (name: string) (fsharpType: FSharpType) : AnalyzedField =
         let kind = mapFieldType fsharpType
 
         let isRequired =
@@ -151,14 +151,14 @@ module TypeAnalyzer =
           IsScalar = isScalar
           Constraints = [] }
 
-    let private makeFieldFromFSharpField (field: FSharpField) : AnalyzedField =
+    let internal makeFieldFromFSharpField (field: FSharpField) : AnalyzedField =
         let baseField = makeField field.Name field.FieldType
         let constraints = extractConstraintAttributes field
 
         { baseField with
             Constraints = constraints }
 
-    let private entityToSourceLocation (entity: FSharpEntity) : SourceLocation option =
+    let internal entityToSourceLocation (entity: FSharpEntity) : SourceLocation option =
         tryFcs None (fun () ->
             let r = entity.DeclarationLocation
 

@@ -5,13 +5,18 @@ open Frank.Cli.Core.Unified
 open Frank.Cli.Core.Unified.ProjectionPipeline
 open Frank.Cli.Core.Statechart.StatechartError
 
+type ArtifactKind =
+    | RoleProfile of roleName: string
+    | GlobalOverride
+
 type ProjectedArtifact =
-    { Slug: string
+    { ProfileSlug: string
+      ResourceSlug: string
       Content: string
       FilePath: string option
-      IsGlobalOverride: bool }
+      Kind: ArtifactKind }
 
-type ProjectResult =
+type RoleProjectionResult =
     { Artifacts: ProjectedArtifact list
       OrphanWarnings: string list
       Errors: string list
@@ -24,7 +29,7 @@ let execute
     (outputDir: string option)
     (resourceFilter: string option)
     (force: bool)
-    : Async<Result<ProjectResult, StatechartError>> =
+    : Async<Result<RoleProjectionResult, StatechartError>> =
     async {
         let! resourcesResult = UnifiedExtractor.loadOrExtract projectPath force
 
@@ -56,20 +61,27 @@ let execute
 
                 let roleArtifacts =
                     [ for result in projectionResults do
-                          for KeyValue(slug, content) in result.RoleProfiles do
-                              { Slug = slug
+                          for KeyValue(profileSlug, content) in result.RoleProfiles do
+                              let roleName =
+                                  result.RoleNameByProfileSlug
+                                  |> Map.tryFind profileSlug
+                                  |> Option.defaultValue profileSlug
+
+                              { ProfileSlug = profileSlug
+                                ResourceSlug = result.ResourceSlug
                                 Content = content
                                 FilePath = None
-                                IsGlobalOverride = false } ]
+                                Kind = RoleProfile roleName } ]
 
                 let globalArtifacts =
                     batchResult.GlobalProfileOverrides
                     |> Map.toList
-                    |> List.map (fun (slug, content) ->
-                        { Slug = slug
+                    |> List.map (fun (resourceSlug, content) ->
+                        { ProfileSlug = resourceSlug
+                          ResourceSlug = resourceSlug
                           Content = content
                           FilePath = None
-                          IsGlobalOverride = true })
+                          Kind = GlobalOverride })
 
                 let allArtifacts = roleArtifacts @ globalArtifacts
 
@@ -88,7 +100,7 @@ let execute
                     let written =
                         allArtifacts
                         |> List.map (fun a ->
-                            let filePath = Path.Combine(dir, $"{a.Slug}.alps.json")
+                            let filePath = Path.Combine(dir, $"{a.ProfileSlug}.alps.json")
                             File.WriteAllText(filePath, a.Content)
                             { a with FilePath = Some filePath })
 
