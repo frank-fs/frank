@@ -48,5 +48,13 @@ dotnet test test/Frank.Statecharts.Sqlite.Tests
 dotnet test test/Frank.Discovery.Tests
 dotnet test test/Frank.TicTacToe.Tests
 dotnet pack -c Release src/Frank.Resources.Model /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Statecharts.Core /p:Version=$version$versionSuffix -o $psscriptroot/bin
 dotnet pack -c Release src/Frank.LinkedData /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Discovery /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Provenance /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Validation /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Statecharts /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Statecharts.Sqlite /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Cli.Core /p:Version=$version$versionSuffix -o $psscriptroot/bin
+dotnet pack -c Release src/Frank.Cli /p:Version=$version$versionSuffix -o $psscriptroot/bin
 dotnet pack -c Release src/Frank.Cli.MSBuild -o $psscriptroot/bin
