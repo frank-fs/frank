@@ -11,17 +11,14 @@ let private setupTempProject () =
     let dir = Path.Combine(Path.GetTempPath(), $"frank-cache-test-{Guid.NewGuid():N}")
     Directory.CreateDirectory(dir) |> ignore
 
-    File.WriteAllText(
-        Path.Combine(dir, "Program.fs"),
-        "module Program\n\n[<EntryPoint>]\nlet main _ = 0\n")
+    File.WriteAllText(Path.Combine(dir, "Program.fs"), "module Program\n\n[<EntryPoint>]\nlet main _ = 0\n")
 
-    File.WriteAllText(
-        Path.Combine(dir, "Types.fs"),
-        "namespace MyApp\n\ntype GameState = XTurn | OTurn\n")
+    File.WriteAllText(Path.Combine(dir, "Types.fs"), "namespace MyApp\n\ntype GameState = XTurn | OTurn\n")
 
     File.WriteAllText(
         Path.Combine(dir, "Test.fsproj"),
-        "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>")
+        "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+    )
 
     dir
 
@@ -37,8 +34,10 @@ let private createSampleState (sourceHash: string) : UnifiedExtractionState =
 
 /// Cleanup a temp directory.
 let private cleanup (dir: string) =
-    try Directory.Delete(dir, true)
-    with _ -> ()
+    try
+        Directory.Delete(dir, true)
+    with _ ->
+        ()
 
 [<Tests>]
 let unifiedCacheTests =
@@ -93,7 +92,9 @@ let unifiedCacheTests =
 
                 testCase "load returns Error for corrupt data"
                 <| fun _ ->
-                    let dir = Path.Combine(Path.GetTempPath(), $"frank-cache-corrupt-{Guid.NewGuid():N}")
+                    let dir =
+                        Path.Combine(Path.GetTempPath(), $"frank-cache-corrupt-{Guid.NewGuid():N}")
+
                     Directory.CreateDirectory(dir) |> ignore
 
                     try
@@ -138,9 +139,7 @@ let unifiedCacheTests =
                     try
                         let hash1 = UnifiedCache.computeSourceHash dir
                         // Add a new source file
-                        File.WriteAllText(
-                            Path.Combine(dir, "NewModule.fs"),
-                            "module NewModule\n\nlet value = 1\n")
+                        File.WriteAllText(Path.Combine(dir, "NewModule.fs"), "module NewModule\n\nlet value = 1\n")
                         let hash2 = UnifiedCache.computeSourceHash dir
                         Expect.notEqual hash1 hash2 "Added file should change hash"
                     finally
@@ -175,6 +174,29 @@ let unifiedCacheTests =
                         let hash2 = UnifiedCache.computeSourceHash dir
                         Expect.equal hash1 hash2 "obj/ and bin/ files should not affect hash"
                     finally
+                        cleanup dir
+
+                testCase "spec file changes affect source hash"
+                <| fun _ ->
+                    let dir = setupTempProject ()
+
+                    try
+                        let hash1 = UnifiedCache.computeSourceHash dir
+
+                        // Add a specs/ directory with a .smcat file
+                        let specsDir = Path.Combine(dir, "specs")
+                        Directory.CreateDirectory(specsDir) |> ignore
+                        File.WriteAllText(Path.Combine(specsDir, "game.smcat"), "XTurn => OTurn;")
+                        let hash2 = UnifiedCache.computeSourceHash dir
+
+                        Expect.notEqual hash2 hash1 "Adding spec file should change hash"
+
+                        // Modify the spec file
+                        File.WriteAllText(Path.Combine(specsDir, "game.smcat"), "XTurn => OTurn: move;")
+                        let hash3 = UnifiedCache.computeSourceHash dir
+
+                        Expect.notEqual hash3 hash2 "Modifying spec file should change hash"
+                    finally
                         cleanup dir ]
 
           testList
@@ -193,8 +215,7 @@ let unifiedCacheTests =
                         Expect.isOk result "Cache with matching hash should be fresh"
 
                         match result with
-                        | Ok loaded ->
-                            Expect.equal loaded.SourceHash sourceHash "Source hash matches"
+                        | Ok loaded -> Expect.equal loaded.SourceHash sourceHash "Source hash matches"
                         | Error _ -> failtest "Expected Ok"
                     finally
                         cleanup dir
@@ -262,9 +283,11 @@ let unifiedCacheTests =
 
                     try
                         let sourceHash = UnifiedCache.computeSourceHash dir
+
                         let state =
                             { createSampleState sourceHash with
                                 ToolVersion = "0.0.1-old" }
+
                         let path = UnifiedCache.cachePath dir
                         UnifiedCache.save path state |> ignore
 
@@ -335,10 +358,10 @@ let unifiedCacheTests =
                                 TypeInfo = []
                                 Statechart = None
                                 HttpCapabilities =
-                                    [ { Method = "GET"
-                                        StateKey = None
-                                        LinkRelation = "self"
-                                        IsSafe = true } ]
+                                  [ { Method = "GET"
+                                      StateKey = None
+                                      LinkRelation = "self"
+                                      IsSafe = true } ]
                                 DerivedFields = ResourceModel.emptyDerivedFields } ]
 
                         let result =
@@ -382,23 +405,23 @@ let unifiedCacheTests =
                                 ResourceSlug = "games"
                                 TypeInfo = []
                                 Statechart =
-                                    Some
-                                        { RouteTemplate = "/games/{gameId}"
-                                          StateNames = [ "XTurn"; "OTurn"; "Won"; "Draw" ]
-                                          InitialStateKey = "XTurn"
-                                          GuardNames = [ "TurnGuard" ]
-                                          StateMetadata = Map.empty
-                                          Roles = roles
-                                          Transitions = transitions }
+                                  Some
+                                      { RouteTemplate = "/games/{gameId}"
+                                        StateNames = [ "XTurn"; "OTurn"; "Won"; "Draw" ]
+                                        InitialStateKey = "XTurn"
+                                        GuardNames = [ "TurnGuard" ]
+                                        StateMetadata = Map.empty
+                                        Roles = roles
+                                        Transitions = transitions }
                                 HttpCapabilities =
-                                    [ { Method = "GET"
-                                        StateKey = Some "XTurn"
-                                        LinkRelation = "self"
-                                        IsSafe = true }
-                                      { Method = "POST"
-                                        StateKey = Some "XTurn"
-                                        LinkRelation = "makeMove"
-                                        IsSafe = false } ]
+                                  [ { Method = "GET"
+                                      StateKey = Some "XTurn"
+                                      LinkRelation = "self"
+                                      IsSafe = true }
+                                    { Method = "POST"
+                                      StateKey = Some "XTurn"
+                                      LinkRelation = "makeMove"
+                                      IsSafe = false } ]
                                 DerivedFields = ResourceModel.emptyDerivedFields } ]
 
                         let state =

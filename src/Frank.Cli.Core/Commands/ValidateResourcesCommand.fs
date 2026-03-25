@@ -74,5 +74,5 @@ let execute
     async {
         match! UnifiedExtractor.loadOrExtract projectPath force with
         | Error e -> return Error e
-        | Ok(resources, fromCache) -> return Ok(buildResult fromCache resources checkProjection checkProgress)
+        | Ok result -> return Ok(buildResult result.FromCache result.Resources checkProjection checkProgress)
     }

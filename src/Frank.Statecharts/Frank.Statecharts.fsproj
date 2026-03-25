@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Frank.Statecharts.Tests" />
     <InternalsVisibleTo Include="Frank.Cli.Core" />
+    <InternalsVisibleTo Include="Frank.Cli.Core.Tests" />
   </ItemGroup>
 
   <ItemGroup>

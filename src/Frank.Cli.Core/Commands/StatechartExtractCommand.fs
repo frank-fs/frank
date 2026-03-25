@@ -11,8 +11,8 @@ type ExtractResult =
 let execute (projectPath: string) : Async<Result<ExtractResult, StatechartError>> =
     async {
         match! UnifiedExtractor.loadOrExtract projectPath false with
-        | Ok(resources, _) ->
-            let machines = resources |> List.choose _.Statechart
+        | Ok result ->
+            let machines = result.Resources |> List.choose _.Statechart
             return Ok { StateMachines = machines }
         | Error e -> return Error e
     }

@@ -12,12 +12,13 @@ open MessagePack.FSharp
 /// FSharpResolver handles DUs, options, lists, maps.
 /// ContractlessStandardResolver handles public records without attributes.
 let private msgpackOptions =
-    MessagePackSerializerOptions
-        .Standard
-        .WithResolver(
-            CompositeResolver.Create(
-                FSharpResolver.Instance,
-                ContractlessStandardResolver.Instance))
+    MessagePackSerializerOptions.Standard.WithResolver(
+        CompositeResolver.Create(FSharpResolver.Instance, ContractlessStandardResolver.Instance)
+    )
+
+/// Spec file extensions recognized by the extraction pipeline.
+/// Shared between cache hash computation and spec file discovery.
+let specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
 
 /// Cache file name for the unified extraction state.
 let cacheFileName = "model.bin"
@@ -49,7 +50,10 @@ let load (path: string) : Result<UnifiedExtractionState option, string> =
             Ok None
         else
             let bytes = File.ReadAllBytes(path)
-            let state = MessagePackSerializer.Deserialize<UnifiedExtractionState>(bytes, msgpackOptions)
+
+            let state =
+                MessagePackSerializer.Deserialize<UnifiedExtractionState>(bytes, msgpackOptions)
+
             Ok(Some state)
     with ex ->
         Error $"Failed to read cache: {ex.Message}"
@@ -65,6 +69,7 @@ let computeSourceHash (projectDir: string) : string =
         Directory.GetFiles(projectDir, "*.fs", SearchOption.AllDirectories)
         |> Array.filter (fun f ->
             let rel = Path.GetRelativePath(projectDir, f)
+
             not (rel.StartsWith("obj" + string Path.DirectorySeparatorChar))
             && not (rel.StartsWith("bin" + string Path.DirectorySeparatorChar))
             && not (rel.StartsWith("obj/"))
@@ -81,6 +86,21 @@ let computeSourceHash (projectDir: string) : string =
     for fsproj in fsprojFiles do
         let content = File.ReadAllBytes(fsproj)
         hash.AppendData(content)
+
+    // Also hash spec files in specs/ directory (spec changes affect extraction output)
+    let specsDir = Path.Combine(projectDir, "specs")
+
+    if Directory.Exists(specsDir) then
+        let specFiles =
+            specExtensions
+            |> List.map (fun ext -> $"*{ext}")
+            |> List.toArray
+            |> Array.collect (fun glob -> Directory.GetFiles(specsDir, glob))
+            |> Array.sort
+
+        for specFile in specFiles do
+            let content = File.ReadAllBytes(specFile)
+            hash.AppendData(content)
 
     let hashBytes = hash.GetHashAndReset()
     Convert.ToHexString(hashBytes).ToLowerInvariant()
@@ -118,6 +138,7 @@ let checkStaleness
             else
                 // Check source hash
                 let currentHash = computeSourceHash projectDir
+
                 if state.SourceHash <> currentHash then
                     Error(SourceHashMismatch(state.SourceHash, currentHash))
                 else
@@ -140,6 +161,7 @@ let saveExtractionState
     : Result<UnifiedExtractionState, string> =
 
     let sourceHash = computeSourceHash projectDir
+
     let state: UnifiedExtractionState =
         { Resources = resources
           SourceHash = sourceHash
@@ -150,6 +172,7 @@ let saveExtractionState
           Profiles = ProjectedProfiles.empty }
 
     let cacheFile = cachePath projectDir
+
     match save cacheFile state with
     | Ok() -> Ok state
     | Error msg -> Error msg

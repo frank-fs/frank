@@ -686,8 +686,7 @@ let private enrichWithDerivedFields
 // Spec file co-extraction: bridge transitions from spec files into extracted statecharts
 // ══════════════════════════════════════════════════════════════════════════════
 
-let internal specExtensions =
-    [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+let internal specExtensions = UnifiedCache.specExtensions
 
 let internal tryParseSpecFile (filePath: string) : Result<Frank.Statecharts.Ast.StatechartDocument, string> =
     try
@@ -757,8 +756,48 @@ let internal matchDocToResource
     let docStates = documentStateNames doc
     resources |> List.tryFind (matchesResource docStates)
 
+/// Pure function: merge transitions from pre-parsed spec documents into resources.
+/// For resources with statecharts that have empty transitions, find a matching
+/// spec document by state name overlap and apply its transitions and roles.
+let internal applySpecTransitions
+    (docs: Frank.Statecharts.Ast.StatechartDocument list)
+    (resources: UnifiedResource list)
+    : UnifiedResource list =
+    if docs.IsEmpty then
+        resources
+    else
+        let docsWithStates = docs |> List.map (fun doc -> doc, documentStateNames doc)
+
+        resources
+        |> List.map (fun r ->
+            match r.Statechart with
+            | Some sc when sc.Transitions.IsEmpty ->
+                let matchingDoc =
+                    docsWithStates
+                    |> List.tryPick (fun (doc, docStates) -> if matchesResource docStates r then Some doc else None)
+
+                match matchingDoc with
+                | Some doc ->
+                    let transitions = TransitionExtractor.extract doc
+                    let specRoles = TransitionExtractor.extractRoles doc
+
+                    let mergedRoles =
+                        if not sc.Roles.IsEmpty then sc.Roles
+                        elif not specRoles.IsEmpty then specRoles
+                        else []
+
+                    { r with
+                        Statechart =
+                            Some
+                                { sc with
+                                    Transitions = transitions
+                                    Roles = mergedRoles } }
+                | None -> r
+            | _ -> r)
+
 /// Co-extract transitions from spec files and merge into resources.
 /// Returns enriched resources and any parse warnings.
+/// This is the impure shell: does file I/O, then delegates to pure applySpecTransitions.
 let internal enrichWithSpecTransitions
     (projectDir: string)
     (resources: UnifiedResource list)
@@ -777,42 +816,14 @@ let internal enrichWithSpecTransitions
                 | Error msg -> Some msg
                 | Ok _ -> None)
 
-        let parsedDocs =
+        let docs =
             parseResults
-            |> List.choose (fun (f, r) ->
+            |> List.choose (fun (_, r) ->
                 match r with
-                | Ok doc -> Some(f, doc, documentStateNames doc)
+                | Ok doc -> Some doc
                 | Error _ -> None)
 
-        resources
-        |> List.map (fun r ->
-            match r.Statechart with
-            | Some sc when sc.Transitions.IsEmpty ->
-                let matchingDoc =
-                    parsedDocs
-                    |> List.tryPick (fun (_path, doc, docStates) ->
-                        if matchesResource docStates r then Some doc else None)
-
-                match matchingDoc with
-                | Some doc ->
-                    let transitions = TransitionExtractor.extract doc
-
-                    let specRoles = TransitionExtractor.extractRoles doc
-
-                    let mergedRoles =
-                        if not sc.Roles.IsEmpty then sc.Roles
-                        elif not specRoles.IsEmpty then specRoles
-                        else []
-
-                    { r with
-                        Statechart =
-                            Some
-                                { sc with
-                                    Transitions = transitions
-                                    Roles = mergedRoles } }
-                | None -> r
-            | _ -> r),
-        parseWarnings
+        applySpecTransitions docs resources, parseWarnings
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -839,7 +850,10 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
 
                 // Phase 3.5: Co-extract transitions from spec files
                 let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-                let withTransitions, _specWarnings = enrichWithSpecTransitions projectDir resources
+                let withTransitions, specWarnings = enrichWithSpecTransitions projectDir resources
+
+                for warning in specWarnings do
+                    eprintfn "Warning: %s" warning
 
                 // Phase 4: Associate types with resources
                 let withTypes = associateTypes withTransitions typedResult.AnalyzedTypes
@@ -850,9 +864,15 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 return Ok enriched
     }
 
-/// Load resources from cache if fresh, otherwise extract from source.
-/// Shared by all commands that need resources (extract, generate, validate, project).
-let loadOrExtract (projectPath: string) (force: bool) : Async<Result<UnifiedResource list * bool, StatechartError>> =
+/// Result of loading or extracting resources.
+type LoadResult =
+    { Resources: UnifiedResource list
+      FromCache: bool }
+
+/// Load resources from cache if fresh, otherwise extract from source and write cache.
+/// Shared by all commands that need resources (generate, validate, project).
+/// Cache write failures are logged but do not fail the operation.
+let loadOrExtract (projectPath: string) (force: bool) : Async<Result<LoadResult, StatechartError>> =
     async {
         if not (File.Exists projectPath) then
             return Error(FileNotFound projectPath)
@@ -860,9 +880,22 @@ let loadOrExtract (projectPath: string) (force: bool) : Async<Result<UnifiedReso
             let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
 
             match UnifiedCache.tryLoadFresh projectDir force with
-            | Ok state -> return Ok(state.Resources, true)
+            | Ok state ->
+                return
+                    Ok
+                        { Resources = state.Resources
+                          FromCache = true }
             | Error _ ->
                 match! extract projectPath with
-                | Ok resources -> return Ok(resources, false)
+                | Ok resources ->
+                    // baseUri/vocabularies are projection config, not extraction data — use defaults for cache
+                    match UnifiedCache.saveExtractionState projectDir resources "" [] with
+                    | Ok _ -> ()
+                    | Error msg -> eprintfn "Warning: failed to write cache: %s" msg
+
+                    return
+                        Ok
+                            { Resources = resources
+                              FromCache = false }
                 | Error e -> return Error e
     }
