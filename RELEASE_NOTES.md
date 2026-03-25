@@ -1,40 +1,52 @@
 ### New in 7.3.0
 
-**Frank.LinkedData - Semantic RDF Content Negotiation**
+Self-describing, protocol-aware applications — legible to both human developers and machine agents, with formal multi-party session guarantees enforced at the HTTP boundary.
 
-- **New Library:** Frank.LinkedData extension library for automatic RDF content negotiation
-- **Content Negotiation Middleware:** Endpoints marked with `linkedData` serve JSON-LD, Turtle, and RDF/XML alongside standard JSON based on the `Accept` header
-- **OWL Ontology Integration:** JSON responses are projected to RDF graphs using ontology-derived predicate URIs
-- **Supported Formats:**
-  - `application/ld+json` — JSON-LD
-  - `text/turtle` — Turtle
-  - `application/rdf+xml` — RDF/XML
-  - `application/json` — pass-through (no transformation)
-- **ResourceBuilder Extensions:**
-  - `linkedData` — marks a resource for RDF content negotiation
-- **WebHostBuilder Extensions:**
-  - `useLinkedData` — loads embedded semantic artifacts and enables content negotiation middleware
-  - `useLinkedDataWith` — uses a pre-loaded `LinkedDataConfig`
+**Multi-Party Session Protocol Enforcement**
 
-**Frank.Cli - Semantic Resource Extraction Toolchain**
+- **Role definitions** on stateful resources with typed guard projections
+- **Projection operator** derives per-role ALPS profiles from the global statechart
+- **Projected profile middleware** serves role-aware ALPS `Link` headers at zero per-request cost
+- **Progress analysis** detects deadlock and starvation at build time
+- **Projection consistency validator** with 4 MPST checks (safety, completeness, role independence, liveness)
+- **Post-hoc session conformance checking** via `Frank.Provenance`
+- **Role-aware SHACL shape references** for projected content negotiation and validation
+- **`frank project` command** generates per-role ALPS profiles with `--base-uri` support
 
-- **New Tool:** `frank` command-line tool for extracting semantic definitions from F# source code
-- **Commands:**
-  - `extract --project <path> --base-uri <uri>` — extract OWL ontology and SHACL shapes from F# types
-  - `clarify --project <path>` — identify ambiguities requiring human input
-  - `validate --project <path>` — validate completeness and consistency
-  - `compile --project <path>` — generate OWL/XML and SHACL Turtle artifacts
-  - `diff --project <path>` — compare current state with previous snapshot
+**Bidirectional Spec Pipeline**
 
-**Frank.Cli.MSBuild - Build-Time Semantic Artifact Embedding**
+- **Shared statechart AST** (`Frank.Statecharts.Core`) — unified type model for all format parsers
+- **Cross-format validator** with Jaro-Winkler near-match detection across WSD, ALPS, SCXML, smcat, XState
+- **Typed ALPS extension vocabulary** for role, guard, duality, and classification metadata
+- **End-to-end extraction pipeline** with `loadOrExtract` caching and pure/impure separation
+- **`frank extract`**, **`compile`**, **`validate`**, **`generate`**, **`diff`** CLI commands
 
-- **New Package:** Content-only NuGet package that auto-embeds compiled semantic artifacts as assembly resources
-- **Embedded Resources:** `Frank.Semantic.ontology.owl.xml`, `Frank.Semantic.shapes.shacl.ttl`, `Frank.Semantic.manifest.json`
-- **Transitive:** Works automatically via `buildTransitive/` targets
+**Discovery and JSON Home**
 
-**Frank.Analyzers**
+- **JSON Home document generation** at `GET /` via strict content negotiation
+- **`useDiscovery`** as pit-of-success default — bundles OPTIONS, Link headers, and JSON Home
+- **`useAffordances`** auto-loads pre-computed affordance map from embedded assembly resource
+- **Combinatorial integration tests** for discovery middleware composition
 
-- **FRANK001:** Duplicate HTTP handler detection now covers `datastar` operations
+**Frank.LinkedData — Semantic RDF Content Negotiation**
+
+- **New library** for automatic RDF content negotiation (JSON-LD, Turtle, RDF/XML)
+- **OWL ontology integration** projects JSON responses to RDF graphs using ontology-derived predicate URIs
+- **`useLinkedData`** / **`useLinkedDataWith`** WebHostBuilder extensions
+
+**Frank.Cli.MSBuild — Build-Time Artifact Embedding**
+
+- **Content-only NuGet package** auto-embeds compiled semantic artifacts and affordance maps as assembly resources
+- Works automatically via `buildTransitive/` targets
+
+**Additional Improvements**
+
+- **`IStatechartFeature`** typed feature replaces `HttpContext.Items` string conventions
+- **Auto-infer `ResourceSpec.Name`** from route template
+- **`frank` CLI** renamed from `frank-cli`; LLM-ready hierarchical help system
+- **FRANK001 analyzer** extended to cover `datastar` operations
+- **Constitution VII compliance** — all bare `with _ ->` catches replaced with logged helpers
+- **Type design improvements** — `FoundStatefulResource` record carrier, `ArtifactKind` DU, `RoleProjectionResult` naming
 
 ### New in 7.2.0 (Released 2026-02-10)
 
