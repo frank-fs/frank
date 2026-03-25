@@ -16,6 +16,10 @@ let private msgpackOptions =
         CompositeResolver.Create(FSharpResolver.Instance, ContractlessStandardResolver.Instance)
     )
 
+/// Spec file extensions recognized by the extraction pipeline.
+/// Shared between cache hash computation and spec file discovery.
+let specExtensions = [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+
 /// Cache file name for the unified extraction state.
 let cacheFileName = "model.bin"
 
@@ -87,12 +91,11 @@ let computeSourceHash (projectDir: string) : string =
     let specsDir = Path.Combine(projectDir, "specs")
 
     if Directory.Exists(specsDir) then
-        let specExtensions =
-            [| "*.wsd"; "*.smcat"; "*.scxml"; "*.alps.json"; "*.alps.xml" |]
-
         let specFiles =
             specExtensions
-            |> Array.collect (fun ext -> Directory.GetFiles(specsDir, ext))
+            |> List.map (fun ext -> $"*{ext}")
+            |> List.toArray
+            |> Array.collect (fun glob -> Directory.GetFiles(specsDir, glob))
             |> Array.sort
 
         for specFile in specFiles do

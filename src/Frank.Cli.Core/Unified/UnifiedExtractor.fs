@@ -686,8 +686,7 @@ let private enrichWithDerivedFields
 // Spec file co-extraction: bridge transitions from spec files into extracted statecharts
 // ══════════════════════════════════════════════════════════════════════════════
 
-let internal specExtensions =
-    [ ".wsd"; ".smcat"; ".alps.json"; ".alps.xml"; ".scxml" ]
+let internal specExtensions = UnifiedCache.specExtensions
 
 let internal tryParseSpecFile (filePath: string) : Result<Frank.Statecharts.Ast.StatechartDocument, string> =
     try
@@ -849,24 +848,12 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 // Phase 3: Cross-reference and build UnifiedResource records
                 let resources = buildUnifiedResources syntaxFindings typedResult
 
-                // Phase 3.5: Co-extract transitions from spec files (I/O boundary)
+                // Phase 3.5: Co-extract transitions from spec files
                 let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-                let specFiles = findSpecFiles projectDir
-                let parseResults = specFiles |> List.map (fun f -> f, tryParseSpecFile f)
+                let withTransitions, specWarnings = enrichWithSpecTransitions projectDir resources
 
-                for _, result in parseResults do
-                    match result with
-                    | Error msg -> eprintfn "Warning: %s" msg
-                    | Ok _ -> ()
-
-                let docs =
-                    parseResults
-                    |> List.choose (fun (_, r) ->
-                        match r with
-                        | Ok doc -> Some doc
-                        | Error _ -> None)
-
-                let withTransitions = applySpecTransitions docs resources
+                for warning in specWarnings do
+                    eprintfn "Warning: %s" warning
 
                 // Phase 4: Associate types with resources
                 let withTypes = associateTypes withTransitions typedResult.AnalyzedTypes
