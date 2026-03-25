@@ -59,7 +59,7 @@ This is past the HATEOAS threshold — agents can discover and use the API throu
 
 The remaining ~20% splits between two work items:
 
-1. **Response body hypermedia** (~10-15pp) — Phase 1 demo work. The [reference app](https://github.com/frank-fs/frank-tictactoe) will include structured JSON responses with embedded affordances.
+1. **Response body hypermedia** (~10-15pp) — Phase 1 demo work. The [reference app](https://github.com/frank-fs/tic-tac-toe) will include structured JSON responses with embedded affordances.
 
 2. **Client dual derivation** (~5pp) — [v7.4.0 milestone](MULTI-PARTY_SESSIONS.md). Mechanically derives the client's protocol obligations from the server's session type.
 
