@@ -66,6 +66,9 @@ These principles govern all code changes.
 - **`Allow` is a content header**: Use `resp.Content.Headers.Allow` not `resp.Headers.Contains("Allow")`. The latter throws `Misused header name` at runtime.
 - **CE delegation for bundles**: `spec |> this.UseJsonHome |> this.UseDiscoveryHeaders` — compose CE operations via member calls without inline duplication. Each writes to a different `WebHostSpec` field. Precedent: `Frank.Provenance`.
 - **`useX`/`useXWith` naming convention**: Zero-arg auto-load operations use `useX`; explicit-arg overloads use `useXWith`. Established by: `useValidation`/`useValidationWith`, `useLinkedData`/`useLinkedDataWith`, `useAffordances`/`useAffordancesWith`. Do not attempt same-name CE overloading at different arities.
+- **Integer division in threshold checks**: `count / 2` truncates (3/2=1), making thresholds more permissive than intended. Use multiplication instead: `overlap * 2 >= total` gives honest "at least half" semantics without rounding issues.
+- **Result over Option for diagnostics**: When a `None` return would discard useful error context (parse failures, file not found, unsupported format), return `Result<'T, string>` instead. Lets callers aggregate and surface warnings rather than silently dropping them.
+- **Transition state collection**: When extracting state names from `TransitionElement`, collect both `edge.Source` and `edge.Target`. Transition-only formats (smcat) don't create `StateDecl` for target-only states — they'd be invisible if you only collect sources.
 
 ## Workflow Rules
 
@@ -73,6 +76,8 @@ These principles govern all code changes.
 - **Keep master clean by working on a worktree within `.worktrees/`.** Every change — features, fixes, docs, config — follows: create worktree → work on branch → push → create PR → merge on approval. This keeps master free of in-progress commits so parallel branches can always use local master as a clean base.
 - **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
 - **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
+- **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first. The branch with the most shared-file changes merges last to minimize rebase churn.
+- **Verification sequence before PRs.** Before creating a PR, run the full verification sequence: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review`. Address findings before opening the PR.
 
 ### Planning and communication
 - **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
