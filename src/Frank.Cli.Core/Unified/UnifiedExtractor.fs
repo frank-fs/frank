@@ -849,9 +849,24 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 // Phase 3: Cross-reference and build UnifiedResource records
                 let resources = buildUnifiedResources syntaxFindings typedResult
 
-                // Phase 3.5: Co-extract transitions from spec files
+                // Phase 3.5: Co-extract transitions from spec files (I/O boundary)
                 let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-                let withTransitions, _specWarnings = enrichWithSpecTransitions projectDir resources
+                let specFiles = findSpecFiles projectDir
+                let parseResults = specFiles |> List.map (fun f -> f, tryParseSpecFile f)
+
+                for _, result in parseResults do
+                    match result with
+                    | Error msg -> eprintfn "Warning: %s" msg
+                    | Ok _ -> ()
+
+                let docs =
+                    parseResults
+                    |> List.choose (fun (_, r) ->
+                        match r with
+                        | Ok doc -> Some doc
+                        | Error _ -> None)
+
+                let withTransitions = applySpecTransitions docs resources
 
                 // Phase 4: Associate types with resources
                 let withTypes = associateTypes withTransitions typedResult.AnalyzedTypes
