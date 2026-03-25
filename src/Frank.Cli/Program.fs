@@ -574,8 +574,11 @@ let main args =
     uniExtractProjectOpt.Description <- "Path to .fsproj file"
     uniExtractProjectOpt.Required <- true
     let uniExtractBaseUriOpt = Option<string>("--base-uri")
-    uniExtractBaseUriOpt.Description <- "Base URI for ALPS profiles"
-    uniExtractBaseUriOpt.DefaultValueFactory <- (fun _ -> "http://example.org/")
+
+    uniExtractBaseUriOpt.Description <-
+        "Base URI for ALPS profile namespace (used in descriptor hrefs and cross-profile links)"
+
+    uniExtractBaseUriOpt.DefaultValueFactory <- (fun _ -> "http://example.org")
     let uniExtractVocabOpt = Option<string array>("--vocabularies")
     uniExtractVocabOpt.Description <- "Vocabulary namespaces to align"
     uniExtractVocabOpt.DefaultValueFactory <- (fun _ -> [| "schema.org" |])
@@ -629,6 +632,12 @@ let main args =
     let uniGenFormatOpt = Option<string>("--format")
     uniGenFormatOpt.Description <- "Target format (wsd|alps|alps-xml|scxml|smcat|xstate|affordance-map|all)"
     uniGenFormatOpt.Required <- true
+    let uniGenBaseUriOpt = Option<string>("--base-uri")
+
+    uniGenBaseUriOpt.Description <-
+        "Base URI for ALPS profile namespace (used in descriptor hrefs and cross-profile links)"
+
+    uniGenBaseUriOpt.DefaultValueFactory <- (fun _ -> "http://example.org")
     let uniGenOutputOpt = Option<string>("--output")
     uniGenOutputOpt.Description <- "Output directory for generated artifacts"
     let uniGenResourceOpt = Option<string>("--resource")
@@ -638,6 +647,7 @@ let main args =
     uniGenForceOpt.DefaultValueFactory <- (fun _ -> false)
     uniGenCmd.Options.Add(uniGenProjectOpt)
     uniGenCmd.Options.Add(uniGenFormatOpt)
+    uniGenCmd.Options.Add(uniGenBaseUriOpt)
     uniGenCmd.Options.Add(uniGenOutputOpt)
     uniGenCmd.Options.Add(uniGenResourceOpt)
     uniGenCmd.Options.Add(uniGenForceOpt)
@@ -645,6 +655,7 @@ let main args =
     uniGenCmd.SetAction(fun parseResult ->
         let project = parseResult.GetValue(uniGenProjectOpt)
         let format = parseResult.GetValue(uniGenFormatOpt)
+        let baseUri = parseResult.GetValue(uniGenBaseUriOpt)
 
         let outputDir =
             let v = parseResult.GetValue(uniGenOutputOpt)
@@ -657,7 +668,7 @@ let main args =
         let force = parseResult.GetValue(uniGenForceOpt)
 
         let result =
-            GenerateArtifactsCommand.execute project format outputDir resource force
+            GenerateArtifactsCommand.execute project format baseUri outputDir resource force
             |> Async.RunSynchronously
 
         match result with
@@ -740,12 +751,17 @@ let main args =
     // ── project (top-level, unified) ──
     let uniProjCmd = Command("project")
 
-    uniProjCmd.Description <-
-        "Generate per-role ALPS profiles from stateful resources using the projection operator"
+    uniProjCmd.Description <- "Generate per-role ALPS profiles from stateful resources using the projection operator"
 
     let uniProjProjectOpt = Option<string>("--project")
     uniProjProjectOpt.Description <- "Path to .fsproj file"
     uniProjProjectOpt.Required <- true
+    let uniProjBaseUriOpt = Option<string>("--base-uri")
+
+    uniProjBaseUriOpt.Description <-
+        "Base URI for ALPS profile namespace (used in descriptor hrefs and cross-profile links)"
+
+    uniProjBaseUriOpt.DefaultValueFactory <- (fun _ -> "http://example.org")
     let uniProjOutputOpt = Option<string>("--output")
     uniProjOutputOpt.Description <- "Output directory for projected ALPS profiles"
     let uniProjResourceOpt = Option<string>("--resource")
@@ -754,12 +770,14 @@ let main args =
     uniProjForceOpt.Description <- "Force re-extraction, bypassing cache"
     uniProjForceOpt.DefaultValueFactory <- (fun _ -> false)
     uniProjCmd.Options.Add(uniProjProjectOpt)
+    uniProjCmd.Options.Add(uniProjBaseUriOpt)
     uniProjCmd.Options.Add(uniProjOutputOpt)
     uniProjCmd.Options.Add(uniProjResourceOpt)
     uniProjCmd.Options.Add(uniProjForceOpt)
 
     uniProjCmd.SetAction(fun parseResult ->
         let project = parseResult.GetValue(uniProjProjectOpt)
+        let baseUri = parseResult.GetValue(uniProjBaseUriOpt)
 
         let outputDir =
             let v = parseResult.GetValue(uniProjOutputOpt)
@@ -772,7 +790,7 @@ let main args =
         let force = parseResult.GetValue(uniProjForceOpt)
 
         let result =
-            ProjectCommand.execute project outputDir resource force
+            ProjectCommand.execute project baseUri outputDir resource force
             |> Async.RunSynchronously
 
         match result with
@@ -788,8 +806,7 @@ let main args =
                 | Some fp ->
                     let kind = if artifact.IsGlobalOverride then "global" else "role"
                     Console.WriteLine($"Projected ({kind}): {fp}")
-                | None ->
-                    Console.WriteLine(artifact.Content)
+                | None -> Console.WriteLine(artifact.Content)
         | Error e ->
             Environment.ExitCode <- 1
             Console.Error.WriteLine(StatechartError.formatError e))
