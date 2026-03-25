@@ -5,6 +5,7 @@ open System.IO
 open Expecto
 open Frank.Resources.Model
 open Frank.Cli.Core.Unified.UnifiedExtractor
+open Frank.Statecharts.Smcat
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -286,4 +287,86 @@ let specCoExtractionTests =
                                 "Matching resource should have transitions after enrichment"
                         | None -> failtest "Should have statechart"
                     finally
-                        cleanup dir ] ]
+                        cleanup dir ]
+
+          testList
+              "applySpecTransitions (pure, in-memory)"
+              [ testCase "applies transitions from matching document"
+                <| fun _ ->
+                    let smcat = "XTurn => OTurn: makeMove;\nOTurn => XTurn: makeMove;"
+
+                    let doc = (Frank.Statecharts.Smcat.Parser.parseSmcat smcat).Document
+
+                    let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
+                    let result = applySpecTransitions [ doc ] [ resource ]
+
+                    match result.[0].Statechart with
+                    | Some sc ->
+                        Expect.isGreaterThan sc.Transitions.Length 0 "Should have transitions"
+
+                        let sources = sc.Transitions |> List.map _.Source |> Set.ofList
+                        Expect.isTrue (sources.Contains "XTurn") "Should have XTurn source"
+                        Expect.isTrue (sources.Contains "OTurn") "Should have OTurn source"
+                    | None -> failtest "Should have statechart"
+
+                testCase "does not overwrite existing transitions"
+                <| fun _ ->
+                    let smcat = "XTurn => OTurn: makeMove;"
+
+                    let doc = (Frank.Statecharts.Smcat.Parser.parseSmcat smcat).Document
+
+                    let existing =
+                        { Event = "Existing"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted }
+
+                    let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] [ existing ]
+                    let result = applySpecTransitions [ doc ] [ resource ]
+
+                    match result.[0].Statechart with
+                    | Some sc ->
+                        Expect.equal sc.Transitions.Length 1 "Should keep existing"
+                        Expect.equal sc.Transitions.[0].Event "Existing" "Should keep existing event"
+                    | None -> failtest "Should have statechart"
+
+                testCase "no match when states don't overlap"
+                <| fun _ ->
+                    let smcat = "XTurn => OTurn: makeMove;"
+
+                    let doc = (Frank.Statecharts.Smcat.Parser.parseSmcat smcat).Document
+
+                    let resource = makeResourceWithStates "tasks" [ "Active"; "Done" ] []
+                    let result = applySpecTransitions [ doc ] [ resource ]
+
+                    match result.[0].Statechart with
+                    | Some sc -> Expect.isEmpty sc.Transitions "No overlap means no transitions"
+                    | None -> failtest "Should have statechart"
+
+                testCase "empty docs list returns resources unchanged"
+                <| fun _ ->
+                    let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
+                    let result = applySpecTransitions [] [ resource ]
+
+                    match result.[0].Statechart with
+                    | Some sc -> Expect.isEmpty sc.Transitions "Empty docs = no transitions"
+                    | None -> failtest "Should have statechart"
+
+                testCase "matches correct resource among multiple"
+                <| fun _ ->
+                    let smcat = "XTurn => OTurn: makeMove;\nOTurn => XTurn: makeMove;"
+
+                    let doc = (Frank.Statecharts.Smcat.Parser.parseSmcat smcat).Document
+
+                    let matching = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] []
+                    let nonMatching = makeResourceWithStates "tasks" [ "Active"; "Done" ] []
+                    let result = applySpecTransitions [ doc ] [ nonMatching; matching ]
+
+                    match result.[0].Statechart with
+                    | Some sc -> Expect.isEmpty sc.Transitions "Non-matching unchanged"
+                    | None -> failtest "Should have statechart"
+
+                    match result.[1].Statechart with
+                    | Some sc -> Expect.isGreaterThan sc.Transitions.Length 0 "Matching gets transitions"
+                    | None -> failtest "Should have statechart" ] ]
