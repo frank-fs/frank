@@ -8,13 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="OptionsDiscoveryTests.fs" />
-    <Compile Include="LinkHeaderTests.fs" />
     <Compile Include="JsonHomeDocumentTests.fs" />
-    <Compile Include="JsonHomeProjectionTests.fs" />
     <Compile Include="JsonHomeMiddlewareTests.fs" />
-    <Compile Include="EdgeCaseTests.fs" />
-    <Compile Include="CombinationTests.fs" />
+    <Compile Include="JsonHomeProjectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

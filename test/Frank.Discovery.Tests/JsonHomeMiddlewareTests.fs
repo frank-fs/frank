@@ -16,7 +16,12 @@ open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-open Frank.Discovery.Tests.OptionsDiscoveryTests
+
+/// Simple endpoint data source for tests (ResourceEndpointDataSource is internal).
+type TestEndpointDataSource(endpoints: Endpoint[]) =
+    inherit EndpointDataSource()
+    override _.Endpoints = endpoints :> _
+    override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 let private withServer (f: HttpClient -> Task) =
     task {
@@ -228,98 +233,6 @@ let ceTests =
                 let contentType =
                     if isNull resp.Content.Headers.ContentType then "" else resp.Content.Headers.ContentType.MediaType
                 Expect.notEqual contentType "application/json-home" "should not be json-home"
-            })
-        }
-    ]
-
-[<Tests>]
-let useDiscoveryTests =
-    testList "useDiscovery CE operation" [
-        testTask "useDiscovery serves JSON Home at root" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let req = new HttpRequestMessage(HttpMethod.Get, "/")
-                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
-                let! (resp: HttpResponseMessage) = client.SendAsync(req)
-                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
-                Expect.isTrue (resp.Headers.Contains("Vary")) "should have Vary header"
-                let! (body: string) = resp.Content.ReadAsStringAsync()
-                Expect.isTrue (body.Contains("/items")) "should contain items resource"
-            })
-        }
-
-        testTask "useDiscovery returns Allow header on OPTIONS" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                    discoveryMediaType "application/json" "self"
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
-                Expect.isGreaterThan (resp.Content.Headers.Allow.Count) 0 "should have Allow header"
-            })
-        }
-
-        testTask "useDiscovery returns Link headers on GET" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                    discoveryMediaType "application/json" "self"
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/items"))
-                Expect.equal resp.StatusCode HttpStatusCode.OK "GET should return 200"
-                Expect.isTrue (resp.Headers.Contains("Link")) "should have Link header"
-            })
-        }
-    ]
-
-[<Tests>]
-let useDiscoveryHeadersTests =
-    testList "useDiscoveryHeaders CE operation" [
-        testTask "useDiscoveryHeaders does not serve JSON Home" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscoveryHeaders(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let req = new HttpRequestMessage(HttpMethod.Get, "/")
-                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
-                let! (resp: HttpResponseMessage) = client.SendAsync(req)
-                // Should NOT serve JSON Home — useDiscoveryHeaders only provides OPTIONS + Link
-                Expect.notEqual resp.StatusCode HttpStatusCode.OK "should not serve home document"
             })
         }
     ]

@@ -8,7 +8,7 @@ open Microsoft.Extensions.FileProviders
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-open Frank.Discovery.Tests.OptionsDiscoveryTests
+open Frank.Discovery.Tests.JsonHomeMiddlewareTests
 
 [<Tests>]
 let tests =
