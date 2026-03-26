@@ -45,15 +45,18 @@ let xTurnAffordance =
         StringValues(
             [| "<https://example.com/alps/games>; rel=\"profile\""
                "</games/123/move>; rel=\"makeMove\"" |]
-        ) }
+        )
+      HasTemplateLinks = false }
 
 let wonAffordance =
     { AllowHeaderValue = StringValues("GET")
-      LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |]) }
+      LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |])
+      HasTemplateLinks = false }
 
 let healthAffordance =
     { AllowHeaderValue = StringValues("GET")
-      LinkHeaderValues = StringValues([| "<https://example.com/alps/health>; rel=\"profile\"" |]) }
+      LinkHeaderValues = StringValues([| "<https://example.com/alps/health>; rel=\"profile\"" |])
+      HasTemplateLinks = false }
 
 /// Run a test against a configured test server with AffordanceMiddleware,
 /// disposing all resources on completion.

@@ -14,6 +14,10 @@ type PreComputedAffordance =
         /// Pre-formatted Link header values as a single StringValues (from string array).
         /// Each entry follows RFC 8288 syntax: `<URI>; rel="relation-type"`
         LinkHeaderValues: StringValues
+        /// True when any Link href contains route template parameters ({param}).
+        /// Middleware must resolve templates against ctx.Request.RouteValues at request time
+        /// because RFC 8288 Link targets must be URIs, not URI Templates.
+        HasTemplateLinks: bool
     }
 
 module AffordancePreCompute =
@@ -42,9 +46,12 @@ module AffordancePreCompute =
 
             let linkHeader = StringValues(linkValues)
 
+            let hasTemplates = linkValues |> Array.exists (fun v -> v.Contains("{"))
+
             dict.[key] <-
                 { AllowHeaderValue = allowHeader
-                  LinkHeaderValues = linkHeader }
+                  LinkHeaderValues = linkHeader
+                  HasTemplateLinks = hasTemplates }
 
             // Collect distinct roles from link relations
             let distinctRoles =
@@ -67,7 +74,8 @@ module AffordancePreCompute =
 
                 dict.[roleKey] <-
                     { AllowHeaderValue = allowHeader
-                      LinkHeaderValues = StringValues(roleLinkValues) }
+                      LinkHeaderValues = StringValues(roleLinkValues)
+                      HasTemplateLinks = roleLinkValues |> Array.exists (fun v -> v.Contains("{")) }
 
             // Generate authenticated fallback entry: only role-agnostic links
             // Used when user has roles but none match any role-specific entry
@@ -85,6 +93,7 @@ module AffordancePreCompute =
 
                 dict.[authKey] <-
                     { AllowHeaderValue = allowHeader
-                      LinkHeaderValues = StringValues(authLinkValues) }
+                      LinkHeaderValues = StringValues(authLinkValues)
+                      HasTemplateLinks = authLinkValues |> Array.exists (fun v -> v.Contains("{")) }
 
         dict

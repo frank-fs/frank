@@ -63,7 +63,7 @@ module WebHostBuilderExtensions =
                 Services =
                     spec.Services
                     >> fun services ->
-                        services.AddSingleton<Dictionary<string, PreComputedAffordance>>(
+                        services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
                             Func<IServiceProvider, Dictionary<string, PreComputedAffordance>>(fun sp ->
                                 let loggerFactory = sp.GetRequiredService<ILoggerFactory>()
                                 let logger = loggerFactory.CreateLogger<AffordanceMiddleware>()
@@ -120,56 +120,68 @@ module WebHostBuilderExtensions =
                 spec
             else
                 { spec with
+                    Services =
+                        spec.Services
+                        >> fun services ->
+                            services.AddSingleton<RoleProfileLookup>(roleLookup) |> ignore
+                            services
                     Middleware =
                         spec.Middleware
                         >> fun app ->
-                            app.UseMiddleware<ProjectedProfileMiddleware>(roleLookup) |> ignore
+                            app.UseMiddleware<ProjectedProfileMiddleware>() |> ignore
                             app }
 
         /// Auto-load projected profile data from the entry assembly's embedded model.bin.
-        /// Falls back to no-op when the entry assembly is null or model.bin is not found.
+        /// Registers a DI factory that lazily loads from the assembly.
+        /// Falls back to empty lookup when the entry assembly is null or model.bin is not found.
         /// For multi-project solutions, use useProjectedProfilesWith.
         [<CustomOperation("useProjectedProfiles")>]
         member _.UseProjectedProfiles(spec: WebHostSpec) : WebHostSpec =
-            match Assembly.GetEntryAssembly() with
-            | null ->
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            (getAffordanceLogger app)
-                                .LogWarning(
-                                    "Assembly.GetEntryAssembly() returned null; cannot auto-load projected profiles. Use useProjectedProfilesWith to supply an explicit RuntimeState."
-                                )
+            { spec with
+                Services =
+                    spec.Services
+                    >> fun services ->
+                        services.TryAddSingleton<RoleProfileLookup>(
+                            Func<IServiceProvider, RoleProfileLookup>(fun sp ->
+                                let loggerFactory = sp.GetRequiredService<ILoggerFactory>()
+                                let logger = loggerFactory.CreateLogger<ProjectedProfileMiddleware>()
 
-                            app }
-            | assembly ->
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            let logger = getAffordanceLogger app
-
-                            match StartupProjection.loadRuntimeStateFromAssembly logger assembly with
-                            | Some state ->
-                                let roleLookup = RoleProfileOverlay.build state
-
-                                if roleLookup.Count > 0 then
-                                    logger.LogInformation(
-                                        "Projected profiles loaded from assembly '{AssemblyName}' ({RouteCount} routes with role projections).",
-                                        assembly.GetName().Name,
-                                        roleLookup.Count
+                                match Assembly.GetEntryAssembly() with
+                                | null ->
+                                    logger.LogWarning(
+                                        "Assembly.GetEntryAssembly() returned null; cannot auto-load projected profiles. Use useProjectedProfilesWith to supply an explicit RuntimeState."
                                     )
 
-                                    app.UseMiddleware<ProjectedProfileMiddleware>(roleLookup) |> ignore
+                                    RoleProfileLookup(System.StringComparer.Ordinal)
+                                | assembly ->
+                                    match StartupProjection.loadRuntimeStateFromAssembly logger assembly with
+                                    | Some state ->
+                                        let roleLookup = RoleProfileOverlay.build state
 
-                            | None ->
-                                logger.LogInformation(
-                                    "model.bin not found or unreadable in assembly '{AssemblyName}'; projected profiles not loaded.",
-                                    assembly.GetName().Name
-                                )
+                                        if roleLookup.Count > 0 then
+                                            logger.LogInformation(
+                                                "Projected profiles loaded from assembly '{AssemblyName}' ({RouteCount} routes with role projections).",
+                                                assembly.GetName().Name,
+                                                roleLookup.Count
+                                            )
 
-                            app }
+                                        roleLookup
+                                    | None ->
+                                        logger.LogInformation(
+                                            "model.bin not found or unreadable in assembly '{AssemblyName}'; projected profiles not loaded.",
+                                            assembly.GetName().Name
+                                        )
+
+                                        RoleProfileLookup(System.StringComparer.Ordinal))
+                        )
+                        |> ignore
+
+                        services
+                Middleware =
+                    spec.Middleware
+                    >> fun app ->
+                        app.UseMiddleware<ProjectedProfileMiddleware>() |> ignore
+                        app }
 
         /// Registers the OPTIONS discovery middleware. Endpoints respond to
         /// OPTIONS with an Allow header listing registered HTTP methods and

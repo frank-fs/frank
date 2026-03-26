@@ -486,7 +486,8 @@ let stateAwareOptionsTests =
                       StringValues(
                           [| "<https://example.com/alps/games>; rel=\"profile\""
                              "</games/{gameId}/move>; rel=\"makeMove\"" |]
-                      ) }
+                      )
+                    HasTemplateLinks = true }
 
               let lookup = buildAffordanceLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
 
@@ -510,7 +511,8 @@ let stateAwareOptionsTests =
           testTask "OPTIONS returns restricted Allow for terminal state" {
               let wonAffordance =
                   { AllowHeaderValue = StringValues("GET, OPTIONS")
-                    LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |]) }
+                    LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |])
+                    HasTemplateLinks = false }
 
               let lookup = buildAffordanceLookup [ "/games/{gameId}|Won", wonAffordance ]
 
@@ -542,7 +544,8 @@ let stateAwareOptionsTests =
                       StringValues(
                           [| "<https://example.com/alps/games>; rel=\"profile\""
                              "</games/{gameId}/move>; rel=\"makeMove\"" |]
-                      ) }
+                      )
+                    HasTemplateLinks = true }
 
               let lookup = buildAffordanceLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
 
@@ -569,7 +572,8 @@ let stateAwareOptionsTests =
           testTask "OPTIONS returns Link headers with only profile for terminal state" {
               let wonAffordance =
                   { AllowHeaderValue = StringValues("GET, OPTIONS")
-                    LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |]) }
+                    LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |])
+                    HasTemplateLinks = false }
 
               let lookup = buildAffordanceLookup [ "/games/{gameId}|Won", wonAffordance ]
 
@@ -615,7 +619,8 @@ let stateAwareOptionsTests =
               // Lookup with only "XTurn" state
               let xTurnAffordance =
                   { AllowHeaderValue = StringValues("GET, OPTIONS, POST")
-                    LinkHeaderValues = StringValues([| "</games/{gameId}>; rel=\"profile\"" |]) }
+                    LinkHeaderValues = StringValues([| "</games/{gameId}>; rel=\"profile\"" |])
+                    HasTemplateLinks = true }
 
               let lookup = buildAffordanceLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
 

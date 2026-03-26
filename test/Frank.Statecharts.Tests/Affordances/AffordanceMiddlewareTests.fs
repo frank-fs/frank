@@ -516,7 +516,7 @@ let roleFilteredMiddlewareTests =
                   .GetAwaiter()
                   .GetResult()
 
-          testCase "Unauthenticated sees all links (fallback)"
+          testCase "Unauthenticated sees only role-agnostic links (HATEOAS: don't advertise unfollowable transitions)"
           <| fun _ ->
               (withAffordanceServer
                   roleLookup
@@ -531,13 +531,13 @@ let roleFilteredMiddlewareTests =
                           let links = getHeaderValues response "Link"
                           let allLinks = links |> String.concat " "
 
-                          Expect.isTrue
+                          Expect.isFalse
                               (allLinks.Contains("rel=\"makeMove\""))
-                              "Unauthenticated should see makeMove (all links fallback)"
+                              "Unauthenticated should NOT see makeMove (role-restricted)"
 
                           Expect.isTrue
                               (allLinks.Contains("rel=\"viewGame\""))
-                              "Unauthenticated should see viewGame"
+                              "Unauthenticated should see viewGame (role-agnostic)"
                       }))
                   .GetAwaiter()
                   .GetResult()

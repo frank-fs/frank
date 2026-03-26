@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
+open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Resources.Model
 open Frank.Statecharts
@@ -33,59 +34,109 @@ type OptionsDiscoveryMiddleware
         affordanceLookup: Dictionary<string, PreComputedAffordance>
     ) =
 
-    /// Cached parsed templates for route matching. Lazy-initialized on first request
-    /// to avoid per-request TemplateParser/TemplateMatcher allocations (FW-1).
-    let parsedEndpoints =
+    /// Cached parsed route templates for matching. RouteTemplate is immutable and safe
+    /// for concurrent access. TemplateMatcher is created per-request because its internal
+    /// state is not guaranteed thread-safe.
+    let parsedTemplates =
         lazy
             (dataSource.Endpoints
              |> Seq.choose (fun ep ->
                  match ep with
                  | :? RouteEndpoint as re when not (isNull re.RoutePattern.RawText) ->
                      let template = TemplateParser.Parse(re.RoutePattern.RawText)
-                     let matcher = TemplateMatcher(template, RouteValueDictionary())
-                     Some(re, matcher)
+                     Some(re, template)
                  | _ -> None)
-             |> Seq.toList)
+             |> Seq.toArray)
 
-    /// Find all RouteEndpoints whose route pattern matches the given request path.
-    /// Uses cached TemplateMatcher instances initialized lazily at first request.
+    /// Pre-computed route-level fallback data (Allow header + Link header values).
+    /// Keyed by route template, computed lazily on first request.
+    let routeLevelCache =
+        lazy
+            (let cache =
+                Dictionary<string, struct (StringValues * StringValues)>(System.StringComparer.Ordinal)
+
+             let grouped =
+                 parsedTemplates.Value |> Array.groupBy (fun (re, _) -> re.RoutePattern.RawText)
+
+             for routeTemplate, endpoints in grouped do
+                 let siblings = endpoints |> Array.map fst
+
+                 let methods =
+                     siblings
+                     |> Seq.collect (fun ep ->
+                         let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+
+                         if isNull meta then
+                             Seq.empty
+                         else
+                             meta.HttpMethods :> seq<_>)
+                     |> Set.ofSeq
+                     |> Set.add "OPTIONS"
+
+                 let allowValue = StringValues(System.String.Join(", ", methods))
+
+                 let mediaTypes =
+                     siblings
+                     |> Seq.collect (fun ep ->
+                         ep.Metadata
+                         |> Seq.choose (fun m ->
+                             match m with
+                             | :? DiscoveryMediaType as d -> Some d
+                             | _ -> None))
+                     |> Seq.distinctBy (fun mt -> mt.MediaType, mt.Rel)
+                     |> Seq.toArray
+
+                 let linkValues =
+                     if routeTemplate.Contains("{") then
+                         StringValues.Empty
+                     else
+                         let path =
+                             if routeTemplate.StartsWith("/") then
+                                 routeTemplate
+                             else
+                                 "/" + routeTemplate
+
+                         StringValues(
+                             mediaTypes
+                             |> Array.map (fun mt -> sprintf "<%s>; rel=\"%s\"; type=\"%s\"" path mt.Rel mt.MediaType)
+                         )
+
+                 cache.[routeTemplate] <- struct (allowValue, linkValues)
+
+             cache)
+
     let findSiblingEndpoints (requestPath: string) =
         let pathString = PathString(requestPath)
 
-        parsedEndpoints.Value
-        |> List.choose (fun (re, matcher) ->
+        parsedTemplates.Value
+        |> Array.choose (fun (re, template) ->
+            let matcher = TemplateMatcher(template, RouteValueDictionary())
             let routeValues = RouteValueDictionary()
 
             if matcher.TryMatch(pathString, routeValues) then
                 Some(re, routeValues)
             else
                 None)
+        |> Array.toList
 
-    /// Try to resolve state-aware affordances from the pre-computed lookup.
-    /// Returns Found when statechart metadata is present and the state resolves.
-    /// Returns NoStatechart when no statechart metadata exists (use route-level fallback).
-    /// Returns StateNotResolved when statechart exists but state can't be resolved (404).
     let tryResolveStateAwareAffordance
         (ctx: HttpContext)
         (siblings: RouteEndpoint list)
         (routeValues: RouteValueDictionary)
         : Task<AffordanceResolution> =
         task {
-            if isNull affordanceLookup || affordanceLookup.Count = 0 then
+            if affordanceLookup.Count = 0 then
                 return AffordanceResolution.NoStatechart
             else
-                // Check if any sibling has StateMachineMetadata
                 let stateMeta =
                     siblings
                     |> List.tryPick (fun ep ->
                         let meta = ep.Metadata.GetMetadata<StateMachineMetadata>()
-
                         if obj.ReferenceEquals(meta, null) then None else Some meta)
 
                 match stateMeta with
                 | None -> return AffordanceResolution.NoStatechart
                 | Some meta ->
-                    // Populate route values on the context so ResolveInstanceId can read them
                     for kv in routeValues do
                         ctx.Request.RouteValues.[kv.Key] <- kv.Value
 
@@ -100,18 +151,21 @@ type OptionsDiscoveryMiddleware
                     | false, _ -> return AffordanceResolution.StateNotResolved
         }
 
-    /// Collect HTTP methods from sibling endpoints using HttpMethodMetadata (route-level fallback).
-    let collectRouteLevelMethods (siblings: RouteEndpoint list) =
-        siblings
-        |> Seq.collect (fun ep ->
-            let meta = ep.Metadata.GetMetadata<HttpMethodMetadata>()
+    /// Resolve URI template parameters in pre-computed Link headers using route values.
+    let resolveTemplateLinks (ctx: HttpContext) (values: StringValues) =
+        let routeValues = ctx.Request.RouteValues
 
-            if isNull meta then
-                Seq.empty
-            else
-                meta.HttpMethods :> seq<_>)
-        |> Set.ofSeq
-        |> Set.add "OPTIONS"
+        let resolved =
+            values.ToArray()
+            |> Array.map (fun link ->
+                let mutable result = link
+
+                for kv in routeValues do
+                    result <- result.Replace(sprintf "{%s}" kv.Key, string kv.Value)
+
+                result)
+
+        StringValues(resolved)
 
     member _.Invoke(ctx: HttpContext) : Task =
         if not (HttpMethods.IsOptions(ctx.Request.Method)) then
@@ -145,41 +199,33 @@ type OptionsDiscoveryMiddleware
                         | AffordanceResolution.Found preComputed ->
                             ctx.Response.StatusCode <- 204
                             ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
-                            ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
-                        | AffordanceResolution.StateNotResolved -> ctx.Response.StatusCode <- 404
-                        | AffordanceResolution.NoStatechart ->
-                            let methods = collectRouteLevelMethods siblings
 
-                            let mediaTypes =
-                                siblings
-                                |> Seq.collect (fun ep ->
-                                    ep.Metadata
-                                    |> Seq.choose (fun m ->
-                                        match m with
-                                        | :? DiscoveryMediaType as d -> Some d
-                                        | _ -> None))
-                                |> Seq.distinctBy (fun mt -> mt.MediaType, mt.Rel)
-                                |> Seq.toList
+                            if preComputed.HasTemplateLinks then
+                                ctx.Response.Headers["Link"] <- resolveTemplateLinks ctx preComputed.LinkHeaderValues
+                            else
+                                ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
+                        | AffordanceResolution.StateNotResolved ->
+                            // Resource exists but current state could not be determined.
+                            // 404 per Fielding: returning superset Allow is misleading.
+                            ctx.Response.StatusCode <- 404
+                            ctx.Response.ContentType <- "text/plain"
+
+                            do!
+                                ctx.Response.WriteAsync(
+                                    "Resource state could not be resolved. The URI is valid but the instance state is unknown."
+                                )
+                        | AffordanceResolution.NoStatechart ->
+                            let routeTemplate = (List.head siblings).RoutePattern.RawText
+
+                            let struct (allowValue, linkValues) =
+                                match routeLevelCache.Value.TryGetValue(routeTemplate) with
+                                | true, cached -> cached
+                                | false, _ -> struct (StringValues.Empty, StringValues.Empty)
 
                             ctx.Response.StatusCode <- 204
-
-                            let allowValue = methods |> Set.toSeq |> String.concat ", "
                             ctx.Response.Headers["Allow"] <- allowValue
 
-                            // Suppress Link headers for parameterized routes —
-                            // curly braces are invalid URI chars per RFC 3986.
-                            let routePattern = (List.head siblings).RoutePattern.RawText
-
-                            if not (routePattern.Contains("{")) then
-                                let path =
-                                    if routePattern.StartsWith("/") then
-                                        routePattern
-                                    else
-                                        "/" + routePattern
-
-                                for mt in mediaTypes do
-                                    let linkValue = sprintf "<%s>; rel=\"%s\"; type=\"%s\"" path mt.Rel mt.MediaType
-
-                                    ctx.Response.Headers.Append("Link", linkValue)
+                            if linkValues.Count > 0 then
+                                ctx.Response.Headers["Link"] <- linkValues
             }
             :> Task

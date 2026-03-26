@@ -24,8 +24,10 @@ module JsonHomeProjection =
         internalPrefixes
         |> Array.exists (fun prefix -> normalized.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
 
-    /// Strip ASP.NET Core route constraints from templates.
-    /// {gameId:int} -> {gameId}, {slug:regex(...)} -> {slug}
+    /// Strip ASP.NET Core route constraints from templates for RFC 6570 compliance.
+    /// {gameId:int} -> {gameId}, {slug:regex(^[a-z]+$)} -> {slug}
+    /// The [^}]+ pattern is correct because ASP.NET Core's route parser does not allow
+    /// unescaped } inside constraint expressions — it terminates the parameter.
     let private stripConstraints (template: string) =
         System.Text.RegularExpressions.Regex.Replace(template, @"\{(\w+):[^}]+\}", "{$1}")
 
