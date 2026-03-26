@@ -10,6 +10,16 @@ open Frank.Builder
 open Frank.Resources.Model
 open Frank.Statecharts
 
+/// Result of attempting to resolve state-aware affordance data.
+[<RequireQualifiedAccess>]
+type AffordanceResolution =
+    /// Pre-computed affordance data found for the resolved state.
+    | Found of PreComputedAffordance
+    /// No statechart metadata on this resource — use route-level fallback.
+    | NoStatechart
+    /// Statechart exists but state could not be resolved — return 404.
+    | StateNotResolved
+
 /// Middleware that generates implicit OPTIONS responses for Frank resources.
 /// Builds an Allow header from all HTTP methods registered for the matched route
 /// and aggregates DiscoveryMediaType entries from endpoint metadata.
@@ -23,48 +33,46 @@ type OptionsDiscoveryMiddleware
         affordanceLookup: Dictionary<string, PreComputedAffordance>
     ) =
 
+    /// Cached parsed templates for route matching. Lazy-initialized on first request
+    /// to avoid per-request TemplateParser/TemplateMatcher allocations (FW-1).
+    let parsedEndpoints =
+        lazy
+            (dataSource.Endpoints
+             |> Seq.choose (fun ep ->
+                 match ep with
+                 | :? RouteEndpoint as re when not (isNull re.RoutePattern.RawText) ->
+                     let template = TemplateParser.Parse(re.RoutePattern.RawText)
+                     let matcher = TemplateMatcher(template, RouteValueDictionary())
+                     Some(re, matcher)
+                 | _ -> None)
+             |> Seq.toList)
+
     /// Find all RouteEndpoints whose route pattern matches the given request path.
-    /// Uses ASP.NET Core's TemplateMatcher to support both literal and parameterized
-    /// routes (e.g., "/games/{gameId}").
-    ///
-    /// Design decision: We match by comparing ctx.Request.Path against RoutePattern.RawText
-    /// rather than using ctx.GetEndpoint(). For OPTIONS requests without an explicit OPTIONS
-    /// handler, ASP.NET Core routing does not match an endpoint (GetEndpoint() returns null)
-    /// because no route is registered for the OPTIONS method. Path-based matching against
-    /// the EndpointDataSource is therefore the correct approach for implicit OPTIONS handling.
+    /// Uses cached TemplateMatcher instances initialized lazily at first request.
     let findSiblingEndpoints (requestPath: string) =
         let pathString = PathString(requestPath)
 
-        dataSource.Endpoints
-        |> Seq.choose (fun ep ->
-            match ep with
-            | :? RouteEndpoint as re ->
-                let rawText = re.RoutePattern.RawText
+        parsedEndpoints.Value
+        |> List.choose (fun (re, matcher) ->
+            let routeValues = RouteValueDictionary()
 
-                if not (isNull rawText) then
-                    let template = TemplateParser.Parse(rawText)
-                    let matcher = TemplateMatcher(template, RouteValueDictionary())
-                    let routeValues = RouteValueDictionary()
-
-                    if matcher.TryMatch(pathString, routeValues) then
-                        Some(re, routeValues)
-                    else
-                        None
-                else
-                    None
-            | _ -> None)
-        |> Seq.toList
+            if matcher.TryMatch(pathString, routeValues) then
+                Some(re, routeValues)
+            else
+                None)
 
     /// Try to resolve state-aware affordances from the pre-computed lookup.
-    /// Returns Some(preComputed) when statechart metadata is present and the state can be resolved.
+    /// Returns Found when statechart metadata is present and the state resolves.
+    /// Returns NoStatechart when no statechart metadata exists (use route-level fallback).
+    /// Returns StateNotResolved when statechart exists but state can't be resolved (404).
     let tryResolveStateAwareAffordance
         (ctx: HttpContext)
         (siblings: RouteEndpoint list)
         (routeValues: RouteValueDictionary)
-        : Task<PreComputedAffordance option> =
+        : Task<AffordanceResolution> =
         task {
-            if isNull affordanceLookup then
-                return None
+            if isNull affordanceLookup || affordanceLookup.Count = 0 then
+                return AffordanceResolution.NoStatechart
             else
                 // Check if any sibling has StateMachineMetadata
                 let stateMeta =
@@ -75,7 +83,7 @@ type OptionsDiscoveryMiddleware
                         if obj.ReferenceEquals(meta, null) then None else Some meta)
 
                 match stateMeta with
-                | None -> return None
+                | None -> return AffordanceResolution.NoStatechart
                 | Some meta ->
                     // Populate route values on the context so ResolveInstanceId can read them
                     for kv in routeValues do
@@ -88,8 +96,8 @@ type OptionsDiscoveryMiddleware
                     let compositeKey = AffordanceMap.lookupKey routeTemplate stateKey
 
                     match affordanceLookup.TryGetValue(compositeKey) with
-                    | true, preComputed -> return Some preComputed
-                    | false, _ -> return None
+                    | true, preComputed -> return AffordanceResolution.Found preComputed
+                    | false, _ -> return AffordanceResolution.StateNotResolved
         }
 
     /// Collect HTTP methods from sibling endpoints using HttpMethodMetadata (route-level fallback).
@@ -143,15 +151,18 @@ type OptionsDiscoveryMiddleware
                         do! next.Invoke(ctx)
                     else
                         // Try state-aware affordance lookup first
-                        let! stateAwareAffordance = tryResolveStateAwareAffordance ctx siblings routeValues
+                        let! resolution = tryResolveStateAwareAffordance ctx siblings routeValues
 
-                        match stateAwareAffordance with
-                        | Some preComputed ->
+                        match resolution with
+                        | AffordanceResolution.Found preComputed ->
                             // State-aware response from pre-computed affordance data
-                            ctx.Response.StatusCode <- 200
+                            ctx.Response.StatusCode <- 204
                             ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
                             ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
-                        | None ->
+                        | AffordanceResolution.StateNotResolved ->
+                            // Statechart exists but state could not be resolved — 404 (F-4)
+                            ctx.Response.StatusCode <- 404
+                        | AffordanceResolution.NoStatechart ->
                             // Fall back to route-level: collect all HttpMethodMetadata methods
                             let methods = collectRouteLevelMethods siblings
 
@@ -167,24 +178,26 @@ type OptionsDiscoveryMiddleware
                                 |> Seq.distinctBy (fun mt -> mt.MediaType, mt.Rel)
                                 |> Seq.toList
 
-                            ctx.Response.StatusCode <- 200
+                            ctx.Response.StatusCode <- 204
 
                             let allowValue = methods |> Set.toSeq |> String.concat ", "
                             ctx.Response.Headers["Allow"] <- allowValue
 
-                            // Emit Link headers for each DiscoveryMediaType (RFC 8288)
+                            // Emit Link headers only for non-parameterized routes (F-2).
+                            // Parameterized routes contain {}, which are invalid URI chars per RFC 3986.
                             let routePattern = (List.head siblings).RoutePattern.RawText
 
-                            let path =
-                                if routePattern.StartsWith("/") then
-                                    routePattern
-                                else
-                                    "/" + routePattern
+                            if not (routePattern.Contains("{")) then
+                                let path =
+                                    if routePattern.StartsWith("/") then
+                                        routePattern
+                                    else
+                                        "/" + routePattern
 
-                            for mt in mediaTypes do
-                                ctx.Response.Headers.Append(
-                                    "Link",
-                                    $"<{path}>; rel=\"{mt.Rel}\"; type=\"{mt.MediaType}\""
-                                )
+                                for mt in mediaTypes do
+                                    let linkValue =
+                                        sprintf "<%s>; rel=\"%s\"; type=\"%s\"" path mt.Rel mt.MediaType
+
+                                    ctx.Response.Headers.Append("Link", linkValue)
             }
             :> Task

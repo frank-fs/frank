@@ -83,7 +83,7 @@ let isolationTests =
         testTask "useOptionsDiscovery alone handles OPTIONS" {
             do! withSpec (fun b s -> b.UseOptionsDiscovery(s)) (itemsResourceWithMedia ()) (fun client -> task {
                 let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal resp.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
                 Expect.isGreaterThan (resp.Content.Headers.Allow.Count) 0 "should have Allow header"
             })
         }
@@ -157,7 +157,7 @@ let pairwiseTests =
             do! withSpec (fun b s -> s |> b.UseJsonHome |> b.UseOptionsDiscovery) (itemsResourceWithMedia ()) (fun client -> task {
                 // OPTIONS works
                 let! (resp1: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp1.StatusCode HttpStatusCode.OK "OPTIONS should work"
+                Expect.equal resp1.StatusCode HttpStatusCode.NoContent "OPTIONS should work"
                 Expect.isGreaterThan (resp1.Content.Headers.Allow.Count) 0 "should have Allow"
 
                 // JSON Home works
@@ -196,7 +196,7 @@ let bundleTests =
             do! withSpec (fun b s -> b.UseDiscoveryHeaders(s)) (itemsResourceWithMedia ()) (fun client -> task {
                 // OPTIONS works
                 let! (resp1: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp1.StatusCode HttpStatusCode.OK "OPTIONS should work"
+                Expect.equal resp1.StatusCode HttpStatusCode.NoContent "OPTIONS should work"
 
                 // Link works
                 let! (resp2: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/items"))
@@ -214,7 +214,7 @@ let bundleTests =
             do! withSpec (fun b s -> b.UseDiscovery(s)) (itemsResourceWithMedia ()) (fun client -> task {
                 // OPTIONS works
                 let! (resp1: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp1.StatusCode HttpStatusCode.OK "OPTIONS should work"
+                Expect.equal resp1.StatusCode HttpStatusCode.NoContent "OPTIONS should work"
                 Expect.isGreaterThan (resp1.Content.Headers.Allow.Count) 0 "should have Allow"
 
                 // Link headers work
@@ -325,7 +325,7 @@ let interactionTests =
                 // No user-defined resource at /, JSON Home only intercepts GET/HEAD
                 let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/"))
                 // OptionsDiscoveryMiddleware scans EndpointDataSource — no endpoint at /
-                Expect.notEqual resp.StatusCode HttpStatusCode.OK "OPTIONS at root should pass through"
+                Expect.notEqual resp.StatusCode HttpStatusCode.NoContent "OPTIONS at root should pass through"
             })
         }
 

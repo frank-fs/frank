@@ -109,7 +109,7 @@ let us1Tests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/items")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -134,7 +134,7 @@ let us1Tests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/health")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -166,7 +166,7 @@ let us1Tests =
                           // our discovery middleware did NOT handle it (no 200 from us).
                           Expect.notEqual
                               response.StatusCode
-                              HttpStatusCode.OK
+                              HttpStatusCode.NoContent
                               "CORS preflight should not be handled by discovery middleware"
                       })
           }
@@ -184,12 +184,12 @@ let us1Tests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/items")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          // Without the discovery middleware, OPTIONS should not return 200.
+                          // Without the discovery middleware, OPTIONS should not return 204.
                           // ASP.NET Core routing may return 405 for method not allowed.
                           Expect.notEqual
                               response.StatusCode
-                              HttpStatusCode.OK
-                              "Without discovery middleware, OPTIONS should not return 200"
+                              HttpStatusCode.NoContent
+                              "Without discovery middleware, OPTIONS should not return 204"
                       })
           }
 
@@ -208,7 +208,7 @@ let us1Tests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/items")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -300,7 +300,7 @@ let us1Tests =
                           // Check /items
                           let request1 = new HttpRequestMessage(HttpMethod.Options, "/items")
                           let! (response1: HttpResponseMessage) = client.SendAsync(request1)
-                          Expect.equal response1.StatusCode HttpStatusCode.OK "OPTIONS /items should return 200"
+                          Expect.equal response1.StatusCode HttpStatusCode.NoContent "OPTIONS /items should return 204"
                           let allow1 = response1.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allow1 "GET" "/items Allow should contain GET"
                           Expect.contains allow1 "POST" "/items Allow should contain POST"
@@ -310,7 +310,7 @@ let us1Tests =
                           // Check /health
                           let request2 = new HttpRequestMessage(HttpMethod.Options, "/health")
                           let! (response2: HttpResponseMessage) = client.SendAsync(request2)
-                          Expect.equal response2.StatusCode HttpStatusCode.OK "OPTIONS /health should return 200"
+                          Expect.equal response2.StatusCode HttpStatusCode.NoContent "OPTIONS /health should return 204"
                           let allow2 = response2.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allow2 "GET" "/health Allow should contain GET"
                           Expect.contains allow2 "OPTIONS" "/health Allow should contain OPTIONS"
@@ -337,7 +337,7 @@ let parameterizedRouteTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -359,7 +359,7 @@ let parameterizedRouteTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123/moves")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -381,7 +381,7 @@ let parameterizedRouteTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/health")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -496,7 +496,7 @@ let stateAwareOptionsTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -520,7 +520,7 @@ let stateAwareOptionsTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
@@ -552,7 +552,7 @@ let stateAwareOptionsTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           // Verify Link headers are present in state-aware path
                           Expect.isTrue (response.Headers.Contains("Link")) "State-aware OPTIONS should include Link headers"
@@ -579,7 +579,7 @@ let stateAwareOptionsTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           Expect.isTrue (response.Headers.Contains("Link")) "Terminal state OPTIONS should include Link headers"
                           let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
@@ -598,12 +598,34 @@ let stateAwareOptionsTests =
                           let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
                           let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                          Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                           // Falls back to route-level: collects all HttpMethodMetadata methods
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
                           Expect.contains allowHeader "POST" "Allow header should contain POST"
                           Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
+                      })
+          }
+
+          // F-4: OPTIONS returns 404 when statechart state cannot be resolved
+          testTask "OPTIONS returns 404 when statechart state cannot be resolved" {
+              // Lookup with only "XTurn" state
+              let xTurnAffordance =
+                  { AllowHeaderValue = StringValues("GET, OPTIONS, POST")
+                    LinkHeaderValues = StringValues([| "</games/{gameId}>; rel=\"profile\"" |]) }
+
+              let lookup = buildAffordanceLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
+
+              // stateMeta resolves instanceId but GetCurrentStateKey returns a state not in lookup
+              let meta = testStateMachineMetadata (fun _ -> "NonExistentState")
+
+              do!
+                  withStatefulOptionsServer lookup (Some meta) (statefulEndpoints meta) (fun client ->
+                      task {
+                          let request = new HttpRequestMessage(HttpMethod.Options, "/games/unknown-id")
+                          let! (response: HttpResponseMessage) = client.SendAsync(request)
+
+                          Expect.equal response.StatusCode HttpStatusCode.NotFound "OPTIONS should return 404 for unresolvable state"
                       })
           } ]
