@@ -11,12 +11,11 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-open Frank.Discovery.Tests.OptionsDiscoveryTests
+open Frank.Tests.Shared.TestEndpointDataSource
 
 let private withServer (f: HttpClient -> Task) =
     task {
@@ -208,6 +207,67 @@ let ceTests =
             })
         }
 
+        // #198: useJsonHome registers JsonHomeMetadata in DI
+        testTask "useJsonHome registers default JsonHomeMetadata in DI" {
+            let testResource =
+                resource "/items" {
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
+                }
+
+            let ceBuilder = WebHostBuilder([||])
+            let spec =
+                ceBuilder.Yield()
+                |> fun s -> ceBuilder.UseJsonHome(s)
+                |> fun s -> ceBuilder.Resource(s, testResource)
+
+            do! withCeServer spec (fun client -> task {
+                let req = new HttpRequestMessage(HttpMethod.Get, "/")
+                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+                let! (resp: HttpResponseMessage) = client.SendAsync(req)
+                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document with auto-registered metadata"
+                let! (body: string) = resp.Content.ReadAsStringAsync()
+                Expect.isTrue (body.Contains("/items")) "should contain items resource"
+            })
+        }
+
+        // #198: TryAddSingleton does NOT override pre-registered metadata
+        testTask "useJsonHome does not override explicitly registered JsonHomeMetadata" {
+            let testResource =
+                resource "/games/{gameId}" {
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+                }
+
+            let customMetadata: JsonHomeMetadata =
+                { Title = Some "Custom Title"
+                  DocsUrl = None
+                  AlpsBaseUri = Some "http://example.com/alps/games"
+                  AlpsDescriptors = Some (Map.ofList [ "games", Map.ofList [ "gameId", "http://example.com/alps/games#gameId" ] ]) }
+
+            let ceBuilder = WebHostBuilder([||])
+            let spec =
+                ceBuilder.Yield()
+                |> fun s -> ceBuilder.UseJsonHome(s)
+                |> fun s -> ceBuilder.Resource(s, testResource)
+
+            // Wrap Services to pre-register custom metadata BEFORE useJsonHome's TryAddSingleton
+            let innerServices = spec.Services
+            let specWithCustom =
+                { spec with
+                    Services = fun services ->
+                        services.AddSingleton<JsonHomeMetadata>(customMetadata) |> ignore
+                        innerServices services }
+
+            do! withCeServer specWithCustom (fun client -> task {
+                let req = new HttpRequestMessage(HttpMethod.Get, "/")
+                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+                let! (resp: HttpResponseMessage) = client.SendAsync(req)
+                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
+                let! (body: string) = resp.Content.ReadAsStringAsync()
+                Expect.isTrue (body.Contains("Custom Title")) "should use pre-registered metadata title, not Empty"
+                Expect.isTrue (body.Contains("http://example.com/alps/games#games~gameId")) "should use ALPS relation from pre-registered metadata"
+            })
+        }
+
         testTask "useJsonHome passes through non-json-home Accept at root" {
             let testResource =
                 resource "/items" {
@@ -228,98 +288,6 @@ let ceTests =
                 let contentType =
                     if isNull resp.Content.Headers.ContentType then "" else resp.Content.Headers.ContentType.MediaType
                 Expect.notEqual contentType "application/json-home" "should not be json-home"
-            })
-        }
-    ]
-
-[<Tests>]
-let useDiscoveryTests =
-    testList "useDiscovery CE operation" [
-        testTask "useDiscovery serves JSON Home at root" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let req = new HttpRequestMessage(HttpMethod.Get, "/")
-                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
-                let! (resp: HttpResponseMessage) = client.SendAsync(req)
-                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
-                Expect.isTrue (resp.Headers.Contains("Vary")) "should have Vary header"
-                let! (body: string) = resp.Content.ReadAsStringAsync()
-                Expect.isTrue (body.Contains("/items")) "should contain items resource"
-            })
-        }
-
-        testTask "useDiscovery returns Allow header on OPTIONS" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                    discoveryMediaType "application/json" "self"
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/items"))
-                Expect.equal resp.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
-                Expect.isGreaterThan (resp.Content.Headers.Allow.Count) 0 "should have Allow header"
-            })
-        }
-
-        testTask "useDiscovery returns Link headers on GET" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                    discoveryMediaType "application/json" "self"
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscovery(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let! (resp: HttpResponseMessage) = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/items"))
-                Expect.equal resp.StatusCode HttpStatusCode.OK "GET should return 200"
-                Expect.isTrue (resp.Headers.Contains("Link")) "should have Link header"
-            })
-        }
-    ]
-
-[<Tests>]
-let useDiscoveryHeadersTests =
-    testList "useDiscoveryHeaders CE operation" [
-        testTask "useDiscoveryHeaders does not serve JSON Home" {
-            let testResource =
-                resource "/items" {
-                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items")))
-                }
-
-            let ceBuilder = WebHostBuilder([||])
-            let spec =
-                ceBuilder.Yield()
-                |> fun s -> ceBuilder.UseDiscoveryHeaders(s)
-                |> fun s -> ceBuilder.Resource(s, testResource)
-
-            do! withCeServer spec (fun client -> task {
-                let req = new HttpRequestMessage(HttpMethod.Get, "/")
-                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
-                let! (resp: HttpResponseMessage) = client.SendAsync(req)
-                // Should NOT serve JSON Home — useDiscoveryHeaders only provides OPTIONS + Link
-                Expect.notEqual resp.StatusCode HttpStatusCode.OK "should not serve home document"
             })
         }
     ]
@@ -364,7 +332,7 @@ let metadataTests =
                     let! (resp: HttpResponseMessage) = client.SendAsync(req)
                     let! (body: string) = resp.Content.ReadAsStringAsync()
                     Expect.isTrue (body.Contains("Game API")) "should use metadata title"
-                    Expect.isTrue (body.Contains("http://example.com/alps/games#games")) "should have ALPS relation"
+                    Expect.isTrue (body.Contains("http://example.com/alps/games#games~gameId")) "should have ALPS relation"
                     Expect.isTrue (body.Contains("http://example.com/alps/games#gameId")) "should have ALPS hrefVar"
                     Expect.isTrue (body.Contains("/scalar/v1")) "should have docs URL"
                 finally

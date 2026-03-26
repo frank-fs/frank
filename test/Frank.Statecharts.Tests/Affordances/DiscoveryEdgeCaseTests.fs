@@ -1,25 +1,19 @@
-module Frank.Discovery.Tests.EdgeCaseTests
+module Frank.Statecharts.Tests.Affordances.DiscoveryEdgeCaseTests
 
 open System.Net
 open System.Net.Http
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.Routing
-open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-
-// Reuse helpers from OptionsDiscoveryTests
-open Frank.Discovery.Tests.OptionsDiscoveryTests
+open Frank.Affordances
+open Frank.Statecharts.Tests.Affordances.OptionsDiscoveryTests
 
 [<Tests>]
 let edgeCaseTests =
-    testList "Edge Cases" [
+    testList "Discovery Edge Cases" [
         testTask "CORS preflight passes through - discovery middleware does not intercept" {
             let itemsResource =
                 resource "/items" {
@@ -82,7 +76,7 @@ let edgeCaseTests =
                 let request = new HttpRequestMessage(HttpMethod.Options, "/items")
                 let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                 // Verify deduplication: application/ld+json should appear only once
                 let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
@@ -152,8 +146,8 @@ let edgeCaseTests =
                 // OPTIONS should still return 200 with Link headers (it's middleware-generated)
                 let optionsRequest = new HttpRequestMessage(HttpMethod.Options, "/items")
                 let! (optionsResponse: HttpResponseMessage) = client.SendAsync(optionsRequest)
-                Expect.equal optionsResponse.StatusCode HttpStatusCode.OK
-                    "OPTIONS should return 200 regardless of handler behavior"
+                Expect.equal optionsResponse.StatusCode HttpStatusCode.NoContent
+                    "OPTIONS should return 204 regardless of handler behavior"
 
                 let linkHeaders = optionsResponse.Headers.GetValues("Link") |> Seq.toList
                 Expect.isNonEmpty linkHeaders
@@ -177,7 +171,7 @@ let edgeCaseTests =
                 let request = new HttpRequestMessage(HttpMethod.Options, "/workflow")
                 let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                 let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
 
@@ -211,7 +205,7 @@ let edgeCaseTests =
                 let request = new HttpRequestMessage(HttpMethod.Options, "/plain")
                 let! (response: HttpResponseMessage) = client.SendAsync(request)
 
-                Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+                Expect.equal response.StatusCode HttpStatusCode.NoContent "OPTIONS should return 204"
 
                 let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                 Expect.contains allowHeader "GET" "Allow should contain GET"

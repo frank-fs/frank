@@ -69,6 +69,9 @@
     <Compile Include="Affordances/StartupProjection.fs" />
     <Compile Include="Affordances/StatechartProjection.fs" />
     <Compile Include="Affordances/ProfileMiddleware.fs" />
+    <!-- Discovery middlewares (moved from Frank.Discovery) -->
+    <Compile Include="Affordances/OptionsDiscoveryMiddleware.fs" />
+    <Compile Include="Affordances/LinkHeaderMiddleware.fs" />
     <Compile Include="Affordances/WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
@@ -83,6 +86,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
+    <ProjectReference Include="../Frank.Discovery/Frank.Discovery.fsproj" />
     <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
     <ProjectReference Include="../Frank.Statecharts.Core/Frank.Statecharts.Core.fsproj" />
   </ItemGroup>

@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="HandlerBuilderTests.fs" />
     <Compile Include="MetadataTests.fs" />
     <Compile Include="OpenApiDocumentTests.fs" />

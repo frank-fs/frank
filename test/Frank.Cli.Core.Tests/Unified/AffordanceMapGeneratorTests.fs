@@ -141,12 +141,12 @@ let affordanceMapGeneratorTests =
               "profileUrl"
               [ testCase "derives profile URL from base URI and slug"
                 <| fun _ ->
-                    let url = AffordanceMapGenerator.profileUrl "https://example.com/alps" "games"
+                    let url = AffordanceMap.profileUrl "https://example.com/alps" "games"
                     Expect.equal url "https://example.com/alps/games" "Profile URL"
 
                 testCase "trims trailing slash from base URI"
                 <| fun _ ->
-                    let url = AffordanceMapGenerator.profileUrl "https://example.com/alps/" "health"
+                    let url = AffordanceMap.profileUrl "https://example.com/alps/" "health"
                     Expect.equal url "https://example.com/alps/health" "Trailing slash trimmed" ]
 
           testList
@@ -219,7 +219,7 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/health|*"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.equal methods [ "GET" ] "Health has GET only"
+                    Expect.equal methods [ "GET"; "OPTIONS" ] "Health has GET and OPTIONS"
 
                 testCase "health entry has correct profileUrl"
                 <| fun _ ->
@@ -231,7 +231,7 @@ let affordanceMapGeneratorTests =
                     let profile = getStringProp entry "profileUrl"
                     Expect.equal profile "https://example.com/alps/health" "Profile URL"
 
-                testCase "health entry has self link relation"
+                testCase "health entry has no link relations (self filtered)"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ healthResource ] baseUri (Some fixedTimestamp)
@@ -239,11 +239,7 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/health|*"
                     let rels = entry.GetProperty("linkRelations").EnumerateArray() |> Seq.toList
-                    Expect.equal rels.Length 1 "One link relation"
-                    let rel = rels.[0]
-                    Expect.equal (rel.GetProperty("rel").GetString()) "self" "Rel is self"
-                    Expect.equal (rel.GetProperty("method").GetString()) "GET" "Method is GET"
-                    Expect.equal (rel.GetProperty("href").GetString()) "/health" "Href is route template" ]
+                    Expect.isEmpty rels "Self is filtered — no link relations remain" ]
 
           testList
               "generate - tic-tac-toe stateful resource"
@@ -255,9 +251,9 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|XTurn"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.equal methods [ "GET"; "POST" ] "XTurn has GET and POST"
+                    Expect.equal methods [ "GET"; "OPTIONS"; "POST" ] "XTurn has GET, OPTIONS, and POST"
 
-                testCase "OTurn entry has GET and POST"
+                testCase "OTurn entry has GET, OPTIONS, and POST"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ ticTacToeResource ] baseUri (Some fixedTimestamp)
@@ -265,9 +261,9 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|OTurn"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.equal methods [ "GET"; "POST" ] "OTurn has GET and POST"
+                    Expect.equal methods [ "GET"; "OPTIONS"; "POST" ] "OTurn has GET, OPTIONS, and POST"
 
-                testCase "Won entry has GET only"
+                testCase "Won entry has GET and OPTIONS"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ ticTacToeResource ] baseUri (Some fixedTimestamp)
@@ -275,9 +271,9 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|Won"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.equal methods [ "GET" ] "Won has GET only"
+                    Expect.equal methods [ "GET"; "OPTIONS" ] "Won has GET and OPTIONS"
 
-                testCase "Draw entry has GET only"
+                testCase "Draw entry has GET and OPTIONS"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ ticTacToeResource ] baseUri (Some fixedTimestamp)
@@ -285,7 +281,7 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|Draw"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.equal methods [ "GET" ] "Draw has GET only"
+                    Expect.equal methods [ "GET"; "OPTIONS" ] "Draw has GET and OPTIONS"
 
                 testCase "all entries have correct profileUrl"
                 <| fun _ ->
@@ -300,7 +296,7 @@ let affordanceMapGeneratorTests =
                         let profile = getStringProp entry "profileUrl"
                         Expect.equal profile "https://example.com/alps/games" (sprintf "Profile URL for %s" state)
 
-                testCase "XTurn has self and domain link relations"
+                testCase "XTurn has domain link relation (self filtered)"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ ticTacToeResource ] baseUri (Some fixedTimestamp)
@@ -308,19 +304,17 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|XTurn"
                     let rels = entry.GetProperty("linkRelations").EnumerateArray() |> Seq.toList
-                    Expect.equal rels.Length 2 "XTurn has 2 link relations"
+                    Expect.equal rels.Length 1 "XTurn has 1 link relation (self filtered)"
 
                     let relTypes =
                         rels |> List.map (fun r -> r.GetProperty("rel").GetString())
-
-                    Expect.contains relTypes "self" "Has self relation"
 
                     Expect.contains
                         relTypes
                         "https://example.com/alps/games#makeMove"
                         "Has domain-specific relation"
 
-                testCase "Won has only self link relation"
+                testCase "Won has no link relations (only self, which is filtered)"
                 <| fun _ ->
                     let json =
                         AffordanceMapGenerator.generate [ ticTacToeResource ] baseUri (Some fixedTimestamp)
@@ -328,8 +322,7 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/games/{gameId}|Won"
                     let rels = entry.GetProperty("linkRelations").EnumerateArray() |> Seq.toList
-                    Expect.equal rels.Length 1 "Won has 1 link relation"
-                    Expect.equal (rels.[0].GetProperty("rel").GetString()) "self" "Only self" ]
+                    Expect.isEmpty rels "Won has no link relations (only self, filtered)" ]
 
           testList
               "generate - edge cases"
@@ -341,7 +334,7 @@ let affordanceMapGeneratorTests =
                     use doc = parseJson json
                     let entry = getEntry doc "/empty|*"
                     let methods = getStringArray entry "allowedMethods"
-                    Expect.isEmpty methods "Empty resource has no methods"
+                    Expect.equal methods [ "OPTIONS" ] "Empty resource has OPTIONS only"
                     let rels = entry.GetProperty("linkRelations").EnumerateArray() |> Seq.toList
                     Expect.isEmpty rels "Empty resource has no link relations"
 
@@ -397,11 +390,11 @@ let affordanceMapGeneratorTests =
                     let xTurn =
                         entries |> List.find (fun e -> e.StateKey = "XTurn")
 
-                    Expect.equal xTurn.AllowedMethods [ "GET"; "POST" ] "XTurn methods"
+                    Expect.equal xTurn.AllowedMethods [ "GET"; "OPTIONS"; "POST" ] "XTurn methods"
                     Expect.equal xTurn.ProfileUrl "https://example.com/alps/games" "XTurn profile"
 
                     let health =
                         entries |> List.find (fun e -> e.StateKey = "*")
 
-                    Expect.equal health.AllowedMethods [ "GET" ] "Health methods"
+                    Expect.equal health.AllowedMethods [ "GET"; "OPTIONS" ] "Health methods"
                     Expect.equal health.ProfileUrl "https://example.com/alps/health" "Health profile" ] ]

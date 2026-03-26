@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="TypeTests.fs" />
     <Compile Include="StoreTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
@@ -64,6 +65,11 @@
     <Compile Include="Affordances/EmbeddingTests.fs" />
     <Compile Include="Affordances/AutoLoadTests.fs" />
     <Compile Include="Affordances/ProjectedProfileMiddlewareTests.fs" />
+    <!-- Discovery middleware tests (moved from Frank.Discovery.Tests) -->
+    <Compile Include="Affordances/OptionsDiscoveryTests.fs" />
+    <Compile Include="Affordances/LinkHeaderTests.fs" />
+    <Compile Include="Affordances/DiscoveryEdgeCaseTests.fs" />
+    <Compile Include="Affordances/DiscoveryCombinationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -77,6 +83,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
     <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
+    <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
   </ItemGroup>
 
   <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->

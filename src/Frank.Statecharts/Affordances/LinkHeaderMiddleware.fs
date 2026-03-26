@@ -1,4 +1,4 @@
-namespace Frank.Discovery
+namespace Frank.Affordances
 
 open System
 open System.Threading.Tasks
@@ -38,32 +38,36 @@ type LinkHeaderMiddleware(next: RequestDelegate, logger: ILogger<LinkHeaderMiddl
                 // Register an OnStarting callback to add Link headers just before
                 // the response begins streaming. At that point the status code is set
                 // but headers can still be modified.
-                ctx.Response.OnStarting(fun state ->
-                    let httpCtx = state :?> HttpContext
-                    let isSuccess = httpCtx.Response.StatusCode >= 200 && httpCtx.Response.StatusCode < 300
+                ctx.Response.OnStarting(
+                    fun state ->
+                        let httpCtx = state :?> HttpContext
 
-                    if isSuccess then
-                        // Deduplicate by (MediaType, Rel) tuple
-                        let dedupedMediaTypes =
-                            mediaTypes
-                            |> Seq.distinctBy (fun mt -> mt.MediaType, mt.Rel)
-                            |> Seq.toList
+                        let isSuccess =
+                            httpCtx.Response.StatusCode >= 200 && httpCtx.Response.StatusCode < 300
 
-                        let requestPath = httpCtx.Request.Path.Value
+                        if isSuccess then
+                            // Deduplicate by (MediaType, Rel) tuple
+                            let dedupedMediaTypes =
+                                mediaTypes |> Seq.distinctBy (fun mt -> mt.MediaType, mt.Rel) |> Seq.toList
 
-                        for mt in dedupedMediaTypes do
-                            let linkValue = sprintf "<%s>; rel=\"%s\"; type=\"%s\"" requestPath mt.Rel mt.MediaType
-                            httpCtx.Response.Headers.Append("Link", linkValue)
+                            let requestPath = httpCtx.Request.Path.Value
 
-                            logger.LogDebug(
-                                "Added Link header for {Path}: rel={Rel}, type={MediaType}",
-                                requestPath,
-                                mt.Rel,
-                                mt.MediaType
-                            )
-                    // (i) If status is not 2xx -> do nothing (FR-010)
-                    Task.CompletedTask
-                , ctx :> obj)
+                            for mt in dedupedMediaTypes do
+                                let linkValue =
+                                    sprintf "<%s>; rel=\"%s\"; type=\"%s\"" requestPath mt.Rel mt.MediaType
+
+                                httpCtx.Response.Headers.Append("Link", linkValue)
+
+                                logger.LogDebug(
+                                    "Added Link header for {Path}: rel={Rel}, type={MediaType}",
+                                    requestPath,
+                                    mt.Rel,
+                                    mt.MediaType
+                                )
+                        // (i) If status is not 2xx -> do nothing (FR-010)
+                        Task.CompletedTask
+                    , ctx :> obj
+                )
 
                 // (f) Call next to execute the handler
                 next.Invoke(ctx)

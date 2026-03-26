@@ -6,20 +6,24 @@ open System.Text.Json
 /// Pure F# records — no ASP.NET Core or framework dependencies.
 
 type JsonHomeHints =
-    { Allow: string list
-      /// GET response media types. Serialized as JSON object {"media/type": {}} per JSON Home spec.
-      Formats: string list
-      AcceptPost: string list option
-      AcceptPut: string list option
-      AcceptPatch: string list option
-      DocsUrl: string option }
+    {
+        Allow: string list
+        /// GET response media types. Serialized as JSON object {"media/type": {}} per JSON Home spec.
+        Formats: string list
+        AcceptPost: string list option
+        AcceptPut: string list option
+        AcceptPatch: string list option
+        DocsUrl: string option
+    }
 
 type JsonHomeResource =
-    { RelationType: string
-      /// If RouteVariables is empty → "href". If non-empty → "hrefTemplate" + "hrefVars".
-      RouteTemplate: string
-      RouteVariables: Map<string, string>
-      Hints: JsonHomeHints }
+    {
+        RelationType: string
+        /// If RouteVariables is empty → "href". If non-empty → "hrefTemplate" + "hrefVars".
+        RouteTemplate: string
+        RouteVariables: Map<string, string>
+        Hints: JsonHomeHints
+    }
 
 type JsonHomeInput =
     { Title: string
@@ -32,7 +36,10 @@ module JsonHomeDocument =
         match types with
         | Some ts when not ts.IsEmpty ->
             w.WriteStartArray(name)
-            for t in ts do w.WriteStringValue(t)
+
+            for t in ts do
+                w.WriteStringValue(t)
+
             w.WriteEndArray()
         | _ -> ()
 
@@ -40,14 +47,19 @@ module JsonHomeDocument =
         w.WriteStartObject("hints")
 
         w.WriteStartArray("allow")
-        for m in hints.Allow do w.WriteStringValue(m)
+
+        for m in hints.Allow do
+            w.WriteStringValue(m)
+
         w.WriteEndArray()
 
         if not hints.Formats.IsEmpty then
             w.WriteStartObject("formats")
+
             for fmt in hints.Formats do
                 w.WriteStartObject(fmt)
                 w.WriteEndObject()
+
             w.WriteEndObject()
 
         writeOptionalArray w "accept-post" hints.AcceptPost
@@ -68,8 +80,10 @@ module JsonHomeDocument =
         else
             w.WriteString("hrefTemplate", res.RouteTemplate)
             w.WriteStartObject("hrefVars")
+
             for kv in res.RouteVariables do
                 w.WriteString(kv.Key, kv.Value)
+
             w.WriteEndObject()
 
         writeHints w res.Hints
@@ -84,17 +98,23 @@ module JsonHomeDocument =
 
         w.WriteStartObject("api")
         w.WriteString("title", input.Title)
+
         match input.DescribedByUrl with
         | Some url ->
             w.WriteStartObject("links")
-            w.WriteString("describedBy", url)
+            w.WriteStartObject("describedBy")
+            w.WriteString("href", url)
+            w.WriteEndObject()
             w.WriteEndObject()
         | None -> ()
+
         w.WriteEndObject()
 
         w.WriteStartObject("resources")
+
         for res in input.Resources do
             writeResource w res
+
         w.WriteEndObject()
 
         w.WriteEndObject()

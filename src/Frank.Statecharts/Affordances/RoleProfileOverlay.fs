@@ -12,11 +12,6 @@ type RoleProfileLookup = Dictionary<string, Dictionary<string, string>>
 
 module RoleProfileOverlay =
 
-    /// Build a profile URL from base URI and slug, reusing the same format as AffordanceMap.profileUrl.
-    let private profileUrl (baseUri: string) (slug: string) : string =
-        let trimmed = baseUri.TrimEnd('/')
-        sprintf "%s/%s" trimmed slug
-
     /// Build a role profile overlay from runtime state.
     /// Returns a lookup mapping route templates to per-role profile Link values.
     let build (state: RuntimeState) : RoleProfileLookup =
@@ -50,7 +45,7 @@ module RoleProfileOverlay =
                         && roleSlugKey.[slug.Length] = '-'
                     then
                         let roleName = roleSlugKey.Substring(slug.Length + 1)
-                        let url = profileUrl state.BaseUri roleSlugKey
+                        let url = AffordanceMap.profileUrl state.BaseUri roleSlugKey
                         let linkValue = AffordancePreCompute.formatLinkValue url "profile"
 
                         for routeTemplate in routes do

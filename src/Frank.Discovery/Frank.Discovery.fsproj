@@ -10,8 +10,6 @@
     <Compile Include="JsonHomeDocument.fs" />
     <Compile Include="JsonHomeProjection.fs" />
     <Compile Include="JsonHomeMiddleware.fs" />
-    <Compile Include="OptionsDiscoveryMiddleware.fs" />
-    <Compile Include="LinkHeaderMiddleware.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
