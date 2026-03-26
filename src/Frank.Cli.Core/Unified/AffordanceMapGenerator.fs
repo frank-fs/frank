@@ -52,7 +52,8 @@ let private buildLinkRelations
         { Rel = cap.LinkRelation
           Href = routeTemplate
           Method = cap.Method
-          Title = None })
+          Title = None
+          Roles = [] })
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Entry Generation (T032)
@@ -117,6 +118,13 @@ let private writeLinkRelation (writer: Utf8JsonWriter) (lr: AffordanceLinkRelati
     match lr.Title with
     | Some t -> writer.WriteString("title", t)
     | None -> ()
+    match lr.Roles with
+    | [] -> ()
+    | roles ->
+        writer.WriteStartArray("roles")
+        for r in roles do
+            writer.WriteStringValue(r)
+        writer.WriteEndArray()
     writer.WriteEndObject()
 
 let private writeEntry (writer: Utf8JsonWriter) (entry: AffordanceMapEntry) =

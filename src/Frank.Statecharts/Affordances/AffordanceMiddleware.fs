@@ -16,6 +16,15 @@ open Frank.Statecharts
 /// through unmodified.
 type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreComputedAffordance>) =
 
+    let tryLookup (key: string) =
+        match lookup.TryGetValue(key) with
+        | true, entry -> Some entry
+        | false, _ -> None
+
+    let applyHeaders (ctx: HttpContext) (preComputed: PreComputedAffordance) =
+        ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
+        ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
+
     member _.InvokeAsync(ctx: HttpContext) : Task =
         let endpoint = ctx.GetEndpoint()
 
@@ -26,7 +35,7 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
                 | _ -> null
 
             if not (isNull routeTemplate) then
-                // Try stateful lookup first (state key from statechart middleware)
+                // Resolve state key from statechart middleware
                 let stateKey =
                     let f = ctx.Features.Get<IStatechartFeature>()
                     if obj.ReferenceEquals(f, null) then null
@@ -35,17 +44,39 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
                         | Some key -> key
                         | None -> null
 
-                let compositeKey =
-                    if not (isNull stateKey) then
-                        AffordanceMap.lookupKey routeTemplate stateKey
-                    else
-                        // Fallback to wildcard for plain resources
-                        AffordanceMap.lookupKey routeTemplate AffordanceMap.WildcardStateKey
+                let effectiveStateKey =
+                    if not (isNull stateKey) then stateKey
+                    else AffordanceMap.WildcardStateKey
 
-                match lookup.TryGetValue(compositeKey) with
-                | true, preComputed ->
-                    ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
-                    ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
-                | false, _ -> ()
+                let baseKey = AffordanceMap.lookupKey routeTemplate effectiveStateKey
+
+                // Resolve entry: role-specific > authenticated fallback > base
+                let roles = ctx.GetRoles()
+                let hasRoles = not (Set.isEmpty roles)
+
+                let resolved =
+                    if hasRoles then
+                        // Try role-specific entry (first matching role wins)
+                        let roleMatch =
+                            roles
+                            |> Seq.tryPick (fun role ->
+                                tryLookup (AffordanceMap.lookupKeyWithRole routeTemplate effectiveStateKey role))
+
+                        match roleMatch with
+                        | Some _ -> roleMatch
+                        | None ->
+                            // Authenticated fallback (role-agnostic links only)
+                            let authMatch = tryLookup (AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey)
+
+                            match authMatch with
+                            | Some _ -> authMatch
+                            | None ->
+                                // No role-restricted links exist: use base entry
+                                tryLookup baseKey
+                    else
+                        // Unauthenticated: base entry with all links
+                        tryLookup baseKey
+
+                resolved |> Option.iter (applyHeaders ctx)
 
         next.Invoke(ctx)

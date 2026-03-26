@@ -23,6 +23,8 @@ module AffordancePreCompute =
 
     /// Pre-compute header strings for all entries in the affordance map.
     /// Returns a dictionary indexed by composite key for O(1) request-time lookup.
+    /// Also generates role-scoped entries keyed by route|state|role for role-filtered
+    /// transition link rels.
     let preCompute (map: AffordanceMap) : Dictionary<string, PreComputedAffordance> =
         let dict = Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)
 
@@ -30,6 +32,7 @@ module AffordancePreCompute =
             let key = AffordanceMap.lookupKey entry.RouteTemplate entry.StateKey
             let allowHeader = StringValues(String.Join(", ", entry.AllowedMethods))
 
+            // Base entry: ALL links (unauthenticated fallback)
             let linkValues =
                 [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
                        formatLinkValue entry.ProfileUrl "profile"
@@ -42,5 +45,46 @@ module AffordancePreCompute =
             dict.[key] <-
                 { AllowHeaderValue = allowHeader
                   LinkHeaderValues = linkHeader }
+
+            // Collect distinct roles from link relations
+            let distinctRoles =
+                entry.LinkRelations
+                |> List.collect (fun lr -> lr.Roles)
+                |> List.distinct
+
+            let hasRoleRestrictedLinks = not (List.isEmpty distinctRoles)
+
+            // Generate role-scoped entries
+            for role in distinctRoles do
+                let roleKey = AffordanceMap.lookupKeyWithRole entry.RouteTemplate entry.StateKey role
+
+                let roleLinkValues =
+                    [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
+                           formatLinkValue entry.ProfileUrl "profile"
+
+                       for lr in entry.LinkRelations do
+                           if lr.Roles = [] || List.contains role lr.Roles then
+                               formatLinkValue lr.Href lr.Rel |]
+
+                dict.[roleKey] <-
+                    { AllowHeaderValue = allowHeader
+                      LinkHeaderValues = StringValues(roleLinkValues) }
+
+            // Generate authenticated fallback entry: only role-agnostic links
+            // Used when user has roles but none match any role-specific entry
+            if hasRoleRestrictedLinks then
+                let authKey = AffordanceMap.lookupKeyAuthenticated entry.RouteTemplate entry.StateKey
+
+                let authLinkValues =
+                    [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
+                           formatLinkValue entry.ProfileUrl "profile"
+
+                       for lr in entry.LinkRelations do
+                           if lr.Roles = [] then
+                               formatLinkValue lr.Href lr.Rel |]
+
+                dict.[authKey] <-
+                    { AllowHeaderValue = allowHeader
+                      LinkHeaderValues = StringValues(authLinkValues) }
 
         dict

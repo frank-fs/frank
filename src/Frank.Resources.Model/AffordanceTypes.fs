@@ -12,7 +12,9 @@ type AffordanceLinkRelation =
       /// HTTP method for this transition
       Method: string
       /// Human-readable label (optional)
-      Title: string option }
+      Title: string option
+      /// Roles that may use this transition. Empty list = available to all roles.
+      Roles: string list }
 
 /// One entry per (route, state) pair in the affordance map.
 [<RequireQualifiedAccess>]
@@ -57,6 +59,19 @@ module AffordanceMap =
     let lookupKey (routeTemplate: string) (stateKey: string) : string =
         routeTemplate + KeySeparator + stateKey
 
+    /// Build a composite lookup key from route template, state key, and role.
+    let lookupKeyWithRole (routeTemplate: string) (stateKey: string) (role: string) : string =
+        routeTemplate + KeySeparator + stateKey + KeySeparator + role
+
+    /// Sentinel role name for "authenticated but no matching role" fallback entry.
+    /// Contains links available to all roles (Roles = []) only.
+    [<Literal>]
+    let AuthenticatedFallbackRole = "~authenticated"
+
+    /// Build a composite lookup key for authenticated users without a matching role.
+    let lookupKeyAuthenticated (routeTemplate: string) (stateKey: string) : string =
+        routeTemplate + KeySeparator + stateKey + KeySeparator + AuthenticatedFallbackRole
+
     /// Try to find an entry in the affordance map by route and state.
     let tryFind (routeTemplate: string) (stateKey: string) (map: AffordanceMap) : AffordanceMapEntry option =
         let key = lookupKey routeTemplate stateKey
@@ -70,7 +85,7 @@ module AffordanceMap =
     /// Build link relations from runtime HTTP capabilities.
     let private buildLinkRelations (routeTemplate: string) (capabilities: RuntimeHttpCapability list) : AffordanceLinkRelation list =
         capabilities |> List.map (fun cap ->
-            { Rel = cap.LinkRelation; Href = routeTemplate; Method = cap.Method; Title = None })
+            { Rel = cap.LinkRelation; Href = routeTemplate; Method = cap.Method; Title = None; Roles = [] })
 
     /// Build affordance map entries for a single runtime resource.
     let private buildEntries (resource: RuntimeResource) (baseUri: string) : AffordanceMapEntry list =

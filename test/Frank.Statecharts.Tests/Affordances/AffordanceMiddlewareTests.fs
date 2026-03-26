@@ -180,7 +180,8 @@ let preComputeTests =
                             [ { Rel = "makeMove"
                                 Href = "/games/{gameId}/move"
                                 Method = "POST"
-                                Title = Some "Make a move" } ]
+                                Title = Some "Make a move"
+                                Roles = [] } ]
                           ProfileUrl = "https://example.com/alps/games" } ] }
 
               let result = AffordancePreCompute.preCompute map
@@ -240,4 +241,243 @@ let preComputeTests =
               Expect.isTrue (result.ContainsKey(xTurnKey)) "Should contain XTurn key"
               Expect.isTrue (result.ContainsKey(wonKey)) "Should contain Won key"
               Expect.equal (result.[xTurnKey].AllowHeaderValue.ToString()) "GET, POST" "XTurn allows GET, POST"
-              Expect.equal (result.[wonKey].AllowHeaderValue.ToString()) "GET" "Won allows only GET" ]
+              Expect.equal (result.[wonKey].AllowHeaderValue.ToString()) "GET" "Won allows only GET"
+
+          testCase "preCompute generates role-specific entries"
+          <| fun _ ->
+              let map =
+                  { Version = AffordanceMap.currentVersion
+                    Entries =
+                      [ { RouteTemplate = "/games/{gameId}"
+                          StateKey = "XTurn"
+                          AllowedMethods = [ "GET"; "POST" ]
+                          LinkRelations =
+                            [ { Rel = "makeMove"
+                                Href = "/games/{gameId}/move"
+                                Method = "POST"
+                                Title = Some "Make a move"
+                                Roles = [ "PlayerX" ] }
+                              { Rel = "viewGame"
+                                Href = "/games/{gameId}"
+                                Method = "GET"
+                                Title = None
+                                Roles = [] } ]
+                          ProfileUrl = "https://example.com/alps/games" } ] }
+
+              let result = AffordancePreCompute.preCompute map
+
+              // Base entry with ALL links
+              let baseKey = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"
+              Expect.isTrue (result.ContainsKey(baseKey)) "Should contain base key"
+              let baseEntry = result.[baseKey]
+              let baseLinks = baseEntry.LinkHeaderValues.ToArray()
+              // profile + makeMove + viewGame = 3
+              Expect.equal baseLinks.Length 3 "Base entry should have all links (profile + 2 transitions)"
+
+              // Role-specific entry for PlayerX
+              let playerXKey = AffordanceMap.lookupKeyWithRole "/games/{gameId}" "XTurn" "PlayerX"
+              Expect.isTrue (result.ContainsKey(playerXKey)) "Should contain PlayerX role key"
+              let playerXEntry = result.[playerXKey]
+              let playerXLinks = playerXEntry.LinkHeaderValues.ToArray()
+              // profile + makeMove (PlayerX role) + viewGame (all roles) = 3
+              Expect.equal playerXLinks.Length 3 "PlayerX should see profile + makeMove + viewGame"
+              let playerXLinksStr = playerXLinks |> String.concat " "
+              Expect.isTrue (playerXLinksStr.Contains("makeMove")) "PlayerX should see makeMove"
+              Expect.isTrue (playerXLinksStr.Contains("viewGame")) "PlayerX should see viewGame"
+
+          testCase "Allow header identical across role variants"
+          <| fun _ ->
+              let map =
+                  { Version = AffordanceMap.currentVersion
+                    Entries =
+                      [ { RouteTemplate = "/games/{gameId}"
+                          StateKey = "XTurn"
+                          AllowedMethods = [ "GET"; "POST" ]
+                          LinkRelations =
+                            [ { Rel = "makeMove"
+                                Href = "/games/{gameId}/move"
+                                Method = "POST"
+                                Title = None
+                                Roles = [ "PlayerX" ] } ]
+                          ProfileUrl = "https://example.com/alps/games" } ] }
+
+              let result = AffordancePreCompute.preCompute map
+              let baseKey = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"
+              let roleKey = AffordanceMap.lookupKeyWithRole "/games/{gameId}" "XTurn" "PlayerX"
+
+              Expect.equal
+                  (result.[roleKey].AllowHeaderValue.ToString())
+                  (result.[baseKey].AllowHeaderValue.ToString())
+                  "Allow header should be identical for base and role variant"
+
+          testCase "Links with Roles=[] appear in all role variants"
+          <| fun _ ->
+              let map =
+                  { Version = AffordanceMap.currentVersion
+                    Entries =
+                      [ { RouteTemplate = "/games/{gameId}"
+                          StateKey = "XTurn"
+                          AllowedMethods = [ "GET"; "POST" ]
+                          LinkRelations =
+                            [ { Rel = "makeMove"
+                                Href = "/games/{gameId}/move"
+                                Method = "POST"
+                                Title = None
+                                Roles = [ "PlayerX" ] }
+                              { Rel = "spectate"
+                                Href = "/games/{gameId}/watch"
+                                Method = "GET"
+                                Title = None
+                                Roles = [] } ]
+                          ProfileUrl = "" } ] }
+
+              let result = AffordancePreCompute.preCompute map
+              let roleKey = AffordanceMap.lookupKeyWithRole "/games/{gameId}" "XTurn" "PlayerX"
+              Expect.isTrue (result.ContainsKey(roleKey)) "Should have PlayerX entry"
+              let links = result.[roleKey].LinkHeaderValues.ToArray() |> String.concat " "
+              Expect.isTrue (links.Contains("spectate")) "Role-agnostic link should appear in PlayerX variant"
+              Expect.isTrue (links.Contains("makeMove")) "Role-specific link should appear in PlayerX variant" ]
+
+[<Tests>]
+let roleFilteredMiddlewareTests =
+    // Build lookup via preCompute from a map with role-tagged links
+    let roleMap =
+        { Version = AffordanceMap.currentVersion
+          Entries =
+            [ { RouteTemplate = "/games/{gameId}"
+                StateKey = "XTurn"
+                AllowedMethods = [ "GET"; "POST" ]
+                LinkRelations =
+                  [ { Rel = "makeMove"
+                      Href = "/games/{gameId}/move"
+                      Method = "POST"
+                      Title = Some "Make a move"
+                      Roles = [ "PlayerX" ] }
+                    { Rel = "viewGame"
+                      Href = "/games/{gameId}"
+                      Method = "GET"
+                      Title = None
+                      Roles = [] } ]
+                ProfileUrl = "https://example.com/alps/games" } ] }
+
+    let roleLookup = AffordancePreCompute.preCompute roleMap
+
+    testList
+        "AffordanceMiddleware role-filtered transition links"
+        [
+          testCase "PlayerX in XTurn sees rel=makeMove"
+          <| fun _ ->
+              (withAffordanceServer
+                  roleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("XTurn", "XTurn", 0)
+                      ctx.SetRoles(Set [ "PlayerX" ]))
+                  defaultEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          let links = getHeaderValues response "Link"
+                          let allLinks = links |> String.concat " "
+
+                          Expect.isTrue
+                              (allLinks.Contains("rel=\"makeMove\""))
+                              "PlayerX should see makeMove link"
+
+                          Expect.isTrue
+                              (allLinks.Contains("rel=\"viewGame\""))
+                              "PlayerX should see viewGame link (available to all)"
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "PlayerO in XTurn does NOT see rel=makeMove"
+          <| fun _ ->
+              (withAffordanceServer
+                  roleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("XTurn", "XTurn", 0)
+                      ctx.SetRoles(Set [ "PlayerO" ]))
+                  defaultEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          let links = getHeaderValues response "Link"
+                          let allLinks = links |> String.concat " "
+
+                          Expect.isFalse
+                              (allLinks.Contains("rel=\"makeMove\""))
+                              "PlayerO should NOT see makeMove link in XTurn"
+
+                          Expect.isTrue
+                              (allLinks.Contains("rel=\"viewGame\""))
+                              "PlayerO should still see viewGame link"
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Unauthenticated sees all links (fallback)"
+          <| fun _ ->
+              (withAffordanceServer
+                  roleLookup
+                  (fun ctx -> ctx.SetStatechartState("XTurn", "XTurn", 0))
+                  defaultEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          let links = getHeaderValues response "Link"
+                          let allLinks = links |> String.concat " "
+
+                          Expect.isTrue
+                              (allLinks.Contains("rel=\"makeMove\""))
+                              "Unauthenticated should see makeMove (all links fallback)"
+
+                          Expect.isTrue
+                              (allLinks.Contains("rel=\"viewGame\""))
+                              "Unauthenticated should see viewGame"
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Allow header identical for all roles"
+          <| fun _ ->
+              let mutable playerXAllow = ""
+              let mutable playerOAllow = ""
+
+              (withAffordanceServer
+                  roleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("XTurn", "XTurn", 0)
+                      ctx.SetRoles(Set [ "PlayerX" ]))
+                  defaultEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
+                          playerXAllow <- (getHeaderValues response "Allow") |> String.concat ", "
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+              (withAffordanceServer
+                  roleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("XTurn", "XTurn", 0)
+                      ctx.SetRoles(Set [ "PlayerO" ]))
+                  defaultEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/games/abc")
+                          playerOAllow <- (getHeaderValues response "Allow") |> String.concat ", "
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+              Expect.equal playerXAllow playerOAllow "Allow header should be identical for PlayerX and PlayerO" ]
