@@ -137,6 +137,8 @@ type OptionsDiscoveryMiddleware
                 match stateMeta with
                 | None -> return AffordanceResolution.NoStatechart
                 | Some meta ->
+                    // Populate route values so ResolveInstanceId can read them.
+                    // Safe: this path always terminates (204/404), never calls next.
                     for kv in routeValues do
                         ctx.Request.RouteValues.[kv.Key] <- kv.Value
 

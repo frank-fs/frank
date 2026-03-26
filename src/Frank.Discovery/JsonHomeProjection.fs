@@ -66,7 +66,12 @@ module JsonHomeProjection =
         match alpsBaseUri with
         | Some baseUri when System.Uri.IsWellFormedUriString(baseUri, System.UriKind.Absolute) ->
             let cleanBase = baseUri.Split('#').[0]
-            sprintf "%s#%s" cleanBase (routeToFragment routeTemplate)
+            let fragment = routeToFragment routeTemplate
+
+            if System.String.IsNullOrEmpty(fragment) then
+                sprintf "%s#root" cleanBase
+            else
+                sprintf "%s#%s" cleanBase fragment
         | _ -> sprintf "urn:frank:%s%s" assemblyName routeTemplate
 
     /// Project an EndpointDataSource into a JsonHomeInput.

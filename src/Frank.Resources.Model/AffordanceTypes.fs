@@ -61,8 +61,9 @@ module AffordanceMap =
     [<Literal>]
     let KeySeparator = "|"
 
-    /// IANA-registered "self" link relation, filtered from affordance Link headers
-    /// as informationally vacuous per Fielding — the resource already knows its own URI.
+    /// IANA-registered "self" link relation. Filtered from affordance Link headers
+    /// (not from body representations) because in Link header context the client
+    /// already knows the URI it requested. GET is preserved in AllowedMethods.
     [<Literal>]
     let SelfRelation = "self"
 
