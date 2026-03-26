@@ -532,6 +532,63 @@ let stateAwareOptionsTests =
                       })
           }
 
+          // Step 2 gap: verify Link headers in state-aware OPTIONS path
+          testTask "OPTIONS returns state-aware Link headers with profile and transitions" {
+              let xTurnAffordance =
+                  { AllowHeaderValue = StringValues("GET, OPTIONS, POST")
+                    LinkHeaderValues =
+                      StringValues(
+                          [| "<https://example.com/alps/games>; rel=\"profile\""
+                             "</games/{gameId}/move>; rel=\"makeMove\"" |]
+                      ) }
+
+              let lookup = buildAffordanceLookup [ "/games/{gameId}|XTurn", xTurnAffordance ]
+
+              let meta = testStateMachineMetadata (fun _ -> "XTurn")
+
+              do!
+                  withStatefulOptionsServer lookup (Some meta) (statefulEndpoints meta) (fun client ->
+                      task {
+                          let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
+                          let! (response: HttpResponseMessage) = client.SendAsync(request)
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+
+                          // Verify Link headers are present in state-aware path
+                          Expect.isTrue (response.Headers.Contains("Link")) "State-aware OPTIONS should include Link headers"
+                          let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
+                          let allLinks = linkHeaders |> String.concat " "
+                          Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Link should contain profile"
+                          Expect.isTrue (allLinks.Contains("rel=\"makeMove\"")) "Link should contain makeMove transition"
+                      })
+          }
+
+          // Step 2 gap: terminal state Link headers (profile only, no transitions)
+          testTask "OPTIONS returns Link headers with only profile for terminal state" {
+              let wonAffordance =
+                  { AllowHeaderValue = StringValues("GET, OPTIONS")
+                    LinkHeaderValues = StringValues([| "<https://example.com/alps/games>; rel=\"profile\"" |]) }
+
+              let lookup = buildAffordanceLookup [ "/games/{gameId}|Won", wonAffordance ]
+
+              let meta = testStateMachineMetadata (fun _ -> "Won")
+
+              do!
+                  withStatefulOptionsServer lookup (Some meta) (statefulEndpoints meta) (fun client ->
+                      task {
+                          let request = new HttpRequestMessage(HttpMethod.Options, "/games/abc123")
+                          let! (response: HttpResponseMessage) = client.SendAsync(request)
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "OPTIONS should return 200"
+
+                          Expect.isTrue (response.Headers.Contains("Link")) "Terminal state OPTIONS should include Link headers"
+                          let linkHeaders = response.Headers.GetValues("Link") |> Seq.toList
+                          let allLinks = linkHeaders |> String.concat " "
+                          Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Link should contain profile"
+                          Expect.isFalse (allLinks.Contains("makeMove")) "Link should NOT contain transitions for terminal state"
+                      })
+          }
+
           testTask "OPTIONS falls back to route-level when no affordance data" {
               let lookup = buildAffordanceLookup []
 
