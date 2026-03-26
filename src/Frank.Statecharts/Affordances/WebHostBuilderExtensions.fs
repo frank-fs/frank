@@ -17,6 +17,9 @@ module WebHostBuilderExtensions =
     let private getAffordanceLogger (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger<AffordanceMiddleware>()
 
+    let private versionMismatchMessage =
+        "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect."
+
     type WebHostBuilder with
 
         /// Register the affordance middleware with an explicit AffordanceMap.
@@ -44,11 +47,7 @@ module WebHostBuilderExtensions =
                         >> fun app ->
                             if version <> AffordanceMap.currentVersion then
                                 (getAffordanceLogger app)
-                                    .LogWarning(
-                                        "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
-                                        version,
-                                        AffordanceMap.currentVersion
-                                    )
+                                    .LogWarning(versionMismatchMessage, version, AffordanceMap.currentVersion)
 
                             app.UseMiddleware<AffordanceMiddleware>() |> ignore
                             app }
@@ -87,7 +86,7 @@ module WebHostBuilderExtensions =
 
                                         if map.Version <> AffordanceMap.currentVersion then
                                             logger.LogWarning(
-                                                "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
+                                                versionMismatchMessage,
                                                 map.Version,
                                                 AffordanceMap.currentVersion
                                             )
@@ -207,26 +206,11 @@ module WebHostBuilderExtensions =
                         app }
 
         /// Registers OPTIONS discovery and Link header middlewares (without JSON Home).
-        /// Responses lack API-level discovery — clients must know the root URL.
-        /// For the full discovery bundle including JSON Home, use useDiscovery.
+        /// Delegates to useOptionsDiscovery + useLinkHeaders to avoid duplicating
+        /// DI registration logic. For the full bundle including JSON Home, use useDiscovery.
         [<CustomOperation("useDiscoveryHeaders")>]
-        member _.UseDiscoveryHeaders(spec: WebHostSpec) : WebHostSpec =
-            { spec with
-                Services =
-                    spec.Services
-                    >> fun services ->
-                        services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
-                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)
-                        )
-
-                        services
-                Middleware =
-                    spec.Middleware
-                    >> fun app ->
-                        app.UseMiddleware<OptionsDiscoveryMiddleware>().UseMiddleware<LinkHeaderMiddleware>()
-                        |> ignore
-
-                        app }
+        member this.UseDiscoveryHeaders(spec: WebHostSpec) : WebHostSpec =
+            spec |> this.UseOptionsDiscovery |> this.UseLinkHeaders
 
         /// Registers all three discovery middlewares: OPTIONS responses, Link headers,
         /// and JSON Home at the root. This is the recommended default.

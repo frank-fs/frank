@@ -43,17 +43,23 @@ let deriveSlug (routeTemplate: string) : string =
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// Build link relations for a set of HTTP capabilities.
+/// Filters out rel="self" which is informationally vacuous per Fielding —
+/// the resource already knows its own URI. GET is still in AllowedMethods.
 let private buildLinkRelations
     (routeTemplate: string)
     (capabilities: HttpCapability list)
     : AffordanceLinkRelation list =
     capabilities
-    |> List.map (fun cap ->
-        { Rel = cap.LinkRelation
-          Href = routeTemplate
-          Method = cap.Method
-          Title = None
-          Roles = [] })
+    |> List.choose (fun cap ->
+        if cap.LinkRelation = AffordanceMap.SelfRelation then
+            None
+        else
+            Some
+                { Rel = cap.LinkRelation
+                  Href = routeTemplate
+                  Method = cap.Method
+                  Title = None
+                  Roles = [] })
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Entry Generation (T032)
@@ -76,7 +82,12 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
                     | Some sk -> sk = stateName
                     | None -> true) // Capabilities with no state key apply to all states
 
-            let methods = capsForState |> List.map _.Method |> List.distinct |> List.sort
+            let methods =
+                capsForState
+                |> List.map _.Method
+                |> fun ms -> "OPTIONS" :: ms
+                |> List.distinct
+                |> List.sort
 
             let linkRels = buildLinkRelations resource.RouteTemplate capsForState
 
@@ -89,7 +100,11 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
     | None ->
         // Stateless resource: single entry with "*" state key
         let methods =
-            resource.HttpCapabilities |> List.map _.Method |> List.distinct |> List.sort
+            resource.HttpCapabilities
+            |> List.map _.Method
+            |> fun ms -> "OPTIONS" :: ms
+            |> List.distinct
+            |> List.sort
 
         let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
 

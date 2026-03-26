@@ -61,6 +61,11 @@ module AffordanceMap =
     [<Literal>]
     let KeySeparator = "|"
 
+    /// IANA-registered "self" link relation, filtered from affordance Link headers
+    /// as informationally vacuous per Fielding — the resource already knows its own URI.
+    [<Literal>]
+    let SelfRelation = "self"
+
     /// Build a composite lookup key from route template and state key.
     let lookupKey (routeTemplate: string) (stateKey: string) : string = routeTemplate + KeySeparator + stateKey
 
@@ -75,11 +80,7 @@ module AffordanceMap =
 
     /// Build a composite lookup key for authenticated users without a matching role.
     let lookupKeyAuthenticated (routeTemplate: string) (stateKey: string) : string =
-        routeTemplate
-        + KeySeparator
-        + stateKey
-        + KeySeparator
-        + AuthenticatedFallbackRole
+        lookupKeyWithRole routeTemplate stateKey AuthenticatedFallbackRole
 
     /// Try to find an entry in the affordance map by route and state.
     /// O(n) scan — suitable for tests/startup. Runtime uses pre-computed Dictionary.
@@ -103,7 +104,7 @@ module AffordanceMap =
         : AffordanceLinkRelation list =
         capabilities
         |> List.choose (fun cap ->
-            if cap.LinkRelation = "self" then
+            if cap.LinkRelation = SelfRelation then
                 None
             else
                 Some

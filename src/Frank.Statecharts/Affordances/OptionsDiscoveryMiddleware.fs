@@ -114,26 +114,21 @@ type OptionsDiscoveryMiddleware
         |> Set.add "OPTIONS"
 
     member _.Invoke(ctx: HttpContext) : Task =
-        // (a) Not an OPTIONS request -> pass through
         if not (HttpMethods.IsOptions(ctx.Request.Method)) then
             next.Invoke(ctx)
-        // (b) CORS preflight -> pass through
         elif ctx.Request.Headers.ContainsKey("Access-Control-Request-Method") then
             logger.LogDebug("CORS preflight detected for {Path}, passing through", ctx.Request.Path)
             next.Invoke(ctx)
         else
             task {
-                // Find siblings by matching request path against route patterns
                 let matches = findSiblingEndpoints (ctx.Request.Path.Value)
 
-                // No matching endpoints -> pass through
                 if List.isEmpty matches then
                     do! next.Invoke(ctx)
                 else
                     let siblings = matches |> List.map fst
                     let routeValues = matches |> List.head |> snd
 
-                    // (e) Check if any sibling has an explicit OPTIONS handler
                     let hasExplicitOptions =
                         siblings
                         |> List.exists (fun ep ->
@@ -141,28 +136,20 @@ type OptionsDiscoveryMiddleware
                             not (isNull meta) && meta.HttpMethods |> Seq.exists (fun m -> m = "OPTIONS"))
 
                     if hasExplicitOptions then
-                        // Explicit handler takes precedence -- let routing handle it.
                         logger.LogDebug("Explicit OPTIONS handler found for {Path}, passing through", ctx.Request.Path)
-
                         do! next.Invoke(ctx)
                     else
-                        // Try state-aware affordance lookup first
                         let! resolution = tryResolveStateAwareAffordance ctx siblings routeValues
 
                         match resolution with
                         | AffordanceResolution.Found preComputed ->
-                            // State-aware response from pre-computed affordance data
                             ctx.Response.StatusCode <- 204
                             ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
                             ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
-                        | AffordanceResolution.StateNotResolved ->
-                            // Statechart exists but state could not be resolved — 404 (F-4)
-                            ctx.Response.StatusCode <- 404
+                        | AffordanceResolution.StateNotResolved -> ctx.Response.StatusCode <- 404
                         | AffordanceResolution.NoStatechart ->
-                            // Fall back to route-level: collect all HttpMethodMetadata methods
                             let methods = collectRouteLevelMethods siblings
 
-                            // Collect and deduplicate DiscoveryMediaType entries
                             let mediaTypes =
                                 siblings
                                 |> Seq.collect (fun ep ->
@@ -179,8 +166,8 @@ type OptionsDiscoveryMiddleware
                             let allowValue = methods |> Set.toSeq |> String.concat ", "
                             ctx.Response.Headers["Allow"] <- allowValue
 
-                            // Emit Link headers only for non-parameterized routes (F-2).
-                            // Parameterized routes contain {}, which are invalid URI chars per RFC 3986.
+                            // Suppress Link headers for parameterized routes —
+                            // curly braces are invalid URI chars per RFC 3986.
                             let routePattern = (List.head siblings).RoutePattern.RawText
 
                             if not (routePattern.Contains("{")) then

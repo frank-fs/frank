@@ -60,13 +60,7 @@ module JsonHomeProjection =
     /// Uses route-template-based fragments to avoid slug collisions (#200).
     /// AlpsBaseUri alone is sufficient — descriptor lookup is for hrefVar enrichment only (M-2).
     /// Requires AlpsBaseUri to be absolute per RFC 8288 (#201).
-    let private deriveRelationType
-        (_slug: string)
-        (routeTemplate: string)
-        (alpsBaseUri: string option)
-        (_alpsDescriptors: Map<string, Map<string, string>>)
-        (assemblyName: string)
-        =
+    let private deriveRelationType (routeTemplate: string) (alpsBaseUri: string option) (assemblyName: string) =
         match alpsBaseUri with
         | Some baseUri when System.Uri.IsWellFormedUriString(baseUri, System.UriKind.Absolute) ->
             let cleanBase = baseUri.Split('#').[0]
@@ -152,8 +146,7 @@ module JsonHomeProjection =
                     let types = collectMediaTypes (fun m -> m = methodName)
                     if types.IsEmpty then None else Some types
 
-                let relationType =
-                    deriveRelationType slug routeTemplate alpsBaseUri alpsDescriptors assemblyName
+                let relationType = deriveRelationType routeTemplate alpsBaseUri assemblyName
 
                 { RelationType = relationType
                   RouteTemplate = routeTemplate
