@@ -99,7 +99,8 @@ module WebHostBuilderExtensions =
                                             assembly.GetName().Name
                                         )
 
-                                        Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)))
+                                        Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal))
+                        )
                         |> ignore
 
                         services
@@ -183,7 +184,8 @@ module WebHostBuilderExtensions =
                     spec.Services
                     >> fun services ->
                         services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
-                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal))
+                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)
+                        )
 
                         services
                 Middleware =
@@ -214,15 +216,16 @@ module WebHostBuilderExtensions =
                     spec.Services
                     >> fun services ->
                         services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
-                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal))
+                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)
+                        )
 
                         services
                 Middleware =
                     spec.Middleware
                     >> fun app ->
-                        app.UseMiddleware<OptionsDiscoveryMiddleware>()
-                            .UseMiddleware<LinkHeaderMiddleware>()
+                        app.UseMiddleware<OptionsDiscoveryMiddleware>().UseMiddleware<LinkHeaderMiddleware>()
                         |> ignore
+
                         app }
 
         /// Registers all three discovery middlewares: OPTIONS responses, Link headers,

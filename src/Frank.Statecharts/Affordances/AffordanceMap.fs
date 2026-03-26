@@ -48,15 +48,14 @@ module AffordancePreCompute =
 
             // Collect distinct roles from link relations
             let distinctRoles =
-                entry.LinkRelations
-                |> List.collect (fun lr -> lr.Roles)
-                |> List.distinct
+                entry.LinkRelations |> List.collect (fun lr -> lr.Roles) |> List.distinct
 
             let hasRoleRestrictedLinks = not (List.isEmpty distinctRoles)
 
             // Generate role-scoped entries
             for role in distinctRoles do
-                let roleKey = AffordanceMap.lookupKeyWithRole entry.RouteTemplate entry.StateKey role
+                let roleKey =
+                    AffordanceMap.lookupKeyWithRole entry.RouteTemplate entry.StateKey role
 
                 let roleLinkValues =
                     [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
@@ -73,7 +72,8 @@ module AffordancePreCompute =
             // Generate authenticated fallback entry: only role-agnostic links
             // Used when user has roles but none match any role-specific entry
             if hasRoleRestrictedLinks then
-                let authKey = AffordanceMap.lookupKeyAuthenticated entry.RouteTemplate entry.StateKey
+                let authKey =
+                    AffordanceMap.lookupKeyAuthenticated entry.RouteTemplate entry.StateKey
 
                 let authLinkValues =
                     [| if not (String.IsNullOrEmpty entry.ProfileUrl) then

@@ -38,15 +38,19 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
                 // Resolve state key from statechart middleware
                 let stateKey =
                     let f = ctx.Features.Get<IStatechartFeature>()
-                    if obj.ReferenceEquals(f, null) then null
+
+                    if obj.ReferenceEquals(f, null) then
+                        null
                     else
                         match f.StateKey with
                         | Some key -> key
                         | None -> null
 
                 let effectiveStateKey =
-                    if not (isNull stateKey) then stateKey
-                    else AffordanceMap.WildcardStateKey
+                    if not (isNull stateKey) then
+                        stateKey
+                    else
+                        AffordanceMap.WildcardStateKey
 
                 let baseKey = AffordanceMap.lookupKey routeTemplate effectiveStateKey
 
@@ -69,7 +73,8 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
                         | Some _ -> roleMatch
                         | None ->
                             // Authenticated fallback (role-agnostic links only)
-                            let authMatch = tryLookup (AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey)
+                            let authMatch =
+                                tryLookup (AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey)
 
                             match authMatch with
                             | Some _ -> authMatch

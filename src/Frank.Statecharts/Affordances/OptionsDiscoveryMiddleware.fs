@@ -191,8 +191,7 @@ type OptionsDiscoveryMiddleware
                                         "/" + routePattern
 
                                 for mt in mediaTypes do
-                                    let linkValue =
-                                        sprintf "<%s>; rel=\"%s\"; type=\"%s\"" path mt.Rel mt.MediaType
+                                    let linkValue = sprintf "<%s>; rel=\"%s\"; type=\"%s\"" path mt.Rel mt.MediaType
 
                                     ctx.Response.Headers.Append("Link", linkValue)
             }

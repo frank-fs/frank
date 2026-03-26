@@ -146,6 +146,7 @@ module AffordanceMap =
                     |> fun ms -> "OPTIONS" :: ms
                     |> List.distinct
                     |> List.sort
+
                 let linkRels = buildLinkRelations resource.RouteTemplate capsForState
 
                 { RouteTemplate = resource.RouteTemplate

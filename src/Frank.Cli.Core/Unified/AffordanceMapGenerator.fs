@@ -76,11 +76,7 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
                     | Some sk -> sk = stateName
                     | None -> true) // Capabilities with no state key apply to all states
 
-            let methods =
-                capsForState
-                |> List.map _.Method
-                |> List.distinct
-                |> List.sort
+            let methods = capsForState |> List.map _.Method |> List.distinct |> List.sort
 
             let linkRels = buildLinkRelations resource.RouteTemplate capsForState
 
@@ -93,10 +89,7 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
     | None ->
         // Stateless resource: single entry with "*" state key
         let methods =
-            resource.HttpCapabilities
-            |> List.map _.Method
-            |> List.distinct
-            |> List.sort
+            resource.HttpCapabilities |> List.map _.Method |> List.distinct |> List.sort
 
         let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
 
@@ -115,16 +108,21 @@ let private writeLinkRelation (writer: Utf8JsonWriter) (lr: AffordanceLinkRelati
     writer.WriteString("rel", lr.Rel)
     writer.WriteString("href", lr.Href)
     writer.WriteString("method", lr.Method)
+
     match lr.Title with
     | Some t -> writer.WriteString("title", t)
     | None -> ()
+
     match lr.Roles with
     | [] -> ()
     | roles ->
         writer.WriteStartArray("roles")
+
         for r in roles do
             writer.WriteStringValue(r)
+
         writer.WriteEndArray()
+
     writer.WriteEndObject()
 
 let private writeEntry (writer: Utf8JsonWriter) (entry: AffordanceMapEntry) =
@@ -134,14 +132,18 @@ let private writeEntry (writer: Utf8JsonWriter) (entry: AffordanceMapEntry) =
 
     // allowedMethods
     writer.WriteStartArray("allowedMethods")
+
     for m in entry.AllowedMethods do
         writer.WriteStringValue(m)
+
     writer.WriteEndArray()
 
     // linkRelations
     writer.WriteStartArray("linkRelations")
+
     for lr in entry.LinkRelations do
         writeLinkRelation writer lr
+
     writer.WriteEndArray()
 
     // profileUrl
@@ -151,17 +153,10 @@ let private writeEntry (writer: Utf8JsonWriter) (entry: AffordanceMapEntry) =
 
 /// Generate the affordance map JSON from a list of unified resources.
 /// Accepts an optional generatedAt timestamp for testability (defaults to UtcNow).
-let generate
-    (resources: UnifiedResource list)
-    (baseUri: string)
-    (generatedAt: DateTimeOffset option)
-    : string =
-    let timestamp =
-        generatedAt |> Option.defaultWith (fun () -> DateTimeOffset.UtcNow)
+let generate (resources: UnifiedResource list) (baseUri: string) (generatedAt: DateTimeOffset option) : string =
+    let timestamp = generatedAt |> Option.defaultWith (fun () -> DateTimeOffset.UtcNow)
 
-    let allEntries =
-        resources
-        |> List.collect (fun r -> buildEntries r baseUri)
+    let allEntries = resources |> List.collect (fun r -> buildEntries r baseUri)
 
     use stream = new MemoryStream()
     use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
@@ -173,8 +168,10 @@ let generate
 
     // entries object (keyed by composite key)
     writer.WriteStartObject("entries")
+
     for entry in allEntries do
         writeEntry writer entry
+
     writer.WriteEndObject()
 
     writer.WriteEndObject()
