@@ -87,7 +87,9 @@ module JsonHomeDocument =
         match input.DescribedByUrl with
         | Some url ->
             w.WriteStartObject("links")
-            w.WriteString("describedBy", url)
+            w.WriteStartObject("describedBy")
+            w.WriteString("href", url)
+            w.WriteEndObject()
             w.WriteEndObject()
         | None -> ()
         w.WriteEndObject()

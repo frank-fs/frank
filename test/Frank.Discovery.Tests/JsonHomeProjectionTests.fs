@@ -98,6 +98,15 @@ let tests =
             let result = JsonHomeProjection.project dataSource None "TestApp"
             Expect.equal result.DescribedByUrl (Some "/.well-known/frank-profiles") "should detect profiles endpoint"
 
+        // M-1: route constraints stripped from hrefTemplate
+        testCase "route constraints stripped from template" <| fun _ ->
+            let res = resource "/items/{id:int}" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
+            let dataSource = TestEndpointDataSource(res.Endpoints)
+            let result = JsonHomeProjection.project dataSource None "TestApp"
+            let r = result.Resources.[0]
+            Expect.equal r.RouteTemplate "/items/{id}" "route constraint should be stripped"
+            Expect.isFalse (r.RouteTemplate.Contains(":")) "should not contain constraint colon"
+
         // #200: ALPS slug collision
         testCase "distinct routes with same slug produce distinct relation types" <| fun _ ->
             let listRes = resource "/games" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("list"))) }

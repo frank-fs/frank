@@ -24,6 +24,11 @@ module JsonHomeProjection =
         internalPrefixes
         |> Array.exists (fun prefix -> normalized.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
 
+    /// Strip ASP.NET Core route constraints from templates.
+    /// {gameId:int} -> {gameId}, {slug:regex(...)} -> {slug}
+    let private stripConstraints (template: string) =
+        System.Text.RegularExpressions.Regex.Replace(template, @"\{(\w+):[^}]+\}", "{$1}")
+
     /// Extract route variable names from a RouteEndpoint using RoutePattern.Parameters.
     let private extractRouteVariables
         (endpoint: RouteEndpoint)
@@ -103,7 +108,7 @@ module JsonHomeProjection =
                     if isNull rawText || isInternalEndpoint rawText then
                         None
                     else
-                        Some(rawText, re)
+                        Some(stripConstraints rawText, re)
                 | _ -> None)
             |> Seq.groupBy fst
             |> Seq.map (fun (routeTemplate, endpoints) ->

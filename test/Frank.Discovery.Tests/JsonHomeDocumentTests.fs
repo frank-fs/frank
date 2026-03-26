@@ -80,14 +80,16 @@ let tests =
             // accept-post is an array: ["application/json"]
             Expect.isTrue (json.Contains("\"accept-post\":[\"application/json\"]")) "accept-post should be array"
 
-        testCase "describedByUrl present adds api.links" <| fun _ ->
+        // M-5: api.links.describedBy must be a link object with href, not a bare string
+        testCase "describedByUrl present adds api.links with link object format" <| fun _ ->
             let input: JsonHomeInput =
                 { Title = "TestApp"
                   DescribedByUrl = Some "/.well-known/frank-profiles"
                   Resources = [] }
 
             let json = JsonHomeDocument.build input
-            Expect.isTrue (json.Contains("\"describedBy\":\"/.well-known/frank-profiles\"")) "should have describedBy link"
+            Expect.isTrue (json.Contains("\"describedBy\":{\"href\":\"/.well-known/frank-profiles\"}")) "describedBy should be link object with href per JSON Home spec"
+            Expect.isFalse (json.Contains("\"describedBy\":\"/.well-known")) "should NOT be a bare string"
 
         testCase "describedByUrl None omits api.links" <| fun _ ->
             let input: JsonHomeInput =
