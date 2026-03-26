@@ -130,4 +130,50 @@ let affordanceMapTests =
               // Won state: GET (self, filtered) only — no link relations at all
               let won = map.Entries |> List.find (fun e -> e.StateKey = "Won")
               Expect.contains won.AllowedMethods "GET" "Won should have GET in Allow"
-              Expect.isEmpty won.LinkRelations "Won should have no link relations (only self, which is filtered)" ]
+              Expect.isEmpty won.LinkRelations "Won should have no link relations (only self, which is filtered)"
+
+          // F-1: OPTIONS must always be in AllowedMethods (RFC 7231 §4.3.7)
+          testCase "generateFromResources includes OPTIONS in AllowedMethods for stateless resource"
+          <| fun _ ->
+              let resource: RuntimeResource =
+                  { RouteTemplate = "/items"
+                    ResourceSlug = "items"
+                    Statechart = RuntimeStatechart.empty
+                    HttpCapabilities =
+                      [ { Method = "GET"
+                          StateKey = "*"
+                          LinkRelation = "self"
+                          IsSafe = true }
+                        { Method = "POST"
+                          StateKey = "*"
+                          LinkRelation = "create"
+                          IsSafe = false } ] }
+
+              let map = AffordanceMap.generateFromResources [ resource ] "http://example.com/alps"
+              let entry = map.Entries |> List.head
+              Expect.contains entry.AllowedMethods "OPTIONS" "OPTIONS must be in AllowedMethods per RFC 7231 §4.3.7"
+
+          // F-1: OPTIONS in AllowedMethods for each state of a stateful resource
+          testCase "generateFromResources includes OPTIONS in AllowedMethods per state"
+          <| fun _ ->
+              let resource: RuntimeResource =
+                  { RouteTemplate = "/games/{gameId}"
+                    ResourceSlug = "games"
+                    Statechart =
+                      { StateNames = [ "XTurn"; "Won" ]
+                        InitialStateKey = "XTurn"
+                        GuardNames = []
+                        StateMetadata = Map.empty }
+                    HttpCapabilities =
+                      [ { Method = "GET"
+                          StateKey = "*"
+                          LinkRelation = "self"
+                          IsSafe = true }
+                        { Method = "POST"
+                          StateKey = "XTurn"
+                          LinkRelation = "makeMove"
+                          IsSafe = false } ] }
+
+              let map = AffordanceMap.generateFromResources [ resource ] "http://example.com/alps"
+              for entry in map.Entries do
+                  Expect.contains entry.AllowedMethods "OPTIONS" (sprintf "OPTIONS must be in AllowedMethods for state %s" entry.StateKey) ]

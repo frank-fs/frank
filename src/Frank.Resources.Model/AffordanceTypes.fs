@@ -82,6 +82,7 @@ module AffordanceMap =
         + AuthenticatedFallbackRole
 
     /// Try to find an entry in the affordance map by route and state.
+    /// O(n) scan — suitable for tests/startup. Runtime uses pre-computed Dictionary.
     let tryFind (routeTemplate: string) (stateKey: string) (map: AffordanceMap) : AffordanceMapEntry option =
         let key = lookupKey routeTemplate stateKey
 
@@ -119,7 +120,11 @@ module AffordanceMap =
         match resource.Statechart.StateNames with
         | [] ->
             let methods =
-                resource.HttpCapabilities |> List.map _.Method |> List.distinct |> List.sort
+                resource.HttpCapabilities
+                |> List.map _.Method
+                |> fun ms -> "OPTIONS" :: ms
+                |> List.distinct
+                |> List.sort
 
             let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
 
@@ -135,7 +140,12 @@ module AffordanceMap =
                     resource.HttpCapabilities
                     |> List.filter (fun cap -> cap.StateKey = WildcardStateKey || cap.StateKey = stateName)
 
-                let methods = capsForState |> List.map _.Method |> List.distinct |> List.sort
+                let methods =
+                    capsForState
+                    |> List.map _.Method
+                    |> fun ms -> "OPTIONS" :: ms
+                    |> List.distinct
+                    |> List.sort
                 let linkRels = buildLinkRelations resource.RouteTemplate capsForState
 
                 { RouteTemplate = resource.RouteTemplate

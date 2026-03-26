@@ -231,7 +231,7 @@ let preComputeTests =
               Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile"
               Expect.isTrue (allLinks.Contains("rel=\"makeMove\"")) "Should contain makeMove"
               // Allow header should still have GET
-              Expect.equal (entry.AllowHeaderValue.ToString()) "GET, POST" "Allow should still list GET and POST"
+              Expect.equal (entry.AllowHeaderValue.ToString()) "GET, OPTIONS, POST" "Allow should list GET, OPTIONS, and POST"
 
           testCase "omits profile link when ProfileUrl is empty"
           <| fun _ ->
