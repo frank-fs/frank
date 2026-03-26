@@ -14,7 +14,9 @@ module WebHostBuilderExtensions =
         /// root resources. The middleware lazily computes the home document on
         /// first request from EndpointDataSource and optional JsonHomeMetadata
         /// (contributed by other packages via DI).
-        /// Registers a default empty JsonHomeMetadata if none is already in DI.
+        /// TryAddSingleton registers Empty metadata as a default. Packages that
+        /// provide custom JsonHomeMetadata should register it before useJsonHome
+        /// in the CE pipeline to take precedence (M-4).
         [<CustomOperation("useJsonHome")>]
         member _.UseJsonHome(spec: WebHostSpec) : WebHostSpec =
             { spec with

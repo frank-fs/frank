@@ -25,7 +25,7 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
         ctx.Response.Headers["Allow"] <- preComputed.AllowHeaderValue
         ctx.Response.Headers["Link"] <- preComputed.LinkHeaderValues
 
-    member _.InvokeAsync(ctx: HttpContext) : Task =
+    member _.Invoke(ctx: HttpContext) : Task =
         let endpoint = ctx.GetEndpoint()
 
         if not (isNull endpoint) then
@@ -50,7 +50,10 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
 
                 let baseKey = AffordanceMap.lookupKey routeTemplate effectiveStateKey
 
-                // Resolve entry: role-specific > authenticated fallback > base
+                // Resolve entry: role-specific > authenticated fallback > base.
+                // Role matching uses Set iteration order (alphabetical for strings).
+                // When multiple roles match, the first alphabetically wins.
+                // Role priority ordering is a potential Phase 2 enhancement.
                 let roles = ctx.GetRoles()
                 let hasRoles = not (Set.isEmpty roles)
 
