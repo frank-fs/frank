@@ -15,13 +15,13 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Statecharts
 open Frank.Affordances
 open Frank.Resources.Model
+open Frank.Tests.Shared.TestEndpointDataSource
 
 // === Domain types (self-contained for tests) ===
 
@@ -156,11 +156,6 @@ let buildGameResource () =
     }
 
 // === Test infrastructure ===
-
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 /// Middleware shim that resolves the statechart state key from the store
 /// and sets IStatechartFeature on HttpContext.Features for the affordance middleware to read.

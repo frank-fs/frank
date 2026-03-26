@@ -13,6 +13,7 @@ open Microsoft.Extensions.Logging.Abstractions
 open Expecto
 open Frank.Builder
 open Frank.Affordances
+open Frank.Tests.Shared.TestEndpointDataSource
 open MiddlewareTests
 
 type CapturingLogger() =

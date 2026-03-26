@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="AuthorizationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

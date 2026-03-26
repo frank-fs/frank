@@ -11,7 +11,6 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 open Expecto
@@ -21,12 +20,7 @@ open Frank.Affordances
 open Frank.Affordances.Tests.AffordanceTestHelpers
 open Frank.Resources.Model
 open Frank.Statecharts
-
-/// Simple endpoint data source for tests (ResourceEndpointDataSource is internal).
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+open Frank.Tests.Shared.TestEndpointDataSource
 
 /// Test extension to add DiscoveryMediaType metadata to a resource via the builder.
 [<AutoOpen>]

@@ -4,11 +4,10 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
-open Microsoft.Extensions.FileProviders
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-open Frank.Discovery.Tests.JsonHomeMiddlewareTests
+open Frank.Tests.Shared.TestEndpointDataSource
 
 [<Tests>]
 let tests =

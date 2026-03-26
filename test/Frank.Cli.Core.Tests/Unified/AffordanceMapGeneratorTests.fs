@@ -141,12 +141,12 @@ let affordanceMapGeneratorTests =
               "profileUrl"
               [ testCase "derives profile URL from base URI and slug"
                 <| fun _ ->
-                    let url = AffordanceMapGenerator.profileUrl "https://example.com/alps" "games"
+                    let url = AffordanceMap.profileUrl "https://example.com/alps" "games"
                     Expect.equal url "https://example.com/alps/games" "Profile URL"
 
                 testCase "trims trailing slash from base URI"
                 <| fun _ ->
-                    let url = AffordanceMapGenerator.profileUrl "https://example.com/alps/" "health"
+                    let url = AffordanceMap.profileUrl "https://example.com/alps/" "health"
                     Expect.equal url "https://example.com/alps/health" "Trailing slash trimmed" ]
 
           testList

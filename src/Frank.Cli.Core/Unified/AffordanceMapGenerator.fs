@@ -19,11 +19,6 @@ let compositeKey (routeTemplate: string) (stateKey: string) : string =
 // Profile URL Derivation (T035)
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Derive the ALPS profile URL from a base URI and resource slug.
-let profileUrl (baseUri: string) (slug: string) : string =
-    let trimmed = baseUri.TrimEnd('/')
-    sprintf "%s/%s" trimmed slug
-
 /// Derive a slug for multi-segment routes.
 /// "/games/{gameId}" -> "games", "/health" -> "health",
 /// "/api/v1/games/{id}" -> "api-v1-games"
@@ -39,36 +34,13 @@ let deriveSlug (routeTemplate: string) : string =
     | multiple -> String.Join("-", multiple)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Link Relation Population (T034)
-// ══════════════════════════════════════════════════════════════════════════════
-
-/// Build link relations for a set of HTTP capabilities.
-/// Filters out rel="self" which is informationally vacuous per Fielding —
-/// the resource already knows its own URI. GET is still in AllowedMethods.
-let private buildLinkRelations
-    (routeTemplate: string)
-    (capabilities: HttpCapability list)
-    : AffordanceLinkRelation list =
-    capabilities
-    |> List.choose (fun cap ->
-        if cap.LinkRelation = AffordanceMap.SelfRelation then
-            None
-        else
-            Some
-                { Rel = cap.LinkRelation
-                  Href = routeTemplate
-                  Method = cap.Method
-                  Title = None
-                  Roles = [] })
-
-// ══════════════════════════════════════════════════════════════════════════════
 // Entry Generation (T032)
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// Build affordance map entries for a single unified resource.
 let private buildEntries (resource: UnifiedResource) (baseUri: string) : AffordanceMapEntry list =
     let slug = resource.ResourceSlug
-    let profile = profileUrl baseUri slug
+    let profile = AffordanceMap.profileUrl baseUri slug
 
     match resource.Statechart with
     | Some sc ->
@@ -89,7 +61,10 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
                 |> List.distinct
                 |> List.sort
 
-            let linkRels = buildLinkRelations resource.RouteTemplate capsForState
+            let linkRels =
+                AffordanceMap.buildLinkRelations
+                    resource.RouteTemplate
+                    (capsForState |> List.map (fun c -> c.Method, c.LinkRelation))
 
             { RouteTemplate = resource.RouteTemplate
               StateKey = stateName
@@ -106,7 +81,10 @@ let private buildEntries (resource: UnifiedResource) (baseUri: string) : Afforda
             |> List.distinct
             |> List.sort
 
-        let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
+        let linkRels =
+            AffordanceMap.buildLinkRelations
+                resource.RouteTemplate
+                (resource.HttpCapabilities |> List.map (fun c -> c.Method, c.LinkRelation))
 
         [ { RouteTemplate = resource.RouteTemplate
             StateKey = AffordanceMap.WildcardStateKey

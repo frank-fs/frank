@@ -92,26 +92,27 @@ module AffordanceMap =
         |> List.tryFind (fun e -> lookupKey e.RouteTemplate e.StateKey = key)
 
     /// Derive the ALPS profile URL from a base URI and resource slug.
-    let private profileUrl (baseUri: string) (slug: string) : string =
+    let profileUrl (baseUri: string) (slug: string) : string =
         let trimmed = baseUri.TrimEnd('/')
         sprintf "%s/%s" trimmed slug
 
-    /// Build link relations from runtime HTTP capabilities.
-    /// Filters out rel="self" entries which are informationally vacuous per Fielding —
-    /// the resource already knows its own URI. GET is still in AllowedMethods.
-    let private buildLinkRelations
+    /// Build link relations from (method, linkRelation) pairs.
+    /// Filters out rel="self" which is informationally vacuous in Link header context —
+    /// the client already knows the URI it requested. GET is preserved in AllowedMethods.
+    /// Shared by runtime (RuntimeHttpCapability) and CLI (HttpCapability) paths.
+    let buildLinkRelations
         (routeTemplate: string)
-        (capabilities: RuntimeHttpCapability list)
+        (capabilities: (string * string) list)
         : AffordanceLinkRelation list =
         capabilities
-        |> List.choose (fun cap ->
-            if cap.LinkRelation = SelfRelation then
+        |> List.choose (fun (method, linkRelation) ->
+            if linkRelation = SelfRelation then
                 None
             else
                 Some
-                    { Rel = cap.LinkRelation
+                    { Rel = linkRelation
                       Href = routeTemplate
-                      Method = cap.Method
+                      Method = method
                       Title = None
                       Roles = [] })
 
@@ -128,7 +129,10 @@ module AffordanceMap =
                 |> List.distinct
                 |> List.sort
 
-            let linkRels = buildLinkRelations resource.RouteTemplate resource.HttpCapabilities
+            let linkRels =
+                buildLinkRelations
+                    resource.RouteTemplate
+                    (resource.HttpCapabilities |> List.map (fun c -> c.Method, c.LinkRelation))
 
             [ { RouteTemplate = resource.RouteTemplate
                 StateKey = WildcardStateKey
@@ -149,7 +153,10 @@ module AffordanceMap =
                     |> List.distinct
                     |> List.sort
 
-                let linkRels = buildLinkRelations resource.RouteTemplate capsForState
+                let linkRels =
+                    buildLinkRelations
+                        resource.RouteTemplate
+                        (capsForState |> List.map (fun c -> c.Method, c.LinkRelation))
 
                 { RouteTemplate = resource.RouteTemplate
                   StateKey = stateName

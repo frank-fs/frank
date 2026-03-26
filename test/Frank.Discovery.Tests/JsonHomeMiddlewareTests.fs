@@ -11,17 +11,11 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-
-/// Simple endpoint data source for tests (ResourceEndpointDataSource is internal).
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+open Frank.Tests.Shared.TestEndpointDataSource
 
 let private withServer (f: HttpClient -> Task) =
     task {

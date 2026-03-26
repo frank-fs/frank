@@ -13,20 +13,14 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Auth
+open Frank.Tests.Shared.TestEndpointDataSource
 
 /// Test authentication scheme name
 let [<Literal>] TestScheme = "TestScheme"
-
-/// Simple endpoint data source for tests
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 /// Test authentication handler that authenticates based on X-Test-User header.
 type TestAuthHandler(options, logger, encoder) =

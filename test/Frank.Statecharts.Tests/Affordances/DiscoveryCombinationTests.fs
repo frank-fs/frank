@@ -13,6 +13,7 @@ open Expecto
 open Frank.Builder
 open Frank.Discovery
 open Frank.Affordances
+open Frank.Tests.Shared.TestEndpointDataSource
 open Frank.Statecharts.Tests.Affordances.OptionsDiscoveryTests
 
 /// Build a test server from a WebHostSpec, replicating the CE Run pipeline with TestServer.

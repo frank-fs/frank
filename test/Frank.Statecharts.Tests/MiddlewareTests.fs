@@ -13,9 +13,9 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
+open Frank.Tests.Shared.TestEndpointDataSource
 
 // --- Test domain ---
 
@@ -63,11 +63,6 @@ let guardedMachine: StateMachine<TestState, TestEvent, int> =
               ) ] }
 
 // --- Test infrastructure ---
-
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 let buildTestServer
     (resource: Resource)

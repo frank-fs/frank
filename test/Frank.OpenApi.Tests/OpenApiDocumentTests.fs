@@ -11,19 +11,13 @@ open Microsoft.AspNetCore.OpenApi
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open FSharp.Data.JsonSchema.OpenApi
 open Expecto
 open Frank.Builder
 open Frank.OpenApi
 open Scalar.AspNetCore
-
-/// Simple endpoint data source for tests (ResourceEndpointDataSource is internal)
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+open Frank.Tests.Shared.TestEndpointDataSource
 
 /// Creates a test server with Frank resources and OpenAPI enabled
 let createOpenApiTestServer (resources: Resource list) =
