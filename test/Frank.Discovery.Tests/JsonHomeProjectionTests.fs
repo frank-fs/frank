@@ -43,7 +43,7 @@ let tests =
                   AlpsDescriptors = Some (Map.ofList [ "games", Map.ofList [ "gameId", "http://example.com/alps/games#gameId" ] ]) }
             let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
             let r = result.Resources.[0]
-            Expect.equal r.RelationType "http://example.com/alps/games#games-gameId" "ALPS-derived relation"
+            Expect.equal r.RelationType "http://example.com/alps/games#games~gameId" "ALPS-derived relation"
             Expect.equal r.RouteVariables.["gameId"] "http://example.com/alps/games#gameId" "ALPS-enriched hrefVar"
             Expect.equal result.Title "My Game API" "should use metadata title"
 
@@ -122,8 +122,8 @@ let tests =
             let rels = result.Resources |> List.map _.RelationType
             Expect.equal rels.Length 2 "should have two resources"
             Expect.notEqual rels.[0] rels.[1] "relation types must be distinct (no slug collision)"
-            Expect.isTrue (rels |> List.exists (fun r -> r.Contains("#games-gameId"))) "item route should have games-gameId fragment"
-            Expect.isTrue (rels |> List.exists (fun r -> r.Contains("#games") && not (r.Contains("#games-")))) "list route should have games fragment"
+            Expect.isTrue (rels |> List.exists (fun r -> r.Contains("#games~gameId"))) "item route should have games~gameId fragment"
+            Expect.isTrue (rels |> List.exists (fun r -> r.Contains("#games") && not (r.Contains("#games~")))) "list route should have games fragment"
 
         // #200: nested routes produce unique fragments
         testCase "nested routes produce unique collision-free fragments" <| fun _ ->
@@ -144,9 +144,9 @@ let tests =
             // All relation types must be distinct
             Expect.equal (rels |> List.distinct |> List.length) 4 "all relation types must be distinct"
             Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games"))) "/games should have fragment 'games'"
-            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games-gameId"))) "/games/{gameId} should have fragment 'games-gameId'"
-            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games-gameId-moves"))) "/games/{gameId}/moves should have fragment 'games-gameId-moves'"
-            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games-gameId-moves-moveId"))) "/games/{gameId}/moves/{moveId} should have fragment 'games-gameId-moves-moveId'"
+            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games~gameId"))) "/games/{gameId} should have fragment 'games~gameId'"
+            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games~gameId~moves"))) "/games/{gameId}/moves should have fragment 'games~gameId~moves'"
+            Expect.isTrue (rels |> List.exists (fun r -> r.EndsWith("#games~gameId~moves~moveId"))) "/games/{gameId}/moves/{moveId} should have fragment 'games~gameId~moves~moveId'"
 
         // #200: backward compatibility — single route still works
         testCase "single route without collision still produces correct fragment" <| fun _ ->
@@ -160,6 +160,49 @@ let tests =
             let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
             let r = result.Resources.[0]
             Expect.equal r.RelationType "http://example.com/alps/items#items" "single route should produce simple fragment"
+
+        // M-2: AlpsBaseUri alone is sufficient for ALPS relation (no descriptor required)
+        testCase "AlpsBaseUri without AlpsDescriptors produces ALPS relation" <| fun _ ->
+            let res = resource "/widgets" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
+            let dataSource = TestEndpointDataSource(res.Endpoints)
+            let metadata: JsonHomeMetadata =
+                { Title = None
+                  DocsUrl = None
+                  AlpsBaseUri = Some "http://example.com/alps/widgets"
+                  AlpsDescriptors = None }
+            let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
+            let r = result.Resources.[0]
+            Expect.isTrue (r.RelationType.StartsWith("http://example.com/alps/widgets#")) "AlpsBaseUri alone should produce ALPS relation, not URN"
+
+        // M-6: AlpsBaseUri with existing fragment strips fragment before appending
+        testCase "AlpsBaseUri with existing fragment strips fragment before appending" <| fun _ ->
+            let res = resource "/items" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
+            let dataSource = TestEndpointDataSource(res.Endpoints)
+            let metadata: JsonHomeMetadata =
+                { Title = None
+                  DocsUrl = None
+                  AlpsBaseUri = Some "http://example.com/alps#existing"
+                  AlpsDescriptors = Some (Map.ofList [ "items", Map.empty ]) }
+            let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
+            let r = result.Resources.[0]
+            Expect.isFalse (r.RelationType.Contains("#existing#")) "should not produce double-fragment URI"
+            Expect.equal r.RelationType "http://example.com/alps#items" "should strip existing fragment and append new one"
+
+        // F-6: collision-free separator (~)
+        testCase "routes with hyphens in segments don't collide with multi-segment routes" <| fun _ ->
+            let res1 = resource "/a-b/c" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
+            let res2 = resource "/a/b-c" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("ok"))) }
+            let allEndpoints = Array.append res1.Endpoints res2.Endpoints
+            let dataSource = TestEndpointDataSource(allEndpoints)
+            let metadata: JsonHomeMetadata =
+                { Title = None
+                  DocsUrl = None
+                  AlpsBaseUri = Some "http://example.com/alps/test"
+                  AlpsDescriptors = Some (Map.ofList [ "a-b", Map.empty; "a", Map.empty ]) }
+            let result = JsonHomeProjection.project dataSource (Some metadata) "TestApp"
+            let rels = result.Resources |> List.map _.RelationType
+            Expect.equal rels.Length 2 "should have two resources"
+            Expect.notEqual rels.[0] rels.[1] "relation types must be distinct (no collision)"
 
         // #201: AlpsBaseUri must be absolute
         testCase "relative AlpsBaseUri falls back to URN" <| fun _ ->

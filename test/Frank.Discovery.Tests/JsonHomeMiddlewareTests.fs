@@ -270,7 +270,7 @@ let ceTests =
                 Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
                 let! (body: string) = resp.Content.ReadAsStringAsync()
                 Expect.isTrue (body.Contains("Custom Title")) "should use pre-registered metadata title, not Empty"
-                Expect.isTrue (body.Contains("http://example.com/alps/games#games-gameId")) "should use ALPS relation from pre-registered metadata"
+                Expect.isTrue (body.Contains("http://example.com/alps/games#games~gameId")) "should use ALPS relation from pre-registered metadata"
             })
         }
 
@@ -338,7 +338,7 @@ let metadataTests =
                     let! (resp: HttpResponseMessage) = client.SendAsync(req)
                     let! (body: string) = resp.Content.ReadAsStringAsync()
                     Expect.isTrue (body.Contains("Game API")) "should use metadata title"
-                    Expect.isTrue (body.Contains("http://example.com/alps/games#games-gameId")) "should have ALPS relation"
+                    Expect.isTrue (body.Contains("http://example.com/alps/games#games~gameId")) "should have ALPS relation"
                     Expect.isTrue (body.Contains("http://example.com/alps/games#gameId")) "should have ALPS hrefVar"
                     Expect.isTrue (body.Contains("/scalar/v1")) "should have docs URL"
                 finally

@@ -50,23 +50,27 @@ module JsonHomeProjection =
         |> Map.ofSeq
 
     /// Derive a collision-free fragment identifier from a route template.
-    /// /games → "games", /games/{gameId} → "games-gameId"
+    /// Uses ~ as segment separator (RFC 3986 unreserved char) to avoid collisions
+    /// with hyphens in route segment names (F-6). Fragment IDs are document-level
+    /// identifiers within JSON Home, not ALPS descriptor references (M-3).
     let private routeToFragment (routeTemplate: string) =
-        routeTemplate.TrimStart('/').Replace("/", "-").Replace("{", "").Replace("}", "")
+        routeTemplate.TrimStart('/').Replace("/", "~").Replace("{", "").Replace("}", "")
 
     /// Derive the link relation type for a resource.
     /// Uses route-template-based fragments to avoid slug collisions (#200).
+    /// AlpsBaseUri alone is sufficient — descriptor lookup is for hrefVar enrichment only (M-2).
     /// Requires AlpsBaseUri to be absolute per RFC 8288 (#201).
     let private deriveRelationType
-        (slug: string)
+        (_slug: string)
         (routeTemplate: string)
         (alpsBaseUri: string option)
-        (alpsDescriptors: Map<string, Map<string, string>>)
+        (_alpsDescriptors: Map<string, Map<string, string>>)
         (assemblyName: string)
         =
-        match alpsBaseUri, Map.tryFind slug alpsDescriptors with
-        | Some baseUri, Some _ when System.Uri.IsWellFormedUriString(baseUri, System.UriKind.Absolute) ->
-            sprintf "%s#%s" baseUri (routeToFragment routeTemplate)
+        match alpsBaseUri with
+        | Some baseUri when System.Uri.IsWellFormedUriString(baseUri, System.UriKind.Absolute) ->
+            let cleanBase = baseUri.Split('#').[0]
+            sprintf "%s#%s" cleanBase (routeToFragment routeTemplate)
         | _ -> sprintf "urn:frank:%s%s" assemblyName routeTemplate
 
     /// Project an EndpointDataSource into a JsonHomeInput.
