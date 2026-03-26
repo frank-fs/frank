@@ -69,6 +69,10 @@ These principles govern all code changes.
 - **Integer division in threshold checks**: `count / 2` truncates (3/2=1), making thresholds more permissive than intended. Use multiplication instead: `overlap * 2 >= total` gives honest "at least half" semantics without rounding issues.
 - **Result over Option for diagnostics**: When a `None` return would discard useful error context (parse failures, file not found, unsupported format), return `Result<'T, string>` instead. Lets callers aggregate and surface warnings rather than silently dropping them.
 - **Transition state collection**: When extracting state names from `TransitionElement`, collect both `edge.Source` and `edge.Target`. Transition-only formats (smcat) don't create `StateDecl` for target-only states — they'd be invisible if you only collect sources.
+- **`StringValues` overload on `Headers.Append`**: `sprintf` returns `string`, but `IHeaderDictionary.Append` expects `StringValues`. Use an intermediate `let` binding: `let linkValue = sprintf "..." in ctx.Response.Headers.Append("Link", linkValue)`.
+- **`TemplateMatcher` is not thread-safe**: Cache immutable `RouteTemplate` objects (via `TemplateParser.Parse`); create `TemplateMatcher` per-request. Sharing cached matchers across concurrent requests causes subtle data races.
+- **`AddSingleton` vs `TryAddSingleton`**: `AddSingleton` always registers (last-wins for same type). `TryAddSingleton` is first-wins (no-op if already registered). Use `TryAddSingleton` for auto-load defaults, `AddSingleton` for explicit overrides.
+- **Link headers must be URIs per RFC 8288**: Pre-computed Link headers with route template params (`{gameId}`) need runtime resolution against `ctx.Request.RouteValues`. Use a `HasTemplateLinks` flag to skip resolution for non-parameterized resources (zero-alloc fast path).
 
 ## Workflow Rules
 
