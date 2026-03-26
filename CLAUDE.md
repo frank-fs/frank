@@ -82,6 +82,9 @@ These principles govern all code changes.
 - **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
 - **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first. The branch with the most shared-file changes merges last to minimize rebase churn.
 - **Verification sequence before PRs.** Before creating a PR, run the full verification sequence: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review`. Address findings before opening the PR.
+- **Section-by-section audit before closing.** When an issue has multiple sections (e.g., "Operational MPST" + "Wadler/dual"), verify every requirement in every section before closing. Don't close an issue because one section is done.
+- **PRs must enumerate all issue requirements with status.** For each requirement in the linked issue, the PR body must state: implemented, blocked by #X, or deferred with rationale. "Closes #X" without per-requirement accounting is insufficient.
+- **Never close issues with unfulfilled-dependency requirements.** If an issue has requirements that depend on open issues (#124, #125, etc.), leave the issue open. Either split it (done-now vs blocked) or add a comment listing what's blocked. The user decides when to close.
 
 ### Planning and communication
 - **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
