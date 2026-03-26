@@ -67,6 +67,7 @@ let withAffordanceServer
         let builder = WebApplication.CreateBuilder([||])
         builder.WebHost.UseTestServer() |> ignore
         builder.Services.AddRouting() |> ignore
+        builder.Services.AddSingleton<Dictionary<string, PreComputedAffordance>>(lookup) |> ignore
         let app = builder.Build()
 
         app.UseRouting() |> ignore
@@ -77,7 +78,7 @@ let withAffordanceServer
                 next.Invoke())
         |> ignore
 
-        (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(lookup)
+        (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>()
         |> ignore
 
         app.UseEndpoints(configureEndpoints) |> ignore

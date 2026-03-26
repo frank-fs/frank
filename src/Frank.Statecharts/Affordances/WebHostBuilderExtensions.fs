@@ -1,9 +1,11 @@
 namespace Frank.Affordances
 
+open System
 open System.Collections.Generic
 open System.Reflection
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.DependencyInjection.Extensions
 open Microsoft.Extensions.Logging
 open Frank.Resources.Model
 open Frank.Builder
@@ -15,25 +17,10 @@ module WebHostBuilderExtensions =
     let private getAffordanceLogger (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger<AffordanceMiddleware>()
 
-    let private registerAffordanceMiddleware
-        (logger: ILogger)
-        (preComputed: Dictionary<string, PreComputedAffordance>)
-        (version: string)
-        (app: IApplicationBuilder)
-        =
-        if version <> AffordanceMap.currentVersion then
-            logger.LogWarning(
-                "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
-                version,
-                AffordanceMap.currentVersion
-            )
-
-        app.UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
-
     type WebHostBuilder with
 
         /// Register the affordance middleware with an explicit AffordanceMap.
-        /// Injects Link and Allow headers based on the pre-computed affordance map.
+        /// Registers the pre-computed dictionary as a DI singleton (FW-3).
         /// Middleware runs after routing (and after statechart middleware if present).
         [<CustomOperation("useAffordancesWith")>]
         member _.UseAffordancesWith(spec: WebHostSpec, map: AffordanceMap) : WebHostSpec =
@@ -45,57 +32,82 @@ module WebHostBuilderExtensions =
                 let version = map.Version
 
                 { spec with
+                    Services =
+                        spec.Services
+                        >> fun services ->
+                            services.AddSingleton<Dictionary<string, PreComputedAffordance>>(preComputed)
+                            |> ignore
+
+                            services
                     Middleware =
                         spec.Middleware
                         >> fun app ->
-                            registerAffordanceMiddleware (getAffordanceLogger app) preComputed version app
+                            if version <> AffordanceMap.currentVersion then
+                                (getAffordanceLogger app)
+                                    .LogWarning(
+                                        "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
+                                        version,
+                                        AffordanceMap.currentVersion
+                                    )
+
+                            app.UseMiddleware<AffordanceMiddleware>() |> ignore
                             app }
 
         /// Auto-load the AffordanceMap from the entry assembly's embedded model.bin.
-        /// Falls back to no-op with a log message when the entry assembly is null
+        /// Registers a DI factory that lazily loads from the assembly (FW-3).
+        /// Falls back to empty dictionary when the entry assembly is null
         /// or model.bin is not found/readable. For multi-project solutions where
         /// model.bin lives in a library assembly, use useAffordancesWith.
         [<CustomOperation("useAffordances")>]
         member _.UseAffordances(spec: WebHostSpec) : WebHostSpec =
-            match Assembly.GetEntryAssembly() with
-            | null ->
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            (getAffordanceLogger app)
-                                .LogWarning(
-                                    "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map."
-                                )
+            { spec with
+                Services =
+                    spec.Services
+                    >> fun services ->
+                        services.AddSingleton<Dictionary<string, PreComputedAffordance>>(
+                            Func<IServiceProvider, Dictionary<string, PreComputedAffordance>>(fun sp ->
+                                let loggerFactory = sp.GetRequiredService<ILoggerFactory>()
+                                let logger = loggerFactory.CreateLogger<AffordanceMiddleware>()
 
-                            app }
-            | assembly ->
-                { spec with
-                    Middleware =
-                        spec.Middleware
-                        >> fun app ->
-                            let logger = getAffordanceLogger app
+                                match Assembly.GetEntryAssembly() with
+                                | null ->
+                                    logger.LogWarning(
+                                        "Assembly.GetEntryAssembly() returned null; cannot auto-load affordances. Use useAffordancesWith to supply an explicit map."
+                                    )
 
-                            match StartupProjection.loadAffordanceMapFromAssembly logger assembly with
-                            | Some map ->
-                                logger.LogInformation(
-                                    "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
-                                    assembly.GetName().Name,
-                                    map.Entries.Length
-                                )
+                                    Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)
+                                | assembly ->
+                                    match StartupProjection.loadAffordanceMapFromAssembly logger assembly with
+                                    | Some map ->
+                                        logger.LogInformation(
+                                            "Affordance map loaded from assembly '{AssemblyName}' ({EntryCount} entries).",
+                                            assembly.GetName().Name,
+                                            map.Entries.Length
+                                        )
 
-                                let preComputed = AffordancePreCompute.preCompute map
+                                        if map.Version <> AffordanceMap.currentVersion then
+                                            logger.LogWarning(
+                                                "Affordance map version '{MapVersion}' does not match expected version '{ExpectedVersion}'. Affordance headers may be incorrect.",
+                                                map.Version,
+                                                AffordanceMap.currentVersion
+                                            )
 
-                                if preComputed.Count > 0 then
-                                    registerAffordanceMiddleware logger preComputed map.Version app
+                                        AffordancePreCompute.preCompute map
+                                    | None ->
+                                        logger.LogInformation(
+                                            "model.bin not found or unreadable in assembly '{AssemblyName}'; affordances not loaded. Use useAffordancesWith to supply an explicit map.",
+                                            assembly.GetName().Name
+                                        )
 
-                            | None ->
-                                logger.LogInformation(
-                                    "model.bin not found or unreadable in assembly '{AssemblyName}'; affordances not loaded. Use useAffordancesWith to supply an explicit map.",
-                                    assembly.GetName().Name
-                                )
+                                        Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)))
+                        |> ignore
 
-                            app }
+                        services
+                Middleware =
+                    spec.Middleware
+                    >> fun app ->
+                        app.UseMiddleware<AffordanceMiddleware>() |> ignore
+                        app }
 
         /// Register the projected profile middleware with an explicit RuntimeState.
         /// Swaps the global ALPS profile Link header for a role-specific one when
@@ -162,9 +174,18 @@ module WebHostBuilderExtensions =
         /// Registers the OPTIONS discovery middleware. Endpoints respond to
         /// OPTIONS with an Allow header listing registered HTTP methods and
         /// aggregated DiscoveryMediaType information.
+        /// Registers a default empty affordance dictionary via TryAddSingleton
+        /// so the middleware resolves from DI without a null secondary constructor (FW-2).
         [<CustomOperation("useOptionsDiscovery")>]
         member _.UseOptionsDiscovery(spec: WebHostSpec) : WebHostSpec =
             { spec with
+                Services =
+                    spec.Services
+                    >> fun services ->
+                        services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
+                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal))
+
+                        services
                 Middleware =
                     spec.Middleware
                     >> fun app ->
@@ -189,6 +210,13 @@ module WebHostBuilderExtensions =
         [<CustomOperation("useDiscoveryHeaders")>]
         member _.UseDiscoveryHeaders(spec: WebHostSpec) : WebHostSpec =
             { spec with
+                Services =
+                    spec.Services
+                    >> fun services ->
+                        services.TryAddSingleton<Dictionary<string, PreComputedAffordance>>(
+                            Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal))
+
+                        services
                 Middleware =
                     spec.Middleware
                     >> fun app ->

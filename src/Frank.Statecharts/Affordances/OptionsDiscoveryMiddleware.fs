@@ -113,10 +113,6 @@ type OptionsDiscoveryMiddleware
         |> Set.ofSeq
         |> Set.add "OPTIONS"
 
-    /// Secondary constructor for backward compatibility when no affordance lookup is configured.
-    new(next: RequestDelegate, dataSource: EndpointDataSource, logger: ILogger<OptionsDiscoveryMiddleware>) =
-        OptionsDiscoveryMiddleware(next, dataSource, logger, null)
-
     member _.Invoke(ctx: HttpContext) : Task =
         // (a) Not an OPTIONS request -> pass through
         if not (HttpMethods.IsOptions(ctx.Request.Method)) then

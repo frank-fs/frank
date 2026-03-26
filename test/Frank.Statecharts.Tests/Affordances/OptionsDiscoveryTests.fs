@@ -58,7 +58,9 @@ let withTestHost (configureApp: IApplicationBuilder -> unit) (resources: Resourc
                         .UseTestServer()
                         .ConfigureServices(fun services ->
                             services.AddRouting() |> ignore
-                            services.AddSingleton<EndpointDataSource>(dataSource) |> ignore)
+                            services.AddSingleton<EndpointDataSource>(dataSource) |> ignore
+                            services.AddSingleton<Dictionary<string, PreComputedAffordance>>(
+                                Dictionary<string, PreComputedAffordance>(StringComparer.Ordinal)) |> ignore)
                         .Configure(fun app ->
                             app.UseRouting() |> ignore
                             configureApp app
@@ -429,7 +431,7 @@ let withStatefulOptionsServer
 
         app.UseRouting() |> ignore
 
-        (app :> IApplicationBuilder).UseMiddleware<OptionsDiscoveryMiddleware>(lookup)
+        (app :> IApplicationBuilder).UseMiddleware<OptionsDiscoveryMiddleware>()
         |> ignore
 
         app.UseEndpoints(fun endpoints ->
