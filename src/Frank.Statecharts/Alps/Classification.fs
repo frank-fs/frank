@@ -102,32 +102,35 @@ let RelRelated = "related"
 let RelProfile = "profile"
 
 // ---------------------------------------------------------------------------
-// ALPS extension vocabulary IDs (T008)
+// ALPS extension vocabulary IDs (T008, #165: namespaced HTTPS URIs)
 // ---------------------------------------------------------------------------
 
 [<Literal>]
-let GuardExtId = "guard"
+let AlpsExtBaseUri = "https://frank-fs.github.io/alps-ext"
 
 [<Literal>]
-let ProjectedRoleExtId = "projectedRole"
+let GuardExtId = "https://frank-fs.github.io/alps-ext/guard"
 
 [<Literal>]
-let ProtocolStateExtId = "protocolState"
+let ProjectedRoleExtId = "https://frank-fs.github.io/alps-ext/projectedRole"
 
 [<Literal>]
-let AvailableInStatesExtId = "availableInStates"
+let ProtocolStateExtId = "https://frank-fs.github.io/alps-ext/protocolState"
 
 [<Literal>]
-let ClientObligationExtId = "clientObligation"
+let AvailableInStatesExtId = "https://frank-fs.github.io/alps-ext/availableInStates"
 
 [<Literal>]
-let AdvancesProtocolExtId = "advancesProtocol"
+let ClientObligationExtId = "https://frank-fs.github.io/alps-ext/clientObligation"
 
 [<Literal>]
-let DualOfExtId = "dualOf"
+let AdvancesProtocolExtId = "https://frank-fs.github.io/alps-ext/advancesProtocol"
 
 [<Literal>]
-let CutPointExtId = "cutPoint"
+let DualOfExtId = "https://frank-fs.github.io/alps-ext/dualOf"
+
+[<Literal>]
+let CutPointExtId = "https://frank-fs.github.io/alps-ext/cutPoint"
 
 // ---------------------------------------------------------------------------
 // Transition extraction (T006, ported from Mapper.fs)
@@ -137,10 +140,11 @@ let CutPointExtId = "cutPoint"
 let resolveRt (rt: string option) : string option =
     rt |> Option.map (fun r -> if r.StartsWith("#") then r.Substring(1) else r)
 
-/// Extract a guard label from ext elements (first ext with id="guard").
+/// Extract a guard label from ext elements (first ext with id matching guard).
+/// Accepts both the canonical HTTPS URI and the legacy bare name for backward compat.
 let extractGuard (exts: ParsedExtension list) : string option =
     exts
-    |> List.tryFind (fun e -> e.Id = GuardExtId)
+    |> List.tryFind (fun e -> e.Id = GuardExtId || e.Id = "guard")
     |> Option.bind (fun e -> e.Value)
 
 /// Extract parameter descriptor ids from a descriptor's children.
@@ -165,29 +169,42 @@ let toTransitionKind (typeStr: string option) : AlpsTransitionKind =
 
 /// Classify a parsed extension into a typed AlpsMeta DU case.
 /// Known extension ids get typed cases; unknown fall back to AlpsExtension.
+/// Backward compat (#165): both old bare names and new HTTPS URIs are accepted.
+/// Stored ids always use the canonical HTTPS URI constants.
 /// Note: these extension types do not carry href in the ALPS extension vocabulary;
 /// href is preserved only for unknown extensions via AlpsExtension fallback.
 let classifyExtension (ext: ParsedExtension) : Annotation =
     let value = ext.Value |> Option.defaultValue ""
 
-    match ext.Id with
-    | GuardExtId -> AlpsAnnotation(AlpsGuardExt value)
-    | ProjectedRoleExtId
-    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ext.Id, value))
-    | AvailableInStatesExtId ->
-        let states =
-            value.Split(
-                ',',
-                System.StringSplitOptions.RemoveEmptyEntries
-                ||| System.StringSplitOptions.TrimEntries
-            )
-            |> Array.toList
+    let parseStates (v: string) =
+        v.Split(
+            ',',
+            System.StringSplitOptions.RemoveEmptyEntries
+            ||| System.StringSplitOptions.TrimEntries
+        )
+        |> Array.toList
 
-        AlpsAnnotation(AlpsAvailableInStates states)
-    | ClientObligationExtId
-    | AdvancesProtocolExtId
-    | DualOfExtId
-    | CutPointExtId -> AlpsAnnotation(AlpsDuality(ext.Id, value))
+    match ext.Id with
+    // Guard: new URI and old bare name
+    | GuardExtId
+    | "guard" -> AlpsAnnotation(AlpsGuardExt value)
+    // Role extensions: new URIs and old bare names, always store canonical URI
+    | ProjectedRoleExtId -> AlpsAnnotation(AlpsRole(ProjectedRoleExtId, value))
+    | "projectedRole" -> AlpsAnnotation(AlpsRole(ProjectedRoleExtId, value))
+    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ProtocolStateExtId, value))
+    | "protocolState" -> AlpsAnnotation(AlpsRole(ProtocolStateExtId, value))
+    // AvailableInStates: new URI and old bare name
+    | AvailableInStatesExtId -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
+    | "availableInStates" -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
+    // Duality extensions: new URIs and old bare names, always store canonical URI
+    | ClientObligationExtId -> AlpsAnnotation(AlpsDuality(ClientObligationExtId, value))
+    | "clientObligation" -> AlpsAnnotation(AlpsDuality(ClientObligationExtId, value))
+    | AdvancesProtocolExtId -> AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, value))
+    | "advancesProtocol" -> AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, value))
+    | DualOfExtId -> AlpsAnnotation(AlpsDuality(DualOfExtId, value))
+    | "dualOf" -> AlpsAnnotation(AlpsDuality(DualOfExtId, value))
+    | CutPointExtId -> AlpsAnnotation(AlpsDuality(CutPointExtId, value))
+    | "cutPoint" -> AlpsAnnotation(AlpsDuality(CutPointExtId, value))
     | _ -> AlpsAnnotation(AlpsExtension(ext.Id, ext.Href, ext.Value))
 
 // ---------------------------------------------------------------------------
@@ -233,7 +250,7 @@ let buildTransitionAnnotations
     //    (guards flow through TransitionEdge.Guard; AlpsGuardExt is for state/doc-level only)
     let extAnnotations =
         resolved.Extensions
-        |> List.filter (fun e -> e.Id <> GuardExtId)
+        |> List.filter (fun e -> e.Id <> GuardExtId && e.Id <> "guard")
         |> List.map classifyExtension
 
     typeAnnotation @ hrefAnnotation @ docAnnotation @ extAnnotations

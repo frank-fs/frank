@@ -40,7 +40,9 @@ let private buildTransitionDescriptor (t: TransitionEdge) : XElement =
 
     t.Event |> Option.iter (fun id -> el.SetAttributeValue(XName.Get "id", id))
     el.SetAttributeValue(XName.Get "type", transitionTypeStr t)
-    rtValue t.Target |> Option.iter (fun rt -> el.SetAttributeValue(XName.Get "rt", rt))
+
+    rtValue t.Target
+    |> Option.iter (fun rt -> el.SetAttributeValue(XName.Get "rt", rt))
 
     // Transition-level documentation
     tryGetDocAnnotation t.Annotations
@@ -57,7 +59,7 @@ let private buildTransitionDescriptor (t: TransitionEdge) : XElement =
 
     let extElements =
         match t.Guard with
-        | Some guard -> ("guard", None, Some guard) :: nonGuardExts
+        | Some guard -> (Classification.GuardExtId, None, Some guard) :: nonGuardExts
         | None -> nonGuardExts
 
     for extEl in buildExtElements extElements do
@@ -75,8 +77,7 @@ let private buildDataDescriptor (id: string) (doc: (string option * string) opti
     el.SetAttributeValue(XName.Get "id", id)
     el.SetAttributeValue(XName.Get "type", "semantic")
 
-    doc
-    |> Option.iter (fun (fmt, value) -> el.Add(buildDocElement fmt value))
+    doc |> Option.iter (fun (fmt, value) -> el.Add(buildDocElement fmt value))
 
     el
 
@@ -90,9 +91,7 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
 
     // Group transitions by source state
     let transitionsBySource =
-        transitions
-        |> List.groupBy (fun t -> t.Source)
-        |> Map.ofList
+        transitions |> List.groupBy (fun t -> t.Source) |> Map.ofList
 
     // Identify shared transitions (D-004)
     let sharedTransitions = collectSharedTransitions transitions
@@ -119,7 +118,10 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
     // 2. State descriptors
     for state in states do
         let stateEl = XElement(XName.Get "descriptor")
-        state.Identifier |> Option.iter (fun id -> stateEl.SetAttributeValue(XName.Get "id", id))
+
+        state.Identifier
+        |> Option.iter (fun id -> stateEl.SetAttributeValue(XName.Get "id", id))
+
         stateEl.SetAttributeValue(XName.Get "type", "semantic")
 
         // State-level documentation
@@ -136,9 +138,7 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
             match t.Event with
             | Some eventName when Set.contains eventName sharedNames ->
                 // Shared transition: emit href-only reference
-                let href =
-                    tryGetDescriptorHref t
-                    |> Option.defaultValue ("#" + eventName)
+                let href = tryGetDescriptorHref t |> Option.defaultValue ("#" + eventName)
 
                 let refEl = XElement(XName.Get "descriptor")
                 refEl.SetAttributeValue(XName.Get "href", href)

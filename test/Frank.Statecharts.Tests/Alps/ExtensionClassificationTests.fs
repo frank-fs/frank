@@ -38,17 +38,17 @@ let classifyExtensionTests =
           testCase "projectedRole → AlpsRole"
           <| fun () ->
               let ext =
-                  { Id = "projectedRole"
+                  { Id = ProjectedRoleExtId
                     Href = None
                     Value = Some "admin" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsRole("projectedRole", "admin"))) "projectedRole → AlpsRole"
+              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "admin"))) "projectedRole → AlpsRole"
 
           testCase "protocolState → AlpsRole"
           <| fun () ->
               let ext =
-                  { Id = "protocolState"
+                  { Id = ProtocolStateExtId
                     Href = None
                     Value = Some "authenticated" }
 
@@ -56,14 +56,14 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole("protocolState", "authenticated")))
+                  (AlpsAnnotation(AlpsRole(ProtocolStateExtId, "authenticated")))
                   "protocolState → AlpsRole"
 
           // Duality extensions
           testCase "clientObligation → AlpsDuality"
           <| fun () ->
               let ext =
-                  { Id = "clientObligation"
+                  { Id = ClientObligationExtId
                     Href = None
                     Value = Some "must-ack" }
 
@@ -71,13 +71,13 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("clientObligation", "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")))
                   "clientObligation → AlpsDuality"
 
           testCase "advancesProtocol → AlpsDuality"
           <| fun () ->
               let ext =
-                  { Id = "advancesProtocol"
+                  { Id = AdvancesProtocolExtId
                     Href = None
                     Value = Some "true" }
 
@@ -85,28 +85,30 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("advancesProtocol", "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, "true")))
                   "advancesProtocol → AlpsDuality"
 
           testCase "dualOf → AlpsDuality"
           <| fun () ->
               let ext =
-                  { Id = "dualOf"
+                  { Id = DualOfExtId
                     Href = None
                     Value = Some "serverAction" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality("dualOf", "serverAction"))) "dualOf → AlpsDuality"
+
+              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOfExtId, "serverAction"))) "dualOf → AlpsDuality"
 
           testCase "cutPoint → AlpsDuality"
           <| fun () ->
               let ext =
-                  { Id = "cutPoint"
+                  { Id = CutPointExtId
                     Href = None
                     Value = Some "true" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality("cutPoint", "true"))) "cutPoint → AlpsDuality"
+
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPointExtId, "true"))) "cutPoint → AlpsDuality"
 
           // AvailableInStates extension
           testCase "availableInStates → AlpsAvailableInStates"
@@ -156,10 +158,7 @@ let classifyExtensionTests =
 
               let result = classifyExtension ext
 
-              Expect.equal
-                  result
-                  (AlpsAnnotation(AlpsAvailableInStates [ "XTurn"; "OTurn" ]))
-                  "empty entries removed"
+              Expect.equal result (AlpsAnnotation(AlpsAvailableInStates [ "XTurn"; "OTurn" ])) "empty entries removed"
 
           // Fallback: unknown extension → AlpsExtension (backward compat)
           testCase "unknown extension → AlpsExtension fallback"
@@ -174,7 +173,250 @@ let classifyExtensionTests =
               Expect.equal
                   result
                   (AlpsAnnotation(AlpsExtension("author", Some "http://example.com", Some "amundsen")))
-                  "unknown → AlpsExtension" ]
+                  "unknown → AlpsExtension"
+
+          // -----------------------------------------------------------------
+          // #165: Extension IDs use namespaced HTTPS URIs
+          // -----------------------------------------------------------------
+
+          // --- New URI IDs classify correctly ---
+          testCase "guard URI → AlpsGuardExt"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/guard"
+                    Href = None
+                    Value = Some "isReady" }
+
+              let result = classifyExtension ext
+              Expect.equal result (AlpsAnnotation(AlpsGuardExt "isReady")) "guard URI → AlpsGuardExt"
+
+          testCase "projectedRole URI → AlpsRole"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/projectedRole"
+                    Href = None
+                    Value = Some "admin" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsRole("https://frank-fs.github.io/alps-ext/projectedRole", "admin")))
+                  "projectedRole URI → AlpsRole"
+
+          testCase "protocolState URI → AlpsRole"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/protocolState"
+                    Href = None
+                    Value = Some "authenticated" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsRole("https://frank-fs.github.io/alps-ext/protocolState", "authenticated")))
+                  "protocolState URI → AlpsRole"
+
+          testCase "availableInStates URI → AlpsAvailableInStates"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/availableInStates"
+                    Href = None
+                    Value = Some "XTurn,OTurn" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsAvailableInStates [ "XTurn"; "OTurn" ]))
+                  "availableInStates URI → AlpsAvailableInStates"
+
+          testCase "clientObligation URI → AlpsDuality"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/clientObligation"
+                    Href = None
+                    Value = Some "must-ack" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/clientObligation", "must-ack")))
+                  "clientObligation URI → AlpsDuality"
+
+          testCase "advancesProtocol URI → AlpsDuality"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/advancesProtocol"
+                    Href = None
+                    Value = Some "true" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/advancesProtocol", "true")))
+                  "advancesProtocol URI → AlpsDuality"
+
+          testCase "dualOf URI → AlpsDuality"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/dualOf"
+                    Href = None
+                    Value = Some "serverAction" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/dualOf", "serverAction")))
+                  "dualOf URI → AlpsDuality"
+
+          testCase "cutPoint URI → AlpsDuality"
+          <| fun () ->
+              let ext =
+                  { Id = "https://frank-fs.github.io/alps-ext/cutPoint"
+                    Href = None
+                    Value = Some "true" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/cutPoint", "true")))
+                  "cutPoint URI → AlpsDuality"
+
+          // --- Backward compat: old bare names still classify correctly ---
+          testCase "bare guard → AlpsGuardExt (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "guard"
+                    Href = None
+                    Value = Some "emailValid" }
+
+              let result = classifyExtension ext
+              Expect.equal result (AlpsAnnotation(AlpsGuardExt "emailValid")) "bare guard still works"
+
+          testCase "bare projectedRole → AlpsRole with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "projectedRole"
+                    Href = None
+                    Value = Some "admin" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "admin")))
+                  "bare projectedRole normalizes to URI"
+
+          testCase "bare protocolState → AlpsRole with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "protocolState"
+                    Href = None
+                    Value = Some "running" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsRole(ProtocolStateExtId, "running")))
+                  "bare protocolState normalizes to URI"
+
+          testCase "bare availableInStates → AlpsAvailableInStates (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "availableInStates"
+                    Href = None
+                    Value = Some "Idle" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsAvailableInStates [ "Idle" ]))
+                  "bare availableInStates still works"
+
+          testCase "bare clientObligation → AlpsDuality with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "clientObligation"
+                    Href = None
+                    Value = Some "must-ack" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")))
+                  "bare clientObligation normalizes to URI"
+
+          testCase "bare advancesProtocol → AlpsDuality with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "advancesProtocol"
+                    Href = None
+                    Value = Some "true" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, "true")))
+                  "bare advancesProtocol normalizes to URI"
+
+          testCase "bare dualOf → AlpsDuality with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "dualOf"
+                    Href = None
+                    Value = Some "serverAction" }
+
+              let result = classifyExtension ext
+
+              Expect.equal
+                  result
+                  (AlpsAnnotation(AlpsDuality(DualOfExtId, "serverAction")))
+                  "bare dualOf normalizes to URI"
+
+          testCase "bare cutPoint → AlpsDuality with canonical URI (backward compat)"
+          <| fun () ->
+              let ext =
+                  { Id = "cutPoint"
+                    Href = None
+                    Value = Some "true" }
+
+              let result = classifyExtension ext
+
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPointExtId, "true"))) "bare cutPoint normalizes to URI"
+
+          // --- Constants are HTTPS URIs ---
+          testCase "GuardExtId is an HTTPS URI"
+          <| fun () ->
+              Expect.isTrue
+                  (GuardExtId.StartsWith("https://frank-fs.github.io/alps-ext/"))
+                  "GuardExtId should be an HTTPS URI"
+
+          testCase "all ext constants are HTTPS URIs"
+          <| fun () ->
+              let allConstants =
+                  [ GuardExtId
+                    ProjectedRoleExtId
+                    ProtocolStateExtId
+                    AvailableInStatesExtId
+                    ClientObligationExtId
+                    AdvancesProtocolExtId
+                    DualOfExtId
+                    CutPointExtId ]
+
+              for c in allConstants do
+                  Expect.isTrue
+                      (c.StartsWith("https://frank-fs.github.io/alps-ext/"))
+                      $"Constant '{c}' should be an HTTPS URI" ]
 
 // ---------------------------------------------------------------------------
 // buildStateAnnotations uses classifyExtension for typed extensions
@@ -196,7 +438,7 @@ let buildStateAnnotationsTypedTests =
                     DocValue = None
                     Children = []
                     Extensions =
-                      [ { Id = "projectedRole"
+                      [ { Id = ProjectedRoleExtId
                           Href = None
                           Value = Some "PlayerX" } ]
                     Links = [] }
@@ -207,7 +449,7 @@ let buildStateAnnotationsTypedTests =
                   annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsRole("projectedRole", "PlayerX")) -> true
+                      | AlpsAnnotation(AlpsRole(id, "PlayerX")) when id = ProjectedRoleExtId -> true
                       | _ -> false)
 
               Expect.isTrue hasRole "should contain AlpsRole annotation"
@@ -260,10 +502,10 @@ let buildTransitionAnnotationsTypedTests =
                     DocValue = None
                     Children = []
                     Extensions =
-                      [ { Id = "guard"
+                      [ { Id = GuardExtId
                           Href = None
                           Value = Some "role=PlayerX" }
-                        { Id = "clientObligation"
+                        { Id = ClientObligationExtId
                           Href = None
                           Value = Some "must-ack" } ]
                     Links = [] }
@@ -288,7 +530,7 @@ let buildTransitionAnnotationsTypedTests =
                   annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsDuality("clientObligation", "must-ack")) -> true
+                      | AlpsAnnotation(AlpsDuality(id, "must-ack")) when id = ClientObligationExtId -> true
                       | _ -> false)
 
               let hasGuard =
@@ -300,3 +542,196 @@ let buildTransitionAnnotationsTypedTests =
 
               Expect.isTrue hasDuality "should contain AlpsDuality annotation"
               Expect.isFalse hasGuard "guard should be excluded from transition annotations" ]
+
+// ---------------------------------------------------------------------------
+// #165: Generated ext elements contain full URIs, not bare names
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let generatedExtUriTests =
+    testList
+        "Generated ext elements use HTTPS URIs (#165)"
+        [ testCase "generated JSON contains full URI for guard ext"
+          <| fun () ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "Idle"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "Idle"
+                              Target = Some "Active"
+                              Event = Some "start"
+                              Guard = Some "isReady"
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let json = Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson doc
+              Expect.stringContains json "https://frank-fs.github.io/alps-ext/guard" "generated JSON uses guard URI"
+              Expect.isFalse (json.Contains("\"id\": \"guard\"")) "generated JSON does not use bare guard id"
+
+          testCase "generated JSON contains full URI for projectedRole ext"
+          <| fun () ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "Idle"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "server")) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let json = Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson doc
+
+              Expect.stringContains
+                  json
+                  "https://frank-fs.github.io/alps-ext/projectedRole"
+                  "generated JSON uses projectedRole URI"
+
+          testCase "generated XML contains full URI for guard ext"
+          <| fun () ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "Idle"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations = [] }
+                        TransitionElement
+                            { Source = "Idle"
+                              Target = Some "Active"
+                              Event = Some "start"
+                              Guard = Some "isReady"
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe) ] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let xml = Frank.Statecharts.Alps.XmlGenerator.generateAlpsXml doc
+              Expect.stringContains xml "https://frank-fs.github.io/alps-ext/guard" "generated XML uses guard URI"
+
+          testCase "round-trip: parse generated ALPS with URIs, regenerate, compare"
+          <| fun () ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ StateDecl
+                            { Identifier = Some "Idle"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations =
+                                [ AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "server"))
+                                  AlpsAnnotation(AlpsAvailableInStates [ "Idle" ]) ] }
+                        StateDecl
+                            { Identifier = Some "Active"
+                              Label = None
+                              Kind = StateKind.Regular
+                              Children = []
+                              Activities = None
+                              Position = None
+                              Annotations =
+                                [ AlpsAnnotation(AlpsRole(ProtocolStateExtId, "running"))
+                                  AlpsAnnotation(AlpsDuality(DualOfExtId, "start")) ] }
+                        TransitionElement
+                            { Source = "Idle"
+                              Target = Some "Active"
+                              Event = Some "start"
+                              Guard = Some "isReady"
+                              Action = None
+                              Parameters = []
+                              Position = None
+                              Annotations =
+                                [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
+                                  AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")) ] } ]
+                    DataEntries = []
+                    Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
+
+              let json1 = Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson doc
+              let parsed1 = Frank.Statecharts.Alps.JsonParser.parseAlpsJson json1
+              Expect.isEmpty parsed1.Errors "first parse should succeed"
+
+              let json2 = Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson parsed1.Document
+              let parsed2 = Frank.Statecharts.Alps.JsonParser.parseAlpsJson json2
+              Expect.isEmpty parsed2.Errors "second parse should succeed"
+
+              Expect.equal parsed2.Document parsed1.Document "round-trip preserves AST"
+
+          testCase "backward compat: parse ALPS with old bare names, verify classification"
+          <| fun () ->
+              // JSON with old-style bare ext ids
+              let oldJson =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"Idle","type":"semantic","ext":[{"id":"projectedRole","value":"server"},{"id":"availableInStates","value":"Idle"}],"descriptor":[{"id":"start","type":"unsafe","rt":"#Active","ext":[{"id":"guard","value":"isReady"},{"id":"clientObligation","value":"must-ack"}]}]}]}}"""
+
+              let parsed = Frank.Statecharts.Alps.JsonParser.parseAlpsJson oldJson
+              Expect.isEmpty parsed.Errors "parse of old-style bare names should succeed"
+
+              // Verify the state has the correct role annotation with canonical URI
+              let states =
+                  parsed.Document.Elements
+                  |> List.choose (fun el ->
+                      match el with
+                      | StateDecl s -> Some s
+                      | _ -> None)
+
+              let idle = states |> List.find (fun s -> s.Identifier = Some "Idle")
+
+              let hasRoleWithUri =
+                  idle.Annotations
+                  |> List.exists (fun a ->
+                      match a with
+                      | AlpsAnnotation(AlpsRole(id, "server")) when id = ProjectedRoleExtId -> true
+                      | _ -> false)
+
+              Expect.isTrue hasRoleWithUri "bare projectedRole should normalize to URI in parsed AST"
+
+              // Verify the generated output uses full URIs
+              let generated =
+                  Frank.Statecharts.Alps.JsonGenerator.generateAlpsJson parsed.Document
+
+              Expect.stringContains
+                  generated
+                  "https://frank-fs.github.io/alps-ext/projectedRole"
+                  "regenerated from old bare names emits full URIs"
+
+              Expect.stringContains
+                  generated
+                  "https://frank-fs.github.io/alps-ext/guard"
+                  "regenerated from old bare names emits full guard URI"
+
+              Expect.stringContains
+                  generated
+                  "https://frank-fs.github.io/alps-ext/clientObligation"
+                  "regenerated from old bare names emits full clientObligation URI"
+
+              Expect.stringContains
+                  generated
+                  "https://frank-fs.github.io/alps-ext/availableInStates"
+                  "regenerated from old bare names emits full availableInStates URI" ]

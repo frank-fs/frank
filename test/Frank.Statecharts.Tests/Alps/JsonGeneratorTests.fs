@@ -3,6 +3,7 @@ module Frank.Statecharts.Tests.Alps.JsonGeneratorTests
 open System.Text.Json
 open Expecto
 open Frank.Statecharts.Ast
+open Frank.Statecharts.Alps.Classification
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.Alps.JsonGenerator
 open Frank.Statecharts.Tests.Alps.GoldenFiles
@@ -119,8 +120,7 @@ let jsonGeneratorStructureTests =
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
 
-              let stateDesc =
-                  parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
 
               let transDesc = stateDesc.GetProperty("descriptor").[0]
               Expect.equal (transDesc.GetProperty("type").GetString()) "unsafe" "type is unsafe"
@@ -214,7 +214,7 @@ let jsonGeneratorStructureTests =
               let transDesc = stateDesc.GetProperty("descriptor").[0]
               let extElem = transDesc.GetProperty("ext").[0]
 
-              Expect.equal (extElem.GetProperty("id").GetString()) "guard" "ext id"
+              Expect.equal (extElem.GetProperty("id").GetString()) GuardExtId "ext id"
               Expect.equal (extElem.GetProperty("value").GetString()) "role=PlayerX" "ext value"
 
           testCase "output is indented (human-readable)"
@@ -236,18 +236,14 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsDocumentation(Some "html", "Some <b>bold</b> text")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsDocumentation(Some "html", "Some <b>bold</b> text")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
               let alpsDoc = parsed.RootElement.GetProperty("alps").GetProperty("doc")
               Expect.equal (alpsDoc.GetProperty("format").GetString()) "html" "doc format"
 
-              Expect.equal
-                  (alpsDoc.GetProperty("value").GetString())
-                  "Some <b>bold</b> text"
-                  "doc value"
+              Expect.equal (alpsDoc.GetProperty("value").GetString()) "Some <b>bold</b> text" "doc value"
 
           testCase "documentation without format omits format property"
           <| fun _ ->
@@ -271,8 +267,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsLink("self", "http://example.com/alps/test")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsLink("self", "http://example.com/alps/test")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -287,8 +282,7 @@ let jsonGeneratorStructureTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsExtension("custom", None, Some "data")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsExtension("custom", None, Some "data")) ] }
 
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
@@ -333,8 +327,7 @@ let jsonGeneratorStructureTests =
               let json = generateAlpsJson doc
               use parsed = JsonDocument.Parse(json)
 
-              let stateA =
-                  parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let stateA = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
 
               let transDesc = stateA.GetProperty("descriptor").[0]
               Expect.equal (transDesc.GetProperty("rt").GetString()) "#gameState" "rt preserved"

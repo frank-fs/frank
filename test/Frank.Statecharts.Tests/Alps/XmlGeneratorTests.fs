@@ -3,6 +3,7 @@ module Frank.Statecharts.Tests.Alps.XmlGeneratorTests
 open System.Xml.Linq
 open Expecto
 open Frank.Statecharts.Ast
+open Frank.Statecharts.Alps.Classification
 open Frank.Statecharts.Alps.XmlGenerator
 open Frank.Statecharts.Alps.XmlParser
 open Frank.Statecharts.Alps.JsonParser
@@ -13,12 +14,10 @@ open Frank.Statecharts.Tests.Alps.GoldenFiles
 // ---------------------------------------------------------------------------
 
 /// Parse generated XML into an XDocument (fails test on invalid XML).
-let private parseXml (xml: string) =
-    XDocument.Parse(xml)
+let private parseXml (xml: string) = XDocument.Parse(xml)
 
 /// Get the <alps> root element from a parsed document.
-let private alpsRoot (xdoc: XDocument) =
-    xdoc.Root
+let private alpsRoot (xdoc: XDocument) = xdoc.Root
 
 /// Get direct child <descriptor> elements of a parent.
 let private descriptors (parent: XElement) =
@@ -215,8 +214,7 @@ let xmlGeneratorTests =
                               Action = None
                               Parameters = []
                               Position = None
-                              Annotations =
-                                [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Idempotent) ] } ]
+                              Annotations = [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Idempotent) ] } ]
                     DataEntries = []
                     Annotations = [] }
 
@@ -293,7 +291,11 @@ let xmlGeneratorTests =
                     Annotations = [] }
 
               let xml = generateAlpsXml doc
-              Expect.isTrue (xml.Contains("\"#B\"") || xml.Contains("'#B'") || xml.Contains("#B")) "rt target has # prefix"
+
+              Expect.isTrue
+                  (xml.Contains("\"#B\"") || xml.Contains("'#B'") || xml.Contains("#B"))
+                  "rt target has # prefix"
+
               let xdoc = parseXml xml
               let transDesc = (descriptors (descriptors xdoc.Root).[0]).[0]
               Expect.equal (attr "rt" transDesc) "#B" "rt attribute value"
@@ -344,8 +346,7 @@ let xmlGeneratorDocTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsDocumentation(Some "text", "A description")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsDocumentation(Some "text", "A description")) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -383,8 +384,7 @@ let xmlGeneratorDocTests =
                               Children = []
                               Activities = None
                               Position = None
-                              Annotations =
-                                [ AlpsAnnotation(AlpsDocumentation(Some "html", "Home <b>page</b>")) ] } ]
+                              Annotations = [ AlpsAnnotation(AlpsDocumentation(Some "html", "Home <b>page</b>")) ] } ]
                     DataEntries = []
                     Annotations = [] }
 
@@ -446,8 +446,7 @@ let xmlGeneratorExtLinkTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsLink("self", "http://example.com/alps/test")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsLink("self", "http://example.com/alps/test")) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -463,8 +462,7 @@ let xmlGeneratorExtLinkTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsExtension("custom", None, Some "data")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsExtension("custom", None, Some "data")) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -480,8 +478,7 @@ let xmlGeneratorExtLinkTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsExtension("myext", Some "http://example.com/ext", Some "val")) ] }
+                    Annotations = [ AlpsAnnotation(AlpsExtension("myext", Some "http://example.com/ext", Some "val")) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -519,7 +516,7 @@ let xmlGeneratorExtLinkTests =
               let transDesc = (descriptors (descriptors xdoc.Root).[0]).[0]
               let extEls = exts transDesc
               Expect.equal extEls.Length 1 "one ext on transition"
-              Expect.equal (attr "id" extEls.[0]) "guard" "ext id is guard"
+              Expect.equal (attr "id" extEls.[0]) GuardExtId "ext id is guard"
               Expect.equal (attr "value" extEls.[0]) "role=admin" "guard value" ]
 
 // ---------------------------------------------------------------------------
@@ -571,8 +568,7 @@ let xmlGeneratorParamTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsDataDescriptor("myField", None)) ] }
+                    Annotations = [ AlpsAnnotation(AlpsDataDescriptor("myField", None)) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -588,8 +584,7 @@ let xmlGeneratorParamTests =
                     InitialStateId = None
                     Elements = []
                     DataEntries = []
-                    Annotations =
-                      [ AlpsAnnotation(AlpsDataDescriptor("email", Some(Some "text", "Email address"))) ] }
+                    Annotations = [ AlpsAnnotation(AlpsDataDescriptor("email", Some(Some "text", "Email address"))) ] }
 
               let xml = generateAlpsXml doc
               let xdoc = parseXml xml
@@ -763,18 +758,24 @@ let xmlGeneratorRoundTripTests =
               // Count descriptors that have type=semantic and an id (states, not data descriptors)
               // Data descriptors from doc.Annotations also appear — we count all top-level id-bearing descriptors
               let topLevelDescriptors = descriptors xdoc.Root
+
               let stateDescs =
                   topLevelDescriptors
                   |> List.filter (fun d -> attr "type" d = "semantic" && attr "id" d <> "")
 
               // The number of state+data descriptors in XML >= stateCount
               // (data descriptors from annotations appear before states)
-              Expect.isGreaterThanOrEqual stateDescs.Length stateCount "XML has at least as many semantic descriptors as AST states"
+              Expect.isGreaterThanOrEqual
+                  stateDescs.Length
+                  stateCount
+                  "XML has at least as many semantic descriptors as AST states"
 
           // True round-trip tests (now that XmlParser is available on master)
           testCase "true XML round-trip: generate then parse produces equal AST"
           <| fun _ ->
-              let json = """{"alps":{"version":"1.0","descriptor":[{"id":"home","type":"semantic","descriptor":[{"href":"#go"}]},{"id":"go","type":"unsafe","rt":"#home"}]}}"""
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"home","type":"semantic","descriptor":[{"href":"#go"}]},{"id":"go","type":"unsafe","rt":"#home"}]}}"""
+
               let ast = (parseAlpsJson json).Document
               let xml = generateAlpsXml ast
               let reparsed = parseAlpsXml xml
