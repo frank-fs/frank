@@ -14,6 +14,7 @@ type ProjectionCheckKind =
     | MixedChoice
     | Completeness
     | Deadlock
+    | Livelock
     | GuardConsistency
     | ShapeReference
 
@@ -24,6 +25,7 @@ module ProjectionCheckKind =
         | MixedChoice -> "mixed-choice"
         | Completeness -> "completeness"
         | Deadlock -> "deadlock"
+        | Livelock -> "livelock"
         | GuardConsistency -> "guard-consistency"
         | ShapeReference -> "shape-reference"
 
@@ -126,6 +128,37 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
                   Severity = Severity.Warning
                   Message = $"State '%s{state}' is reachable but no role has outgoing transitions from it" })
 
+/// Post-projection: warn when a reachable non-final state has outgoing transitions
+/// but ALL of them are self-loops (source == target). The system is active but cannot
+/// make progress — a livelock.
+let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: ExtractedStatechart) : ProjectionIssue list =
+    let isFinal state =
+        pruned.StateMetadata
+        |> Map.tryFind state
+        |> Option.map _.IsFinal
+        |> Option.defaultValue false
+
+    let allTransitions =
+        projections |> Map.values |> Seq.collect _.Transitions |> Seq.toList
+
+    pruned.StateNames
+    |> List.choose (fun state ->
+        if isFinal state then
+            None
+        else
+            let outgoing = allTransitions |> List.filter (fun t -> t.Source = state)
+
+            if outgoing.IsEmpty then
+                None // No outgoing transitions = deadlock, not livelock
+            elif outgoing |> List.forall (fun t -> t.Target = t.Source) then
+                Some
+                    { Check = Livelock
+                      Severity = Severity.Warning
+                      Message =
+                        $"State '%s{state}' has only self-loop transitions across all role projections — no role can advance out of it" }
+            else
+                None)
+
 /// Guard consistency: compare guards referenced by transitions against declared GuardNames.
 /// Guards in transitions but not in GuardNames are errors (undeclared guard).
 /// Guards in GuardNames but not referenced by any transition are warnings (unused guard).
@@ -198,7 +231,7 @@ let private hasGuards (statechart: ExtractedStatechart) =
     || statechart.Transitions |> List.exists (fun t -> t.Guard.IsSome)
 
 /// Run projection checks. Returns 0 checks if statechart has no roles and no guards.
-/// GuardConsistency runs on all statecharts with guards; the 4 role-based checks require roles.
+/// GuardConsistency runs on all statecharts with guards; the 5 role-based checks require roles.
 let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart) : ProjectionCheckResult =
     let guardIssues, guardChecks =
         if hasGuards statechart then
@@ -219,8 +252,9 @@ let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart)
               yield! checkMixedChoice statechart
               yield! checkCompleteness projections pruned
               yield! checkDeadlock projections pruned
+              yield! checkLivelock projections pruned
               yield! guardIssues ]
 
         { Issues = issues
-          ChecksRun = 4 + guardChecks
+          ChecksRun = 5 + guardChecks
           ResourceRoute = resourceRoute }
