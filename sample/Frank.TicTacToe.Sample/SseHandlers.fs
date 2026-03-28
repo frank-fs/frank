@@ -10,7 +10,6 @@ open System.Threading.Channels
 open System.Threading.Tasks
 open FSharp.Reflection
 open Microsoft.AspNetCore.Http
-open Frank.Resources.Model
 open Frank.Statecharts
 open Frank.TicTacToe.Sample.Domain
 
@@ -21,18 +20,19 @@ let stateKeyOf (state: TicTacToeState) : string =
     let caseNames = cases |> Array.map (fun c -> c.Name)
     caseNames.[tagReader (box state)]
 
+/// Pre-computed lookup: state key -> whether POST is allowed.
+/// Derived from the machine's StateMetadata so the SSE renderer doesn't need the affordance map.
+let private stateAllowsPost: Map<string, bool> =
+    gameMachine.StateMetadata
+    |> Map.toList
+    |> List.map (fun (state, info) -> stateKeyOf state, List.contains "POST" info.AllowedMethods)
+    |> Map.ofList
+
 /// Render HTML for the game board based on current state and affordances.
-/// When POST is in the allowed methods (from the affordance map), render move buttons.
+/// When POST is in the allowed methods (from the state machine metadata), render move buttons.
 /// When only GET is allowed, render a read-only board.
 let renderBoard (stateKey: string) (moveCount: int) : string =
-    let entry =
-        gameAffordanceMap.Entries
-        |> List.tryFind (fun e -> e.StateKey = stateKey)
-
-    let canMove =
-        entry
-        |> Option.map (fun e -> List.contains "POST" e.AllowedMethods)
-        |> Option.defaultValue false
+    let canMove = stateAllowsPost |> Map.tryFind stateKey |> Option.defaultValue false
 
     let statusText =
         match stateKey with

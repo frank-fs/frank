@@ -193,13 +193,13 @@ let buildTestServer (resource: Resource) =
     |> ignore
 
     // 2. Affordance middleware reads IStatechartFeature and injects Link/Allow headers
-    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed) |> ignore
+    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed)
+    |> ignore
 
     // 3. Statechart middleware handles state-dependent dispatch
     (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
 
-    app.UseEndpoints(fun endpoints ->
-        endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+    app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
     |> ignore
 
     app.Start()
@@ -217,7 +217,10 @@ let getHeaderValues (response: HttpResponseMessage) (name: string) : string list
 
     if response.Headers.TryGetValues(name, &values) then
         values |> Seq.toList
-    elif not (isNull response.Content) && response.Content.Headers.TryGetValues(name, &values) then
+    elif
+        not (isNull response.Content)
+        && response.Content.Headers.TryGetValues(name, &values)
+    then
         values |> Seq.toList
     else
         []
@@ -234,6 +237,78 @@ let withServer (f: TestServer -> HttpClient -> Task) =
         do! f server client
     }
     :> Task
+
+/// Build a test server with ProjectedProfileMiddleware for role-specific Link header testing.
+let buildTestServerWithProfiles (resource: Resource) (roleLookup: RoleProfileLookup) =
+    let preComputed = AffordancePreCompute.preCompute testAffordanceMap
+
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
+    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    let app = builder.Build()
+
+    app.UseRouting() |> ignore
+
+    (app :> IApplicationBuilder).Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed)
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<ProjectedProfileMiddleware>(roleLookup)
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
+
+    app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
+
+/// Middleware shim that sets IRoleFeature for testing projected profile middleware.
+let setRolesMiddleware (roles: Set<string>) (ctx: HttpContext) (next: Func<Task>) =
+    task {
+        ctx.SetRoles(roles)
+        do! next.Invoke()
+    }
+    :> Task
+
+/// Build a test server with role injection + projected profile middleware.
+let buildTestServerWithRolesAndProfiles (resource: Resource) (roleLookup: RoleProfileLookup) (roles: Set<string>) =
+    let preComputed = AffordancePreCompute.preCompute testAffordanceMap
+
+    let builder = WebApplication.CreateBuilder([||])
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddRouting() |> ignore
+    builder.Services.AddLogging() |> ignore
+    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    let app = builder.Build()
+
+    app.UseRouting() |> ignore
+
+    // Inject roles before affordance/profile middleware
+    (app :> IApplicationBuilder).Use(Func<HttpContext, Func<Task>, Task>(setRolesMiddleware roles))
+    |> ignore
+
+    (app :> IApplicationBuilder).Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed)
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<ProjectedProfileMiddleware>(roleLookup)
+    |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
+
+    app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+    |> ignore
+
+    app.Start()
+    app.GetTestServer()
 
 // === Tests ===
 
@@ -496,10 +571,7 @@ let endToEndPipelineTests =
                       let! (postResp2: HttpResponseMessage) =
                           client.PostAsync("/games/pipeline-test", new StringContent(""))
 
-                      Expect.equal
-                          postResp2.StatusCode
-                          HttpStatusCode.MethodNotAllowed
-                          "Won: POST should be 405"
+                      Expect.equal postResp2.StatusCode HttpStatusCode.MethodNotAllowed "Won: POST should be 405"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -526,5 +598,85 @@ let endToEndPipelineTests =
                       let! bodyA2 = respA2.Content.ReadAsStringAsync()
                       Expect.stringContains bodyA2 "state=XTurn" "Game A should still be in XTurn"
                   }))
+                  .GetAwaiter()
+                  .GetResult() ]
+
+[<Tests>]
+let projectedProfileTests =
+    testList
+        "Projected profile middleware (role-specific Link headers)"
+        [ testCase "PlayerX role gets role-specific profile Link header"
+          <| fun () ->
+              let roleLookup = RoleProfileLookup(StringComparer.Ordinal)
+
+              let innerMap = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+              innerMap.["PlayerX"] <- "</alps/games-playerx>; rel=\"profile\""
+
+              innerMap.["PlayerO"] <- "</alps/games-playero>; rel=\"profile\""
+
+              roleLookup.["/games/{gameId}"] <- innerMap
+
+              // Affordance map with a profile URL so AffordanceMiddleware emits a base profile Link
+              let profileAffordanceMap: AffordanceMap =
+                  { Version = AffordanceMap.currentVersion
+                    Entries =
+                      testAffordanceMap.Entries
+                      |> List.map (fun e -> { e with ProfileUrl = "/alps/games" }) }
+
+              let preComputed = AffordancePreCompute.preCompute profileAffordanceMap
+              let resource = buildGameResource ()
+
+              let builder = WebApplication.CreateBuilder([||])
+              builder.WebHost.UseTestServer() |> ignore
+              builder.Services.AddRouting() |> ignore
+              builder.Services.AddLogging() |> ignore
+              builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+              let app = builder.Build()
+
+              app.UseRouting() |> ignore
+
+              (app :> IApplicationBuilder)
+                  .Use(Func<HttpContext, Func<Task>, Task>(setRolesMiddleware (Set.ofList [ "PlayerX" ])))
+              |> ignore
+
+              (app :> IApplicationBuilder).Use(Func<HttpContext, Func<Task>, Task>(resolveStateKeyMiddleware))
+              |> ignore
+
+              (app :> IApplicationBuilder).UseMiddleware<AffordanceMiddleware>(preComputed)
+              |> ignore
+
+              (app :> IApplicationBuilder).UseMiddleware<ProjectedProfileMiddleware>(roleLookup)
+              |> ignore
+
+              (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
+
+              app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+              |> ignore
+
+              app.Start()
+              use server = app.GetTestServer()
+              use client = server.CreateClient()
+
+              (task {
+                  let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
+                  Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                  let links = getHeaderValues response "Link"
+                  let allLinks = links |> String.concat " "
+
+                  Expect.isTrue
+                      (allLinks.Contains("alps/games-playerx"))
+                      "PlayerX should get role-specific profile link"
+
+                  Expect.isFalse
+                      (allLinks.Contains("alps/games-playero"))
+                      "PlayerX should NOT get PlayerO's profile link"
+
+                  // Vary header should include Authorization
+                  let vary = getHeaderValues response "Vary"
+                  let varyValue = vary |> String.concat ", "
+                  Expect.isTrue (varyValue.Contains("Authorization")) "Vary should include Authorization"
+              })
                   .GetAwaiter()
                   .GetResult() ]
