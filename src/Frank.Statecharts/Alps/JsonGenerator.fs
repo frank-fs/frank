@@ -77,7 +77,7 @@ let private writeTransitionDescriptor (writer: Utf8JsonWriter) (t: TransitionEdg
 
     let extElements =
         match t.Guard with
-        | Some guard -> ("guard", None, Some guard) :: nonGuardExts
+        | Some guard -> (Classification.GuardExtId, None, Some guard) :: nonGuardExts
         | None -> nonGuardExts
 
     writeExtensions writer extElements
@@ -118,9 +118,7 @@ let generateAlpsJson (doc: StatechartDocument) : string =
 
     // Group transitions by source state
     let transitionsBySource =
-        transitions
-        |> List.groupBy (fun t -> t.Source)
-        |> Map.ofList
+        transitions |> List.groupBy (fun t -> t.Source) |> Map.ofList
 
     // Identify shared transitions (D-004)
     let sharedTransitions = collectSharedTransitions transitions
@@ -180,9 +178,7 @@ let generateAlpsJson (doc: StatechartDocument) : string =
                     match t.Event with
                     | Some eventName when Set.contains eventName sharedNames ->
                         // Shared transition: emit href-only reference
-                        let href =
-                            tryGetDescriptorHref t
-                            |> Option.defaultValue ("#" + eventName)
+                        let href = tryGetDescriptorHref t |> Option.defaultValue ("#" + eventName)
 
                         writer.WriteStartObject()
                         writer.WriteString("href", href)
