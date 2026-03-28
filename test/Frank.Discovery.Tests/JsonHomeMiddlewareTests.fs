@@ -12,6 +12,7 @@ open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
 open Expecto
 open Frank.Builder
 open Frank.Discovery
@@ -47,6 +48,62 @@ let private withServer (f: HttpClient -> Task) =
 
             try
                 do! f client
+            finally
+                client.Dispose()
+        finally
+            (host :> System.IDisposable).Dispose()
+    }
+    :> Task
+
+/// Captures log messages for assertion in tests.
+type TestLoggerProvider() =
+    let messages = System.Collections.Generic.List<string>()
+
+    member _.Messages = messages |> Seq.toList
+
+    interface ILoggerProvider with
+        member _.CreateLogger(_categoryName: string) =
+            { new ILogger with
+                member _.Log<'TState>(logLevel, _eventId, state: 'TState, _ex, formatter) =
+                    if logLevel >= LogLevel.Warning then
+                        let msg = formatter.Invoke(state, _ex)
+                        messages.Add(msg)
+
+                member _.IsEnabled(_logLevel) = true
+                member _.BeginScope<'TState>(_state: 'TState) = null }
+
+        member _.Dispose() = ()
+
+let private withServerAndLogs (endpoints: Endpoint[]) (f: HttpClient -> TestLoggerProvider -> Task) =
+    task {
+        let dataSource = TestEndpointDataSource(endpoints)
+        let logProvider = new TestLoggerProvider()
+
+        let host =
+            Host.CreateDefaultBuilder([||])
+                .ConfigureWebHost(fun webBuilder ->
+                    webBuilder
+                        .UseTestServer()
+                        .ConfigureServices(fun services ->
+                            services.AddRouting() |> ignore
+                            services.AddSingleton<EndpointDataSource>(dataSource) |> ignore
+                            services.AddLogging(fun logging ->
+                                logging.AddProvider(logProvider) |> ignore) |> ignore)
+                        .Configure(fun app ->
+                            app.UseMiddleware<JsonHomeMiddleware>() |> ignore
+                            app.UseRouting() |> ignore
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints.DataSources.Add(dataSource)) |> ignore)
+                    |> ignore)
+                .Build()
+
+        host.Start()
+
+        try
+            let client = host.GetTestClient()
+
+            try
+                do! f client logProvider
             finally
                 client.Dispose()
         finally
@@ -339,5 +396,68 @@ let metadataTests =
                     client.Dispose()
             finally
                 (host :> System.IDisposable).Dispose()
+        }
+    ]
+
+[<Tests>]
+let entryPointMiddlewareTests =
+    testList "JsonHomeMiddleware entry-point logging" [
+        testTask "logs warning when fallback-all behavior is used (no entry points marked)" {
+            let res = resource "/items" { get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("items"))) }
+
+            do! withServerAndLogs res.Endpoints (fun client logProvider -> task {
+                let req = new HttpRequestMessage(HttpMethod.Get, "/")
+                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+                let! (resp: HttpResponseMessage) = client.SendAsync(req)
+                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
+                let! (body: string) = resp.Content.ReadAsStringAsync()
+                Expect.isTrue (body.Contains("/items")) "should contain items resource in fallback"
+                let hasWarning =
+                    logProvider.Messages
+                    |> Seq.exists (fun msg -> msg.Contains("entry point") || msg.Contains("entryPoint"))
+                Expect.isTrue hasWarning "should log warning about missing entry-point designations"
+            })
+        }
+
+        testTask "does not log warning when entry points are explicitly marked" {
+            let entryRes =
+                resource "/games" {
+                    entryPoint
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("games")))
+                }
+
+            do! withServerAndLogs entryRes.Endpoints (fun client logProvider -> task {
+                let req = new HttpRequestMessage(HttpMethod.Get, "/")
+                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+                let! (resp: HttpResponseMessage) = client.SendAsync(req)
+                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
+                let hasWarning =
+                    logProvider.Messages
+                    |> Seq.exists (fun msg -> msg.Contains("entry point") || msg.Contains("entryPoint"))
+                Expect.isFalse hasWarning "should not log warning when entry points are designated"
+            })
+        }
+
+        testTask "entry-point resources appear in JSON Home via middleware; non-entry-point resources do not" {
+            let entryRes =
+                resource "/games" {
+                    entryPoint
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("games")))
+                }
+            let hiddenRes =
+                resource "/internal/metrics" {
+                    get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("metrics")))
+                }
+            let allEndpoints = Array.append entryRes.Endpoints hiddenRes.Endpoints
+
+            do! withServerAndLogs allEndpoints (fun client _logProvider -> task {
+                let req = new HttpRequestMessage(HttpMethod.Get, "/")
+                req.Headers.Accept.Add(MediaTypeWithQualityHeaderValue("application/json-home"))
+                let! (resp: HttpResponseMessage) = client.SendAsync(req)
+                Expect.equal resp.StatusCode HttpStatusCode.OK "should serve home document"
+                let! (body: string) = resp.Content.ReadAsStringAsync()
+                Expect.isTrue (body.Contains("/games")) "should contain entry-point resource"
+                Expect.isFalse (body.Contains("/internal/metrics")) "should not contain non-entry-point resource"
+            })
         }
     ]

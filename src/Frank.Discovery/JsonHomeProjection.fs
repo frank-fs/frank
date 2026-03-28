@@ -74,12 +74,21 @@ module JsonHomeProjection =
                 sprintf "%s#%s" cleanBase fragment
         | _ -> sprintf "urn:frank:%s%s" assemblyName routeTemplate
 
-    /// Project an EndpointDataSource into a JsonHomeInput.
+    /// Check whether any endpoint in a group carries EntryPointMetadata.
+    let private hasEntryPointMetadata (endpoints: RouteEndpoint list) =
+        endpoints
+        |> List.exists (fun ep ->
+            let marker = ep.Metadata.GetMetadata<EntryPointMetadata>()
+            not (isNull (box marker)) && marker.IsEntryPoint)
+
+    /// Project an EndpointDataSource into a JsonHomeProjectionResult.
+    /// When any endpoints carry EntryPointMetadata, only those routes appear.
+    /// Otherwise all non-internal endpoints appear (backward compat fallback).
     let project
         (dataSource: EndpointDataSource)
         (metadata: JsonHomeMetadata option)
         (assemblyName: string)
-        : JsonHomeInput =
+        : JsonHomeProjectionResult =
 
         let title =
             metadata |> Option.bind (fun m -> m.Title) |> Option.defaultValue assemblyName
@@ -103,7 +112,7 @@ module JsonHomeProjection =
                 | _ -> false)
             |> fun found -> if found then Some "/.well-known/frank-profiles" else None
 
-        let resources =
+        let groupedEndpoints =
             dataSource.Endpoints
             |> Seq.choose (fun ep ->
                 match ep with
@@ -118,6 +127,22 @@ module JsonHomeProjection =
             |> Seq.groupBy fst
             |> Seq.map (fun (routeTemplate, endpoints) ->
                 let allEndpoints = endpoints |> Seq.map snd |> Seq.toList
+                (routeTemplate, allEndpoints))
+            |> Seq.toList
+
+        // Determine entry-point filtering: if any group has EntryPointMetadata, filter.
+        let anyEntryPoints =
+            groupedEndpoints |> List.exists (fun (_, eps) -> hasEntryPointMetadata eps)
+
+        let filteredGroups =
+            if anyEntryPoints then
+                groupedEndpoints |> List.filter (fun (_, eps) -> hasEntryPointMetadata eps)
+            else
+                groupedEndpoints
+
+        let resources =
+            filteredGroups
+            |> List.map (fun (routeTemplate, allEndpoints) ->
                 let slug = routeTemplate.TrimStart('/').Split('/') |> Array.head
 
                 let routeVars =
@@ -165,8 +190,11 @@ module JsonHomeProjection =
                       AcceptPut = collectAcceptTypes "PUT"
                       AcceptPatch = collectAcceptTypes "PATCH"
                       DocsUrl = docsUrl } })
-            |> Seq.toList
 
-        { Title = title
-          DescribedByUrl = describedByUrl
-          Resources = resources }
+        let usedFallback = not anyEntryPoints && not (List.isEmpty groupedEndpoints)
+
+        { Input =
+            { Title = title
+              DescribedByUrl = describedByUrl
+              Resources = resources }
+          UsedFallback = usedFallback }

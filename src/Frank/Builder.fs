@@ -98,6 +98,12 @@ module Builder =
               AlpsBaseUri = None
               AlpsDescriptors = None }
 
+    /// Marker metadata indicating a resource is an entry point for the JSON Home document.
+    /// When any endpoints carry this metadata, only those endpoints appear in the home document.
+    /// When no endpoints carry it, all non-internal endpoints appear (backward compat fallback).
+    /// Not a struct because EndpointMetadataCollection.GetMetadata<T> requires reference semantics.
+    type EntryPointMetadata = { IsEntryPoint: bool }
+
     type ResourceSpec =
         { Name: string option
           Handlers: (string * RequestDelegate) list
@@ -149,6 +155,12 @@ module Builder =
 
         [<CustomOperation("name")>]
         member __.Name(spec, name) = { spec with Name = Some name }
+
+        /// Marks this resource as a JSON Home entry point.
+        /// Only entry-point resources appear in the home document when any are designated.
+        [<CustomOperation("entryPoint")>]
+        member __.EntryPoint(spec) =
+            ResourceBuilder.AddMetadata(spec, fun b -> b.Metadata.Add({ IsEntryPoint = true }: EntryPointMetadata))
 
         static member AddMetadata(spec: ResourceSpec, convention: EndpointBuilder -> unit) : ResourceSpec =
             { spec with

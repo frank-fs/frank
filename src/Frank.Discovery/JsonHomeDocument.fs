@@ -30,6 +30,16 @@ type JsonHomeInput =
       DescribedByUrl: string option
       Resources: JsonHomeResource list }
 
+/// Result of projecting endpoints into a JSON Home document.
+/// Carries the input data plus a flag indicating whether fallback behavior was used.
+type JsonHomeProjectionResult =
+    {
+        /// The projected JSON Home input data.
+        Input: JsonHomeInput
+        /// True when no endpoints had EntryPointMetadata and the fallback (include all) was used.
+        UsedFallback: bool
+    }
+
 module JsonHomeDocument =
 
     let private writeOptionalArray (w: Utf8JsonWriter) (name: string) (types: string list option) =
