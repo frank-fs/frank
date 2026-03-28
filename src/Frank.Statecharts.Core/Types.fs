@@ -73,6 +73,20 @@ type AlpsTransitionKind =
     | Unsafe
     | Idempotent
 
+/// Sub-DU for AlpsRole id field (#167).
+/// Typed replacement for raw string ids like "projectedRole" / "protocolState".
+type AlpsRoleKind =
+    | ProjectedRole
+    | ProtocolState
+
+/// Sub-DU for AlpsDuality id field (#167).
+/// Typed replacement for raw string ids like "clientObligation" / "advancesProtocol" / etc.
+type AlpsDualityKind =
+    | ClientObligation
+    | AdvancesProtocol
+    | DualOf
+    | CutPoint
+
 /// ALPS-specific annotation metadata.
 type AlpsMeta =
     | AlpsTransitionType of AlpsTransitionKind
@@ -82,12 +96,12 @@ type AlpsMeta =
     | AlpsLink of rel: string * href: string
     | AlpsDataDescriptor of id: string * doc: (string option * string) option
     | AlpsVersion of string
-    | AlpsRole of id: string * value: string
+    | AlpsRole of kind: AlpsRoleKind * value: string
     /// Guard annotation for state/document-level ext elements only.
     /// Invariant: never appears on TransitionEdge.Annotations (guards are
     /// extracted to TransitionEdge.Guard during classification).
     | AlpsGuardExt of value: string
-    | AlpsDuality of id: string * value: string
+    | AlpsDuality of kind: AlpsDualityKind * value: string
     | AlpsAvailableInStates of states: string list
 
 // -- SCXML annotation types --

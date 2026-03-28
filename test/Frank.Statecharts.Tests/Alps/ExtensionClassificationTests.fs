@@ -43,7 +43,7 @@ let classifyExtensionTests =
                     Value = Some "admin" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "admin"))) "projectedRole → AlpsRole"
+              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRole, "admin"))) "projectedRole → AlpsRole"
 
           testCase "protocolState → AlpsRole"
           <| fun () ->
@@ -56,7 +56,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole(ProtocolStateExtId, "authenticated")))
+                  (AlpsAnnotation(AlpsRole(ProtocolState, "authenticated")))
                   "protocolState → AlpsRole"
 
           // Duality extensions
@@ -71,7 +71,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")))
                   "clientObligation → AlpsDuality"
 
           testCase "advancesProtocol → AlpsDuality"
@@ -85,7 +85,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")))
                   "advancesProtocol → AlpsDuality"
 
           testCase "dualOf → AlpsDuality"
@@ -97,7 +97,7 @@ let classifyExtensionTests =
 
               let result = classifyExtension ext
 
-              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOfExtId, "serverAction"))) "dualOf → AlpsDuality"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOf, "serverAction"))) "dualOf → AlpsDuality"
 
           testCase "cutPoint → AlpsDuality"
           <| fun () ->
@@ -108,7 +108,7 @@ let classifyExtensionTests =
 
               let result = classifyExtension ext
 
-              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPointExtId, "true"))) "cutPoint → AlpsDuality"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true"))) "cutPoint → AlpsDuality"
 
           // AvailableInStates extension
           testCase "availableInStates → AlpsAvailableInStates"
@@ -201,7 +201,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole("https://frank-fs.github.io/alps-ext/projectedRole", "admin")))
+                  (AlpsAnnotation(AlpsRole(ProjectedRole, "admin")))
                   "projectedRole URI → AlpsRole"
 
           testCase "protocolState URI → AlpsRole"
@@ -215,7 +215,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole("https://frank-fs.github.io/alps-ext/protocolState", "authenticated")))
+                  (AlpsAnnotation(AlpsRole(ProtocolState, "authenticated")))
                   "protocolState URI → AlpsRole"
 
           testCase "availableInStates URI → AlpsAvailableInStates"
@@ -243,7 +243,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/clientObligation", "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")))
                   "clientObligation URI → AlpsDuality"
 
           testCase "advancesProtocol URI → AlpsDuality"
@@ -257,7 +257,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/advancesProtocol", "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")))
                   "advancesProtocol URI → AlpsDuality"
 
           testCase "dualOf URI → AlpsDuality"
@@ -271,7 +271,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/dualOf", "serverAction")))
+                  (AlpsAnnotation(AlpsDuality(DualOf, "serverAction")))
                   "dualOf URI → AlpsDuality"
 
           testCase "cutPoint URI → AlpsDuality"
@@ -285,7 +285,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality("https://frank-fs.github.io/alps-ext/cutPoint", "true")))
+                  (AlpsAnnotation(AlpsDuality(CutPoint, "true")))
                   "cutPoint URI → AlpsDuality"
 
           // --- Backward compat: old bare names still classify correctly ---
@@ -310,7 +310,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "admin")))
+                  (AlpsAnnotation(AlpsRole(ProjectedRole, "admin")))
                   "bare projectedRole normalizes to URI"
 
           testCase "bare protocolState → AlpsRole with canonical URI (backward compat)"
@@ -324,7 +324,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole(ProtocolStateExtId, "running")))
+                  (AlpsAnnotation(AlpsRole(ProtocolState, "running")))
                   "bare protocolState normalizes to URI"
 
           testCase "bare availableInStates → AlpsAvailableInStates (backward compat)"
@@ -352,7 +352,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")))
                   "bare clientObligation normalizes to URI"
 
           testCase "bare advancesProtocol → AlpsDuality with canonical URI (backward compat)"
@@ -366,7 +366,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")))
                   "bare advancesProtocol normalizes to URI"
 
           testCase "bare dualOf → AlpsDuality with canonical URI (backward compat)"
@@ -380,7 +380,7 @@ let classifyExtensionTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(DualOfExtId, "serverAction")))
+                  (AlpsAnnotation(AlpsDuality(DualOf, "serverAction")))
                   "bare dualOf normalizes to URI"
 
           testCase "bare cutPoint → AlpsDuality with canonical URI (backward compat)"
@@ -392,7 +392,7 @@ let classifyExtensionTests =
 
               let result = classifyExtension ext
 
-              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPointExtId, "true"))) "bare cutPoint normalizes to URI"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true"))) "bare cutPoint normalizes to URI"
 
           // --- Constants are HTTPS URIs ---
           testCase "GuardExtId is an HTTPS URI"
@@ -449,7 +449,7 @@ let buildStateAnnotationsTypedTests =
                   annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsRole(id, "PlayerX")) when id = ProjectedRoleExtId -> true
+                      | AlpsAnnotation(AlpsRole(ProjectedRole, "PlayerX")) -> true
                       | _ -> false)
 
               Expect.isTrue hasRole "should contain AlpsRole annotation"
@@ -530,7 +530,7 @@ let buildTransitionAnnotationsTypedTests =
                   annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsDuality(id, "must-ack")) when id = ClientObligationExtId -> true
+                      | AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")) -> true
                       | _ -> false)
 
               let hasGuard =
@@ -594,7 +594,7 @@ let generatedExtUriTests =
                               Children = []
                               Activities = None
                               Position = None
-                              Annotations = [ AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "server")) ] } ]
+                              Annotations = [ AlpsAnnotation(AlpsRole(ProjectedRole, "server")) ] } ]
                     DataEntries = []
                     Annotations = [] }
 
@@ -648,7 +648,7 @@ let generatedExtUriTests =
                               Activities = None
                               Position = None
                               Annotations =
-                                [ AlpsAnnotation(AlpsRole(ProjectedRoleExtId, "server"))
+                                [ AlpsAnnotation(AlpsRole(ProjectedRole, "server"))
                                   AlpsAnnotation(AlpsAvailableInStates [ "Idle" ]) ] }
                         StateDecl
                             { Identifier = Some "Active"
@@ -658,8 +658,8 @@ let generatedExtUriTests =
                               Activities = None
                               Position = None
                               Annotations =
-                                [ AlpsAnnotation(AlpsRole(ProtocolStateExtId, "running"))
-                                  AlpsAnnotation(AlpsDuality(DualOfExtId, "start")) ] }
+                                [ AlpsAnnotation(AlpsRole(ProtocolState, "running"))
+                                  AlpsAnnotation(AlpsDuality(DualOf, "start")) ] }
                         TransitionElement
                             { Source = "Idle"
                               Target = Some "Active"
@@ -670,7 +670,7 @@ let generatedExtUriTests =
                               Position = None
                               Annotations =
                                 [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
-                                  AlpsAnnotation(AlpsDuality(ClientObligationExtId, "must-ack")) ] } ]
+                                  AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")) ] } ]
                     DataEntries = []
                     Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
@@ -707,7 +707,7 @@ let generatedExtUriTests =
                   idle.Annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsRole(id, "server")) when id = ProjectedRoleExtId -> true
+                      | AlpsAnnotation(AlpsRole(ProjectedRole, "server")) -> true
                       | _ -> false)
 
               Expect.isTrue hasRoleWithUri "bare projectedRole should normalize to URI in parsed AST"

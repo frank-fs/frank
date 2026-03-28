@@ -45,6 +45,7 @@
     <Compile Include="Alps/JsonGeneratorTests.fs" />
     <Compile Include="Alps/RoundTripTests.fs" />
     <Compile Include="Alps/ExtensionClassificationTests.fs" />
+    <Compile Include="Alps/SubDuTests.fs" />
     <Compile Include="Alps/XmlGeneratorTests.fs" />
     <!-- Validation tests -->
     <Compile Include="Validation/StringDistanceTests.fs" />

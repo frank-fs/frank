@@ -53,8 +53,7 @@ let tryGetDescriptorHref (t: TransitionEdge) : string option =
         | _ -> None)
 
 /// Check if a transition is a shared transition (has AlpsDescriptorHref).
-let isSharedTransition (t: TransitionEdge) : bool =
-    tryGetDescriptorHref t |> Option.isSome
+let isSharedTransition (t: TransitionEdge) : bool = tryGetDescriptorHref t |> Option.isSome
 
 /// Extract documentation annotation from an annotation list.
 let tryGetDocAnnotation (annotations: Annotation list) : (string option * string) option =
@@ -74,9 +73,23 @@ let getExtAnnotations (annotations: Annotation list) : (string * string option *
         | AlpsAnnotation meta ->
             match meta with
             | AlpsExtension(id, href, value) -> Some(id, href, value)
-            | AlpsRole(id, value) -> Some(id, None, Some value)
+            | AlpsRole(kind, value) ->
+                let id =
+                    match kind with
+                    | ProjectedRole -> Classification.ProjectedRoleExtId
+                    | ProtocolState -> Classification.ProtocolStateExtId
+
+                Some(id, None, Some value)
             | AlpsGuardExt value -> Some(Classification.GuardExtId, None, Some value)
-            | AlpsDuality(id, value) -> Some(id, None, Some value)
+            | AlpsDuality(kind, value) ->
+                let id =
+                    match kind with
+                    | ClientObligation -> Classification.ClientObligationExtId
+                    | AdvancesProtocol -> Classification.AdvancesProtocolExtId
+                    | DualOf -> Classification.DualOfExtId
+                    | CutPoint -> Classification.CutPointExtId
+
+                Some(id, None, Some value)
             | AlpsAvailableInStates states ->
                 // Normalized: no spaces (classifyExtension trims on parse)
                 Some(Classification.AvailableInStatesExtId, None, Some(states |> String.concat ","))
@@ -108,8 +121,10 @@ let getDataDescriptors (annotations: Annotation list) : (string * (string option
 let rtValue (target: string option) : string option =
     target
     |> Option.map (fun t ->
-        if t.StartsWith("http://") || t.StartsWith("https://") then t
-        else "#" + t)
+        if t.StartsWith("http://") || t.StartsWith("https://") then
+            t
+        else
+            "#" + t)
 
 /// Collect shared transitions: group by event name, take the first (canonical) transition.
 let collectSharedTransitions (transitions: TransitionEdge list) : (string * TransitionEdge) list =

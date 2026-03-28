@@ -188,23 +188,23 @@ let classifyExtension (ext: ParsedExtension) : Annotation =
     // Guard: new URI and old bare name
     | GuardExtId
     | "guard" -> AlpsAnnotation(AlpsGuardExt value)
-    // Role extensions: new URIs and old bare names, always store canonical URI
-    | ProjectedRoleExtId -> AlpsAnnotation(AlpsRole(ProjectedRoleExtId, value))
-    | "projectedRole" -> AlpsAnnotation(AlpsRole(ProjectedRoleExtId, value))
-    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ProtocolStateExtId, value))
-    | "protocolState" -> AlpsAnnotation(AlpsRole(ProtocolStateExtId, value))
+    // Role extensions: new URIs and old bare names, map to typed AlpsRoleKind
+    | ProjectedRoleExtId -> AlpsAnnotation(AlpsRole(ProjectedRole, value))
+    | "projectedRole" -> AlpsAnnotation(AlpsRole(ProjectedRole, value))
+    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ProtocolState, value))
+    | "protocolState" -> AlpsAnnotation(AlpsRole(ProtocolState, value))
     // AvailableInStates: new URI and old bare name
     | AvailableInStatesExtId -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
     | "availableInStates" -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
-    // Duality extensions: new URIs and old bare names, always store canonical URI
-    | ClientObligationExtId -> AlpsAnnotation(AlpsDuality(ClientObligationExtId, value))
-    | "clientObligation" -> AlpsAnnotation(AlpsDuality(ClientObligationExtId, value))
-    | AdvancesProtocolExtId -> AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, value))
-    | "advancesProtocol" -> AlpsAnnotation(AlpsDuality(AdvancesProtocolExtId, value))
-    | DualOfExtId -> AlpsAnnotation(AlpsDuality(DualOfExtId, value))
-    | "dualOf" -> AlpsAnnotation(AlpsDuality(DualOfExtId, value))
-    | CutPointExtId -> AlpsAnnotation(AlpsDuality(CutPointExtId, value))
-    | "cutPoint" -> AlpsAnnotation(AlpsDuality(CutPointExtId, value))
+    // Duality extensions: new URIs and old bare names, map to typed AlpsDualityKind
+    | ClientObligationExtId -> AlpsAnnotation(AlpsDuality(ClientObligation, value))
+    | "clientObligation" -> AlpsAnnotation(AlpsDuality(ClientObligation, value))
+    | AdvancesProtocolExtId -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value))
+    | "advancesProtocol" -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value))
+    | DualOfExtId -> AlpsAnnotation(AlpsDuality(DualOf, value))
+    | "dualOf" -> AlpsAnnotation(AlpsDuality(DualOf, value))
+    | CutPointExtId -> AlpsAnnotation(AlpsDuality(CutPoint, value))
+    | "cutPoint" -> AlpsAnnotation(AlpsDuality(CutPoint, value))
     | _ -> AlpsAnnotation(AlpsExtension(ext.Id, ext.Href, ext.Value))
 
 // ---------------------------------------------------------------------------
