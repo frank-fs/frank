@@ -89,10 +89,17 @@ let private writeTransitionDescriptor (writer: Utf8JsonWriter) (t: TransitionEdg
     writer.WriteEndObject()
 
 /// Write a data descriptor as a top-level semantic descriptor.
-let private writeDataDescriptor (writer: Utf8JsonWriter) (id: string) (doc: (string option * string) option) =
+/// When defUri is Some, emits a `def` attribute pointing to the shape document.
+let private writeDataDescriptor
+    (writer: Utf8JsonWriter)
+    (id: string)
+    (doc: (string option * string) option)
+    (defUri: string option)
+    =
     writer.WriteStartObject()
     writer.WriteString("id", id)
     writer.WriteString("type", "semantic")
+    defUri |> Option.iter (fun uri -> writer.WriteString("def", uri))
 
     doc
     |> Option.iter (fun (fmt, value) ->
@@ -108,8 +115,8 @@ let private writeDataDescriptor (writer: Utf8JsonWriter) (id: string) (doc: (str
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Generate an ALPS JSON string from a StatechartDocument.
-let generateAlpsJson (doc: StatechartDocument) : string =
+/// Core ALPS JSON generation with optional def URI support.
+let private generateAlpsJsonCore (options: AlpsGeneratorOptions) (doc: StatechartDocument) : string =
     use stream = new MemoryStream()
     use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
 
@@ -153,13 +160,19 @@ let generateAlpsJson (doc: StatechartDocument) : string =
 
         // 1. Data descriptors
         for (id, docOpt) in dataDescriptors do
-            writeDataDescriptor writer id docOpt
+            let defUri = buildDefUri options id
+            writeDataDescriptor writer id docOpt defUri
 
         // 2. State descriptors
         for state in states do
             writer.WriteStartObject()
             state.Identifier |> Option.iter (fun id -> writer.WriteString("id", id))
             writer.WriteString("type", "semantic")
+
+            // #174: Emit def URI on state descriptors when options provide baseUri
+            state.Identifier
+            |> Option.bind (buildDefUri options)
+            |> Option.iter (fun defUri -> writer.WriteString("def", defUri))
 
             // State-level documentation
             writeDocAnnotation writer state.Annotations
@@ -216,3 +229,13 @@ let generateAlpsJson (doc: StatechartDocument) : string =
     writer.Flush()
 
     Encoding.UTF8.GetString(stream.ToArray())
+
+/// Generate an ALPS JSON string from a StatechartDocument.
+let generateAlpsJson (doc: StatechartDocument) : string =
+    generateAlpsJsonCore AlpsGeneratorOptions.None doc
+
+/// Generate an ALPS JSON string with def URI support.
+/// When options.DefBaseUri and options.ResourceSlug are set,
+/// state and data descriptors emit def="{baseUri}/shapes/{slug}#{id}".
+let generateAlpsJsonWithOptions (options: AlpsGeneratorOptions) (doc: StatechartDocument) : string =
+    generateAlpsJsonCore options doc

@@ -1,10 +1,15 @@
 namespace Frank.Affordances
 
 open System
+open System.IO
 open Frank.Resources.Model
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.Net.Http.Headers
+open VDS.RDF
+open VDS.RDF.Parsing
+open Frank.LinkedData.Negotiation
 
 /// Extension methods for mapping profile endpoints that serve
 /// pre-generated ALPS, OWL, SHACL, and JSON Schema documents.
@@ -12,6 +17,47 @@ open Microsoft.AspNetCore.Routing
 /// zero I/O and zero computation at request time.
 [<AutoOpen>]
 module ProfileMiddlewareExtensions =
+
+    /// Supported RDF media types for shape content negotiation.
+    let private shapeMediaTypes =
+        [ "text/turtle"; "application/ld+json"; "application/rdf+xml" ]
+
+    /// Negotiate the RDF media type from an Accept header for shape endpoints.
+    let private negotiateShapeType (accept: string) : string =
+        if String.IsNullOrWhiteSpace accept then
+            "text/turtle"
+        else
+            let success, mediaTypes =
+                MediaTypeHeaderValue.TryParseList(Microsoft.Extensions.Primitives.StringValues(accept))
+
+            if not success || isNull mediaTypes then
+                "text/turtle"
+            else
+                mediaTypes
+                |> Seq.sortByDescending (fun mt -> mt.Quality |> Option.ofNullable |> Option.defaultValue 1.0)
+                |> Seq.tryPick (fun mt ->
+                    shapeMediaTypes
+                    |> List.tryFind (fun s -> mt.MediaType.Equals(s, StringComparison.OrdinalIgnoreCase)))
+                |> Option.defaultValue "text/turtle"
+
+    /// Parse a Turtle string into an IGraph.
+    let private parseTurtle (turtle: string) : IGraph =
+        let g = new Graph()
+        let parser = TurtleParser()
+        use reader = new StringReader(turtle)
+        parser.Load(g, reader)
+        g
+
+    /// Write an IGraph to a byte array in the specified RDF format.
+    let private serializeGraph (mediaType: string) (graph: IGraph) : byte[] =
+        use ms = new MemoryStream()
+
+        match mediaType with
+        | "application/ld+json" -> JsonLdFormatter.writeJsonLd graph ms
+        | "application/rdf+xml" -> RdfXmlFormatter.writeRdfXml graph ms
+        | _ -> TurtleFormatter.writeTurtle graph ms
+
+        ms.ToArray()
 
     /// Serve a pre-computed string at the given path with the specified content type.
     /// Sets Vary: Accept header for correct caching behavior.
@@ -28,6 +74,29 @@ module ProfileMiddlewareExtensions =
                 ctx.Response.ContentType <- contentType
                 ctx.Response.Headers["Vary"] <- Microsoft.Extensions.Primitives.StringValues("Accept")
                 ctx.Response.WriteAsync(content))
+        )
+        |> ignore
+
+    /// Serve SHACL shapes with content negotiation at /shapes/{slug}.
+    /// Supports text/turtle (default), application/ld+json, and application/rdf+xml.
+    let private mapShapeEndpoint (endpoints: IEndpointRouteBuilder) (slug: string) (turtleContent: string) =
+        endpoints.MapGet(
+            sprintf "/shapes/%s" slug,
+            RequestDelegate(fun ctx ->
+                let accept = ctx.Request.Headers.Accept.ToString()
+                let mediaType = negotiateShapeType accept
+                ctx.Response.Headers["Vary"] <- Microsoft.Extensions.Primitives.StringValues("Accept")
+
+                if mediaType = "text/turtle" then
+                    // Fast path: serve pre-computed Turtle directly
+                    ctx.Response.ContentType <- "text/turtle"
+                    ctx.Response.WriteAsync(turtleContent)
+                else
+                    // Parse and re-serialize in the requested format
+                    let graph = parseTurtle turtleContent
+                    let bytes = serializeGraph mediaType graph
+                    ctx.Response.ContentType <- mediaType
+                    ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length))
         )
         |> ignore
 
@@ -54,9 +123,9 @@ module ProfileMiddlewareExtensions =
             for slug, owlTurtle in Map.toSeq profiles.OwlOntologies do
                 mapProfileEndpoint endpoints "/ontology" slug owlTurtle "text/turtle"
 
-            // SHACL shape endpoints
+            // SHACL shape endpoints (with content negotiation: Turtle, JSON-LD, RDF/XML)
             for slug, shaclTurtle in Map.toSeq profiles.ShaclShapes do
-                mapProfileEndpoint endpoints "/shapes" slug shaclTurtle "text/turtle"
+                mapShapeEndpoint endpoints slug shaclTurtle
 
             // JSON Schema endpoints
             for slug, jsonSchema in Map.toSeq profiles.JsonSchemas do

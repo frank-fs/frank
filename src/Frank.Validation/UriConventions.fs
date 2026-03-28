@@ -65,6 +65,18 @@ module UriConventions =
 
         buildNodeShapeUri assemblyName typeName
 
+    /// Resolve a shape URI for a type within a resource.
+    /// When baseUri is provided, produces an HTTP-dereferenceable URI:
+    ///   {baseUri}/shapes/{slug}#{typeName}
+    /// When baseUri is absent or empty, falls back to the URN scheme:
+    ///   urn:frank:shape:{slug}:{typeName}
+    let resolveShapeUri (baseUri: string option) (slug: string) (typeName: string) : Uri =
+        match baseUri with
+        | Some baseStr when not (System.String.IsNullOrWhiteSpace(baseStr)) ->
+            let trimmed = baseStr.TrimEnd('/')
+            Uri(sprintf "%s/shapes/%s#%s" trimmed slug typeName)
+        | _ -> Uri(sprintf "urn:frank:shape:%s:%s" slug typeName)
+
     /// Build a property path URI for a field name.
     /// Pattern: urn:frank:property:{fieldName}
     let buildPropertyPathUri (fieldName: string) : string =
