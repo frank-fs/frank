@@ -49,5 +49,8 @@ type ShapeCache() =
                 struct (shapesGraph, shape)
         )
 
+    /// All currently cached shape URIs. Used by cross-reference checks (e.g., ProjectionValidator).
+    member _.Keys: Uri seq = cache.Keys :> Uri seq
+
     /// Clear all cached shapes. Useful for testing.
     member _.Clear() = cache.Clear()

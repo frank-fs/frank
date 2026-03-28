@@ -89,6 +89,7 @@
     <ProjectReference Include="../Frank.Discovery/Frank.Discovery.fsproj" />
     <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
     <ProjectReference Include="../Frank.Statecharts.Core/Frank.Statecharts.Core.fsproj" />
+    <ProjectReference Include="../Frank.Validation/Frank.Validation.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,10 @@
 module Frank.Statecharts.Tests.Analysis.ProjectionValidatorTests
 
+open System
 open Expecto
 open Frank.Resources.Model
 open Frank.Statecharts.Analysis.ProjectionValidator
+open Frank.Validation
 
 // -- Test fixtures --
 
@@ -209,21 +211,162 @@ let deadlockTests =
 let validateProjectionTests =
     testList
         "ProjectionValidator.validateProjection"
-        [ testCase "no roles returns 0 checks"
+        [ testCase "no roles and no guards returns 0 checks"
+          <| fun _ ->
+              let chart =
+                  { ticTacToeChart with
+                      Roles = []
+                      GuardNames = []
+                      Transitions =
+                          ticTacToeChart.Transitions
+                          |> List.map (fun t -> { t with Guard = None; Constraint = Unrestricted }) }
+
+              let result = validateProjection chart.RouteTemplate chart
+              Expect.equal result.ChecksRun 0 "No checks for roleless guardless chart"
+              Expect.isEmpty result.Issues "No issues"
+
+          testCase "no roles but has guards runs guard consistency only"
           <| fun _ ->
               let chart = { ticTacToeChart with Roles = [] }
               let result = validateProjection chart.RouteTemplate chart
-              Expect.equal result.ChecksRun 0 "No checks for roleless chart"
-              Expect.isEmpty result.Issues "No issues"
+              Expect.equal result.ChecksRun 1 "Guard consistency check only"
+              Expect.isEmpty result.Issues "Guards are consistent"
 
-          testCase "TicTacToe returns 4 checks, 0 issues"
+          testCase "TicTacToe returns 5 checks, 0 issues"
           <| fun _ ->
               let result = validateProjection ticTacToeChart.RouteTemplate ticTacToeChart
-              Expect.equal result.ChecksRun 4 "All 4 checks run"
+              Expect.equal result.ChecksRun 5 "All 5 checks run"
               Expect.isEmpty result.Issues "No issues"
 
           testCase "dead transition chart has issues"
           <| fun _ ->
               let result = validateProjection deadTransitionChart.RouteTemplate deadTransitionChart
-              Expect.equal result.ChecksRun 4 "All 4 checks run"
+              Expect.equal result.ChecksRun 5 "All 5 checks run"
               Expect.isGreaterThan result.Issues.Length 0 "Has issues" ]
+
+// -- Guard consistency test fixtures --
+
+/// Chart where all guards referenced in transitions are declared in GuardNames.
+let private consistentGuardChart: ExtractedStatechart =
+    { RouteTemplate = "/items/{itemId}"
+      StateNames = [ "Active"; "Archived" ]
+      InitialStateKey = "Active"
+      GuardNames = [ "OwnerGuard" ]
+      StateMetadata =
+        Map.ofList
+            [ "Active", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
+              "Archived", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+      Roles = [ { Name = "Owner"; Description = None } ]
+      Transitions =
+        [ mkTransition "view" "Active" "Active" None Unrestricted
+          mkTransition "archive" "Active" "Archived" (Some "OwnerGuard") (RestrictedTo [ "Owner" ]) ] }
+
+/// Chart with a guard in transitions that does not appear in GuardNames.
+let private undeclaredGuardChart: ExtractedStatechart =
+    { consistentGuardChart with
+        GuardNames = []
+        Transitions =
+            [ mkTransition "view" "Active" "Active" None Unrestricted
+              mkTransition "archive" "Active" "Archived" (Some "MissingGuard") (RestrictedTo [ "Owner" ]) ] }
+
+/// Chart with a declared guard that is not referenced by any transition.
+let private unusedGuardChart: ExtractedStatechart =
+    { consistentGuardChart with
+        GuardNames = [ "OwnerGuard"; "UnusedGuard" ]
+        Transitions =
+            [ mkTransition "view" "Active" "Active" None Unrestricted
+              mkTransition "archive" "Active" "Archived" (Some "OwnerGuard") (RestrictedTo [ "Owner" ]) ] }
+
+[<Tests>]
+let guardConsistencyTests =
+    testList
+        "ProjectionValidator.checkGuardConsistency"
+        [ testCase "all guards consistent passes"
+          <| fun _ ->
+              let issues = checkGuardConsistency consistentGuardChart
+              Expect.isEmpty issues "No guard mismatches"
+
+          testCase "guard in transition but not in GuardNames produces error"
+          <| fun _ ->
+              let issues = checkGuardConsistency undeclaredGuardChart
+              Expect.equal issues.Length 1 "One mismatch"
+              Expect.equal issues[0].Check GuardConsistency "Check kind is GuardConsistency"
+              Expect.equal issues[0].Severity Severity.Error "Undeclared guard is an error"
+              Expect.stringContains issues[0].Message "MissingGuard" "Mentions the guard name"
+
+          testCase "guard in GuardNames but not in any transition produces warning"
+          <| fun _ ->
+              let issues = checkGuardConsistency unusedGuardChart
+              Expect.equal issues.Length 1 "One mismatch"
+              Expect.equal issues[0].Check GuardConsistency "Check kind is GuardConsistency"
+              Expect.equal issues[0].Severity Severity.Warning "Unused guard is a warning"
+              Expect.stringContains issues[0].Message "UnusedGuard" "Mentions the guard name"
+
+          testCase "chart with no guards produces no issues"
+          <| fun _ ->
+              let chart =
+                  { consistentGuardChart with
+                      GuardNames = []
+                      Transitions =
+                          [ mkTransition "view" "Active" "Active" None Unrestricted ] }
+
+              let issues = checkGuardConsistency chart
+              Expect.isEmpty issues "No guards, no issues" ]
+
+// -- Shape reference test fixtures --
+
+let private mkShapeCache (uris: Uri list) =
+    let cache = ShapeCache()
+
+    let shapes =
+        uris
+        |> List.map (fun uri ->
+            { TargetType = None
+              NodeShapeUri = uri
+              Properties = []
+              Closed = false
+              Description = None
+              SparqlConstraints = [] })
+
+    cache.LoadAll(shapes)
+    cache
+
+[<Tests>]
+let shapeReferenceTests =
+    testList
+        "ProjectionValidator.checkShapeReference"
+        [ testCase "matching def URIs and shapes passes"
+          <| fun _ ->
+              let uri1 = Uri("https://example.com/shapes/Game")
+              let defUris = [ uri1 ]
+              let cache = mkShapeCache [ uri1 ]
+              let issues = checkShapeReference defUris cache
+              Expect.isEmpty issues "All defs matched by shapes"
+
+          testCase "ALPS def URI with no ShapeCache entry produces warning"
+          <| fun _ ->
+              let orphanUri = Uri("https://example.com/shapes/Missing")
+              let defUris = [ orphanUri ]
+              let cache = mkShapeCache []
+              let issues = checkShapeReference defUris cache
+              Expect.equal issues.Length 1 "One orphan"
+              Expect.equal issues[0].Check ShapeReference "Check kind is ShapeReference"
+              Expect.equal issues[0].Severity Severity.Warning "Orphaned ref is a warning"
+              Expect.stringContains issues[0].Message "Missing" "Mentions the URI"
+
+          testCase "ShapeCache entry with no ALPS def produces warning"
+          <| fun _ ->
+              let shapeUri = Uri("https://example.com/shapes/Unreferenced")
+              let defUris: Uri list = []
+              let cache = mkShapeCache [ shapeUri ]
+              let issues = checkShapeReference defUris cache
+              Expect.equal issues.Length 1 "One unreferenced"
+              Expect.equal issues[0].Check ShapeReference "Check kind is ShapeReference"
+              Expect.equal issues[0].Severity Severity.Warning "Unreferenced shape is a warning"
+              Expect.stringContains issues[0].Message "Unreferenced" "Mentions the URI"
+
+          testCase "empty def URIs and empty cache produces no issues"
+          <| fun _ ->
+              let cache = mkShapeCache []
+              let issues = checkShapeReference [] cache
+              Expect.isEmpty issues "Nothing to compare" ]
