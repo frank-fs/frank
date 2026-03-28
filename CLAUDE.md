@@ -73,6 +73,8 @@ These principles govern all code changes.
 - **`TemplateMatcher` is not thread-safe**: Cache immutable `RouteTemplate` objects (via `TemplateParser.Parse`); create `TemplateMatcher` per-request. Sharing cached matchers across concurrent requests causes subtle data races.
 - **`AddSingleton` vs `TryAddSingleton`**: `AddSingleton` always registers (last-wins for same type). `TryAddSingleton` is first-wins (no-op if already registered). Use `TryAddSingleton` for auto-load defaults, `AddSingleton` for explicit overrides.
 - **Link headers must be URIs per RFC 8288**: Pre-computed Link headers with route template params (`{gameId}`) need runtime resolution against `ctx.Request.RouteValues`. Use a `HasTemplateLinks` flag to skip resolution for non-parameterized resources (zero-alloc fast path).
+- **`_.Member` shorthand can break type inference with `Set.ofList`**: `List.map _.AbsoluteUri |> Set.ofList` may fail with "Uri does not support comparison" because the compiler doesn't resolve the intermediate `string` type. Use explicit lambdas: `List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList`.
+- **`GetMetadata<T>()` requires reference types**: `EndpointMetadataCollection.GetMetadata<T>()` has a `class` constraint. Endpoint metadata marker types must be records, not `[<Struct>]` types.
 
 ## Workflow Rules
 
@@ -81,6 +83,7 @@ These principles govern all code changes.
 - **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
 - **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
 - **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first. The branch with the most shared-file changes merges last to minimize rebase churn.
+- **Worktree agent Bash commands must be standalone.** Compound commands (`cd /path && dotnet build`) don't match pre-approved `Bash(dotnet:*)` patterns. Instruct agents to run `cd /path/to/worktree` as a separate Bash call first (working directory persists), then run standalone commands (`dotnet build Frank.sln`). Also `mkdir -p nupkg` in each worktree before building.
 - **Verification sequence before PRs.** Before creating a PR, run the full verification sequence: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review`. Address findings before opening the PR.
 - **Section-by-section audit before closing.** When an issue has multiple sections (e.g., "Operational MPST" + "Wadler/dual"), verify every requirement in every section before closing. Don't close an issue because one section is done.
 - **PRs must enumerate all issue requirements with status.** For each requirement in the linked issue, the PR body must state: implemented, blocked by #X, or deferred with rationale. "Closes #X" without per-requirement accounting is insufficient.

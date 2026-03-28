@@ -178,6 +178,15 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with
             ResolveInstanceId = Some resolver }
 
+    /// Marks this resource as a JSON Home entry point.
+    /// Only entry-point resources appear in the home document when any are designated.
+    [<CustomOperation("entryPoint")>]
+    member _.EntryPoint(spec: StatefulResourceSpec<'S, 'E, 'C>) =
+        { spec with
+            Metadata =
+                spec.Metadata
+                @ [ fun (b: EndpointBuilder) -> b.Metadata.Add({ IsEntryPoint = true }: EntryPointMetadata) ] }
+
     /// Declare a named role with an identity-matching predicate.
     [<CustomOperation("role")>]
     member _.Role(spec: StatefulResourceSpec<'S, 'E, 'C>, name: string, predicate: ClaimsPrincipal -> bool) =
