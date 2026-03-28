@@ -18,6 +18,7 @@ let private stateKindToString (kind: StateKind) : string =
     | Choice -> "Choice"
     | ForkJoin -> "ForkJoin"
     | Terminate -> "Terminate"
+    | Composite -> "Composite"
 
 let private writeOptional (w: Utf8JsonWriter) (name: string) (value: string option) =
     match value with
@@ -33,8 +34,10 @@ let rec private writeStateNode (w: Utf8JsonWriter) (state: StateNode) =
 
     if not state.Children.IsEmpty then
         w.WriteStartArray("children")
+
         for child in state.Children do
             writeStateNode w child
+
         w.WriteEndArray()
 
     w.WriteEndObject()
@@ -59,12 +62,13 @@ let private writeNote (w: Utf8JsonWriter) (note: NoteContent) =
 let private writeDirective (w: Utf8JsonWriter) (directive: Directive) =
     w.WriteStartObject()
     w.WriteString("type", "directive")
+
     match directive with
     | TitleDirective(title, _) ->
         w.WriteString("directiveType", "title")
         w.WriteString("value", title)
-    | AutoNumberDirective _ ->
-        w.WriteString("directiveType", "autoNumber")
+    | AutoNumberDirective _ -> w.WriteString("directiveType", "autoNumber")
+
     w.WriteEndObject()
 
 let rec private writeElement (w: Utf8JsonWriter) (el: StatechartElement) =
@@ -80,14 +84,18 @@ and private writeGroup (w: Utf8JsonWriter) (group: GroupBlock) =
     w.WriteString("type", "group")
     w.WriteString("kind", sprintf "%A" group.Kind)
     w.WriteStartArray("branches")
+
     for branch in group.Branches do
         w.WriteStartObject()
         writeOptional w "condition" branch.Condition
         w.WriteStartArray("elements")
+
         for el in branch.Elements do
             writeElement w el
+
         w.WriteEndArray()
         w.WriteEndObject()
+
     w.WriteEndArray()
     w.WriteEndObject()
 
@@ -102,8 +110,7 @@ let private collectStates (elements: StatechartElement list) =
             | _ -> [])
 
     and collectChildren (children: StateNode list) =
-        children
-        |> List.collect (fun c -> c :: collectChildren c.Children)
+        children |> List.collect (fun c -> c :: collectChildren c.Children)
 
     collect elements
 
@@ -137,21 +144,27 @@ let private writeDocumentInline (writer: Utf8JsonWriter) (doc: StatechartDocumen
 
     // Elements array preserving full AST hierarchy
     writer.WriteStartArray("elements")
+
     for el in doc.Elements do
         writeElement writer el
+
     writer.WriteEndArray()
 
     // Flattened arrays for backward compatibility
     let states = collectStates doc.Elements
     writer.WriteStartArray("states")
+
     for s in states do
         writeStateLegacy writer s
+
     writer.WriteEndArray()
 
     let transitions = collectTransitions doc.Elements
     writer.WriteStartArray("transitions")
+
     for t in transitions do
         writeTransitionLegacy writer t
+
     writer.WriteEndArray()
 
     writer.WriteEndObject()
@@ -199,13 +212,17 @@ let serializeParseResult (result: ParseResult) : string =
     writeDocumentInline writer result.Document
 
     writer.WriteStartArray("errors")
+
     for e in result.Errors do
         writeParseFailure writer e
+
     writer.WriteEndArray()
 
     writer.WriteStartArray("warnings")
+
     for w in result.Warnings do
         writeParseWarning writer w
+
     writer.WriteEndArray()
 
     writer.WriteEndObject()
@@ -224,13 +241,17 @@ let serializeParseResultWithFormat (result: ParseResult) (format: FormatTag) : s
     writeDocumentInline writer result.Document
 
     writer.WriteStartArray("errors")
+
     for e in result.Errors do
         writeParseFailure writer e
+
     writer.WriteEndArray()
 
     writer.WriteStartArray("warnings")
+
     for w in result.Warnings do
         writeParseWarning writer w
+
     writer.WriteEndArray()
 
     writer.WriteEndObject()

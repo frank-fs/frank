@@ -10,8 +10,7 @@ open Frank.Statecharts.Ast
 /// smcat allows alphanumeric, underscore, dot, and hyphen without quoting.
 let private needsQuoting (name: string) =
     name
-    |> Seq.exists (fun c ->
-        not (System.Char.IsLetterOrDigit c || c = '_' || c = '.' || c = '-'))
+    |> Seq.exists (fun c -> not (System.Char.IsLetterOrDigit c || c = '_' || c = '.' || c = '-'))
 
 /// Wraps a name in double quotes if it contains special characters,
 /// escaping any embedded double quotes.
@@ -37,6 +36,7 @@ let private stateKindToSmcatType (kind: StateKind) : string =
     | Choice -> "choice"
     | ForkJoin -> "forkjoin"
     | Terminate -> "terminate"
+    | Composite -> "regular"
 
 // ---------------------------------------------------------------------------
 // Helpers: annotation extraction
@@ -67,7 +67,7 @@ let private extractStateType (annotations: Annotation list) : (StateKind * Smcat
 let private extractCustomAttributes (annotations: Annotation list) : (string * string) list =
     annotations
     |> List.choose (function
-        | SmcatAnnotation(SmcatCustomAttribute(key, value)) -> Some (key, value)
+        | SmcatAnnotation(SmcatCustomAttribute(key, value)) -> Some(key, value)
         | _ -> None)
 
 // ---------------------------------------------------------------------------
@@ -129,12 +129,16 @@ let private serializeActivities (activities: StateActivities option) : string =
     | None -> ""
     | Some a ->
         let parts = ResizeArray<string>()
+
         for entry in a.Entry do
             parts.Add(sprintf "entry/ %s" entry)
+
         for exit in a.Exit do
             parts.Add(sprintf "exit/ %s" exit)
+
         for doAct in a.Do do
             parts.Add(sprintf "...%s" doAct)
+
         if parts.Count > 0 then
             sprintf ": %s" (System.String.Join(" ", parts))
         else
@@ -145,13 +149,18 @@ let private serializeActivities (activities: StateActivities option) : string =
 // ---------------------------------------------------------------------------
 
 /// Serialize a single state node (handles composites recursively).
-let rec private serializeState (sb: System.Text.StringBuilder) (indent: string) (node: StateNode) (siblingTransitions: TransitionEdge list) : unit =
+let rec private serializeState
+    (sb: System.Text.StringBuilder)
+    (indent: string)
+    (node: StateNode)
+    (siblingTransitions: TransitionEdge list)
+    : unit =
     let effectiveAnnotations =
         match extractStateType node.Annotations with
         | Some _ -> node.Annotations
-        | None when node.Kind <> Regular ->
-            SmcatAnnotation(SmcatStateType(node.Kind, Explicit)) :: node.Annotations
+        | None when node.Kind <> Regular -> SmcatAnnotation(SmcatStateType(node.Kind, Explicit)) :: node.Annotations
         | None -> node.Annotations
+
     sb.Append(indent) |> ignore
     sb.Append(quoteName (node.Identifier |> Option.defaultValue "")) |> ignore
     sb.Append(serializeActivities node.Activities) |> ignore
@@ -163,15 +172,19 @@ let rec private serializeState (sb: System.Text.StringBuilder) (indent: string) 
         sb.Append(" {\n") |> ignore
         let childNames = children |> List.choose (fun c -> c.Identifier) |> Set.ofList
         let innerIndent = indent + "  "
+
         let childTransitions =
             siblingTransitions
             |> List.filter (fun t ->
-                childNames.Contains(t.Source) ||
-                (t.Target |> Option.map childNames.Contains |> Option.defaultValue false))
+                childNames.Contains(t.Source)
+                || (t.Target |> Option.map childNames.Contains |> Option.defaultValue false))
+
         for child in children do
             serializeState sb innerIndent child childTransitions
+
         for t in childTransitions do
             serializeTransition sb innerIndent t
+
         sb.Append(indent) |> ignore
         sb.Append("};\n") |> ignore
 
@@ -179,14 +192,17 @@ and private serializeTransition (sb: System.Text.StringBuilder) (indent: string)
     sb.Append(indent) |> ignore
     sb.Append(quoteName t.Source) |> ignore
     sb.Append(" => ") |> ignore
+
     match t.Target with
     | Some target -> sb.Append(quoteName target) |> ignore
     | None -> ()
+
     match formatLabel t.Event t.Guard t.Action with
     | Some l ->
         sb.Append(": ") |> ignore
         sb.Append(l) |> ignore
     | None -> ()
+
     sb.Append(";\n") |> ignore
 
 // ---------------------------------------------------------------------------
@@ -196,20 +212,26 @@ and private serializeTransition (sb: System.Text.StringBuilder) (indent: string)
 /// Serialize a StatechartDocument to valid smcat text.
 let serialize (document: StatechartDocument) : string =
     let sb = System.Text.StringBuilder()
+
     let allStates =
         document.Elements
-        |> List.choose (function StateDecl s -> Some s | _ -> None)
+        |> List.choose (function
+            | StateDecl s -> Some s
+            | _ -> None)
+
     let allTransitions =
         document.Elements
-        |> List.choose (function TransitionElement t -> Some t | _ -> None)
+        |> List.choose (function
+            | TransitionElement t -> Some t
+            | _ -> None)
 
     // Collect all child state names (to avoid double-emitting transitions)
     let rec collectChildNames (nodes: StateNode list) =
-        nodes |> List.collect (fun n -> (n.Identifier |> Option.toList) @ collectChildNames n.Children)
+        nodes
+        |> List.collect (fun n -> (n.Identifier |> Option.toList) @ collectChildNames n.Children)
+
     let childNames =
-        allStates
-        |> List.collect (fun s -> collectChildNames s.Children)
-        |> Set.ofList
+        allStates |> List.collect (fun s -> collectChildNames s.Children) |> Set.ofList
 
     // Emit states (with composite blocks)
     for s in allStates do
@@ -218,8 +240,9 @@ let serialize (document: StatechartDocument) : string =
     // Emit top-level transitions (those not inside composite blocks)
     for t in allTransitions do
         let isChild =
-            childNames.Contains(t.Source) ||
-            (t.Target |> Option.map childNames.Contains |> Option.defaultValue false)
+            childNames.Contains(t.Source)
+            || (t.Target |> Option.map childNames.Contains |> Option.defaultValue false)
+
         if not isChild then
             serializeTransition sb "" t
 

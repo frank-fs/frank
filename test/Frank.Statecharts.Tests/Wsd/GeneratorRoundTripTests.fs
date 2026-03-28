@@ -48,7 +48,8 @@ let private makeMetadata
       EvaluateEventGuards = fun _ -> Allowed
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent)
       Roles = []
-      ResolveRoles = fun _ -> Set.empty }
+      ResolveRoles = fun _ -> Set.empty
+      Hierarchy = None }
 
 let private dummyHandler = RequestDelegate(fun _ -> Task.CompletedTask)
 

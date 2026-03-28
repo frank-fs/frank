@@ -17,7 +17,8 @@ open Frank.Builder
 /// For non-DU types, falls back to ToString().
 [<RequireQualifiedAccess>]
 module internal StateKeyExtractor =
-    let private cache = System.Collections.Concurrent.ConcurrentDictionary<System.Type, obj -> string>()
+    let private cache =
+        System.Collections.Concurrent.ConcurrentDictionary<System.Type, obj -> string>()
 
     let private buildExtractor (t: System.Type) : obj -> string =
         if FSharpType.IsUnion(t, true) then
@@ -86,6 +87,10 @@ type StateMachineMetadata =
         Roles: RoleDefinition list
         /// Closure: evaluates role predicates against ctx.User, returns Set<string> of matching role names.
         ResolveRoles: HttpContext -> Set<string>
+        /// Opt-in hierarchical runtime. When Some, middleware uses hierarchical dispatch
+        /// (composite states, LCA entry/exit, history pseudo-states).
+        /// When None, middleware uses flat dispatch (current behavior, zero breaking changes).
+        Hierarchy: StateHierarchy option
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -191,7 +196,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
     [<CustomOperation("role")>]
     member _.Role(spec: StatefulResourceSpec<'S, 'E, 'C>, name: string, predicate: ClaimsPrincipal -> bool) =
         { spec with
-            Roles = { Name = name; ClaimsPredicate = predicate } :: spec.Roles }
+            Roles =
+                { Name = name
+                  ClaimsPredicate = predicate }
+                :: spec.Roles }
 
     member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : Resource =
         let machine =
@@ -206,7 +214,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     routeData.Values.Values |> Seq.head |> string)
 
         // Validate role definitions — fail fast on duplicates or empty names
-        let emptyNames = spec.Roles |> List.filter (fun r -> String.IsNullOrWhiteSpace r.Name)
+        let emptyNames =
+            spec.Roles |> List.filter (fun r -> String.IsNullOrWhiteSpace r.Name)
 
         if not (List.isEmpty emptyNames) then
             failwithf "Empty role name on resource '%s'" routeTemplate
@@ -228,7 +237,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 Set.empty
             else
                 let logger =
-                    ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Statecharts.RoleResolution")
+                    ctx.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("Frank.Statecharts.RoleResolution")
 
                 spec.Roles
                 |> List.choose (fun role ->
@@ -385,7 +396,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
               EvaluateEventGuards = evaluateEventGuards
               ExecuteTransition = executeTransition
               Roles = spec.Roles
-              ResolveRoles = resolveRoles }
+              ResolveRoles = resolveRoles
+              Hierarchy = None }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.

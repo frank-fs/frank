@@ -16,6 +16,7 @@
     <!-- Core domain types -->
     <Compile Include="Types.fs" />
     <Compile Include="Store.fs" />
+    <Compile Include="Hierarchy.fs" />
     <!-- WSD parser -->
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />
