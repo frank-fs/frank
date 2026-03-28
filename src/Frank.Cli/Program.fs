@@ -695,7 +695,7 @@ let main args =
     let uniValCheckProjectionOpt = Option<bool>("--check-projection")
 
     uniValCheckProjectionOpt.Description <-
-        "Run projection consistency checks (connectedness, mixed-choice, completeness, deadlock)"
+        "Run projection consistency checks (connectedness, mixed-choice, completeness, deadlock, guard-consistency)"
 
     uniValCheckProjectionOpt.DefaultValueFactory <- (fun _ -> false)
     let uniValCheckProgressOpt = Option<bool>("--check-progress")

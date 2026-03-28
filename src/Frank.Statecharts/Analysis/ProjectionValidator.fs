@@ -1,6 +1,8 @@
 module Frank.Statecharts.Analysis.ProjectionValidator
 
+open System
 open Frank.Resources.Model
+open Frank.Validation
 
 [<RequireQualifiedAccess>]
 type Severity =
@@ -12,6 +14,8 @@ type ProjectionCheckKind =
     | MixedChoice
     | Completeness
     | Deadlock
+    | GuardConsistency
+    | ShapeReference
 
 module ProjectionCheckKind =
     let toString =
@@ -20,6 +24,8 @@ module ProjectionCheckKind =
         | MixedChoice -> "mixed-choice"
         | Completeness -> "completeness"
         | Deadlock -> "deadlock"
+        | GuardConsistency -> "guard-consistency"
+        | ShapeReference -> "shape-reference"
 
 type ProjectionIssue =
     { Check: ProjectionCheckKind
@@ -120,11 +126,89 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
                   Severity = Severity.Warning
                   Message = $"State '%s{state}' is reachable but no role has outgoing transitions from it" })
 
-/// Run all 4 projection checks. Returns 0 checks if statechart has no roles.
+/// Guard consistency: compare guards referenced by transitions against declared GuardNames.
+/// Guards in transitions but not in GuardNames are errors (undeclared guard).
+/// Guards in GuardNames but not referenced by any transition are warnings (unused guard).
+let checkGuardConsistency (statechart: ExtractedStatechart) : ProjectionIssue list =
+    let declaredGuards = statechart.GuardNames |> Set.ofList
+
+    let referencedGuards = statechart.Transitions |> List.choose _.Guard |> Set.ofList
+
+    let undeclared =
+        Set.difference referencedGuards declaredGuards
+        |> Set.toList
+        |> List.map (fun guard ->
+            { Check = GuardConsistency
+              Severity = Severity.Error
+              Message = $"Guard '%s{guard}' is referenced by a transition but not declared in GuardNames" })
+
+    let unused =
+        Set.difference declaredGuards referencedGuards
+        |> Set.toList
+        |> List.map (fun guard ->
+            { Check = GuardConsistency
+              Severity = Severity.Warning
+              Message = $"Guard '%s{guard}' is declared in GuardNames but not referenced by any transition" })
+
+    undeclared @ unused
+
+/// SHACL shape cross-reference: compare ALPS def URIs against ShapeCache entries.
+/// Orphaned shape refs (def URI with no shape) and unreferenced shapes (shape with no def) are warnings.
+/// Uses string comparison on absolute URIs since System.Uri does not implement IComparable.
+let checkShapeReference (alpsDefUris: Uri list) (shapeCache: ShapeCache) : ProjectionIssue list =
+    let shapeKeys = shapeCache.Keys |> Seq.toList
+
+    let defUriStrings =
+        alpsDefUris |> List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList
+
+    let shapeUriStrings =
+        shapeKeys |> List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList
+
+    let defUriByString =
+        alpsDefUris |> List.map (fun u -> u.AbsoluteUri, u) |> Map.ofList
+
+    let shapeUriByString =
+        shapeKeys |> List.map (fun u -> u.AbsoluteUri, u) |> Map.ofList
+
+    let orphaned =
+        Set.difference defUriStrings shapeUriStrings
+        |> Set.toList
+        |> List.map (fun uriStr ->
+            let uri = defUriByString[uriStr]
+
+            { Check = ShapeReference
+              Severity = Severity.Warning
+              Message = $"ALPS def URI '%O{uri}' has no corresponding entry in ShapeCache" })
+
+    let unreferenced =
+        Set.difference shapeUriStrings defUriStrings
+        |> Set.toList
+        |> List.map (fun uriStr ->
+            let uri = shapeUriByString[uriStr]
+
+            { Check = ShapeReference
+              Severity = Severity.Warning
+              Message = $"ShapeCache entry '%O{uri}' is not referenced by any ALPS def URI" })
+
+    orphaned @ unreferenced
+
+/// Whether the statechart has any guard-related content worth checking.
+let private hasGuards (statechart: ExtractedStatechart) =
+    not statechart.GuardNames.IsEmpty
+    || statechart.Transitions |> List.exists (fun t -> t.Guard.IsSome)
+
+/// Run projection checks. Returns 0 checks if statechart has no roles and no guards.
+/// GuardConsistency runs on all statecharts with guards; the 4 role-based checks require roles.
 let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart) : ProjectionCheckResult =
+    let guardIssues, guardChecks =
+        if hasGuards statechart then
+            checkGuardConsistency statechart, 1
+        else
+            [], 0
+
     if statechart.Roles.IsEmpty then
-        { Issues = []
-          ChecksRun = 0
+        { Issues = guardIssues
+          ChecksRun = guardChecks
           ResourceRoute = resourceRoute }
     else
         let projections = Projection.projectAll statechart
@@ -134,8 +218,9 @@ let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart)
             [ yield! checkConnectedness statechart
               yield! checkMixedChoice statechart
               yield! checkCompleteness projections pruned
-              yield! checkDeadlock projections pruned ]
+              yield! checkDeadlock projections pruned
+              yield! guardIssues ]
 
         { Issues = issues
-          ChecksRun = 4
+          ChecksRun = 4 + guardChecks
           ResourceRoute = resourceRoute }

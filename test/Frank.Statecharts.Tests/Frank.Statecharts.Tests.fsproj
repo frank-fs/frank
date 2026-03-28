@@ -85,6 +85,7 @@
     <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
     <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
   </ItemGroup>
 
   <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->
