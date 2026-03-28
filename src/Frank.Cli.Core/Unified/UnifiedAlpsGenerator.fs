@@ -171,13 +171,17 @@ let private writeTransitionDescriptor
         writer.WriteEndObject()
         writer.WriteEndArray()
 
-    // availableInStates extension
+    // State extensions: availableInStates + protocolState (#207)
     match stateKey with
     | Some state ->
         writer.WritePropertyName("ext")
         writer.WriteStartArray()
         writer.WriteStartObject()
         writer.WriteString("id", AvailableInStatesExtId)
+        writer.WriteString("value", state)
+        writer.WriteEndObject()
+        writer.WriteStartObject()
+        writer.WriteString("id", ProtocolStateExtId)
         writer.WriteString("value", state)
         writer.WriteEndObject()
         writer.WriteEndArray()

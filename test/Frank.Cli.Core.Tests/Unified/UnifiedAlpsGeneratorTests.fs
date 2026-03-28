@@ -171,6 +171,25 @@ let private descriptorHasId (id: string) (desc: JsonElement) =
     | true, i -> i.GetString() = id
     | _ -> false
 
+/// Extract ext elements from a descriptor as (id, value) pairs.
+let private getExtElements (desc: JsonElement) : (string * string) list =
+    match desc.TryGetProperty("ext") with
+    | true, exts ->
+        [ for e in exts.EnumerateArray() ->
+              let id = e.GetProperty("id").GetString()
+
+              let value =
+                  match e.TryGetProperty("value") with
+                  | true, v -> v.GetString()
+                  | _ -> ""
+
+              (id, value) ]
+    | _ -> []
+
+/// Check if a descriptor has an ext element with the given id and value.
+let private hasExtElement (extId: string) (extValue: string) (desc: JsonElement) : bool =
+    getExtElements desc |> List.exists (fun (id, v) -> id = extId && v = extValue)
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -479,4 +498,99 @@ let unifiedAlpsGeneratorTests =
 
                         match alps.TryGetProperty("version") with
                         | true, v -> Expect.equal (v.GetString()) "1.0" "Version should be 1.0"
-                        | _ -> failtest "Should have version property" ] ]
+                        | _ -> failtest "Should have version property" ]
+
+          // ── #207: protocolState ext element ──
+          testList
+              "protocolState"
+              [ testCase "stateful transition descriptor includes protocolState ext"
+                <| fun _ ->
+                    let result = generate ticTacToeResource "https://example.com/alps"
+
+                    match result with
+                    | Error errors -> failtest $"Generation failed: {errors}"
+                    | Ok json ->
+                        let descriptors = getDescriptors json
+
+                        // Find a transition descriptor scoped to XTurn
+                        let xTurnDesc =
+                            descriptors
+                            |> List.tryFind (fun d ->
+                                descriptorHasId "XTurn-getGames" d || descriptorHasId "XTurn-createGames" d)
+
+                        Expect.isSome xTurnDesc "Should have an XTurn-scoped transition descriptor"
+
+                        let desc = xTurnDesc.Value
+
+                        Expect.isTrue
+                            (hasExtElement Alps.Classification.ProtocolStateExtId "XTurn" desc)
+                            "XTurn transition should have protocolState ext with value 'XTurn'"
+
+                testCase "multiple states each have their own protocolState value"
+                <| fun _ ->
+                    let result = generate ticTacToeResource "https://example.com/alps"
+
+                    match result with
+                    | Error errors -> failtest $"Generation failed: {errors}"
+                    | Ok json ->
+                        let descriptors = getDescriptors json
+
+                        // Find transition descriptors for different states
+                        let xTurnDescs =
+                            descriptors
+                            |> List.filter (fun d ->
+                                let exts = getExtElements d
+
+                                exts
+                                |> List.exists (fun (id, v) ->
+                                    id = Alps.Classification.ProtocolStateExtId && v = "XTurn"))
+
+                        let oTurnDescs =
+                            descriptors
+                            |> List.filter (fun d ->
+                                let exts = getExtElements d
+
+                                exts
+                                |> List.exists (fun (id, v) ->
+                                    id = Alps.Classification.ProtocolStateExtId && v = "OTurn"))
+
+                        let wonDescs =
+                            descriptors
+                            |> List.filter (fun d ->
+                                let exts = getExtElements d
+
+                                exts
+                                |> List.exists (fun (id, v) ->
+                                    id = Alps.Classification.ProtocolStateExtId && v = "Won"))
+
+                        Expect.isGreaterThan xTurnDescs.Length 0 "Should have XTurn protocolState"
+                        Expect.isGreaterThan oTurnDescs.Length 0 "Should have OTurn protocolState"
+                        Expect.isGreaterThan wonDescs.Length 0 "Should have Won protocolState"
+
+                testCase "plain resource has no protocolState ext"
+                <| fun _ ->
+                    let result = generate plainHealthResource "https://example.com/alps"
+
+                    match result with
+                    | Error errors -> failtest $"Generation failed: {errors}"
+                    | Ok json ->
+                        Expect.isFalse
+                            (json.Contains("protocolState"))
+                            "Plain resource should not contain protocolState"
+
+                testCase "round-trip preserves protocolState ext"
+                <| fun _ ->
+                    let result = generate ticTacToeResource "https://example.com/alps"
+
+                    match result with
+                    | Error errors -> failtest $"Generation failed: {errors}"
+                    | Ok json ->
+                        // Parse the generated JSON and check that protocolState ext round-trips
+                        let parseResult = Frank.Statecharts.Alps.JsonParser.parseAlpsJson json
+                        Expect.isEmpty parseResult.Errors "Round-trip should produce no parse errors"
+
+                        // Verify the raw JSON contains protocolState with the canonical URI
+                        Expect.stringContains
+                            json
+                            Alps.Classification.ProtocolStateExtId
+                            "Generated JSON should contain protocolState ext URI" ] ]
