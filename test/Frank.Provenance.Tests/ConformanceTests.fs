@@ -22,15 +22,33 @@ let private ticTacToeChart: ExtractedStatechart =
       GuardNames = []
       StateMetadata =
         Map.ofList
-            [ "XTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "OTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "XWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "OWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "Draw", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "XTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "OTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "XWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "OWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Draw",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles =
-        [ { Name = "PlayerX"; Description = Some "Player X" }
-          { Name = "PlayerO"; Description = Some "Player O" }
-          { Name = "Spectator"; Description = Some "Observer" } ]
+        [ { Name = "PlayerX"
+            Description = Some "Player X" }
+          { Name = "PlayerO"
+            Description = Some "Player O" }
+          { Name = "Spectator"
+            Description = Some "Observer" } ]
       Transitions =
         [ mkTransition "getGame" "XTurn" "XTurn" Unrestricted
           mkTransition "getGame" "OTurn" "OTurn" Unrestricted
@@ -112,8 +130,7 @@ let conformanceTests =
               Expect.equal v.Reasons.Length 1 "One reason"
 
               match v.Reasons.[0] with
-              | ViolationReason.TransitionNotInProjection role ->
-                  Expect.equal role "PlayerO" "Violating role"
+              | ViolationReason.TransitionNotInProjection role -> Expect.equal role "PlayerO" "Violating role"
               | other -> failtest $"Expected TransitionNotInProjection, got {other}"
           }
 
@@ -156,8 +173,7 @@ let conformanceTests =
               Expect.equal report.Violations.Length 1 "One violation"
 
               match report.Violations.[0].Reasons.[0] with
-              | ViolationReason.RoleNotInProjection role ->
-                  Expect.equal role "UnknownRole" "Unknown role flagged"
+              | ViolationReason.RoleNotInProjection role -> Expect.equal role "UnknownRole" "Unknown role flagged"
               | other -> failtest $"Expected RoleNotInProjection, got {other}"
           }
 
@@ -204,8 +220,7 @@ let sequenceConformanceTests =
                     makeRecord [ "PlayerO" ] "OTurn" "XTurn" "makeMove"
                     makeRecord [ "PlayerX" ] "XTurn" "XWins" "makeMove" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
               Expect.equal report.TotalRecords 3 "TotalRecords"
               Expect.equal report.ConformantCount 3 "ConformantCount"
@@ -217,13 +232,9 @@ let sequenceConformanceTests =
                   [ makeRecord [ "PlayerO" ] "OTurn" "XTurn" "makeMove"
                     makeRecord [ "PlayerX" ] "XTurn" "OTurn" "makeMove" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
-              Expect.isGreaterThanOrEqual
-                  report.Violations.Length
-                  1
-                  "At least one violation for non-initial start"
+              Expect.isGreaterThanOrEqual report.Violations.Length 1 "At least one violation for non-initial start"
 
               let firstViolation = report.Violations.[0]
 
@@ -240,8 +251,7 @@ let sequenceConformanceTests =
                   firstViolation.Reasons
                   |> List.pick (fun r ->
                       match r with
-                      | ViolationReason.StateSequenceViolation(expected, actual) ->
-                          Some(expected, actual)
+                      | ViolationReason.StateSequenceViolation(expected, actual) -> Some(expected, actual)
                       | _ -> None)
 
               Expect.equal (fst seqViolation) "XTurn" "Expected initial state"
@@ -254,13 +264,9 @@ let sequenceConformanceTests =
                     // Gap: previous target was OTurn, but this starts at XWins
                     makeRecord [ "Spectator" ] "XWins" "XWins" "getGame" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
-              Expect.isGreaterThanOrEqual
-                  report.Violations.Length
-                  1
-                  "At least one violation for gap"
+              Expect.isGreaterThanOrEqual report.Violations.Length 1 "At least one violation for gap"
 
               let gapViolation =
                   report.Violations
@@ -275,61 +281,55 @@ let sequenceConformanceTests =
                   gapViolation.Reasons
                   |> List.pick (fun r ->
                       match r with
-                      | ViolationReason.StateSequenceViolation(expected, actual) ->
-                          Some(expected, actual)
+                      | ViolationReason.StateSequenceViolation(expected, actual) -> Some(expected, actual)
                       | _ -> None)
 
               Expect.equal (fst seqReason) "OTurn" "Expected previous target"
               Expect.equal (snd seqReason) "XWins" "Actual source state"
           }
 
-          test "valid transitions in wrong sequence order produces violation" {
-              // Both transitions are individually valid, but B->C happens before A->B
+          test "mid-sequence gap produces violation on second record" {
+              // First transition is valid from initial state, but second has wrong source
               let records =
-                  [ makeRecord [ "PlayerO" ] "OTurn" "XTurn" "makeMove"
-                    makeRecord [ "PlayerX" ] "XTurn" "OTurn" "makeMove" ]
+                  [ makeRecord [ "PlayerX" ] "XTurn" "OTurn" "makeMove"
+                    // Gap: expected OTurn (previous target), actual XTurn
+                    makeRecord [ "PlayerX" ] "XTurn" "XWins" "makeMove"
+                    makeRecord [ "PlayerO" ] "OTurn" "XTurn" "makeMove" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
-              // First record: source=OTurn, expected=XTurn -> StateSequenceViolation
-              Expect.isGreaterThanOrEqual
-                  report.Violations.Length
-                  1
-                  "At least one violation for wrong order"
+              // Records 2 and 3 should have sequence violations
+              Expect.equal report.Violations.Length 2 "Two violations for mid-sequence gaps"
 
-              let hasSequenceViolation =
-                  report.Violations
-                  |> List.exists (fun v ->
-                      v.Reasons
-                      |> List.exists (fun r ->
-                          match r with
-                          | ViolationReason.StateSequenceViolation _ -> true
-                          | _ -> false))
+              let secondRecordViolation = report.Violations.[0]
 
-              Expect.isTrue hasSequenceViolation "Should have StateSequenceViolation"
+              let seqReason =
+                  secondRecordViolation.Reasons
+                  |> List.pick (fun r ->
+                      match r with
+                      | ViolationReason.StateSequenceViolation(expected, actual) -> Some(expected, actual)
+                      | _ -> None)
+
+              Expect.equal (fst seqReason) "OTurn" "Expected previous target"
+              Expect.equal (snd seqReason) "XTurn" "Actual source state"
           }
 
           test "empty records produces clean empty report" {
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections []
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections []
 
               Expect.equal report.TotalRecords 0 "TotalRecords"
               Expect.isEmpty report.Violations "No violations"
           }
 
           test "sequence violations combine with role violations" {
-              // First record has wrong initial state AND invalid role
-              let records =
-                  [ makeRecord [ "PlayerO" ] "OTurn" "XTurn" "makeMove" ]
+              // Wrong initial state AND unknown role — should produce both violation types
+              let records = [ makeRecord [ "Admin" ] "OTurn" "XTurn" "makeMove" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
               Expect.equal report.Violations.Length 1 "One violation record"
               let v = report.Violations.[0]
 
-              // Should have both StateSequenceViolation and TransitionNotInProjection
               let hasSequence =
                   v.Reasons
                   |> List.exists (fun r ->
@@ -337,15 +337,21 @@ let sequenceConformanceTests =
                       | ViolationReason.StateSequenceViolation _ -> true
                       | _ -> false)
 
-              Expect.isTrue hasSequence "Should have sequence violation"
+              let hasRoleViolation =
+                  v.Reasons
+                  |> List.exists (fun r ->
+                      match r with
+                      | ViolationReason.RoleNotInProjection _ -> true
+                      | _ -> false)
+
+              Expect.isTrue hasSequence "Should have StateSequenceViolation"
+              Expect.isTrue hasRoleViolation "Should have RoleNotInProjection"
           }
 
           test "single-record valid sequence from initial state" {
-              let records =
-                  [ makeRecord [ "PlayerX" ] "XTurn" "OTurn" "makeMove" ]
+              let records = [ makeRecord [ "PlayerX" ] "XTurn" "OTurn" "makeMove" ]
 
-              let report =
-                  ConformanceChecker.checkSequenceConformance "XTurn" projections records
+              let report = ConformanceChecker.checkSequenceConformance "XTurn" projections records
 
               Expect.equal report.ConformantCount 1 "Conformant"
               Expect.isEmpty report.Violations "No violations"

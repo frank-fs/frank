@@ -41,19 +41,21 @@ module ConformanceChecker =
             else
                 None
 
+    /// Build per-role transition sets from projected statecharts.
+    let private buildTransitionSets (projections: Map<string, ExtractedStatechart>) =
+        projections
+        |> Map.map (fun _ proj ->
+            proj.Transitions
+            |> List.map (fun t -> (t.Source, t.Event, t.Target))
+            |> Set.ofList)
+
     /// Verify provenance records against per-role projected profiles.
     /// A transition is conformant if at least one acting role's projection includes it.
     let checkConformance
         (projections: Map<string, ExtractedStatechart>)
         (records: ProvenanceRecord list)
         : ConformanceReport =
-        let transitionSets =
-            projections
-            |> Map.map (fun _ proj ->
-                proj.Transitions
-                |> List.map (fun t -> (t.Source, t.Event, t.Target))
-                |> Set.ofList)
-
+        let transitionSets = buildTransitionSets projections
         let violations = records |> List.choose (checkRecord transitionSets)
 
         { TotalRecords = List.length records
@@ -69,14 +71,9 @@ module ConformanceChecker =
         (projections: Map<string, ExtractedStatechart>)
         (records: ProvenanceRecord list)
         : ConformanceReport =
-        let transitionSets =
-            projections
-            |> Map.map (fun _ proj ->
-                proj.Transitions
-                |> List.map (fun t -> (t.Source, t.Event, t.Target))
-                |> Set.ofList)
+        let transitionSets = buildTransitionSets projections
 
-        let folder (expectedState: string, violations: ConformanceViolation list) (record: ProvenanceRecord) =
+        let folder (expectedState: string, revViolations: ConformanceViolation list) (record: ProvenanceRecord) =
             let actualSource = record.Activity.PreviousState
 
             let sequenceReason =
@@ -95,15 +92,15 @@ module ConformanceChecker =
             let nextExpected = record.Activity.NewState
 
             if List.isEmpty combinedReasons then
-                (nextExpected, violations)
+                (nextExpected, revViolations)
             else
                 let violation =
                     { Record = record
                       Reasons = combinedReasons }
 
-                (nextExpected, violations @ [ violation ])
+                (nextExpected, violation :: revViolations)
 
-        let _, violations = records |> List.fold folder (initialStateKey, [])
+        let _, revViolations = records |> List.fold folder (initialStateKey, [])
 
         { TotalRecords = List.length records
-          Violations = violations }
+          Violations = List.rev revViolations }
