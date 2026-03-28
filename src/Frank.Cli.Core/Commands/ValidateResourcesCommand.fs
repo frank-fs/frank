@@ -28,9 +28,25 @@ let private buildResult
             r.Statechart
             |> Option.bind (fun sc -> if sc.Roles.IsEmpty then None else Some(r.RouteTemplate, sc)))
 
+    let withRolesOrGuards =
+        resources
+        |> List.choose (fun r ->
+            r.Statechart
+            |> Option.bind (fun sc ->
+                let hasRoles = not sc.Roles.IsEmpty
+
+                let hasGuards =
+                    not sc.GuardNames.IsEmpty
+                    || sc.Transitions |> List.exists (fun t -> t.Guard.IsSome)
+
+                if hasRoles || hasGuards then
+                    Some(r.RouteTemplate, sc)
+                else
+                    None))
+
     let results =
         if checkProjection then
-            withRoles |> List.map (fun (route, sc) -> validateProjection route sc)
+            withRolesOrGuards |> List.map (fun (route, sc) -> validateProjection route sc)
         else
             []
 
