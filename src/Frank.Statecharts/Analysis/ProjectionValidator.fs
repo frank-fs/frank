@@ -156,8 +156,11 @@ let checkGuardConsistency (statechart: ExtractedStatechart) : ProjectionIssue li
 /// Orphaned shape refs (def URI with no shape) and unreferenced shapes (shape with no def) are warnings.
 /// Uses string comparison on absolute URIs since System.Uri does not implement IComparable.
 let checkShapeReference (alpsDefUris: Uri list) (shapeCache: ShapeCache) : ProjectionIssue list =
-    let defUriStrings = alpsDefUris |> List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList
-    let shapeUriStrings = shapeCache.Keys |> Seq.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofSeq
+    let defUriStrings =
+        alpsDefUris |> List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList
+
+    let shapeUriStrings =
+        shapeCache.Keys |> Seq.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofSeq
 
     let defUriByString =
         alpsDefUris |> List.map (fun u -> u.AbsoluteUri, u) |> Map.ofList
