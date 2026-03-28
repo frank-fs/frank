@@ -17,6 +17,7 @@ type ProjectionCheckKind =
     | Livelock
     | GuardConsistency
     | ShapeReference
+    | ClosedWorldTotality
 
 module ProjectionCheckKind =
     let toString =
@@ -28,6 +29,7 @@ module ProjectionCheckKind =
         | Livelock -> "livelock"
         | GuardConsistency -> "guard-consistency"
         | ShapeReference -> "shape-reference"
+        | ClosedWorldTotality -> "closed-world-totality"
 
 type ProjectionIssue =
     { Check: ProjectionCheckKind
@@ -229,6 +231,27 @@ let private hasGuards (statechart: ExtractedStatechart) =
     not statechart.GuardNames.IsEmpty
     || statechart.Transitions |> List.exists (fun t -> t.Guard.IsSome)
 
+/// Closed-world totality: every transition must be explicitly assigned to at least one role.
+/// Unrestricted transitions are errors (must use RestrictedTo with non-empty role list).
+/// RestrictedTo [] (dead transitions) are also errors.
+let checkClosedWorldTotality (statechart: ExtractedStatechart) : ProjectionIssue list =
+    statechart.Transitions
+    |> List.choose (fun t ->
+        match t.Constraint with
+        | Unrestricted ->
+            Some
+                { Check = ClosedWorldTotality
+                  Severity = Severity.Error
+                  Message =
+                    $"Transition '%s{t.Event}' (%s{t.Source} -> %s{t.Target}) has no explicit role assignment (Unrestricted)" }
+        | RestrictedTo [] ->
+            Some
+                { Check = ClosedWorldTotality
+                  Severity = Severity.Error
+                  Message =
+                    $"Transition '%s{t.Event}' (%s{t.Source} -> %s{t.Target}) has empty role assignment (RestrictedTo [])" }
+        | RestrictedTo _ -> None)
+
 /// Run projection checks. Returns 0 checks if statechart has no roles and no guards.
 /// GuardConsistency runs on all statecharts with guards; the 5 role-based checks require roles.
 let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart) : ProjectionCheckResult =
@@ -252,6 +275,37 @@ let validateProjection (resourceRoute: string) (statechart: ExtractedStatechart)
               yield! checkCompleteness projections pruned
               yield! checkDeadlock projections pruned
               yield! checkLivelock projections pruned
+              yield! guardIssues ]
+
+        { Issues = issues
+          ChecksRun = 5 + guardChecks
+          ResourceRoute = resourceRoute }
+
+/// Run projection checks in strict (closed-world) mode.
+/// Includes all checks from validateProjection plus ClosedWorldTotality.
+/// In strict mode, Unrestricted transitions and RestrictedTo [] are errors.
+/// Returns 0 checks if statechart has no roles and no guards.
+let validateProjectionStrict (resourceRoute: string) (statechart: ExtractedStatechart) : ProjectionCheckResult =
+    let guardIssues, guardChecks =
+        if hasGuards statechart then
+            checkGuardConsistency statechart, 1
+        else
+            [], 0
+
+    if statechart.Roles.IsEmpty then
+        { Issues = guardIssues
+          ChecksRun = guardChecks
+          ResourceRoute = resourceRoute }
+    else
+        let projections = Projection.projectAll statechart
+        let pruned = Projection.pruneUnreachableStates statechart
+
+        let issues =
+            [ yield! checkConnectedness statechart
+              yield! checkMixedChoice statechart
+              yield! checkCompleteness projections pruned
+              yield! checkDeadlock projections pruned
+              yield! checkClosedWorldTotality statechart
               yield! guardIssues ]
 
         { Issues = issues

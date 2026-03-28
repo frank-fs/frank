@@ -10,6 +10,7 @@
     <Compile Include="ResourceSlugTests.fs" />
     <Compile Include="AffordanceMapTests.fs" />
     <Compile Include="ProjectionTests.fs" />
+    <Compile Include="ClosedWorldProjectionTests.fs" />
     <Compile Include="ProgressAnalysisTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

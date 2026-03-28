@@ -2,7 +2,26 @@ namespace Frank.Resources.Model
 
 /// Per-role projection of statecharts.
 /// All functions are pure, total (no Result/Option), and format-agnostic.
+/// Closed-world strict mode returns Result with explicit error types.
 module Projection =
+
+    /// Error types for closed-world (strict) projection.
+    /// In closed-world mode, every transition must be explicitly assigned to roles.
+    type ProjectionError =
+        /// Transition uses Unrestricted constraint — no explicit role assignment.
+        | UnmappedTransition of TransitionSpec
+        /// Transition uses RestrictedTo [] — no role can trigger it.
+        | DeadTransition of TransitionSpec
+
+    module ProjectionError =
+
+        /// Human-readable description of a projection error.
+        let describe (error: ProjectionError) : string =
+            match error with
+            | UnmappedTransition t ->
+                $"Unmapped transition '%s{t.Event}' (%s{t.Source} -> %s{t.Target}): no explicit role assignment (Unrestricted)"
+            | DeadTransition t ->
+                $"Dead transition '%s{t.Event}' (%s{t.Source} -> %s{t.Target}): RestrictedTo [] means no role can trigger it"
 
     /// Filter transitions to those available to the given role.
     /// Unrestricted transitions survive in all projections.
@@ -74,6 +93,32 @@ module Projection =
         statechart.Roles
         |> List.map (fun role -> role.Name, filterTransitionsByRole role.Name pruned)
         |> Map.ofList
+
+    /// Closed-world (strict) projection: every transition must be explicitly
+    /// assigned to at least one role. Unrestricted transitions are errors
+    /// (they must use RestrictedTo with a non-empty role list).
+    /// RestrictedTo [] (dead transitions) are also errors.
+    /// Returns Ok with projections if all transitions are assigned,
+    /// or Error with a list of projection errors.
+    /// No-role statecharts return Ok with empty map (nothing to project).
+    let projectAllStrict
+        (statechart: ExtractedStatechart)
+        : Result<Map<string, ExtractedStatechart>, ProjectionError list> =
+        if statechart.Roles.IsEmpty then
+            Ok Map.empty
+        else
+            let errors =
+                statechart.Transitions
+                |> List.choose (fun t ->
+                    match t.Constraint with
+                    | Unrestricted -> Some(UnmappedTransition t)
+                    | RestrictedTo [] -> Some(DeadTransition t)
+                    | RestrictedTo _ -> None)
+
+            if errors.IsEmpty then
+                Ok(projectAll statechart)
+            else
+                Error errors
 
     /// Post-projection completeness check: every global transition must appear
     /// in at least one role's projection. Returns orphaned transitions.
