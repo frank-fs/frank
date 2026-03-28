@@ -10,10 +10,8 @@ type StatechartError =
     | AmbiguousFileExtension of filePath: string * candidates: FormatTag list
     | FileNotFound of path: string
     | FileReadError of path: string * reason: string
-    | ParseFailed of filePath: string * errors: string list
     | AmbiguousParseFailed of filePath: string * attempts: string list
     | GenerationFailed of format: FormatTag * resourceSlug: string * reason: string
-    | UnrecognizedMachineType of typeName: string
     | ResourceNotFound of name: string * available: string list
 
 let formatError (error: StatechartError) : string =
@@ -32,12 +30,10 @@ let formatError (error: StatechartError) : string =
             path
     | FileNotFound path -> sprintf "File not found: %s" path
     | FileReadError(path, reason) -> sprintf "Cannot read file '%s': %s" path reason
-    | ParseFailed(path, errors) -> sprintf "Parse errors in '%s': %s" path (errors |> String.concat "; ")
     | AmbiguousParseFailed(path, attempts) ->
         sprintf "Could not parse '%s' as any supported format. Attempts: %s" path (attempts |> String.concat "; ")
     | GenerationFailed(format, slug, reason) ->
         sprintf "Failed to generate %s for resource '%s': %s" (FormatTag.toString format) slug reason
-    | UnrecognizedMachineType typeName -> sprintf "Unrecognized machine type: %s" typeName
     | ResourceNotFound(name, available) ->
         sprintf "No resource matching '%s' found. Available: %s" name (available |> String.concat ", ")
 
@@ -50,10 +46,8 @@ let formatErrorJson (error: StatechartError) : string =
         | AmbiguousFileExtension _ -> "ambiguous_extension"
         | FileNotFound _ -> "file_not_found"
         | FileReadError _ -> "file_read_error"
-        | ParseFailed _ -> "parse_failed"
         | AmbiguousParseFailed _ -> "ambiguous_parse_failed"
         | GenerationFailed _ -> "generation_failed"
-        | UnrecognizedMachineType _ -> "unrecognized_machine_type"
         | ResourceNotFound _ -> "resource_not_found"
 
     use stream = new System.IO.MemoryStream()
