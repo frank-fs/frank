@@ -11,7 +11,8 @@
 /// Pipeline order (after routing):
 ///   1. State key resolver — reads state from store, sets IStatechartFeature on HttpContext.Features
 ///   2. Affordance middleware — reads IStatechartFeature, injects Link + Allow headers
-///   3. Statechart middleware — dispatches to state-specific handler
+///   3. Projected profile middleware — role-specific ALPS profile links
+///   4. Statechart middleware — dispatches to state-specific handler
 module Frank.TicTacToe.Sample.Program
 
 open System
@@ -25,7 +26,6 @@ open Frank.Builder
 open Frank.Datastar
 open Frank.Statecharts
 open Frank.Affordances
-open Frank.Resources.Model
 open Frank.TicTacToe.Sample.Domain
 open Frank.TicTacToe.Sample.SseHandlers
 
@@ -36,21 +36,23 @@ open Frank.TicTacToe.Sample.SseHandlers
 /// Must run AFTER routing (to have endpoint metadata) and BEFORE
 /// the affordance middleware (which reads the feature).
 let resolveStateKey (app: IApplicationBuilder) =
-    app.Use(Func<HttpContext, Func<Task>, Task>(fun ctx next ->
-        task {
-            let endpoint = ctx.GetEndpoint()
+    app.Use(
+        Func<HttpContext, Func<Task>, Task>(fun ctx next ->
+            task {
+                let endpoint = ctx.GetEndpoint()
 
-            if not (isNull endpoint) then
-                let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
+                if not (isNull endpoint) then
+                    let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
 
-                if not (obj.ReferenceEquals(metadata, null)) then
-                    let instanceId = metadata.ResolveInstanceId ctx
-                    let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-                    ()
+                    if not (obj.ReferenceEquals(metadata, null)) then
+                        let instanceId = metadata.ResolveInstanceId ctx
+                        let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
+                        ()
 
-            do! next.Invoke()
-        }
-        :> Task))
+                do! next.Invoke()
+            }
+            :> Task)
+    )
 
 // === Handlers ===
 
@@ -107,8 +109,7 @@ let sseResource =
     resource "/games/{gameId}/sse" {
         name "GameSSE"
 
-        datastar (fun (ctx: HttpContext) ->
-            task { do! streamGameBoard ctx })
+        datastar (fun (ctx: HttpContext) -> task { do! streamGameBoard ctx })
     }
 
 // === Seed initial game state ===
@@ -145,8 +146,10 @@ let main args =
         // 1. State key resolver (reads store, sets IStatechartFeature on HttpContext.Features)
         plug resolveStateKey
         // 2. Affordance middleware (reads IStatechartFeature, injects Link + Allow headers)
-        useAffordancesWith gameAffordanceMap
-        // 3. Statechart middleware (state-dependent handler dispatch)
+        useAffordances
+        // 3. Projected profile middleware (role-specific ALPS profile links)
+        useProjectedProfiles
+        // 4. Statechart middleware (state-dependent handler dispatch)
         useStatecharts
 
         // Seed game state after services are built
