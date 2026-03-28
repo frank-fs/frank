@@ -1,3 +1,32 @@
+### New in 7.3.1
+
+Patch release: state-aware OPTIONS, role-filtered Link rels, and ALPS profile completeness.
+
+**Discovery and Entry Points**
+
+- **Entry-point designation** for JSON Home — `entryPoint` CE operation on both `ResourceBuilder` and `StatefulResourceBuilder` filters the home document to designated resources only (fallback to all with logged warning)
+- **ALPS extension IDs** use HTTPS dereferenceable URIs (`https://frank-fs.github.io/alps-ext/{name}`) with backward-compatible parsing of bare names
+- **`protocolState` ext element** emitted in generated ALPS profiles alongside `availableInStates`
+
+**Validation and Conformance**
+
+- **Conformance sequence validation** — `checkSequenceConformance` verifies transition ordering from initial state, not just per-transition role checks
+- **Guard consistency check** — new `ProjectionCheckKind.GuardConsistency` compares ALPS guard annotations against SCXML guard definitions
+- **SHACL shape cross-reference** — new `ProjectionCheckKind.ShapeReference` validates ALPS `def` URIs against `ShapeCache` entries
+- **CLI filter fix** — `--check-projection` now includes guard-only statecharts (previously required roles)
+
+**TicTacToe Sample**
+
+- **Auto-load affordances** — replaced `useAffordancesWith` with `useAffordances` (loads from embedded `model.bin`)
+- **Projected profile serving** — added `useProjectedProfiles` for role-specific ALPS profile Link headers
+- **Entry-point designated** — games resource marked with `entryPoint`
+
+**Code Quality**
+
+- Removed 8 dead `StatechartError` DU cases from abandoned assembly extraction feature
+- Added orphaned `Wsd/LexerTests.fs` to fsproj (453 lines of tests that were never compiled)
+- Deleted 5 stale test file copies left from restructure
+
 ### New in 7.3.0
 
 Self-describing, protocol-aware applications — legible to both human developers and machine agents, with formal multi-party session guarantees enforced at the HTTP boundary.
