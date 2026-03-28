@@ -9,6 +9,9 @@ type ViolationReason =
     | RoleNotInProjection of role: string
     /// No acting roles were recorded — conformance cannot be verified.
     | NoActingRoles
+    /// The transition's source state does not match the expected state from the sequence.
+    /// First transition must start at initialStateKey; subsequent must start where the previous landed.
+    | StateSequenceViolation of expected: string * actual: string
 
 /// A single conformance violation tied to a specific provenance record.
 type ConformanceViolation =
