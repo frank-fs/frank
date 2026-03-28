@@ -92,6 +92,7 @@ let gameResource =
     statefulResource "/games/{gameId}" {
         machine gameMachine
         resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+        entryPoint
         role "PlayerX" (fun user -> user.HasClaim("player", "X"))
         role "PlayerO" (fun user -> user.HasClaim("player", "O"))
         role "Spectator" (fun _user -> true)
