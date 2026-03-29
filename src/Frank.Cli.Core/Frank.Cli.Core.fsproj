@@ -59,6 +59,7 @@
     <Compile Include="Commands/StatusCommand.fs" />
     <Compile Include="Commands/StatechartExtractCommand.fs" />
     <Compile Include="Commands/StatechartGenerateCommand.fs" />
+    <Compile Include="Commands/DualCommand.fs" />
     <Compile Include="Commands/StatechartValidateCommand.fs" />
     <Compile Include="Commands/OpenApiValidateCommand.fs" />
     <Compile Include="Commands/StatechartParseCommand.fs" />
@@ -81,6 +82,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="3.3.2" />
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Ontology" Version="3.5.1" />
     <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
