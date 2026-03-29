@@ -47,6 +47,7 @@
     <Compile Include="Alps/ExtensionClassificationTests.fs" />
     <Compile Include="Alps/SubDuTests.fs" />
     <Compile Include="Alps/XmlGeneratorTests.fs" />
+    <Compile Include="Alps/DefGenerationTests.fs" />
     <!-- Validation tests -->
     <Compile Include="Validation/StringDistanceTests.fs" />
     <Compile Include="Validation/TypeTests.fs" />
@@ -64,6 +65,7 @@
     <Compile Include="Affordances/AffordanceTestHelpers.fs" />
     <Compile Include="Affordances/AffordanceMiddlewareTests.fs" />
     <Compile Include="Affordances/ProfileMiddlewareTests.fs" />
+    <Compile Include="Affordances/ShapeContentNegotiationTests.fs" />
     <Compile Include="Affordances/EmbeddingTests.fs" />
     <Compile Include="Affordances/AutoLoadTests.fs" />
     <Compile Include="Affordances/ProjectedProfileMiddlewareTests.fs" />

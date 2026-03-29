@@ -18,6 +18,7 @@
     <Compile Include="CapabilityTests.fs" />
     <Compile Include="ShapeMergerTests.fs" />
     <Compile Include="IntegrationTests.fs" />
+    <Compile Include="UriConventionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

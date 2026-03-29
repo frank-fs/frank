@@ -72,10 +72,12 @@ let private buildTransitionDescriptor (t: TransitionEdge) : XElement =
     el
 
 /// Build a data descriptor as a top-level semantic descriptor element.
-let private buildDataDescriptor (id: string) (doc: (string option * string) option) : XElement =
+/// When defUri is Some, emits a `def` attribute pointing to the shape document.
+let private buildDataDescriptor (id: string) (doc: (string option * string) option) (defUri: string option) : XElement =
     let el = XElement(XName.Get "descriptor")
     el.SetAttributeValue(XName.Get "id", id)
     el.SetAttributeValue(XName.Get "type", "semantic")
+    defUri |> Option.iter (fun uri -> el.SetAttributeValue(XName.Get "def", uri))
 
     doc |> Option.iter (fun (fmt, value) -> el.Add(buildDocElement fmt value))
 
@@ -85,7 +87,7 @@ let private buildDataDescriptor (id: string) (doc: (string option * string) opti
 // Document builder
 // ---------------------------------------------------------------------------
 
-let private buildXDocument (doc: StatechartDocument) : XDocument =
+let private buildXDocumentCore (options: AlpsGeneratorOptions) (doc: StatechartDocument) : XDocument =
     let states = extractStateNodes doc
     let transitions = extractTransitionEdges doc
 
@@ -113,7 +115,8 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
 
     // 1. Data descriptors
     for (id, docOpt) in dataDescriptors do
-        root.Add(buildDataDescriptor id docOpt)
+        let defUri = buildDefUri options id
+        root.Add(buildDataDescriptor id docOpt defUri)
 
     // 2. State descriptors
     for state in states do
@@ -123,6 +126,11 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
         |> Option.iter (fun id -> stateEl.SetAttributeValue(XName.Get "id", id))
 
         stateEl.SetAttributeValue(XName.Get "type", "semantic")
+
+        // #174: Emit def URI on state descriptors when options provide baseUri
+        state.Identifier
+        |> Option.bind (buildDefUri options)
+        |> Option.iter (fun defUri -> stateEl.SetAttributeValue(XName.Get "def", defUri))
 
         // State-level documentation
         tryGetDocAnnotation state.Annotations
@@ -177,7 +185,16 @@ let private buildXDocument (doc: StatechartDocument) : XDocument =
 
 /// Generate an ALPS XML string from a StatechartDocument.
 let generateAlpsXml (doc: StatechartDocument) : string =
-    let xdoc = buildXDocument doc
+    let xdoc = buildXDocumentCore AlpsGeneratorOptions.None doc
+    use sw = new System.IO.StringWriter()
+    xdoc.Save(sw)
+    sw.ToString()
+
+/// Generate an ALPS XML string with def URI support.
+/// When options.DefBaseUri and options.ResourceSlug are set,
+/// state and data descriptors emit def="{baseUri}/shapes/{slug}#{id}".
+let generateAlpsXmlWithOptions (options: AlpsGeneratorOptions) (doc: StatechartDocument) : string =
+    let xdoc = buildXDocumentCore options doc
     use sw = new System.IO.StringWriter()
     xdoc.Save(sw)
     sw.ToString()

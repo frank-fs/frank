@@ -1,6 +1,38 @@
 module internal Frank.Statecharts.Alps.GeneratorCommon
 
 open Frank.Statecharts.Ast
+open Frank.Validation
+
+// ---------------------------------------------------------------------------
+// Generator options (#174: dereferenceable shape URIs)
+// ---------------------------------------------------------------------------
+
+/// Options for ALPS generation that control `def` URI emission.
+type AlpsGeneratorOptions =
+    {
+        /// Base URI for shape documents (e.g., "http://example.com/api").
+        /// When set, descriptors emit `def` pointing to {DefBaseUri}/shapes/{ResourceSlug}#{descriptorId}.
+        DefBaseUri: string option
+        /// Resource slug for the shape path (e.g., "games").
+        ResourceSlug: string option
+    }
+
+    static member None =
+        { DefBaseUri = None
+          ResourceSlug = None }
+
+/// Build a def URI from generator options and a descriptor id.
+/// Returns None if DefBaseUri or ResourceSlug is absent.
+/// Delegates to UriConventions.resolveShapeUri to avoid duplicated URI construction logic.
+let buildDefUri (options: AlpsGeneratorOptions) (descriptorId: string) : string option =
+    match options.DefBaseUri, options.ResourceSlug with
+    | Some baseUri, Some slug when
+        not (System.String.IsNullOrWhiteSpace(baseUri))
+        && not (System.String.IsNullOrWhiteSpace(slug))
+        ->
+        let uri = UriConventions.resolveShapeUri (Some baseUri) slug descriptorId
+        Some(uri.ToString())
+    | _ -> None
 
 // ---------------------------------------------------------------------------
 // Shared helpers for JSON and XML ALPS generators (Principle VIII)
