@@ -80,6 +80,8 @@
     <Compile Include="HierarchyTests.fs" />
     <!-- Dual derivation tests (issue #125) -->
     <Compile Include="DualTests.fs" />
+    <!-- Dual profile content negotiation tests (issue #126 WP1) -->
+    <Compile Include="Affordances/DualProfileMiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

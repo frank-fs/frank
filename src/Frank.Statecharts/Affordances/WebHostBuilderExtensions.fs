@@ -183,6 +183,80 @@ module WebHostBuilderExtensions =
                         app.UseMiddleware<ProjectedProfileMiddleware>() |> ignore
                         app }
 
+        /// Register the dual profile middleware with an explicit DualProfileLookup.
+        /// Swaps the ALPS profile Link header for a dual-annotated variant when
+        /// the client sends `Prefer: return=dual` with an authenticated request.
+        /// Runs after ProjectedProfileMiddleware.
+        [<CustomOperation("useDualProfilesWith")>]
+        member _.UseDualProfilesWith(spec: WebHostSpec, dualLookup: DualProfileLookup) : WebHostSpec =
+            if dualLookup.Count = 0 then
+                spec
+            else
+                { spec with
+                    Services =
+                        spec.Services
+                        >> fun services ->
+                            services.AddSingleton<DualProfileLookup>(dualLookup) |> ignore
+                            services
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            app.UseMiddleware<DualProfileMiddleware>() |> ignore
+                            app }
+
+        /// Auto-load dual profile data from the entry assembly's embedded model.bin.
+        /// Derives client duals at startup from the ExtractedStatechart data.
+        /// Falls back to empty lookup when the entry assembly is null or model.bin is not found.
+        /// For multi-project solutions, use useDualProfilesWith.
+        [<CustomOperation("useDualProfiles")>]
+        member _.UseDualProfiles(spec: WebHostSpec) : WebHostSpec =
+            { spec with
+                Services =
+                    spec.Services
+                    >> fun services ->
+                        services.TryAddSingleton<DualProfileLookup>(
+                            Func<IServiceProvider, DualProfileLookup>(fun sp ->
+                                let loggerFactory = sp.GetRequiredService<ILoggerFactory>()
+                                let logger = loggerFactory.CreateLogger<DualProfileMiddleware>()
+
+                                match Assembly.GetEntryAssembly() with
+                                | null ->
+                                    logger.LogWarning(
+                                        "Assembly.GetEntryAssembly() returned null; cannot auto-load dual profiles. Use useDualProfilesWith to supply an explicit lookup."
+                                    )
+
+                                    DualProfileLookup(System.StringComparer.Ordinal)
+                                | assembly ->
+                                    match StartupProjection.loadUnifiedStateFromAssembly logger assembly with
+                                    | Some state ->
+                                        let dualLookup =
+                                            DualProfileOverlay.buildFromRuntimeState state.Resources state.BaseUri
+
+                                        if dualLookup.Count > 0 then
+                                            logger.LogInformation(
+                                                "Dual profiles loaded from assembly '{AssemblyName}' ({RouteCount} routes with dual projections).",
+                                                assembly.GetName().Name,
+                                                dualLookup.Count
+                                            )
+
+                                        dualLookup
+                                    | None ->
+                                        logger.LogInformation(
+                                            "model.bin not found or unreadable in assembly '{AssemblyName}'; dual profiles not loaded.",
+                                            assembly.GetName().Name
+                                        )
+
+                                        DualProfileLookup(System.StringComparer.Ordinal))
+                        )
+                        |> ignore
+
+                        services
+                Middleware =
+                    spec.Middleware
+                    >> fun app ->
+                        app.UseMiddleware<DualProfileMiddleware>() |> ignore
+                        app }
+
         /// Registers the OPTIONS discovery middleware. Endpoints respond to
         /// OPTIONS with an Allow header listing registered HTTP methods and
         /// aggregated DiscoveryMediaType information.
