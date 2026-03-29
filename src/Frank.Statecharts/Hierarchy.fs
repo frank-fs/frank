@@ -40,6 +40,10 @@ type StateHierarchy =
         InitialChild: Map<string, string>
         /// composite state -> XOR or AND
         StateKind: Map<string, CompositeKind>
+        /// Pre-computed LCA for all (source, target) pairs in the statechart
+        LcaCache: Map<string * string, string>
+        /// Pre-computed depth (distance from root) for every state
+        DepthMap: Map<string, int>
     }
 
 /// The set of currently active state IDs in a hierarchical statechart.
@@ -109,6 +113,7 @@ module HistoryRecord =
 module StateHierarchy =
 
     /// Build a StateHierarchy from a HierarchySpec.
+    /// Pre-computes LCA cache for all (source, target) state pairs and depth map.
     let build (spec: HierarchySpec) : StateHierarchy =
         let parentMap =
             spec.States
@@ -128,43 +133,99 @@ module StateHierarchy =
 
         let stateKind = spec.States |> List.map (fun s -> (s.Id, s.Kind)) |> Map.ofList
 
+        // Collect all known state IDs (composite parents + their children)
+        let allStateIds =
+            spec.States |> List.collect (fun s -> s.Id :: s.Children) |> List.distinct
+
+        // Pre-compute depth for every state
+        let computeDepthFromParentMap stateId =
+            let rec loop current d =
+                match Map.tryFind current parentMap with
+                | Some parent -> loop parent (d + 1)
+                | None -> d
+
+            loop stateId 0
+
+        let depthMap =
+            allStateIds
+            |> List.map (fun s -> (s, computeDepthFromParentMap s))
+            |> Map.ofList
+
+        // Pre-compute ancestry (root-to-leaf) for LCA computation
+        let ancestryFromParentMap stateId =
+            let rec loop current acc =
+                let acc = current :: acc
+
+                match Map.tryFind current parentMap with
+                | Some parent -> loop parent acc
+                | None -> acc
+
+            loop stateId []
+
+        // Pre-compute LCA for all (source, target) pairs
+        let lcaCache =
+            allStateIds
+            |> List.collect (fun a ->
+                allStateIds
+                |> List.choose (fun b ->
+                    let ancestryA = ancestryFromParentMap a
+                    let ancestryBSet = ancestryFromParentMap b |> Set.ofList
+
+                    let rec findLCA candidates lastCommon =
+                        match candidates with
+                        | [] -> lastCommon
+                        | x :: rest ->
+                            if Set.contains x ancestryBSet then
+                                findLCA rest (Some x)
+                            else
+                                lastCommon
+
+                    match findLCA ancestryA None with
+                    | Some lca -> Some((a, b), lca)
+                    | None -> None))
+            |> Map.ofList
+
         { ParentMap = parentMap
           ChildrenMap = childrenMap
           InitialChild = initialChild
-          StateKind = stateKind }
+          StateKind = stateKind
+          LcaCache = lcaCache
+          DepthMap = depthMap }
 
     /// Compute the ancestry path from a state up to the root (inclusive).
-    /// Returns the state itself first, then its parent, then grandparent, etc.
-    /// Example: ancestry("Red") = ["Red"; "Active"; "Root"]
+    /// Returns root-to-leaf order: root first, then its child, down to the state itself.
+    /// Example: ancestry("Red") = ["Root"; "Active"; "Red"]
     let private ancestry (hierarchy: StateHierarchy) (stateId: string) : string list =
         let rec loop current acc =
             let acc = current :: acc
 
             match Map.tryFind current hierarchy.ParentMap with
             | Some parent -> loop parent acc
-            | None -> List.rev acc
+            | None -> acc
 
         loop stateId []
 
     /// Compute the Least Common Ancestor of two states.
+    /// Uses the pre-computed LCA cache when available, falls back to ancestry traversal.
     /// Returns None if the states share no common ancestor (disconnected hierarchies).
     let computeLCA (hierarchy: StateHierarchy) (stateA: string) (stateB: string) : string option =
-        let ancestryA = ancestry hierarchy stateA
-        let ancestryB = ancestry hierarchy stateB |> Set.ofList
+        match Map.tryFind (stateA, stateB) hierarchy.LcaCache with
+        | Some lca -> Some lca
+        | None ->
+            // Fallback for states not in the pre-computed cache
+            let ancestryA = ancestry hierarchy stateA
+            let ancestryB = ancestry hierarchy stateB |> Set.ofList
 
-        // Walk ancestry of A from root toward leaf; last one in both sets is LCA
-        let ancestryAFromRoot = List.rev ancestryA
+            let rec findLCA candidates lastCommon =
+                match candidates with
+                | [] -> lastCommon
+                | x :: rest ->
+                    if Set.contains x ancestryB then
+                        findLCA rest (Some x)
+                    else
+                        lastCommon
 
-        let rec findLCA candidates lastCommon =
-            match candidates with
-            | [] -> lastCommon
-            | x :: rest ->
-                if Set.contains x ancestryB then
-                    findLCA rest (Some x)
-                else
-                    lastCommon
-
-        findLCA ancestryAFromRoot None
+            findLCA ancestryA None
 
 // ==========================================================================
 // HierarchicalRuntime module
@@ -275,32 +336,31 @@ module HierarchicalRuntime =
         // Compute entry path (LCA down to target, not including LCA)
         let entryStates = entryPath hierarchy target lca
 
-        // Record history for exited composite states
-        let mutable history = HistoryRecord.empty
+        // Exit phase: record history for exited composite states, then remove from config
+        let history =
+            exitStates
+            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) HistoryRecord.empty
 
-        for exitState in exitStates do
-            history <- exitCompositeState hierarchy exitState config history
+        let configAfterExit =
+            exitStates
+            |> List.fold (fun c exitState -> ActiveStateConfiguration.remove exitState c) config
 
-        // Exit states: remove from configuration
-        let mutable currentConfig = config
+        // Entry phase: add states to configuration, recursively entering composites.
+        // Accumulate entered states in reverse to avoid O(n^2) list concatenation.
+        let configAfterEntry, enteredStatesRev =
+            entryStates
+            |> List.fold
+                (fun (currentConfig, accRev) entryState ->
+                    let before = ActiveStateConfiguration.toSet currentConfig
+                    let nextConfig = enterState hierarchy entryState currentConfig
+                    let after = ActiveStateConfiguration.toSet nextConfig
+                    let newlyEntered = Set.difference after before |> Set.toList
+                    (nextConfig, List.rev newlyEntered @ accRev))
+                (configAfterExit, [])
 
-        for exitState in exitStates do
-            currentConfig <- ActiveStateConfiguration.remove exitState currentConfig
-
-        // Enter states: add to configuration, recursively entering composites
-        let mutable enteredStates = []
-
-        for entryState in entryStates do
-            // If this is a composite state, enterState handles the recursion
-            let before = ActiveStateConfiguration.toSet currentConfig
-            currentConfig <- enterState hierarchy entryState currentConfig
-            let after = ActiveStateConfiguration.toSet currentConfig
-            let newlyEntered = Set.difference after before |> Set.toList
-            enteredStates <- enteredStates @ newlyEntered
-
-        { Configuration = currentConfig
+        { Configuration = configAfterEntry
           ExitedStates = exitStates
-          EnteredStates = enteredStates
+          EnteredStates = List.rev enteredStatesRev
           HistoryRecord = history }
 
     /// Enter a composite state using history (shallow or deep).
@@ -361,6 +421,15 @@ module HierarchicalRuntime =
             | None -> [])
         |> Set.ofList
 
+    /// Collect all ancestor state IDs from a given state up to the root (exclusive of stateId itself).
+    let private ancestorStates (hierarchy: StateHierarchy) (stateId: string) : string list =
+        let rec loop current acc =
+            match Map.tryFind current hierarchy.ParentMap with
+            | Some parent -> loop parent (parent :: acc)
+            | None -> acc
+
+        loop stateId []
+
     /// Resolve handlers for the current active configuration.
     /// Child handlers override parent handlers for the same HTTP method.
     let resolveHandlers<'T>
@@ -370,47 +439,48 @@ module HierarchicalRuntime =
         : (string * 'T) list =
         let activeStates = ActiveStateConfiguration.toSet config
 
-        // Collect all active states ordered by depth (deepest first for override precedence)
+        // Collect all active states ordered by depth (deepest first for override precedence),
+        // using the pre-computed DepthMap
         let statesByDepth =
             activeStates
             |> Set.toList
             |> List.map (fun stateId ->
-                let rec depth id d =
-                    match Map.tryFind id hierarchy.ParentMap with
-                    | Some parent -> depth parent (d + 1)
-                    | None -> d
-
-                (stateId, depth stateId 0))
+                let d = Map.tryFind stateId hierarchy.DepthMap |> Option.defaultValue 0
+                (stateId, d))
             |> List.sortByDescending snd
             |> List.map fst
 
-        // Build handler map: deepest state wins for each method
-        let mutable methodMap = Map.empty<string, 'T>
+        // Collect all states to consider: active states + their ancestors (for fallback)
+        let allStatesWithDepth =
+            statesByDepth
+            |> List.collect (fun stateId ->
+                let ancestors = ancestorStates hierarchy stateId
 
-        for stateId in statesByDepth do
-            match Map.tryFind stateId stateHandlerMap with
-            | Some handlers ->
-                for (method, handler) in handlers do
-                    if not (Map.containsKey method methodMap) then
-                        methodMap <- Map.add method handler methodMap
-            | None -> ()
+                let ancestorsWithDepth =
+                    ancestors
+                    |> List.map (fun a -> (a, Map.tryFind a hierarchy.DepthMap |> Option.defaultValue 0))
 
-        // Also collect from parents not in active set but in ancestry
-        // Walk back up from deepest active states to find parent handlers
-        for stateId in statesByDepth do
-            let rec walkParents current =
-                match Map.tryFind current hierarchy.ParentMap with
-                | Some parent ->
-                    match Map.tryFind parent stateHandlerMap with
+                let d = Map.tryFind stateId hierarchy.DepthMap |> Option.defaultValue 0
+                (stateId, d) :: ancestorsWithDepth)
+            |> List.sortByDescending snd
+            |> List.distinctBy fst
+
+        // Build handler map via fold: deepest state wins for each method
+        let methodMap =
+            allStatesWithDepth
+            |> List.fold
+                (fun (acc: Map<string, 'T>) (stateId, _depth) ->
+                    match Map.tryFind stateId stateHandlerMap with
                     | Some handlers ->
-                        for (method, handler) in handlers do
-                            if not (Map.containsKey method methodMap) then
-                                methodMap <- Map.add method handler methodMap
-                    | None -> ()
-
-                    walkParents parent
-                | None -> ()
-
-            walkParents stateId
+                        handlers
+                        |> List.fold
+                            (fun m (method, handler) ->
+                                if Map.containsKey method m then
+                                    m
+                                else
+                                    Map.add method handler m)
+                            acc
+                    | None -> acc)
+                Map.empty
 
         methodMap |> Map.toList
