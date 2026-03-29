@@ -83,11 +83,12 @@ type TransitionResult<'State, 'Context> =
     | Blocked of reason: BlockReason
     | Invalid of message: string
 
-/// Algebraic operations for TransitionResult (bifunctor map, Kleisli-style bind over state*context product).
+/// Algebraic operations for TransitionResult (bifunctor map, applicative apply, Kleisli-style bind).
+/// Primary abstraction is applicative (pure' + apply); bind is secondary.
 [<RequireQualifiedAccess>]
 module TransitionResult =
 
-    /// Lift a state and context into a successful TransitionResult.
+    /// Lift a state and context into a successful TransitionResult (applicative pure).
     let pure' (state: 'State) (context: 'Context) : TransitionResult<'State, 'Context> =
         TransitionResult.Transitioned(state, context)
 
@@ -103,8 +104,22 @@ module TransitionResult =
         | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
         | TransitionResult.Invalid message -> TransitionResult.Invalid message
 
-    /// Kleisli-style bind over ('State * 'Context) product, presented in curried form:
-    /// apply function to state and context if Transitioned; short-circuit on Blocked and Invalid.
+    /// Applicative apply: combine a wrapped function with a wrapped value.
+    /// Both sides must be Transitioned for the result to succeed; first error wins.
+    let apply
+        (fResult: TransitionResult<'State1 -> 'State2, 'Context1 -> 'Context2>)
+        (xResult: TransitionResult<'State1, 'Context1>)
+        : TransitionResult<'State2, 'Context2> =
+        match fResult, xResult with
+        | TransitionResult.Transitioned(fState, fContext), TransitionResult.Transitioned(state, context) ->
+            TransitionResult.Transitioned(fState state, fContext context)
+        | TransitionResult.Blocked reason, _ -> TransitionResult.Blocked reason
+        | _, TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message, _ -> TransitionResult.Invalid message
+        | _, TransitionResult.Invalid message -> TransitionResult.Invalid message
+
+    /// Kleisli-style bind over ('State * 'Context) product, presented in curried form.
+    /// Secondary to applicative — use when computation depends on previous result.
     let bind
         (f: 'State -> 'Context -> TransitionResult<'State2, 'Context2>)
         (result: TransitionResult<'State, 'Context>)

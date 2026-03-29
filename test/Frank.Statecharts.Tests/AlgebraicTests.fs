@@ -57,13 +57,19 @@ let transitionResultMapTests =
           testCase "map over Blocked preserves BlockReason"
           <| fun _ ->
               let result = TransitionResult.Blocked NotYourTurn
-              let mapped = TransitionResult.map (fun (s: string) -> s + "!") (fun (c: int) -> c * 2) result
+
+              let mapped =
+                  TransitionResult.map (fun (s: string) -> s + "!") (fun (c: int) -> c * 2) result
+
               Expect.equal mapped (TransitionResult.Blocked NotYourTurn) "Blocked preserved"
 
           testCase "map over Invalid preserves message"
           <| fun _ ->
               let result = TransitionResult.Invalid "bad move"
-              let mapped = TransitionResult.map (fun (s: string) -> s + "!") (fun (c: int) -> c * 2) result
+
+              let mapped =
+                  TransitionResult.map (fun (s: string) -> s + "!") (fun (c: int) -> c * 2) result
+
               Expect.equal mapped (TransitionResult.Invalid "bad move") "Invalid preserved" ]
 
 [<Tests>]
@@ -256,22 +262,18 @@ let guardResultMonoidLaws =
 
           testCase "compose is associative"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult))
-                  (fun (a, b, c) ->
-                      let leftAssoc = GuardResult.compose (GuardResult.compose a b) c
-                      let rightAssoc = GuardResult.compose a (GuardResult.compose b c)
-                      leftAssoc = rightAssoc)
+              Prop.forAll (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult)) (fun (a, b, c) ->
+                  let leftAssoc = GuardResult.compose (GuardResult.compose a b) c
+                  let rightAssoc = GuardResult.compose a (GuardResult.compose b c)
+                  leftAssoc = rightAssoc)
               |> Check.QuickThrowOnFailure
 
           testCase "alternative is associative"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult))
-                  (fun (a, b, c) ->
-                      let leftAssoc = GuardResult.alternative (GuardResult.alternative a b) c
-                      let rightAssoc = GuardResult.alternative a (GuardResult.alternative b c)
-                      leftAssoc = rightAssoc)
+              Prop.forAll (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult)) (fun (a, b, c) ->
+                  let leftAssoc = GuardResult.alternative (GuardResult.alternative a b) c
+                  let rightAssoc = GuardResult.alternative a (GuardResult.alternative b c)
+                  leftAssoc = rightAssoc)
               |> Check.QuickThrowOnFailure ]
 
 // ===========================================================================
@@ -312,9 +314,7 @@ let guardCompositionOrderFulfillmentTests =
               // Simulating all three role guards being checked
               let results = [ Allowed; Blocked NotYourTurn; Allowed ]
 
-              let composed =
-                  results
-                  |> List.fold GuardResult.compose GuardResult.identity
+              let composed = results |> List.fold GuardResult.compose GuardResult.identity
 
               Expect.equal composed (Blocked NotYourTurn) "fold compose with identity works" ]
 
@@ -329,7 +329,9 @@ let transitionResultMonadLaws =
         [ testCase "left identity: bind f (pure' a b) = f a b"
           <| fun _ ->
               let check (s: string, c: int) =
-                  let f s' c' = TransitionResult.Transitioned(s' + "!", c' * 2)
+                  let f s' c' =
+                      TransitionResult.Transitioned(s' + "!", c' * 2)
+
                   let lhs = TransitionResult.pure' s c |> TransitionResult.bind f
                   let rhs = f s c
                   lhs = rhs
@@ -363,11 +365,96 @@ let transitionResultMonadLaws =
           testCase "associativity: bind g (bind f m) = bind (fun s c -> bind g (f s c)) m"
           <| fun _ ->
               let check (s: string, c: int) =
-                  let f s' c' = TransitionResult.Transitioned(s' + "!", c' + 1)
-                  let g s' c' = TransitionResult.Transitioned(s' + "?", c' * 2)
+                  let f s' c' =
+                      TransitionResult.Transitioned(s' + "!", c' + 1)
+
+                  let g s' c' =
+                      TransitionResult.Transitioned(s' + "?", c' * 2)
+
                   let m = TransitionResult.Transitioned(s, c)
                   let lhs = m |> TransitionResult.bind f |> TransitionResult.bind g
-                  let rhs = m |> TransitionResult.bind (fun s' c' -> f s' c' |> TransitionResult.bind g)
+
+                  let rhs =
+                      m |> TransitionResult.bind (fun s' c' -> f s' c' |> TransitionResult.bind g)
+
+                  lhs = rhs
+
+              Check.QuickThrowOnFailure check ]
+
+// ===========================================================================
+// Property-based tests: Applicative laws for TransitionResult.apply
+// ===========================================================================
+
+[<Tests>]
+let transitionResultApplicativeLaws =
+    testList
+        "TransitionResult.apply applicative laws"
+        [ testCase "identity: apply (pure id) v = v"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let v = TransitionResult.Transitioned(s, c)
+                  let idResult = TransitionResult.pure' id id
+                  TransitionResult.apply idResult v = v
+
+              Check.QuickThrowOnFailure check
+
+          testCase "identity holds for Blocked"
+          <| fun _ ->
+              let v: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let idResult = TransitionResult.pure' id id
+              Expect.equal (TransitionResult.apply idResult v) v "apply (pure id) Blocked = Blocked"
+
+          testCase "identity holds for Invalid"
+          <| fun _ ->
+              let check (msg: string) =
+                  let v: TransitionResult<string, int> = TransitionResult.Invalid msg
+                  let idResult = TransitionResult.pure' id id
+                  TransitionResult.apply idResult v = v
+
+              Check.QuickThrowOnFailure check
+
+          testCase "homomorphism: apply (pure f) (pure x) = pure (f x)"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let f = fun (x: string) -> x + "!"
+                  let cf = fun (x: int) -> x + 1
+
+                  let lhs =
+                      TransitionResult.apply (TransitionResult.pure' f cf) (TransitionResult.pure' s c)
+
+                  let rhs = TransitionResult.pure' (f s) (cf c)
+                  lhs = rhs
+
+              Check.QuickThrowOnFailure check
+
+          testCase "first-error-wins: Blocked function, Transitioned value yields Blocked"
+          <| fun _ ->
+              let fResult: TransitionResult<string -> string, int -> int> =
+                  TransitionResult.Blocked NotYourTurn
+
+              let xResult = TransitionResult.Transitioned("hello", 42)
+              let result = TransitionResult.apply fResult xResult
+              Expect.equal result (TransitionResult.Blocked NotYourTurn) "Blocked function short-circuits"
+
+          testCase "first-error-wins: Transitioned function, Blocked value yields Blocked"
+          <| fun _ ->
+              let fResult =
+                  TransitionResult.pure' (fun (s: string) -> s + "!") (fun (c: int) -> c + 1)
+
+              let xResult: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let result = TransitionResult.apply fResult xResult
+              Expect.equal result (TransitionResult.Blocked NotAllowed) "Blocked value short-circuits"
+
+          testCase "interchange: apply u (pure y) = apply (pure (fun f -> f y)) u"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let u = TransitionResult.pure' (fun (x: string) -> x + "!") (fun (x: int) -> x + 1)
+
+                  let lhs = TransitionResult.apply u (TransitionResult.pure' s c)
+
+                  let rhs =
+                      TransitionResult.apply (TransitionResult.pure' (fun f -> f s) (fun f -> f c)) u
+
                   lhs = rhs
 
               Check.QuickThrowOnFailure check ]
