@@ -18,6 +18,25 @@ type GuardResult =
     | Allowed
     | Blocked of reason: BlockReason
 
+/// Algebraic operations for GuardResult (monoid under conjunction).
+[<RequireQualifiedAccess>]
+module GuardResult =
+
+    /// Identity element: always Allowed.
+    let identity: GuardResult = Allowed
+
+    /// Conjunction (AND): if the first blocks, short-circuit; otherwise return the second.
+    let compose (a: GuardResult) (b: GuardResult) : GuardResult =
+        match a with
+        | Blocked _ -> a
+        | Allowed -> b
+
+    /// Disjunction (OR): if the first allows, short-circuit; otherwise return the second.
+    let alternative (a: GuardResult) (b: GuardResult) : GuardResult =
+        match a with
+        | Allowed -> a
+        | Blocked _ -> b
+
 /// Context for access-control guards (pre-handler). No event available.
 [<NoEquality; NoComparison>]
 type AccessControlContext<'State, 'Context> =
@@ -60,6 +79,33 @@ type TransitionResult<'State, 'Context> =
     | Transitioned of state: 'State * context: 'Context
     | Blocked of reason: BlockReason
     | Invalid of message: string
+
+/// Algebraic operations for TransitionResult (functor + monad).
+[<RequireQualifiedAccess>]
+module TransitionResult =
+
+    /// Functor map: apply functions to state and context if Transitioned;
+    /// pass through Blocked and Invalid unchanged.
+    let map
+        (fState: 'State1 -> 'State2)
+        (fContext: 'Context1 -> 'Context2)
+        (result: TransitionResult<'State1, 'Context1>)
+        : TransitionResult<'State2, 'Context2> =
+        match result with
+        | TransitionResult.Transitioned(state, context) -> TransitionResult.Transitioned(fState state, fContext context)
+        | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message -> TransitionResult.Invalid message
+
+    /// Monadic bind: apply function to state and context if Transitioned;
+    /// short-circuit on Blocked and Invalid.
+    let bind
+        (f: 'State -> 'Context -> TransitionResult<'State2, 'Context2>)
+        (result: TransitionResult<'State, 'Context>)
+        : TransitionResult<'State2, 'Context2> =
+        match result with
+        | TransitionResult.Transitioned(state, context) -> f state context
+        | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message -> TransitionResult.Invalid message
 
 /// Compile-time definition of a state machine.
 type StateMachine<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
