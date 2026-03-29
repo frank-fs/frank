@@ -234,13 +234,53 @@ module StateHierarchy =
 [<RequireQualifiedAccess>]
 module HierarchicalRuntime =
 
+    /// Collect all descendant state IDs of a composite state (recursive).
+    let private allDescendants (hierarchy: StateHierarchy) (stateId: string) : string list =
+        let rec loop states =
+            states
+            |> List.collect (fun s ->
+                let descendants =
+                    match Map.tryFind s hierarchy.ChildrenMap with
+                    | Some kids -> loop kids
+                    | None -> []
+
+                s :: descendants)
+
+        match Map.tryFind stateId hierarchy.ChildrenMap with
+        | Some children -> loop children
+        | None -> []
+
     /// Enter a state, recursively activating initial children for composite states.
     /// For AND composites, all children are entered. For XOR, only the initial child.
+    /// Enforces XOR exclusivity: entering a child of an XOR composite deactivates siblings.
     let rec enterState
         (hierarchy: StateHierarchy)
         (stateId: string)
         (config: ActiveStateConfiguration)
         : ActiveStateConfiguration =
+        // Enforce XOR exclusivity: if parent is XOR, deactivate sibling children and their descendants
+        let config =
+            match Map.tryFind stateId hierarchy.ParentMap with
+            | Some parentId ->
+                match Map.tryFind parentId hierarchy.StateKind with
+                | Some CompositeKind.XOR ->
+                    match Map.tryFind parentId hierarchy.ChildrenMap with
+                    | Some siblings ->
+                        siblings
+                        |> List.fold
+                            (fun c sibling ->
+                                if sibling = stateId then
+                                    c
+                                else
+                                    let c = ActiveStateConfiguration.remove sibling c
+
+                                    allDescendants hierarchy sibling
+                                    |> List.fold (fun c' s -> ActiveStateConfiguration.remove s c') c)
+                            config
+                    | None -> config
+                | _ -> config
+            | None -> config
+
         let config = ActiveStateConfiguration.add stateId config
 
         match Map.tryFind stateId hierarchy.StateKind with
@@ -291,23 +331,7 @@ module HierarchicalRuntime =
         : HistoryRecord =
         match Map.tryFind stateId hierarchy.StateKind with
         | Some _ ->
-            // Record the current configuration for this composite state
-            // (all active children within this composite)
-            let childStates =
-                match Map.tryFind stateId hierarchy.ChildrenMap with
-                | Some children ->
-                    let rec allDescendants states =
-                        states
-                        |> List.collect (fun s ->
-                            let descendants =
-                                match Map.tryFind s hierarchy.ChildrenMap with
-                                | Some kids -> allDescendants kids
-                                | None -> []
-
-                            s :: descendants)
-
-                    allDescendants children
-                | None -> []
+            let childStates = allDescendants hierarchy stateId
 
             let activeChildren =
                 childStates |> List.filter (fun s -> ActiveStateConfiguration.isActive s config)
@@ -321,29 +345,46 @@ module HierarchicalRuntime =
 
     /// Perform a hierarchical state transition from source to target.
     /// Computes LCA, exits states from source up to LCA, enters states from LCA down to target.
+    /// Accepts a HistoryRecord to accumulate history across transitions.
     let transition
         (hierarchy: StateHierarchy)
         (config: ActiveStateConfiguration)
         (source: string)
         (target: string)
+        (history: HistoryRecord)
         : HierarchicalTransitionResult =
-        let lca =
-            StateHierarchy.computeLCA hierarchy source target |> Option.defaultValue source
+        // For self-transitions (source = target), use external semantics:
+        // exit the state and re-enter it, resetting composite children to initial.
+        let exitStates, entryStates =
+            if source = target then
+                ([ source ], [ target ])
+            else
+                let lca =
+                    StateHierarchy.computeLCA hierarchy source target |> Option.defaultValue source
 
-        // Compute exit path (source up to but not including LCA)
-        let exitStates = exitPath hierarchy source lca
+                let exits = exitPath hierarchy source lca
+                let entries = entryPath hierarchy target lca
+                (exits, entries)
 
-        // Compute entry path (LCA down to target, not including LCA)
-        let entryStates = entryPath hierarchy target lca
-
-        // Exit phase: record history for exited composite states, then remove from config
-        let history =
+        // Exit phase: record history for exited composite states, folding into input history
+        let updatedHistory =
             exitStates
-            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) HistoryRecord.empty
+            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) history
 
+        // Remove exited states and all descendants of exited composite states.
+        // For AND composites, this deactivates all regions; for XOR, any active child subtree.
         let configAfterExit =
             exitStates
-            |> List.fold (fun c exitState -> ActiveStateConfiguration.remove exitState c) config
+            |> List.fold
+                (fun c exitState ->
+                    let c = ActiveStateConfiguration.remove exitState c
+
+                    match Map.tryFind exitState hierarchy.StateKind with
+                    | Some _ ->
+                        allDescendants hierarchy exitState
+                        |> List.fold (fun c' s -> ActiveStateConfiguration.remove s c') c
+                    | None -> c)
+                config
 
         // Entry phase: add states to configuration, recursively entering composites.
         // Accumulate entered states in reverse to avoid O(n^2) list concatenation.
@@ -361,7 +402,7 @@ module HierarchicalRuntime =
         { Configuration = configAfterEntry
           ExitedStates = exitStates
           EnteredStates = List.rev enteredStatesRev
-          HistoryRecord = history }
+          HistoryRecord = updatedHistory }
 
     /// Enter a composite state using history (shallow or deep).
     /// Falls back to initial child when no history is recorded.
@@ -404,6 +445,15 @@ module HierarchicalRuntime =
             | Some initial -> enterState hierarchy initial config
             | None -> config
 
+    /// Collect all ancestor state IDs from a given state up to the root (exclusive of stateId itself).
+    let private ancestorStates (hierarchy: StateHierarchy) (stateId: string) : string list =
+        let rec loop current acc =
+            match Map.tryFind current hierarchy.ParentMap with
+            | Some parent -> loop parent (parent :: acc)
+            | None -> acc
+
+        loop stateId []
+
     /// Resolve allowed HTTP methods for the current active configuration.
     /// Returns the union of methods from all active states and their ancestors.
     let resolveAllowedMethods
@@ -413,22 +463,19 @@ module HierarchicalRuntime =
         : Set<string> =
         let activeStates = ActiveStateConfiguration.toSet config
 
-        activeStates
-        |> Set.toList
+        // Collect active states + their ancestors (same traversal as resolveHandlers)
+        let allStates =
+            activeStates
+            |> Set.toList
+            |> List.collect (fun stateId -> stateId :: ancestorStates hierarchy stateId)
+            |> List.distinct
+
+        allStates
         |> List.collect (fun stateId ->
             match Map.tryFind stateId stateHandlerMap with
             | Some methods -> methods
             | None -> [])
         |> Set.ofList
-
-    /// Collect all ancestor state IDs from a given state up to the root (exclusive of stateId itself).
-    let private ancestorStates (hierarchy: StateHierarchy) (stateId: string) : string list =
-        let rec loop current acc =
-            match Map.tryFind current hierarchy.ParentMap with
-            | Some parent -> loop parent (parent :: acc)
-            | None -> acc
-
-        loop stateId []
 
     /// Resolve handlers for the current active configuration.
     /// Child handlers override parent handlers for the same HTTP method.

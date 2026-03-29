@@ -299,7 +299,12 @@ let xorCompositeTests =
 
               // Transition from Red to Green
               let result =
-                  HierarchicalRuntime.transition hierarchy initial TrafficLight.red TrafficLight.green
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      initial
+                      TrafficLight.red
+                      TrafficLight.green
+                      HistoryRecord.empty
 
               Expect.isTrue
                   (ActiveStateConfiguration.isActive TrafficLight.green result.Configuration)
@@ -339,7 +344,12 @@ let entryExitOrderingTests =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
 
               let result =
-                  HierarchicalRuntime.transition hierarchy initial TrafficLight.red TrafficLight.green
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      initial
+                      TrafficLight.red
+                      TrafficLight.green
+                      HistoryRecord.empty
 
               // Exit Red, then Enter Green (within Active, so Active is not exited/entered)
               Expect.equal result.ExitedStates [ TrafficLight.red ] "Exited Red"
@@ -364,7 +374,7 @@ let entryExitOrderingTests =
 
               // Transition from Red (inside Active) to Off (sibling of Active)
               let result =
-                  HierarchicalRuntime.transition hierarchy initial TrafficLight.red TrafficLight.off
+                  HierarchicalRuntime.transition hierarchy initial TrafficLight.red TrafficLight.off HistoryRecord.empty
 
               // Should exit Red, then Active, then enter Off (LCA is Root)
               Expect.equal result.ExitedStates [ TrafficLight.red; TrafficLight.active ] "Exited Red then Active"
@@ -391,7 +401,12 @@ let entryExitOrderingTests =
                   |> ActiveStateConfiguration.add TrafficLight.root
 
               let result =
-                  HierarchicalRuntime.transition hierarchy initial TrafficLight.off TrafficLight.active
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      initial
+                      TrafficLight.off
+                      TrafficLight.active
+                      HistoryRecord.empty
 
               // Should exit Off, enter Active then Red (initial child of Active)
               Expect.equal result.ExitedStates [ TrafficLight.off ] "Exited Off"
@@ -479,7 +494,7 @@ let andCompositeTests =
 
               // Transition ScreenOn -> ScreenOff (Display region only)
               let result =
-                  HierarchicalRuntime.transition hierarchy initial Device.screenOn Device.screenOff
+                  HierarchicalRuntime.transition hierarchy initial Device.screenOn Device.screenOff HistoryRecord.empty
 
               Expect.isTrue
                   (ActiveStateConfiguration.isActive Device.screenOff result.Configuration)
@@ -524,11 +539,21 @@ let historyTests =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
 
               let inGreen =
-                  HierarchicalRuntime.transition hierarchy initial TrafficLight.red TrafficLight.green
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      initial
+                      TrafficLight.red
+                      TrafficLight.green
+                      HistoryRecord.empty
 
               // Exit Active -> Off
               let inOff =
-                  HierarchicalRuntime.transition hierarchy inGreen.Configuration TrafficLight.green TrafficLight.off
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      inGreen.Configuration
+                      TrafficLight.green
+                      TrafficLight.off
+                      HistoryRecord.empty
 
               // Re-enter Active via shallow history: should restore Green (last active child of Active)
               let restored =
@@ -600,11 +625,12 @@ let historyTests =
               let initial =
                   HierarchicalRuntime.enterState hierarchy "Machine" ActiveStateConfiguration.empty
 
-              let moved = HierarchicalRuntime.transition hierarchy initial "ChildX" "ChildY"
+              let moved =
+                  HierarchicalRuntime.transition hierarchy initial "ChildX" "ChildY" HistoryRecord.empty
 
               // Exit to Idle
               let exited =
-                  HierarchicalRuntime.transition hierarchy moved.Configuration "ChildY" "Idle"
+                  HierarchicalRuntime.transition hierarchy moved.Configuration "ChildY" "Idle" HistoryRecord.empty
 
               // Re-enter Active via deep history: should fully restore ChildY
               let restored =
@@ -795,6 +821,263 @@ let historyRecordTests =
               let record = HistoryRecord.empty |> HistoryRecord.record "Parent" config
               let retrieved = HistoryRecord.tryGet "Parent" record
               Expect.equal retrieved (Some config) "config stored and retrieved" ]
+
+// ==========================================================================
+// Bug 1: resolveAllowedMethods must traverse ancestors (#224)
+// ==========================================================================
+
+[<Tests>]
+let resolveAllowedMethodsAncestryTests =
+    testList
+        "resolveAllowedMethods ancestor traversal (#224)"
+        [ testCase "methods from non-active ancestor are included"
+          <| fun () ->
+              // Root (XOR) -> Active (XOR) -> Red
+              // Only Red is in the active config (not Active itself),
+              // but Active defines methods that should be discovered via ancestry.
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = TrafficLight.root
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.active; TrafficLight.off ]
+                              InitialChild = Some TrafficLight.active }
+                            { Id = TrafficLight.active
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                              InitialChild = Some TrafficLight.red } ] }
+
+              let stateHandlerMap =
+                  Map.ofList
+                      [ TrafficLight.root, [ "OPTIONS" ]
+                        TrafficLight.active, [ "GET" ]
+                        TrafficLight.red, [ "POST" ] ]
+
+              // Only Red is active (leaf) — ancestors Active and Root are NOT in config
+              let config =
+                  ActiveStateConfiguration.empty |> ActiveStateConfiguration.add TrafficLight.red
+
+              let result =
+                  HierarchicalRuntime.resolveAllowedMethods hierarchy stateHandlerMap config
+
+              Expect.contains result "POST" "Red's own method"
+              Expect.contains result "GET" "Active's method via ancestor traversal"
+              Expect.contains result "OPTIONS" "Root's method via ancestor traversal" ]
+
+// ==========================================================================
+// Bug 2: HistoryRecord must accumulate across transitions (#224)
+// ==========================================================================
+
+[<Tests>]
+let historyAccumulationTests =
+    testList
+        "HistoryRecord accumulation across transitions (#224)"
+        [ testCase "transition preserves prior history for unrelated composite states"
+          <| fun () ->
+              // Two sibling composite states under Root.
+              // Transition within one composite should preserve history recorded for the other.
+              // Root (XOR)
+              //   GroupA (XOR): A1 (initial), A2
+              //   GroupB (XOR): B1 (initial), B2
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Root"
+                              Kind = CompositeKind.XOR
+                              Children = [ "GroupA"; "GroupB" ]
+                              InitialChild = Some "GroupA" }
+                            { Id = "GroupA"
+                              Kind = CompositeKind.XOR
+                              Children = [ "A1"; "A2" ]
+                              InitialChild = Some "A1" }
+                            { Id = "GroupB"
+                              Kind = CompositeKind.XOR
+                              Children = [ "B1"; "B2" ]
+                              InitialChild = Some "B1" } ] }
+
+              // Enter GroupA -> A1, then move to A2
+              let initial =
+                  HierarchicalRuntime.enterState hierarchy "GroupA" ActiveStateConfiguration.empty
+                  |> ActiveStateConfiguration.add "Root"
+
+              let inA2 =
+                  HierarchicalRuntime.transition hierarchy initial "A1" "A2" HistoryRecord.empty
+
+              // Transition from A2 to GroupB (crosses Root, exits GroupA — records GroupA history)
+              let inB =
+                  HierarchicalRuntime.transition hierarchy inA2.Configuration "A2" "GroupB" HistoryRecord.empty
+
+              // GroupA history should be recorded
+              Expect.isSome (HistoryRecord.tryGet "GroupA" inB.HistoryRecord) "GroupA history recorded on exit"
+
+              // Now transition B1 -> B2, PASSING the accumulated history
+              let inB2 =
+                  HierarchicalRuntime.transition hierarchy inB.Configuration "B1" "B2" inB.HistoryRecord
+
+              // BUG: if transition starts from HistoryRecord.empty, GroupA's history is lost
+              Expect.isSome
+                  (HistoryRecord.tryGet "GroupA" inB2.HistoryRecord)
+                  "GroupA history preserved during unrelated transition" ]
+
+// ==========================================================================
+// Bug 3: AND composite exit must deactivate all regions (#224)
+// ==========================================================================
+
+[<Tests>]
+let andCompositeExitTests =
+    testList
+        "AND composite exit deactivates all regions (#224)"
+        [ testCase "transitioning out of AND composite deactivates all region states"
+          <| fun () ->
+              // Device (AND) has Display and Network regions.
+              // We add an "Outer" parent so we can transition out of Device.
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Outer"
+                              Kind = CompositeKind.XOR
+                              Children = [ Device.device; "Standby" ]
+                              InitialChild = Some Device.device }
+                            { Id = Device.device
+                              Kind = CompositeKind.AND
+                              Children = [ Device.display; Device.network ]
+                              InitialChild = None }
+                            { Id = Device.display
+                              Kind = CompositeKind.XOR
+                              Children = [ Device.screenOn; Device.screenOff ]
+                              InitialChild = Some Device.screenOn }
+                            { Id = Device.network
+                              Kind = CompositeKind.XOR
+                              Children = [ Device.connected; Device.disconnected ]
+                              InitialChild = Some Device.connected } ] }
+
+              // Enter Device -> all regions active
+              let initial =
+                  ActiveStateConfiguration.empty
+                  |> ActiveStateConfiguration.add "Outer"
+                  |> fun c -> HierarchicalRuntime.enterState hierarchy Device.device c
+
+              // Verify all regions are active
+              Expect.isTrue (ActiveStateConfiguration.isActive Device.screenOn initial) "ScreenOn active"
+              Expect.isTrue (ActiveStateConfiguration.isActive Device.connected initial) "Connected active"
+
+              // Transition from ScreenOn (Display region) to Standby (outside Device)
+              let result =
+                  HierarchicalRuntime.transition hierarchy initial Device.screenOn "Standby" HistoryRecord.empty
+
+              // ALL Device descendant states should be deactivated
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive Device.screenOn result.Configuration)
+                  "ScreenOn deactivated"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive Device.display result.Configuration)
+                  "Display deactivated"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive Device.connected result.Configuration)
+                  "Connected deactivated (sibling region)"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive Device.network result.Configuration)
+                  "Network deactivated (sibling region)"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive Device.device result.Configuration)
+                  "Device itself deactivated"
+
+              Expect.isTrue (ActiveStateConfiguration.isActive "Standby" result.Configuration) "Standby is active" ]
+
+// ==========================================================================
+// Improvement 4: Internal vs external self-transitions (#224)
+// ==========================================================================
+
+[<Tests>]
+let selfTransitionTests =
+    testList
+        "Internal vs external self-transitions (#224)"
+        [ testCase "external self-transition exits and re-enters the state"
+          <| fun () ->
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = TrafficLight.active
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                              InitialChild = Some TrafficLight.red } ] }
+
+              let initial =
+                  HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
+
+              // Move to Green first
+              let inGreen =
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      initial
+                      TrafficLight.red
+                      TrafficLight.green
+                      HistoryRecord.empty
+
+              // Self-transition on Active (external): should exit Active+Green, re-enter Active+Red
+              let result =
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      inGreen.Configuration
+                      TrafficLight.active
+                      TrafficLight.active
+                      HistoryRecord.empty
+
+              // External self-transition: exits the state and re-enters it (resets to initial child)
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive TrafficLight.red result.Configuration)
+                  "Re-entered to initial child Red"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive TrafficLight.green result.Configuration)
+                  "Green no longer active after self-transition"
+
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive TrafficLight.active result.Configuration)
+                  "Active still active" ]
+
+// ==========================================================================
+// Improvement 5: XOR exclusivity enforcement (#224)
+// ==========================================================================
+
+[<Tests>]
+let xorExclusivityTests =
+    testList
+        "XOR exclusivity enforcement (#224)"
+        [ testCase "enterState on XOR composite deactivates previous sibling"
+          <| fun () ->
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = TrafficLight.active
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                              InitialChild = Some TrafficLight.red } ] }
+
+              // Manually create invalid config: both Red and Green active in XOR composite
+              let invalidConfig =
+                  ActiveStateConfiguration.empty
+                  |> ActiveStateConfiguration.add TrafficLight.active
+                  |> ActiveStateConfiguration.add TrafficLight.red
+                  |> ActiveStateConfiguration.add TrafficLight.green
+
+              // enterState should enforce XOR by deactivating other children
+              let result =
+                  HierarchicalRuntime.enterState hierarchy TrafficLight.yellow invalidConfig
+
+              Expect.isTrue (ActiveStateConfiguration.isActive TrafficLight.yellow result) "Yellow is active"
+
+              // XOR: only one child should be active
+              let activeChildren =
+                  [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                  |> List.filter (fun c -> ActiveStateConfiguration.isActive c result)
+
+              Expect.equal activeChildren.Length 1 "Only one child active in XOR composite"
+              Expect.equal activeChildren.Head TrafficLight.yellow "That child is Yellow" ]
 
 // ==========================================================================
 // Composite StateKind in AST
