@@ -10,6 +10,9 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
 open Frank.Cli.Core.Shared
 
+/// FSharpCheckProjectResults must be consumed within the same async scope where LoadedProject was created.
+/// Do not cache or serialize across application sessions — the results reference internal compiler state
+/// that becomes invalid if the FSharpChecker is disposed or recreated.
 type LoadedProject =
     { ProjectPath: string
       ParsedFiles: (string * ParsedInput) list
@@ -221,9 +224,13 @@ module ProjectLoader =
 
                                 return Error $"Type-check errors:\n{errors}"
                             else
-                                // Derive parsing options from project options to include
-                                // conditional defines, language version, and other flags.
-                                // Using Default would miss cross-file conditional compilation.
+                                // Re-parse each file individually to obtain ParsedInput (untyped AST) trees.
+                                // ParseAndCheckProject above already parses internally, but FSharpCheckProjectResults
+                                // does not expose per-file ParsedInput directly. The individual ParseFile calls are
+                                // cheap (syntax-only, no type checking) and leverage the checker's internal cache,
+                                // so the redundancy is negligible. We derive parsing options from project options
+                                // to include conditional defines, language version, and other flags — using
+                                // FSharpParsingOptions.Default would miss cross-file conditional compilation.
                                 let parsingOptions, _diagnostics =
                                     checker.GetParsingOptionsFromProjectOptions(options)
 
