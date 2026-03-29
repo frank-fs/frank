@@ -200,7 +200,7 @@ let main args =
 
     semanticCmd.Subcommands.Add(diffCmd)
 
-    // ── semantic compile ──
+    // ── compile (top-level, used by MSBuild targets) ──
     let compileCmd = Command("compile")
 
     compileCmd.Description <-
@@ -273,7 +273,7 @@ let main args =
 
             Console.Error.WriteLine(output))
 
-    semanticCmd.Subcommands.Add(compileCmd)
+    root.Subcommands.Add(compileCmd)
 
     // ── semantic openapi-validate ──
     let openApiValCmd = Command("openapi-validate")
