@@ -99,16 +99,16 @@ let checkCompleteness
           Severity = Severity.Error
           Message = $"Transition '%s{t.Event}' (%s{t.Source} -> %s{t.Target}) is not covered by any role's projection" })
 
+let private isFinal (statechart: ExtractedStatechart) (state: string) =
+    statechart.StateMetadata
+    |> Map.tryFind state
+    |> Option.map _.IsFinal
+    |> Option.defaultValue false
+
 /// Post-projection: warn when a reachable non-final state has no outgoing transitions
 /// in any role's projection. This checks whether *any* role can advance the state machine
 /// (sufficient for HTTP where state is server-side), not per-role progress (which is #108).
 let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: ExtractedStatechart) : ProjectionIssue list =
-    let isFinal state =
-        pruned.StateMetadata
-        |> Map.tryFind state
-        |> Option.map _.IsFinal
-        |> Option.defaultValue false
-
     let roleOutgoing =
         projections
         |> Map.values
@@ -118,7 +118,7 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
 
     pruned.StateNames
     |> List.choose (fun state ->
-        if isFinal state then
+        if isFinal pruned state then
             None
         elif Set.contains state roleOutgoing then
             None
@@ -132,21 +132,20 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
 /// but ALL of them are self-loops (source == target). The system is active but cannot
 /// make progress — a livelock.
 let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: ExtractedStatechart) : ProjectionIssue list =
-    let isFinal state =
-        pruned.StateMetadata
-        |> Map.tryFind state
-        |> Option.map _.IsFinal
-        |> Option.defaultValue false
-
-    let allTransitions =
-        projections |> Map.values |> Seq.collect _.Transitions |> Seq.toList
+    let transitionsBySource =
+        projections
+        |> Map.values
+        |> Seq.collect _.Transitions
+        |> Seq.toList
+        |> List.groupBy _.Source
+        |> Map.ofList
 
     pruned.StateNames
     |> List.choose (fun state ->
-        if isFinal state then
+        if isFinal pruned state then
             None
         else
-            let outgoing = allTransitions |> List.filter (fun t -> t.Source = state)
+            let outgoing = transitionsBySource |> Map.tryFind state |> Option.defaultValue []
 
             if outgoing.IsEmpty then
                 None // No outgoing transitions = deadlock, not livelock
