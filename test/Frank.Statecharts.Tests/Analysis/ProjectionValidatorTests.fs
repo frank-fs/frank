@@ -561,3 +561,126 @@ let shapeReferenceTests =
               let cache = mkShapeCache []
               let issues = checkShapeReference [] cache
               Expect.isEmpty issues "Nothing to compare" ]
+
+// -- Strict projection validation tests --
+
+/// Fully assigned chart (no Unrestricted transitions) — passes strict.
+let private fullyAssignedChart: ExtractedStatechart =
+    { RouteTemplate = "/games/{gameId}"
+      StateNames = [ "XTurn"; "OTurn"; "XWins"; "OWins"; "Draw" ]
+      InitialStateKey = "XTurn"
+      GuardNames = [ "TurnGuard" ]
+      StateMetadata =
+        Map.ofList
+            [ "XTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "OTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "XWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "OWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Draw",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
+      Roles =
+        [ { Name = "PlayerX"
+            Description = Some "Player X" }
+          { Name = "PlayerO"
+            Description = Some "Player O" }
+          { Name = "Spectator"
+            Description = Some "Observer" } ]
+      Transitions =
+        [ mkTransition "getGame" "XTurn" "XTurn" None (RestrictedTo [ "PlayerX"; "PlayerO"; "Spectator" ])
+          mkTransition "getGame" "OTurn" "OTurn" None (RestrictedTo [ "PlayerX"; "PlayerO"; "Spectator" ])
+          mkTransition "getGame" "XWins" "XWins" None (RestrictedTo [ "PlayerX"; "PlayerO"; "Spectator" ])
+          mkTransition "getGame" "OWins" "OWins" None (RestrictedTo [ "PlayerX"; "PlayerO"; "Spectator" ])
+          mkTransition "getGame" "Draw" "Draw" None (RestrictedTo [ "PlayerX"; "PlayerO"; "Spectator" ])
+          mkTransition "makeMove" "XTurn" "OTurn" (Some "TurnGuard") (RestrictedTo [ "PlayerX" ])
+          mkTransition "makeMove" "XTurn" "XWins" (Some "TurnGuard") (RestrictedTo [ "PlayerX" ])
+          mkTransition "makeMove" "XTurn" "Draw" (Some "TurnGuard") (RestrictedTo [ "PlayerX" ])
+          mkTransition "makeMove" "OTurn" "XTurn" (Some "TurnGuard") (RestrictedTo [ "PlayerO" ])
+          mkTransition "makeMove" "OTurn" "OWins" (Some "TurnGuard") (RestrictedTo [ "PlayerO" ])
+          mkTransition "makeMove" "OTurn" "Draw" (Some "TurnGuard") (RestrictedTo [ "PlayerO" ]) ] }
+
+[<Tests>]
+let validateProjectionStrictTests =
+    testList
+        "ProjectionValidator.validateProjectionStrict"
+        [ testCase "TicTacToe with Unrestricted transitions reports ClosedWorldTotality errors in strict mode"
+          <| fun _ ->
+              let result = validateProjectionStrict ticTacToeChart.RouteTemplate ticTacToeChart
+
+              let totalityIssues =
+                  result.Issues |> List.filter (fun i -> i.Check = ClosedWorldTotality)
+
+              Expect.isNonEmpty totalityIssues "Unrestricted getGame flagged in strict mode"
+
+              // All should be errors, not warnings
+              totalityIssues
+              |> List.iter (fun i -> Expect.equal i.Severity Severity.Error "Strict mode issues are errors")
+
+          testCase "fully assigned chart passes strict mode with no ClosedWorldTotality issues"
+          <| fun _ ->
+              let result =
+                  validateProjectionStrict fullyAssignedChart.RouteTemplate fullyAssignedChart
+
+              let totalityIssues =
+                  result.Issues |> List.filter (fun i -> i.Check = ClosedWorldTotality)
+
+              Expect.isEmpty totalityIssues "All transitions assigned — no totality issues"
+
+          testCase "strict mode runs same checks as non-strict plus ClosedWorldTotality"
+          <| fun _ ->
+              let normalResult =
+                  validateProjection fullyAssignedChart.RouteTemplate fullyAssignedChart
+
+              let strictResult =
+                  validateProjectionStrict fullyAssignedChart.RouteTemplate fullyAssignedChart
+
+              // Strict should run one more check (ClosedWorldTotality)
+              Expect.equal strictResult.ChecksRun (normalResult.ChecksRun + 1) "Strict adds totality check"
+
+          testCase "dead transition is caught in strict mode"
+          <| fun _ ->
+              let result =
+                  validateProjectionStrict deadTransitionChart.RouteTemplate deadTransitionChart
+
+              let totalityIssues =
+                  result.Issues |> List.filter (fun i -> i.Check = ClosedWorldTotality)
+
+              let deadIssues =
+                  totalityIssues |> List.filter (fun i -> i.Message.Contains("archive"))
+
+              Expect.isNonEmpty deadIssues "Dead transition flagged in strict mode"
+
+          testCase "strict mode with no roles skips ClosedWorldTotality"
+          <| fun _ ->
+              let chart =
+                  { ticTacToeChart with
+                      Roles = []
+                      GuardNames = []
+                      Transitions =
+                          ticTacToeChart.Transitions
+                          |> List.map (fun t ->
+                              { t with
+                                  Guard = None
+                                  Constraint = Unrestricted }) }
+
+              let result = validateProjectionStrict chart.RouteTemplate chart
+              Expect.equal result.ChecksRun 0 "No checks for roleless guardless chart"
+
+          testCase "strict mode ChecksRun count includes ClosedWorldTotality"
+          <| fun _ ->
+              let result = validateProjectionStrict ticTacToeChart.RouteTemplate ticTacToeChart
+              // 5 role-based + 1 closed-world totality + 1 guard = 7
+              Expect.equal result.ChecksRun 7 "Seven checks run in strict mode" ]
