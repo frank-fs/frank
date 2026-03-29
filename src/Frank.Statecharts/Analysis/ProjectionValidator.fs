@@ -130,10 +130,33 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
                   Severity = Severity.Warning
                   Message = $"State '%s{state}' is reachable but no role has outgoing transitions from it" })
 
+/// Check whether any descendant of a composite state has a non-self-loop transition.
+/// Returns true if at least one descendant can progress (transition to a different state).
+let private hasProgressingDescendant
+    (containment: StateContainment)
+    (transitionsBySource: Map<string, TransitionSpec list>)
+    (state: string)
+    : bool =
+    let descendants = StateContainment.allDescendants state containment
+
+    descendants
+    |> List.exists (fun descendant ->
+        let outgoing =
+            transitionsBySource |> Map.tryFind descendant |> Option.defaultValue []
+
+        outgoing |> List.exists (fun t -> t.Target <> t.Source))
+
 /// Post-projection: warn when a reachable non-final state has outgoing transitions
 /// but ALL of them are self-loops (source == target). The system is active but cannot
 /// make progress — a livelock.
-let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: ExtractedStatechart) : ProjectionIssue list =
+///
+/// Hierarchy-aware: a composite state self-loop is suppressed when any descendant
+/// has non-self-loop transitions (children can progress internally).
+let checkLivelock
+    (projections: Map<string, ExtractedStatechart>)
+    (pruned: ExtractedStatechart)
+    (containment: StateContainment)
+    : ProjectionIssue list =
     let transitionsBySource =
         projections
         |> Map.values
@@ -152,11 +175,18 @@ let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
             if outgoing.IsEmpty then
                 None // No outgoing transitions = deadlock, not livelock
             elif outgoing |> List.forall (fun t -> t.Target = t.Source) then
-                Some
-                    { Check = Livelock
-                      Severity = Severity.Warning
-                      Message =
-                        $"State '%s{state}' has only self-loop transitions across all role projections — no role can advance out of it" }
+                // Check hierarchy: if this is a composite state with progressing descendants, suppress
+                if
+                    StateContainment.isComposite state containment
+                    && hasProgressingDescendant containment transitionsBySource state
+                then
+                    None
+                else
+                    Some
+                        { Check = Livelock
+                          Severity = Severity.Warning
+                          Message =
+                            $"State '%s{state}' has only self-loop transitions across all role projections — no role can advance out of it" }
             else
                 None)
 
@@ -280,7 +310,7 @@ let private validateProjectionCore
               yield! checkMixedChoice statechart
               yield! checkCompleteness projections pruned
               yield! checkDeadlock projections pruned
-              yield! checkLivelock projections pruned
+              yield! checkLivelock projections pruned StateContainment.empty
 
               if strict then
                   yield! checkClosedWorldTotality statechart

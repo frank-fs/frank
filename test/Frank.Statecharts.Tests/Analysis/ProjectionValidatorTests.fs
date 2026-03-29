@@ -354,7 +354,7 @@ let livelockTests =
           <| fun _ ->
               let projections = Projection.projectAll livelockChart
               let pruned = Projection.pruneUnreachableStates livelockChart
-              let issues = checkLivelock projections pruned
+              let issues = checkLivelock projections pruned StateContainment.empty
               Expect.equal issues.Length 1 "One livelock"
               Expect.stringContains issues[0].Message "Paused" "Mentions the livelocked state"
               Expect.equal issues[0].Severity Severity.Warning "Severity is Warning"
@@ -364,21 +364,21 @@ let livelockTests =
           <| fun _ ->
               let projections = Projection.projectAll ticTacToeChart
               let pruned = Projection.pruneUnreachableStates ticTacToeChart
-              let issues = checkLivelock projections pruned
+              let issues = checkLivelock projections pruned StateContainment.empty
               Expect.isEmpty issues "TicTacToe has no livelocks"
 
           testCase "final state with only self-loops is not flagged"
           <| fun _ ->
               let projections = Projection.projectAll finalSelfLoopChart
               let pruned = Projection.pruneUnreachableStates finalSelfLoopChart
-              let issues = checkLivelock projections pruned
+              let issues = checkLivelock projections pruned StateContainment.empty
               Expect.isEmpty issues "Final states are expected to self-loop"
 
           testCase "mix of self-loop and non-self-loop transitions is not flagged"
           <| fun _ ->
               let projections = Projection.projectAll mixedTransitionsChart
               let pruned = Projection.pruneUnreachableStates mixedTransitionsChart
-              let issues = checkLivelock projections pruned
+              let issues = checkLivelock projections pruned StateContainment.empty
               Expect.isEmpty issues "Progress is possible from all states" ]
 
 [<Tests>]

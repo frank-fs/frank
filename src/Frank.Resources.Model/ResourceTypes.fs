@@ -8,6 +8,51 @@ type StateInfo =
       IsFinal: bool
       Description: string option }
 
+/// Lightweight parent-child containment information for hierarchy-aware analysis.
+/// Zero-dependency: just string state names. Built from the richer StateHierarchy
+/// in Frank.Statecharts when hierarchy info is available.
+type StateContainment =
+    {
+        /// Parent state -> ordered list of child states.
+        ParentOf: Map<string, string list>
+        /// Child state -> parent state.
+        ChildOf: Map<string, string>
+    }
+
+module StateContainment =
+
+    let empty: StateContainment =
+        { ParentOf = Map.empty
+          ChildOf = Map.empty }
+
+    let isEmpty (c: StateContainment) : bool = Map.isEmpty c.ParentOf
+
+    /// Build a StateContainment from a list of (parent, children) pairs.
+    let ofPairs (pairs: (string * string list) list) : StateContainment =
+        let parentOf = pairs |> Map.ofList
+
+        let childOf =
+            pairs
+            |> List.collect (fun (parent, children) -> children |> List.map (fun child -> (child, parent)))
+            |> Map.ofList
+
+        { ParentOf = parentOf
+          ChildOf = childOf }
+
+    /// Get all children of a state (empty if atomic).
+    let children (state: string) (c: StateContainment) : string list =
+        c.ParentOf |> Map.tryFind state |> Option.defaultValue []
+
+    /// Get the parent of a state (None if root-level).
+    let parent (state: string) (c: StateContainment) : string option = c.ChildOf |> Map.tryFind state
+
+    /// Check if a state is a composite (has children).
+    let isComposite (state: string) (c: StateContainment) : bool = c.ParentOf |> Map.containsKey state
+
+    /// Get all descendants of a state (recursive).
+    let rec allDescendants (state: string) (c: StateContainment) : string list =
+        children state c |> List.collect (fun child -> child :: allDescendants child c)
+
 /// Pre-generated profile strings for all formats, keyed by resource slug.
 type ProjectedProfiles =
     {

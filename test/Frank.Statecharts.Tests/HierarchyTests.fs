@@ -156,7 +156,57 @@ let stateHierarchyBuildTests =
               Expect.isEmpty (Map.toList hierarchy.ParentMap) "no parents"
               Expect.isEmpty (Map.toList hierarchy.ChildrenMap) "no children"
               Expect.isEmpty (Map.toList hierarchy.InitialChild) "no initials"
-              Expect.isEmpty (Map.toList hierarchy.StateKind) "no kinds" ]
+              Expect.isEmpty (Map.toList hierarchy.StateKind) "no kinds"
+
+          testCase "toContainment produces correct StateContainment"
+          <| fun () ->
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = TrafficLight.root
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.active; TrafficLight.off ]
+                              InitialChild = Some TrafficLight.active }
+                            { Id = TrafficLight.active
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                              InitialChild = Some TrafficLight.red } ] }
+
+              let containment = StateHierarchy.toContainment hierarchy
+
+              // ParentOf
+              Expect.equal
+                  (Frank.Resources.Model.StateContainment.children TrafficLight.root containment)
+                  [ TrafficLight.active; TrafficLight.off ]
+                  "Root children"
+
+              Expect.equal
+                  (Frank.Resources.Model.StateContainment.children TrafficLight.active containment)
+                  [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
+                  "Active children"
+
+              // ChildOf
+              Expect.equal
+                  (Frank.Resources.Model.StateContainment.parent TrafficLight.red containment)
+                  (Some TrafficLight.active)
+                  "Red's parent is Active"
+
+              // isComposite
+              Expect.isTrue
+                  (Frank.Resources.Model.StateContainment.isComposite TrafficLight.root containment)
+                  "Root is composite"
+
+              Expect.isFalse
+                  (Frank.Resources.Model.StateContainment.isComposite TrafficLight.red containment)
+                  "Red is atomic"
+
+              // allDescendants
+              let rootDescendants =
+                  Frank.Resources.Model.StateContainment.allDescendants TrafficLight.root containment
+                  |> Set.ofList
+
+              Expect.contains rootDescendants TrafficLight.active "Root descendants include Active"
+              Expect.contains rootDescendants TrafficLight.red "Root descendants include Red (grandchild)" ]
 
 // ==========================================================================
 // Sub-task A: LCA computation

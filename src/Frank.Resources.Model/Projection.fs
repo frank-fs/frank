@@ -37,17 +37,9 @@ module Projection =
         { statechart with
             Transitions = filtered }
 
-    /// Remove states unreachable from the initial state via surviving transitions.
-    /// Initial state is always retained. Updates StateNames, StateMetadata,
-    /// and removes transitions referencing pruned states.
-    /// Uses a pre-built adjacency map for O(V+E) traversal.
-    let pruneUnreachableStates (statechart: ExtractedStatechart) : ExtractedStatechart =
-        let adjacency =
-            statechart.Transitions
-            |> List.groupBy (fun t -> t.Source)
-            |> List.map (fun (k, ts) -> k, ts |> List.map (fun t -> t.Target))
-            |> Map.ofList
-
+    /// Core reachability computation: BFS/DFS from initial state via transition adjacency.
+    /// Returns the set of reachable state names.
+    let private computeReachable (adjacency: Map<string, string list>) (initialState: string) : Set<string> =
         let rec reachable (visited: Set<string>) (frontier: string list) =
             match frontier with
             | [] -> visited
@@ -65,8 +57,17 @@ module Projection =
 
                     reachable visited' (neighbors @ rest)
 
-        let reachableStates = reachable Set.empty [ statechart.InitialStateKey ]
+        reachable Set.empty [ initialState ]
 
+    /// Build transition adjacency map from a statechart's transitions.
+    let private buildAdjacency (transitions: TransitionSpec list) : Map<string, string list> =
+        transitions
+        |> List.groupBy (fun t -> t.Source)
+        |> List.map (fun (k, ts) -> k, ts |> List.map (fun t -> t.Target))
+        |> Map.ofList
+
+    /// Apply reachable state set to prune a statechart.
+    let private applyPrune (reachableStates: Set<string>) (statechart: ExtractedStatechart) : ExtractedStatechart =
         { statechart with
             StateNames = statechart.StateNames |> List.filter (fun s -> Set.contains s reachableStates)
             StateMetadata =
@@ -76,6 +77,63 @@ module Projection =
                 statechart.Transitions
                 |> List.filter (fun t -> Set.contains t.Source reachableStates && Set.contains t.Target reachableStates) }
 
+    /// Remove states unreachable from the initial state via surviving transitions.
+    /// Initial state is always retained. Updates StateNames, StateMetadata,
+    /// and removes transitions referencing pruned states.
+    /// Uses a pre-built adjacency map for O(V+E) traversal.
+    let pruneUnreachableStates (statechart: ExtractedStatechart) : ExtractedStatechart =
+        let adjacency = buildAdjacency statechart.Transitions
+        let reachableStates = computeReachable adjacency statechart.InitialStateKey
+        applyPrune reachableStates statechart
+
+    /// Hierarchy-aware pruning: after computing reachable states via transitions,
+    /// also include child states of any reachable composite state (implicit initial-child entry).
+    /// Iterates to a fixed point: hierarchy expansion may reveal states with transitions
+    /// to new states, which may themselves be composites needing expansion.
+    /// This prevents children from being pruned when they are reachable via containment
+    /// but have no explicit incoming transitions from outside the parent.
+    let pruneUnreachableStatesWithHierarchy
+        (containment: StateContainment)
+        (statechart: ExtractedStatechart)
+        : ExtractedStatechart =
+        if StateContainment.isEmpty containment then
+            pruneUnreachableStates statechart
+        else
+            let adjacency = buildAdjacency statechart.Transitions
+
+            // Fixed-point expansion: alternate between transition reachability and hierarchy expansion.
+            // Each iteration: (1) follow all transitions from current set, (2) expand hierarchy
+            // descendants. Repeats until no new states are discovered.
+            let rec fixedPoint (current: Set<string>) : Set<string> =
+                // Step 1: follow transitions from all currently reachable states
+                let withTransitions =
+                    current
+                    |> Set.fold
+                        (fun acc state ->
+                            adjacency
+                            |> Map.tryFind state
+                            |> Option.defaultValue []
+                            |> List.fold (fun a target -> Set.add target a) acc)
+                        current
+
+                // Step 2: expand hierarchy — add all descendants of reachable composites
+                let withHierarchy =
+                    withTransitions
+                    |> Set.fold
+                        (fun acc state ->
+                            StateContainment.allDescendants state containment
+                            |> List.fold (fun a desc -> Set.add desc a) acc)
+                        withTransitions
+
+                if withHierarchy = current then
+                    current // Fixed point reached
+                else
+                    fixedPoint withHierarchy
+
+            let initialReachable = computeReachable adjacency statechart.InitialStateKey
+            let expandedReachable = fixedPoint initialReachable
+            applyPrune expandedReachable statechart
+
     /// Project a statechart for a single role.
     /// Prune globally first (remove truly disconnected states using all transitions),
     /// then filter transitions by role. In multi-party protocols, state reachability
@@ -84,11 +142,35 @@ module Projection =
     let projectForRole (roleName: string) : ExtractedStatechart -> ExtractedStatechart =
         pruneUnreachableStates >> filterTransitionsByRole roleName
 
+    /// Hierarchy-aware role projection: uses containment-aware pruning so child states
+    /// reachable via implicit initial-child entry are retained.
+    let projectForRoleWithHierarchy
+        (containment: StateContainment)
+        (roleName: string)
+        (statechart: ExtractedStatechart)
+        : ExtractedStatechart =
+        statechart
+        |> pruneUnreachableStatesWithHierarchy containment
+        |> filterTransitionsByRole roleName
+
     /// Project for all roles defined in the statechart.
     /// Returns empty map if statechart has no roles (no-op).
     /// Prunes unreachable states once, then filters per role.
     let projectAll (statechart: ExtractedStatechart) : Map<string, ExtractedStatechart> =
         let pruned = pruneUnreachableStates statechart
+
+        statechart.Roles
+        |> List.map (fun role -> role.Name, filterTransitionsByRole role.Name pruned)
+        |> Map.ofList
+
+    /// Hierarchy-aware projection for all roles.
+    /// Uses containment-aware pruning so child states reachable via implicit
+    /// initial-child entry are retained in all role projections.
+    let projectAllWithHierarchy
+        (containment: StateContainment)
+        (statechart: ExtractedStatechart)
+        : Map<string, ExtractedStatechart> =
+        let pruned = pruneUnreachableStatesWithHierarchy containment statechart
 
         statechart.Roles
         |> List.map (fun role -> role.Name, filterTransitionsByRole role.Name pruned)

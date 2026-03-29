@@ -7,14 +7,17 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="TestHelpers.fs" />
+    <Compile Include="StateContainmentTests.fs" />
     <Compile Include="ResourceSlugTests.fs" />
     <Compile Include="AffordanceMapTests.fs" />
     <Compile Include="ProjectionTests.fs" />
     <Compile Include="ClosedWorldProjectionTests.fs" />
+    <Compile Include="HierarchyProjectionTests.fs" />
     <Compile Include="ProgressAnalysisTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="3.3.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />

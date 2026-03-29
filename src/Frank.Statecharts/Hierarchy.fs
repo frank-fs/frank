@@ -227,6 +227,11 @@ module StateHierarchy =
 
             findLCA ancestryA None
 
+    /// Convert a StateHierarchy to a lightweight StateContainment for use
+    /// in hierarchy-aware projection and validation functions in Frank.Resources.Model.
+    let toContainment (hierarchy: StateHierarchy) : Frank.Resources.Model.StateContainment =
+        Frank.Resources.Model.StateContainment.ofPairs (Map.toList hierarchy.ChildrenMap)
+
 // ==========================================================================
 // HierarchicalRuntime module
 // ==========================================================================
