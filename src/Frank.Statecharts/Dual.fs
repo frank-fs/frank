@@ -1,7 +1,14 @@
-/// Session type dual derivation engine.
+/// One-directional dual derivation engine: server -> client obligations.
+///
 /// Derives client protocol duals from server statechart + projected ALPS profiles.
-/// Implements Wadler's structural duality: the server's projected profile describes
-/// what the server offers; the dual describes what the client must/may do.
+/// The server's projected profile describes what the server offers; the dual describes
+/// what the client must/may do.
+///
+/// IMPORTANT: This is NOT a full session-type duality with involution (dual(dual(T)) = T).
+/// It is a one-directional derivation: given a server statechart, produce the client's
+/// obligation classification per (role, state, descriptor). The naming "Dual" is domain
+/// shorthand following Wadler's structural duality vocabulary, but the implementation
+/// only computes server -> client obligations, not bidirectional session types.
 module Frank.Statecharts.Dual
 
 open Frank.Resources.Model
@@ -29,6 +36,11 @@ type DualAnnotation =
         DualOf: string option
         /// Cross-service composition boundary (e.g., "service-b#acceptOrder").
         CutPoint: string option
+        /// Choice group identifier for external choice semantics (Wadler).
+        /// All MustSelect descriptors in the same (role, state) share the same group ID,
+        /// meaning "the client must select exactly one from this group."
+        /// None for MayPoll and SessionComplete obligations.
+        ChoiceGroupId: int option
     }
 
 /// Result of dual derivation for a statechart.
@@ -36,39 +48,67 @@ type DeriveResult =
     {
         /// Per-(role, state) dual annotations.
         Annotations: Map<string * string, DualAnnotation list>
-        /// States where no role can advance the protocol (potential deadlocks).
-        PotentialDeadlocks: string list
+        /// Non-final states where no role can advance the protocol.
+        /// These are protocol sinks: reachable states with no advancing transitions.
+        ProtocolSinks: string list
     }
 
-/// Classify a transition's obligation for a specific role in a specific state.
-/// Safe self-loop = MayPoll. Unsafe/idempotent with source != target = MustSelect.
-let private classifyObligation (isFinalState: bool) (transition: TransitionSpec) : ClientObligation =
-    if isFinalState then
-        SessionComplete
-    else
-        let advancesProtocol = transition.Source <> transition.Target
+/// Check whether a state is final (session complete).
+let private isFinal (statechart: ExtractedStatechart) (state: string) : bool =
+    statechart.StateMetadata
+    |> Map.tryFind state
+    |> Option.map (fun info -> info.IsFinal)
+    |> Option.defaultValue false
 
-        if advancesProtocol then MustSelect else MayPoll
-
-/// Check whether a transition advances the protocol (source != target).
-let private advancesProtocol (transition: TransitionSpec) : bool = transition.Source <> transition.Target
-
-/// Build a DualAnnotation for a transition.
-let private buildAnnotation
+/// Build a DualAnnotation for a grouped event (one annotation per unique event per state).
+/// For nondeterministic branching (same event, multiple targets), AdvancesProtocol = true
+/// if ANY target differs from source.
+let private buildGroupedAnnotation
     (isFinalState: bool)
     (cutPoints: Map<string, string>)
     (dualOfMap: Map<string, string>)
-    (transition: TransitionSpec)
+    (event: string, transitions: TransitionSpec list)
     : DualAnnotation =
-    { Descriptor = transition.Event
-      Obligation = classifyObligation isFinalState transition
-      AdvancesProtocol = advancesProtocol transition
-      CutPoint = cutPoints |> Map.tryFind transition.Event
-      DualOf = dualOfMap |> Map.tryFind transition.Event }
+    let anyAdvances = transitions |> List.exists ProgressAnalysis.isAdvancing
 
-/// Detect potential deadlock states: non-final states where no role's projection
+    let obligation =
+        if isFinalState then SessionComplete
+        elif anyAdvances then MustSelect
+        else MayPoll
+
+    { Descriptor = event
+      Obligation = obligation
+      AdvancesProtocol = anyAdvances
+      CutPoint = cutPoints |> Map.tryFind event
+      DualOf = dualOfMap |> Map.tryFind event
+      ChoiceGroupId = None }
+
+/// Assign ChoiceGroupId to MustSelect annotations that share the same (role, state).
+/// Uses a mutable counter to assign globally unique group IDs.
+let private assignChoiceGroups (annotations: Map<string * string, DualAnnotation list>) =
+    let mutable nextGroupId = 0
+
+    annotations
+    |> Map.map (fun _key anns ->
+        let hasMustSelect = anns |> List.exists (fun a -> a.Obligation = MustSelect)
+
+        if hasMustSelect then
+            let groupId = nextGroupId
+            nextGroupId <- nextGroupId + 1
+
+            anns
+            |> List.map (fun a ->
+                if a.Obligation = MustSelect then
+                    { a with ChoiceGroupId = Some groupId }
+                else
+                    a)
+        else
+            anns)
+
+/// Detect protocol sink states: non-final states where no role's projection
 /// has any advancing (source != target) transition.
-let private detectDeadlocks
+let private detectProtocolSinks
+    (reachableStates: Set<string>)
     (statechart: ExtractedStatechart)
     (projections: Map<string, ExtractedStatechart>)
     : string list =
@@ -76,23 +116,24 @@ let private detectDeadlocks
         projections
         |> Map.values
         |> Seq.collect (fun sc -> sc.Transitions)
-        |> Seq.filter (fun t -> t.Source <> t.Target)
+        |> Seq.filter ProgressAnalysis.isAdvancing
         |> Seq.map (fun t -> t.Source)
         |> Set.ofSeq
 
     statechart.StateNames
     |> List.filter (fun state ->
-        let isFinal =
-            statechart.StateMetadata
-            |> Map.tryFind state
-            |> Option.map (fun info -> info.IsFinal)
-            |> Option.defaultValue false
-
-        not isFinal && not (Set.contains state advancingSourceStates))
+        Set.contains state reachableStates
+        && not (isFinal statechart state)
+        && not (Set.contains state advancingSourceStates))
 
 /// Derive client protocol duals from server statechart + projected ALPS profiles.
 /// For each role R and each reachable state S, classifies each descriptor as
 /// MustSelect (advances protocol), MayPoll (self-loop/safe), or SessionComplete (final).
+///
+/// LIMITATION: Operates on flat ExtractedStatechart only. Hierarchical inputs
+/// (e.g., from StateMachineMetadata with Hierarchy = Some) must be flattened before
+/// calling this function. The caller is responsible for flattening composite states;
+/// see Projection.pruneUnreachableStates for reachability filtering.
 let deriveCore
     (statechart: ExtractedStatechart)
     (projections: Map<string, ExtractedStatechart>)
@@ -101,49 +142,43 @@ let deriveCore
     : DeriveResult =
     if statechart.Roles.IsEmpty then
         { Annotations = Map.empty
-          PotentialDeadlocks = [] }
+          ProtocolSinks = [] }
     else
+        let reachableStates =
+            (Projection.pruneUnreachableStates statechart).StateNames |> Set.ofList
+
         let annotations =
             projections
             |> Map.toList
             |> List.collect (fun (roleName, roleProjection) ->
                 statechart.StateNames
+                |> List.filter (fun s -> Set.contains s reachableStates)
                 |> List.map (fun state ->
-                    let isFinal =
-                        statechart.StateMetadata
-                        |> Map.tryFind state
-                        |> Option.map (fun info -> info.IsFinal)
-                        |> Option.defaultValue false
+                    let isFinalState = isFinal statechart state
 
                     let transitionsFromState =
                         roleProjection.Transitions |> List.filter (fun t -> t.Source = state)
 
                     let annotations =
-                        if isFinal then
-                            // For final states, annotate all transitions as SessionComplete
-                            // and if no transitions exist, add a synthetic one
-                            let transAnnotations =
-                                transitionsFromState |> List.map (buildAnnotation true cutPoints dualOfMap)
-
-                            if transAnnotations.IsEmpty then
-                                // Final state with no visible transitions: emit SessionComplete marker
-                                [ { Descriptor = ""
-                                    Obligation = SessionComplete
-                                    AdvancesProtocol = false
-                                    CutPoint = None
-                                    DualOf = None } ]
-                            else
-                                transAnnotations
+                        if isFinalState then
+                            // For final states, group by event and annotate as SessionComplete.
+                            // If no transitions exist, return empty list — consumers check isFinal.
+                            transitionsFromState
+                            |> List.groupBy (fun t -> t.Event)
+                            |> List.map (buildGroupedAnnotation true cutPoints dualOfMap)
                         else
-                            transitionsFromState |> List.map (buildAnnotation false cutPoints dualOfMap)
+                            transitionsFromState
+                            |> List.groupBy (fun t -> t.Event)
+                            |> List.map (buildGroupedAnnotation false cutPoints dualOfMap)
 
                     (roleName, state), annotations))
             |> Map.ofList
 
-        let deadlocks = detectDeadlocks statechart projections
+        let annotationsWithGroups = assignChoiceGroups annotations
+        let sinks = detectProtocolSinks reachableStates statechart projections
 
-        { Annotations = annotations
-          PotentialDeadlocks = deadlocks }
+        { Annotations = annotationsWithGroups
+          ProtocolSinks = sinks }
 
 /// Derive client protocol duals (simple version — no cut points or dualOf annotations).
 let derive (statechart: ExtractedStatechart) (projections: Map<string, ExtractedStatechart>) : DeriveResult =

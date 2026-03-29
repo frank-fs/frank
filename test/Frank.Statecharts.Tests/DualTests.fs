@@ -1,8 +1,6 @@
 module Frank.Statecharts.Tests.DualTests
 
 open Expecto
-open FsCheck
-open FsCheck.FSharp
 open Frank.Resources.Model
 open Frank.Statecharts.Dual
 
@@ -157,6 +155,7 @@ let private findAnnotation descriptor (annotations: DualAnnotation list) =
 let private obligationsFor role state (result: DeriveResult) =
     annotationsFor role state result
     |> List.map (fun a -> a.Descriptor, a.Obligation)
+    |> List.distinctBy fst
     |> Map.ofList
 
 // ===========================================================================
@@ -269,7 +268,7 @@ let ticTacToeDualTests =
               Expect.isFalse getGame.Value.AdvancesProtocol "getGame does not advance protocol"
 
           testCase "no deadlocks flagged"
-          <| fun _ -> Expect.isEmpty result.PotentialDeadlocks "TicTacToe has no deadlocks"
+          <| fun _ -> Expect.isEmpty result.ProtocolSinks "TicTacToe has no deadlocks"
 
           testCase "no cut points in TicTacToe"
           <| fun _ ->
@@ -459,7 +458,7 @@ let orderFulfillmentDualTests =
 
           // -- No deadlocks in the standard fixture --
           testCase "no deadlocks in order fulfillment"
-          <| fun _ -> Expect.isEmpty result.PotentialDeadlocks "OrderFulfillment has no deadlocks" ]
+          <| fun _ -> Expect.isEmpty result.ProtocolSinks "OrderFulfillment has no deadlocks" ]
 
 // ===========================================================================
 // Cut point tests
@@ -467,24 +466,12 @@ let orderFulfillmentDualTests =
 
 [<Tests>]
 let cutPointTests =
-    let chartWithCutPoint: ExtractedStatechart =
-        { orderFulfillmentChart with
-            Transitions =
-                orderFulfillmentChart.Transitions
-                |> List.map (fun t ->
-                    if t.Event = "beginPicking" then
-                        { t with
-                            // Mark beginPicking as a cut point via a dedicated field approach:
-                            // In the real system, cut points come from ALPS annotations.
-                            // For the derive function, we pass them as a separate parameter.
-                            Event = t.Event }
-                    else
-                        t) }
-
-    let projections = Projection.projectAll chartWithCutPoint
+    // Cut points come from ALPS annotations, passed as a separate parameter to deriveWithCutPoints.
+    // The chart itself is unchanged — we just use the standard orderFulfillmentChart.
+    let projections = Projection.projectAll orderFulfillmentChart
 
     let cutPoints = Map.ofList [ "beginPicking", "service-b#acceptOrder" ]
-    let result = deriveWithCutPoints chartWithCutPoint projections cutPoints
+    let result = deriveWithCutPoints orderFulfillmentChart projections cutPoints
 
     testList
         "Dual.derive CutPoints"
@@ -519,15 +506,9 @@ let deadlockTests =
     let result = derive deadlockChart projections
 
     testList
-        "Dual.derive Deadlock detection"
-        [ testCase "Paid flagged as potential deadlock when beginPicking removed"
-          <| fun _ -> Expect.contains result.PotentialDeadlocks "Paid" "Paid should be flagged as deadlock"
-
-          testCase "other states not flagged as deadlock"
-          <| fun _ ->
-              Expect.isFalse (List.contains "Submitted" result.PotentialDeadlocks) "Submitted should not be deadlock"
-
-              Expect.isFalse (List.contains "Confirmed" result.PotentialDeadlocks) "Confirmed should not be deadlock" ]
+        "Dual.derive ProtocolSink detection"
+        [ testCase "Paid is the only protocol sink when beginPicking removed"
+          <| fun _ -> Expect.equal result.ProtocolSinks [ "Paid" ] "Paid should be the only protocol sink" ]
 
 // ===========================================================================
 // DualOf annotation tests
@@ -563,7 +544,7 @@ let edgeCaseTests =
               let projections = Projection.projectAll noRoleChart
               let result = derive noRoleChart projections
               Expect.isTrue (Map.isEmpty result.Annotations) "empty roles → empty annotations"
-              Expect.isEmpty result.PotentialDeadlocks "no deadlocks with no roles"
+              Expect.isEmpty result.ProtocolSinks "no deadlocks with no roles"
 
           testCase "single state chart with final state"
           <| fun _ ->
