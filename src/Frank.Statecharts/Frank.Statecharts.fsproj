@@ -15,9 +15,9 @@
   <ItemGroup>
     <!-- Core domain types -->
     <Compile Include="Types.fs" />
-    <Compile Include="Dual.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="Hierarchy.fs" />
+    <Compile Include="Dual.fs" />
     <!-- WSD parser -->
     <Compile Include="Wsd/Types.fs" />
     <Compile Include="Wsd/Lexer.fs" />

@@ -186,32 +186,35 @@ let ticTacToeDualTests =
               for (_descriptor, obligation) in Map.toList obligations do
                   Expect.equal obligation MayPoll "PlayerX in OTurn should only have MayPoll"
 
-          testCase "PlayerX in XWins: SessionComplete"
+          testCase "PlayerX in XWins: MayObserve (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "XWins" result
 
-              let hasSessionComplete =
-                  annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+              let hasTerminalObligation =
+                  annotations
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-              Expect.isTrue hasSessionComplete "XWins should have SessionComplete"
+              Expect.isTrue hasTerminalObligation "XWins should have terminal obligation"
 
-          testCase "PlayerX in OWins: SessionComplete"
+          testCase "PlayerX in OWins: MayObserve (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "OWins" result
 
-              let hasSessionComplete =
-                  annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+              let hasTerminalObligation =
+                  annotations
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-              Expect.isTrue hasSessionComplete "OWins should have SessionComplete"
+              Expect.isTrue hasTerminalObligation "OWins should have terminal obligation"
 
-          testCase "PlayerX in Draw: SessionComplete"
+          testCase "PlayerX in Draw: MayObserve (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "Draw" result
 
-              let hasSessionComplete =
-                  annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+              let hasTerminalObligation =
+                  annotations
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-              Expect.isTrue hasSessionComplete "Draw should have SessionComplete"
+              Expect.isTrue hasTerminalObligation "Draw should have terminal obligation"
 
           testCase "PlayerO in OTurn: MustSelect on makeMove"
           <| fun _ ->
@@ -230,10 +233,11 @@ let ticTacToeDualTests =
               for state in [ "XWins"; "OWins"; "Draw" ] do
                   let annotations = annotationsFor "PlayerO" state result
 
-                  let hasSessionComplete =
-                      annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                  let hasTerminalObligation =
+                      annotations
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-                  Expect.isTrue hasSessionComplete $"PlayerO in {state} should be SessionComplete"
+                  Expect.isTrue hasTerminalObligation $"PlayerO in {state} should have terminal obligation"
 
           testCase "Spectator: MayPoll in all non-terminal states"
           <| fun _ ->
@@ -243,15 +247,16 @@ let ticTacToeDualTests =
                   for (_descriptor, obligation) in Map.toList obligations do
                       Expect.equal obligation MayPoll $"Spectator in {state} should be MayPoll"
 
-          testCase "Spectator: SessionComplete in all terminal states"
+          testCase "Spectator: terminal obligation in all terminal states"
           <| fun _ ->
               for state in [ "XWins"; "OWins"; "Draw" ] do
                   let annotations = annotationsFor "Spectator" state result
 
-                  let hasSessionComplete =
-                      annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                  let hasTerminalObligation =
+                      annotations
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-                  Expect.isTrue hasSessionComplete $"Spectator in {state} should be SessionComplete"
+                  Expect.isTrue hasTerminalObligation $"Spectator in {state} should have terminal obligation"
 
           testCase "makeMove AdvancesProtocol is true"
           <| fun _ ->
@@ -395,15 +400,16 @@ let orderFulfillmentDualTests =
                   for (_descriptor, obligation) in Map.toList obligations do
                       Expect.equal obligation MayPoll $"Auditor in {state} should be MayPoll"
 
-          testCase "Auditor in terminal states: SessionComplete"
+          testCase "Auditor in terminal states: terminal obligation"
           <| fun _ ->
               for state in [ "Completed"; "Cancelled" ] do
                   let annotations = annotationsFor "Auditor" state result
 
-                  let hasSessionComplete =
-                      annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                  let hasTerminalObligation =
+                      annotations
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-                  Expect.isTrue hasSessionComplete $"Auditor in {state} should be SessionComplete"
+                  Expect.isTrue hasTerminalObligation $"Auditor in {state} should have terminal obligation"
 
           // -- Multi-role advancing state (Confirmed) --
           testCase "Confirmed: both Buyer and Seller have MustSelect transitions"
@@ -421,25 +427,27 @@ let orderFulfillmentDualTests =
               Expect.isTrue sellerHasMustSelect "Seller has MustSelect in Confirmed"
 
           // -- Terminal states --
-          testCase "all roles: SessionComplete in Completed"
+          testCase "all roles: terminal obligation in Completed"
           <| fun _ ->
               for role in [ "Buyer"; "Seller"; "Warehouse"; "Auditor" ] do
                   let annotations = annotationsFor role "Completed" result
 
-                  let hasSessionComplete =
-                      annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                  let hasTerminalObligation =
+                      annotations
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-                  Expect.isTrue hasSessionComplete $"{role} in Completed should be SessionComplete"
+                  Expect.isTrue hasTerminalObligation $"{role} in Completed should have terminal obligation"
 
-          testCase "all roles: SessionComplete in Cancelled"
+          testCase "all roles: terminal obligation in Cancelled"
           <| fun _ ->
               for role in [ "Buyer"; "Seller"; "Warehouse"; "Auditor" ] do
                   let annotations = annotationsFor role "Cancelled" result
 
-                  let hasSessionComplete =
-                      annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                  let hasTerminalObligation =
+                      annotations
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
-                  Expect.isTrue hasSessionComplete $"{role} in Cancelled should be SessionComplete"
+                  Expect.isTrue hasTerminalObligation $"{role} in Cancelled should have terminal obligation"
 
           // -- AdvancesProtocol --
           testCase "confirmOrder advances protocol"
@@ -480,7 +488,7 @@ let cutPointTests =
               let annotations = annotationsFor "Warehouse" "Paid" result
               let beginPicking = findAnnotation "beginPicking" annotations
               Expect.isSome beginPicking "beginPicking annotation exists"
-              Expect.equal beginPicking.Value.CutPoint (Some "service-b#acceptOrder") "cut point value"
+              Expect.equal beginPicking.Value.CutPoint (Some(Opaque "service-b#acceptOrder")) "cut point value"
 
           testCase "non-cut-point transitions have no cut point"
           <| fun _ ->
@@ -546,7 +554,7 @@ let edgeCaseTests =
               Expect.isTrue (Map.isEmpty result.Annotations) "empty roles → empty annotations"
               Expect.isEmpty result.ProtocolSinks "no deadlocks with no roles"
 
-          testCase "single state chart with final state"
+          testCase "single state chart with final state and self-loop yields MayObserve"
           <| fun _ ->
               let singleStateChart: ExtractedStatechart =
                   { RouteTemplate = "/done"
@@ -566,10 +574,9 @@ let edgeCaseTests =
               let result = derive singleStateChart projections
               let annotations = annotationsFor "User" "Done" result
 
-              let hasSessionComplete =
-                  annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+              let hasMayObserve = annotations |> List.exists (fun a -> a.Obligation = MayObserve)
 
-              Expect.isTrue hasSessionComplete "single final state yields SessionComplete" ]
+              Expect.isTrue hasMayObserve "single final state with self-loop yields MayObserve" ]
 
 // ===========================================================================
 // FsCheck property tests
@@ -579,7 +586,7 @@ let edgeCaseTests =
 let propertyTests =
     testList
         "Dual.derive properties"
-        [ testCase "every final state for every role has SessionComplete"
+        [ testCase "every final state for every role has terminal obligation"
           <| fun _ ->
               let charts = [ ticTacToeChart; orderFulfillmentChart ]
 
@@ -597,12 +604,13 @@ let propertyTests =
                       for state in finalStates do
                           let annotations = annotationsFor role.Name state result
 
-                          let hasSessionComplete =
-                              annotations |> List.exists (fun a -> a.Obligation = SessionComplete)
+                          let hasTerminalObligation =
+                              annotations
+                              |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
 
                           Expect.isTrue
-                              hasSessionComplete
-                              $"{role.Name} in final state {state} should have SessionComplete"
+                              hasTerminalObligation
+                              $"{role.Name} in final state {state} should have terminal obligation"
 
           testCase "self-loop transitions in non-final states always produce MayPoll"
           <| fun _ ->

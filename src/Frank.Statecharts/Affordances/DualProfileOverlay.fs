@@ -50,6 +50,7 @@ module DualAlpsGenerator =
         | MustSelect -> "must-select"
         | MayPoll -> "may-poll"
         | SessionComplete -> "session-complete"
+        | MayObserve -> "may-observe"
 
     /// Generate a dual-annotated ALPS JSON for a specific (role, state) pair.
     /// The document contains the role's available descriptors in the given state,
@@ -134,7 +135,13 @@ module DualAlpsGenerator =
                 |> Option.iter (fun cutPoint ->
                     writer.WriteStartObject()
                     writer.WriteString("id", "https://frank-fs.github.io/alps-ext/cutPoint")
-                    writer.WriteString("value", cutPoint)
+
+                    let cutPointStr =
+                        match cutPoint with
+                        | Opaque s -> s
+                        | Enriched cp -> sprintf "%s@%s" cp.TargetUriTemplate cp.AuthorityBoundary
+
+                    writer.WriteString("value", cutPointStr)
                     writer.WriteEndObject())
 
                 // choiceGroupId (optional, for external choice semantics)

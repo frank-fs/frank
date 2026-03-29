@@ -128,7 +128,7 @@ let checkDual (statechart: ExtractedStatechart) : Result<CheckDualResult, string
               Message = $"Protocol sink (deadlock) at state '%s{sink}': no role can advance the protocol" }
         )
 
-    // Check 2: session-complete only at final states
+    // Check 2: session-complete/may-observe only at final states
     for KeyValue((role, state), annotations) in deriveResult.Annotations do
         for ann in annotations do
             if ann.Obligation = SessionComplete && not (Set.contains state finalStates) then
@@ -138,14 +138,23 @@ let checkDual (statechart: ExtractedStatechart) : Result<CheckDualResult, string
                         $"session-complete at non-final state '%s{state}' for role '%s{role}' descriptor '%s{ann.Descriptor}'" }
                 )
 
-    // Check 3: every must-select has a corresponding advancing transition
+            if ann.Obligation = MayObserve && not (Set.contains state finalStates) then
+                issues.Add(
+                    { Severity = "error"
+                      Message =
+                        $"may-observe at non-final state '%s{state}' for role '%s{role}' descriptor '%s{ann.Descriptor}'" }
+                )
+
+    // Check 3: every must-select has a corresponding advancing transition.
+    // Note: With method safety integration (#226), unsafe self-loops can be MustSelect
+    // without advancing — this is expected when the self-loop has side effects (POST/PUT).
     for KeyValue((role, state), annotations) in deriveResult.Annotations do
         for ann in annotations do
             if ann.Obligation = MustSelect && not ann.AdvancesProtocol then
                 issues.Add(
-                    { Severity = "warning"
+                    { Severity = "info"
                       Message =
-                        $"MustSelect obligation on '%s{ann.Descriptor}' in state '%s{state}' for role '%s{role}' does not advance the protocol" }
+                        $"MustSelect obligation on '%s{ann.Descriptor}' in state '%s{state}' for role '%s{role}' does not advance the protocol (may be an unsafe self-loop)" }
                 )
 
     let issueList = issues |> Seq.toList

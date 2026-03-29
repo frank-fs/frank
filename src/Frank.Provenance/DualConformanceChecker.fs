@@ -33,6 +33,7 @@ module DualConformanceChecker =
                 match a.CutPoint with
                 | Some _ -> Some(a.Descriptor, state)
                 | None -> None))
+
         |> Map.ofList
 
     /// A state epoch: a contiguous run of records while the system is in a given state.
