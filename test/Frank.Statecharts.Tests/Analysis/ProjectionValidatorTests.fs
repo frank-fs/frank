@@ -682,5 +682,5 @@ let validateProjectionStrictTests =
           testCase "strict mode ChecksRun count includes ClosedWorldTotality"
           <| fun _ ->
               let result = validateProjectionStrict ticTacToeChart.RouteTemplate ticTacToeChart
-              // 4 role-based + 1 guard + 1 closed-world totality = 6
-              Expect.equal result.ChecksRun 6 "Six checks run in strict mode" ]
+              // 5 role-based + 1 closed-world totality + 1 guard = 7
+              Expect.equal result.ChecksRun 7 "Seven checks run in strict mode" ]
