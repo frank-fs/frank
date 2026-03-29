@@ -22,15 +22,33 @@ let private ticTacToeChart: ExtractedStatechart =
       GuardNames = [ "TurnGuard" ]
       StateMetadata =
         Map.ofList
-            [ "XTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "OTurn", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "XWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "OWins", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "Draw", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "XTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "OTurn",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "XWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "OWins",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Draw",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles =
-        [ { Name = "PlayerX"; Description = Some "Player X" }
-          { Name = "PlayerO"; Description = Some "Player O" }
-          { Name = "Spectator"; Description = Some "Observer" } ]
+        [ { Name = "PlayerX"
+            Description = Some "Player X" }
+          { Name = "PlayerO"
+            Description = Some "Player O" }
+          { Name = "Spectator"
+            Description = Some "Observer" } ]
       Transitions =
         [ mkTransition "getGame" "XTurn" "XTurn" None Unrestricted
           mkTransition "getGame" "OTurn" "OTurn" None Unrestricted
@@ -51,8 +69,14 @@ let private deadTransitionChart: ExtractedStatechart =
       GuardNames = [ "DeadGuard" ]
       StateMetadata =
         Map.ofList
-            [ "Active", { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None }
-              "Archived", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Active",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = None }
+              "Archived",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles = [ { Name = "Admin"; Description = None } ]
       Transitions =
         [ mkTransition "getItem" "Active" "Active" None Unrestricted
@@ -65,9 +89,18 @@ let private mixedChoiceChart: ExtractedStatechart =
       GuardNames = []
       StateMetadata =
         Map.ofList
-            [ "Pending", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "Approved", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None }
-              "Rejected", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Pending",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Approved",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None }
+              "Rejected",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles =
         [ { Name = "Manager"; Description = None }
           { Name = "Clerk"; Description = None } ]
@@ -83,12 +116,22 @@ let private deadlockChart: ExtractedStatechart =
       GuardNames = []
       StateMetadata =
         Map.ofList
-            [ "Open", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "Blocked", { AllowedMethods = [ "GET" ]; IsFinal = false; Description = None }
-              "Done", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Open",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Blocked",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = None }
+              "Done",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles =
         [ { Name = "Worker"; Description = None }
-          { Name = "Reviewer"; Description = None } ]
+          { Name = "Reviewer"
+            Description = None } ]
       Transitions =
         [ mkTransition "view" "Open" "Open" None Unrestricted
           mkTransition "block" "Open" "Blocked" None (RestrictedTo [ "Worker" ])
@@ -101,8 +144,14 @@ let private staleRoleChart: ExtractedStatechart =
       GuardNames = []
       StateMetadata =
         Map.ofList
-            [ "Draft", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "Published", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Draft",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Published",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles = [ { Name = "Editor"; Description = None } ]
       Transitions =
         [ mkTransition "view" "Draft" "Draft" None Unrestricted
@@ -152,9 +201,7 @@ let mixedChoiceTests =
           <| fun _ ->
               let chart =
                   { ticTacToeChart with
-                      Transitions =
-                          ticTacToeChart.Transitions
-                          |> List.filter (fun t -> t.Constraint = Unrestricted) }
+                      Transitions = ticTacToeChart.Transitions |> List.filter (fun t -> t.Constraint = Unrestricted) }
 
               let issues = checkMixedChoice chart
               Expect.isEmpty issues "Unrestricted transitions don't count" ]
@@ -204,8 +251,135 @@ let deadlockTests =
               let projections = Projection.projectAll ticTacToeChart
               let pruned = Projection.pruneUnreachableStates ticTacToeChart
               let issues = checkDeadlock projections pruned
-              let finalIssues = issues |> List.filter (fun i -> i.Message.Contains("Wins") || i.Message.Contains("Draw"))
+
+              let finalIssues =
+                  issues
+                  |> List.filter (fun i -> i.Message.Contains("Wins") || i.Message.Contains("Draw"))
+
               Expect.isEmpty finalIssues "Final states not flagged" ]
+
+// -- Livelock test fixtures --
+
+/// Chart with a "Paused" state where the only outgoing transition is a self-loop.
+/// No role can advance out of Paused — this is a livelock.
+let private livelockChart: ExtractedStatechart =
+    { RouteTemplate = "/games/{gameId}"
+      StateNames = [ "Playing"; "Paused"; "Done" ]
+      InitialStateKey = "Playing"
+      GuardNames = []
+      StateMetadata =
+        Map.ofList
+            [ "Playing",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Paused",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = None }
+              "Done",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
+      Roles =
+        [ { Name = "Player"; Description = None }
+          { Name = "Spectator"
+            Description = None } ]
+      Transitions =
+        [ mkTransition "getGame" "Playing" "Playing" None Unrestricted
+          mkTransition "pause" "Playing" "Paused" None (RestrictedTo [ "Player" ])
+          mkTransition "getGame" "Paused" "Paused" None Unrestricted
+          mkTransition "finish" "Playing" "Done" None (RestrictedTo [ "Player" ])
+          mkTransition "getGame" "Done" "Done" None Unrestricted ] }
+
+/// Chart where a final state has only self-loop transitions — should NOT be flagged.
+let private finalSelfLoopChart: ExtractedStatechart =
+    { RouteTemplate = "/items/{itemId}"
+      StateNames = [ "Active"; "Archived" ]
+      InitialStateKey = "Active"
+      GuardNames = []
+      StateMetadata =
+        Map.ofList
+            [ "Active",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Archived",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
+      Roles = [ { Name = "Admin"; Description = None } ]
+      Transitions =
+        [ mkTransition "view" "Active" "Active" None Unrestricted
+          mkTransition "archive" "Active" "Archived" None (RestrictedTo [ "Admin" ])
+          mkTransition "view" "Archived" "Archived" None Unrestricted ] }
+
+/// Chart where a state has both self-loop and non-self-loop transitions — no livelock.
+let private mixedTransitionsChart: ExtractedStatechart =
+    { RouteTemplate = "/games/{gameId}"
+      StateNames = [ "Playing"; "Paused"; "Done" ]
+      InitialStateKey = "Playing"
+      GuardNames = []
+      StateMetadata =
+        Map.ofList
+            [ "Playing",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Paused",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Done",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
+      Roles =
+        [ { Name = "Player"; Description = None }
+          { Name = "Spectator"
+            Description = None } ]
+      Transitions =
+        [ mkTransition "getGame" "Playing" "Playing" None Unrestricted
+          mkTransition "pause" "Playing" "Paused" None (RestrictedTo [ "Player" ])
+          mkTransition "getGame" "Paused" "Paused" None Unrestricted
+          mkTransition "resume" "Paused" "Playing" None (RestrictedTo [ "Player" ])
+          mkTransition "finish" "Playing" "Done" None (RestrictedTo [ "Player" ])
+          mkTransition "getGame" "Done" "Done" None Unrestricted ] }
+
+[<Tests>]
+let livelockTests =
+    testList
+        "ProjectionValidator.checkLivelock"
+        [ testCase "state with only self-loop transitions is flagged"
+          <| fun _ ->
+              let projections = Projection.projectAll livelockChart
+              let pruned = Projection.pruneUnreachableStates livelockChart
+              let issues = checkLivelock projections pruned
+              Expect.equal issues.Length 1 "One livelock"
+              Expect.stringContains issues[0].Message "Paused" "Mentions the livelocked state"
+              Expect.equal issues[0].Severity Severity.Warning "Severity is Warning"
+              Expect.equal issues[0].Check Livelock "Check kind is Livelock"
+
+          testCase "no livelock states produces no warnings"
+          <| fun _ ->
+              let projections = Projection.projectAll ticTacToeChart
+              let pruned = Projection.pruneUnreachableStates ticTacToeChart
+              let issues = checkLivelock projections pruned
+              Expect.isEmpty issues "TicTacToe has no livelocks"
+
+          testCase "final state with only self-loops is not flagged"
+          <| fun _ ->
+              let projections = Projection.projectAll finalSelfLoopChart
+              let pruned = Projection.pruneUnreachableStates finalSelfLoopChart
+              let issues = checkLivelock projections pruned
+              Expect.isEmpty issues "Final states are expected to self-loop"
+
+          testCase "mix of self-loop and non-self-loop transitions is not flagged"
+          <| fun _ ->
+              let projections = Projection.projectAll mixedTransitionsChart
+              let pruned = Projection.pruneUnreachableStates mixedTransitionsChart
+              let issues = checkLivelock projections pruned
+              Expect.isEmpty issues "Progress is possible from all states" ]
 
 [<Tests>]
 let validateProjectionTests =
@@ -219,7 +393,10 @@ let validateProjectionTests =
                       GuardNames = []
                       Transitions =
                           ticTacToeChart.Transitions
-                          |> List.map (fun t -> { t with Guard = None; Constraint = Unrestricted }) }
+                          |> List.map (fun t ->
+                              { t with
+                                  Guard = None
+                                  Constraint = Unrestricted }) }
 
               let result = validateProjection chart.RouteTemplate chart
               Expect.equal result.ChecksRun 0 "No checks for roleless guardless chart"
@@ -232,17 +409,26 @@ let validateProjectionTests =
               Expect.equal result.ChecksRun 1 "Guard consistency check only"
               Expect.isEmpty result.Issues "Guards are consistent"
 
-          testCase "TicTacToe returns 5 checks, 0 issues"
+          testCase "TicTacToe returns 6 checks, 0 issues"
           <| fun _ ->
               let result = validateProjection ticTacToeChart.RouteTemplate ticTacToeChart
-              Expect.equal result.ChecksRun 5 "All 5 checks run"
+              Expect.equal result.ChecksRun 6 "All 6 checks run"
               Expect.isEmpty result.Issues "No issues"
 
           testCase "dead transition chart has issues"
           <| fun _ ->
-              let result = validateProjection deadTransitionChart.RouteTemplate deadTransitionChart
-              Expect.equal result.ChecksRun 5 "All 5 checks run"
-              Expect.isGreaterThan result.Issues.Length 0 "Has issues" ]
+              let result =
+                  validateProjection deadTransitionChart.RouteTemplate deadTransitionChart
+
+              Expect.equal result.ChecksRun 6 "All 6 checks run"
+              Expect.isGreaterThan result.Issues.Length 0 "Has issues"
+
+          testCase "livelock chart produces livelock warning via validateProjection"
+          <| fun _ ->
+              let result = validateProjection livelockChart.RouteTemplate livelockChart
+              let livelockIssues = result.Issues |> List.filter (fun i -> i.Check = Livelock)
+              Expect.equal livelockIssues.Length 1 "One livelock issue"
+              Expect.stringContains livelockIssues[0].Message "Paused" "Mentions the livelocked state" ]
 
 // -- Guard consistency test fixtures --
 
@@ -254,8 +440,14 @@ let private consistentGuardChart: ExtractedStatechart =
       GuardNames = [ "OwnerGuard" ]
       StateMetadata =
         Map.ofList
-            [ "Active", { AllowedMethods = [ "GET"; "PUT" ]; IsFinal = false; Description = None }
-              "Archived", { AllowedMethods = [ "GET" ]; IsFinal = true; Description = None } ]
+            [ "Active",
+              { AllowedMethods = [ "GET"; "PUT" ]
+                IsFinal = false
+                Description = None }
+              "Archived",
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = None } ]
       Roles = [ { Name = "Owner"; Description = None } ]
       Transitions =
         [ mkTransition "view" "Active" "Active" None Unrestricted
@@ -307,8 +499,7 @@ let guardConsistencyTests =
               let chart =
                   { consistentGuardChart with
                       GuardNames = []
-                      Transitions =
-                          [ mkTransition "view" "Active" "Active" None Unrestricted ] }
+                      Transitions = [ mkTransition "view" "Active" "Active" None Unrestricted ] }
 
               let issues = checkGuardConsistency chart
               Expect.isEmpty issues "No guards, no issues" ]
