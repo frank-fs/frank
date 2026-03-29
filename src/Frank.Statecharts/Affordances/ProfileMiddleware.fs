@@ -18,11 +18,32 @@ open Frank.LinkedData.Negotiation
 [<AutoOpen>]
 module ProfileMiddlewareExtensions =
 
+    /// Pre-compute all RDF serialization formats from a Turtle source string.
+    /// Parses once, serializes to all formats, disposes the graph. Returns a
+    /// Map<mediaType, byte[]> for zero-alloc serving at request time.
+    let private preComputeShapeFormats (turtleContent: string) : Map<string, byte[]> =
+        use g = new Graph() :> IGraph
+        let parser = TurtleParser()
+        use reader = new StringReader(turtleContent)
+        parser.Load(g, reader)
+
+        let serializeTo (writeFn: IGraph -> Stream -> unit) =
+            use ms = new MemoryStream()
+            writeFn g ms
+            ms.ToArray()
+
+        Map.ofList
+            [ "text/turtle", Text.Encoding.UTF8.GetBytes(turtleContent)
+              "application/ld+json", serializeTo JsonLdFormatter.writeJsonLd
+              "application/rdf+xml", serializeTo RdfXmlFormatter.writeRdfXml ]
+
     /// Supported RDF media types for shape content negotiation.
     let private shapeMediaTypes =
         [ "text/turtle"; "application/ld+json"; "application/rdf+xml" ]
 
-    /// Negotiate the RDF media type from an Accept header for shape endpoints.
+    /// Negotiate RDF media type from Accept header, defaulting to text/turtle.
+    /// Note: Frank.LinkedData has a similar negotiateRdfType (private), kept
+    /// separate because it returns Option and lives in a different module scope.
     let private negotiateShapeType (accept: string) : string =
         if String.IsNullOrWhiteSpace accept then
             "text/turtle"
@@ -39,25 +60,6 @@ module ProfileMiddlewareExtensions =
                     shapeMediaTypes
                     |> List.tryFind (fun s -> mt.MediaType.Equals(s, StringComparison.OrdinalIgnoreCase)))
                 |> Option.defaultValue "text/turtle"
-
-    /// Parse a Turtle string into an IGraph.
-    let private parseTurtle (turtle: string) : IGraph =
-        let g = new Graph()
-        let parser = TurtleParser()
-        use reader = new StringReader(turtle)
-        parser.Load(g, reader)
-        g
-
-    /// Write an IGraph to a byte array in the specified RDF format.
-    let private serializeGraph (mediaType: string) (graph: IGraph) : byte[] =
-        use ms = new MemoryStream()
-
-        match mediaType with
-        | "application/ld+json" -> JsonLdFormatter.writeJsonLd graph ms
-        | "application/rdf+xml" -> RdfXmlFormatter.writeRdfXml graph ms
-        | _ -> TurtleFormatter.writeTurtle graph ms
-
-        ms.ToArray()
 
     /// Serve a pre-computed string at the given path with the specified content type.
     /// Sets Vary: Accept header for correct caching behavior.
@@ -78,25 +80,19 @@ module ProfileMiddlewareExtensions =
         |> ignore
 
     /// Serve SHACL shapes with content negotiation at /shapes/{slug}.
-    /// Supports text/turtle (default), application/ld+json, and application/rdf+xml.
+    /// All formats pre-computed at startup — zero parsing/serialization at request time.
     let private mapShapeEndpoint (endpoints: IEndpointRouteBuilder) (slug: string) (turtleContent: string) =
+        let formats = preComputeShapeFormats turtleContent
+
         endpoints.MapGet(
             sprintf "/shapes/%s" slug,
             RequestDelegate(fun ctx ->
                 let accept = ctx.Request.Headers.Accept.ToString()
                 let mediaType = negotiateShapeType accept
+                let bytes = formats |> Map.find mediaType
+                ctx.Response.ContentType <- mediaType
                 ctx.Response.Headers["Vary"] <- Microsoft.Extensions.Primitives.StringValues("Accept")
-
-                if mediaType = "text/turtle" then
-                    // Fast path: serve pre-computed Turtle directly
-                    ctx.Response.ContentType <- "text/turtle"
-                    ctx.Response.WriteAsync(turtleContent)
-                else
-                    // Parse and re-serialize in the requested format
-                    let graph = parseTurtle turtleContent
-                    let bytes = serializeGraph mediaType graph
-                    ctx.Response.ContentType <- mediaType
-                    ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length))
+                ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length))
         )
         |> ignore
 
