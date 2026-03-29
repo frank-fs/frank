@@ -18,6 +18,28 @@ type GuardResult =
     | Allowed
     | Blocked of reason: BlockReason
 
+/// Algebraic operations for GuardResult.
+/// Monoid under conjunction via compose. alternative provides disjunction
+/// (semigroup — no identity element). compose and alternative do NOT form
+/// a distributive lattice.
+[<RequireQualifiedAccess>]
+module GuardResult =
+
+    /// Identity element: always Allowed.
+    let identity: GuardResult = Allowed
+
+    /// Conjunction (AND): if the first blocks, short-circuit; otherwise return the second.
+    let compose (a: GuardResult) (b: GuardResult) : GuardResult =
+        match a with
+        | Blocked _ -> a
+        | Allowed -> b
+
+    /// Disjunction (OR): if the first allows, short-circuit; otherwise return the second.
+    let alternative (a: GuardResult) (b: GuardResult) : GuardResult =
+        match a with
+        | Allowed -> a
+        | Blocked _ -> b
+
 /// Context for access-control guards (pre-handler). No event available.
 [<NoEquality; NoComparison>]
 type AccessControlContext<'State, 'Context> =
@@ -60,6 +82,52 @@ type TransitionResult<'State, 'Context> =
     | Transitioned of state: 'State * context: 'Context
     | Blocked of reason: BlockReason
     | Invalid of message: string
+
+/// Algebraic operations for TransitionResult (bifunctor map, applicative apply, Kleisli-style bind).
+/// Primary abstraction is applicative (pure' + apply); bind is secondary.
+[<RequireQualifiedAccess>]
+module TransitionResult =
+
+    /// Lift a state and context into a successful TransitionResult (applicative pure).
+    let pure' (state: 'State) (context: 'Context) : TransitionResult<'State, 'Context> =
+        TransitionResult.Transitioned(state, context)
+
+    /// Bifunctor map over ('State, 'Context): apply functions to state and context
+    /// if Transitioned; pass through Blocked and Invalid unchanged.
+    let map
+        (fState: 'State1 -> 'State2)
+        (fContext: 'Context1 -> 'Context2)
+        (result: TransitionResult<'State1, 'Context1>)
+        : TransitionResult<'State2, 'Context2> =
+        match result with
+        | TransitionResult.Transitioned(state, context) -> TransitionResult.Transitioned(fState state, fContext context)
+        | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message -> TransitionResult.Invalid message
+
+    /// Applicative apply: combine a wrapped function with a wrapped value.
+    /// Both sides must be Transitioned for the result to succeed; first error wins.
+    let apply
+        (fResult: TransitionResult<'State1 -> 'State2, 'Context1 -> 'Context2>)
+        (xResult: TransitionResult<'State1, 'Context1>)
+        : TransitionResult<'State2, 'Context2> =
+        match fResult, xResult with
+        | TransitionResult.Transitioned(fState, fContext), TransitionResult.Transitioned(state, context) ->
+            TransitionResult.Transitioned(fState state, fContext context)
+        | TransitionResult.Blocked reason, _ -> TransitionResult.Blocked reason
+        | _, TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message, _ -> TransitionResult.Invalid message
+        | _, TransitionResult.Invalid message -> TransitionResult.Invalid message
+
+    /// Kleisli-style bind over ('State * 'Context) product, presented in curried form.
+    /// Secondary to applicative — use when computation depends on previous result.
+    let bind
+        (f: 'State -> 'Context -> TransitionResult<'State2, 'Context2>)
+        (result: TransitionResult<'State, 'Context>)
+        : TransitionResult<'State2, 'Context2> =
+        match result with
+        | TransitionResult.Transitioned(state, context) -> f state context
+        | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
+        | TransitionResult.Invalid message -> TransitionResult.Invalid message
 
 /// Compile-time definition of a state machine.
 type StateMachine<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =

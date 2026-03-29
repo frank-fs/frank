@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="TypeTests.fs" />
+    <Compile Include="AlgebraicTests.fs" />
     <Compile Include="StoreTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="StatefulResourceTests.fs" />
@@ -46,6 +47,7 @@
     <Compile Include="Alps/RoundTripTests.fs" />
     <Compile Include="Alps/ExtensionClassificationTests.fs" />
     <Compile Include="Alps/SubDuTests.fs" />
+    <Compile Include="Alps/DualityTests.fs" />
     <Compile Include="Alps/XmlGeneratorTests.fs" />
     <Compile Include="Alps/DefGenerationTests.fs" />
     <!-- Validation tests -->
@@ -80,6 +82,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="3.3.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
@@ -95,10 +98,8 @@
 
   <!-- Direct embedding for test verification (mirrors what the MSBuild target does) -->
   <ItemGroup>
-    <EmbeddedResource Include="Affordances/Fixtures/test-descriptors.bin"
-                      LogicalName="Frank.Descriptors.bin" />
-    <EmbeddedResource Include="Affordances/Fixtures/corrupt-model.bin"
-                      LogicalName="Frank.Corrupt.model.bin" />
+    <EmbeddedResource Include="Affordances/Fixtures/test-descriptors.bin" LogicalName="Frank.Descriptors.bin" />
+    <EmbeddedResource Include="Affordances/Fixtures/corrupt-model.bin" LogicalName="Frank.Corrupt.model.bin" />
   </ItemGroup>
 
 </Project>
