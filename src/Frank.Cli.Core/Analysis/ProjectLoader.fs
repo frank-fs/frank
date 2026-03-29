@@ -22,13 +22,9 @@ module ProjectLoader =
     /// caches project snapshots internally, so reuse is both safe and fast.
     let private checker = FSharpChecker.Create(keepAssemblyContents = true)
 
-    let private parseSourceFile (checker: FSharpChecker) (sourceFile: string) =
+    let private parseSourceFile (checker: FSharpChecker) (parsingOptions: FSharpParsingOptions) (sourceFile: string) =
         async {
             let sourceText = SourceText.ofString (File.ReadAllText sourceFile)
-
-            let parsingOptions =
-                { FSharpParsingOptions.Default with
-                    SourceFiles = [| sourceFile |] }
 
             let! parseResult = checker.ParseFile(sourceFile, sourceText, parsingOptions)
 
@@ -225,10 +221,16 @@ module ProjectLoader =
 
                                 return Error $"Type-check errors:\n{errors}"
                             else
+                                // Derive parsing options from project options to include
+                                // conditional defines, language version, and other flags.
+                                // Using Default would miss cross-file conditional compilation.
+                                let parsingOptions, _diagnostics =
+                                    checker.GetParsingOptionsFromProjectOptions(options)
+
                                 let! parsedFiles =
                                     sourceFiles
                                     |> List.toArray
-                                    |> Array.map (parseSourceFile checker)
+                                    |> Array.map (parseSourceFile checker parsingOptions)
                                     |> Async.Sequential
 
                                 let parsedFiles = parsedFiles |> Array.choose id |> Array.toList

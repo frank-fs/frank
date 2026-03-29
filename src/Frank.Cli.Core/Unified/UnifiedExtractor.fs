@@ -331,7 +331,7 @@ let internal findResourcesInParsedInput (parsedInput: ParsedInput) : SyntaxFindi
 // Typed AST walking
 // ══════════════════════════════════════════════════════════════════════════════
 
-type private TypedMachineBinding =
+type internal TypedMachineBinding =
     { BindingName: string
       StateTypeCases: string list
       InitialStateName: string option
@@ -355,7 +355,7 @@ let private tryExtractStateMachineInfo (fsharpType: FSharpType) : (string list) 
     else
         None
 
-type private UnifiedTypedResult =
+type internal UnifiedTypedResult =
     { AnalyzedTypes: AnalyzedType list
       MachineBindings: TypedMachineBinding list }
 
@@ -424,8 +424,9 @@ let rec private walkEntity (entity: FSharpEntity) : UnifiedTypedResult =
                     { AnalyzedTypes = acc.AnalyzedTypes @ r.AnalyzedTypes
                       MachineBindings = acc.MachineBindings @ r.MachineBindings })
                 emptyTypedResult
-        with :? System.InvalidOperationException ->
-            emptyTypedResult
+        with
+        | :? System.InvalidOperationException -> emptyTypedResult
+        | :? System.NotSupportedException -> emptyTypedResult
 
     let typeResult = collectEntityType entity
 
@@ -443,13 +444,14 @@ let rec private walkEntity (entity: FSharpEntity) : UnifiedTypedResult =
                 else
                     None)
             |> Seq.toList
-        with :? System.InvalidOperationException ->
-            []
+        with
+        | :? System.InvalidOperationException -> []
+        | :? System.NotSupportedException -> []
 
     { AnalyzedTypes = typeResult @ nested.AnalyzedTypes
       MachineBindings = machineBindings @ nested.MachineBindings }
 
-let private analyzeTypedAst (checkResults: FSharpCheckProjectResults) : UnifiedTypedResult =
+let internal analyzeTypedAst (checkResults: FSharpCheckProjectResults) : UnifiedTypedResult =
     checkResults.AssemblySignature.Entities
     |> Seq.map walkEntity
     |> Seq.fold
@@ -458,19 +460,80 @@ let private analyzeTypedAst (checkResults: FSharpCheckProjectResults) : UnifiedT
               MachineBindings = acc.MachineBindings @ r.MachineBindings })
         emptyTypedResult
 
+/// Search all entities in the assembly signature for a module value with the given name
+/// that has type StateMachine<...>. This is used as a fallback when the initial
+/// walkEntity pass doesn't find a binding -- which can happen when NestedEntities or
+/// MembersFunctionsAndValues throws for certain entity structures in cross-file projects.
+let rec private searchEntityForBinding (name: string) (entity: FSharpEntity) : TypedMachineBinding option =
+    // Try this entity's members first
+    let fromMembers =
+        try
+            entity.MembersFunctionsAndValues
+            |> Seq.tryPick (fun mfv ->
+                if mfv.DisplayName = name && mfv.IsModuleValueOrMember && not mfv.IsMember then
+                    tryExtractStateMachineInfo mfv.FullType
+                    |> Option.map (fun cases ->
+                        { BindingName = mfv.DisplayName
+                          StateTypeCases = cases
+                          InitialStateName = cases |> List.tryHead
+                          GuardNames = [] })
+                else
+                    None)
+        with
+        | :? System.InvalidOperationException -> None
+        | :? System.NotSupportedException -> None
+
+    match fromMembers with
+    | Some _ -> fromMembers
+    | None ->
+        // Recurse into nested entities
+        try
+            entity.NestedEntities |> Seq.tryPick (searchEntityForBinding name)
+        with
+        | :? System.InvalidOperationException -> None
+        | :? System.NotSupportedException -> None
+
+/// Fallback search across all assembly entities for a machine binding by name.
+/// Called when the primary walkEntity pass didn't find the binding, which can happen
+/// in cross-file scenarios where NestedEntities access throws InvalidOperationException
+/// on certain namespace entity structures.
+let private findMachineBindingFallback
+    (checkResults: FSharpCheckProjectResults)
+    (name: string)
+    : TypedMachineBinding option =
+    if obj.ReferenceEquals(checkResults, null) then
+        None
+    else
+        try
+            checkResults.AssemblySignature.Entities
+            |> Seq.tryPick (searchEntityForBinding name)
+        with
+        | :? System.InvalidOperationException -> None
+        | :? System.NotSupportedException -> None
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Cross-reference syntax CEs with typed bindings -> UnifiedResource
 // ══════════════════════════════════════════════════════════════════════════════
 
-let private buildUnifiedResources
+let internal buildUnifiedResources
     (syntaxFindings: SyntaxFinding list)
     (typedResult: UnifiedTypedResult)
+    (checkResults: FSharpCheckProjectResults)
     : UnifiedResource list =
 
     let bindingsByName =
         typedResult.MachineBindings
         |> List.map (fun b -> b.BindingName, b)
         |> Map.ofList
+
+    let findBinding (name: string) : TypedMachineBinding option =
+        match Map.tryFind name bindingsByName with
+        | Some _ as found -> found
+        | None ->
+            // Fallback: search all entities directly when the initial walk missed the binding.
+            // This handles cross-file scenarios where the machine binding is in a different
+            // module/file from the statefulResource CE.
+            findMachineBindingFallback checkResults name
 
     syntaxFindings
     |> List.map (fun finding ->
@@ -508,8 +571,7 @@ let private buildUnifiedResources
         | FoundStatefulResource sr ->
             let slug = ResourceModel.resourceSlug sr.RouteTemplate
 
-            let machineInfo =
-                sr.MachineName |> Option.bind (fun n -> Map.tryFind n bindingsByName)
+            let machineInfo = sr.MachineName |> Option.bind findBinding
 
             let stateNames =
                 match machineInfo with
@@ -846,7 +908,7 @@ let extract (projectPath: string) : Async<Result<UnifiedResource list, Statechar
                 let typedResult = analyzeTypedAst loaded.CheckResults
 
                 // Phase 3: Cross-reference and build UnifiedResource records
-                let resources = buildUnifiedResources syntaxFindings typedResult
+                let resources = buildUnifiedResources syntaxFindings typedResult loaded.CheckResults
 
                 // Phase 3.5: Co-extract transitions from spec files
                 let projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))
