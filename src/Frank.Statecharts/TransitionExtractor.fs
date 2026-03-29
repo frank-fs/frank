@@ -1,7 +1,6 @@
 module Frank.Statecharts.TransitionExtractor
 
 open Frank.Statecharts.Ast
-open Frank.Statecharts.Alps.Classification
 open Frank.Resources.Model
 
 // ---------------------------------------------------------------------------
@@ -9,14 +8,14 @@ open Frank.Resources.Model
 // ---------------------------------------------------------------------------
 
 /// Extract RoleConstraint from a transition edge's annotations.
-/// Finds AlpsRole annotations whose id matches ProjectedRoleExtId and
+/// Finds AlpsRole annotations with ProjectedRole kind and
 /// collects their values into RestrictedTo; no matches yields Unrestricted.
 let private resolveConstraint (annotations: Annotation list) : RoleConstraint =
     let roleValues =
         annotations
         |> List.choose (fun ann ->
             match ann with
-            | AlpsAnnotation(AlpsRole(id, value)) when id = ProjectedRoleExtId -> Some value
+            | AlpsAnnotation(AlpsRole(ProjectedRole, value)) -> Some value
             | _ -> None)
 
     match roleValues with
@@ -25,13 +24,13 @@ let private resolveConstraint (annotations: Annotation list) : RoleConstraint =
 
 /// Extract RoleInfo list from document-level annotations.
 /// Roles declared at the document level appear as AlpsRole annotations
-/// with id = ProjectedRoleExtId. Comma-separated values are split into
+/// with ProjectedRole kind. Comma-separated values are split into
 /// individual roles (e.g., "PlayerX,PlayerO,Spectator" → 3 RoleInfo).
 let extractRoles (doc: StatechartDocument) : RoleInfo list =
     doc.Annotations
     |> List.collect (fun ann ->
         match ann with
-        | AlpsAnnotation(AlpsRole(id, value)) when id = ProjectedRoleExtId ->
+        | AlpsAnnotation(AlpsRole(ProjectedRole, value)) ->
             value.Split(
                 ',',
                 System.StringSplitOptions.RemoveEmptyEntries
