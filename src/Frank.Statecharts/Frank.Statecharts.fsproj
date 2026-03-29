@@ -68,6 +68,8 @@
     <Compile Include="Affordances/AffordanceMiddleware.fs" />
     <Compile Include="Affordances/RoleProfileOverlay.fs" />
     <Compile Include="Affordances/ProjectedProfileMiddleware.fs" />
+    <Compile Include="Affordances/DualProfileOverlay.fs" />
+    <Compile Include="Affordances/DualProfileMiddleware.fs" />
     <Compile Include="Affordances/StartupProjection.fs" />
     <Compile Include="Affordances/StatechartProjection.fs" />
     <Compile Include="Affordances/ProfileMiddleware.fs" />
