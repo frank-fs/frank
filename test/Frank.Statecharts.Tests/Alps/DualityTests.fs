@@ -4,6 +4,8 @@ open Expecto
 open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.JsonParser
 open Frank.Statecharts.Alps.JsonGenerator
+open Frank.Statecharts.Alps.XmlGenerator
+open Frank.Statecharts.Alps.XmlParser
 open Frank.Resources.Model
 
 // ---------------------------------------------------------------------------
@@ -332,6 +334,19 @@ let dualityRoundTripTests =
               let roundTrippedDuality = collectDualityAnnotations roundTripped
 
               Expect.equal roundTrippedDuality originalDuality "all duality annotations preserved"
+
+          testCase "order fulfillment XML roundtrip preserves duality annotations"
+          <| fun _ ->
+              let original = parseOk orderFulfillmentAlpsJson "JSON parse failed"
+              let xml = generateAlpsXml original
+              let xmlResult = parseAlpsXml xml
+              Expect.isEmpty xmlResult.Errors "XML re-parse failed"
+              let roundTripped = xmlResult.Document
+
+              let originalDuality = collectDualityAnnotations original
+              let roundTrippedDuality = collectDualityAnnotations roundTripped
+
+              Expect.equal roundTrippedDuality originalDuality "XML roundtrip preserves duality annotations"
 
           testCase "4-role projection produces structurally distinct per-role results"
           <| fun _ ->

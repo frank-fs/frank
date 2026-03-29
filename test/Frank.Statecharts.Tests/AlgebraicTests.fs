@@ -2,7 +2,39 @@ module Frank.Statecharts.Tests.AlgebraicTests
 
 open Expecto
 open FsCheck
+open FsCheck.FSharp
 open Frank.Statecharts
+
+// ---------------------------------------------------------------------------
+// Arbitrary generators for property-based tests
+// ---------------------------------------------------------------------------
+
+/// Generate a random BlockReason covering all 5 DU cases.
+let private genBlockReason: Gen<BlockReason> =
+    let defaultArbs = ArbMap.defaults
+
+    Gen.oneof
+        [ gen { return NotAllowed }
+          gen { return NotYourTurn }
+          gen { return InvalidTransition }
+          gen { return PreconditionFailed }
+          gen {
+              let! code = (ArbMap.arbitrary<int> defaultArbs).Generator
+              let! msg = (ArbMap.arbitrary<string> defaultArbs).Generator
+              return Custom(code, msg)
+          } ]
+
+/// Generate a random GuardResult (Allowed or Blocked with random reason).
+let private genGuardResult: Gen<GuardResult> =
+    Gen.oneof
+        [ gen { return Allowed }
+          gen {
+              let! reason = genBlockReason
+              return Blocked reason
+          } ]
+
+let private arbBlockReason: Arbitrary<BlockReason> = Arb.fromGen genBlockReason
+let private arbGuardResult: Arbitrary<GuardResult> = Arb.fromGen genGuardResult
 
 // ---------------------------------------------------------------------------
 // Part 2: Algebraic Composition Tests
@@ -214,44 +246,33 @@ let guardResultMonoidLaws =
         "GuardResult.compose monoid laws"
         [ testCase "compose identity g = g (left identity)"
           <| fun _ ->
-              Expect.equal (GuardResult.compose GuardResult.identity Allowed) Allowed "identity compose Allowed"
-
-              Expect.equal
-                  (GuardResult.compose GuardResult.identity (Blocked NotAllowed))
-                  (Blocked NotAllowed)
-                  "identity compose Blocked"
+              Prop.forAll arbGuardResult (fun g -> GuardResult.compose GuardResult.identity g = g)
+              |> Check.QuickThrowOnFailure
 
           testCase "compose g identity = g (right identity)"
           <| fun _ ->
-              Expect.equal (GuardResult.compose Allowed GuardResult.identity) Allowed "Allowed compose identity"
-
-              Expect.equal
-                  (GuardResult.compose (Blocked NotAllowed) GuardResult.identity)
-                  (Blocked NotAllowed)
-                  "Blocked compose identity"
+              Prop.forAll arbGuardResult (fun g -> GuardResult.compose g GuardResult.identity = g)
+              |> Check.QuickThrowOnFailure
 
           testCase "compose is associative"
           <| fun _ ->
-              // (a . b) . c = a . (b . c)
-              let a = Allowed
-              let b = Blocked NotYourTurn
-              let c = Allowed
+              Prop.forAll
+                  (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult))
+                  (fun (a, b, c) ->
+                      let leftAssoc = GuardResult.compose (GuardResult.compose a b) c
+                      let rightAssoc = GuardResult.compose a (GuardResult.compose b c)
+                      leftAssoc = rightAssoc)
+              |> Check.QuickThrowOnFailure
 
-              let leftAssoc = GuardResult.compose (GuardResult.compose a b) c
-              let rightAssoc = GuardResult.compose a (GuardResult.compose b c)
-
-              Expect.equal leftAssoc rightAssoc "compose is associative"
-
-          testCase "compose associativity with all Blocked"
+          testCase "alternative is associative"
           <| fun _ ->
-              let a = Blocked NotAllowed
-              let b = Blocked NotYourTurn
-              let c = Blocked InvalidTransition
-
-              let leftAssoc = GuardResult.compose (GuardResult.compose a b) c
-              let rightAssoc = GuardResult.compose a (GuardResult.compose b c)
-
-              Expect.equal leftAssoc rightAssoc "compose associative with Blocked values" ]
+              Prop.forAll
+                  (Arb.fromGen (Gen.zip3 genGuardResult genGuardResult genGuardResult))
+                  (fun (a, b, c) ->
+                      let leftAssoc = GuardResult.alternative (GuardResult.alternative a b) c
+                      let rightAssoc = GuardResult.alternative a (GuardResult.alternative b c)
+                      leftAssoc = rightAssoc)
+              |> Check.QuickThrowOnFailure ]
 
 // ===========================================================================
 // Guard composition with Order Fulfillment fixture
@@ -296,3 +317,57 @@ let guardCompositionOrderFulfillmentTests =
                   |> List.fold GuardResult.compose GuardResult.identity
 
               Expect.equal composed (Blocked NotYourTurn) "fold compose with identity works" ]
+
+// ===========================================================================
+// Property-based tests: Monad laws for TransitionResult.bind
+// ===========================================================================
+
+[<Tests>]
+let transitionResultMonadLaws =
+    testList
+        "TransitionResult.bind monad laws"
+        [ testCase "left identity: bind f (pure' a b) = f a b"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let f s' c' = TransitionResult.Transitioned(s' + "!", c' * 2)
+                  let lhs = TransitionResult.pure' s c |> TransitionResult.bind f
+                  let rhs = f s c
+                  lhs = rhs
+
+              Check.QuickThrowOnFailure check
+
+          testCase "right identity: bind pure' m = m"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let m = TransitionResult.Transitioned(s, c)
+                  let result = TransitionResult.bind TransitionResult.pure' m
+                  result = m
+
+              Check.QuickThrowOnFailure check
+
+          testCase "right identity holds for Blocked"
+          <| fun _ ->
+              let m: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let result = TransitionResult.bind TransitionResult.pure' m
+              Expect.equal result m "bind pure' on Blocked = id"
+
+          testCase "right identity holds for Invalid"
+          <| fun _ ->
+              let check (msg: string) =
+                  let m: TransitionResult<string, int> = TransitionResult.Invalid msg
+                  let result = TransitionResult.bind TransitionResult.pure' m
+                  result = m
+
+              Check.QuickThrowOnFailure check
+
+          testCase "associativity: bind g (bind f m) = bind (fun s c -> bind g (f s c)) m"
+          <| fun _ ->
+              let check (s: string, c: int) =
+                  let f s' c' = TransitionResult.Transitioned(s' + "!", c' + 1)
+                  let g s' c' = TransitionResult.Transitioned(s' + "?", c' * 2)
+                  let m = TransitionResult.Transitioned(s, c)
+                  let lhs = m |> TransitionResult.bind f |> TransitionResult.bind g
+                  let rhs = m |> TransitionResult.bind (fun s' c' -> f s' c' |> TransitionResult.bind g)
+                  lhs = rhs
+
+              Check.QuickThrowOnFailure check ]

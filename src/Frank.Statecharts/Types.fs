@@ -18,7 +18,10 @@ type GuardResult =
     | Allowed
     | Blocked of reason: BlockReason
 
-/// Algebraic operations for GuardResult (monoid under conjunction).
+/// Algebraic operations for GuardResult.
+/// Monoid under conjunction via compose. alternative provides disjunction
+/// (semigroup — no identity element). compose and alternative do NOT form
+/// a distributive lattice.
 [<RequireQualifiedAccess>]
 module GuardResult =
 
@@ -80,12 +83,16 @@ type TransitionResult<'State, 'Context> =
     | Blocked of reason: BlockReason
     | Invalid of message: string
 
-/// Algebraic operations for TransitionResult (functor + monad).
+/// Algebraic operations for TransitionResult (bifunctor map, Kleisli-style bind over state*context product).
 [<RequireQualifiedAccess>]
 module TransitionResult =
 
-    /// Functor map: apply functions to state and context if Transitioned;
-    /// pass through Blocked and Invalid unchanged.
+    /// Lift a state and context into a successful TransitionResult.
+    let pure' (state: 'State) (context: 'Context) : TransitionResult<'State, 'Context> =
+        TransitionResult.Transitioned(state, context)
+
+    /// Bifunctor map over ('State, 'Context): apply functions to state and context
+    /// if Transitioned; pass through Blocked and Invalid unchanged.
     let map
         (fState: 'State1 -> 'State2)
         (fContext: 'Context1 -> 'Context2)
@@ -96,8 +103,8 @@ module TransitionResult =
         | TransitionResult.Blocked reason -> TransitionResult.Blocked reason
         | TransitionResult.Invalid message -> TransitionResult.Invalid message
 
-    /// Monadic bind: apply function to state and context if Transitioned;
-    /// short-circuit on Blocked and Invalid.
+    /// Kleisli-style bind over ('State * 'Context) product, presented in curried form:
+    /// apply function to state and context if Transitioned; short-circuit on Blocked and Invalid.
     let bind
         (f: 'State -> 'Context -> TransitionResult<'State2, 'Context2>)
         (result: TransitionResult<'State, 'Context>)

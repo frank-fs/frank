@@ -306,11 +306,12 @@ type StatefulResourceBuilder(routeTemplate: string) =
                   Roles = ctx.GetRoles() }
 
             accessGuards
-            |> List.tryPick (fun (_, pred) ->
-                match pred guardCtx with
-                | Allowed -> None
-                | Blocked reason -> Some(Blocked reason))
-            |> Option.defaultValue Allowed
+            |> List.fold
+                (fun acc (_, pred) ->
+                    match acc with
+                    | Blocked _ -> acc
+                    | Allowed -> GuardResult.compose acc (pred guardCtx))
+                GuardResult.identity
 
         // Closure: evaluate event-validation guards after handler has set the event (post-handler)
         let evaluateEventGuards (ctx: HttpContext) : GuardResult =
@@ -329,11 +330,12 @@ type StatefulResourceBuilder(routeTemplate: string) =
                       Roles = ctx.GetRoles() }
 
                 eventGuards
-                |> List.tryPick (fun (_, pred) ->
-                    match pred guardCtx with
-                    | Allowed -> None
-                    | Blocked reason -> Some(Blocked reason))
-                |> Option.defaultValue Allowed
+                |> List.fold
+                    (fun acc (_, pred) ->
+                        match acc with
+                        | Blocked _ -> acc
+                        | Allowed -> GuardResult.compose acc (pred guardCtx))
+                    GuardResult.identity
 
         // Closure: get event from Items, run transition, persist, return result
         let executeTransition
