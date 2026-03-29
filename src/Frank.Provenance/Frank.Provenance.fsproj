@@ -11,6 +11,8 @@
     <Compile Include="Types.fs" />
     <Compile Include="ConformanceTypes.fs" />
     <Compile Include="ConformanceChecker.fs" />
+    <Compile Include="DualConformanceTypes.fs" />
+    <Compile Include="DualConformanceChecker.fs" />
     <Compile Include="Store.fs" />
     <Compile Include="MailboxProcessorStore.fs" />
     <Compile Include="GraphBuilder.fs" />
@@ -27,6 +29,7 @@
     <ProjectReference Include="../Frank/Frank.fsproj" />
     <ProjectReference Include="../Frank.LinkedData/Frank.LinkedData.fsproj" />
     <ProjectReference Include="../Frank.Resources.Model/Frank.Resources.Model.fsproj" />
+    <ProjectReference Include="../Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

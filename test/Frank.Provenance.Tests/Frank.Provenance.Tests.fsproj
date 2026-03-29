@@ -20,6 +20,7 @@
     <Compile Include="SparqlHelpers.fs" />
     <Compile Include="ProvenanceGraphTests.fs" />
     <Compile Include="ConformanceTests.fs" />
+    <Compile Include="DualConformanceTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -34,6 +35,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
     <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
+    <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
 </Project>
