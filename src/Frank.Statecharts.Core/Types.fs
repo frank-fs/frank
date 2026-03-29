@@ -35,6 +35,7 @@ type StateKind =
     | Choice
     | ForkJoin
     | Terminate
+    | Composite
 
 // -- WSD annotation payload types (FR-020) --
 

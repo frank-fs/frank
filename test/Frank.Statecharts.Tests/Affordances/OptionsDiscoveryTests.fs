@@ -403,7 +403,8 @@ let testStateMachineMetadata (stateResolver: string -> string) : StateMachineMet
       EvaluateEventGuards = fun _ -> Allowed
       ExecuteTransition = fun _sp _ctx _instanceId -> Task.FromResult(TransitionAttemptResult.NoEvent)
       Roles = []
-      ResolveRoles = fun _ -> Set.empty }
+      ResolveRoles = fun _ -> Set.empty
+      Hierarchy = None }
 
 /// Run a test against a WebApplication-based server with OPTIONS discovery middleware
 /// and an affordance lookup, using MapGet/MapPost endpoints with StateMachineMetadata.

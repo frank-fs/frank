@@ -74,6 +74,8 @@
     <Compile Include="Affordances/LinkHeaderTests.fs" />
     <Compile Include="Affordances/DiscoveryEdgeCaseTests.fs" />
     <Compile Include="Affordances/DiscoveryCombinationTests.fs" />
+    <!-- Hierarchical runtime tests (issue #136) -->
+    <Compile Include="HierarchyTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
