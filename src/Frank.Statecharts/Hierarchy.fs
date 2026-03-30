@@ -387,7 +387,8 @@ module HierarchicalRuntime =
                 config
 
         // Entry phase: add states to configuration, recursively entering composites.
-        // Accumulate entered states in reverse to avoid O(n^2) list concatenation.
+        // Accumulate entered states in reverse using cons-based accumulation
+        // to avoid O(n^2) list concatenation from List.rev + append.
         let configAfterEntry, enteredStatesRev =
             entryStates
             |> List.fold
@@ -395,8 +396,11 @@ module HierarchicalRuntime =
                     let before = ActiveStateConfiguration.toSet currentConfig
                     let nextConfig = enterState hierarchy entryState currentConfig
                     let after = ActiveStateConfiguration.toSet nextConfig
-                    let newlyEntered = Set.difference after before |> Set.toList
-                    (nextConfig, List.rev newlyEntered @ accRev))
+                    let newlyEntered = Set.difference after before
+
+                    let nextAccRev = Set.fold (fun acc s -> s :: acc) accRev newlyEntered
+
+                    (nextConfig, nextAccRev))
                 (configAfterExit, [])
 
         { Configuration = configAfterEntry

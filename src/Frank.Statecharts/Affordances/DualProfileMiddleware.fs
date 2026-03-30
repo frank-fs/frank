@@ -17,6 +17,9 @@ open Frank.Statecharts
 /// - Adds `Vary: Prefer` so caches distinguish dual from non-dual responses
 type DualProfileMiddleware(next: RequestDelegate, dualLookup: DualProfileLookup) =
 
+    /// Pre-computed StringValues for Preference-Applied header (avoids per-request allocation).
+    static let preferenceAppliedValue = StringValues("return=dual")
+
     member _.Invoke(ctx: HttpContext) : Task =
         let endpoint = ctx.GetEndpoint()
 
@@ -39,47 +42,39 @@ type DualProfileMiddleware(next: RequestDelegate, dualLookup: DualProfileLookup)
                         let roles = ctx.GetRoles()
 
                         if not (Set.isEmpty roles) then
-                            // Get current statechart state
-                            let stateKey =
-                                let f = ctx.Features.Get<IStatechartFeature>()
+                            // Get current statechart state via idiomatic Option chain
+                            let stateKeyOpt = ctx.GetStatechartFeature() |> Option.bind (fun f -> f.StateKey)
 
-                                if obj.ReferenceEquals(f, null) then
-                                    null
-                                else
-                                    match f.StateKey with
-                                    | Some key -> key
-                                    | None -> null
-
-                            if not (isNull stateKey) then
+                            match stateKeyOpt with
+                            | Some stateKey ->
                                 match stateDict.TryGetValue(stateKey) with
                                 | true, roleDict ->
-                                    // First matching role wins (alphabetical via Set iteration)
-                                    let dualMatch =
+                                    // Sort roles explicitly for deterministic selection
+                                    // (F# Set iterates in order, but explicit sort documents the contract)
+                                    let dualEntry =
                                         roles
+                                        |> Seq.sort
                                         |> Seq.tryPick (fun role ->
                                             match roleDict.TryGetValue(role) with
-                                            | true, _alpsJson -> Some role
+                                            | true, entry -> Some entry
                                             | false, _ -> None)
 
-                                    match dualMatch with
-                                    | Some matchedRole ->
-                                        // Swap profile link to dual variant
+                                    match dualEntry with
+                                    | Some entry ->
+                                        // Swap profile link to dual variant using pre-computed Link header value
                                         let existingLinks = ctx.Response.Headers["Link"]
 
                                         if existingLinks.Count > 0 then
-                                            let dualLinkValue =
-                                                sprintf
-                                                    "<%s-%s-dual>; rel=\"profile\""
-                                                    (matchedRole.ToLowerInvariant())
-                                                    stateKey
-
                                             ctx.Response.Headers["Link"] <-
-                                                LinkHeaderRewriter.replaceProfileLink existingLinks dualLinkValue
+                                                LinkHeaderRewriter.replaceProfileLink
+                                                    existingLinks
+                                                    entry.LinkHeaderValue
 
                                         // RFC 7240: indicate the preference was applied
-                                        ctx.Response.Headers["Preference-Applied"] <- StringValues("return=dual")
+                                        ctx.Response.Headers["Preference-Applied"] <- preferenceAppliedValue
                                     | None -> ()
                                 | false, _ -> ()
+                            | None -> ()
                 | false, _ -> ()
 
         next.Invoke(ctx)

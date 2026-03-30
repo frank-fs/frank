@@ -8,12 +8,23 @@ open System.Text.Json
 open Frank.Resources.Model
 open Frank.Statecharts.Dual
 
-/// Pre-computed dual profile lookup: route template -> state -> role -> ALPS JSON.
+/// Pre-computed entry for a single (route, state, role) dual profile.
+/// Contains both the ALPS JSON content and the pre-formatted Link header value.
+type DualProfileEntry =
+    {
+        /// ALPS JSON string with duality annotations for serving content.
+        AlpsJson: string
+        /// Pre-formatted RFC 8288 Link header value (e.g., '<https://example.com/alps/orders-seller-Submitted-dual>; rel="profile"').
+        /// Built at startup so the middleware writes a cached string with zero per-request allocation.
+        LinkHeaderValue: string
+    }
+
+/// Pre-computed dual profile lookup: route template -> state -> role -> DualProfileEntry.
 /// Outer key: route template (e.g., "/orders/{orderId}")
 /// Middle key: state name (e.g., "Submitted")
 /// Inner key: role name (case-insensitive via OrdinalIgnoreCase comparer)
-/// Value: ALPS JSON string with duality annotations
-type DualProfileLookup = Dictionary<string, Dictionary<string, Dictionary<string, string>>>
+/// Value: DualProfileEntry with ALPS JSON and pre-computed Link header value
+type DualProfileLookup = Dictionary<string, Dictionary<string, Dictionary<string, DualProfileEntry>>>
 
 /// Parsing for RFC 7240 Prefer header values.
 module PreferHeader =
@@ -165,6 +176,7 @@ module DualProfileOverlay =
 
     /// Build a DualProfileLookup from a single ExtractedStatechart.
     /// Derives client duals via Dual.derive and generates ALPS JSON for each (role, state) pair.
+    /// Pre-computes Link header values at startup for zero per-request allocation.
     let buildFromStatechart (chart: ExtractedStatechart) (resourceSlug: string) (baseUri: string) : DualProfileLookup =
         let lookup = DualProfileLookup(StringComparer.Ordinal)
 
@@ -175,18 +187,29 @@ module DualProfileOverlay =
             let deriveResult = derive chart projections
 
             let stateDict =
-                Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal)
+                Dictionary<string, Dictionary<string, DualProfileEntry>>(StringComparer.Ordinal)
 
             for (roleName, stateName), annotations in deriveResult.Annotations |> Map.toSeq do
                 if not (List.isEmpty annotations) then
                     let alpsJson =
                         DualAlpsGenerator.generate annotations resourceSlug roleName stateName baseUri
 
+                    let roleLower = roleName.ToLowerInvariant()
+                    let dualSlug = sprintf "%s-%s-%s-dual" resourceSlug roleLower stateName
+                    let profileUrl = AffordanceMap.profileUrl baseUri dualSlug
+                    let linkHeaderValue = AffordancePreCompute.formatLinkValue profileUrl "profile"
+
+                    let entry =
+                        { AlpsJson = alpsJson
+                          LinkHeaderValue = linkHeaderValue }
+
                     match stateDict.TryGetValue(stateName) with
-                    | true, roleDict -> roleDict.[roleName] <- alpsJson
+                    | true, roleDict -> roleDict.[roleName] <- entry
                     | false, _ ->
-                        let roleDict = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                        roleDict.[roleName] <- alpsJson
+                        let roleDict =
+                            Dictionary<string, DualProfileEntry>(StringComparer.OrdinalIgnoreCase)
+
+                        roleDict.[roleName] <- entry
                         stateDict.[stateName] <- roleDict
 
             if stateDict.Count > 0 then
@@ -194,7 +217,7 @@ module DualProfileOverlay =
 
             lookup
 
-    /// Build a DualProfileLookup from a RuntimeState.
+    /// Build a DualProfileLookup from a list of UnifiedResources.
     /// Merges dual profiles from all resources that have statecharts with roles.
     let buildFromRuntimeState (resources: UnifiedResource list) (baseUri: string) : DualProfileLookup =
         let merged = DualProfileLookup(StringComparer.Ordinal)
