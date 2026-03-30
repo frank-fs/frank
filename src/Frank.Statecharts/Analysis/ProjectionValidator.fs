@@ -130,10 +130,38 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
                   Severity = Severity.Warning
                   Message = $"State '%s{state}' is reachable but no role has outgoing transitions from it" })
 
+/// Check whether any reachable descendant of a composite state has a non-self-loop transition.
+/// Returns true if at least one reachable descendant can progress (transition to a different state).
+/// Filters descendants to only those in reachableStates, so unreachable descendants
+/// (which would be pruned from the projection) don't suppress livelock warnings.
+let private hasProgressingDescendant
+    (containment: StateContainment)
+    (transitionsBySource: Map<string, TransitionSpec list>)
+    (reachableStates: Set<string>)
+    (state: string)
+    : bool =
+    let descendants = StateContainment.allDescendants state containment
+
+    descendants
+    |> List.filter (fun d -> Set.contains d reachableStates)
+    |> List.exists (fun descendant ->
+        let outgoing =
+            transitionsBySource |> Map.tryFind descendant |> Option.defaultValue []
+
+        outgoing |> List.exists (fun t -> t.Target <> t.Source))
+
 /// Post-projection: warn when a reachable non-final state has outgoing transitions
 /// but ALL of them are self-loops (source == target). The system is active but cannot
 /// make progress — a livelock.
-let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: ExtractedStatechart) : ProjectionIssue list =
+///
+/// Hierarchy-aware: a composite state self-loop is suppressed when any reachable descendant
+/// has non-self-loop transitions (children can progress internally). Only reachable
+/// descendants are considered — unreachable ones would be pruned and cannot actually progress.
+let checkLivelock
+    (projections: Map<string, ExtractedStatechart>)
+    (pruned: ExtractedStatechart)
+    (containment: StateContainment)
+    : ProjectionIssue list =
     let transitionsBySource =
         projections
         |> Map.values
@@ -141,6 +169,8 @@ let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
         |> Seq.toList
         |> List.groupBy _.Source
         |> Map.ofList
+
+    let reachableStates = pruned.StateNames |> Set.ofList
 
     pruned.StateNames
     |> List.choose (fun state ->
@@ -152,11 +182,18 @@ let checkLivelock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
             if outgoing.IsEmpty then
                 None // No outgoing transitions = deadlock, not livelock
             elif outgoing |> List.forall (fun t -> t.Target = t.Source) then
-                Some
-                    { Check = Livelock
-                      Severity = Severity.Warning
-                      Message =
-                        $"State '%s{state}' has only self-loop transitions across all role projections — no role can advance out of it" }
+                // Check hierarchy: if this is a composite state with reachable progressing descendants, suppress
+                if
+                    StateContainment.isComposite state containment
+                    && hasProgressingDescendant containment transitionsBySource reachableStates state
+                then
+                    None
+                else
+                    Some
+                        { Check = Livelock
+                          Severity = Severity.Warning
+                          Message =
+                            $"State '%s{state}' has only self-loop transitions across all role projections — no role can advance out of it" }
             else
                 None)
 
@@ -280,7 +317,7 @@ let private validateProjectionCore
               yield! checkMixedChoice statechart
               yield! checkCompleteness projections pruned
               yield! checkDeadlock projections pruned
-              yield! checkLivelock projections pruned
+              yield! checkLivelock projections pruned StateContainment.empty
 
               if strict then
                   yield! checkClosedWorldTotality statechart

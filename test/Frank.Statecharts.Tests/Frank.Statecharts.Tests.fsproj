@@ -63,6 +63,7 @@
     <Compile Include="Validation/MergeTests.fs" />
     <!-- Analysis tests -->
     <Compile Include="Analysis/ProjectionValidatorTests.fs" />
+    <Compile Include="Analysis/HierarchyLivelockTests.fs" />
     <!-- Affordance tests (merged from Frank.Affordances.Tests) -->
     <Compile Include="Affordances/AffordanceTestHelpers.fs" />
     <Compile Include="Affordances/AffordanceMiddlewareTests.fs" />
