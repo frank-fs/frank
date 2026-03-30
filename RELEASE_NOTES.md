@@ -1,3 +1,51 @@
+### New in 7.4.0
+
+Protocol composition, hierarchical statecharts, and session type duality — the algebraic foundations that make Frank's multi-party protocols composable and verifiable by construction.
+
+**Hierarchical Statechart Runtime**
+
+- **Composite states** with LCA-based entry/exit, XOR (exclusive) and AND (parallel) regions (#136)
+- **History pseudo-states** — shallow and deep history with proper accumulation across transition sequences
+- **Hierarchy-aware livelock detection** — composite state self-loops suppressed when children progress (#225)
+- **Closed-world projection** with containment-aware pruning — child states reachable via implicit initial-child entry are not pruned (#225)
+- **Hierarchy bug fixes** — ancestor traversal in `resolveAllowedMethods`, history accumulation threading, AND composite exit deactivation (#224)
+
+**Session Type Duality**
+
+- **ALPS duality vocabulary** — `clientObligation`, `advancesProtocol`, `dualOf`, `cutPoint` extension elements with HTTPS dereferenceable URIs (#124)
+- **Dual derivation engine** — classifies each descriptor as MustSelect, MayPoll, or SessionComplete per (role, state) pair (#125)
+- **Involution** — `deriveReverse` flips MustSelect/MayPoll per session type duality; FsCheck property test validates dual(dual(T)) = T (#226)
+- **Method safety integration** — unsafe self-loops (POST) classified as MustSelect, safe (GET) as MayPoll (#226)
+- **Race condition detection** — flags states where different roles compete on overlapping descriptors (#226)
+- **Circular wait detection** — DFS on (role, state) dependency graph with observer filtering (#226)
+- **Cut point enrichment** — structured `CutPointInfo` with URI template, authority boundary, link relation (#226)
+- **Content negotiation** — `Prefer: return=dual` serves client dual ALPS profiles via middleware (#126)
+- **Dual conformance checking** — validates provenance traces against derived client obligations (#126)
+
+**Algebraic Composition**
+
+- **TransitionResult functor** with applicative `apply` and monadic `bind` (#119)
+- **Guard monoids** with identity, composition, and FsCheck algebraic law verification (#119)
+- **Typed sub-DUs** for `AlpsRole` and `AlpsDuality` id fields (#167)
+
+**CLI**
+
+- **`frank dual`** command — derive client duals, `--check-dual` for obligation validation, `--check-laws` for algebraic properties (#181)
+- **`frank compile`** promoted to root command — fixes MSBuild integration where `frank semantic compile` was unreachable (#228)
+- **Cross-file extraction** — `frank extract` resolves machine bindings across files via FCS `AssemblySignature.Entities` fallback (#229)
+
+**Discovery and Profiles**
+
+- **Livelock detection** — flags non-final states with only self-loop transitions (#175)
+- **Closed-world projection** with totality check — ensures every transition has explicit role assignment (#171)
+- **HTTP-dereferenceable shape URIs** for ALPS `def` elements (#174)
+
+**Performance**
+
+- **Zero per-request allocation** in dual profile middleware — pre-computed Link header values and role lookup at startup
+- **O(n) entry phase** in hierarchy runtime — cons-based accumulation replaces O(n²) list concatenation
+- **Idiomatic Option chains** replace null checks in middleware request paths
+
 ### New in 7.3.1
 
 Patch release: state-aware OPTIONS, role-filtered Link rels, and ALPS profile completeness.
