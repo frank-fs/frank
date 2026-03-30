@@ -3,7 +3,6 @@ namespace Frank.Cli.Core.Analysis
 open System
 open System.Diagnostics
 open System.IO
-open System.Text
 open System.Text.Json
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Syntax
@@ -18,12 +17,29 @@ type LoadedProject =
       ParsedFiles: (string * ParsedInput) list
       CheckResults: FSharpCheckProjectResults }
 
+/// Pre-resolved MSBuild project options written by the MSBuild target to a JSON file.
+/// Eliminates the redundant subprocess spawning when frank compile is invoked by MSBuild,
+/// since MSBuild already has all source files, references, and defines resolved.
+/// JSON schema: { "sourceFiles": [...], "references": [...], "defines": [...], "otherFlags": [...] }
+type ResolvedProjectOptions =
+    { SourceFiles: string list
+      References: string list
+      Defines: string list
+      OtherFlags: string list }
+
 module ProjectLoader =
 
     /// Singleton FSharpChecker shared across all loadProject calls.
     /// Creating a new checker per call is expensive (~5 min each); the checker
     /// caches project snapshots internally, so reuse is both safe and fast.
     let private checker = FSharpChecker.Create(keepAssemblyContents = true)
+
+    /// Checker for the MSBuild/extraction path — expression trees are not needed for
+    /// affordance/type extraction, so keepAssemblyContents = false reduces peak memory.
+    /// projectCacheSize = 1: the CLI processes one project per invocation, so there is
+    /// nothing to gain from a larger project cache.
+    let private extractionChecker =
+        FSharpChecker.Create(keepAssemblyContents = false, projectCacheSize = 1)
 
     let private parseSourceFile (checker: FSharpChecker) (parsingOptions: FSharpParsingOptions) (sourceFile: string) =
         async {
@@ -103,14 +119,10 @@ module ProjectLoader =
 
         use proc = Process.Start(psi)
 
-        let stderrBuf = StringBuilder()
-
-        proc.ErrorDataReceived.Add(fun args ->
-            if not (isNull args.Data) then
-                stderrBuf.AppendLine(args.Data) |> ignore)
-
-        proc.BeginErrorReadLine()
-
+        // Read stderr asynchronously first to avoid a deadlock where the process blocks
+        // trying to write to a full stderr pipe while we are blocking on stdout.
+        // StringBuilder with ErrorDataReceived is not thread-safe; ReadToEndAsync is.
+        let stderrTask = proc.StandardError.ReadToEndAsync()
         let stdout = proc.StandardOutput.ReadToEnd()
         let exited = proc.WaitForExit(120_000)
 
@@ -119,7 +131,7 @@ module ProjectLoader =
             Error "dotnet msbuild timed out after 120 seconds. Ensure the project restores successfully: dotnet restore"
         else
 
-            let stderr = stderrBuf.ToString()
+            let stderr = stderrTask.Result
 
             if proc.ExitCode <> 0 then
                 Error $"dotnet msbuild failed (exit code {proc.ExitCode}):\n{stderr}"
@@ -189,6 +201,104 @@ module ProjectLoader =
                yield! sourceFiles |]
 
         checker.GetProjectOptionsFromCommandLineArgs(fsprojPath, args)
+
+    /// Read a pre-resolved project options JSON file written by the MSBuild target.
+    /// Uses File.ReadAllText for BOM-safe reading and validates that references are non-empty.
+    let readResolvedOptions (path: string) : Result<ResolvedProjectOptions, string> =
+        if not (File.Exists path) then
+            Error $"Project options file not found: {path}"
+        else
+            try
+                use doc = JsonDocument.Parse(File.ReadAllText path)
+                let root = doc.RootElement
+
+                let getStringArray (propName: string) =
+                    match root.TryGetProperty(propName) with
+                    | true, v -> [ for elem in v.EnumerateArray() -> elem.GetString() ]
+                    | _ -> []
+
+                let sourceFiles = getStringArray "sourceFiles"
+                let references = getStringArray "references"
+                let defines = getStringArray "defines"
+                let otherFlags = getStringArray "otherFlags"
+
+                if references.IsEmpty then
+                    Error
+                        $"No assembly references in options file: {path}\nThis usually means the project needs restoring. Run: dotnet restore"
+                else
+                    Ok
+                        { SourceFiles = sourceFiles
+                          References = references
+                          Defines = defines
+                          OtherFlags = otherFlags }
+            with ex ->
+                Error $"Failed to parse project options file '{path}': {ex.Message}"
+
+    /// Load an F# project using pre-resolved MSBuild options, bypassing subprocess spawning.
+    /// Uses extractionChecker (keepAssemblyContents = false, projectCacheSize = 1) to reduce
+    /// peak memory on the MSBuild invocation path where expression trees are not needed.
+    let loadProjectFromOptions
+        (fsprojPath: string)
+        (options: ResolvedProjectOptions)
+        : Async<Result<LoadedProject, string>> =
+        async {
+            try
+                let fullPath = Path.GetFullPath fsprojPath
+
+                if options.SourceFiles.IsEmpty then
+                    return Error $"No source files in resolved options for project: {fullPath}"
+                else
+
+                    let fcsOptions =
+                        buildFcsOptions
+                            extractionChecker
+                            fullPath
+                            options.SourceFiles
+                            options.References
+                            options.Defines
+                            options.OtherFlags
+
+                    let! projectResults = extractionChecker.ParseAndCheckProject(fcsOptions)
+
+                    if projectResults.HasCriticalErrors then
+                        let errors =
+                            projectResults.Diagnostics
+                            |> Array.filter (fun d ->
+                                d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
+                            |> Array.map (fun d -> $"  {d.FileName}({d.StartLine},{d.StartColumn}): {d.Message}")
+                            |> String.concat "\n"
+
+                        return Error $"Type-check errors:\n{errors}"
+                    else
+                        // Re-parse each file individually to obtain ParsedInput (untyped AST) trees.
+                        // ParseAndCheckProject above already parses internally, but FSharpCheckProjectResults
+                        // does not expose per-file ParsedInput directly. The individual ParseFile calls are
+                        // cheap (syntax-only, no type checking). We derive parsing options from project options
+                        // to include conditional defines, language version, and other flags — using
+                        // FSharpParsingOptions.Default would miss cross-file conditional compilation.
+                        // Note: the SourceText instances created per ParseFile call differ from
+                        // ParseAndCheckProject's internal instances, so FCS cache misses are expected
+                        // on cold subprocess invocations. This is acceptable — the per-file parse is
+                        // syntax-only and does not repeat type-checking.
+                        let parsingOptions, _diagnostics =
+                            extractionChecker.GetParsingOptionsFromProjectOptions(fcsOptions)
+
+                        let! parsedFiles =
+                            options.SourceFiles
+                            |> List.toArray
+                            |> Array.map (parseSourceFile extractionChecker parsingOptions)
+                            |> Async.Sequential
+
+                        let parsedFiles = parsedFiles |> Array.choose id |> Array.toList
+
+                        return
+                            Ok
+                                { ProjectPath = fullPath
+                                  ParsedFiles = parsedFiles
+                                  CheckResults = projectResults }
+            with ex ->
+                return Error $"Failed to load project from options: {ex.Message}"
+        }
 
     /// Load an F# project, parse and type-check all files.
     /// Uses dotnet msbuild structured output (no Ionide.ProjInfo dependency).
