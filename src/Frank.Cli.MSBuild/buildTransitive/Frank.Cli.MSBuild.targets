@@ -41,10 +41,10 @@
           AfterTargets="ResolveAssemblyReferences"
           BeforeTargets="GenerateFrankSemanticDefinitions"
           Inputs="@(Compile)"
-          Outputs="$(FrankCliOutputPath)resolved-options.$(TargetFramework).json"
+          Outputs="$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)"
           Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
     <WriteResolvedOptionsJson
-        OutputPath="$(FrankCliOutputPath)resolved-options.$(TargetFramework).json"
+        OutputPath="$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)"
         SourceFiles="@(Compile)"
         ReferencePaths="@(ReferencePath)"
         DefineConstants="$(DefineConstants)"
@@ -60,7 +60,7 @@
           Inputs="@(Compile)"
           Outputs="$(FrankCliOutputPath)shapes.shacl.ttl"
           Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
-    <Exec Command="dotnet frank compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot; --project-options-file &quot;$(FrankCliOutputPath)resolved-options.$(TargetFramework).json&quot;"
+    <Exec Command="dotnet frank compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot; --project-options-file &quot;$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)&quot;"
           IgnoreExitCode="true"
           ConsoleToMSBuild="true">
       <Output TaskParameter="ExitCode" PropertyName="_FrankCliExitCode" />

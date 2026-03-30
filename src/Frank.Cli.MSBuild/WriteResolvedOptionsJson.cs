@@ -57,7 +57,8 @@ namespace Frank.Cli.MSBuild
             }
             writer.WriteEndArray();
 
-            // otherFlags — split on whitespace (MSBuild sends as single string)
+            // otherFlags — naive whitespace split; corrupts flags with quoted paths
+            // (e.g., --pathmap:"..."). Matches the F# side limitation in ProjectLoader.fs.
             writer.WriteStartArray("otherFlags");
             if (!string.IsNullOrEmpty(OtherFlags))
             {
@@ -72,7 +73,6 @@ namespace Frank.Cli.MSBuild
 
             writer.WriteEndObject();
             writer.Flush();
-            stream.Flush();
 
             Log.LogMessage(MessageImportance.Low, "Wrote resolved options to {0}", OutputPath);
             return true;

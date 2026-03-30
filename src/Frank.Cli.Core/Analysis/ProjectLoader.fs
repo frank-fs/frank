@@ -17,10 +17,7 @@ type LoadedProject =
       ParsedFiles: (string * ParsedInput) list
       CheckResults: FSharpCheckProjectResults }
 
-/// Pre-resolved MSBuild project options written by the MSBuild target to a JSON file.
-/// Eliminates the redundant subprocess spawning when frank compile is invoked by MSBuild,
-/// since MSBuild already has all source files, references, and defines resolved.
-/// JSON schema: { "sourceFiles": [...], "references": [...], "defines": [...], "otherFlags": [...] }
+/// Pre-resolved MSBuild project options. JSON: { "sourceFiles", "references", "defines", "otherFlags" }
 type ResolvedProjectOptions =
     { SourceFiles: string list
       References: string list
@@ -204,14 +201,56 @@ module ProjectLoader =
 
         checker.GetProjectOptionsFromCommandLineArgs(fsprojPath, args)
 
+    /// Check a project and parse all source files into LoadedProject.
+    /// Shared by both loadProject and loadProjectFromOptions to avoid duplicated logic.
+    let private checkAndParse
+        (checker: FSharpChecker)
+        (fullPath: string)
+        (sourceFiles: string list)
+        (fcsOptions: FSharpProjectOptions)
+        : Async<Result<LoadedProject, string>> =
+        async {
+            let! projectResults = checker.ParseAndCheckProject(fcsOptions)
+
+            if projectResults.HasCriticalErrors then
+                let errors =
+                    projectResults.Diagnostics
+                    |> Array.filter (fun d -> d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
+                    |> Array.map (fun d -> $"  {d.FileName}({d.StartLine},{d.StartColumn}): {d.Message}")
+                    |> String.concat "\n"
+
+                return Error $"Type-check errors:\n{errors}"
+            else
+                // Re-parse each file individually to obtain ParsedInput (untyped AST) trees.
+                // ParseAndCheckProject parses internally but does not expose per-file ParsedInput.
+                // These syntax-only calls do not repeat type-checking. SourceText instances differ
+                // from ParseAndCheckProject's, so FCS cache misses are expected on cold invocations.
+                let parsingOptions, _diagnostics =
+                    checker.GetParsingOptionsFromProjectOptions(fcsOptions)
+
+                let! parsedFiles =
+                    sourceFiles
+                    |> List.toArray
+                    |> Array.map (parseSourceFile checker parsingOptions)
+                    |> Async.Sequential
+
+                let parsedFiles = parsedFiles |> Array.choose id |> Array.toList
+
+                return
+                    Ok
+                        { ProjectPath = fullPath
+                          ParsedFiles = parsedFiles
+                          CheckResults = projectResults }
+        }
+
     /// Read a pre-resolved project options JSON file written by the MSBuild target.
-    /// Uses File.ReadAllText for BOM-safe reading and validates that references are non-empty.
     let readResolvedOptions (path: string) : Result<ResolvedProjectOptions, string> =
         if not (File.Exists path) then
             Error $"Project options file not found: {path}"
         else
             try
-                use doc = JsonDocument.Parse(File.ReadAllText path)
+                use stream = File.OpenRead(path)
+                use doc = JsonDocument.Parse(stream)
                 let root = doc.RootElement
 
                 let getStringArray (propName: string) =
@@ -260,44 +299,7 @@ module ProjectLoader =
                             options.Defines
                             options.OtherFlags
 
-                    let! projectResults = extractionChecker.ParseAndCheckProject(fcsOptions)
-
-                    if projectResults.HasCriticalErrors then
-                        let errors =
-                            projectResults.Diagnostics
-                            |> Array.filter (fun d ->
-                                d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
-                            |> Array.map (fun d -> $"  {d.FileName}({d.StartLine},{d.StartColumn}): {d.Message}")
-                            |> String.concat "\n"
-
-                        return Error $"Type-check errors:\n{errors}"
-                    else
-                        // Re-parse each file individually to obtain ParsedInput (untyped AST) trees.
-                        // ParseAndCheckProject above already parses internally, but FSharpCheckProjectResults
-                        // does not expose per-file ParsedInput directly. The individual ParseFile calls are
-                        // cheap (syntax-only, no type checking). We derive parsing options from project options
-                        // to include conditional defines, language version, and other flags — using
-                        // FSharpParsingOptions.Default would miss cross-file conditional compilation.
-                        // Note: the SourceText instances created per ParseFile call differ from
-                        // ParseAndCheckProject's internal instances, so FCS cache misses are expected
-                        // on cold subprocess invocations. This is acceptable — the per-file parse is
-                        // syntax-only and does not repeat type-checking.
-                        let parsingOptions, _diagnostics =
-                            extractionChecker.GetParsingOptionsFromProjectOptions(fcsOptions)
-
-                        let! parsedFiles =
-                            options.SourceFiles
-                            |> List.toArray
-                            |> Array.map (parseSourceFile extractionChecker parsingOptions)
-                            |> Async.Sequential
-
-                        let parsedFiles = parsedFiles |> Array.choose id |> Array.toList
-
-                        return
-                            Ok
-                                { ProjectPath = fullPath
-                                  ParsedFiles = parsedFiles
-                                  CheckResults = projectResults }
+                    return! checkAndParse extractionChecker fullPath options.SourceFiles fcsOptions
             with ex ->
                 return Error $"Failed to load project from options: {ex.Message}"
         }
@@ -320,45 +322,10 @@ module ProjectLoader =
                             return Error $"No source files found in project: {fullPath}"
                         else
 
-                            let options =
+                            let fcsOptions =
                                 buildFcsOptions checker fullPath sourceFiles references defines otherFlags
 
-                            let! projectResults = checker.ParseAndCheckProject(options)
-
-                            if projectResults.HasCriticalErrors then
-                                let errors =
-                                    projectResults.Diagnostics
-                                    |> Array.filter (fun d ->
-                                        d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
-                                    |> Array.map (fun d ->
-                                        $"  {d.FileName}({d.StartLine},{d.StartColumn}): {d.Message}")
-                                    |> String.concat "\n"
-
-                                return Error $"Type-check errors:\n{errors}"
-                            else
-                                // Re-parse each file individually to obtain ParsedInput (untyped AST) trees.
-                                // ParseAndCheckProject above already parses internally, but FSharpCheckProjectResults
-                                // does not expose per-file ParsedInput directly. The individual ParseFile calls are
-                                // cheap (syntax-only, no type checking) and leverage the checker's internal cache,
-                                // so the redundancy is negligible. We derive parsing options from project options
-                                // to include conditional defines, language version, and other flags — using
-                                // FSharpParsingOptions.Default would miss cross-file conditional compilation.
-                                let parsingOptions, _diagnostics =
-                                    checker.GetParsingOptionsFromProjectOptions(options)
-
-                                let! parsedFiles =
-                                    sourceFiles
-                                    |> List.toArray
-                                    |> Array.map (parseSourceFile checker parsingOptions)
-                                    |> Async.Sequential
-
-                                let parsedFiles = parsedFiles |> Array.choose id |> Array.toList
-
-                                return
-                                    Ok
-                                        { ProjectPath = fullPath
-                                          ParsedFiles = parsedFiles
-                                          CheckResults = projectResults }
+                            return! checkAndParse checker fullPath sourceFiles fcsOptions
             with ex ->
                 return Error $"Failed to load project: {ex.Message}"
         }

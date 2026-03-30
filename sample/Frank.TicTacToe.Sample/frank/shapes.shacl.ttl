@@ -1,0 +1,22 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeEvent> a <http://www.w3.org/ns/shacl#NodeShape>;
+                                                               <http://www.w3.org/ns/shacl#or> (<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeEvent.MakeMove>);
+                                                               <http://www.w3.org/ns/shacl#targetNode> <urn:frank:validation:request>.
+<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeEvent.MakeMove> a <http://www.w3.org/ns/shacl#NodeShape>;
+                                                                        <http://www.w3.org/ns/shacl#property> [<http://www.w3.org/ns/shacl#path> <urn:frank:property:position> ; 
+                                                                                                               <http://www.w3.org/ns/shacl#datatype> xsd:integer ; 
+                                                                                                               <http://www.w3.org/ns/shacl#minCount> 1  ; 
+                                                                                                               <http://www.w3.org/ns/shacl#maxCount> 1 ];
+                                                                        <http://www.w3.org/ns/shacl#targetNode> <urn:frank:validation:request>.
+<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeState> a <http://www.w3.org/ns/shacl#NodeShape>;
+                                                               <http://www.w3.org/ns/shacl#or> (<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeState.Won>);
+                                                               <http://www.w3.org/ns/shacl#targetNode> <urn:frank:validation:request>.
+<urn:frank:shape:Frank.TicTacToe.Sample.Domain.TicTacToeState.Won> a <http://www.w3.org/ns/shacl#NodeShape>;
+                                                                   <http://www.w3.org/ns/shacl#property> [<http://www.w3.org/ns/shacl#path> <urn:frank:property:winner> ; 
+                                                                                                          <http://www.w3.org/ns/shacl#datatype> xsd:string ; 
+                                                                                                          <http://www.w3.org/ns/shacl#minCount> 1  ; 
+                                                                                                          <http://www.w3.org/ns/shacl#maxCount> 1 ];
+                                                                   <http://www.w3.org/ns/shacl#targetNode> <urn:frank:validation:request>.

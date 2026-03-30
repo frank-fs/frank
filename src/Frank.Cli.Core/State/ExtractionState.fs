@@ -38,11 +38,6 @@ module ExtractionState =
         writer.Save(graph, sw :> System.IO.TextWriter)
         sw.ToString()
 
-    /// Write a graph to Turtle format directly to a TextWriter, avoiding the intermediate string allocation.
-    let graphToTurtleWriter (graph: IGraph) (writer: System.IO.TextWriter) : unit =
-        let turtleWriter = CompressingTurtleWriter()
-        turtleWriter.Save(graph, writer)
-
     let turtleToGraph (turtle: string) : IGraph =
         let g = new Graph()
         let parser = TurtleParser()

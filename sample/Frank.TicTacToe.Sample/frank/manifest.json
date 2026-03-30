@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "baseUri": "urn:frank:Frank.TicTacToe.Sample/",
+  "sourceHash": "",
+  "vocabularies": [
+    "schema.org"
+  ],
+  "generatedAt": "2026-03-30T22:35:06.301318+00:00"
+}
