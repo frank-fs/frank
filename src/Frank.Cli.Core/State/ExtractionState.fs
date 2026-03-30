@@ -33,7 +33,7 @@ type ExtractionState =
 module ExtractionState =
 
     let graphToTurtle (graph: IGraph) : string =
-        let sw = new System.IO.StringWriter()
+        use sw = new System.IO.StringWriter()
         let writer = CompressingTurtleWriter()
         writer.Save(graph, sw :> System.IO.TextWriter)
         sw.ToString()
@@ -41,7 +41,7 @@ module ExtractionState =
     let turtleToGraph (turtle: string) : IGraph =
         let g = new Graph()
         let parser = TurtleParser()
-        let sr = new System.IO.StringReader(turtle)
+        use sr = new System.IO.StringReader(turtle)
         parser.Load(g, sr :> System.IO.TextReader)
         g :> IGraph
 
