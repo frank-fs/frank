@@ -21,18 +21,22 @@ open Frank.Affordances.Tests.AffordanceTestHelpers
 // -- Helpers --
 
 /// Build a test DualProfileLookup.
-let private buildDualLookup (entries: (string * (string * (string * string) list) list) list) : DualProfileLookup =
+let private buildDualLookup
+    (entries: (string * (string * (string * (string * string)) list) list) list)
+    : DualProfileLookup =
     let lookup = DualProfileLookup(StringComparer.Ordinal)
 
     for routeTemplate, states in entries do
         let stateDict =
-            Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal)
+            Dictionary<string, Dictionary<string, DualProfileEntry>>(StringComparer.Ordinal)
 
         for state, roles in states do
-            let roleDict = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            let roleDict = Dictionary<string, DualProfileEntry>(StringComparer.OrdinalIgnoreCase)
 
-            for roleName, alpsJson in roles do
-                roleDict.[roleName] <- alpsJson
+            for roleName, (alpsJson, linkHeaderValue) in roles do
+                roleDict.[roleName] <-
+                    { AlpsJson = alpsJson
+                      LinkHeaderValue = linkHeaderValue }
 
             stateDict.[state] <- roleDict
 
@@ -40,11 +44,17 @@ let private buildDualLookup (entries: (string * (string * (string * string) list
 
     lookup
 
-/// Sample dual ALPS JSON for tests.
-let private sampleDualAlpsJson role state =
-    sprintf
-        """{"alps":{"version":"1.0","descriptor":[{"id":"%s","type":"semantic","ext":[{"id":"https://frank-fs.github.io/alps-ext/clientObligation","value":"must-select"}]}]}}"""
-        (sprintf "%s-%s-dual" role state)
+/// Sample dual ALPS JSON and Link header value for tests.
+let private sampleDualEntry role state =
+    let alpsJson =
+        sprintf
+            """{"alps":{"version":"1.0","descriptor":[{"id":"%s","type":"semantic","ext":[{"id":"https://frank-fs.github.io/alps-ext/clientObligation","value":"must-select"}]}]}}"""
+            (sprintf "%s-%s-dual" role state)
+
+    let linkHeaderValue =
+        sprintf "<https://example.com/alps/games-%s-%s-dual>; rel=\"profile\"" role state
+
+    (alpsJson, linkHeaderValue)
 
 /// Run a test against a server with AffordanceMiddleware, ProjectedProfileMiddleware, and DualProfileMiddleware.
 let private withDualServer
@@ -106,11 +116,11 @@ let private gamesDualLookup =
     buildDualLookup
         [ "/games/{gameId}",
           [ "XTurn",
-            [ "playerx", sampleDualAlpsJson "playerx" "XTurn"
-              "playero", sampleDualAlpsJson "playero" "XTurn" ]
+            [ "playerx", sampleDualEntry "playerx" "XTurn"
+              "playero", sampleDualEntry "playero" "XTurn" ]
             "OTurn",
-            [ "playerx", sampleDualAlpsJson "playerx" "OTurn"
-              "playero", sampleDualAlpsJson "playero" "OTurn" ] ] ]
+            [ "playerx", sampleDualEntry "playerx" "OTurn"
+              "playero", sampleDualEntry "playero" "OTurn" ] ] ]
 
 // -- Tests --
 
@@ -407,7 +417,16 @@ let dualProfileOverlayBuildTests =
 
               // The dual ALPS JSON should contain clientObligation annotation
               let sellerDual = submittedRoles.["Seller"]
-              Expect.isTrue (sellerDual.Contains("clientObligation")) "Dual should contain clientObligation"
+              Expect.isTrue (sellerDual.AlpsJson.Contains("clientObligation")) "Dual should contain clientObligation"
+
+              // The pre-computed Link header value should be a valid URI
+              Expect.isTrue
+                  (sellerDual.LinkHeaderValue.StartsWith("<https://"))
+                  "Link header value should start with valid URI"
+
+              Expect.isTrue
+                  (sellerDual.LinkHeaderValue.Contains("dual"))
+                  "Link header value should reference dual profile"
 
           testCase "empty roles produces empty lookup"
           <| fun _ ->
@@ -523,11 +542,11 @@ let orderFulfillmentDualIntegrationTests =
 
               // Parse and verify the dual ALPS JSON contains obligation annotations
               Expect.isTrue
-                  (sellerSubmitted.Contains("must-select"))
+                  (sellerSubmitted.AlpsJson.Contains("must-select"))
                   "Seller in Submitted should have must-select obligation (confirmOrder advances protocol)"
 
               Expect.isTrue
-                  (sellerSubmitted.Contains("advancesProtocol"))
+                  (sellerSubmitted.AlpsJson.Contains("advancesProtocol"))
                   "Seller in Submitted should have advancesProtocol annotation"
 
           testCase "Buyer in Submitted gets may-poll obligation only"
@@ -597,6 +616,10 @@ let orderFulfillmentDualIntegrationTests =
               let buyerSubmitted = stateDict.["Submitted"].["Buyer"]
 
               // Buyer in Submitted is observer: only may-poll
-              Expect.isTrue (buyerSubmitted.Contains("may-poll")) "Buyer in Submitted should have may-poll obligation"
+              Expect.isTrue
+                  (buyerSubmitted.AlpsJson.Contains("may-poll"))
+                  "Buyer in Submitted should have may-poll obligation"
 
-              Expect.isFalse (buyerSubmitted.Contains("must-select")) "Buyer in Submitted should NOT have must-select" ]
+              Expect.isFalse
+                  (buyerSubmitted.AlpsJson.Contains("must-select"))
+                  "Buyer in Submitted should NOT have must-select" ]
