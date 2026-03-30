@@ -479,16 +479,16 @@ let circularWaitTests =
               let result = derive circularChart projections
               Expect.isEmpty result.CircularWaits "negotiation has escape paths (agree/cancel)"
 
-          testCase "deadlock circular chart detects circular dependency"
+          testCase "alternating chart has no circular wait (C4: turn-taking is not deadlock)"
           <| fun _ ->
+              // This chart is turn-taking: RoleB acts in WaitA, RoleA acts in WaitB.
+              // Each role has a state where it must act, so neither is permanently blocked.
+              // The fix (C4) correctly identifies this as non-circular because (role, state)
+              // pairs don't form a cycle — each waiting role has a different state where it acts.
               let projections = Projection.projectAll deadlockCircularChart
               let result = derive deadlockCircularChart projections
 
-              Expect.isNonEmpty result.CircularWaits "should detect circular wait"
-
-              let cycle = result.CircularWaits |> List.head
-              // Should contain both roles in the cycle
-              Expect.isTrue (cycle.Length >= 2) "cycle should have at least 2 edges" ]
+              Expect.isEmpty result.CircularWaits "alternating protocol is not a circular wait" ]
 
 // ===========================================================================
 // Enhancement 6: Conditional request modeling

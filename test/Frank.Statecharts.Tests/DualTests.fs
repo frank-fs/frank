@@ -235,7 +235,7 @@ let ticTacToeDualTests =
 
                   let hasTerminalObligation =
                       annotations
-                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                   Expect.isTrue hasTerminalObligation $"PlayerO in {state} should have terminal obligation"
 
@@ -254,7 +254,7 @@ let ticTacToeDualTests =
 
                   let hasTerminalObligation =
                       annotations
-                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                   Expect.isTrue hasTerminalObligation $"Spectator in {state} should have terminal obligation"
 
@@ -407,7 +407,7 @@ let orderFulfillmentDualTests =
 
                   let hasTerminalObligation =
                       annotations
-                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                   Expect.isTrue hasTerminalObligation $"Auditor in {state} should have terminal obligation"
 
@@ -434,7 +434,7 @@ let orderFulfillmentDualTests =
 
                   let hasTerminalObligation =
                       annotations
-                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                   Expect.isTrue hasTerminalObligation $"{role} in Completed should have terminal obligation"
 
@@ -445,7 +445,7 @@ let orderFulfillmentDualTests =
 
                   let hasTerminalObligation =
                       annotations
-                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                      |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                   Expect.isTrue hasTerminalObligation $"{role} in Cancelled should have terminal obligation"
 
@@ -554,7 +554,7 @@ let edgeCaseTests =
               Expect.isTrue (Map.isEmpty result.Annotations) "empty roles → empty annotations"
               Expect.isEmpty result.ProtocolSinks "no deadlocks with no roles"
 
-          testCase "single state chart with final state and self-loop yields MayObserve"
+          testCase "single state chart with final state and self-loop yields MayPoll"
           <| fun _ ->
               let singleStateChart: ExtractedStatechart =
                   { RouteTemplate = "/done"
@@ -574,9 +574,9 @@ let edgeCaseTests =
               let result = derive singleStateChart projections
               let annotations = annotationsFor "User" "Done" result
 
-              let hasMayObserve = annotations |> List.exists (fun a -> a.Obligation = MayObserve)
+              let hasMayPoll = annotations |> List.exists (fun a -> a.Obligation = MayPoll)
 
-              Expect.isTrue hasMayObserve "single final state with self-loop yields MayObserve" ]
+              Expect.isTrue hasMayPoll "single final state with self-loop yields MayPoll (not truly final per Harel)" ]
 
 // ===========================================================================
 // FsCheck property tests
@@ -606,7 +606,7 @@ let propertyTests =
 
                           let hasTerminalObligation =
                               annotations
-                              |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                              |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
                           Expect.isTrue
                               hasTerminalObligation

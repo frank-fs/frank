@@ -239,9 +239,17 @@ let private detectRaceConditions (annotations: Map<string * string, DualAnnotati
             let allDescriptorSets =
                 descriptorsByRole |> Map.toList |> List.map (fun (_, descs) -> Set.ofList descs)
 
+            // Check if any two DIFFERENT roles share a descriptor
+            let rolePairs =
+                let roleDescs = descriptorsByRole |> Map.toList
+                [ for i in 0 .. roleDescs.Length - 2 do
+                    for j in i + 1 .. roleDescs.Length - 1 do
+                        yield snd roleDescs.[i], snd roleDescs.[j] ]
+
             let hasOverlap =
-                allDescriptorSets
-                |> List.exists (fun s1 -> allDescriptorSets |> List.exists (fun s2 -> s1 <> s2 && not (Set.isEmpty (Set.intersect s1 s2))))
+                rolePairs
+                |> List.exists (fun (descs1, descs2) ->
+                    not (Set.isEmpty (Set.intersect (Set.ofList descs1) (Set.ofList descs2))))
 
             if hasOverlap then
                 Some
