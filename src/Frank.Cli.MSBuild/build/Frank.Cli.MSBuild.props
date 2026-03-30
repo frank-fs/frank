@@ -7,5 +7,7 @@
     <!-- Unified resource model binary produced by frank extract -->
     <FrankResourcesPath Condition="'$(FrankResourcesPath)' == ''">$(BaseIntermediateOutputPath)frank/model.bin</FrankResourcesPath>
     <FrankResourcesLogicalName Condition="'$(FrankResourcesLogicalName)' == ''">Frank.Resources.model.bin</FrankResourcesLogicalName>
+    <!-- TFM-suffixed resolved options file — prevents races in multi-TFM builds -->
+    <_FrankResolvedOptionsFile Condition="'$(_FrankResolvedOptionsFile)' == ''">resolved-options.$(TargetFramework).json</_FrankResolvedOptionsFile>
   </PropertyGroup>
 </Project>

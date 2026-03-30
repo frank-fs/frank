@@ -1,4 +1,15 @@
 <Project>
+  <!-- Resolve task assembly path: NuGet package layout (lib/netstandard2.0/) takes precedence;
+       fall back to build output for projects importing from source tree (dev workflow). -->
+  <PropertyGroup>
+    <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../lib/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../lib/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
+    <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../bin/Debug/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../bin/Debug/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
+    <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../bin/Release/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../bin/Release/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Frank.Cli.MSBuild.WriteResolvedOptionsJson"
+             AssemblyFile="$(_FrankMSBuildTaskAssembly)" />
+
   <!-- ================================================================
        Resource model binary (produced by frank extract)
        ================================================================
@@ -23,16 +34,33 @@
        Semantic definitions (produced by frank compile)
        ================================================================ -->
 
+  <!-- Write MSBuild-resolved project options to a JSON file so that
+       frank compile can bypass redundant subprocess MSBuild invocations.
+       Incremental: skipped if output JSON is newer than all @(Compile) inputs. -->
+  <Target Name="WriteFrankResolvedOptions"
+          AfterTargets="ResolveAssemblyReferences"
+          BeforeTargets="GenerateFrankSemanticDefinitions"
+          Inputs="@(Compile)"
+          Outputs="$(FrankCliOutputPath)resolved-options.$(TargetFramework).json"
+          Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <WriteResolvedOptionsJson
+        OutputPath="$(FrankCliOutputPath)resolved-options.$(TargetFramework).json"
+        SourceFiles="@(Compile)"
+        ReferencePaths="@(ReferencePath)"
+        DefineConstants="$(DefineConstants)"
+        OtherFlags="$(OtherFlags)" />
+  </Target>
+
   <!-- Auto-invoke frank compile before CoreCompile.
-       Runs after ResolveAssemblyReferences so the project's assembly list is stable.
+       Runs after WriteFrankResolvedOptions so resolved options are ready.
        Incremental: skipped if shapes.shacl.ttl is newer than all @(Compile) inputs. -->
   <Target Name="GenerateFrankSemanticDefinitions"
-          AfterTargets="ResolveAssemblyReferences"
+          DependsOnTargets="WriteFrankResolvedOptions"
           BeforeTargets="CoreCompile"
           Inputs="@(Compile)"
           Outputs="$(FrankCliOutputPath)shapes.shacl.ttl"
-          Condition="'$(FrankCliSkipGeneration)' != 'true'">
-    <Exec Command="dotnet frank compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot;"
+          Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet frank compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot; --project-options-file &quot;$(FrankCliOutputPath)resolved-options.$(TargetFramework).json&quot;"
           IgnoreExitCode="true"
           ConsoleToMSBuild="true">
       <Output TaskParameter="ExitCode" PropertyName="_FrankCliExitCode" />
