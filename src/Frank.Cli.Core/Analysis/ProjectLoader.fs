@@ -159,6 +159,8 @@ module ProjectLoader =
                             if String.IsNullOrWhiteSpace s then
                                 []
                             else
+                                // NOTE: Naive whitespace split; corrupts flags with quoted paths (e.g., --pathmap:"...").
+                                // The MSBuild response file path (--project-options-file) receives pre-split arrays, avoiding this.
                                 s.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries) |> Array.toList
                         | _ -> []
 

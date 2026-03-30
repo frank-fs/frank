@@ -70,31 +70,7 @@ module ExtractCommand =
             | _ -> false)
         |> Seq.length
 
-    let private mergeGraphs (target: IGraph) (source: IGraph) =
-        for triple in source.Triples do
-            let s =
-                match triple.Subject with
-                | :? IUriNode as u -> createUriNode target u.Uri
-                | :? IBlankNode as b -> createBlankNode target b.InternalID
-                | n -> n
-
-            let p =
-                match triple.Predicate with
-                | :? IUriNode as u -> createUriNode target u.Uri
-                | n -> n
-
-            let o =
-                match triple.Object with
-                | :? IUriNode as u -> createUriNode target u.Uri
-                | :? IBlankNode as b -> createBlankNode target b.InternalID
-                | :? ILiteralNode as l ->
-                    if isNull l.DataType then
-                        createLiteralNode target l.Value None
-                    else
-                        createLiteralNode target l.Value (Some l.DataType)
-                | n -> n
-
-            assertTriple target (s, p, o)
+    let private mergeGraphs (target: IGraph) (source: IGraph) = target.Merge(source)
 
     let private countAligned (graph: IGraph) : int =
         let equivPropNode = createUriNode graph (Uri Owl.EquivalentProperty)
@@ -176,11 +152,14 @@ module ExtractCommand =
                     // Step 7: Shape generation
                     let shapesGraph = pipeline.GenerateShapes config analyzedTypes
 
-                    // Merge type, route, capability graphs into ontology
+                    // Merge type, route, capability graphs into ontology, then dispose each source graph.
                     let ontologyGraph = createGraph ()
                     mergeGraphs ontologyGraph typeGraph
+                    (typeGraph :> System.IDisposable).Dispose()
                     mergeGraphs ontologyGraph routeGraph
+                    (routeGraph :> System.IDisposable).Dispose()
                     mergeGraphs ontologyGraph capabilityGraph
+                    (capabilityGraph :> System.IDisposable).Dispose()
 
                     // Step 8: Vocabulary alignment
                     let alignedOntology = pipeline.AlignVocabularies config ontologyGraph
