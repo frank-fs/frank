@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Machine.fs" />
+    <Compile Include="Consumer.fs" />
+  </ItemGroup>
+
+</Project>
