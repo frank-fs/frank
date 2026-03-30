@@ -31,12 +31,12 @@ module ProjectLoader =
     /// caches project snapshots internally, so reuse is both safe and fast.
     let private checker = FSharpChecker.Create(keepAssemblyContents = true)
 
-    /// Checker for the MSBuild/extraction path — expression trees are not needed for
-    /// affordance/type extraction, so keepAssemblyContents = false reduces peak memory.
-    /// projectCacheSize = 1: the CLI processes one project per invocation, so there is
-    /// nothing to gain from a larger project cache.
-    let private extractionChecker =
-        FSharpChecker.Create(keepAssemblyContents = false, projectCacheSize = 1)
+    /// Lightweight checker for the MSBuild/extraction path — expression trees are not
+    /// needed for affordance/type extraction, so keepAssemblyContents = false reduces
+    /// peak memory. projectCacheSize = 1: CLI processes one project per invocation.
+    /// Lazy to avoid allocating two FSharpChecker instances when only loadProject is used.
+    let private lightweightChecker =
+        lazy FSharpChecker.Create(keepAssemblyContents = false, projectCacheSize = 1)
 
     let private parseSourceFile (checker: FSharpChecker) (parsingOptions: FSharpParsingOptions) (sourceFile: string) =
         async {
@@ -68,7 +68,7 @@ module ProjectLoader =
             None
         else
             tryFcs None (fun () ->
-                let doc = JsonDocument.Parse(stdout)
+                use doc = JsonDocument.Parse(stdout)
                 let props = doc.RootElement.GetProperty("Properties")
 
                 match props.TryGetProperty("TargetFrameworks") with
@@ -96,9 +96,7 @@ module ProjectLoader =
                     | _ -> None)
 
     /// Run dotnet msbuild with structured JSON output to resolve project options.
-    let private resolveProjectOptions
-        (fsprojPath: string)
-        : Result<string list * string list * string list * string list, string> =
+    let private resolveProjectOptions (fsprojPath: string) : Result<ResolvedProjectOptions, string> =
         let tfmArg =
             match detectTargetFramework fsprojPath with
             | Some tfm -> $" /p:TargetFramework={tfm}"
@@ -173,7 +171,11 @@ module ProjectLoader =
                         Error
                             $"No assembly references resolved for: {fsprojPath}\nThis usually means the project needs restoring. Run: dotnet restore \"{fsprojPath}\""
                     else
-                        Ok(sourceFiles, references, defines, otherFlags)
+                        Ok
+                            { SourceFiles = sourceFiles
+                              References = references
+                              Defines = defines
+                              OtherFlags = otherFlags }
                 with ex ->
                     let preview = if stdout.Length > 500 then stdout.[..499] else stdout
                     Error $"Failed to parse MSBuild output: {ex.Message}\nOutput: {preview}"
@@ -276,7 +278,7 @@ module ProjectLoader =
                 Error $"Failed to parse project options file '{path}': {ex.Message}"
 
     /// Load an F# project using pre-resolved MSBuild options, bypassing subprocess spawning.
-    /// Uses extractionChecker (keepAssemblyContents = false, projectCacheSize = 1) to reduce
+    /// Uses lightweightChecker.Value (keepAssemblyContents = false, projectCacheSize = 1) to reduce
     /// peak memory on the MSBuild invocation path where expression trees are not needed.
     let loadProjectFromOptions
         (fsprojPath: string)
@@ -292,17 +294,27 @@ module ProjectLoader =
 
                     let fcsOptions =
                         buildFcsOptions
-                            extractionChecker
+                            lightweightChecker.Value
                             fullPath
                             options.SourceFiles
                             options.References
                             options.Defines
                             options.OtherFlags
 
-                    return! checkAndParse extractionChecker fullPath options.SourceFiles fcsOptions
+                    return! checkAndParse lightweightChecker.Value fullPath options.SourceFiles fcsOptions
             with ex ->
                 return Error $"Failed to load project from options: {ex.Message}"
         }
+
+    /// Compose readResolvedOptions + loadProjectFromOptions into a single loader function.
+    /// Returns a partially-applied loader suitable for CompileCommand.compileFromProjectWith.
+    let loadProjectFromOptionsFile (optionsFilePath: string) : string -> Async<Result<LoadedProject, string>> =
+        fun fsprojPath ->
+            async {
+                match readResolvedOptions optionsFilePath with
+                | Error e -> return Error e
+                | Ok opts -> return! loadProjectFromOptions fsprojPath opts
+            }
 
     /// Load an F# project, parse and type-check all files.
     /// Uses dotnet msbuild structured output (no Ionide.ProjInfo dependency).
@@ -316,16 +328,22 @@ module ProjectLoader =
 
                     match resolveProjectOptions fullPath with
                     | Error e -> return Error e
-                    | Ok(sourceFiles, references, defines, otherFlags) ->
+                    | Ok opts ->
 
-                        if sourceFiles.IsEmpty then
+                        if opts.SourceFiles.IsEmpty then
                             return Error $"No source files found in project: {fullPath}"
                         else
 
                             let fcsOptions =
-                                buildFcsOptions checker fullPath sourceFiles references defines otherFlags
+                                buildFcsOptions
+                                    checker
+                                    fullPath
+                                    opts.SourceFiles
+                                    opts.References
+                                    opts.Defines
+                                    opts.OtherFlags
 
-                            return! checkAndParse checker fullPath sourceFiles fcsOptions
+                            return! checkAndParse checker fullPath opts.SourceFiles fcsOptions
             with ex ->
                 return Error $"Failed to load project: {ex.Message}"
         }

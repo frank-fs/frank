@@ -253,20 +253,12 @@ let main args =
                 Some outputDir
 
         // When --base-uri is supplied, run the unified extract+compile path.
-        // When --project-options-file is also provided, compose a loader that reads
-        // pre-resolved MSBuild options from the JSON file, bypassing subprocess spawning.
-        // The --project-options-file option only emits plain text to stdout (not raw JSON)
-        // so that ConsoleToMSBuild in the calling target can relay messages correctly.
-        // Without --base-uri, fall back to the state-file-only compile path.
+        // When --project-options-file is also provided, use the pre-resolved loader
+        // to bypass subprocess spawning. Without --base-uri, fall back to state-file compile.
         let result =
             if not (String.IsNullOrEmpty baseUri) then
                 if not (String.IsNullOrEmpty projectOptionsFile) then
-                    let loadFn (path: string) =
-                        async {
-                            match ProjectLoader.readResolvedOptions projectOptionsFile with
-                            | Error e -> return Error e
-                            | Ok opts -> return! ProjectLoader.loadProjectFromOptions path opts
-                        }
+                    let loadFn = ProjectLoader.loadProjectFromOptionsFile projectOptionsFile
 
                     CompileCommand.compileFromProjectWith loadFn project (Uri baseUri) (Array.toList vocabs) outDir
                     |> Async.RunSynchronously

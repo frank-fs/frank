@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>true</IncludeBuildOutput>
+    <!-- Place task DLL in tasks/ not lib/ so consumers don't get a runtime reference -->
+    <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
     <PackageId>Frank.Cli.MSBuild</PackageId>
     <Description>MSBuild integration for Frank.Cli: auto-embeds unified state binary and semantic artifacts into compiled assemblies.</Description>
     <NoWarn>$(NoWarn);NU5128;NU5017</NoWarn>

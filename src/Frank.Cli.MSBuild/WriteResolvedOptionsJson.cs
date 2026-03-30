@@ -22,6 +22,8 @@ namespace Frank.Cli.MSBuild
 
         public override bool Execute()
         {
+            try
+            {
             // Ensure output directory exists
             var dir = Path.GetDirectoryName(OutputPath);
             if (!string.IsNullOrEmpty(dir))
@@ -76,6 +78,12 @@ namespace Frank.Cli.MSBuild
 
             Log.LogMessage(MessageImportance.Low, "Wrote resolved options to {0}", OutputPath);
             return true;
+            }
+            catch (System.Exception ex)
+            {
+                Log.LogError("WriteResolvedOptionsJson failed: {0}", ex.Message);
+                return false;
+            }
         }
     }
 }

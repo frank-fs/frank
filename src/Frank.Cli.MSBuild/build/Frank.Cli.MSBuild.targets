@@ -1,13 +1,14 @@
 <Project>
-  <!-- Resolve task assembly path: NuGet package layout (lib/netstandard2.0/) takes precedence;
+  <!-- Resolve task assembly path: NuGet package layout (tasks/netstandard2.0/) takes precedence;
        fall back to build output for projects importing from source tree (dev workflow). -->
   <PropertyGroup>
-    <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../lib/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../lib/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
+    <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../tasks/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../tasks/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
     <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../bin/Debug/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../bin/Debug/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
     <_FrankMSBuildTaskAssembly Condition="'$(_FrankMSBuildTaskAssembly)' == '' AND Exists('$(MSBuildThisFileDirectory)../bin/Release/netstandard2.0/Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)../bin/Release/netstandard2.0/Frank.Cli.MSBuild.dll</_FrankMSBuildTaskAssembly>
   </PropertyGroup>
 
-  <UsingTask TaskName="Frank.Cli.MSBuild.WriteResolvedOptionsJson"
+  <UsingTask Condition="'$(_FrankMSBuildTaskAssembly)' != ''"
+             TaskName="Frank.Cli.MSBuild.WriteResolvedOptionsJson"
              AssemblyFile="$(_FrankMSBuildTaskAssembly)" />
 
   <!-- ================================================================
@@ -40,9 +41,9 @@
   <Target Name="WriteFrankResolvedOptions"
           AfterTargets="ResolveAssemblyReferences"
           BeforeTargets="GenerateFrankSemanticDefinitions"
-          Inputs="@(Compile)"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)"
-          Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(_FrankMSBuildTaskAssembly)' != ''">
     <WriteResolvedOptionsJson
         OutputPath="$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)"
         SourceFiles="@(Compile)"
@@ -57,7 +58,7 @@
   <Target Name="GenerateFrankSemanticDefinitions"
           DependsOnTargets="WriteFrankResolvedOptions"
           BeforeTargets="CoreCompile"
-          Inputs="@(Compile)"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(FrankCliOutputPath)shapes.shacl.ttl"
           Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
     <Exec Command="dotnet frank compile --project &quot;$(MSBuildProjectFullPath)&quot; --base-uri &quot;$(FrankCliBaseUri)&quot; --output &quot;$(FrankCliOutputPath)&quot; --project-options-file &quot;$(FrankCliOutputPath)$(_FrankResolvedOptionsFile)&quot;"
