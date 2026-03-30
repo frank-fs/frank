@@ -186,33 +186,33 @@ let ticTacToeDualTests =
               for (_descriptor, obligation) in Map.toList obligations do
                   Expect.equal obligation MayPoll "PlayerX in OTurn should only have MayPoll"
 
-          testCase "PlayerX in XWins: MayObserve (final state with self-loop)"
+          testCase "PlayerX in XWins: MayPoll (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "XWins" result
 
               let hasTerminalObligation =
                   annotations
-                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
               Expect.isTrue hasTerminalObligation "XWins should have terminal obligation"
 
-          testCase "PlayerX in OWins: MayObserve (final state with self-loop)"
+          testCase "PlayerX in OWins: MayPoll (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "OWins" result
 
               let hasTerminalObligation =
                   annotations
-                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
               Expect.isTrue hasTerminalObligation "OWins should have terminal obligation"
 
-          testCase "PlayerX in Draw: MayObserve (final state with self-loop)"
+          testCase "PlayerX in Draw: MayPoll (final state with self-loop)"
           <| fun _ ->
               let annotations = annotationsFor "PlayerX" "Draw" result
 
               let hasTerminalObligation =
                   annotations
-                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayObserve)
+                  |> List.exists (fun a -> a.Obligation = SessionComplete || a.Obligation = MayPoll)
 
               Expect.isTrue hasTerminalObligation "Draw should have terminal obligation"
 

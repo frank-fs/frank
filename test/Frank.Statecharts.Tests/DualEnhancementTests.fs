@@ -111,35 +111,35 @@ let private orderFulfillmentChart: ExtractedStatechart =
           mkTransition "viewOrder" "Cancelled" "Cancelled" None Unrestricted ] }
 
 // ===========================================================================
-// Enhancement 7: MayObserve for final states
-// "Self-loops in final states classified as SessionComplete. Consider MayObserve
-// to distinguish 'session done, can still read' from 'session done, go away.'"
+// Final state classification (C1: MayObserve removed per Harel/Wadler/Fielding)
+// Final states with self-loops -> MayPoll (not truly final in the Harel sense)
+// Final states without self-loops -> SessionComplete
 // ===========================================================================
 
 [<Tests>]
-let mayObserveTests =
+let finalStateClassificationTests =
     let projections = Projection.projectAll orderFulfillmentChart
     let result = derive orderFulfillmentChart projections
 
     testList
-        "Enhancement 7: MayObserve for final states"
-        [ testCase "final state with self-loop transitions yields MayObserve"
+        "Final state classification: self-loops -> MayPoll, no self-loops -> SessionComplete"
+        [ testCase "final state with self-loop transitions yields MayPoll"
           <| fun _ ->
               // Delivered has a viewOrder self-loop -- client can still read
               let annotations = annotationsFor "Buyer" "Delivered" result
               let viewOrder = findAnnotation "viewOrder" annotations
               Expect.isSome viewOrder "viewOrder annotation exists in Delivered"
-              Expect.equal viewOrder.Value.Obligation MayObserve "self-loop in final state should be MayObserve"
+              Expect.equal viewOrder.Value.Obligation MayPoll "self-loop in final state should be MayPoll"
 
-          testCase "MayObserve in final state does not advance protocol"
+          testCase "MayPoll in final state does not advance protocol"
           <| fun _ ->
               let annotations = annotationsFor "Buyer" "Delivered" result
 
               for ann in annotations do
-                  if ann.Obligation = MayObserve then
-                      Expect.isFalse ann.AdvancesProtocol "MayObserve should not advance protocol"
+                  if ann.Obligation = MayPoll then
+                      Expect.isFalse ann.AdvancesProtocol "MayPoll should not advance protocol"
 
-          testCase "all roles get MayObserve for self-loops in Delivered"
+          testCase "all roles get MayPoll for self-loops in Delivered"
           <| fun _ ->
               for role in [ "Buyer"; "Seller"; "Warehouse"; "Shipper" ] do
                   let annotations = annotationsFor role "Delivered" result
@@ -148,8 +148,8 @@ let mayObserveTests =
 
                   Expect.equal
                       viewOrder.Value.Obligation
-                      MayObserve
-                      $"{role} viewOrder in Delivered should be MayObserve"
+                      MayPoll
+                      $"{role} viewOrder in Delivered should be MayPoll"
 
           testCase "final state with no self-loop yields SessionComplete"
           <| fun _ ->
@@ -175,9 +175,8 @@ let mayObserveTests =
               let proj = Projection.projectAll noSelfLoopChart
               let res = derive noSelfLoopChart proj
               let annotations = annotationsFor "User" "Done" res
-              // No self-loops in Done, so no MayObserve annotations
-              let hasMayObserve = annotations |> List.exists (fun a -> a.Obligation = MayObserve)
-              Expect.isFalse hasMayObserve "no self-loop in final state means no MayObserve" ]
+              // No self-loops in Done, so SessionComplete (no annotations produced for empty transitions)
+              Expect.isEmpty annotations "no self-loop in final state means no annotations (SessionComplete)" ]
 
 // ===========================================================================
 // Enhancement 2: Method safety integration
@@ -257,8 +256,10 @@ let methodSafetyTests =
               Expect.equal updateDraft.Value.Obligation MayPoll "without method info, self-loops default to MayPoll" ]
 
 // ===========================================================================
-// Enhancement 3: Race condition detection
-// "States where multiple roles have competing MustSelect transitions should be flagged."
+// Enhancement 3: Race condition detection (C3: overlapping descriptors only)
+// Multiple MustSelect from SAME role = external choice (valid, not a race).
+// Multiple MustSelect from DIFFERENT roles on non-overlapping descriptors = valid interleaving.
+// Only flag as race when different roles compete for the same transition/descriptor.
 // ===========================================================================
 
 [<Tests>]
@@ -267,19 +268,15 @@ let raceConditionTests =
     let result = derive orderFulfillmentChart projections
 
     testList
-        "Enhancement 3: Race condition detection"
-        [ testCase "Confirmed state has race condition between Buyer and Seller"
+        "Enhancement 3: Race condition detection (overlapping descriptors only)"
+        [ testCase "Confirmed state: no race (Buyer and Seller have non-overlapping descriptors)"
           <| fun _ ->
-              // Both Buyer (submitPayment, cancelOrder) and Seller (cancelBySeller) have MustSelect in Confirmed
-              Expect.isNonEmpty result.RaceConditions "should detect at least one race condition"
-
+              // Buyer has submitPayment, cancelOrder; Seller has cancelBySeller
+              // These are non-overlapping descriptors = valid interleaving, NOT a race
               let confirmedRace =
                   result.RaceConditions |> List.tryFind (fun rc -> rc.State = "Confirmed")
 
-              Expect.isSome confirmedRace "Confirmed should have a race condition"
-              let rc = confirmedRace.Value
-              Expect.isTrue (Set.contains "Buyer" rc.CompetingRoles) "Buyer competes in Confirmed"
-              Expect.isTrue (Set.contains "Seller" rc.CompetingRoles) "Seller competes in Confirmed"
+              Expect.isNone confirmedRace "Confirmed has no race (non-overlapping descriptors)"
 
           testCase "no race condition in Submitted (only Seller has MustSelect)"
           <| fun _ ->
@@ -291,7 +288,46 @@ let raceConditionTests =
           testCase "no race condition in Paid (only Warehouse has MustSelect)"
           <| fun _ ->
               let paidRace = result.RaceConditions |> List.tryFind (fun rc -> rc.State = "Paid")
-              Expect.isNone paidRace "Paid has no race condition (only Warehouse acts)" ]
+              Expect.isNone paidRace "Paid has no race condition (only Warehouse acts)"
+
+          testCase "overlapping descriptors across roles creates race condition"
+          <| fun _ ->
+              // Chart where two roles both have MustSelect on the same descriptor
+              let raceChart: ExtractedStatechart =
+                  { RouteTemplate = "/race/{id}"
+                    StateNames = [ "Competing"; "Done" ]
+                    InitialStateKey = "Competing"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "Competing",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "Done",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = true
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "RoleA"; Description = None }
+                        { Name = "RoleB"; Description = None } ]
+                    Transitions =
+                      [ mkTransition "claim" "Competing" "Done" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "claim" "Competing" "Done" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "view" "Competing" "Competing" None Unrestricted ] }
+
+              let proj = Projection.projectAll raceChart
+              let res = derive raceChart proj
+
+              Expect.isNonEmpty res.RaceConditions "overlapping 'claim' descriptor should create race"
+
+              let competingRace =
+                  res.RaceConditions |> List.tryFind (fun rc -> rc.State = "Competing")
+
+              Expect.isSome competingRace "Competing state should have a race condition"
+              let rc = competingRace.Value
+              Expect.isTrue (Set.contains "RoleA" rc.CompetingRoles) "RoleA competes"
+              Expect.isTrue (Set.contains "RoleB" rc.CompetingRoles) "RoleB competes" ]
 
 // ===========================================================================
 // Enhancement 4: Cut point enrichment
@@ -611,13 +647,15 @@ let hierarchyAwareDualTests =
 
 // ===========================================================================
 // Enhancement 1: Involution — dual(dual(T)) = T [FsCheck property test]
+// C2: deriveReverse now properly flips obligations (Wadler session type duality):
+//   MustSelect -> MayPoll, MayPoll -> MustSelect, SessionComplete -> SessionComplete
 // ===========================================================================
 
 [<Tests>]
 let involutionTests =
     testList
         "Enhancement 1: Involution dual(dual(T)) = T"
-        [ testCase "TicTacToe: deriveReverse(derive(chart)) reproduces original obligations"
+        [ testCase "TicTacToe: deriveReverse flips obligations, double reverse restores original"
           <| fun _ ->
               let tttChart: ExtractedStatechart =
                   { RouteTemplate = "/games/{gameId}"
@@ -668,41 +706,59 @@ let involutionTests =
 
               let projections = Projection.projectAll tttChart
               let firstDerive = derive tttChart projections
-              let secondDerive = deriveReverse tttChart firstDerive
+              // Single reverse flips obligations
+              let reversed = deriveReverse tttChart firstDerive
+              // Double reverse restores original
+              let doubleReversed = deriveReverse tttChart reversed
 
-              // After derive -> deriveReverse, the obligations should map back
-              // to the server's original semantics for each (role, state)
+              // Verify single reverse actually flips
               for role in tttChart.Roles do
                   for state in tttChart.StateNames do
-                      let originalAnns = annotationsFor role.Name state firstDerive
-                      let roundTripAnns = annotationsFor role.Name state secondDerive
+                      let origAnns = annotationsFor role.Name state firstDerive
+                      let revAnns = annotationsFor role.Name state reversed
 
-                      for origAnn in originalAnns do
-                          let rtAnn = findAnnotation origAnn.Descriptor roundTripAnns
+                      for origAnn in origAnns do
+                          let revAnn = findAnnotation origAnn.Descriptor revAnns
 
-                          match rtAnn with
+                          match revAnn with
+                          | Some ra ->
+                              match origAnn.Obligation with
+                              | MustSelect ->
+                                  Expect.equal
+                                      ra.Obligation
+                                      MayPoll
+                                      $"Reverse: {role.Name}/{state}/{origAnn.Descriptor} MustSelect -> MayPoll"
+                              | MayPoll ->
+                                  Expect.equal
+                                      ra.Obligation
+                                      MustSelect
+                                      $"Reverse: {role.Name}/{state}/{origAnn.Descriptor} MayPoll -> MustSelect"
+                              | SessionComplete ->
+                                  Expect.equal
+                                      ra.Obligation
+                                      SessionComplete
+                                      $"Reverse: {role.Name}/{state}/{origAnn.Descriptor} SessionComplete symmetric"
+                          | None -> ()
+
+              // Verify double reverse restores original
+              for role in tttChart.Roles do
+                  for state in tttChart.StateNames do
+                      let origAnns = annotationsFor role.Name state firstDerive
+                      let dblRevAnns = annotationsFor role.Name state doubleReversed
+
+                      for origAnn in origAnns do
+                          let dblRevAnn = findAnnotation origAnn.Descriptor dblRevAnns
+
+                          match dblRevAnn with
                           | Some rt ->
                               Expect.equal
                                   rt.Obligation
                                   origAnn.Obligation
-                                  $"Involution: {role.Name}/{state}/{origAnn.Descriptor} obligation preserved"
+                                  $"Involution: {role.Name}/{state}/{origAnn.Descriptor} obligation restored after double reverse"
+                          | None -> ()
 
-                              Expect.equal
-                                  rt.AdvancesProtocol
-                                  origAnn.AdvancesProtocol
-                                  $"Involution: {role.Name}/{state}/{origAnn.Descriptor} advances preserved"
-                          | None ->
-                              Expect.isTrue
-                                  (origAnn.Obligation = SessionComplete || origAnn.Obligation = MayObserve)
-                                  $"Missing annotation in reverse only acceptable for terminal: {role.Name}/{state}/{origAnn.Descriptor}"
-
-          testCase "FsCheck: involution holds for all generated statecharts"
+          testCase "FsCheck: involution (double reverse) holds for all generated statecharts"
           <| fun _ ->
-              // Generate small statecharts and verify derive(derive(chart)) = chart
-              let genStateName = Gen.elements [ "S1"; "S2"; "S3"; "S4" ]
-
-              let genRoleName = Gen.elements [ "RoleA"; "RoleB" ]
-
               let genSmallChart =
                   gen {
                       let! numStates = Gen.choose (2, 4)
@@ -722,7 +778,6 @@ let involutionTests =
                       let nonFinalStates =
                           stateNames |> List.filter (fun s -> not (Set.contains s finalStates))
 
-                      // Generate transitions between non-final states
                       let! transitions =
                           gen {
                               let! pairs =
@@ -739,7 +794,6 @@ let involutionTests =
                                   |> List.mapi (fun i (src, tgt) -> mkTransition $"event{i}" src tgt None Unrestricted)
                           }
 
-                      // Add self-loop view transitions
                       let viewTransitions =
                           stateNames |> List.map (fun s -> mkTransition "view" s s None Unrestricted)
 
@@ -756,41 +810,44 @@ let involutionTests =
               let prop (chart: ExtractedStatechart) =
                   let projections = Projection.projectAll chart
                   let first = derive chart projections
-                  let second = deriveReverse chart first
+                  let reversed = deriveReverse chart first
+                  let doubleReversed = deriveReverse chart reversed
 
-                  // For each annotation in the first derive, the obligation should be preserved
+                  // Double reverse should restore original obligations
                   first.Annotations
                   |> Map.forall (fun key anns ->
-                      let reverseAnns = second.Annotations |> Map.tryFind key |> Option.defaultValue []
+                      let dblRevAnns =
+                          doubleReversed.Annotations |> Map.tryFind key |> Option.defaultValue []
 
                       anns
                       |> List.forall (fun ann ->
-                          let reverseAnn =
-                              reverseAnns |> List.tryFind (fun a -> a.Descriptor = ann.Descriptor)
+                          let dblRevAnn =
+                              dblRevAnns |> List.tryFind (fun a -> a.Descriptor = ann.Descriptor)
 
-                          match reverseAnn with
+                          match dblRevAnn with
                           | Some ra -> ra.Obligation = ann.Obligation && ra.AdvancesProtocol = ann.AdvancesProtocol
-                          | None -> ann.Obligation = SessionComplete || ann.Obligation = MayObserve))
+                          | None -> ann.Obligation = SessionComplete))
 
               let arbChart = Arb.fromGen genSmallChart
 
               Prop.forAll arbChart prop |> Check.QuickThrowOnFailure
 
-          testCase "OrderFulfillment: involution preserves 4-role obligations"
+          testCase "OrderFulfillment: double reverse restores 4-role obligations"
           <| fun _ ->
               let projections = Projection.projectAll orderFulfillmentChart
               let first = derive orderFulfillmentChart projections
-              let second = deriveReverse orderFulfillmentChart first
+              let reversed = deriveReverse orderFulfillmentChart first
+              let doubleReversed = deriveReverse orderFulfillmentChart reversed
 
               for role in orderFulfillmentChart.Roles do
                   for state in orderFulfillmentChart.StateNames do
                       let origAnns = annotationsFor role.Name state first
-                      let rtAnns = annotationsFor role.Name state second
+                      let dblRevAnns = annotationsFor role.Name state doubleReversed
 
                       for origAnn in origAnns do
-                          let rtAnn = findAnnotation origAnn.Descriptor rtAnns
+                          let dblRevAnn = findAnnotation origAnn.Descriptor dblRevAnns
 
-                          match rtAnn with
+                          match dblRevAnn with
                           | Some rt ->
                               Expect.equal
                                   rt.Obligation
@@ -798,5 +855,5 @@ let involutionTests =
                                   $"Involution: {role.Name}/{state}/{origAnn.Descriptor}"
                           | None ->
                               Expect.isTrue
-                                  (origAnn.Obligation = SessionComplete || origAnn.Obligation = MayObserve)
-                                  $"Only terminal obligations can be absent in reverse: {role.Name}/{state}/{origAnn.Descriptor}" ]
+                                  (origAnn.Obligation = SessionComplete)
+                                  $"Only SessionComplete can be absent in double reverse: {role.Name}/{state}/{origAnn.Descriptor}" ]

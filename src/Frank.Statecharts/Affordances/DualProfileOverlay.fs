@@ -50,7 +50,6 @@ module DualAlpsGenerator =
         | MustSelect -> "must-select"
         | MayPoll -> "may-poll"
         | SessionComplete -> "session-complete"
-        | MayObserve -> "may-observe"
 
     /// Generate a dual-annotated ALPS JSON for a specific (role, state) pair.
     /// The document contains the role's available descriptors in the given state,
@@ -164,9 +163,12 @@ module DualAlpsGenerator =
         writer.WriteStartObject()
         writer.WriteString("rel", "self")
 
+        let encodedRole = Uri.EscapeDataString(roleName.ToLowerInvariant())
+        let encodedState = Uri.EscapeDataString(stateName)
+
         writer.WriteString(
             "href",
-            sprintf "%s/%s-%s-%s-dual" baseUri resourceSlug (roleName.ToLowerInvariant()) stateName
+            sprintf "%s/%s-%s-%s-dual" baseUri resourceSlug encodedRole encodedState
         )
 
         writer.WriteEndObject()
@@ -184,8 +186,14 @@ module DualProfileOverlay =
     /// Build a DualProfileLookup from a single ExtractedStatechart.
     /// Derives client duals via Dual.derive and generates ALPS JSON for each (role, state) pair.
     /// Pre-computes Link header values at startup for zero per-request allocation.
+    /// baseUri must be a well-formed absolute URI (e.g., "https://example.com/alps").
     let buildFromStatechart (chart: ExtractedStatechart) (resourceSlug: string) (baseUri: string) : DualProfileLookup =
         let lookup = DualProfileLookup(StringComparer.Ordinal)
+
+        // Validate baseUri is a well-formed absolute URI
+        match Uri.TryCreate(baseUri, UriKind.Absolute) with
+        | false, _ -> invalidArg (nameof baseUri) $"baseUri must be a well-formed absolute URI, got: '%s{baseUri}'"
+        | _ -> ()
 
         if chart.Roles.IsEmpty then
             lookup

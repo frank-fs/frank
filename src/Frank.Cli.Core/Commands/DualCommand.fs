@@ -128,7 +128,7 @@ let checkDual (statechart: ExtractedStatechart) : Result<CheckDualResult, string
               Message = $"Protocol sink (deadlock) at state '%s{sink}': no role can advance the protocol" }
         )
 
-    // Check 2: session-complete/may-observe only at final states
+    // Check 2: session-complete only at final states
     for KeyValue((role, state), annotations) in deriveResult.Annotations do
         for ann in annotations do
             if ann.Obligation = SessionComplete && not (Set.contains state finalStates) then
@@ -136,13 +136,6 @@ let checkDual (statechart: ExtractedStatechart) : Result<CheckDualResult, string
                     { Severity = "error"
                       Message =
                         $"session-complete at non-final state '%s{state}' for role '%s{role}' descriptor '%s{ann.Descriptor}'" }
-                )
-
-            if ann.Obligation = MayObserve && not (Set.contains state finalStates) then
-                issues.Add(
-                    { Severity = "error"
-                      Message =
-                        $"may-observe at non-final state '%s{state}' for role '%s{role}' descriptor '%s{ann.Descriptor}'" }
                 )
 
     // Check 3: every must-select has a corresponding advancing transition.
