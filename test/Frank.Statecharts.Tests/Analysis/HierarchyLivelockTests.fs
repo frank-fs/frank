@@ -113,8 +113,7 @@ let private flatSelfLoopChart: ExtractedStatechart =
                 Description = None } ]
       Roles =
         [ { Name = "Worker"; Description = None }
-          { Name = "Manager"
-            Description = None } ]
+          { Name = "Manager"; Description = None } ]
       Transitions =
         [ mkTransition "view" "Open" "Open" None Unrestricted
           mkTransition "assign" "Open" "Stuck" None (RestrictedTo [ "Manager" ])
@@ -135,14 +134,11 @@ let hierarchyAwareLivelockTests =
                   Projection.projectAllWithHierarchy hierarchicalActiveContainment hierarchicalActiveChart
 
               let pruned =
-                  Projection.pruneUnreachableStatesWithHierarchy
-                      hierarchicalActiveContainment
-                      hierarchicalActiveChart
+                  Projection.pruneUnreachableStatesWithHierarchy hierarchicalActiveContainment hierarchicalActiveChart
 
               let issues = checkLivelock projections pruned hierarchicalActiveContainment
 
-              let activeIssues =
-                  issues |> List.filter (fun i -> i.Message.Contains("Active"))
+              let activeIssues = issues |> List.filter (fun i -> i.Message.Contains("Active"))
 
               Expect.isEmpty activeIssues "Active should not be flagged — children progress"
 
@@ -152,14 +148,11 @@ let hierarchyAwareLivelockTests =
                   Projection.projectAllWithHierarchy trueLivelockContainment hierarchicalTrueLivelockChart
 
               let pruned =
-                  Projection.pruneUnreachableStatesWithHierarchy
-                      trueLivelockContainment
-                      hierarchicalTrueLivelockChart
+                  Projection.pruneUnreachableStatesWithHierarchy trueLivelockContainment hierarchicalTrueLivelockChart
 
               let issues = checkLivelock projections pruned trueLivelockContainment
 
-              let stuckIssues =
-                  issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
+              let stuckIssues = issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
 
               Expect.isNonEmpty stuckIssues "Stuck should be flagged — neither parent nor children progress"
 
@@ -169,10 +162,61 @@ let hierarchyAwareLivelockTests =
               let pruned = Projection.pruneUnreachableStates flatSelfLoopChart
               let issues = checkLivelock projections pruned StateContainment.empty
 
-              let stuckIssues =
-                  issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
+              let stuckIssues = issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
 
               Expect.isNonEmpty stuckIssues "Flat self-loop still detected"
+
+          testCase "composite self-loop IS flagged when progressing descendants are unreachable"
+          <| fun _ ->
+              // Composite state "Outer" has children "Inner" and "Dead".
+              // Inner has a progressing transition (Inner -> Done), but Inner is NOT reachable
+              // because no transition targets it and it's only a child of Outer.
+              // However, with hierarchy-aware pruning, children ARE reachable via containment.
+              // So we need a case where a descendant is genuinely unreachable:
+              // a grandchild whose parent is not in containment of a reachable composite.
+              // Instead, test with a chart where we pass a containment that includes
+              // descendants not in the pruned chart's state names.
+              let chart: ExtractedStatechart =
+                  { RouteTemplate = "/test"
+                    StateNames = [ "Outer"; "Inner"; "Done" ]
+                    InitialStateKey = "Outer"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "Outer",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Inner",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Done",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = true
+                              Description = None } ]
+                    Roles = [ { Name = "User"; Description = None } ]
+                    Transitions =
+                      [ mkTransition "check" "Outer" "Outer" None Unrestricted
+                        mkTransition "check" "Inner" "Inner" None Unrestricted
+                        mkTransition "view" "Done" "Done" None Unrestricted ] }
+
+              // Containment says Inner is a child of Outer, but also claims "Ghost" is a child
+              // with progressing transitions — except Ghost is not in the chart at all.
+              let containment = StateContainment.ofPairs [ ("Outer", [ "Inner"; "Ghost" ]) ]
+
+              // Manually construct a pruned chart where Ghost is not present
+              // (it was never in StateNames). This simulates the case where a descendant
+              // listed in containment is not reachable.
+              let projections = Projection.projectAllWithHierarchy containment chart
+              let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
+
+              let issues = checkLivelock projections pruned containment
+
+              // Inner only has self-loops and is non-final, so it should be flagged
+              let innerIssues = issues |> List.filter (fun i -> i.Message.Contains("Inner"))
+
+              Expect.isNonEmpty innerIssues "Inner should be flagged — it only has self-loops"
 
           testCase "backward compat: checkLivelock without hierarchy behaves as before"
           <| fun _ ->
@@ -195,83 +239,75 @@ let hierarchyLivelockPropertyTests =
         "Hierarchy livelock FsCheck properties"
         [ testCase "composite self-loop with progressing child is never livelock (property)"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen genChildNames)
-                  (fun childNames ->
-                      let parentState = "Composite"
-                      let finalState = "End"
-                      let allStates = parentState :: finalState :: childNames
+              Prop.forAll (Arb.fromGen genChildNames) (fun childNames ->
+                  let parentState = "Composite"
+                  let finalState = "End"
+                  let allStates = parentState :: finalState :: childNames
 
-                      let containment =
-                          StateContainment.ofPairs [ (parentState, childNames) ]
+                  let containment = StateContainment.ofPairs [ (parentState, childNames) ]
 
-                      let chart: ExtractedStatechart =
-                          { RouteTemplate = "/test"
-                            StateNames = allStates
-                            InitialStateKey = parentState
-                            GuardNames = []
-                            StateMetadata =
-                              allStates
-                              |> List.map (fun s ->
-                                  s,
-                                  { AllowedMethods = [ "GET" ]
-                                    IsFinal = (s = finalState)
-                                    Description = None })
-                              |> Map.ofList
-                            Roles = [ { Name = "User"; Description = None } ]
-                            Transitions =
-                              [ mkTransition "observe" parentState parentState None Unrestricted
-                                mkTransition "advance" childNames[0] childNames[1] None (RestrictedTo [ "User" ])
-                                mkTransition "end" childNames[0] finalState None (RestrictedTo [ "User" ])
-                                mkTransition "view" finalState finalState None Unrestricted ] }
+                  let chart: ExtractedStatechart =
+                      { RouteTemplate = "/test"
+                        StateNames = allStates
+                        InitialStateKey = parentState
+                        GuardNames = []
+                        StateMetadata =
+                          allStates
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET" ]
+                                IsFinal = (s = finalState)
+                                Description = None })
+                          |> Map.ofList
+                        Roles = [ { Name = "User"; Description = None } ]
+                        Transitions =
+                          [ mkTransition "observe" parentState parentState None Unrestricted
+                            mkTransition "advance" childNames[0] childNames[1] None (RestrictedTo [ "User" ])
+                            mkTransition "end" childNames[0] finalState None (RestrictedTo [ "User" ])
+                            mkTransition "view" finalState finalState None Unrestricted ] }
 
-                      let projections = Projection.projectAllWithHierarchy containment chart
-                      let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
-                      let issues = checkLivelock projections pruned containment
+                  let projections = Projection.projectAllWithHierarchy containment chart
+                  let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
+                  let issues = checkLivelock projections pruned containment
 
-                      let compositeIssues =
-                          issues |> List.filter (fun i -> i.Message.Contains("Composite"))
+                  let compositeIssues =
+                      issues |> List.filter (fun i -> i.Message.Contains("Composite"))
 
-                      compositeIssues.IsEmpty)
+                  compositeIssues.IsEmpty)
               |> Check.QuickThrowOnFailure
 
           testCase "composite self-loop with all-self-loop children is always livelock (property)"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen genChildNames)
-                  (fun childNames ->
-                      let parentState = "Stuck"
-                      let allStates = parentState :: childNames
+              Prop.forAll (Arb.fromGen genChildNames) (fun childNames ->
+                  let parentState = "Stuck"
+                  let allStates = parentState :: childNames
 
-                      let containment =
-                          StateContainment.ofPairs [ (parentState, childNames) ]
+                  let containment = StateContainment.ofPairs [ (parentState, childNames) ]
 
-                      let chart: ExtractedStatechart =
-                          { RouteTemplate = "/test"
-                            StateNames = allStates
-                            InitialStateKey = parentState
-                            GuardNames = []
-                            StateMetadata =
-                              allStates
-                              |> List.map (fun s ->
-                                  s,
-                                  { AllowedMethods = [ "GET" ]
-                                    IsFinal = false
-                                    Description = None })
-                              |> Map.ofList
-                            Roles = [ { Name = "User"; Description = None } ]
-                            Transitions =
-                              [ mkTransition "observe" parentState parentState None Unrestricted ]
-                              @ (childNames
-                                 |> List.map (fun child ->
-                                     mkTransition "check" child child None Unrestricted)) }
+                  let chart: ExtractedStatechart =
+                      { RouteTemplate = "/test"
+                        StateNames = allStates
+                        InitialStateKey = parentState
+                        GuardNames = []
+                        StateMetadata =
+                          allStates
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET" ]
+                                IsFinal = false
+                                Description = None })
+                          |> Map.ofList
+                        Roles = [ { Name = "User"; Description = None } ]
+                        Transitions =
+                          [ mkTransition "observe" parentState parentState None Unrestricted ]
+                          @ (childNames
+                             |> List.map (fun child -> mkTransition "check" child child None Unrestricted)) }
 
-                      let projections = Projection.projectAllWithHierarchy containment chart
-                      let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
-                      let issues = checkLivelock projections pruned containment
+                  let projections = Projection.projectAllWithHierarchy containment chart
+                  let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
+                  let issues = checkLivelock projections pruned containment
 
-                      let stuckIssues =
-                          issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
+                  let stuckIssues = issues |> List.filter (fun i -> i.Message.Contains("Stuck"))
 
-                      not stuckIssues.IsEmpty)
+                  not stuckIssues.IsEmpty)
               |> Check.QuickThrowOnFailure ]

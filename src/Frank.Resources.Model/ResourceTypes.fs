@@ -11,6 +11,19 @@ type StateInfo =
 /// Lightweight parent-child containment information for hierarchy-aware analysis.
 /// Zero-dependency: just string state names. Built from the richer StateHierarchy
 /// in Frank.Statecharts when hierarchy info is available.
+///
+/// Lives in Frank.Resources.Model (zero-dependency layer) because both Projection.fs
+/// (same assembly) and Frank.Statecharts/Analysis need it. Moving to Frank.Statecharts
+/// would create a circular dependency; moving to Frank.Statecharts.Core would force
+/// Frank.Resources.Model to take a dependency on it, breaking its zero-dep guarantee.
+///
+/// Design trade-off: does not carry XOR/AND composite kind information.
+/// This is sufficient for current analyses (livelock detection only needs
+/// "do descendants progress?" which is answerable from containment alone)
+/// but insufficient for richer analyses that require distinguishing exclusive
+/// vs parallel composition (e.g., AND-state synchronization checks).
+/// The full CompositeKind is available in Frank.Statecharts.StateHierarchy
+/// for analyses that need it.
 type StateContainment =
     {
         /// Parent state -> ordered list of child states.

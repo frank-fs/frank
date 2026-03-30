@@ -92,6 +92,11 @@ module Projection =
     /// to new states, which may themselves be composites needing expansion.
     /// This prevents children from being pruned when they are reachable via containment
     /// but have no explicit incoming transitions from outside the parent.
+    ///
+    /// Termination proof: monotone function over lattice P(States) ordered by subset inclusion.
+    /// The state set is finite and each iteration only adds states (never removes).
+    /// Therefore the sequence is a monotonically non-decreasing chain in a finite lattice,
+    /// which must reach a fixed point in at most |States| iterations.
     let pruneUnreachableStatesWithHierarchy
         (containment: StateContainment)
         (statechart: ExtractedStatechart)

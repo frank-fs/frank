@@ -100,34 +100,24 @@ let hierarchyPruneTests =
               let pruned =
                   Projection.pruneUnreachableStatesWithHierarchy hierarchicalContainment hierarchicalChart
 
-              Expect.isTrue
-                  (List.contains "Playing" pruned.StateNames)
-                  "Playing retained as child of reachable Active"
+              Expect.isTrue (List.contains "Playing" pruned.StateNames) "Playing retained as child of reachable Active"
 
-              Expect.isTrue
-                  (List.contains "Paused" pruned.StateNames)
-                  "Paused retained as child of reachable Active"
+              Expect.isTrue (List.contains "Paused" pruned.StateNames) "Paused retained as child of reachable Active"
 
           testCase "implicit-entry children not pruned when no explicit transition targets them"
           <| fun _ ->
               // Without hierarchy: StepA and StepB would be pruned (no transition targets them)
               let prunedFlat = Projection.pruneUnreachableStates implicitEntryChart
 
-              Expect.isFalse
-                  (List.contains "StepA" prunedFlat.StateNames)
-                  "Without hierarchy, StepA is pruned"
+              Expect.isFalse (List.contains "StepA" prunedFlat.StateNames) "Without hierarchy, StepA is pruned"
 
               // With hierarchy: StepA and StepB are retained as children of Running
               let prunedHierarchical =
                   Projection.pruneUnreachableStatesWithHierarchy implicitEntryContainment implicitEntryChart
 
-              Expect.isTrue
-                  (List.contains "StepA" prunedHierarchical.StateNames)
-                  "With hierarchy, StepA is retained"
+              Expect.isTrue (List.contains "StepA" prunedHierarchical.StateNames) "With hierarchy, StepA is retained"
 
-              Expect.isTrue
-                  (List.contains "StepB" prunedHierarchical.StateNames)
-                  "With hierarchy, StepB is retained"
+              Expect.isTrue (List.contains "StepB" prunedHierarchical.StateNames) "With hierarchy, StepB is retained"
 
           testCase "flat chart with empty containment behaves same as original"
           <| fun _ ->
@@ -198,8 +188,7 @@ let hierarchyPruneTests =
               let containment =
                   StateContainment.ofPairs [ ("Root", [ "Parent" ]); ("Parent", [ "Child"; "GrandChild" ]) ]
 
-              let pruned =
-                  Projection.pruneUnreachableStatesWithHierarchy containment chart
+              let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
 
               Expect.isTrue (List.contains "Parent" pruned.StateNames) "Parent retained"
               Expect.isTrue (List.contains "Child" pruned.StateNames) "Child retained"
@@ -219,78 +208,108 @@ let hierarchyPrunePropertyTests =
         "Hierarchy pruning FsCheck properties"
         [ testCase "children of reachable composites are always in pruned result (property)"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen genChildNames)
-                  (fun childNames ->
-                      let parentState = "Parent"
-                      let finalState = "Final"
-                      let allStates = parentState :: finalState :: childNames
+              Prop.forAll (Arb.fromGen genChildNames) (fun childNames ->
+                  let parentState = "Parent"
+                  let finalState = "Final"
+                  let allStates = parentState :: finalState :: childNames
 
-                      let containment =
-                          StateContainment.ofPairs [ (parentState, childNames) ]
+                  let containment = StateContainment.ofPairs [ (parentState, childNames) ]
 
-                      let chart: ExtractedStatechart =
-                          { RouteTemplate = "/test"
-                            StateNames = allStates
-                            InitialStateKey = parentState
-                            GuardNames = []
-                            StateMetadata =
-                              allStates
-                              |> List.map (fun s ->
-                                  s,
-                                  { AllowedMethods = [ "GET" ]
-                                    IsFinal = (s = finalState)
-                                    Description = None })
-                              |> Map.ofList
-                            Roles = [ { Name = "User"; Description = None } ]
-                            Transitions =
-                              [ mkTransition "view" parentState parentState None Unrestricted
-                                mkTransition "exit" parentState finalState None (RestrictedTo [ "User" ])
-                                mkTransition "view" finalState finalState None Unrestricted ] }
+                  let chart: ExtractedStatechart =
+                      { RouteTemplate = "/test"
+                        StateNames = allStates
+                        InitialStateKey = parentState
+                        GuardNames = []
+                        StateMetadata =
+                          allStates
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET" ]
+                                IsFinal = (s = finalState)
+                                Description = None })
+                          |> Map.ofList
+                        Roles = [ { Name = "User"; Description = None } ]
+                        Transitions =
+                          [ mkTransition "view" parentState parentState None Unrestricted
+                            mkTransition "exit" parentState finalState None (RestrictedTo [ "User" ])
+                            mkTransition "view" finalState finalState None Unrestricted ] }
 
-                      let pruned =
-                          Projection.pruneUnreachableStatesWithHierarchy containment chart
+                  let pruned = Projection.pruneUnreachableStatesWithHierarchy containment chart
 
-                      childNames |> List.forall (fun child -> List.contains child pruned.StateNames))
+                  childNames |> List.forall (fun child -> List.contains child pruned.StateNames))
+              |> Check.QuickThrowOnFailure
+
+          testCase "hierarchy pruning is idempotent (property)"
+          <| fun _ ->
+              Prop.forAll (Arb.fromGen genChildNames) (fun childNames ->
+                  let parentState = "Parent"
+                  let finalState = "Final"
+                  let allStates = parentState :: finalState :: childNames
+
+                  let containment = StateContainment.ofPairs [ (parentState, childNames) ]
+
+                  let chart: ExtractedStatechart =
+                      { RouteTemplate = "/test"
+                        StateNames = allStates
+                        InitialStateKey = parentState
+                        GuardNames = []
+                        StateMetadata =
+                          allStates
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET" ]
+                                IsFinal = (s = finalState)
+                                Description = None })
+                          |> Map.ofList
+                        Roles = [ { Name = "User"; Description = None } ]
+                        Transitions =
+                          [ mkTransition "view" parentState parentState None Unrestricted
+                            mkTransition "exit" parentState finalState None (RestrictedTo [ "User" ])
+                            mkTransition "view" finalState finalState None Unrestricted ] }
+
+                  let once = Projection.pruneUnreachableStatesWithHierarchy containment chart
+
+                  let twice = Projection.pruneUnreachableStatesWithHierarchy containment once
+
+                  once.StateNames = twice.StateNames
+                  && once.Transitions = twice.Transitions
+                  && once.StateMetadata = twice.StateMetadata)
               |> Check.QuickThrowOnFailure
 
           testCase "hierarchy pruning is superset of flat pruning (property)"
           <| fun _ ->
-              Prop.forAll
-                  (Arb.fromGen genChildNames)
-                  (fun childNames ->
-                      let parentState = "Parent"
-                      let finalState = "Final"
-                      let allStates = parentState :: finalState :: childNames
+              Prop.forAll (Arb.fromGen genChildNames) (fun childNames ->
+                  let parentState = "Parent"
+                  let finalState = "Final"
+                  let allStates = parentState :: finalState :: childNames
 
-                      let containment =
-                          StateContainment.ofPairs [ (parentState, childNames) ]
+                  let containment = StateContainment.ofPairs [ (parentState, childNames) ]
 
-                      let chart: ExtractedStatechart =
-                          { RouteTemplate = "/test"
-                            StateNames = allStates
-                            InitialStateKey = parentState
-                            GuardNames = []
-                            StateMetadata =
-                              allStates
-                              |> List.map (fun s ->
-                                  s,
-                                  { AllowedMethods = [ "GET" ]
-                                    IsFinal = (s = finalState)
-                                    Description = None })
-                              |> Map.ofList
-                            Roles = [ { Name = "User"; Description = None } ]
-                            Transitions =
-                              [ mkTransition "view" parentState parentState None Unrestricted
-                                mkTransition "exit" parentState finalState None (RestrictedTo [ "User" ])
-                                mkTransition "view" finalState finalState None Unrestricted ] }
+                  let chart: ExtractedStatechart =
+                      { RouteTemplate = "/test"
+                        StateNames = allStates
+                        InitialStateKey = parentState
+                        GuardNames = []
+                        StateMetadata =
+                          allStates
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET" ]
+                                IsFinal = (s = finalState)
+                                Description = None })
+                          |> Map.ofList
+                        Roles = [ { Name = "User"; Description = None } ]
+                        Transitions =
+                          [ mkTransition "view" parentState parentState None Unrestricted
+                            mkTransition "exit" parentState finalState None (RestrictedTo [ "User" ])
+                            mkTransition "view" finalState finalState None Unrestricted ] }
 
-                      let flatPruned = Projection.pruneUnreachableStates chart
+                  let flatPruned = Projection.pruneUnreachableStates chart
 
-                      let hierarchyPruned =
-                          Projection.pruneUnreachableStatesWithHierarchy containment chart
+                  let hierarchyPruned =
+                      Projection.pruneUnreachableStatesWithHierarchy containment chart
 
-                      let flatSet = flatPruned.StateNames |> Set.ofList
-                      let hierarchySet = hierarchyPruned.StateNames |> Set.ofList
-                      Set.isSubset flatSet hierarchySet)
+                  let flatSet = flatPruned.StateNames |> Set.ofList
+                  let hierarchySet = hierarchyPruned.StateNames |> Set.ofList
+                  Set.isSubset flatSet hierarchySet)
               |> Check.QuickThrowOnFailure ]

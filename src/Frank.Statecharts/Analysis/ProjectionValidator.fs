@@ -130,16 +130,20 @@ let checkDeadlock (projections: Map<string, ExtractedStatechart>) (pruned: Extra
                   Severity = Severity.Warning
                   Message = $"State '%s{state}' is reachable but no role has outgoing transitions from it" })
 
-/// Check whether any descendant of a composite state has a non-self-loop transition.
-/// Returns true if at least one descendant can progress (transition to a different state).
+/// Check whether any reachable descendant of a composite state has a non-self-loop transition.
+/// Returns true if at least one reachable descendant can progress (transition to a different state).
+/// Filters descendants to only those in reachableStates, so unreachable descendants
+/// (which would be pruned from the projection) don't suppress livelock warnings.
 let private hasProgressingDescendant
     (containment: StateContainment)
     (transitionsBySource: Map<string, TransitionSpec list>)
+    (reachableStates: Set<string>)
     (state: string)
     : bool =
     let descendants = StateContainment.allDescendants state containment
 
     descendants
+    |> List.filter (fun d -> Set.contains d reachableStates)
     |> List.exists (fun descendant ->
         let outgoing =
             transitionsBySource |> Map.tryFind descendant |> Option.defaultValue []
@@ -150,8 +154,9 @@ let private hasProgressingDescendant
 /// but ALL of them are self-loops (source == target). The system is active but cannot
 /// make progress — a livelock.
 ///
-/// Hierarchy-aware: a composite state self-loop is suppressed when any descendant
-/// has non-self-loop transitions (children can progress internally).
+/// Hierarchy-aware: a composite state self-loop is suppressed when any reachable descendant
+/// has non-self-loop transitions (children can progress internally). Only reachable
+/// descendants are considered — unreachable ones would be pruned and cannot actually progress.
 let checkLivelock
     (projections: Map<string, ExtractedStatechart>)
     (pruned: ExtractedStatechart)
@@ -165,6 +170,8 @@ let checkLivelock
         |> List.groupBy _.Source
         |> Map.ofList
 
+    let reachableStates = pruned.StateNames |> Set.ofList
+
     pruned.StateNames
     |> List.choose (fun state ->
         if isFinal pruned state then
@@ -175,10 +182,10 @@ let checkLivelock
             if outgoing.IsEmpty then
                 None // No outgoing transitions = deadlock, not livelock
             elif outgoing |> List.forall (fun t -> t.Target = t.Source) then
-                // Check hierarchy: if this is a composite state with progressing descendants, suppress
+                // Check hierarchy: if this is a composite state with reachable progressing descendants, suppress
                 if
                     StateContainment.isComposite state containment
-                    && hasProgressingDescendant containment transitionsBySource state
+                    && hasProgressingDescendant containment transitionsBySource reachableStates state
                 then
                     None
                 else
