@@ -10,7 +10,8 @@ module HelpContent =
           Examples =
             [ { Invocation = "frank semantic extract --project MyApp/MyApp.fsproj --base-uri http://example.org/"
                 Description = "Extract semantic definitions from the MyApp project." }
-              { Invocation = "frank semantic extract --project MyApp/MyApp.fsproj --base-uri http://example.org/ --vocabularies schema.org,foaf"
+              { Invocation =
+                  "frank semantic extract --project MyApp/MyApp.fsproj --base-uri http://example.org/ --vocabularies schema.org,foaf"
                 Description = "Extract with multiple vocabulary alignments." } ]
           Workflow =
             { StepNumber = 1
@@ -47,7 +48,7 @@ module HelpContent =
           Workflow =
             { StepNumber = 3
               Prerequisites = [ "semantic extract" ]
-              NextSteps = [ "semantic compile" ]
+              NextSteps = [ "compile" ]
               IsOptional = false }
           Context =
             "The semantic validate command checks the extracted semantic definitions for completeness and consistency. It verifies that all OWL classes have labels, that SHACL shapes reference valid classes, that property domains and ranges are consistent, and that the extraction is not stale relative to the source files." }
@@ -69,20 +70,23 @@ module HelpContent =
             "The semantic diff command compares the current extraction state with a previously saved snapshot, showing what classes, properties, or shapes have been added, removed, or modified. This is useful for understanding the impact of source code changes on the semantic model." }
 
     let compileHelp: CommandHelp =
-        { Name = "semantic compile"
+        { Name = "compile"
           Summary = "Generate OWL/XML and SHACL artifacts from extraction state"
           Examples =
-            [ { Invocation = "frank semantic compile --project MyApp/MyApp.fsproj"
+            [ { Invocation = "frank compile --project MyApp/MyApp.fsproj"
                 Description = "Generate OWL/XML and SHACL artifacts from the current extraction state." }
-              { Invocation = "frank semantic compile --project MyApp/MyApp.fsproj --output-format json"
-                Description = "Output compilation results in JSON format." } ]
+              { Invocation = "frank compile --project MyApp/MyApp.fsproj --output-format json"
+                Description = "Output compilation results in JSON format." }
+              { Invocation =
+                  "frank compile --project MyApp/MyApp.fsproj --base-uri http://example.org/ --output ./artifacts/"
+                Description = "Run unified extract+compile in one shot (used by MSBuild auto-invoke)." } ]
           Workflow =
             { StepNumber = 5
               Prerequisites = [ "semantic extract" ]
               NextSteps = []
               IsOptional = false }
           Context =
-            "The semantic compile command generates final artifact files from the extraction state: an OWL/XML ontology file (ontology.owl.xml), a SHACL shapes file (shapes.shacl.ttl), and a manifest file (manifest.json). These artifacts can be used by RDF tools, SPARQL endpoints, or other semantic web infrastructure." }
+            "The compile command generates final artifact files from the extraction state: an OWL/XML ontology file (ontology.owl.xml), a SHACL shapes file (shapes.shacl.ttl), and a manifest file (manifest.json). These artifacts can be used by RDF tools, SPARQL endpoints, or other semantic web infrastructure. When invoked with --base-uri, it runs extraction and artifact emission in one shot (the path used by MSBuild auto-invoke via Frank.Cli.MSBuild)." }
 
     let statechartExtractHelp: CommandHelp =
         { Name = "statechart extract"
@@ -191,7 +195,8 @@ module HelpContent =
     let semanticWorkflowsTopic: HelpTopic =
         { Name = "semantic-workflows"
           Summary = "End-to-end guide to the semantic extraction pipeline"
-          Content = """The frank semantic extraction pipeline transforms F# source code into semantic
+          Content =
+            """The frank semantic extraction pipeline transforms F# source code into semantic
 definitions (OWL ontology + SHACL shapes) through a series of commands:
 
   Step 1: semantic extract (required)
@@ -207,14 +212,14 @@ definitions (OWL ontology + SHACL shapes) through a series of commands:
   Step 3: semantic validate (required)
     Checks completeness and consistency of the extracted definitions.
     Prerequisites: semantic extract
-    Next: semantic compile
+    Next: compile
 
   Step 4: semantic diff (optional)
     Compares current extraction state with a previous snapshot.
     Prerequisites: semantic extract
     Next: (informational only)
 
-  Step 5: semantic compile (required)
+  Step 5: compile (required, top-level command)
     Generates final OWL/XML and SHACL artifact files.
     Prerequisites: semantic extract (validate recommended)
     Next: (end of pipeline)
@@ -223,12 +228,13 @@ Typical usage:
   frank semantic extract --project MyApp.fsproj --base-uri http://example.org/
   frank semantic clarify --project MyApp.fsproj
   frank semantic validate --project MyApp.fsproj
-  frank semantic compile --project MyApp.fsproj""" }
+  frank compile --project MyApp.fsproj""" }
 
     let statechartWorkflowsTopic: HelpTopic =
         { Name = "statechart-workflows"
           Summary = "End-to-end guide to the statechart pipeline"
-          Content = """The statechart pipeline extracts, generates, validates, and parses
+          Content =
+            """The statechart pipeline extracts, generates, validates, and parses
 state machine artifacts from Frank applications:
 
   Step 1: statechart extract (required)
@@ -254,7 +260,8 @@ state machine artifacts from Frank applications:
     let conceptsTopic: HelpTopic =
         { Name = "concepts"
           Summary = "Frank's semantic model: F# types, OWL, and SHACL"
-          Content = """Frank bridges F# application code and semantic web standards. Understanding
+          Content =
+            """Frank bridges F# application code and semantic web standards. Understanding
 the mapping between F# constructs and semantic artifacts helps you make
 informed decisions during extraction and clarification.
 
@@ -350,12 +357,15 @@ informed decisions during extraction and clarification.
 
     /// Find a command by name (case-insensitive).
     let findCommand (name: string) : CommandHelp option =
-        allCommands |> List.tryFind (fun c -> c.Name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
+        allCommands
+        |> List.tryFind (fun c -> c.Name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
 
     /// Find a topic by name (case-insensitive).
     let findTopic (name: string) : HelpTopic option =
-        allTopics |> List.tryFind (fun t -> t.Name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
+        allTopics
+        |> List.tryFind (fun t -> t.Name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
 
     /// All known names (commands + topics) for fuzzy matching.
     let allNames: string list =
-        (allCommands |> List.map (fun c -> c.Name)) @ (allTopics |> List.map (fun t -> t.Name))
+        (allCommands |> List.map (fun c -> c.Name))
+        @ (allTopics |> List.map (fun t -> t.Name))

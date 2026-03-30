@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="CommandRegistrationTests.fs" />
     <Compile Include="PipelineTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -19,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Frank.Cli/Frank.Cli.fsproj" />
     <ProjectReference Include="../../src/Frank.Cli.Core/Frank.Cli.Core.fsproj" />
   </ItemGroup>
 
