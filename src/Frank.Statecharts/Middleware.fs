@@ -55,8 +55,25 @@ type StateMachineMiddleware(next: RequestDelegate) =
                 let resolvedRoles = meta.ResolveRoles ctx
                 ctx.SetRoles(resolvedRoles)
 
-            // Step 2: Check if HTTP method is allowed in current state
-            match Map.tryFind stateKey meta.StateHandlerMap with
+            // Step 2: Check if HTTP method is allowed in current state.
+            // When Hierarchy = Some, use hierarchical resolution (parent fallback).
+            // When Hierarchy = None, use flat dispatch (existing behavior, zero breaking changes).
+            let handlers: (string * RequestDelegate) list option =
+                match meta.Hierarchy with
+                | None ->
+                    // Flat dispatch: direct state key lookup
+                    Map.tryFind stateKey meta.StateHandlerMap
+                | Some hierarchy ->
+                    // Hierarchical dispatch: build singleton config from current state key,
+                    // then resolve handlers with parent fallback.
+                    let config = ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
+
+                    let resolved =
+                        HierarchicalRuntime.resolveHandlers hierarchy meta.StateHandlerMap config
+
+                    if List.isEmpty resolved then None else Some resolved
+
+            match handlers with
             | None -> ctx.Response.StatusCode <- 405
             | Some handlers ->
                 let methodMatch =
@@ -66,7 +83,19 @@ type StateMachineMiddleware(next: RequestDelegate) =
                 match methodMatch with
                 | None ->
                     ctx.Response.StatusCode <- 405
-                    let allowedMethods = handlers |> List.map fst |> List.distinct
+
+                    let allowedMethods =
+                        match meta.Hierarchy with
+                        | None -> handlers |> List.map fst |> List.distinct
+                        | Some hierarchy ->
+                            // Use hierarchical resolution for the Allow header too
+                            let config = ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
+
+                            let methodOnlyMap = meta.StateHandlerMap |> Map.map (fun _ v -> v |> List.map fst)
+
+                            HierarchicalRuntime.resolveAllowedMethods hierarchy methodOnlyMap config
+                            |> Set.toList
+
                     ctx.Response.Headers["Allow"] <- StringValues(String.Join(", ", allowedMethods))
                 | Some(_, handler) ->
                     // Step 3: Evaluate guards

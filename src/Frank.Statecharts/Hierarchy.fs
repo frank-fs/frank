@@ -10,7 +10,8 @@ namespace Frank.Statecharts
 // - HTTP method resolution with parent fallback
 //
 // Opt-in: flat FSMs remain unaffected. Hierarchical dispatch activates
-// only when StateMachineMetadata.Hierarchy = Some _.
+// only when StateMachineMetadata.Hierarchy = Some _. Use the `useHierarchyWith`
+// CE operation on statefulResource to set this field.
 // ==========================================================================
 
 /// Composite state kind: XOR (exclusive, one child active) or AND (parallel, all children active).
@@ -454,10 +455,33 @@ module HierarchicalRuntime =
                         | None -> config
                 | None -> config
             | Frank.Statecharts.Ast.HistoryKind.Deep ->
-                // Deep: restore the full configuration recursively
+                // Deep: restore the full active configuration top-down via enterState.
+                // Must use enterState (not Set.fold) to enforce XOR exclusivity at each level.
+                //
+                // Algorithm: walk down the composite hierarchy, finding which direct child
+                // was active in previousConfig, re-entering via enterState (which enforces
+                // XOR exclusivity), then recursively restoring sub-composites.
                 let previousStates = ActiveStateConfiguration.toSet previousConfig
 
-                previousStates |> Set.fold (fun c s -> ActiveStateConfiguration.add s c) config
+                // Recursive local helper: restore a subtree of previousConfig under `parentId`.
+                let rec restoreSubtree (parentId: string) (c: ActiveStateConfiguration) : ActiveStateConfiguration =
+                    let children = Map.tryFind parentId hierarchy.ChildrenMap |> Option.defaultValue []
+
+                    let activeChildren =
+                        children |> List.filter (fun child -> Set.contains child previousStates)
+
+                    activeChildren
+                    |> List.fold
+                        (fun acc child ->
+                            // Re-enter child via enterState to enforce XOR exclusivity.
+                            let acc = enterState hierarchy child acc
+                            // If child is composite, continue restoring its active sub-states.
+                            match Map.tryFind child hierarchy.StateKind with
+                            | Some _ -> restoreSubtree child acc
+                            | None -> acc)
+                        c
+
+                restoreSubtree compositeStateId config
         | None ->
             // No history: fall back to initial child
             match Map.tryFind compositeStateId hierarchy.InitialChild with
