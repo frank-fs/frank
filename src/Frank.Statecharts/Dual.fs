@@ -12,6 +12,45 @@
 /// 5. Circular wait detection: dependency graph cycle analysis using (role, state) pairs
 /// 6. Conditional request modeling: MustSelect = "must attempt" not "will succeed"
 /// 7. Hierarchy-aware dual derivation: composite state handling
+///
+/// ==========================================================================
+/// MPST FORMALISM BOUNDS (issue #244)
+/// ==========================================================================
+///
+/// This module implements dual derivation as a documented approximation of the
+/// full Multiparty Session Types (MPST) formalism. The following limitations
+/// are explicit design choices, not implementation bugs:
+///
+/// 1. AND-STATE DUAL DERIVATION GAP
+///    AND-state (parallel composition) is modeled in the runtime hierarchy
+///    (see Hierarchy.fs, CompositeKind.AND) but is NOT handled by dual derivation.
+///    Synchronization barriers — the requirement that the client must engage ALL
+///    parallel branches before an AND-state may exit — are silently dropped.
+///    When deriveWithHierarchy receives a hierarchy containing AND-state composites,
+///    it emits a DeriveResult.Warnings entry and proceeds with flat-FSM semantics.
+///    Full AND-state dual derivation would require a tensor product T1 ⊗ T2 over
+///    the parallel regions, which is not implemented. See item 3 (no composition
+///    operator) below.
+///
+/// 2. SEQUENTIAL DUALITY APPROXIMATION
+///    Per-(role, state) snapshot dualization is correct for flat FSMs but is an
+///    approximation for sequenced session types with continuations (T.S notation
+///    from Wadler's "Propositions as Sessions"). The dual of a full protocol tree
+///    is not computed: this engine takes a per-state snapshot and classifies each
+///    descriptor as MustSelect/MayPoll/SessionComplete. The full continuation
+///    structure (what comes AFTER each selection) is not reflected in the dual.
+///    This is sufficient for ALPS projection and HTTP affordance generation — the
+///    use cases Frank targets — but is not a complete session-type dual in the
+///    Wadler/Honda sense.
+///
+/// 3. NO PROTOCOL COMPOSITION OPERATOR
+///    There is no tensor product (T1 ⊗ T2), parallel composition, or cut rule for
+///    merging DeriveResult values. CutPointInfo annotates service boundaries but
+///    does not compose protocol types. This means that cross-service protocols
+///    (e.g., order → payment → fulfillment) cannot be composed into a single typed
+///    session. Future work: implement a `compose` function that takes two DeriveResult
+///    values and a cut point map and returns a merged DeriveResult with protocol
+///    continuations linked across service boundaries.
 module Frank.Statecharts.Dual
 
 open Frank.Resources.Model
@@ -109,6 +148,14 @@ type DeriveResult =
         /// Circular wait cycles in role dependency graph (#226 enhancement 5).
         /// Each cycle is a list of (role, state) edges forming the cycle.
         CircularWaits: (string * string) list list
+        /// Formalism-bound warnings: conditions where the derivation is a known approximation
+        /// rather than the full MPST dual. See the module-level MPST FORMALISM BOUNDS comment
+        /// for the complete list of documented limitations.
+        ///
+        /// Current warning sources:
+        /// - AND-state parallel composition: hierarchy contains AND-state composites whose
+        ///   synchronization barriers are not modeled (see formalism bound 1 above).
+        Warnings: string list
     }
 
 /// Check whether a state is final (session complete).
@@ -242,9 +289,10 @@ let private detectRaceConditions (annotations: Map<string * string, DualAnnotati
             // Check if any two DIFFERENT roles share a descriptor
             let rolePairs =
                 let roleDescs = descriptorsByRole |> Map.toList
+
                 [ for i in 0 .. roleDescs.Length - 2 do
-                    for j in i + 1 .. roleDescs.Length - 1 do
-                        yield snd roleDescs.[i], snd roleDescs.[j] ]
+                      for j in i + 1 .. roleDescs.Length - 1 do
+                          yield snd roleDescs.[i], snd roleDescs.[j] ]
 
             let hasOverlap =
                 rolePairs
@@ -304,8 +352,7 @@ let private buildRoleDependencyGraph
 
         // Each waiting role depends on each must-select role in this state
         waitingRoles
-        |> List.collect (fun waiter ->
-            mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
+        |> List.collect (fun waiter -> mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
 
 /// Detect circular waits in role dependency graph (#226 enhancement 5).
 /// Uses (role, state) pairs as graph nodes, not just role names, so that cycles
@@ -321,8 +368,7 @@ let private detectCircularWaits (annotations: Map<string * string, DualAnnotatio
         |> List.map (fun (node, es) -> node, es |> List.map snd)
         |> Map.ofList
 
-    let allNodes =
-        edges |> List.collect (fun (a, b) -> [ a; b ]) |> List.distinct
+    let allNodes = edges |> List.collect (fun (a, b) -> [ a; b ]) |> List.distinct
 
     // DFS-based cycle detection using (role, state) pairs
     let mutable visited: Set<string * string> = Set.empty
@@ -363,6 +409,34 @@ let private isCompositeStateChild (hierarchy: StateHierarchy option) (state: str
     | None -> false
     | Some h -> Map.containsKey state h.ParentMap
 
+/// Detect AND-state composites in the hierarchy and produce formalism-bound warnings.
+///
+/// AND-state dual derivation gap (issue #244, formalism bound 1):
+/// AND-state parallel composition is not handled by dual derivation.
+/// Synchronization barriers — the requirement that the client must engage ALL parallel
+/// branches before the AND-state exits — are silently dropped when the hierarchy
+/// contains AND-state composites. This function produces a warning for each AND-state
+/// found so that callers can surface the approximation rather than assuming full MPST
+/// duality has been computed.
+///
+/// The derivation proceeds with flat-FSM semantics regardless; this function only
+/// produces warnings, it does not halt or change the derivation output.
+let private detectAndStateWarnings (hierarchy: StateHierarchy option) : string list =
+    match hierarchy with
+    | None -> []
+    | Some h ->
+        h.StateKind
+        |> Map.toList
+        |> List.choose (fun (stateId, kind) ->
+            match kind with
+            | CompositeKind.AND ->
+                Some
+                    $"AND-state dual derivation gap: composite state '{stateId}' uses AND (parallel) composition. \
+Synchronization barriers across parallel regions are not modeled by dual derivation. \
+The dual for '{stateId}' is computed using flat-FSM approximation only (formalism bound 1, issue #244). \
+Full tensor-product dual is not supported."
+            | _ -> None)
+
 /// Core derivation engine with all enhancements.
 let private deriveCoreEnhanced
     (statechart: ExtractedStatechart)
@@ -372,11 +446,15 @@ let private deriveCoreEnhanced
     (methodSafety: Map<string, bool>)
     (hierarchy: StateHierarchy option)
     : DeriveResult =
+    // AND-state warning check (formalism bound 1): surface approximation before deriving.
+    let warnings = detectAndStateWarnings hierarchy
+
     if statechart.Roles.IsEmpty then
         { Annotations = Map.empty
           ProtocolSinks = []
           RaceConditions = []
-          CircularWaits = [] }
+          CircularWaits = []
+          Warnings = warnings }
     else
         let reachableStates =
             (Projection.pruneUnreachableStates statechart).StateNames |> Set.ofList
@@ -413,7 +491,8 @@ let private deriveCoreEnhanced
         { Annotations = annotationsWithGroups
           ProtocolSinks = sinks
           RaceConditions = raceConditions
-          CircularWaits = circularWaits }
+          CircularWaits = circularWaits
+          Warnings = warnings }
 
 /// Derive client protocol duals from server statechart + projected ALPS profiles.
 /// For each role R and each reachable state S, classifies each descriptor as
@@ -495,6 +574,13 @@ let deriveWithEnrichedCutPoints
 /// Example: a traffic light with composite state "Active" containing "Red", "Yellow", "Green"
 /// would pass `Some hierarchy` so that flattened parent self-loops (checkStatus: Red->Red)
 /// are recognized as composite-state artifacts, not real protocol sinks.
+///
+/// AND-state formalism bound (issue #244):
+/// If the hierarchy contains AND-state (parallel) composites, the returned DeriveResult
+/// will include Warnings entries describing the approximation. Synchronization barriers
+/// across AND-state parallel regions are NOT modeled — the derivation proceeds with
+/// flat-FSM semantics. Callers SHOULD inspect DeriveResult.Warnings when passing a
+/// hierarchy that may contain AND composites.
 let deriveWithHierarchy
     (statechart: ExtractedStatechart)
     (projections: Map<string, ExtractedStatechart>)
@@ -539,4 +625,5 @@ let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult)
     { Annotations = reverseAnnotations
       ProtocolSinks = clientResult.ProtocolSinks
       RaceConditions = clientResult.RaceConditions
-      CircularWaits = clientResult.CircularWaits }
+      CircularWaits = clientResult.CircularWaits
+      Warnings = clientResult.Warnings }

@@ -14,6 +14,16 @@ namespace Frank.Statecharts
 // ==========================================================================
 
 /// Composite state kind: XOR (exclusive, one child active) or AND (parallel, all children active).
+///
+/// AND-state dual derivation gap (issue #244):
+/// AND-state parallel composition is modeled in this runtime (HierarchicalRuntime.enterState,
+/// HierarchicalRuntime.transition) but is NOT handled by dual derivation in Frank.Statecharts.Dual.
+/// Synchronization barriers — the requirement that the client must engage ALL parallel regions
+/// before the AND-state exits — are silently dropped by the dual derivation engine.
+/// When Dual.deriveWithHierarchy is called with a hierarchy containing AND composites, it emits
+/// DeriveResult.Warnings entries and proceeds with flat-FSM approximation semantics.
+/// Full AND-state dual derivation would require tensor-product composition (T1 ⊗ T2) across
+/// parallel regions, which is not implemented (see Dual.fs module comment, formalism bound 1).
 type CompositeKind =
     | XOR
     | AND

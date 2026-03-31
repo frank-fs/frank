@@ -85,6 +85,8 @@
     <Compile Include="DualEnhancementTests.fs" />
     <!-- Dual profile content negotiation tests (issue #126 WP1) -->
     <Compile Include="Affordances/DualProfileMiddlewareTests.fs" />
+    <!-- MPST formalism bounds tests (issue #244) -->
+    <Compile Include="DualFormalismBoundsTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
