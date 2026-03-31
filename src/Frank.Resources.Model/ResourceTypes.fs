@@ -105,7 +105,15 @@ type RoleInfo =
       Description: string option }
 
 /// Whether a transition is available to all roles or restricted to specific roles.
-/// Maps to MPST semantics: Unrestricted = broadcast, RestrictedTo = directed message.
+///
+/// MPST terminology note (issue #244): Unrestricted = shared-input, NOT broadcast.
+/// Shared-input: any single role may trigger the transition independently (first-come
+/// semantics; only one role's trigger is observed by the server per transition firing).
+/// Broadcast: the server sends a message to ALL roles simultaneously.
+/// These are distinct MPST patterns: shared-input is input choice, broadcast is output.
+/// Using "broadcast" here would incorrectly imply the server initiates and sends to all.
+///
+/// RestrictedTo = directed message: only the listed roles may trigger this transition.
 type RoleConstraint =
     | Unrestricted
     | RestrictedTo of string list
