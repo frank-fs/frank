@@ -110,13 +110,18 @@ type TransitionEvent<'State, 'Event, 'Context> =
 
 /// Accumulator for the statefulResource CE.
 type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
-    { RouteTemplate: string
-      Machine: StateMachine<'State, 'Event, 'Context> option
-      StateHandlerMap: Map<string, (string * RequestDelegate) list>
-      TransitionObservers: (TransitionEvent<'State, 'Event, 'Context> -> unit) list
-      ResolveInstanceId: (HttpContext -> string) option
-      Metadata: (EndpointBuilder -> unit) list
-      Roles: RoleDefinition list }
+    {
+        RouteTemplate: string
+        Machine: StateMachine<'State, 'Event, 'Context> option
+        StateHandlerMap: Map<string, (string * RequestDelegate) list>
+        TransitionObservers: (TransitionEvent<'State, 'Event, 'Context> -> unit) list
+        ResolveInstanceId: (HttpContext -> string) option
+        Metadata: (EndpointBuilder -> unit) list
+        Roles: RoleDefinition list
+        /// Opt-in hierarchy spec. When Some, the Run method wires StateHierarchy.build into
+        /// StateMachineMetadata.Hierarchy, enabling hierarchical dispatch in middleware.
+        HierarchySpec: HierarchySpec option
+    }
 
 /// Helper functions for building per-state handler lists.
 [<RequireQualifiedAccess>]
@@ -153,7 +158,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
           TransitionObservers = []
           ResolveInstanceId = None
           Metadata = []
-          Roles = [] }
+          Roles = []
+          HierarchySpec = None }
 
     /// Register a pre-built state machine definition.
     [<CustomOperation("machine")>]
@@ -200,6 +206,14 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 { Name = name
                   ClaimsPredicate = predicate }
                 :: spec.Roles }
+
+    /// Opt-in hierarchical runtime. Accepts a HierarchySpec describing composite state relationships.
+    /// When set, middleware uses HierarchicalRuntime.resolveHandlers/resolveAllowedMethods for dispatch.
+    /// When absent, flat FSM dispatch is unchanged (zero breaking changes).
+    [<CustomOperation("useHierarchyWith")>]
+    member _.UseHierarchyWith(spec: StatefulResourceSpec<'S, 'E, 'C>, hierarchySpec: HierarchySpec) =
+        { spec with
+            HierarchySpec = Some hierarchySpec }
 
     member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : Resource =
         let machine =
@@ -380,7 +394,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
         let stateMetadataMap =
             machine.StateMetadata
             |> Map.toList
-            |> List.map (fun (s, info) -> (string s, info))
+            |> List.map (fun (s, info) -> (StateKeyExtractor.keyOf s, info))
             |> Map.ofList
 
         let metadata: StateMachineMetadata =
@@ -399,7 +413,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
               ExecuteTransition = executeTransition
               Roles = spec.Roles
               ResolveRoles = resolveRoles
-              Hierarchy = None }
+              Hierarchy = spec.HierarchySpec |> Option.map StateHierarchy.build }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.
