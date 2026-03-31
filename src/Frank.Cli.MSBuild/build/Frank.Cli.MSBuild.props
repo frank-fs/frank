@@ -1,6 +1,5 @@
 <Project>
   <PropertyGroup>
-    <FrankCliOutputPath Condition="'$(FrankCliOutputPath)' == ''">$(IntermediateOutputPath)frank/</FrankCliOutputPath>
     <!-- Set to 'true' to opt out of automatic shape generation during build. -->
     <FrankCliBaseUri Condition="'$(FrankCliBaseUri)' == ''">urn:frank:$(AssemblyName)/</FrankCliBaseUri>
     <FrankCliSkipGeneration Condition="'$(FrankCliSkipGeneration)' == ''">false</FrankCliSkipGeneration>

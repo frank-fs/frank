@@ -1,4 +1,19 @@
 <Project>
+  <!-- Late-bind FrankCliOutputPath via a target: IntermediateOutputPath is not
+       fully resolved at static PropertyGroup evaluation time when this file is
+       imported inline in the fsproj body. Using a target ensures the TFM-specific
+       path (e.g., obj/Debug/net10.0/frank/) is used at target execution time.
+       AfterTargets="ResolveTargetFramework" runs early, before ResolveAssemblyReferences. -->
+  <Target Name="_SetFrankCliOutputPath"
+          AfterTargets="ResolveTargetFramework"
+          BeforeTargets="WriteFrankResolvedOptions;GenerateFrankSemanticDefinitions;EmbedFrankSemanticDefinitions;ValidateFrankSemanticDefinitions"
+          Condition="'$(FrankCliOutputPath)' == ''">
+    <PropertyGroup>
+      <FrankCliOutputPath>$(IntermediateOutputPath)frank/</FrankCliOutputPath>
+    </PropertyGroup>
+    <MakeDir Directories="$(FrankCliOutputPath)" Condition="!Exists('$(FrankCliOutputPath)')" />
+  </Target>
+
   <!-- Resolve task assembly path: NuGet package layout (tasks/netstandard2.0/) takes precedence;
        fall back to build output for projects importing from source tree (dev workflow). -->
   <PropertyGroup>
