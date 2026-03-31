@@ -377,7 +377,11 @@ let private detectCircularWaits (annotations: Map<string * string, DualAnnotatio
 
     let rec dfs (node: string * string) (path: (string * string) list) =
         if Set.contains node inStack then
-            // Found a cycle - extract it from the path
+            // Found a cycle - extract it from the path.
+            // Mark the cycle endpoint as visited so it is not re-entered from
+            // a different DFS root, preventing duplicate cycle reporting.
+            visited <- Set.add node visited
+
             let cycleStart = path |> List.tryFindIndex (fun n -> n = node)
 
             match cycleStart with
@@ -601,6 +605,11 @@ let deriveWithHierarchy
 ///   SessionComplete -> SessionComplete : symmetric (session end)
 ///
 /// Applying this twice yields the identity: dual(dual(T)) = T.
+///
+/// RaceConditions and CircularWaits are re-derived from the reversed annotations
+/// rather than passed through unchanged — obligations change under reversal, so
+/// any race or wait structure may change too. ProtocolSinks is re-derived from
+/// the statechart's structural projections, which are obligation-independent.
 let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult) : DeriveResult =
     let flipObligation (obligation: ClientObligation) : ClientObligation =
         match obligation with
@@ -622,8 +631,30 @@ let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult)
                         ann.DualOf
                         |> Option.map (fun d -> if d.StartsWith("#") then d.Substring(1) else $"#{d}") }))
 
+    // Re-derive RaceConditions and CircularWaits from reversed annotations.
+    // These depend on obligations (which role has MustSelect), so they must be
+    // re-computed rather than carried from the forward result.
+    let reverseRaceConditions = detectRaceConditions reverseAnnotations
+    let reverseCircularWaits = detectCircularWaits reverseAnnotations
+
+    // Re-derive ProtocolSinks from the statechart's structural projections.
+    // ProtocolSinks is obligation-independent (determined by transition graph structure),
+    // so the result is the same as the forward derivation, but we re-derive for correctness.
+    let reachableStates =
+        if statechart.Roles.IsEmpty then
+            Set.empty
+        else
+            (Projection.pruneUnreachableStates statechart).StateNames |> Set.ofList
+
+    let reverseSinks =
+        if statechart.Roles.IsEmpty then
+            []
+        else
+            let projections = Projection.projectAll statechart
+            detectProtocolSinks reachableStates statechart projections
+
     { Annotations = reverseAnnotations
-      ProtocolSinks = clientResult.ProtocolSinks
-      RaceConditions = clientResult.RaceConditions
-      CircularWaits = clientResult.CircularWaits
+      ProtocolSinks = reverseSinks
+      RaceConditions = reverseRaceConditions
+      CircularWaits = reverseCircularWaits
       Warnings = clientResult.Warnings }
