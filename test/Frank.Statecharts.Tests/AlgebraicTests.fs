@@ -457,4 +457,72 @@ let transitionResultApplicativeLaws =
 
                   lhs = rhs
 
-              Check.QuickThrowOnFailure check ]
+              Check.QuickThrowOnFailure check
+
+          testCase "composition: pure (<<) <*> u <*> v <*> w = u <*> (v <*> w)"
+          <| fun _ ->
+              // Composition law: apply (apply (apply (pure (<<)) u) v) w = apply u (apply v w)
+              // where (<<) is function composition: (f << g) x = f (g x)
+              // In our bifunctor world, we need composition for both State and Context dimensions.
+              let check (s: string, c: int) =
+                  let f = fun (x: string) -> x + "!"
+                  let g = fun (x: string) -> x.ToUpperInvariant()
+                  let cf = fun (x: int) -> x * 2
+                  let cg = fun (x: int) -> x + 10
+
+                  let u = TransitionResult.pure' f cf
+                  let v = TransitionResult.pure' g cg
+                  let w = TransitionResult.pure' s c
+
+                  // lhs: pure (<<) <*> u <*> v <*> w
+                  let pureCompose =
+                      TransitionResult.pure' (fun (h: string -> string) -> (<<) h) (fun (h: int -> int) -> (<<) h)
+
+                  let lhs =
+                      TransitionResult.apply (TransitionResult.apply (TransitionResult.apply pureCompose u) v) w
+
+                  // rhs: u <*> (v <*> w)
+                  let rhs = TransitionResult.apply u (TransitionResult.apply v w)
+
+                  lhs = rhs
+
+              Check.QuickThrowOnFailure check
+
+          testCase "composition law holds when u is Blocked"
+          <| fun _ ->
+              let blockedU: TransitionResult<string -> string, int -> int> =
+                  TransitionResult.Blocked NotAllowed
+
+              let v =
+                  TransitionResult.pure' (fun (x: string) -> x.ToUpperInvariant()) (fun (x: int) -> x + 10)
+
+              let w = TransitionResult.pure' "hello" 42
+
+              let pureCompose =
+                  TransitionResult.pure' (fun (h: string -> string) -> (<<) h) (fun (h: int -> int) -> (<<) h)
+
+              let lhs =
+                  TransitionResult.apply (TransitionResult.apply (TransitionResult.apply pureCompose blockedU) v) w
+
+              let rhs = TransitionResult.apply blockedU (TransitionResult.apply v w)
+
+              Expect.equal lhs rhs "Composition law holds when u is Blocked"
+
+          testCase "composition law holds when v is Blocked"
+          <| fun _ ->
+              let u = TransitionResult.pure' (fun (x: string) -> x + "!") (fun (x: int) -> x * 2)
+
+              let blockedV: TransitionResult<string -> string, int -> int> =
+                  TransitionResult.Blocked NotYourTurn
+
+              let w = TransitionResult.pure' "world" 7
+
+              let pureCompose =
+                  TransitionResult.pure' (fun (h: string -> string) -> (<<) h) (fun (h: int -> int) -> (<<) h)
+
+              let lhs =
+                  TransitionResult.apply (TransitionResult.apply (TransitionResult.apply pureCompose u) blockedV) w
+
+              let rhs = TransitionResult.apply u (TransitionResult.apply blockedV w)
+
+              Expect.equal lhs rhs "Composition law holds when v is Blocked" ]
