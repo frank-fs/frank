@@ -97,137 +97,44 @@ let getOrderState (ctx: HttpContext) : Task =
     }
     :> Task
 
-/// Pending state POST: fire PlaceOrder (-> Authorize).
-let handlePlaceOrder (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx PlaceOrder
+/// Create a handler that fires a state event and returns 202.
+let private eventHandler (event: OrderEvent) (ctx: HttpContext) : Task =
+    StateMachineContext.setEvent ctx event
     ctx.Response.StatusCode <- 202
     Task.CompletedTask
 
-/// Authorize state POST: fire AuthorizePayment (-> Capture).
-let handleAuthorizePayment (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx AuthorizePayment
-    ctx.Response.StatusCode <- 202
-    Task.CompletedTask
-
-/// Capture state POST: fire CapturePayment (-> Fulfillment).
-let handleCapturePayment (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx CapturePayment
-    ctx.Response.StatusCode <- 202
-    Task.CompletedTask
-
-/// Retry state POST: fire RecoverFromRetry (-> Capture, shallow history).
-let handleRecoverFromRetry (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx RecoverFromRetry
-    ctx.Response.StatusCode <- 202
-    Task.CompletedTask
-
-/// Fulfillment state POST: fire FulfillOrder (-> Shipped).
-let handleFulfillOrder (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx FulfillOrder
-    ctx.Response.StatusCode <- 202
-    Task.CompletedTask
-
-/// Shipped state POST: fire ConfirmDelivery (-> Delivered).
-let handleConfirmDelivery (ctx: HttpContext) : Task =
-    StateMachineContext.setEvent ctx ConfirmDelivery
-    ctx.Response.StatusCode <- 202
-    Task.CompletedTask
+let handlePlaceOrder = eventHandler PlaceOrder
+let handleAuthorizePayment = eventHandler AuthorizePayment
+let handleCapturePayment = eventHandler CapturePayment
+let handleRecoverFromRetry = eventHandler RecoverFromRetry
+let handleFulfillOrder = eventHandler FulfillOrder
+let handleConfirmDelivery = eventHandler ConfirmDelivery
 
 // ===========================================================================
 // Direct store manipulation helpers (sub-resource endpoints for e2e testing)
 // These bypass state machine validation for demo/testing purposes.
 // ===========================================================================
 
-/// Cancel an order: sets state to Cancelled directly (Customer role, MustSelect).
-let directCancelOrder (ctx: HttpContext) : Task =
+/// Directly set an order to a target state, bypassing statechart guards (for e2e testing).
+let private directSetState (targetState: OrderState) (ctx: HttpContext) : Task =
     task {
         let store =
             ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
             :?> IStateMachineStore<OrderState, unit>
 
         let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Cancelled ()
+        do! store.SetState orderId targetState ()
         ctx.Response.StatusCode <- 202
     }
     :> Task
 
-/// Initiate payment retry: sets state to Retry (Capture -> Retry).
-let directRetryPayment (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Retry ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-/// Recover from retry: sets state to Capture (shallow history proof point).
-let directRetryRecover (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Capture ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-/// Force capture: sets state to Capture.
-let directCapture (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Capture ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-/// Force fulfillment: sets state to Fulfillment.
-let directFulfillment (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Fulfillment ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-/// Force shipped: sets state to Shipped.
-let directShipped (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Shipped ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-/// Force delivered: sets state to Delivered.
-let directDelivered (ctx: HttpContext) : Task =
-    task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId Delivered ()
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
+let directCancelOrder = directSetState Cancelled
+let directRetryPayment = directSetState Retry
+let directRetryRecover = directSetState Capture
+let directCapture = directSetState Capture
+let directFulfillment = directSetState Fulfillment
+let directShipped = directSetState Shipped
+let directDelivered = directSetState Delivered
 
 // ===========================================================================
 // Resource definition — statefulResource CE with useHierarchyWith
