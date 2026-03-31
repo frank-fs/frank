@@ -1,4 +1,19 @@
 <Project>
+  <!-- Late-bind FrankCliOutputPath via a target: IntermediateOutputPath is not
+       fully resolved at static PropertyGroup evaluation time when this file is
+       imported inline in the fsproj body. Using a target ensures the TFM-specific
+       path (e.g., obj/Debug/net10.0/frank/) is used at target execution time.
+       AfterTargets="ResolveTargetFramework" runs early, before ResolveAssemblyReferences. -->
+  <Target Name="_SetFrankCliOutputPath"
+          AfterTargets="ResolveTargetFramework"
+          BeforeTargets="WriteFrankResolvedOptions;GenerateFrankSemanticDefinitions;EmbedFrankSemanticDefinitions;ValidateFrankSemanticDefinitions"
+          Condition="'$(FrankCliOutputPath)' == ''">
+    <PropertyGroup>
+      <FrankCliOutputPath>$(IntermediateOutputPath)frank/</FrankCliOutputPath>
+    </PropertyGroup>
+    <MakeDir Directories="$(FrankCliOutputPath)" Condition="!Exists('$(FrankCliOutputPath)')" />
+  </Target>
+
   <!-- Resolve task assembly path: NuGet package layout (tasks/netstandard2.0/) takes precedence;
        fall back to build output for projects importing from source tree (dev workflow). -->
   <PropertyGroup>
@@ -52,12 +67,12 @@
         OtherFlags="$(OtherFlags)" />
   </Target>
 
-  <!-- Auto-invoke frank compile before CoreCompile.
+  <!-- Auto-invoke frank compile before EmbedFrankSemanticDefinitions.
        Runs after WriteFrankResolvedOptions so resolved options are ready.
        Incremental: skipped if shapes.shacl.ttl is newer than all @(Compile) inputs. -->
   <Target Name="GenerateFrankSemanticDefinitions"
           DependsOnTargets="WriteFrankResolvedOptions"
-          BeforeTargets="CoreCompile"
+          BeforeTargets="EmbedFrankSemanticDefinitions"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(FrankCliOutputPath)shapes.shacl.ttl"
           Condition="'$(FrankCliSkipGeneration)' != 'true' AND '$(DesignTimeBuild)' != 'true'">
@@ -70,22 +85,23 @@
              Text="Frank CLI shape generation failed (exit code $(_FrankCliExitCode)). Shapes may be stale. Run 'dotnet tool restore' if frank is not installed." />
   </Target>
 
-  <!-- Static item group for semantic definitions.
-       F# SDK collects EmbeddedResource items before CoreCompile, so dynamic
-       Target-based ItemGroups fire too late. Files must exist from a prior
-       build or explicit frank compile invocation. On a clean first build,
-       GenerateFrankSemanticDefinitions creates the files, but the F# compiler
-       won't embed them until the next build when the Exists() conditions pass
-       at evaluation time. This is the standard F# limitation for generated
-       resources — the same pattern is used for the resource model binary above. -->
-  <ItemGroup Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
-    <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
-                      LogicalName="Frank.Semantic.ontology.owl.xml" />
-    <EmbeddedResource Include="$(FrankCliOutputPath)shapes.shacl.ttl"
-                      LogicalName="Frank.Semantic.shapes.shacl.ttl" />
-    <EmbeddedResource Include="$(FrankCliOutputPath)manifest.json"
-                      LogicalName="Frank.Semantic.manifest.json" />
-  </ItemGroup>
+  <!-- Embed generated semantic definitions as resources.
+       Runs before SplitResourcesByCulture so items flow through the standard
+       EmbeddedResource → PrepareResourceNames → _GenerateCompileInputs → Fsc
+       pipeline. Must run every build (no Inputs/Outputs) since items must be
+       present even when generation is skipped (incremental). -->
+  <Target Name="EmbedFrankSemanticDefinitions"
+          BeforeTargets="SplitResourcesByCulture"
+          Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
+    <ItemGroup>
+      <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
+                        LogicalName="Frank.Semantic.ontology.owl.xml" />
+      <EmbeddedResource Include="$(FrankCliOutputPath)shapes.shacl.ttl"
+                        LogicalName="Frank.Semantic.shapes.shacl.ttl" />
+      <EmbeddedResource Include="$(FrankCliOutputPath)manifest.json"
+                        LogicalName="Frank.Semantic.manifest.json" />
+    </ItemGroup>
+  </Target>
 
   <Target Name="ValidateFrankSemanticDefinitions"
           BeforeTargets="Build"

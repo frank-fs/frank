@@ -46,6 +46,12 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 - **O(n) entry phase** in hierarchy runtime — cons-based accumulation replaces O(n²) list concatenation
 - **Idiomatic Option chains** replace null checks in middleware request paths
 
+**MSBuild Integration**
+
+- **Embedded resource pipeline fix** — semantic definitions (OWL ontology, SHACL shapes, manifest) now embed correctly on clean builds by hooking `BeforeTargets="SplitResourcesByCulture"` instead of static `ItemGroup` or `BeforeTargets="CoreCompile"` (#239)
+- **FrankCliOutputPath resolution** — generated artifacts now land in `$(IntermediateOutputPath)frank/` (e.g., `obj/Debug/net10.0/frank/`) instead of a bare `frank/` relative path; fixed by moving the default from `.props` to `.targets` where `IntermediateOutputPath` is available
+- **CI build fix** — suppress NU5100 NuGet warning for MSBuild task packages (DLL intentionally in `tasks/` not `lib/`)
+
 ### New in 7.3.1
 
 Patch release: state-aware OPTIONS, role-filtered Link rels, and ALPS profile completeness.
