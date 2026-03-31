@@ -70,9 +70,14 @@
              Text="Frank CLI shape generation failed (exit code $(_FrankCliExitCode)). Shapes may be stale. Run 'dotnet tool restore' if frank is not installed." />
   </Target>
 
-  <!-- Static item group for semantic definitions — same rationale as
-       unified state above. Files must exist from a prior build or
-       explicit frank compile invocation. -->
+  <!-- Static item group for semantic definitions.
+       F# SDK collects EmbeddedResource items before CoreCompile, so dynamic
+       Target-based ItemGroups fire too late. Files must exist from a prior
+       build or explicit frank compile invocation. On a clean first build,
+       GenerateFrankSemanticDefinitions creates the files, but the F# compiler
+       won't embed them until the next build when the Exists() conditions pass
+       at evaluation time. This is the standard F# limitation for generated
+       resources — the same pattern is used for the resource model binary above. -->
   <ItemGroup Condition="Exists('$(FrankCliOutputPath)ontology.owl.xml') AND Exists('$(FrankCliOutputPath)shapes.shacl.ttl') AND Exists('$(FrankCliOutputPath)manifest.json')">
     <EmbeddedResource Include="$(FrankCliOutputPath)ontology.owl.xml"
                       LogicalName="Frank.Semantic.ontology.owl.xml" />
