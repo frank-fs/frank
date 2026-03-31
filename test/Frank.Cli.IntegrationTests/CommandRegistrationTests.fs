@@ -71,4 +71,16 @@ let tests =
               // compile should NOT appear in semantic's subcommand list
               Expect.isFalse
                   (allOutput.Contains("compile"))
-                  "semantic --help should NOT list compile (it was moved to root)" ]
+                  "semantic --help should NOT list compile (it was moved to root)"
+
+          testCase "compile --help shows --project-options-file"
+          <| fun _ ->
+              // 'frank compile --help' should list the --project-options-file option
+              let (exitCode, stdout, stderr) = runCliCapturingOutput [| "compile"; "--help" |]
+              let allOutput = stdout + stderr
+              Expect.equal exitCode 0 $"'frank compile --help' should succeed, output: [{allOutput}]"
+
+              Expect.stringContains
+                  allOutput
+                  "--project-options-file"
+                  "compile --help should show --project-options-file option" ]

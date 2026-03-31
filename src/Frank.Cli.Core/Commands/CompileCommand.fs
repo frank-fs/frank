@@ -7,6 +7,7 @@ open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Writing
 open Frank.Resources.Model
+open Frank.Cli.Core.Analysis
 open Frank.Cli.Core.State
 open Frank.Cli.Core.Output
 open Frank.Cli.Core.Unified
@@ -153,10 +154,12 @@ module CompileCommand =
             with ex ->
                 Error $"Compile failed: {ex.Message}"
 
-    /// Unified entrypoint for MSBuild auto-invoke: runs extraction and emits artifacts in one shot.
-    /// Accepts the project path, base URI, vocabularies, and optional output directory.
-    /// Uses a capturing pipeline to avoid a redundant disk round-trip for the ExtractionState.
-    let compileFromProject
+    /// Unified entrypoint for MSBuild auto-invoke with an injected project loader.
+    /// The loadProject function is supplied by the caller so that the MSBuild path can
+    /// bypass subprocess spawning via ProjectLoader.loadProjectFromOptions, while the
+    /// default path continues using ProjectLoader.loadProject.
+    let compileFromProjectWith
+        (loadProject: string -> Async<Result<LoadedProject, string>>)
         (projectPath: string)
         (baseUri: Uri)
         (vocabularies: string list)
@@ -169,6 +172,7 @@ module CompileCommand =
 
             let capturingPipeline =
                 { ExtractCommand.defaultPipeline with
+                    LoadProject = loadProject
                     SaveState =
                         fun path state ->
                             capturedState.Value <- Some state
@@ -208,3 +212,14 @@ module CompileCommand =
                     with ex ->
                         return Error $"Compile failed: {ex.Message}"
         }
+
+    /// Unified entrypoint for MSBuild auto-invoke: runs extraction and emits artifacts in one shot.
+    /// Accepts the project path, base URI, vocabularies, and optional output directory.
+    /// Uses a capturing pipeline to avoid a redundant disk round-trip for the ExtractionState.
+    let compileFromProject
+        (projectPath: string)
+        (baseUri: Uri)
+        (vocabularies: string list)
+        (outputDir: string option)
+        : Async<Result<CompileResult, string>> =
+        compileFromProjectWith ProjectLoader.loadProject projectPath baseUri vocabularies outputDir
