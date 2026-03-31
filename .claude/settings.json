@@ -44,7 +44,9 @@
       "WebFetch(domain:fsharp.github.io)",
       "WebFetch(domain:ionide.io)",
       "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs"
+      "mcp__plugin_context7_context7__query-docs",
+      "Edit(file_path:.claude/worktrees/**)",
+      "Write(file_path:.claude/worktrees/**)"
     ]
   }
 }
