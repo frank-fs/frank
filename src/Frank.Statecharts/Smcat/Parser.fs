@@ -537,6 +537,7 @@ and private parseTransition
                       Target = Some targetName
                       Event = None
                       Guard = None
+                      GuardHref = None
                       Action = None
                       Parameters = []
                       Position = Some startPos
@@ -654,6 +655,7 @@ and private parseTransition
                       Target = Some targetName
                       Event = ev
                       Guard = gd
+                      GuardHref = None
                       Action = ac
                       Parameters = []
                       Position = Some startPos
@@ -744,6 +746,7 @@ and private tryHandleInvalidArrow
                       Target = Some targetName
                       Event = None
                       Guard = None
+                      GuardHref = None
                       Action = None
                       Parameters = []
                       Position = Some startPos

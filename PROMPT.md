@@ -1,22 +1,116 @@
-Implement #108: Progress Analysis — Deadlock and Starvation Detection.
+## Thesis
 
-`gh issue view 108` has full details. Projection-only scope (no dual features — deferred to v7.4.0).
+ALPS profiles are the semantic contract between server and client. When Frank
+parses an ALPS document, transforms it (projection, dual derivation, role
+filtering), and re-emits it, the output must preserve all spec-defined
+attributes from the input. A client that publishes an ALPS profile with `href`
+links to human-readable documentation must get those links back when the profile
+is round-tripped through Frank's pipeline. Silent data loss in the semantic
+layer breaks trust in the framework's profile handling.
 
-PR #172 just landed the projection operator. Key inputs:
-- `Projection.projectAll : ExtractedStatechart -> Map<string, ExtractedStatechart>` in src/Frank.Resources.Model/Projection.fs
-- `TransitionSpec` with `RoleConstraint` (Unrestricted | RestrictedTo) in src/Frank.Resources.Model/ResourceTypes.fs
-- `ExtractedStatechart.Transitions` and `.States` for reachability analysis
+## Current problem
 
-What to build:
-1. New module `src/Frank.Statecharts/Analysis/ProgressAnalysis.fs` — pure functions: `detectDeadlocks`, `detectStarvation`, `analyzeProgress`
-2. Types: `ProgressDiagnostic` DU (Deadlock of state | Starvation of role * states | ReadOnlyRole of role) and `ProgressReport`
-3. Deadlock: for each non-final state, check if ANY role has an unsafe/idempotent transition. No role can act = deadlock.
-4. Starvation: for each role, build reachability graph. Find SCCs where role has no transitions. Find terminal paths where role is excluded.
-5. CLI integration: add `--check-progress` flag to `src/Frank.Cli.Core/Commands/UnifiedValidateCommand.fs`
-6. Tests in `test/Frank.Statecharts.Tests/Analysis/ProgressAnalysisTests.fs`
+PR #135 introduced typed `AlpsMeta` DU cases (`AlpsRole`, `AlpsGuardExt`,
+`AlpsDuality`, `AlpsAvailableInStates`) that classify known ALPS `ext` elements
+during parsing. The classification step discards the `href` attribute for typed
+cases.
 
-Wadler's guidance: completeness check already exists in #107 (`findOrphanedTransitions`). This issue adds deadlock + starvation. Connectedness and mixed choice go to #133.
+The ALPS spec defines `href` on `ext` as "a reference to a human-readable
+document that describes the extension." If an incoming ALPS document includes:
 
-Expert reviewers for this PR: Wadler (MPST liveness), Harel (statechart reachability).
+```json
+{ "id": "projectedRole", "href": "https://example.com/extensions/projectedRole", "value": "admin" }
+```
 
-Start with /brainstorm, then implement. Run `dotnet build Frank.sln` and `dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"` before claiming complete. PR must include `Closes #108`. Run /simplify then /expert-review before creating the PR.
+The `href` is silently dropped. After round-trip (parse → classify → emit),
+the output contains:
+
+```json
+{ "id": "projectedRole", "value": "admin" }
+```
+
+The `AlpsExtension` fallback case preserves `href` for unknown extensions, but
+the typed cases (`AlpsRole`, `AlpsDuality`, `AlpsGuardExt`) do not.
+
+## Definition: "round-trip fidelity"
+
+An ALPS document parsed by Frank and re-emitted without semantic transformation
+(identity round-trip) must produce output that preserves all spec-defined
+attributes from the input. Attributes may be reordered but not dropped.
+
+## Proposed solution
+
+Add `href: string option` to the typed DU cases, or carry it through a shared
+field. Update `classifyExtension` to preserve `href` during classification and
+`getExtAnnotations` to re-emit it.
+
+## Acceptance tests
+
+### 1. Round-trip preserves href on typed extension cases
+
+```
+Input ALPS JSON:
+  ext: { "id": "projectedRole", "href": "https://example.com/extensions/projectedRole", "value": "admin" }
+
+Parse → classify → emit
+
+Output ALPS JSON:
+  ext includes "href": "https://example.com/extensions/projectedRole"
+```
+
+Test each typed case: AlpsRole, AlpsDuality, AlpsGuardExt, AlpsAvailableInStates.
+Each must preserve href when present and omit it cleanly when absent.
+
+### 2. Round-trip preserves href on untyped extension cases (regression)
+
+```
+Input ALPS JSON:
+  ext: { "id": "customExtension", "href": "https://example.com/custom", "value": "foo" }
+
+Parse → classify (falls through to AlpsExtension) → emit
+
+Output ALPS JSON:
+  ext includes "href": "https://example.com/custom"
+```
+
+This already works — the test ensures it doesn't regress.
+
+### 3. Projected profile preserves href through transformation
+
+```
+Input ALPS JSON with role extension including href
+→ Projection.projectAll for a specific role
+→ Re-emit projected profile
+
+Output ALPS JSON:
+  role extension still includes href
+```
+
+This tests that href survives not just identity round-trip but actual
+transformation through the projection pipeline. If projection strips href,
+clients lose documentation links for the extensions they care about most.
+
+## Dependencies
+
+- Independent of: #250, #251, #253, #254
+- Relates to: #252 (discovery surface) — served ALPS profiles must be complete;
+  missing href links degrade the profile's usefulness to clients
+
+## Expert sources
+
+- **Amundsen** (CRITICAL): typed DU cases drop href, breaking round-trip fidelity
+  for spec-defined attributes
+- **Miller** (IMPORTANT): ALPS spec requires href preservation; silent data loss
+  in profile handling
+
+---
+
+## Instructions
+
+Make the acceptance tests in the issue above pass.
+
+1. Read the issue thoroughly — the thesis and acceptance tests are the spec
+2. Follow TDD (`superpowers:test-driven-development`): write a failing test for each acceptance criterion FIRST, then implement to make it pass
+3. Run `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build Frank.sln` and `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"` to verify nothing is broken
+4. Run the E2E test if one exists
+5. Do not claim done without build + test evidence in your output

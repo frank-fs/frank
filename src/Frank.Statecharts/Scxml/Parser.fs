@@ -87,6 +87,7 @@ let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
       Target = targets |> List.tryHead
       Event = attrValue "event" el
       Guard = attrValue "cond" el
+      GuardHref = None
       Action = None
       Parameters = []
       Position = extractPosition el

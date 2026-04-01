@@ -83,6 +83,7 @@ let generate (options: GenerateOptions) (metadata: StateMachineMetadata) : Resul
                           Target = Some stateName
                           Event = Some httpMethod
                           Guard = None
+                          GuardHref = None
                           Action = None
                           Parameters = []
                           Position = Some syntheticPos

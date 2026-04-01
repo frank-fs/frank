@@ -97,13 +97,13 @@ type AlpsMeta =
     | AlpsLink of rel: string * href: string
     | AlpsDataDescriptor of id: string * doc: (string option * string) option
     | AlpsVersion of string
-    | AlpsRole of kind: AlpsRoleKind * value: string
+    | AlpsRole of kind: AlpsRoleKind * value: string * href: string option
     /// Guard annotation for state/document-level ext elements only.
     /// Invariant: never appears on TransitionEdge.Annotations (guards are
     /// extracted to TransitionEdge.Guard during classification).
-    | AlpsGuardExt of value: string
-    | AlpsDuality of kind: AlpsDualityKind * value: string
-    | AlpsAvailableInStates of states: string list
+    | AlpsGuardExt of value: string * href: string option
+    | AlpsDuality of kind: AlpsDualityKind * value: string * href: string option
+    | AlpsAvailableInStates of states: string list * href: string option
 
 // -- SCXML annotation types --
 
@@ -247,6 +247,7 @@ and TransitionEdge =
       Target: string option
       Event: string option
       Guard: string option
+      GuardHref: string option
       Action: string option
       Parameters: string list
       Position: SourcePosition option

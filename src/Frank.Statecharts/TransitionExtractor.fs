@@ -15,7 +15,7 @@ let private resolveConstraint (annotations: Annotation list) : RoleConstraint =
         annotations
         |> List.choose (fun ann ->
             match ann with
-            | AlpsAnnotation(AlpsRole(ProjectedRole, value)) -> Some value
+            | AlpsAnnotation(AlpsRole(ProjectedRole, value, _)) -> Some value
             | _ -> None)
 
     match roleValues with
@@ -30,7 +30,7 @@ let extractRoles (doc: StatechartDocument) : RoleInfo list =
     doc.Annotations
     |> List.collect (fun ann ->
         match ann with
-        | AlpsAnnotation(AlpsRole(ProjectedRole, value)) ->
+        | AlpsAnnotation(AlpsRole(ProjectedRole, value, _)) ->
             value.Split(
                 ',',
                 System.StringSplitOptions.RemoveEmptyEntries

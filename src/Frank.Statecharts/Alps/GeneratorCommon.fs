@@ -105,15 +105,15 @@ let getExtAnnotations (annotations: Annotation list) : (string * string option *
         | AlpsAnnotation meta ->
             match meta with
             | AlpsExtension(id, href, value) -> Some(id, href, value)
-            | AlpsRole(kind, value) ->
+            | AlpsRole(kind, value, href) ->
                 let id =
                     match kind with
                     | ProjectedRole -> Classification.ProjectedRoleExtId
                     | ProtocolState -> Classification.ProtocolStateExtId
 
-                Some(id, None, Some value)
-            | AlpsGuardExt value -> Some(Classification.GuardExtId, None, Some value)
-            | AlpsDuality(kind, value) ->
+                Some(id, href, Some value)
+            | AlpsGuardExt(value, href) -> Some(Classification.GuardExtId, href, Some value)
+            | AlpsDuality(kind, value, href) ->
                 let id =
                     match kind with
                     | ClientObligation -> Classification.ClientObligationExtId
@@ -121,10 +121,10 @@ let getExtAnnotations (annotations: Annotation list) : (string * string option *
                     | DualOf -> Classification.DualOfExtId
                     | CutPoint -> Classification.CutPointExtId
 
-                Some(id, None, Some value)
-            | AlpsAvailableInStates states ->
+                Some(id, href, Some value)
+            | AlpsAvailableInStates(states, href) ->
                 // Normalized: no spaces (classifyExtension trims on parse)
-                Some(Classification.AvailableInStatesExtId, None, Some(states |> String.concat ","))
+                Some(Classification.AvailableInStatesExtId, href, Some(states |> String.concat ","))
             | AlpsTransitionType _
             | AlpsDescriptorHref _
             | AlpsDocumentation _
@@ -132,6 +132,16 @@ let getExtAnnotations (annotations: Annotation list) : (string * string option *
             | AlpsDataDescriptor _
             | AlpsVersion _ -> None
         | _ -> None)
+
+/// Build the full extension list for a transition, prepending the guard if present.
+/// Guards are stored as first-class fields on TransitionEdge but must be
+/// round-tripped as ext elements in ALPS output.
+let getTransitionExtElements (t: TransitionEdge) : (string * string option * string option) list =
+    let nonGuardExts = getExtAnnotations t.Annotations
+
+    match t.Guard with
+    | Some guard -> (Classification.GuardExtId, t.GuardHref, Some guard) :: nonGuardExts
+    | None -> nonGuardExts
 
 /// Extract link annotations from an annotation list.
 let getLinkAnnotations (annotations: Annotation list) : (string * string) list =

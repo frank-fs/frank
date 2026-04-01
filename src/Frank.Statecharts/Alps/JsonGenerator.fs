@@ -73,14 +73,7 @@ let private writeTransitionDescriptor (writer: Utf8JsonWriter) (t: TransitionEdg
         writer.WriteEndArray()
 
     // Write extensions: guard first, then other extensions from annotations
-    let nonGuardExts = getExtAnnotations t.Annotations
-
-    let extElements =
-        match t.Guard with
-        | Some guard -> (Classification.GuardExtId, None, Some guard) :: nonGuardExts
-        | None -> nonGuardExts
-
-    writeExtensions writer extElements
+    writeExtensions writer (getTransitionExtElements t)
 
     // Write transition-level links (unusual but possible)
     let transLinks = getLinkAnnotations t.Annotations

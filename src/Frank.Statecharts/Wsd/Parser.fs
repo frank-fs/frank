@@ -311,6 +311,7 @@ let private parseMessage (state: ParserState) : unit =
                   Target = Some receiverName
                   Event = if label.Length > 0 then Some label else None
                   Guard = None
+                  GuardHref = None
                   Action = None
                   Parameters = parameters
                   Position = Some senderToken.Position

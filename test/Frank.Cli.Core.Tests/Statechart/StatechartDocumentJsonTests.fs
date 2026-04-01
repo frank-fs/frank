@@ -27,6 +27,7 @@ let private simpleTransition src tgt evt : TransitionEdge =
       Target = Some tgt
       Event = Some evt
       Guard = None
+      GuardHref = None
       Action = None
       Parameters = []
       Position = None

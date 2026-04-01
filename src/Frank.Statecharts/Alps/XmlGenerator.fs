@@ -55,14 +55,7 @@ let private buildTransitionDescriptor (t: TransitionEdge) : XElement =
         el.Add(paramEl)
 
     // Extensions: guard first, then other extension annotations
-    let nonGuardExts = getExtAnnotations t.Annotations
-
-    let extElements =
-        match t.Guard with
-        | Some guard -> (Classification.GuardExtId, None, Some guard) :: nonGuardExts
-        | None -> nonGuardExts
-
-    for extEl in buildExtElements extElements do
+    for extEl in buildExtElements (getTransitionExtElements t) do
         el.Add(extEl)
 
     // Transition-level links (unusual but possible)

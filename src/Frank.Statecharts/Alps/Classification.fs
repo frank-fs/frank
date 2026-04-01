@@ -140,12 +140,18 @@ let CutPointExtId = "https://frank-fs.github.io/alps-ext/cutPoint"
 let resolveRt (rt: string option) : string option =
     rt |> Option.map (fun r -> if r.StartsWith("#") then r.Substring(1) else r)
 
-/// Extract a guard label from ext elements (first ext with id matching guard).
+/// Find the guard extension element from a parsed extension list.
 /// Accepts both the canonical HTTPS URI and the legacy bare name for backward compat.
+let private tryFindGuardExt (exts: ParsedExtension list) : ParsedExtension option =
+    exts |> List.tryFind (fun e -> e.Id = GuardExtId || e.Id = "guard")
+
+/// Extract a guard label from ext elements (first ext with id matching guard).
 let extractGuard (exts: ParsedExtension list) : string option =
-    exts
-    |> List.tryFind (fun e -> e.Id = GuardExtId || e.Id = "guard")
-    |> Option.bind (fun e -> e.Value)
+    tryFindGuardExt exts |> Option.bind (fun e -> e.Value)
+
+/// Extract the href from a guard ext element for round-trip fidelity (#166).
+let extractGuardHref (exts: ParsedExtension list) : string option =
+    tryFindGuardExt exts |> Option.bind (fun e -> e.Href)
 
 /// Extract parameter descriptor ids from a descriptor's children.
 /// Parameters are children that are href-only references (no id, no type).
@@ -171,8 +177,7 @@ let toTransitionKind (typeStr: string option) : AlpsTransitionKind =
 /// Known extension ids get typed cases; unknown fall back to AlpsExtension.
 /// Backward compat (#165): both old bare names and new HTTPS URIs are accepted.
 /// Stored ids always use the canonical HTTPS URI constants.
-/// Note: these extension types do not carry href in the ALPS extension vocabulary;
-/// href is preserved only for unknown extensions via AlpsExtension fallback.
+/// href is preserved on all typed cases to enable round-trip fidelity (#166).
 let classifyExtension (ext: ParsedExtension) : Annotation =
     let value = ext.Value |> Option.defaultValue ""
 
@@ -187,24 +192,24 @@ let classifyExtension (ext: ParsedExtension) : Annotation =
     match ext.Id with
     // Guard: new URI and old bare name
     | GuardExtId
-    | "guard" -> AlpsAnnotation(AlpsGuardExt value)
+    | "guard" -> AlpsAnnotation(AlpsGuardExt(value, ext.Href))
     // Role extensions: new URIs and old bare names, map to typed AlpsRoleKind
-    | ProjectedRoleExtId -> AlpsAnnotation(AlpsRole(ProjectedRole, value))
-    | "projectedRole" -> AlpsAnnotation(AlpsRole(ProjectedRole, value))
-    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ProtocolState, value))
-    | "protocolState" -> AlpsAnnotation(AlpsRole(ProtocolState, value))
+    | ProjectedRoleExtId -> AlpsAnnotation(AlpsRole(ProjectedRole, value, ext.Href))
+    | "projectedRole" -> AlpsAnnotation(AlpsRole(ProjectedRole, value, ext.Href))
+    | ProtocolStateExtId -> AlpsAnnotation(AlpsRole(ProtocolState, value, ext.Href))
+    | "protocolState" -> AlpsAnnotation(AlpsRole(ProtocolState, value, ext.Href))
     // AvailableInStates: new URI and old bare name
-    | AvailableInStatesExtId -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
-    | "availableInStates" -> AlpsAnnotation(AlpsAvailableInStates(parseStates value))
+    | AvailableInStatesExtId -> AlpsAnnotation(AlpsAvailableInStates(parseStates value, ext.Href))
+    | "availableInStates" -> AlpsAnnotation(AlpsAvailableInStates(parseStates value, ext.Href))
     // Duality extensions: new URIs and old bare names, map to typed AlpsDualityKind
-    | ClientObligationExtId -> AlpsAnnotation(AlpsDuality(ClientObligation, value))
-    | "clientObligation" -> AlpsAnnotation(AlpsDuality(ClientObligation, value))
-    | AdvancesProtocolExtId -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value))
-    | "advancesProtocol" -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value))
-    | DualOfExtId -> AlpsAnnotation(AlpsDuality(DualOf, value))
-    | "dualOf" -> AlpsAnnotation(AlpsDuality(DualOf, value))
-    | CutPointExtId -> AlpsAnnotation(AlpsDuality(CutPoint, value))
-    | "cutPoint" -> AlpsAnnotation(AlpsDuality(CutPoint, value))
+    | ClientObligationExtId -> AlpsAnnotation(AlpsDuality(ClientObligation, value, ext.Href))
+    | "clientObligation" -> AlpsAnnotation(AlpsDuality(ClientObligation, value, ext.Href))
+    | AdvancesProtocolExtId -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value, ext.Href))
+    | "advancesProtocol" -> AlpsAnnotation(AlpsDuality(AdvancesProtocol, value, ext.Href))
+    | DualOfExtId -> AlpsAnnotation(AlpsDuality(DualOf, value, ext.Href))
+    | "dualOf" -> AlpsAnnotation(AlpsDuality(DualOf, value, ext.Href))
+    | CutPointExtId -> AlpsAnnotation(AlpsDuality(CutPoint, value, ext.Href))
+    | "cutPoint" -> AlpsAnnotation(AlpsDuality(CutPoint, value, ext.Href))
     | _ -> AlpsAnnotation(AlpsExtension(ext.Id, ext.Href, ext.Value))
 
 // ---------------------------------------------------------------------------
@@ -286,6 +291,7 @@ let extractTransitions
                   Target = resolveRt r.ReturnType
                   Event = r.Id
                   Guard = extractGuard r.Extensions
+                  GuardHref = extractGuardHref r.Extensions
                   Action = None
                   Parameters = extractParameters r.Children
                   Position = None
