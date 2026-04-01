@@ -79,6 +79,7 @@ These principles govern all code changes.
 - **Parallel worktree agents cause OOM on 16GB machines**: Limit to 3 concurrent agents spawning `dotnet build`. Each build + NuGet restore can consume 2-4GB. Stagger builds or use `--no-restore` after the first successful build.
 - **MSBuild .props vs .targets evaluation timing**: Properties in `.props` that reference SDK-computed values (`IntermediateOutputPath`, `TargetFramework`) resolve to empty because `.props` is imported before the SDK sets them. Even static `PropertyGroup` in `.targets` can be too early when consuming projects import targets inline. Use a `Target` with inner `PropertyGroup` for true late-binding of SDK-dependent defaults.
 - **DLL resource verification via `dotnet fsi`**: Quick embedded resource check without external tools: `dotnet fsi -e "let a = System.Reflection.Assembly.LoadFrom(\"path.dll\") in a.GetManifestResourceNames() |> Array.iter (printfn \"%s\")"`
+- **FS3511 in Release builds**: `task { }` with complex match expressions inside fails static state machine compilation. CI builds Release; local builds Debug — so this surfaces only in CI. Fix by extracting pure logic into private static members, keeping only async operations (`let!`, `do!`) in the task body.
 
 ## Workflow Rules
 
@@ -94,11 +95,14 @@ These principles govern all code changes.
 - **Section-by-section audit before closing.** When an issue has multiple sections (e.g., "Operational MPST" + "Wadler/dual"), verify every requirement in every section before closing. Don't close an issue because one section is done.
 - **PRs must enumerate all issue requirements with status.** For each requirement in the linked issue, the PR body must state: implemented, blocked by #X, or deferred with rationale. "Closes #X" without per-requirement accounting is insufficient.
 - **Never close issues with unfulfilled-dependency requirements.** If an issue has requirements that depend on open issues (#124, #125, etc.), leave the issue open. Either split it (done-now vs blocked) or add a comment listing what's blocked. The user decides when to close.
+- **Never create issues, PRs, or take external actions while discussing.** Wait for explicit go-ahead ("yes", "create it", "go ahead"). Presenting a draft is not permission to act on it.
 
 ### Planning and communication
 - **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
 - **Report autonomous decisions.** Maintain a running decisions table (Decision, Rationale, Impact) when making choices without explicit user confirmation.
 - **Use reviewer-informed questions.** Draw on the expert panel perspectives when asking clarifying questions. "What do my experts recommend?" = consult the reviewer panel.
+- **Thesis-first acceptance criteria.** Issue requirements must be falsifiable HTTP request/response pairs that test the thesis, not file:line implementation instructions. Use the template: Thesis → Problem → Definition → Solution → Acceptance Tests → Sources. Include negative tests where possible (remove the crutch, prove the real mechanism works). A test is falsifiable if a wrong implementation can produce a failing result — if the correct output can be produced without the correct mechanism, the test is not falsifiable enough.
+- **Never triage expert findings without consent.** When presenting expert review results, all findings are potentially blocking until the user says otherwise. Do not sort into "fix now" vs "follow-up" or "framework bug" vs "sample issue" — present them and let the user decide.
 
 ### Implementation
 - **Never blame pre-existing issues.** Surface, investigate, and file issues. Never dismiss problems as "not my change."
