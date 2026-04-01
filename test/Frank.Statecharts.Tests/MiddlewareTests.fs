@@ -101,7 +101,7 @@ let nonAdminUser () =
     ClaimsPrincipal(ClaimsIdentity([| Claim("owner", "false") |], "test"))
 
 let addStore (services: IServiceCollection) =
-    services.AddStateMachineStore<TestState, int>() |> ignore
+    services.AddStatechartsStore<TestState, int>() |> ignore
 
 /// Run a test with a TestServer and HttpClient, ensuring proper disposal.
 let withServer resource configServices configUser (f: HttpClient -> Task) =

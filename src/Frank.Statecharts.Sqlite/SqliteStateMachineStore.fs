@@ -12,20 +12,20 @@ open Frank.Statecharts
 /// Messages processed by the internal MailboxProcessor actor.
 /// Identical pattern to MailboxProcessorStore but with SQLite persistence.
 type private StoreMessage<'State, 'Context when 'State: equality> =
-    | GetState of instanceId: string * replyChannel: AsyncReplyChannel<('State * 'Context) option>
-    | SetState of instanceId: string * state: 'State * context: 'Context * replyChannel: AsyncReplyChannel<unit>
+    | Load of instanceId: string * replyChannel: AsyncReplyChannel<InstanceSnapshot<'State, 'Context> option>
+    | Save of instanceId: string * snapshot: InstanceSnapshot<'State, 'Context> * replyChannel: AsyncReplyChannel<unit>
     | Subscribe of
         instanceId: string *
-        observer: IObserver<'State * 'Context> *
+        observer: IObserver<InstanceSnapshot<'State, 'Context>> *
         replyChannel: AsyncReplyChannel<IDisposable>
-    | Unsubscribe of instanceId: string * observer: IObserver<'State * 'Context>
+    | Unsubscribe of instanceId: string * observer: IObserver<InstanceSnapshot<'State, 'Context>>
     | Stop of replyChannel: AsyncReplyChannel<unit>
 
 /// <summary>
-/// SQLite-backed durable implementation of <see cref="IStateMachineStore{TState, TContext}"/>.
+/// SQLite-backed durable implementation of <see cref="IStatechartsStore{TState, TContext}"/>.
 /// All operations are serialized through a <see cref="MailboxProcessor{T}"/> actor.
-/// State is persisted to SQLite on every <c>SetState</c> call and lazily rehydrated
-/// from SQLite on <c>GetState</c> cache misses.
+/// State is persisted to SQLite on every <c>Save</c> call and lazily rehydrated
+/// from SQLite on <c>Load</c> cache misses.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -43,7 +43,7 @@ type private StoreMessage<'State, 'Context when 'State: equality> =
 /// There is no cache eviction. LRU eviction may be added in a future version.
 /// </para>
 /// </remarks>
-type SqliteStateMachineStore<'State, 'Context when 'State: equality>
+type SqliteStatechartsStore<'State, 'Context when 'State: equality>
     (connectionString: string, logger: ILogger, ?jsonOptions: JsonSerializerOptions) =
 
     let options = defaultArg jsonOptions JsonSerializerOptions.Default
@@ -67,18 +67,20 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
         cmd.CommandText <- "PRAGMA busy_timeout=5000;"
         cmd.ExecuteNonQuery() |> ignore
 
-    // Auto-create schema (FR-008).
+    // Auto-create schema with hierarchy_config and history_record columns.
     do
         use cmd = connection.CreateCommand()
 
         cmd.CommandText <-
             """
             CREATE TABLE IF NOT EXISTS state_machine_instances (
-                instance_id  TEXT NOT NULL,
-                state_type   TEXT NOT NULL,
-                state_json   TEXT NOT NULL,
-                context_json TEXT NOT NULL,
-                updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                instance_id      TEXT NOT NULL,
+                state_type       TEXT NOT NULL,
+                state_json       TEXT NOT NULL,
+                context_json     TEXT NOT NULL,
+                hierarchy_config TEXT NOT NULL DEFAULT '{}',
+                history_record   TEXT NOT NULL DEFAULT '{}',
+                updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
                 PRIMARY KEY (instance_id, state_type)
             );"""
 
@@ -86,7 +88,39 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 
     let mutable disposed = false
 
-    /// Load state from SQLite for the given instance ID.
+    /// Serialize ActiveStateConfiguration as a JSON array of state ID strings.
+    let serializeHierarchyConfig (config: ActiveStateConfiguration) : string =
+        let states = ActiveStateConfiguration.toSet config |> Set.toList
+        JsonSerializer.Serialize(states, options)
+
+    /// Deserialize ActiveStateConfiguration from JSON array of state ID strings.
+    let deserializeHierarchyConfig (json: string) : ActiveStateConfiguration =
+        try
+            let states = JsonSerializer.Deserialize<string list>(json, options)
+            states |> Set.ofList |> ActiveStateConfiguration.ofSet
+        with _ ->
+            ActiveStateConfiguration.empty
+
+    /// Serialize HistoryRecord as a JSON map of composite state ID -> set of state ID strings.
+    let serializeHistoryRecord (history: HistoryRecord) : string =
+        let entries =
+            HistoryRecord.toMap history
+            |> Map.map (fun _ config -> ActiveStateConfiguration.toSet config |> Set.toList)
+
+        JsonSerializer.Serialize(entries, options)
+
+    /// Deserialize HistoryRecord from JSON map of composite state ID -> list of state ID strings.
+    let deserializeHistoryRecord (json: string) : HistoryRecord =
+        try
+            let raw = JsonSerializer.Deserialize<Map<string, string list>>(json, options)
+
+            raw
+            |> Map.map (fun _ states -> states |> Set.ofList |> ActiveStateConfiguration.ofSet)
+            |> HistoryRecord.ofMap
+        with _ ->
+            HistoryRecord.empty
+
+    /// Load snapshot from SQLite for the given instance ID.
     /// Returns None if not found. Logs and returns None on deserialization failure.
     let loadFromSqlite (id: string) =
         try
@@ -94,7 +128,7 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 
             cmd.CommandText <-
                 """
-                SELECT state_json, context_json
+                SELECT state_json, context_json, hierarchy_config, history_record
                 FROM state_machine_instances
                 WHERE instance_id = @id AND state_type = @type;"""
 
@@ -105,9 +139,18 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
             if reader.Read() then
                 let stateJson = reader.GetString(0)
                 let ctxJson = reader.GetString(1)
+                let hierarchyJson = reader.GetString(2)
+                let historyJson = reader.GetString(3)
                 let state = JsonSerializer.Deserialize<'State>(stateJson, options)
                 let ctx = JsonSerializer.Deserialize<'Context>(ctxJson, options)
-                Some(state, ctx)
+                let hierarchyConfig = deserializeHierarchyConfig hierarchyJson
+                let historyRecord = deserializeHistoryRecord historyJson
+
+                Some
+                    { State = state
+                      Context = ctx
+                      HierarchyConfig = hierarchyConfig
+                      HistoryRecord = historyRecord }
             else
                 None
         with ex ->
@@ -116,30 +159,30 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 
     let agent =
         MailboxProcessor<StoreMessage<'State, 'Context>>.Start(fun inbox ->
-            let mutable instances = Map.empty<string, 'State * 'Context>
-            let mutable subscribers = Map.empty<string, IObserver<'State * 'Context> list>
+            let mutable instances = Map.empty<string, InstanceSnapshot<'State, 'Context>>
+            let mutable subscribers = Map.empty<string, IObserver<InstanceSnapshot<'State, 'Context>> list>
 
             let rec loop () =
                 async {
                     let! msg = inbox.Receive()
 
                     match msg with
-                    | GetState(id, reply) ->
+                    | Load(id, reply) ->
                         match Map.tryFind id instances with
-                        | Some state -> reply.Reply(Some state)
+                        | Some snapshot -> reply.Reply(Some snapshot)
                         | None ->
-                            // Lazy rehydration from SQLite (T025)
+                            // Lazy rehydration from SQLite
                             match loadFromSqlite id with
-                            | Some(state, ctx) ->
-                                instances <- Map.add id (state, ctx) instances
-                                reply.Reply(Some(state, ctx))
+                            | Some snapshot ->
+                                instances <- Map.add id snapshot instances
+                                reply.Reply(Some snapshot)
                             | None -> reply.Reply(None)
 
                         return! loop ()
 
-                    | SetState(id, state, ctx, reply) ->
+                    | Save(id, snapshot, reply) ->
                         // Update in-memory cache
-                        instances <- Map.add id (state, ctx) instances
+                        instances <- Map.add id snapshot instances
 
                         // Persist to SQLite
                         let persistError =
@@ -148,18 +191,22 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 
                                 cmd.CommandText <-
                                     """
-                                    INSERT INTO state_machine_instances (instance_id, state_type, state_json, context_json, updated_at)
-                                    VALUES (@id, @type, @stateJson, @ctxJson, datetime('now'))
+                                    INSERT INTO state_machine_instances (instance_id, state_type, state_json, context_json, hierarchy_config, history_record, updated_at)
+                                    VALUES (@id, @type, @stateJson, @ctxJson, @hierarchyConfig, @historyRecord, datetime('now'))
                                     ON CONFLICT (instance_id, state_type)
                                     DO UPDATE SET
                                         state_json = excluded.state_json,
                                         context_json = excluded.context_json,
+                                        hierarchy_config = excluded.hierarchy_config,
+                                        history_record = excluded.history_record,
                                         updated_at = excluded.updated_at;"""
 
                                 cmd.Parameters.AddWithValue("@id", id) |> ignore
                                 cmd.Parameters.AddWithValue("@type", stateTypeName) |> ignore
-                                cmd.Parameters.AddWithValue("@stateJson", JsonSerializer.Serialize(state, options)) |> ignore
-                                cmd.Parameters.AddWithValue("@ctxJson", JsonSerializer.Serialize(ctx, options)) |> ignore
+                                cmd.Parameters.AddWithValue("@stateJson", JsonSerializer.Serialize(snapshot.State, options)) |> ignore
+                                cmd.Parameters.AddWithValue("@ctxJson", JsonSerializer.Serialize(snapshot.Context, options)) |> ignore
+                                cmd.Parameters.AddWithValue("@hierarchyConfig", serializeHierarchyConfig snapshot.HierarchyConfig) |> ignore
+                                cmd.Parameters.AddWithValue("@historyRecord", serializeHistoryRecord snapshot.HistoryRecord) |> ignore
                                 cmd.ExecuteNonQuery() |> ignore
                                 None
                             with ex ->
@@ -175,7 +222,7 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
                         | Some observers ->
                             for obs in observers do
                                 try
-                                    obs.OnNext(state, ctx)
+                                    obs.OnNext(snapshot)
                                 with ex ->
                                     logger.LogWarning(
                                         ex,
@@ -191,11 +238,11 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
                         let current = Map.tryFind id subscribers |> Option.defaultValue []
                         subscribers <- Map.add id (observer :: current) subscribers
 
-                        // BehaviorSubject: emit current state immediately
+                        // BehaviorSubject: emit current snapshot immediately
                         match Map.tryFind id instances with
-                        | Some state ->
+                        | Some snapshot ->
                             try
-                                observer.OnNext(state)
+                                observer.OnNext(snapshot)
                             with ex ->
                                 logger.LogWarning(
                                     ex,
@@ -205,11 +252,11 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
                         | None ->
                             // If not in cache, try loading from SQLite for initial emit
                             match loadFromSqlite id with
-                            | Some(state, ctx) ->
-                                instances <- Map.add id (state, ctx) instances
+                            | Some snapshot ->
+                                instances <- Map.add id snapshot instances
 
                                 try
-                                    observer.OnNext((state, ctx))
+                                    observer.OnNext(snapshot)
                                 with ex ->
                                     logger.LogWarning(
                                         ex,
@@ -257,19 +304,19 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
 
     let ensureNotDisposed () =
         if disposed then
-            raise (ObjectDisposedException(nameof SqliteStateMachineStore))
+            raise (ObjectDisposedException(nameof SqliteStatechartsStore))
 
-    interface IStateMachineStore<'State, 'Context> with
-        member _.GetState(instanceId) =
+    interface IStatechartsStore<'State, 'Context> with
+        member _.Load(instanceId) =
             ensureNotDisposed ()
 
-            agent.PostAndAsyncReply(fun reply -> GetState(instanceId, reply))
+            agent.PostAndAsyncReply(fun reply -> Load(instanceId, reply))
             |> Async.StartAsTask
 
-        member _.SetState instanceId state context =
+        member _.Save instanceId snapshot =
             ensureNotDisposed ()
 
-            agent.PostAndAsyncReply(fun reply -> SetState(instanceId, state, context, reply))
+            agent.PostAndAsyncReply(fun reply -> Save(instanceId, snapshot, reply))
             |> Async.StartAsTask
 
         member _.Subscribe instanceId observer =
@@ -286,26 +333,26 @@ type SqliteStateMachineStore<'State, 'Context when 'State: equality>
                 connection.Close()
                 connection.Dispose()
 
-/// Extension methods for registering SqliteStateMachineStore with dependency injection.
+/// Extension methods for registering SqliteStatechartsStore with dependency injection.
 [<AutoOpen>]
 module SqliteStoreServiceCollectionExtensions =
 
     type IServiceCollection with
 
         /// <summary>
-        /// Registers a <see cref="SqliteStateMachineStore{TState, TContext}"/> as the
-        /// <see cref="IStateMachineStore{TState, TContext}"/> singleton.
+        /// Registers a <see cref="SqliteStatechartsStore{TState, TContext}"/> as the
+        /// <see cref="IStatechartsStore{TState, TContext}"/> singleton.
         /// </summary>
         /// <param name="connectionString">SQLite connection string (e.g., "Data Source=state.db").</param>
         /// <param name="jsonOptions">Optional JSON serializer options for state/context serialization.</param>
-        member services.AddSqliteStateMachineStore<'State, 'Context when 'State: equality and 'State: comparison>
+        member services.AddSqliteStatechartsStore<'State, 'Context when 'State: equality and 'State: comparison>
             (connectionString: string, ?jsonOptions: JsonSerializerOptions)
             =
-            services.AddSingleton<IStateMachineStore<'State, 'Context>>(fun sp ->
+            services.AddSingleton<IStatechartsStore<'State, 'Context>>(fun sp ->
                 let logger =
-                    sp.GetRequiredService<ILogger<SqliteStateMachineStore<'State, 'Context>>>()
+                    sp.GetRequiredService<ILogger<SqliteStatechartsStore<'State, 'Context>>>()
 
                 let opts = defaultArg jsonOptions JsonSerializerOptions.Default
 
-                new SqliteStateMachineStore<'State, 'Context>(connectionString, logger, opts)
-                :> IStateMachineStore<'State, 'Context>)
+                new SqliteStatechartsStore<'State, 'Context>(connectionString, logger, opts)
+                :> IStatechartsStore<'State, 'Context>)

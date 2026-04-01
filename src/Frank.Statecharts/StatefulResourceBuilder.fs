@@ -280,15 +280,15 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         // Closure: resolve state from store, set typed values on IStatechartFeature
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
-            let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
+            let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
 
             task {
-                let! result = store.GetState instanceId
+                let! result = store.Load instanceId
 
                 match result with
-                | Some(state, context) ->
-                    ctx.SetStatechartState(stateKey state, state, context, instanceId)
-                    return stateKey state
+                | Some snapshot ->
+                    ctx.SetStatechartState(stateKey snapshot.State, snapshot.State, snapshot.Context, instanceId)
+                    return stateKey snapshot.State
                 | None ->
                     ctx.SetStatechartState(initialStateKey, machine.Initial, machine.InitialContext, instanceId)
                     return initialStateKey
@@ -368,8 +368,15 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                     match result with
                     | TransitionResult.Transitioned(newState, newContext) ->
-                        let store = sp.GetRequiredService<IStateMachineStore<'S, 'C>>()
-                        do! store.SetState instanceId newState newContext
+                        let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
+
+                        do!
+                            store.Save instanceId {
+                                State = newState
+                                Context = newContext
+                                HierarchyConfig = ActiveStateConfiguration.empty
+                                HistoryRecord = HistoryRecord.empty
+                            }
 
                         let evt: TransitionEvent<'S, 'E, 'C> =
                             { PreviousState = state

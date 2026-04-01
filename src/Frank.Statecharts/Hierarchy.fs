@@ -101,6 +101,8 @@ module ActiveStateConfiguration =
 
     let toSet (config: ActiveStateConfiguration) : Set<string> = config.ActiveStates
 
+    let ofSet (states: Set<string>) : ActiveStateConfiguration = { ActiveStates = states }
+
 // ==========================================================================
 // HistoryRecord module
 // ==========================================================================
@@ -115,6 +117,10 @@ module HistoryRecord =
 
     let tryGet (compositeStateId: string) (history: HistoryRecord) : ActiveStateConfiguration option =
         Map.tryFind compositeStateId history.Entries
+
+    let toMap (history: HistoryRecord) : Map<string, ActiveStateConfiguration> = history.Entries
+
+    let ofMap (entries: Map<string, ActiveStateConfiguration>) : HistoryRecord = { Entries = entries }
 
 // ==========================================================================
 // StateHierarchy module

@@ -10,7 +10,7 @@ open Frank
 
 /// Computes ETags for statechart-managed resources by hashing (state, context) pairs.
 type StatechartETagProvider<'State, 'Context when 'State: equality>
-    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
+    (store: IStatechartsStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
 
     let computeETagFromState (state: 'State) (context: 'Context) : string =
         let stateBytes = Encoding.UTF8.GetBytes(string state)
@@ -25,18 +25,18 @@ type StatechartETagProvider<'State, 'Context when 'State: equality>
     interface IETagProvider with
         member _.ComputeETag(instanceId: string) : Task<string option> =
             task {
-                let! result = store.GetState(instanceId)
+                let! result = store.Load(instanceId)
 
                 match result with
-                | Some(state, context) ->
-                    let etag = computeETagFromState state context
+                | Some snapshot ->
+                    let etag = computeETagFromState snapshot.State snapshot.Context
                     return Some etag
                 | None -> return None
             }
 
 /// Factory that creates StatechartETagProvider instances for endpoints with StateMachineMetadata.
 type StatechartETagProviderFactory<'State, 'Context when 'State: equality>
-    (store: IStateMachineStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
+    (store: IStatechartsStore<'State, 'Context>, contextSerializer: 'Context -> byte[]) =
 
     let provider =
         StatechartETagProvider<'State, 'Context>(store, contextSerializer) :> IETagProvider
@@ -58,7 +58,7 @@ module StatechartETagProviderExtensions =
             (contextSerializer: 'Context -> byte[])
             : IServiceCollection =
             services.AddSingleton<IETagProviderFactory>(fun sp ->
-                let store = sp.GetRequiredService<IStateMachineStore<'State, 'Context>>()
+                let store = sp.GetRequiredService<IStatechartsStore<'State, 'Context>>()
 
                 StatechartETagProviderFactory<'State, 'Context>(store, contextSerializer)
                 :> IETagProviderFactory)

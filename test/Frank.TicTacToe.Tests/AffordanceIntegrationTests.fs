@@ -108,15 +108,15 @@ let testAffordanceMap: AffordanceMap =
 let getGameState (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<TicTacToeState, int>>)
-            :?> IStateMachineStore<TicTacToeState, int>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<TicTacToeState, int>>)
+            :?> IStatechartsStore<TicTacToeState, int>
 
         let instanceId = ctx.Request.RouteValues["gameId"] :?> string
-        let! stateResult = store.GetState(instanceId)
+        let! stateResult = store.Load(instanceId)
 
         let state, moveCount =
             match stateResult with
-            | Some(s, c) -> (s, c)
+            | Some snapshot -> (snapshot.State, snapshot.Context)
             | None -> (gameMachine.Initial, gameMachine.InitialContext)
 
         let key = stateKeyOf state
@@ -127,15 +127,15 @@ let getGameState (ctx: HttpContext) : Task =
 let handleMove (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<TicTacToeState, int>>)
-            :?> IStateMachineStore<TicTacToeState, int>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<TicTacToeState, int>>)
+            :?> IStatechartsStore<TicTacToeState, int>
 
         let instanceId = ctx.Request.RouteValues["gameId"] :?> string
-        let! stateResult = store.GetState(instanceId)
+        let! stateResult = store.Load(instanceId)
 
         let _state, _ =
             match stateResult with
-            | Some(s, c) -> (s, c)
+            | Some snapshot -> (snapshot.State, snapshot.Context)
             | None -> (gameMachine.Initial, gameMachine.InitialContext)
 
         StateMachineContext.setEvent ctx (MakeMove 0)
@@ -183,7 +183,7 @@ let buildTestServer (resource: Resource) =
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     builder.Services.AddLogging() |> ignore
-    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
     let app = builder.Build()
 
     app.UseRouting() |> ignore
@@ -207,9 +207,16 @@ let buildTestServer (resource: Resource) =
 
 let prePopulateState (server: TestServer) instanceId (state: TicTacToeState) (moveCount: int) =
     let store =
-        server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+        server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
-    (store.SetState instanceId state moveCount).GetAwaiter().GetResult()
+    (store.Save
+        instanceId
+        { State = state
+          Context = moveCount
+          HierarchyConfig = ActiveStateConfiguration.empty
+          HistoryRecord = HistoryRecord.empty })
+        .GetAwaiter()
+        .GetResult()
 
 /// Get a header value from the response (checks both response and content headers).
 let getHeaderValues (response: HttpResponseMessage) (name: string) : string list =
@@ -246,7 +253,7 @@ let buildTestServerWithProfiles (resource: Resource) (roleLookup: RoleProfileLoo
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     builder.Services.AddLogging() |> ignore
-    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
     let app = builder.Build()
 
     app.UseRouting() |> ignore
@@ -284,7 +291,7 @@ let buildTestServerWithRolesAndProfiles (resource: Resource) (roleLookup: RolePr
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     builder.Services.AddLogging() |> ignore
-    builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
     let app = builder.Build()
 
     app.UseRouting() |> ignore
@@ -631,7 +638,7 @@ let projectedProfileTests =
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
               builder.Services.AddLogging() |> ignore
-              builder.Services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+              builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
               let app = builder.Build()
 
               app.UseRouting() |> ignore

@@ -117,10 +117,10 @@ let buildStatefulServer (resource: Resource) (configServices: IServiceCollection
     app.GetTestServer()
 
 let addDocStore (services: IServiceCollection) =
-    services.AddStateMachineStore<DocState, unit>() |> ignore
+    services.AddStatechartsStore<DocState, unit>() |> ignore
 
 let addGameStore (services: IServiceCollection) =
-    services.AddStateMachineStore<GameState, unit>() |> ignore
+    services.AddStatechartsStore<GameState, unit>() |> ignore
 
 let withDocServer (resource: Resource) (f: HttpClient -> Task) =
     task {

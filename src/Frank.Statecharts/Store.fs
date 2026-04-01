@@ -6,7 +6,22 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 
 /// <summary>
-/// Abstraction for state machine instance persistence.
+/// A unified snapshot of all persisted state for a statechart instance.
+/// Bundles the flat state value, context, active hierarchy configuration, and history record
+/// into a single value that is atomically loaded and saved.
+/// </summary>
+type InstanceSnapshot<'State, 'Context> =
+    { /// The current flat state value (e.g., DU case).
+      State: 'State
+      /// The current context value associated with the state.
+      Context: 'Context
+      /// The active hierarchy configuration (set of currently active state IDs).
+      HierarchyConfig: ActiveStateConfiguration
+      /// The history record for composite states (used by history pseudo-states).
+      HistoryRecord: HistoryRecord }
+
+/// <summary>
+/// Abstraction for statechart instance persistence.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,49 +31,49 @@ open Microsoft.Extensions.Logging
 /// </para>
 /// <para>
 /// The actor is the sole accessor of the backing store. External code never reads or writes
-/// the backing store directly -- all operations go through <c>GetState</c>/<c>SetState</c>.
+/// the backing store directly -- all operations go through <c>Load</c>/<c>Save</c>.
 /// </para>
 /// <para>
 /// For durable implementations (e.g., SQLite), persistence operations occur inside the actor loop.
 /// The actor wraps the backing store, not the other way around.
 /// </para>
 /// </remarks>
-type IStateMachineStore<'State, 'Context when 'State: equality> =
+type IStatechartsStore<'State, 'Context when 'State: equality> =
     /// <summary>
-    /// Retrieve the current state and context for an instance.
+    /// Retrieve the current snapshot for an instance.
     /// </summary>
-    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
-    /// <returns>The current state and context, or <c>None</c> if the instance does not exist.</returns>
+    /// <param name="instanceId">The unique identifier of the statechart instance.</param>
+    /// <returns>The current snapshot, or <c>None</c> if the instance does not exist.</returns>
     /// <remarks>
-    /// This operation is serialized through the actor. Concurrent calls to <c>GetState</c>
+    /// This operation is serialized through the actor. Concurrent calls to <c>Load</c>
     /// are queued and processed one at a time, ensuring consistent reads.
     /// </remarks>
-    abstract GetState: instanceId: string -> Task<('State * 'Context) option>
+    abstract Load: instanceId: string -> Task<InstanceSnapshot<'State, 'Context> option>
 
     /// <summary>
-    /// Persist a state change for an instance.
+    /// Persist a snapshot for an instance.
     /// </summary>
-    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
-    /// <param name="state">The new state value.</param>
-    /// <param name="context">The new context value.</param>
+    /// <param name="instanceId">The unique identifier of the statechart instance.</param>
+    /// <param name="snapshot">The new snapshot value to persist.</param>
     /// <remarks>
-    /// This operation is serialized through the actor. Concurrent calls to <c>SetState</c>
+    /// This operation is serialized through the actor. Concurrent calls to <c>Save</c>
     /// for the same instance are queued and applied sequentially, guaranteeing no lost updates.
-    /// Subscribers are notified after each state change within the actor loop.
+    /// Subscribers are notified after each save within the actor loop.
     /// </remarks>
-    abstract SetState: instanceId: string -> state: 'State -> context: 'Context -> Task<unit>
+    abstract Save: instanceId: string -> snapshot: InstanceSnapshot<'State, 'Context> -> Task<unit>
 
     /// <summary>
-    /// Subscribe to state changes for an instance.
+    /// Subscribe to snapshot changes for an instance.
     /// </summary>
-    /// <param name="instanceId">The unique identifier of the state machine instance.</param>
-    /// <param name="observer">The observer to receive state change notifications.</param>
+    /// <param name="instanceId">The unique identifier of the statechart instance.</param>
+    /// <param name="observer">The observer to receive snapshot change notifications.</param>
     /// <returns>An <see cref="IDisposable"/> that unsubscribes when disposed.</returns>
     /// <remarks>
-    /// BehaviorSubject semantics: new subscribers immediately receive current state if it exists.
+    /// BehaviorSubject semantics: new subscribers immediately receive the current snapshot if it exists.
     /// Subscription management is serialized through the actor alongside state operations.
     /// </remarks>
-    abstract Subscribe: instanceId: string -> observer: IObserver<'State * 'Context> -> IDisposable
+    abstract Subscribe:
+        instanceId: string -> observer: IObserver<InstanceSnapshot<'State, 'Context>> -> IDisposable
 
 /// <summary>
 /// Internal message type for the <c>MailboxProcessor</c> actor loop.
@@ -69,17 +84,17 @@ type IStateMachineStore<'State, 'Context when 'State: equality> =
 /// thread-safe access to the in-memory state map and subscriber list.
 /// </remarks>
 type private StoreMessage<'State, 'Context when 'State: equality> =
-    | GetState of instanceId: string * replyChannel: AsyncReplyChannel<('State * 'Context) option>
-    | SetState of instanceId: string * state: 'State * context: 'Context * replyChannel: AsyncReplyChannel<unit>
+    | Load of instanceId: string * replyChannel: AsyncReplyChannel<InstanceSnapshot<'State, 'Context> option>
+    | Save of instanceId: string * snapshot: InstanceSnapshot<'State, 'Context> * replyChannel: AsyncReplyChannel<unit>
     | Subscribe of
         instanceId: string *
-        observer: IObserver<'State * 'Context> *
+        observer: IObserver<InstanceSnapshot<'State, 'Context>> *
         replyChannel: AsyncReplyChannel<IDisposable>
-    | Unsubscribe of instanceId: string * observer: IObserver<'State * 'Context>
+    | Unsubscribe of instanceId: string * observer: IObserver<InstanceSnapshot<'State, 'Context>>
     | Stop of replyChannel: AsyncReplyChannel<unit>
 
 /// <summary>
-/// In-memory <see cref="IStateMachineStore{TState, TContext}"/> backed by a <c>MailboxProcessor</c>.
+/// In-memory <see cref="IStatechartsStore{TState, TContext}"/> backed by a <c>MailboxProcessor</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -102,26 +117,26 @@ type MailboxProcessorStore<'State, 'Context when 'State: equality>
 
     let agent =
         MailboxProcessor<StoreMessage<'State, 'Context>>.Start(fun inbox ->
-            let mutable instances = Map.empty<string, 'State * 'Context>
-            let mutable subscribers = Map.empty<string, IObserver<'State * 'Context> list>
+            let mutable instances = Map.empty<string, InstanceSnapshot<'State, 'Context>>
+            let mutable subscribers = Map.empty<string, IObserver<InstanceSnapshot<'State, 'Context>> list>
 
             let rec loop () =
                 async {
                     let! msg = inbox.Receive()
 
                     match msg with
-                    | GetState(id, reply) ->
+                    | Load(id, reply) ->
                         reply.Reply(Map.tryFind id instances)
                         return! loop ()
 
-                    | SetState(id, state, ctx, reply) ->
-                        instances <- Map.add id (state, ctx) instances
+                    | Save(id, snapshot, reply) ->
+                        instances <- Map.add id snapshot instances
 
                         match Map.tryFind id subscribers with
                         | Some observers ->
                             for obs in observers do
                                 try
-                                    obs.OnNext(state, ctx)
+                                    obs.OnNext(snapshot)
                                 with ex ->
                                     logger.LogWarning(
                                         ex,
@@ -139,9 +154,9 @@ type MailboxProcessorStore<'State, 'Context when 'State: equality>
                         subscribers <- Map.add id (observer :: current) subscribers
 
                         match Map.tryFind id instances with
-                        | Some state ->
+                        | Some snapshot ->
                             try
-                                observer.OnNext(state)
+                                observer.OnNext(snapshot)
                             with ex ->
                                 logger.LogWarning(
                                     ex,
@@ -191,17 +206,17 @@ type MailboxProcessorStore<'State, 'Context when 'State: equality>
         if disposed then
             raise (ObjectDisposedException(nameof MailboxProcessorStore))
 
-    interface IStateMachineStore<'State, 'Context> with
-        member _.GetState(instanceId) =
+    interface IStatechartsStore<'State, 'Context> with
+        member _.Load(instanceId) =
             ensureNotDisposed ()
 
-            agent.PostAndAsyncReply(fun reply -> GetState(instanceId, reply))
+            agent.PostAndAsyncReply(fun reply -> Load(instanceId, reply))
             |> Async.StartAsTask
 
-        member _.SetState instanceId state context =
+        member _.Save instanceId snapshot =
             ensureNotDisposed ()
 
-            agent.PostAndAsyncReply(fun reply -> SetState(instanceId, state, context, reply))
+            agent.PostAndAsyncReply(fun reply -> Save(instanceId, snapshot, reply))
             |> Async.StartAsTask
 
         member _.Subscribe instanceId observer =
@@ -221,9 +236,9 @@ module StoreServiceCollectionExtensions =
 
     type IServiceCollection with
 
-        member services.AddStateMachineStore<'State, 'Context when 'State: equality and 'State: comparison>() =
-            services.AddSingleton<IStateMachineStore<'State, 'Context>>(fun sp ->
+        member services.AddStatechartsStore<'State, 'Context when 'State: equality and 'State: comparison>() =
+            services.AddSingleton<IStatechartsStore<'State, 'Context>>(fun sp ->
                 let logger =
                     sp.GetRequiredService<ILogger<MailboxProcessorStore<'State, 'Context>>>()
 
-                new MailboxProcessorStore<'State, 'Context>(logger) :> IStateMachineStore<'State, 'Context>)
+                new MailboxProcessorStore<'State, 'Context>(logger) :> IStatechartsStore<'State, 'Context>)

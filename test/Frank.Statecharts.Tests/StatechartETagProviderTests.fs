@@ -40,14 +40,14 @@ let makeCache () =
     new ETagCache(1000, logger)
 
 let makeProvider (store: MailboxProcessorStore<TestState, TestContext>) =
-    let iface = store :> IStateMachineStore<TestState, TestContext>
+    let iface = store :> IStatechartsStore<TestState, TestContext>
 
     StatechartETagProvider<TestState, TestContext>(iface, contextSerializer) :> IETagProvider
 
 let makeFactory (store: MailboxProcessorStore<TestState, TestContext>) =
     let cache = makeCache ()
 
-    let iface = store :> IStateMachineStore<TestState, TestContext>
+    let iface = store :> IStatechartsStore<TestState, TestContext>
 
     StatechartETagProviderFactory<TestState, TestContext>(iface, contextSerializer) :> IETagProviderFactory
 
@@ -61,9 +61,16 @@ let deterministicHashingTests =
               let store = makeStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<TestState, TestContext>
+              let iface = store :> IStatechartsStore<TestState, TestContext>
 
-              do! iface.SetState "inst1" Active { Counter = 1; Label = "test" } |> Async.AwaitTask
+              do!
+                  iface.Save
+                      "inst1"
+                      { State = Active
+                        Context = { Counter = 1; Label = "test" }
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeProvider store
 
@@ -79,11 +86,27 @@ let deterministicHashingTests =
               let store = makeStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<TestState, TestContext>
+              let iface = store :> IStatechartsStore<TestState, TestContext>
 
               let ctx = { Counter = 1; Label = "test" }
-              do! iface.SetState "inst1" Active ctx |> Async.AwaitTask
-              do! iface.SetState "inst2" Completed ctx |> Async.AwaitTask
+
+              do!
+                  iface.Save
+                      "inst1"
+                      { State = Active
+                        Context = ctx
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
+
+              do!
+                  iface.Save
+                      "inst2"
+                      { State = Completed
+                        Context = ctx
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeProvider store
 
@@ -99,13 +122,25 @@ let deterministicHashingTests =
               let store = makeStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<TestState, TestContext>
+              let iface = store :> IStatechartsStore<TestState, TestContext>
 
               do!
-                  iface.SetState "inst1" Active { Counter = 1; Label = "alpha" }
+                  iface.Save
+                      "inst1"
+                      { State = Active
+                        Context = { Counter = 1; Label = "alpha" }
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
                   |> Async.AwaitTask
 
-              do! iface.SetState "inst2" Active { Counter = 2; Label = "beta" } |> Async.AwaitTask
+              do!
+                  iface.Save
+                      "inst2"
+                      { State = Active
+                        Context = { Counter = 2; Label = "beta" }
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeProvider store
 
@@ -121,9 +156,16 @@ let deterministicHashingTests =
               let store = makeStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<TestState, TestContext>
+              let iface = store :> IStatechartsStore<TestState, TestContext>
 
-              do! iface.SetState "inst1" Active { Counter = 1; Label = "test" } |> Async.AwaitTask
+              do!
+                  iface.Save
+                      "inst1"
+                      { State = Active
+                        Context = { Counter = 1; Label = "test" }
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeProvider store
 
@@ -163,9 +205,16 @@ let providerBehaviorTests =
               let store = makeStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<TestState, TestContext>
+              let iface = store :> IStatechartsStore<TestState, TestContext>
 
-              do! iface.SetState "inst1" Idle { Counter = 0; Label = "" } |> Async.AwaitTask
+              do!
+                  iface.Save
+                      "inst1"
+                      { State = Idle
+                        Context = { Counter = 0; Label = "" }
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeProvider store
 
@@ -241,7 +290,7 @@ let makeParamStore () =
     new MailboxProcessorStore<ParameterizedState, ParamContext>(logger)
 
 let makeParamProvider (store: MailboxProcessorStore<ParameterizedState, ParamContext>) =
-    let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+    let iface = store :> IStatechartsStore<ParameterizedState, ParamContext>
 
     StatechartETagProvider<ParameterizedState, ParamContext>(iface, paramContextSerializer) :> IETagProvider
 
@@ -253,11 +302,27 @@ let etagParameterSensitivityTests =
               let store = makeParamStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+              let iface = store :> IStatechartsStore<ParameterizedState, ParamContext>
 
               let ctx = { MoveCount = 5 }
-              do! iface.SetState "game1" (Won "X") ctx |> Async.AwaitTask
-              do! iface.SetState "game2" (Won "O") ctx |> Async.AwaitTask
+
+              do!
+                  iface.Save
+                      "game1"
+                      { State = Won "X"
+                        Context = ctx
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
+
+              do!
+                  iface.Save
+                      "game2"
+                      { State = Won "O"
+                        Context = ctx
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeParamProvider store
 
@@ -277,10 +342,18 @@ let etagParameterSensitivityTests =
               let store = makeParamStore ()
               use _s = store :> IDisposable
 
-              let iface = store :> IStateMachineStore<ParameterizedState, ParamContext>
+              let iface = store :> IStatechartsStore<ParameterizedState, ParamContext>
 
               let ctx = { MoveCount = 5 }
-              do! iface.SetState "game1" (Won "X") ctx |> Async.AwaitTask
+
+              do!
+                  iface.Save
+                      "game1"
+                      { State = Won "X"
+                        Context = ctx
+                        HierarchyConfig = ActiveStateConfiguration.empty
+                        HistoryRecord = HistoryRecord.empty }
+                  |> Async.AwaitTask
 
               let provider = makeParamProvider store
 

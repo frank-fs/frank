@@ -62,26 +62,26 @@ let renderBoard (stateKey: string) (moveCount: int) : string =
 /// The store's BehaviorSubject semantics ensure the current state is sent immediately
 /// on subscribe, then updates are pushed on every state transition.
 ///
-/// Flow: POST -> statechart middleware -> store.SetState -> subscriber.OnNext -> Channel -> SSE push
+/// Flow: POST -> statechart middleware -> store.Save -> subscriber.OnNext -> Channel -> SSE push
 let streamGameBoard (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<TicTacToeState, int>>)
-            :?> IStateMachineStore<TicTacToeState, int>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<TicTacToeState, int>>)
+            :?> IStatechartsStore<TicTacToeState, int>
 
         let channel = Channel.CreateUnbounded<string>()
 
         // Subscribe to the store for "game1". BehaviorSubject semantics:
         // if state already exists, we get it immediately via OnNext.
-        // Every subsequent SetState (from statechart middleware after a move)
+        // Every subsequent Save (from statechart middleware after a move)
         // triggers another OnNext.
         let subscription =
             store.Subscribe
                 "game1"
-                { new IObserver<TicTacToeState * int> with
-                    member _.OnNext((state, moveCount)) =
-                        let key = stateKeyOf state
-                        let html = renderBoard key moveCount
+                { new IObserver<InstanceSnapshot<TicTacToeState, int>> with
+                    member _.OnNext(snapshot) =
+                        let key = stateKeyOf snapshot.State
+                        let html = renderBoard key snapshot.Context
                         channel.Writer.TryWrite(html) |> ignore
 
                     member _.OnError(_) = channel.Writer.Complete()

@@ -383,10 +383,12 @@ let conditionalRequestIntegrationTests =
 
               // Set initial state
               do!
-                  (s.Provider :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>).SetState
+                  (s.Provider :> Frank.Statecharts.IStatechartsStore<ItemState, ItemContext>).Save
                       "item1"
-                      Active
-                      { Name = "Widget"; UpdateCount = 0 }
+                      { State = Active
+                        Context = { Name = "Widget"; UpdateCount = 0 }
+                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
+                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
 
               let! (response: HttpResponseMessage) = s.Client.GetAsync("/items/item1")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
@@ -406,10 +408,16 @@ let conditionalRequestIntegrationTests =
           // -- StatechartETagProvider: ETag changes when state changes --
           testTask "StatechartETagProvider produces different ETag after state change" {
               use s = createStatechartTestServer ()
-              let storeI = s.Provider :> Frank.Statecharts.IStateMachineStore<ItemState, ItemContext>
+              let storeI = s.Provider :> Frank.Statecharts.IStatechartsStore<ItemState, ItemContext>
 
               // Set initial state
-              do! storeI.SetState "item2" Active { Name = "Gadget"; UpdateCount = 0 }
+              do!
+                  storeI.Save
+                      "item2"
+                      { State = Active
+                        Context = { Name = "Gadget"; UpdateCount = 0 }
+                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
+                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
 
               let! (r1: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
               let etag1 = r1.Headers.ETag.ToString()
@@ -417,7 +425,13 @@ let conditionalRequestIntegrationTests =
               // Invalidate cache and change state
               s.Cache.Invalidate("/items/item2")
 
-              do! storeI.SetState "item2" Completed { Name = "Gadget"; UpdateCount = 1 }
+              do!
+                  storeI.Save
+                      "item2"
+                      { State = Completed
+                        Context = { Name = "Gadget"; UpdateCount = 1 }
+                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
+                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
 
               let! (r2: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
               let etag2 = r2.Headers.ETag.ToString()

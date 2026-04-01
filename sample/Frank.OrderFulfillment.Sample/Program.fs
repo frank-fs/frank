@@ -81,15 +81,15 @@ let resolveStateKey (app: IApplicationBuilder) =
 let getOrderState (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<OrderState, unit>>)
+            :?> IStatechartsStore<OrderState, unit>
 
         let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        let! result = store.GetState orderId
+        let! result = store.Load orderId
 
         let state =
             match result with
-            | Some(s, _) -> s
+            | Some snapshot -> snapshot.State
             | None -> orderMachine.Initial
 
         let key = stateKeyOf state
@@ -119,11 +119,19 @@ let handleConfirmDelivery = eventHandler ConfirmDelivery
 let private directSetState (targetState: OrderState) (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<OrderState, unit>>)
+            :?> IStatechartsStore<OrderState, unit>
 
         let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId targetState ()
+
+        do!
+            store.Save
+                orderId
+                { State = targetState
+                  Context = ()
+                  HierarchyConfig = ActiveStateConfiguration.empty
+                  HistoryRecord = HistoryRecord.empty }
+
         ctx.Response.StatusCode <- 202
     }
     :> Task
@@ -349,7 +357,7 @@ let seedInitialStates (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
 
     let store =
-        app.ApplicationServices.GetRequiredService<IStateMachineStore<OrderState, unit>>()
+        app.ApplicationServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
 
     let logger =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger("OrderFulfillment.Seed")
@@ -357,7 +365,12 @@ let seedInitialStates (app: IApplicationBuilder) =
     lifetime.ApplicationStarted.Register(fun () ->
         // Seed 3 order instances for e2e test scenarios
         for orderId in [ "o1"; "o2"; "o3" ] do
-            store.SetState orderId orderMachine.Initial orderMachine.InitialContext
+            store.Save
+                orderId
+                { State = orderMachine.Initial
+                  Context = orderMachine.InitialContext
+                  HierarchyConfig = ActiveStateConfiguration.empty
+                  HistoryRecord = HistoryRecord.empty }
             |> fun t -> t.Wait()
 
         // Compute AND-state warnings and cache for /diagnostics
@@ -411,7 +424,7 @@ let main args =
         useDefaults
 
         service (fun services ->
-            services.AddStateMachineStore<OrderState, unit>() |> ignore
+            services.AddStatechartsStore<OrderState, unit>() |> ignore
             services.AddSingleton<ResolvableWarnings>() |> ignore
             services)
 
