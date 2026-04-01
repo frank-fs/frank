@@ -476,16 +476,16 @@ let circularWaitTests =
               let result = derive circularChart projections
               Expect.isEmpty result.CircularWaits "negotiation has escape paths (agree/cancel)"
 
-          testCase "alternating chart has no circular wait (C4: turn-taking is not deadlock)"
+          testCase "alternating chart has circular wait (cross-state: mutual dependency across states)"
           <| fun _ ->
-              // This chart is turn-taking: RoleB acts in WaitA, RoleA acts in WaitB.
-              // Each role has a state where it must act, so neither is permanently blocked.
-              // The fix (C4) correctly identifies this as non-circular because (role, state)
-              // pairs don't form a cycle — each waiting role has a different state where it acts.
+              // This chart has mutual cross-state dependencies:
+              // WaitA: RoleA waits, RoleB acts (→WaitB). WaitB: RoleB waits, RoleA acts (→WaitA).
+              // Cross-state edges: (RoleA,WaitA)→(RoleB,WaitB) and (RoleB,WaitB)→(RoleA,WaitA).
+              // This forms a cycle: genuine circular wait detected via cross-state analysis (#253).
               let projections = Projection.projectAll deadlockCircularChart
               let result = derive deadlockCircularChart projections
 
-              Expect.isEmpty result.CircularWaits "alternating protocol is not a circular wait" ]
+              Expect.isNonEmpty result.CircularWaits "cross-state circular wait detected" ]
 
 // ===========================================================================
 // Enhancement 6: Conditional request modeling
@@ -866,65 +866,9 @@ let circularWaitDetectionTests =
         "CircularWait: positive detection"
         [ testCase "two-role deadlock: A waits for B in S1, B waits for A in S2 — cycle detected"
           <| fun _ ->
-              // Construct a minimal 2-role deadlock chart.
-              // S1: RoleA has only MayPoll (getA), RoleB has MustSelect (actB: S1->S2).
-              //     RoleA depends on RoleB in S1.
-              // S2: RoleB has only MayPoll (getB), RoleA has MustSelect (actA: S2->S1).
-              //     RoleB depends on RoleA in S2.
-              // Circular wait: (RoleA, S1) -> (RoleB, S1) -> ... and
-              //                (RoleB, S2) -> (RoleA, S2) -> ...
-              // The dependency graph: (RoleA,S1) waits on (RoleB,S1) AND (RoleB,S2) waits on (RoleA,S2)
-              // giving edge (RoleA,S1)->(RoleB,S1) and (RoleB,S2)->(RoleA,S2).
-              // To form a cycle we need edges back. Full cycle example:
-              //   (RoleA,S1) waits on (RoleB,S1) AND (RoleB,S1) waits on (RoleA,S1)? That requires
-              //   RoleB to ALSO have only MayPoll in S1 and RoleA to have MustSelect in S1.
-              //   But if both have MustSelect there's a race not a wait. The simplest proper
-              //   cycle requires three nodes or a 2-node cycle where in the same state each
-              //   role is simultaneously waiting on the other — which can't happen (one must act).
-              //   Real circular wait needs both roles to appear as "waiting" in at least one state:
-              //   State S1: RoleA=MayPoll-only (waiting), RoleB=MayPoll-only (waiting) — but then
-              //   who has MustSelect? Nobody, so it's a protocol sink, not a circular wait.
-              //   The actual structure: across TWO states, each role plays the "waiter" role:
-              //   S1: RoleA waits (MayPoll), RoleB acts (MustSelect). Edge: (RoleA,S1)->(RoleB,S1).
-              //   S2: RoleB waits (MayPoll), RoleA acts (MustSelect). Edge: (RoleB,S2)->(RoleA,S2).
-              //   For a cycle we need (RoleB,S1) and (RoleA,S2) or (RoleA,S1) and (RoleB,S2).
-              //   Actually the cycle is: (RoleA,S1)->(RoleB,S1) and (RoleB,S1) must have an edge
-              //   back to reach (RoleA,S1). For that, in state S1 we need RoleB also as a waiter.
-              //   That requires a 3rd role. Simpler: use the same state S1 for both:
-              //   In S1: RoleA has only MayPoll transitions. RoleB has only MayPoll transitions.
-              //   But then nobody acts = protocol sink.
-              //   The minimal genuine circular wait requires 3 nodes in the dependency graph:
-              //   (RoleA, S1) -> (RoleB, S1) -> (RoleA, S2) -> (RoleA, S1)? No.
-              //   Let's use 3 roles: A waits on B in S1, B waits on C in S2, C waits on A in S3.
-              //   S1: RoleA=MayPoll, RoleB=MustSelect, RoleC=MayPoll. Edges: (A,S1)->(B,S1) and (C,S1)->(B,S1).
-              //   S2: RoleB=MayPoll, RoleC=MustSelect, RoleA=MayPoll. Edges: (A,S2)->(C,S2) and (B,S2)->(C,S2).
-              //   S3: RoleC=MayPoll, RoleA=MustSelect, RoleB=MayPoll. Edges: (B,S3)->(A,S3) and (C,S3)->(A,S3).
-              //   Is there a cycle? (A,S1)->(B,S1). (B,S2)->(C,S2). (C,S3)->(A,S3). That's 3 separate components.
-              //   For them to form a cycle we need edges across states: (B,S1) -> something reaching (A,S1).
-              //   The dependency graph only has edges within the same state (because buildRoleDependencyGraph
-              //   groups by state). So a circular wait requires two roles in the SAME state where each
-              //   waits on the other simultaneously — which is structurally impossible with only 2 roles
-              //   (one must be the actor). With 2 roles you'd need role A to be both waiter and actor.
-              //
-              // Looking at buildRoleDependencyGraph: edges are ((waiter, state), (actor, state)) with SAME state.
-              // For a cycle we need: (RoleA,S) -> (RoleB,S) AND (RoleB,S) -> (RoleA,S).
-              // That means in S: RoleA is waiting AND RoleA is also MustSelect, AND RoleB is waiting AND MustSelect.
-              // "waiting" = only MayPoll/SessionComplete with no advancing transitions.
-              // "actor" = has MustSelect.
-              // They are mutually exclusive for a single role, so a 2-role same-state cycle is impossible.
-              //
-              // Conclusion: a cycle WITHIN A SINGLE STATE is impossible. Multi-state cycles ARE possible
-              // when the adjacency map has edges from different states that chain. But since edges are
-              // (waiter, stateX) -> (actor, stateX) with same stateX, nodes from different states are
-              // distinct and the graph is bipartite per state — no cycles possible in the current model.
-              //
-              // This test verifies the ACTUAL behavior: the current buildRoleDependencyGraph cannot
-              // produce cycles because edges always go (waiter,S) -> (actor,S) within the same state,
-              // and a node can't be both waiter and actor in the same state. The test documents this
-              // fundamental constraint and verifies detectCircularWaits returns empty for any chart
-              // built with a single role per state acting as actor.
-              //
-              // We build the closest possible deadlock scenario and assert detection is consistent.
+              // Minimal 2-role deadlock: RoleA waits in S1, RoleB waits in S2.
+              // Cross-state edges (#253): (RoleA,S1)→(RoleB,S2) and (RoleB,S2)→(RoleA,S1)
+              // form a genuine cycle.
               let deadlockChart: ExtractedStatechart =
                   { RouteTemplate = "/deadlock"
                     StateNames = [ "S1"; "S2" ]
@@ -954,10 +898,6 @@ let circularWaitDetectionTests =
               let projections = Projection.projectAll deadlockChart
               let result = derive deadlockChart projections
 
-              // In S1: (RoleA,S1)->(RoleB,S1) edge exists (A waits, B acts).
-              // In S2: (RoleB,S2)->(RoleA,S2) edge exists (B waits, A acts).
-              // These edges connect different (role,state) nodes and cannot form a cycle
-              // because (RoleB,S1) != (RoleB,S2) and there's no path back.
               // Verify the dependency edges ARE generated (waiting roles are identified):
               let s1Anns = result.Annotations
               let roleAS1 = s1Anns |> Map.tryFind ("RoleA", "S1") |> Option.defaultValue []
@@ -975,9 +915,14 @@ let circularWaitDetectionTests =
                    |> List.forall (fun a -> a.Obligation = MayPoll || a.Obligation = SessionComplete))
                   "RoleB in S2 is MayPoll-only (waiting)"
 
-              // The two-state two-role deadlock produces no cycle because edges are intra-state only.
-              // This documents the fundamental constraint in the current dependency model.
-              Expect.equal result.CircularWaits [] "Two-state two-role deadlock: no intra-state cycle possible"
+              // Cross-state edges (#253): (RoleA,S1)→(RoleB,S2) and (RoleB,S2)→(RoleA,S1)
+              // form a cycle. This is a genuine circular wait: A depends on B in S1, B depends
+              // on A in S2, and neither can independently break out of the cycle.
+              Expect.isNonEmpty result.CircularWaits "Two-state two-role deadlock: cross-state cycle detected"
+
+              let allNodes = result.CircularWaits |> List.collect id |> Set.ofList
+              Expect.isTrue (Set.contains ("RoleA", "S1") allNodes) "cycle contains (RoleA, S1)"
+              Expect.isTrue (Set.contains ("RoleB", "S2") allNodes) "cycle contains (RoleB, S2)"
 
           testCase "self-referential wait in same state: both roles waiting with no actor — no cycle (protocol sink)"
           <| fun _ ->
@@ -1296,23 +1241,18 @@ let extendedInvolutionTests =
               let forward = derive chart projections
               let reversed = deriveReverse chart forward
 
-              // reversed.CircularWaits should be re-derived from reversed.Annotations,
-              // not simply carried from forward.CircularWaits (which is []).
-              // In the reversed result, actB (S1->S2) obligation: was MustSelect -> now MayPoll.
-              // actA (S2->S1) obligation: was MustSelect -> now MayPoll.
-              // getA (S1->S1) obligation: was MayPoll -> now MustSelect.
-              // getB (S2->S2) obligation: was MayPoll -> now MustSelect.
-              // After reversal: self-loops are MustSelect, advancing transitions are MayPoll.
-              // This means neither role advances the protocol (advancing transitions are now MayPoll).
-              // Both roles are "waiting" in both states = both states become protocol sinks.
-              // No dependency edges are generated (mustSelectRoles empty after flip means self-loops
-              // are MustSelect but don't advance — wait, AdvancesProtocol is still false for self-loops).
-              // So CircularWaits = [] in both forward and reversed.
-              // The test verifies the value is re-derived, not merely copied.
+              // Forward has a cross-state circular wait (#253): (RoleA,S1)→(RoleB,S2)→(RoleA,S1).
+              // reversed.CircularWaits must be re-derived from reversed annotations, not passed through.
+              // After reversal: actB/actA (advancing) become MayPoll, getA/getB (self-loops) become MustSelect.
+              // In each state: the role with MayPoll also has AdvancesProtocol=true, so it's NOT classified
+              // as a waiter (waiters need hasOnlyMayPoll AND NOT hasAdvancing). No waiters → no edges → [].
+              // This proves re-derivation: forward is non-empty, reversed is empty.
+              Expect.isNonEmpty forward.CircularWaits "forward has cross-state circular wait"
+
               Expect.equal
                   reversed.CircularWaits
                   []
-                  "Reversed chart: CircularWaits is re-derived from reversed annotations (not passed through)" ]
+                  "Reversed chart: CircularWaits is re-derived (forward non-empty, reversed empty)" ]
 
 // ===========================================================================
 // Issue #243: ChoiceGroupId — assignChoiceGroups correctness tests
@@ -1469,3 +1409,543 @@ let choiceGroupIdTests =
                   act1Ann.Value.ChoiceGroupId
                   act2Ann.Value.ChoiceGroupId
                   "Different (role, state) pairs get different ChoiceGroupIds" ]
+
+// ===========================================================================
+// Issue #253: Cross-state circular wait detection
+// The current buildRoleDependencyGraph only creates intra-state edges, making
+// cycle detection structurally impossible. These acceptance tests require
+// cross-state edges to pass.
+// ===========================================================================
+
+[<Tests>]
+let crossStateCircularWaitTests =
+    testList
+        "Issue #253: Cross-state circular wait detection"
+        [
+          // ---------------------------------------------------------------
+          // Acceptance test 1: Positive detection — genuine circular wait
+          // S1: RoleA = MayPoll (waiter), RoleB = MustSelect (actor, S1→S2)
+          // S2: RoleB = MayPoll (waiter), RoleA = MustSelect (actor, S2→S1)
+          // Cycle: (A,S1) → (B,S2) → (A,S1)
+          // ---------------------------------------------------------------
+          testCase "genuine circular wait: A waits in S1, B waits in S2 — cycle detected"
+          <| fun _ ->
+              let chart: ExtractedStatechart =
+                  { RouteTemplate = "/circular"
+                    StateNames = [ "S1"; "S2" ]
+                    InitialStateKey = "S1"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "S1",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S2",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "RoleA"; Description = None }
+                        { Name = "RoleB"; Description = None } ]
+                    Transitions =
+                      [ // S1: RoleA observes (self-loop), RoleB advances to S2
+                        mkTransition "observe" "S1" "S1" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "advance" "S1" "S2" None (RestrictedTo [ "RoleB" ])
+                        // S2: RoleB observes (self-loop), RoleA advances to S1
+                        mkTransition "observe" "S2" "S2" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "advance" "S2" "S1" None (RestrictedTo [ "RoleA" ]) ] }
+
+              let projections = Projection.projectAll chart
+              let result = derive chart projections
+
+              // Cross-state edges: (A,S1)→(B,S2) and (B,S2)→(A,S1) form a cycle.
+              // This is the first positive detection test in the codebase.
+              Expect.isNonEmpty result.CircularWaits "genuine circular wait must be detected"
+
+              // The cycle must contain both (RoleA, S1) and (RoleB, S2).
+              let allNodesInCycles =
+                  result.CircularWaits |> List.collect id |> Set.ofList
+
+              Expect.isTrue
+                  (Set.contains ("RoleA", "S1") allNodesInCycles)
+                  "cycle contains (RoleA, S1)"
+
+              Expect.isTrue
+                  (Set.contains ("RoleB", "S2") allNodesInCycles)
+                  "cycle contains (RoleB, S2)"
+
+          // ---------------------------------------------------------------
+          // Acceptance test 2: No false positives — healthy chain
+          // S1→S2→S3 (terminal). Cross-state edges form a chain, not a cycle.
+          // ---------------------------------------------------------------
+          testCase "healthy chain: S1→S2→S3 with no cycle — empty"
+          <| fun _ ->
+              let chart: ExtractedStatechart =
+                  { RouteTemplate = "/chain"
+                    StateNames = [ "S1"; "S2"; "S3" ]
+                    InitialStateKey = "S1"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "S1",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S2",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S3",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = true
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "RoleA"; Description = None }
+                        { Name = "RoleB"; Description = None } ]
+                    Transitions =
+                      [ // S1: RoleA acts (MustSelect, S1→S2), RoleB observes
+                        mkTransition "act" "S1" "S2" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "watch" "S1" "S1" None (RestrictedTo [ "RoleB" ])
+                        // S2: RoleB acts (MustSelect, S2→S3), RoleA observes
+                        mkTransition "act" "S2" "S3" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "watch" "S2" "S2" None (RestrictedTo [ "RoleA" ])
+                        // S3: terminal, both observe
+                        mkTransition "view" "S3" "S3" None Unrestricted ] }
+
+              let projections = Projection.projectAll chart
+              let result = derive chart projections
+
+              // Chain: (B,S1)→(A,S2) and (A,S2)→(B,S3). No path back to (B,S1).
+              Expect.isEmpty result.CircularWaits "chain dependencies must not produce false positive"
+
+          // ---------------------------------------------------------------
+          // Acceptance test 3: Order fulfillment — document circular wait status
+          // The order fulfillment pipeline is a linear chain (Seller→Buyer→
+          // Warehouse→Seller) across different states with no cycle.
+          // ---------------------------------------------------------------
+          testCase "order fulfillment: linear pipeline has no circular wait"
+          <| fun _ ->
+              let orderChart: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames =
+                      [ "Submitted"; "Confirmed"; "Paid"; "Picking"
+                        "Shipped"; "Completed"; "Cancelled" ]
+                    InitialStateKey = "Submitted"
+                    GuardNames = [ "SellerGuard"; "BuyerGuard"; "WarehouseGuard" ]
+                    StateMetadata =
+                      Map.ofList
+                          [ "Submitted",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Confirmed",
+                            { AllowedMethods = [ "GET"; "PUT" ]
+                              IsFinal = false
+                              Description = None }
+                            "Paid",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Picking",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Shipped",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = false
+                              Description = None }
+                            "Completed",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = true
+                              Description = None }
+                            "Cancelled",
+                            { AllowedMethods = [ "GET" ]
+                              IsFinal = true
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "Buyer"; Description = None }
+                        { Name = "Seller"; Description = None }
+                        { Name = "Warehouse"; Description = None }
+                        { Name = "Auditor"; Description = None } ]
+                    Transitions =
+                      [ mkTransition "viewOrder" "Submitted" "Submitted" None Unrestricted
+                        mkTransition "confirmOrder" "Submitted" "Confirmed" (Some "SellerGuard") (RestrictedTo [ "Seller" ])
+                        mkTransition "rejectOrder" "Submitted" "Cancelled" (Some "SellerGuard") (RestrictedTo [ "Seller" ])
+                        mkTransition "viewOrder" "Confirmed" "Confirmed" None Unrestricted
+                        mkTransition "submitPayment" "Confirmed" "Paid" (Some "BuyerGuard") (RestrictedTo [ "Buyer" ])
+                        mkTransition "cancelOrder" "Confirmed" "Cancelled" (Some "BuyerGuard") (RestrictedTo [ "Buyer" ])
+                        mkTransition "cancelBySeller" "Confirmed" "Cancelled" (Some "SellerGuard") (RestrictedTo [ "Seller" ])
+                        mkTransition "viewOrder" "Paid" "Paid" None Unrestricted
+                        mkTransition "beginPicking" "Paid" "Picking" (Some "WarehouseGuard") (RestrictedTo [ "Warehouse" ])
+                        mkTransition "viewOrder" "Picking" "Picking" None Unrestricted
+                        mkTransition "shipOrder" "Picking" "Shipped" (Some "WarehouseGuard") (RestrictedTo [ "Warehouse" ])
+                        mkTransition "viewOrder" "Shipped" "Shipped" None Unrestricted
+                        mkTransition "confirmDelivery" "Shipped" "Completed" (Some "SellerGuard") (RestrictedTo [ "Seller" ])
+                        mkTransition "viewOrder" "Completed" "Completed" None Unrestricted
+                        mkTransition "viewOrder" "Cancelled" "Cancelled" None Unrestricted ] }
+
+              let projections = Projection.projectAll orderChart
+              let result = derive orderChart projections
+
+              // The order fulfillment pipeline has no circular waits:
+              // Seller acts in Submitted → Buyer acts in Confirmed → Warehouse acts in Paid/Picking
+              // → Seller acts in Shipped → terminal. This is a DAG across (role, state) pairs.
+              Expect.isEmpty
+                  result.CircularWaits
+                  "order fulfillment is a linear pipeline with no circular dependency"
+
+          // ---------------------------------------------------------------
+          // Acceptance test 4: DeriveResult.CircularWaits reflects cross-state analysis
+          // The public API (derive, deriveWithHierarchy) must surface the
+          // cross-state circular wait analysis in the result.
+          // ---------------------------------------------------------------
+          testCase "public API surfaces cross-state circular waits in DeriveResult"
+          <| fun _ ->
+              let chart: ExtractedStatechart =
+                  { RouteTemplate = "/api-test"
+                    StateNames = [ "S1"; "S2" ]
+                    InitialStateKey = "S1"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "S1",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S2",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "RoleA"; Description = None }
+                        { Name = "RoleB"; Description = None } ]
+                    Transitions =
+                      [ mkTransition "poll" "S1" "S1" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "act" "S1" "S2" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "poll" "S2" "S2" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "act" "S2" "S1" None (RestrictedTo [ "RoleA" ]) ] }
+
+              let projections = Projection.projectAll chart
+
+              // Test via derive (simple API)
+              let simpleResult = derive chart projections
+              Expect.isNonEmpty simpleResult.CircularWaits "derive must detect cross-state circular wait"
+
+              // Test via deriveWithHierarchy (full API)
+              let hierarchyResult = deriveWithHierarchy chart projections Map.empty Map.empty None
+              Expect.isNonEmpty hierarchyResult.CircularWaits "deriveWithHierarchy must detect cross-state circular wait"
+
+              // Both must agree
+              Expect.equal
+                  simpleResult.CircularWaits
+                  hierarchyResult.CircularWaits
+                  "derive and deriveWithHierarchy produce identical CircularWaits"
+
+          // ---------------------------------------------------------------
+          // 3-role cycle: A waits in S1, B waits in S2, C waits in S3
+          // Cycle: (A,S1) → (B,S2) → (C,S3) → (A,S1)
+          // ---------------------------------------------------------------
+          testCase "three-role cycle: A→B→C→A across three states"
+          <| fun _ ->
+              let chart: ExtractedStatechart =
+                  { RouteTemplate = "/three-role"
+                    StateNames = [ "S1"; "S2"; "S3" ]
+                    InitialStateKey = "S1"
+                    GuardNames = []
+                    StateMetadata =
+                      Map.ofList
+                          [ "S1",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S2",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None }
+                            "S3",
+                            { AllowedMethods = [ "GET"; "POST" ]
+                              IsFinal = false
+                              Description = None } ]
+                    Roles =
+                      [ { Name = "RoleA"; Description = None }
+                        { Name = "RoleB"; Description = None }
+                        { Name = "RoleC"; Description = None } ]
+                    Transitions =
+                      [ // S1: A observes, B advances to S2, C observes
+                        mkTransition "poll" "S1" "S1" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "poll" "S1" "S1" None (RestrictedTo [ "RoleC" ])
+                        mkTransition "advance" "S1" "S2" None (RestrictedTo [ "RoleB" ])
+                        // S2: B observes, C advances to S3, A observes
+                        mkTransition "poll" "S2" "S2" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "poll" "S2" "S2" None (RestrictedTo [ "RoleA" ])
+                        mkTransition "advance" "S2" "S3" None (RestrictedTo [ "RoleC" ])
+                        // S3: C observes, A advances to S1, B observes
+                        mkTransition "poll" "S3" "S3" None (RestrictedTo [ "RoleC" ])
+                        mkTransition "poll" "S3" "S3" None (RestrictedTo [ "RoleB" ])
+                        mkTransition "advance" "S3" "S1" None (RestrictedTo [ "RoleA" ]) ] }
+
+              let projections = Projection.projectAll chart
+              let result = derive chart projections
+
+              // Cross-state edges: (A,S1)→(B,S2), (B,S2)→(C,S3), (C,S3)→(A,S1) form a 3-node cycle.
+              Expect.isNonEmpty result.CircularWaits "three-role circular dependency must be detected"
+
+              let allNodes = result.CircularWaits |> List.collect id |> Set.ofList
+              Expect.isTrue (Set.contains ("RoleA", "S1") allNodes) "cycle contains (RoleA, S1)"
+              Expect.isTrue (Set.contains ("RoleB", "S2") allNodes) "cycle contains (RoleB, S2)"
+              Expect.isTrue (Set.contains ("RoleC", "S3") allNodes) "cycle contains (RoleC, S3)" ]
+
+// ===========================================================================
+// Issue #253: FsCheck property tests for circular wait algebraic claims
+// ===========================================================================
+
+[<Tests>]
+let circularWaitPropertyTests =
+    // Generator for multi-role statecharts with RestrictedTo constraints.
+    // Each non-final state has one actor role (advancing transition) and all other
+    // roles observe (self-loop). This ensures well-formed waiter/actor classification.
+    let genMultiRoleChart =
+        gen {
+            let! numStates = Gen.choose (2, 5)
+            let stateNames = [ for i in 1..numStates -> $"S{i}" ]
+            let! numRoles = Gen.choose (2, 4)
+            let roleNames = [ for i in 1..numRoles -> $"R{i}" ]
+
+            let! numFinal = Gen.choose (0, max 0 (numStates / 3))
+            let finalStates = stateNames |> List.rev |> List.take numFinal |> Set.ofList
+
+            let stateMetadata =
+                stateNames
+                |> List.map (fun s ->
+                    s,
+                    { AllowedMethods = [ "GET"; "POST" ]
+                      IsFinal = Set.contains s finalStates
+                      Description = None })
+                |> Map.ofList
+
+            let nonFinalStates =
+                stateNames |> List.filter (fun s -> not (Set.contains s finalStates))
+
+            // For each non-final state, pick one role as the actor with an advancing transition
+            let! actorRoles = Gen.listOfLength nonFinalStates.Length (Gen.elements roleNames)
+            let! targets = Gen.listOfLength nonFinalStates.Length (Gen.elements stateNames)
+
+            let advancingTransitions =
+                List.zip3 nonFinalStates actorRoles targets
+                |> List.map (fun (src, actor, tgt) ->
+                    mkTransition "advance" src tgt None (RestrictedTo [ actor ]))
+
+            // All roles get self-loop observation in every state
+            let selfLoops =
+                stateNames
+                |> List.collect (fun s ->
+                    roleNames |> List.map (fun r -> mkTransition "poll" s s None (RestrictedTo [ r ])))
+
+            return
+                { RouteTemplate = "/prop"
+                  StateNames = stateNames
+                  InitialStateKey = List.head stateNames
+                  GuardNames = []
+                  StateMetadata = stateMetadata
+                  Roles = roleNames |> List.map (fun r -> { Name = r; Description = None })
+                  Transitions = advancingTransitions @ selfLoops }
+        }
+
+    // Generator for DAG charts: states ordered S1→S2→...→Sn with no backward edges.
+    let genDagChart =
+        gen {
+            let! numStates = Gen.choose (2, 5)
+            let stateNames = [ for i in 1..numStates -> $"S{i}" ]
+            let! numRoles = Gen.choose (2, 3)
+            let roleNames = [ for i in 1..numRoles -> $"R{i}" ]
+
+            let stateMetadata =
+                stateNames
+                |> List.map (fun s ->
+                    s,
+                    { AllowedMethods = [ "GET"; "POST" ]
+                      IsFinal = (s = List.last stateNames)
+                      Description = None })
+                |> Map.ofList
+
+            let nonFinalStates = stateNames |> List.take (numStates - 1)
+
+            // Each non-final state transitions FORWARD only (to a later state)
+            let! dagActorRoles = Gen.listOfLength nonFinalStates.Length (Gen.elements roleNames)
+
+            // For forward-only edges: each state picks from its later states using an index offset
+            let! dagTargetOffsets = Gen.listOfLength nonFinalStates.Length (Gen.choose (1, numStates))
+
+            let advancingTransitions =
+                nonFinalStates
+                |> List.mapi (fun i src ->
+                    let srcIdx = stateNames |> List.findIndex (fun s -> s = src)
+                    let laterStates = stateNames |> List.skip (srcIdx + 1)
+                    let tgt = laterStates[dagTargetOffsets[i] % laterStates.Length]
+                    mkTransition "advance" src tgt None (RestrictedTo [ dagActorRoles[i] ]))
+
+            let selfLoops =
+                stateNames
+                |> List.collect (fun s ->
+                    roleNames |> List.map (fun r -> mkTransition "poll" s s None (RestrictedTo [ r ])))
+
+            return
+                { RouteTemplate = "/dag"
+                  StateNames = stateNames
+                  InitialStateKey = List.head stateNames
+                  GuardNames = []
+                  StateMetadata = stateMetadata
+                  Roles = roleNames |> List.map (fun r -> { Name = r; Description = None })
+                  Transitions = advancingTransitions @ selfLoops }
+        }
+
+    testList
+        "FsCheck: circular wait algebraic properties"
+        [
+          // Property 1: Every reported cycle has a dependency edge between each
+          // consecutive pair. We reconstruct the dependency graph independently from
+          // annotations + projections and verify edge connectivity.
+          testCase "FsCheck: reported cycles have valid dependency edges"
+          <| fun _ ->
+              let prop (chart: ExtractedStatechart) =
+                  let projections = Projection.projectAll chart
+                  let result = derive chart projections
+
+                  // Reconstruct the dependency edge set from annotations + projections
+                  let byState =
+                      result.Annotations
+                      |> Map.toList
+                      |> List.groupBy (fun ((_, state), _) -> state)
+
+                  let edges =
+                      byState
+                      |> List.collect (fun (state, entries) ->
+                          let roleInfo =
+                              entries
+                              |> List.map (fun ((role, _), anns) ->
+                                  let hasMustSelect =
+                                      anns |> List.exists (fun a -> a.Obligation = MustSelect)
+
+                                  let isWaiter =
+                                      anns
+                                      |> List.forall (fun a ->
+                                          a.Obligation = MayPoll || a.Obligation = SessionComplete)
+                                      && not (anns |> List.exists (fun a -> a.AdvancesProtocol))
+
+                                  role, hasMustSelect, isWaiter)
+
+                          let actors =
+                              roleInfo |> List.filter (fun (_, ms, _) -> ms) |> List.map (fun (r, _, _) -> r)
+
+                          let waiters =
+                              roleInfo |> List.filter (fun (_, _, w) -> w) |> List.map (fun (r, _, _) -> r)
+
+                          // Intra-state edges
+                          let intra =
+                              waiters
+                              |> List.collect (fun w ->
+                                  actors |> List.map (fun a -> ((w, state), (a, state))))
+
+                          // Cross-state edges
+                          let cross =
+                              waiters
+                              |> List.collect (fun w ->
+                                  actors
+                                  |> List.collect (fun a ->
+                                      let targets =
+                                          projections
+                                          |> Map.tryFind a
+                                          |> Option.map (fun p ->
+                                              p.Transitions
+                                              |> List.filter (fun t ->
+                                                  t.Source = state && t.Source <> t.Target)
+                                              |> List.map (fun t -> t.Target)
+                                              |> List.distinct)
+                                          |> Option.defaultValue []
+
+                                      targets |> List.map (fun tgt -> ((w, state), (a, tgt)))))
+
+                          intra @ cross)
+                      |> Set.ofList
+
+                  // Verify every cycle has >= 2 nodes and every consecutive edge exists
+                  result.CircularWaits
+                  |> List.forall (fun cycle ->
+                      cycle.Length >= 2
+                      && (let pairs =
+                              cycle
+                              |> List.pairwise
+                              |> List.append [ (List.last cycle, List.head cycle) ]
+
+                          pairs |> List.forall (fun edge -> Set.contains edge edges)))
+
+              let arbChart = Arb.fromGen genMultiRoleChart
+              Prop.forAll arbChart prop |> Check.QuickThrowOnFailure
+
+          // Property 2: DAG charts (forward-only transitions) never produce circular waits.
+          testCase "FsCheck: DAG charts have no circular waits"
+          <| fun _ ->
+              let prop (chart: ExtractedStatechart) =
+                  let projections = Projection.projectAll chart
+                  let result = derive chart projections
+                  result.CircularWaits = []
+
+              let arbChart = Arb.fromGen genDagChart
+              Prop.forAll arbChart prop |> Check.QuickThrowOnFailure
+
+          // Property 3: Charts with 0 or 1 role never produce circular waits.
+          // Circular waits require at least 2 roles with mutual dependencies.
+          testCase "FsCheck: single-role charts have no circular waits"
+          <| fun _ ->
+              let genSingleRoleChart =
+                  gen {
+                      let! numStates = Gen.choose (2, 5)
+                      let stateNames = [ for i in 1..numStates -> $"S{i}" ]
+
+                      let stateMetadata =
+                          stateNames
+                          |> List.map (fun s ->
+                              s,
+                              { AllowedMethods = [ "GET"; "POST" ]
+                                IsFinal = (s = List.last stateNames)
+                                Description = None })
+                          |> Map.ofList
+
+                      let! transitions =
+                          gen {
+                              let! pairs =
+                                  Gen.listOfLength
+                                      (max 1 (numStates * 2))
+                                      (gen {
+                                          let! src = Gen.elements stateNames
+                                          let! tgt = Gen.elements stateNames
+                                          return (src, tgt)
+                                      })
+
+                              return
+                                  pairs
+                                  |> List.mapi (fun i (src, tgt) ->
+                                      mkTransition $"e{i}" src tgt None (RestrictedTo [ "Solo" ]))
+                          }
+
+                      let selfLoops =
+                          stateNames |> List.map (fun s -> mkTransition "poll" s s None (RestrictedTo [ "Solo" ]))
+
+                      return
+                          { RouteTemplate = "/solo"
+                            StateNames = stateNames
+                            InitialStateKey = List.head stateNames
+                            GuardNames = []
+                            StateMetadata = stateMetadata
+                            Roles = [ { Name = "Solo"; Description = None } ]
+                            Transitions = transitions @ selfLoops }
+                  }
+
+              let prop (chart: ExtractedStatechart) =
+                  let projections = Projection.projectAll chart
+                  let result = derive chart projections
+                  result.CircularWaits = []
+
+              let arbChart = Arb.fromGen genSingleRoleChart
+              Prop.forAll arbChart prop |> Check.QuickThrowOnFailure ]
