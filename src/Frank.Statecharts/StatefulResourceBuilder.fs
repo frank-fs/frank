@@ -304,7 +304,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     match hierarchy with
                     | Some h ->
                         let config =
-                            if snapshot.HierarchyConfig |> ActiveStateConfiguration.toSet |> Set.isEmpty then
+                            if ActiveStateConfiguration.isEmpty snapshot.HierarchyConfig then
                                 // First access after upgrade or initial store: bootstrap from leaf state
                                 HierarchicalRuntime.enterState h sk ActiveStateConfiguration.empty
                             else
@@ -408,36 +408,29 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         let sourceKey = stateKey state
                         let targetKey = stateKey newState
 
-                        let exitedStates, enteredStates, newConfig, newHistory =
+                        let hResult =
                             match hierarchy with
                             | Some h ->
-                                let hierFeature = ctx.GetHierarchyFeature()
-
-                                let currentConfig =
-                                    match hierFeature with
-                                    | Some f -> f.ActiveConfiguration
+                                let currentConfig, currentHistory =
+                                    match ctx.GetHierarchyFeature() with
+                                    | Some f -> f.ActiveConfiguration, f.History
                                     | None ->
-                                        ActiveStateConfiguration.empty
-                                        |> ActiveStateConfiguration.add sourceKey
+                                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sourceKey),
+                                        HistoryRecord.empty
 
-                                let currentHistory =
-                                    match hierFeature with
-                                    | Some f -> f.History
-                                    | None -> HistoryRecord.empty
-
-                                let hResult =
-                                    HierarchicalRuntime.transition h currentConfig sourceKey targetKey currentHistory
-
-                                (hResult.ExitedStates, hResult.EnteredStates, hResult.Configuration, hResult.HistoryRecord)
+                                HierarchicalRuntime.transition h currentConfig sourceKey targetKey currentHistory
                             | None ->
-                                ([], [], ActiveStateConfiguration.empty, HistoryRecord.empty)
+                                { Configuration = ActiveStateConfiguration.empty
+                                  ExitedStates = []
+                                  EnteredStates = []
+                                  HistoryRecord = HistoryRecord.empty }
 
                         do!
                             store.Save instanceId {
                                 State = newState
                                 Context = newContext
-                                HierarchyConfig = newConfig
-                                HistoryRecord = newHistory
+                                HierarchyConfig = hResult.Configuration
+                                HistoryRecord = hResult.HistoryRecord
                             }
 
                         let evt: TransitionEvent<'S, 'E, 'C> =
@@ -448,8 +441,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
                               Event = event
                               Timestamp = DateTimeOffset.UtcNow
                               User = if isNull (box ctx.User) then None else Some ctx.User
-                              ExitedStates = exitedStates
-                              EnteredStates = enteredStates }
+                              ExitedStates = hResult.ExitedStates
+                              EnteredStates = hResult.EnteredStates }
 
                         return TransitionAttemptResult.Succeeded(box evt)
                     | TransitionResult.Blocked reason -> return TransitionAttemptResult.Blocked reason

@@ -55,6 +55,8 @@ type StateHierarchy =
         LcaCache: Map<string * string, string>
         /// Pre-computed depth (distance from root) for every state
         DepthMap: Map<string, int>
+        /// Pre-computed all descendants (recursive) for every composite state
+        DescendantMap: Map<string, string list>
     }
 
 /// The set of currently active state IDs in a hierarchical statechart.
@@ -100,6 +102,8 @@ module ActiveStateConfiguration =
         Set.contains stateId config.ActiveStates
 
     let toSet (config: ActiveStateConfiguration) : Set<string> = config.ActiveStates
+
+    let isEmpty (config: ActiveStateConfiguration) : bool = Set.isEmpty config.ActiveStates
 
     let ofSet (states: Set<string>) : ActiveStateConfiguration = { ActiveStates = states }
 
@@ -202,12 +206,25 @@ module StateHierarchy =
                     | None -> None))
             |> Map.ofList
 
+        // Pre-compute all descendants for every composite state
+        let descendantMap =
+            spec.States
+            |> List.map (fun s ->
+                let rec collectDescendants stateId =
+                    match Map.tryFind stateId childrenMap with
+                    | Some children -> children |> List.collect (fun c -> c :: collectDescendants c)
+                    | None -> []
+
+                (s.Id, collectDescendants s.Id))
+            |> Map.ofList
+
         { ParentMap = parentMap
           ChildrenMap = childrenMap
           InitialChild = initialChild
           StateKind = stateKind
           LcaCache = lcaCache
-          DepthMap = depthMap }
+          DepthMap = depthMap
+          DescendantMap = descendantMap }
 
     /// Compute the ancestry path from a state up to the root (inclusive).
     /// Returns root-to-leaf order: root first, then its child, down to the state itself.
@@ -257,20 +274,9 @@ module StateHierarchy =
 module HierarchicalRuntime =
 
     /// Collect all descendant state IDs of a composite state (recursive).
+    /// Uses the pre-computed DescendantMap for O(1) lookup.
     let private allDescendants (hierarchy: StateHierarchy) (stateId: string) : string list =
-        let rec loop states =
-            states
-            |> List.collect (fun s ->
-                let descendants =
-                    match Map.tryFind s hierarchy.ChildrenMap with
-                    | Some kids -> loop kids
-                    | None -> []
-
-                s :: descendants)
-
-        match Map.tryFind stateId hierarchy.ChildrenMap with
-        | Some children -> loop children
-        | None -> []
+        Map.tryFind stateId hierarchy.DescendantMap |> Option.defaultValue []
 
     /// Enter a state, recursively activating initial children for composite states.
     /// For AND composites, all children are entered. For XOR, only the initial child.
@@ -377,21 +383,29 @@ module HierarchicalRuntime =
         : HierarchicalTransitionResult =
         // For self-transitions (source = target), use external semantics:
         // exit the state and re-enter it, resetting composite children to initial.
-        let exitStates, entryStates =
+        let exitStates, entryStates, lcaOpt =
             if source = target then
-                ([ source ], [ target ])
+                ([ source ], [ target ], None)
             else
                 let lca =
                     StateHierarchy.computeLCA hierarchy source target |> Option.defaultValue source
 
                 let exits = exitPath hierarchy source lca
                 let entries = entryPath hierarchy target lca
-                (exits, entries)
+                (exits, entries, Some lca)
 
-        // Exit phase: record history for exited composite states, folding into input history
+        // Record history for the LCA if it's a composite. The LCA is NOT being exited,
+        // but its active child is changing. Record what was active before so shallow/deep
+        // history pseudo-states can restore it later (e.g., Capture→Retry within Payment).
+        let historyWithLca =
+            match lcaOpt with
+            | Some lca -> exitCompositeState hierarchy lca config history
+            | None -> history
+
+        // Exit phase: record history for exited composite states, folding into LCA history
         let updatedHistory =
             exitStates
-            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) history
+            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) historyWithLca
 
         // Remove exited states and all descendants of exited composite states.
         // For AND composites, this deactivates all regions; for XOR, any active child subtree.

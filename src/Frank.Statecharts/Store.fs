@@ -21,6 +21,19 @@ type InstanceSnapshot<'State, 'Context> =
       HistoryRecord: HistoryRecord }
 
 /// <summary>
+/// Convenience constructors for <see cref="InstanceSnapshot{TState, TContext}"/>.
+/// </summary>
+[<RequireQualifiedAccess>]
+module InstanceSnapshot =
+
+    /// Create a snapshot for flat (non-hierarchical) resources.
+    let ofPair (state: 'S) (context: 'C) : InstanceSnapshot<'S, 'C> =
+        { State = state
+          Context = context
+          HierarchyConfig = ActiveStateConfiguration.empty
+          HistoryRecord = HistoryRecord.empty }
+
+/// <summary>
 /// Abstraction for statechart instance persistence.
 /// </summary>
 /// <remarks>

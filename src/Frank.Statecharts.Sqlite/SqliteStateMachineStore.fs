@@ -98,7 +98,8 @@ type SqliteStatechartsStore<'State, 'Context when 'State: equality>
         try
             let states = JsonSerializer.Deserialize<string list>(json, options)
             states |> Set.ofList |> ActiveStateConfiguration.ofSet
-        with _ ->
+        with ex ->
+            logger.LogWarning(ex, "Failed to deserialize hierarchy config from JSON: {Json}", json)
             ActiveStateConfiguration.empty
 
     /// Serialize HistoryRecord as a JSON map of composite state ID -> set of state ID strings.
@@ -117,7 +118,8 @@ type SqliteStatechartsStore<'State, 'Context when 'State: equality>
             raw
             |> Map.map (fun _ states -> states |> Set.ofList |> ActiveStateConfiguration.ofSet)
             |> HistoryRecord.ofMap
-        with _ ->
+        with ex ->
+            logger.LogWarning(ex, "Failed to deserialize history record from JSON: {Json}", json)
             HistoryRecord.empty
 
     /// Load snapshot from SQLite for the given instance ID.

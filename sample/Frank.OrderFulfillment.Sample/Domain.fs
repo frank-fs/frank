@@ -27,12 +27,19 @@ open Frank.Statecharts
 
 /// Top-level order lifecycle states.
 /// Hierarchy (below) maps composite relationships; these are the flat FSM nodes.
+/// PickDone/PackDone/ShipDone are final sub-states within their respective XOR regions.
 type OrderState =
     | Pending
     | Authorize
     | Capture
     | Retry
     | Fulfillment
+    | Pick
+    | PickDone
+    | Pack
+    | PackDone
+    | Ship
+    | ShipDone
     | Shipped
     | Delivered
     | Cancelled
@@ -54,6 +61,12 @@ type OrderEvent =
     | RecoverFromRetry
     /// Warehouse completes pick+pack+ship (Fulfillment -> Shipped).
     | FulfillOrder
+    /// Pick region of Fulfillment AND-state is complete.
+    | PickComplete
+    /// Pack region of Fulfillment AND-state is complete.
+    | PackComplete
+    /// Ship region of Fulfillment AND-state is complete.
+    | ShipComplete
     /// ShippingProvider confirms delivery (Shipped -> Delivered).
     | ConfirmDelivery
     /// Customer cancels (Pending or Authorize -> Cancelled).
@@ -71,7 +84,6 @@ let orderTransition (state: OrderState) (event: OrderEvent) (_ctx: unit) =
     | Authorize, CancelOrder -> TransitionResult.Transitioned(Cancelled, ())
     | Capture, CapturePayment -> TransitionResult.Transitioned(Fulfillment, ())
     | Capture, RetryPayment -> TransitionResult.Transitioned(Retry, ())
-    | Retry, RecoverFromRetry -> TransitionResult.Transitioned(Capture, ())
     | Fulfillment, FulfillOrder -> TransitionResult.Transitioned(Shipped, ())
     | Shipped, ConfirmDelivery -> TransitionResult.Transitioned(Delivered, ())
     | _, _ -> TransitionResult.Invalid $"No transition from {state} on {event}"
@@ -107,6 +119,30 @@ let orderMachine: StateMachine<OrderState, OrderEvent, unit> =
               { AllowedMethods = [ "GET"; "POST" ]
                 IsFinal = false
                 Description = Some "Warehouse fulfillment: Pick + Pack + Ship parallel (AND-state)" }
+              Pick,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = Some "Pick region of fulfillment (AND-state)" }
+              PickDone,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = Some "Pick region completed" }
+              Pack,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = Some "Pack region of fulfillment (AND-state)" }
+              PackDone,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = Some "Pack region completed" }
+              Ship,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = false
+                Description = Some "Ship region of fulfillment (AND-state)" }
+              ShipDone,
+              { AllowedMethods = [ "GET" ]
+                IsFinal = true
+                Description = Some "Ship region completed" }
               Shipped,
               { AllowedMethods = [ "GET"; "POST" ]
                 IsFinal = false
@@ -129,14 +165,21 @@ let orderMachine: StateMachine<OrderState, OrderEvent, unit> =
 /// Structure:
 ///   Processing (XOR): children = [Payment, Fulfillment]
 ///   Payment    (XOR): children = [Authorize, Capture, Retry]   — shallow history on parent
-///   Fulfillment (AND): children = [Pick, Pack, Ship]
+///   Fulfillment (AND): children = [PickRegion, PackRegion, ShipRegion]
+///     PickRegion (XOR): children = [Pick, PickDone]  — final sub-state per Harel formalism
+///     PackRegion (XOR): children = [Pack, PackDone]
+///     ShipRegion (XOR): children = [Ship, ShipDone]
 ///
-/// NOTE: The flat FSM uses Authorize/Capture/Retry/Fulfillment as leaf states.
-/// The hierarchy spec maps them as children to support hierarchical dispatch.
-/// The AND composite Fulfillment enables AND-state DeriveResult.Warnings at startup.
+/// Each AND region is a sub-XOR with an active state and a final (Done) state.
+/// A completed region stays active in its Done state (Harel: completion by final sub-state,
+/// not by absence). All regions Done -> Fulfillment -> Shipped auto-transition.
 let orderHierarchySpec: HierarchySpec =
     { States =
-        [ { Id = "Processing"
+        [ { Id = "Order"
+            Kind = XOR
+            Children = [ "Pending"; "Processing"; "Shipped"; "Delivered"; "Cancelled" ]
+            InitialChild = Some "Pending" }
+          { Id = "Processing"
             Kind = XOR
             Children = [ "Payment"; "Fulfillment" ]
             InitialChild = Some "Payment" }
@@ -146,5 +189,48 @@ let orderHierarchySpec: HierarchySpec =
             InitialChild = Some "Authorize" }
           { Id = "Fulfillment"
             Kind = AND
-            Children = [ "Pick"; "Pack"; "Ship" ]
-            InitialChild = None } ] }
+            Children = [ "PickRegion"; "PackRegion"; "ShipRegion" ]
+            InitialChild = None }
+          { Id = "PickRegion"
+            Kind = XOR
+            Children = [ "Pick"; "PickDone" ]
+            InitialChild = Some "Pick" }
+          { Id = "PackRegion"
+            Kind = XOR
+            Children = [ "Pack"; "PackDone" ]
+            InitialChild = Some "Pack" }
+          { Id = "ShipRegion"
+            Kind = XOR
+            Children = [ "Ship"; "ShipDone" ]
+            InitialChild = Some "Ship" } ] }
+
+let orderHierarchy = StateHierarchy.build orderHierarchySpec
+
+/// Children of the Fulfillment AND-state (the sub-XOR region names).
+let fulfillmentRegionNames =
+    orderHierarchy.ChildrenMap |> Map.find "Fulfillment"
+
+/// Maps each region XOR to its Done (final) state key.
+let regionDoneStates =
+    Map.ofList [ "PickRegion", "PickDone"; "PackRegion", "PackDone"; "ShipRegion", "ShipDone" ]
+
+/// Maps each region XOR to its active (non-final) state key.
+let regionActiveStates =
+    Map.ofList [ "PickRegion", "Pick"; "PackRegion", "Pack"; "ShipRegion", "Ship" ]
+
+/// Maps each region XOR to its display name (used in URLs and Link headers).
+let regionDisplayNames =
+    Map.ofList [ "PickRegion", "Pick"; "PackRegion", "Pack"; "ShipRegion", "Ship" ]
+
+/// Children of the Payment XOR-state — used by shallow history recovery.
+let paymentChildren =
+    orderHierarchy.ChildrenMap |> Map.find "Payment"
+
+/// Map state key string back to OrderState DU case.
+let private orderStateCases =
+    FSharp.Reflection.FSharpType.GetUnionCases(typeof<OrderState>)
+    |> Array.map (fun c -> c.Name, FSharp.Reflection.FSharpValue.MakeUnion(c, [||]) :?> OrderState)
+    |> Map.ofArray
+
+let parseOrderState (key: string) : OrderState option =
+    Map.tryFind key orderStateCases
