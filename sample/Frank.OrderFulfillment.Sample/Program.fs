@@ -15,8 +15,10 @@
 ///
 /// All transitions go through the primary stateful resource `/orders/{orderId}`.
 /// The POST handler at each state fires the state-specific event.
-/// Dedicated sub-endpoints (cancel, retry, retry-recover) directly manipulate
+/// Dedicated sub-endpoints (cancel, retry, authorize, capture, etc.) directly manipulate
 /// the store for demo purposes so the e2e test can force specific transitions.
+/// Region-completion sub-resources (/pick, /pack, /ship) use statefulResource + middleware
+/// to prove the library handles ALL hierarchy operations — no direct store manipulation.
 ///
 /// Pipeline order:
 ///   1. State key resolver — reads store, sets IStatechartFeature
@@ -149,8 +151,32 @@ let private eventHandler (event: OrderEvent) (ctx: HttpContext) : Task =
 let handlePlaceOrder = eventHandler PlaceOrder
 let handleAuthorizePayment = eventHandler AuthorizePayment
 let handleCapturePayment = eventHandler CapturePayment
-let handleRecoverFromRetry = eventHandler RecoverFromRetry
 let handleConfirmDelivery = eventHandler ConfirmDelivery
+
+/// Retry recovery via middleware hierarchy op: uses shallow history on Payment composite
+/// to restore the last active Payment child (Capture by default).
+let handleRecoverFromRetry (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (RecoverHistory("Payment", Frank.Statecharts.Ast.HistoryKind.Shallow))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Pick AND-state region via middleware hierarchy op.
+let handlePickComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Pick", "PickDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Pack AND-state region via middleware hierarchy op.
+let handlePackComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Pack", "PackDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Ship AND-state region via middleware hierarchy op.
+let handleShipComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Ship", "ShipDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
 
 // ===========================================================================
 // Direct store manipulation helpers (sub-resource endpoints for e2e testing)
@@ -182,108 +208,6 @@ let directCapture = directSetState Capture
 let directFulfillment = directSetState Fulfillment
 let directShipped = directSetState Shipped
 let directDelivered = directSetState Delivered
-
-/// Retry recovery via hierarchy runtime: uses shallow history on Payment composite
-/// to restore the last active Payment child (Capture by default).
-/// Demonstrates operational hierarchy — no flat Retry->Capture crutch needed.
-let directRetryRecover (ctx: HttpContext) : Task =
-    task {
-        let store = ctx.RequestServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        let! current = store.Load orderId
-        let snapshot = current |> Option.defaultValue defaultSnapshot
-
-        let currentConfig = ensureConfig (stateKeyOf snapshot.State) snapshot
-
-        // Query history directly to find the last active Payment child
-        let activeChild =
-            match HistoryRecord.tryGet "Payment" snapshot.HistoryRecord with
-            | Some prevConfig ->
-                paymentChildren
-                |> List.tryFind (fun c -> ActiveStateConfiguration.isActive c prevConfig)
-                |> Option.defaultValue "Authorize"
-            | None -> "Authorize"
-
-        let targetState = parseOrderState activeChild |> Option.defaultValue Capture
-
-        let transResult =
-            HierarchicalRuntime.transition orderHierarchy currentConfig "Retry" activeChild snapshot.HistoryRecord
-
-        do! store.Save orderId { State = targetState; Context = (); HierarchyConfig = transResult.Configuration; HistoryRecord = transResult.HistoryRecord }
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-// ===========================================================================
-// AND-state region completion (Fulfillment sub-endpoints)
-// ===========================================================================
-
-/// Complete a specific AND-state region within Fulfillment.
-/// Transitions within the sub-XOR region to the Done state (Harel formalism:
-/// a completed region stays active in its final sub-state, not removed from config).
-/// When all regions are in their Done state, auto-transitions Fulfillment -> Shipped.
-let private completeRegion
-    (activeState: string)
-    (doneState: OrderState)
-    (regionXor: string)
-    (ctx: HttpContext)
-    : Task =
-    task {
-        let store = ctx.RequestServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
-        let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        let! current = store.Load orderId
-        let snapshot = current |> Option.defaultValue defaultSnapshot
-
-        // Transition within the sub-XOR region (e.g., Pick -> PickDone)
-        let transResult =
-            HierarchicalRuntime.transition
-                orderHierarchy
-                snapshot.HierarchyConfig
-                activeState
-                (stateKeyOf doneState)
-                snapshot.HistoryRecord
-
-        // Check if all Fulfillment regions are now in their Done state
-        let allComplete =
-            fulfillmentRegionNames
-            |> List.forall (fun region ->
-                let doneKey = regionDoneStates |> Map.find region
-                ActiveStateConfiguration.isActive doneKey transResult.Configuration)
-
-        if allComplete then
-            // All regions done — auto-transition Fulfillment -> Shipped
-            let finalResult =
-                HierarchicalRuntime.transition
-                    orderHierarchy
-                    transResult.Configuration
-                    "Fulfillment"
-                    "Shipped"
-                    transResult.HistoryRecord
-
-            do!
-                store.Save
-                    orderId
-                    { State = Shipped
-                      Context = ()
-                      HierarchyConfig = finalResult.Configuration
-                      HistoryRecord = finalResult.HistoryRecord }
-        else
-            // Region completed but others still active — save with Fulfillment as flat state
-            do!
-                store.Save
-                    orderId
-                    { State = Fulfillment
-                      Context = ()
-                      HierarchyConfig = transResult.Configuration
-                      HistoryRecord = transResult.HistoryRecord }
-
-        ctx.Response.StatusCode <- 202
-    }
-    :> Task
-
-let pickComplete = completeRegion "Pick" PickDone "PickRegion"
-let packComplete = completeRegion "Pack" PackDone "PackRegion"
-let shipComplete = completeRegion "Ship" ShipDone "ShipRegion"
 
 // ===========================================================================
 // Resource definition — statefulResource CE with useHierarchyWith
@@ -343,6 +267,36 @@ let orderResource =
         useHierarchyWith orderHierarchySpec
     }
 
+/// Sub-resource for completing the Pick AND-region via the middleware hierarchy op path.
+/// POST /orders/{orderId}/pick → CompleteRegion("Pick","PickDone") via middleware.
+let pickResource =
+    statefulResource "/orders/{orderId}/pick" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Pick [ StateHandlerBuilder.post handlePickComplete ])
+        useHierarchyWith orderHierarchySpec
+    }
+
+/// Sub-resource for completing the Pack AND-region via the middleware hierarchy op path.
+/// POST /orders/{orderId}/pack → CompleteRegion("Pack","PackDone") via middleware.
+let packResource =
+    statefulResource "/orders/{orderId}/pack" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Pack [ StateHandlerBuilder.post handlePackComplete ])
+        useHierarchyWith orderHierarchySpec
+    }
+
+/// Sub-resource for completing the Ship AND-region via the middleware hierarchy op path.
+/// POST /orders/{orderId}/ship → CompleteRegion("Ship","ShipDone") via middleware.
+let shipResource =
+    statefulResource "/orders/{orderId}/ship" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Ship [ StateHandlerBuilder.post handleShipComplete ])
+        useHierarchyWith orderHierarchySpec
+    }
+
 // Sub-resource endpoints for direct state manipulation (e2e test control paths).
 // These bypass the statechart middleware (no StateMachineMetadata) so transitions
 // are applied directly to the store without guard evaluation.
@@ -366,13 +320,6 @@ let retryResource =
         post (RequestDelegate(fun ctx -> directRetryPayment ctx))
     }
 
-// POST /orders/{orderId}/retry-recover → "retry recovery" → state = Capture (shallow history proof)
-let retryRecoverResource =
-    resource "/orders/{orderId}/retry-recover" {
-        name "OrderRetryRecover"
-        post (RequestDelegate(fun ctx -> directRetryRecover ctx))
-    }
-
 // POST /orders/{orderId}/capture → "payment captured" → state = Fulfillment (AND-state)
 let captureResource =
     resource "/orders/{orderId}/capture" {
@@ -392,27 +339,6 @@ let deliverResource =
     resource "/orders/{orderId}/deliver" {
         name "OrderDeliver"
         post (RequestDelegate(fun ctx -> directDelivered ctx))
-    }
-
-// POST /orders/{orderId}/pick-complete → marks Pick region complete; auto-transitions when all done
-let pickCompleteResource =
-    resource "/orders/{orderId}/pick-complete" {
-        name "OrderPickComplete"
-        post (RequestDelegate(fun ctx -> pickComplete ctx))
-    }
-
-// POST /orders/{orderId}/pack-complete → marks Pack region complete; auto-transitions when all done
-let packCompleteResource =
-    resource "/orders/{orderId}/pack-complete" {
-        name "OrderPackComplete"
-        post (RequestDelegate(fun ctx -> packComplete ctx))
-    }
-
-// POST /orders/{orderId}/ship-complete → marks Ship region complete; auto-transitions when all done
-let shipCompleteResource =
-    resource "/orders/{orderId}/ship-complete" {
-        name "OrderShipComplete"
-        post (RequestDelegate(fun ctx -> shipComplete ctx))
     }
 
 // ===========================================================================
@@ -616,17 +542,19 @@ let main args =
         // Primary stateful resource (demonstrates hierarchy + 4 MPST roles)
         resource orderResource
 
+        // Region-completion stateful resources — each dispatches through middleware
+        // (CompleteRegion hierarchy op via handlePickComplete/handlePackComplete/handleShipComplete)
+        resource pickResource
+        resource packResource
+        resource shipResource
+
         // Direct state manipulation sub-resources (e2e test control paths)
         resource cancelResource
         resource authorizeResource
         resource retryResource
-        resource retryRecoverResource
         resource captureResource
         resource fulfillResource
         resource deliverResource
-        resource pickCompleteResource
-        resource packCompleteResource
-        resource shipCompleteResource
 
         // Diagnostics (AND-state DeriveResult.Warnings proof point)
         resource diagnosticsResource

@@ -44,6 +44,7 @@ type TransitionAttemptResult =
 /// Helpers for communicating transition events between handlers and middleware via HttpContext.Items.
 module StateMachineContext =
     let private eventKey = "Frank.Statecharts.Event"
+    let private hierarchyOpKey = "Frank.Statecharts.HierarchyOp"
 
     /// Set the event that should trigger a state transition after handler execution.
     let setEvent (ctx: HttpContext) (event: 'Event) = ctx.Items[eventKey] <- box event
@@ -53,6 +54,15 @@ module StateMachineContext =
         match ctx.Items.TryGetValue(eventKey) with
         | true, value -> Some(value :?> 'Event)
         | false, _ -> None
+
+    /// Set a hierarchy operation to be executed by middleware after handler execution.
+    let setHierarchyOp (ctx: HttpContext) (op: HierarchyOp) = ctx.Items[hierarchyOpKey] <- box op
+
+    /// Try to retrieve a hierarchy operation set by the handler.
+    let tryGetHierarchyOp (ctx: HttpContext) : HierarchyOp option =
+        match ctx.Items.TryGetValue(hierarchyOpKey) with
+        | true, v -> Some(v :?> HierarchyOp)
+        | _ -> None
 
 /// Endpoint metadata marker for stateful resources.
 /// All fields use obj/string keys because endpoint metadata is untyped.
@@ -87,10 +97,10 @@ type StateMachineMetadata =
         Roles: RoleDefinition list
         /// Closure: evaluates role predicates against ctx.User, returns Set<string> of matching role names.
         ResolveRoles: HttpContext -> Set<string>
-        /// Opt-in hierarchical runtime. When Some, middleware uses hierarchical dispatch
-        /// (composite states, LCA entry/exit, history pseudo-states).
-        /// When None, middleware uses flat dispatch (current behavior, zero breaking changes).
-        Hierarchy: StateHierarchy option
+        /// Hierarchical runtime configuration. Always present (flat FSMs are auto-wrapped
+        /// in a synthetic __root__ XOR composite at Run time). Middleware always uses
+        /// HierarchicalRuntime.resolveHandlers/resolveAllowedMethods for dispatch.
+        Hierarchy: StateHierarchy
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -279,17 +289,61 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         None)
                 |> Set.ofList
 
-        // Pre-compute hierarchy once; captured by both getCurrentStateKey and executeTransition closures.
-        let hierarchy = spec.HierarchySpec |> Option.map StateHierarchy.build
-
         // Precomputed state key extractor: DU case name for unions, ToString() for others.
         let stateKey (state: 'S) = StateKeyExtractor.keyOf state
 
         let initialStateKey = stateKey machine.Initial
 
+        // Pre-compute stateMetadataMap here so it's available for auto-wrap and helper closures.
+        let stateMetadataMap =
+            machine.StateMetadata
+            |> Map.toList
+            |> List.map (fun (s, info) -> (StateKeyExtractor.keyOf s, info))
+            |> Map.ofList
+
+        // Pre-compute hierarchy once; captured by both getCurrentStateKey and executeTransition closures.
+        // Flat FSMs without a HierarchySpec are auto-wrapped in a synthetic __root__ XOR composite
+        // so that ALL resources use hierarchical dispatch uniformly.
+        let hierarchy =
+            match spec.HierarchySpec with
+            | Some hierarchySpec -> StateHierarchy.build hierarchySpec
+            | None ->
+                // Auto-wrap: collect all known state keys and wrap in a synthetic root XOR composite.
+                let stateKeys =
+                    (Map.toList spec.StateHandlerMap |> List.map fst)
+                    @ (Map.toList stateMetadataMap |> List.map fst)
+                    |> List.distinct
+
+                let stateKeys =
+                    if List.isEmpty stateKeys then
+                        [ initialStateKey ]
+                    else
+                        stateKeys
+
+                StateHierarchy.build
+                    { States =
+                        [ { Id = "__root__"
+                            Kind = XOR
+                            Children = stateKeys
+                            InitialChild = Some initialStateKey
+                            CompletionTarget = None } ] }
+
+        // Reverse key map: state key string -> 'S DU case (for HierarchyOp result conversion).
+        let reverseKeyMap: Map<string, 'S> =
+            machine.StateMetadata
+            |> Map.toList
+            |> List.map (fun (s, _) -> (stateKey s, s))
+            |> Map.ofList
+
+        // Set of final state keys (for isCompositeComplete checks).
+        let finalStates: Set<string> =
+            stateMetadataMap
+            |> Map.toList
+            |> List.choose (fun (k, info) -> if info.IsFinal then Some k else None)
+            |> Set.ofList
+
         // Closure: resolve state from store, set typed values on IStatechartFeature.
-        // Also sets IHierarchyFeature when hierarchy is configured, computing initial config
-        // from the persisted snapshot (or bootstrapping from the leaf state on first access).
+        // Always bootstraps IHierarchyFeature (hierarchy is now always configured).
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
             let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
 
@@ -301,30 +355,22 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     let sk = stateKey snapshot.State
                     ctx.SetStatechartState(sk, snapshot.State, snapshot.Context, instanceId)
 
-                    match hierarchy with
-                    | Some h ->
-                        let config =
-                            if ActiveStateConfiguration.isEmpty snapshot.HierarchyConfig then
-                                // First access after upgrade or initial store: bootstrap from leaf state
-                                HierarchicalRuntime.enterState h sk ActiveStateConfiguration.empty
-                            else
-                                snapshot.HierarchyConfig
+                    let config =
+                        if ActiveStateConfiguration.isEmpty snapshot.HierarchyConfig then
+                            // First access after upgrade or initial store: bootstrap from leaf state
+                            HierarchicalRuntime.enterState hierarchy sk ActiveStateConfiguration.empty
+                        else
+                            snapshot.HierarchyConfig
 
-                        ctx.SetHierarchyFeature(config, snapshot.HistoryRecord)
-                    | None -> ()
-
+                    ctx.SetHierarchyFeature(config, snapshot.HistoryRecord)
                     return sk
                 | None ->
                     ctx.SetStatechartState(initialStateKey, machine.Initial, machine.InitialContext, instanceId)
 
-                    match hierarchy with
-                    | Some h ->
-                        let config =
-                            HierarchicalRuntime.enterState h initialStateKey ActiveStateConfiguration.empty
+                    let config =
+                        HierarchicalRuntime.enterState hierarchy initialStateKey ActiveStateConfiguration.empty
 
-                        ctx.SetHierarchyFeature(config, HistoryRecord.empty)
-                    | None -> ()
-
+                    ctx.SetHierarchyFeature(config, HistoryRecord.empty)
                     return initialStateKey
             }
 
@@ -385,68 +431,170 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         | Allowed -> GuardResult.compose acc (pred guardCtx))
                     GuardResult.identity
 
-        // Closure: get event from Items, run transition, persist, return result.
-        // When hierarchy is configured, calls HierarchicalRuntime.transition to compute
-        // LCA-based exit/entry, records history, and persists updated config.
+        // Closure: get event or hierarchy op from Items, run transition, persist, return result.
+        // Checks HierarchyOp first (AND-state region completion, history recovery), then falls back
+        // to standard event-driven transition via machine.Transition.
         let executeTransition
             (sp: IServiceProvider)
             (ctx: HttpContext)
             (instanceId: string)
             : Task<TransitionAttemptResult> =
             task {
-                match StateMachineContext.tryGetEvent<'E> ctx with
-                | None -> return TransitionAttemptResult.NoEvent
-                | Some event ->
+                match StateMachineContext.tryGetHierarchyOp ctx with
+                | Some op ->
+                    let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
                     let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
-                    let state = feature.State.Value
-                    let context = feature.Context.Value
-                    let result = machine.Transition state event context
+                    let currentConfig, currentHistory =
+                        match ctx.GetHierarchyFeature() with
+                        | Some f -> f.ActiveConfiguration, f.History
+                        | None ->
+                            let sk = stateKey feature.State.Value
+                            (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sk),
+                            HistoryRecord.empty
+                    let currentState = feature.State.Value
+                    let currentContext = feature.Context.Value
 
-                    match result with
-                    | TransitionResult.Transitioned(newState, newContext) ->
-                        let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
-                        let sourceKey = stateKey state
-                        let targetKey = stateKey newState
+                    match op with
+                    | CompleteRegion(activeStateKey, doneStateKey) ->
+                        let regionResult =
+                            HierarchicalRuntime.transition
+                                hierarchy
+                                currentConfig
+                                activeStateKey
+                                doneStateKey
+                                currentHistory
 
-                        let hResult =
-                            match hierarchy with
-                            | Some h ->
-                                let currentConfig, currentHistory =
-                                    match ctx.GetHierarchyFeature() with
-                                    | Some f -> f.ActiveConfiguration, f.History
-                                    | None ->
-                                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sourceKey),
-                                        HistoryRecord.empty
+                        // Check if the AND composite owning this region is now complete.
+                        // If so, fire the completion target transition automatically.
+                        let finalResult, finalState =
+                            match HierarchicalRuntime.findCompletionTarget hierarchy doneStateKey with
+                            | Some(compositeId, targetKey) when
+                                HierarchicalRuntime.isCompositeComplete
+                                    hierarchy
+                                    regionResult.Configuration
+                                    compositeId
+                                    finalStates
+                                ->
+                                let r2 =
+                                    HierarchicalRuntime.transition
+                                        hierarchy
+                                        regionResult.Configuration
+                                        compositeId
+                                        targetKey
+                                        regionResult.HistoryRecord
 
-                                HierarchicalRuntime.transition h currentConfig sourceKey targetKey currentHistory
-                            | None ->
-                                { Configuration = ActiveStateConfiguration.empty
-                                  ExitedStates = []
-                                  EnteredStates = []
-                                  HistoryRecord = HistoryRecord.empty }
+                                r2, (Map.tryFind targetKey reverseKeyMap |> Option.defaultValue currentState)
+                            | _ -> regionResult, currentState
 
                         do!
                             store.Save instanceId {
-                                State = newState
-                                Context = newContext
-                                HierarchyConfig = hResult.Configuration
-                                HistoryRecord = hResult.HistoryRecord
+                                State = finalState
+                                Context = currentContext
+                                HierarchyConfig = finalResult.Configuration
+                                HistoryRecord = finalResult.HistoryRecord
                             }
 
                         let evt: TransitionEvent<'S, 'E, 'C> =
-                            { PreviousState = state
-                              PreviousContext = context
-                              NewState = newState
-                              NewContext = newContext
-                              Event = event
+                            { PreviousState = currentState
+                              PreviousContext = currentContext
+                              NewState = finalState
+                              NewContext = currentContext
+                              Event = Unchecked.defaultof<'E>
                               Timestamp = DateTimeOffset.UtcNow
                               User = if isNull (box ctx.User) then None else Some ctx.User
-                              ExitedStates = hResult.ExitedStates
-                              EnteredStates = hResult.EnteredStates }
+                              ExitedStates = finalResult.ExitedStates
+                              EnteredStates = finalResult.EnteredStates }
 
                         return TransitionAttemptResult.Succeeded(box evt)
-                    | TransitionResult.Blocked reason -> return TransitionAttemptResult.Blocked reason
-                    | TransitionResult.Invalid msg -> return TransitionAttemptResult.Invalid msg
+
+                    | RecoverHistory(compositeId, kind) ->
+                        let targetConfig =
+                            HierarchicalRuntime.enterWithHistory
+                                hierarchy
+                                kind
+                                compositeId
+                                currentConfig
+                                currentHistory
+
+                        match HierarchicalRuntime.leafState hierarchy targetConfig with
+                        | Some leafKey ->
+                            let newState =
+                                Map.tryFind leafKey reverseKeyMap |> Option.defaultValue currentState
+
+                            do!
+                                store.Save instanceId {
+                                    State = newState
+                                    Context = currentContext
+                                    HierarchyConfig = targetConfig
+                                    HistoryRecord = currentHistory
+                                }
+
+                            let evt: TransitionEvent<'S, 'E, 'C> =
+                                { PreviousState = currentState
+                                  PreviousContext = currentContext
+                                  NewState = newState
+                                  NewContext = currentContext
+                                  Event = Unchecked.defaultof<'E>
+                                  Timestamp = DateTimeOffset.UtcNow
+                                  User = if isNull (box ctx.User) then None else Some ctx.User
+                                  ExitedStates = [ stateKey currentState ]
+                                  EnteredStates = [ leafKey ] }
+
+                            return TransitionAttemptResult.Succeeded(box evt)
+                        | None -> return TransitionAttemptResult.NoEvent
+
+                | None ->
+                    match StateMachineContext.tryGetEvent<'E> ctx with
+                    | None -> return TransitionAttemptResult.NoEvent
+                    | Some event ->
+                        let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+                        let state = feature.State.Value
+                        let context = feature.Context.Value
+                        let result = machine.Transition state event context
+
+                        match result with
+                        | TransitionResult.Transitioned(newState, newContext) ->
+                            let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
+                            let sourceKey = stateKey state
+                            let targetKey = stateKey newState
+
+                            let currentConfig, currentHistory =
+                                match ctx.GetHierarchyFeature() with
+                                | Some f -> f.ActiveConfiguration, f.History
+                                | None ->
+                                    (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sourceKey),
+                                    HistoryRecord.empty
+
+                            let hResult =
+                                HierarchicalRuntime.transition
+                                    hierarchy
+                                    currentConfig
+                                    sourceKey
+                                    targetKey
+                                    currentHistory
+
+                            do!
+                                store.Save instanceId {
+                                    State = newState
+                                    Context = newContext
+                                    HierarchyConfig = hResult.Configuration
+                                    HistoryRecord = hResult.HistoryRecord
+                                }
+
+                            let evt: TransitionEvent<'S, 'E, 'C> =
+                                { PreviousState = state
+                                  PreviousContext = context
+                                  NewState = newState
+                                  NewContext = newContext
+                                  Event = event
+                                  Timestamp = DateTimeOffset.UtcNow
+                                  User = if isNull (box ctx.User) then None else Some ctx.User
+                                  ExitedStates = hResult.ExitedStates
+                                  EnteredStates = hResult.EnteredStates }
+
+                            return TransitionAttemptResult.Succeeded(box evt)
+                        | TransitionResult.Blocked reason -> return TransitionAttemptResult.Blocked reason
+                        | TransitionResult.Invalid msg -> return TransitionAttemptResult.Invalid msg
             }
 
         let guardNames =
@@ -454,12 +602,6 @@ type StatefulResourceBuilder(routeTemplate: string) =
             |> List.map (function
                 | AccessControl(name, _) -> name
                 | EventValidation(name, _) -> name)
-
-        let stateMetadataMap =
-            machine.StateMetadata
-            |> Map.toList
-            |> List.map (fun (s, info) -> (StateKeyExtractor.keyOf s, info))
-            |> Map.ofList
 
         let metadata: StateMachineMetadata =
             { Machine = box machine

@@ -102,10 +102,10 @@ check_body   "o1: now Retry"               "$BASE/orders/o1" "state=Retry"
 
 echo ""
 echo "--- KEY TEST: Recover from Retry via shallow history (no flat transition exists) ---"
-curl -s -X POST "$BASE/orders/o1/retry-recover" > /dev/null
+# POST to main resource — middleware dispatches to Retry state's POST handler (handleRecoverFromRetry)
+check_status "AT1: retry-recover returns 202" "$BASE/orders/o1" "POST" "202"
 sleep 1
 check_body   "AT1: shallow history recovered to Capture" "$BASE/orders/o1" "state=Capture"
-check_status "AT1: retry-recover returns 202" "$BASE/orders/o1/retry-recover" "POST" "202"
 
 echo ""
 echo "================================================================"
@@ -125,8 +125,8 @@ check_body   "AT2: Pack active"            "$BASE/orders/o1" "Pack:active"
 check_body   "AT2: Ship active"            "$BASE/orders/o1" "Ship:active"
 
 echo ""
-echo "--- Complete Pick region ---"
-curl -s -X POST "$BASE/orders/o1/pick-complete" > /dev/null
+echo "--- Complete Pick region (via stateful sub-resource → middleware CompleteRegion op) ---"
+curl -s -X POST "$BASE/orders/o1/pick" > /dev/null
 sleep 1
 check_body   "AT2: Pick complete"          "$BASE/orders/o1" "Pick:complete"
 check_body   "AT2: Pack still active"      "$BASE/orders/o1" "Pack:active"
@@ -134,16 +134,16 @@ check_body   "AT2: Ship still active"      "$BASE/orders/o1" "Ship:active"
 check_body   "AT2: still Fulfillment"      "$BASE/orders/o1" "state=Fulfillment"
 
 echo ""
-echo "--- Complete Pack region ---"
-curl -s -X POST "$BASE/orders/o1/pack-complete" > /dev/null
+echo "--- Complete Pack region (via stateful sub-resource → middleware CompleteRegion op) ---"
+curl -s -X POST "$BASE/orders/o1/pack" > /dev/null
 sleep 1
 check_body   "AT2: Pack complete"          "$BASE/orders/o1" "Pack:complete"
 check_body   "AT2: Ship still active"      "$BASE/orders/o1" "Ship:active"
 check_body   "AT2: still Fulfillment"      "$BASE/orders/o1" "state=Fulfillment"
 
 echo ""
-echo "--- Complete Ship region (all complete → Shipped) ---"
-curl -s -X POST "$BASE/orders/o1/ship-complete" > /dev/null
+echo "--- Complete Ship region (via stateful sub-resource → middleware CompleteRegion op; all done → Shipped) ---"
+curl -s -X POST "$BASE/orders/o1/ship" > /dev/null
 sleep 1
 check_body   "AT2: all regions complete → Shipped" "$BASE/orders/o1" "state=Shipped"
 

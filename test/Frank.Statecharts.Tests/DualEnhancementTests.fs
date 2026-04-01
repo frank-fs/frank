@@ -588,7 +588,8 @@ let hierarchyAwareDualTests =
                 [ { Id = "Active"
                     Kind = XOR
                     Children = [ "Red"; "Yellow"; "Green" ]
-                    InitialChild = Some "Red" } ] }
+                    InitialChild = Some "Red"
+                    CompletionTarget = None } ] }
 
     testList
         "Enhancement 8: Hierarchy-aware dual derivation"

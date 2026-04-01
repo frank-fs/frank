@@ -63,7 +63,8 @@ let sampleHierarchySpec: HierarchySpec =
         [ { Id = "Root"
             Kind = CompositeKind.XOR
             Children = [ "Draft"; "Published" ]
-            InitialChild = Some "Draft" } ] }
+            InitialChild = Some "Draft"
+            CompletionTarget = None } ] }
 
 // ===========================================================================
 // Test domain: parameterized DU for stateMetadataMap key mismatch regression
@@ -164,9 +165,11 @@ let ceOperationTests =
 
               let meta = getMetadata res
               Expect.isSome meta "StateMachineMetadata should be present"
-              Expect.isSome meta.Value.Hierarchy "Hierarchy should be Some _ after useHierarchyWith"
+              // Hierarchy is always built; verify it reflects the provided spec (Draft is a child of Root)
+              let h = meta.Value.Hierarchy
+              Expect.isTrue (Map.containsKey "Draft" h.ParentMap) "Hierarchy should reflect the sampleHierarchySpec"
 
-          testCase "Without useHierarchyWith, Hierarchy remains None"
+          testCase "Without useHierarchyWith, Hierarchy is auto-wrapped with __root__"
           <| fun () ->
               let res =
                   statefulResource "/docs/{id}" {
@@ -179,7 +182,9 @@ let ceOperationTests =
 
               let meta = getMetadata res
               Expect.isSome meta "StateMachineMetadata should be present"
-              Expect.isNone meta.Value.Hierarchy "Hierarchy should be None when not configured"
+              // Without useHierarchyWith, flat FSM is auto-wrapped in synthetic __root__ XOR composite
+              let h = meta.Value.Hierarchy
+              Expect.isTrue (Map.containsKey "__root__" h.ChildrenMap) "Auto-wrapped hierarchy should have __root__"
 
           testCase "useHierarchyWith wires the correct HierarchySpec"
           <| fun () ->
@@ -188,7 +193,8 @@ let ceOperationTests =
                       [ { Id = "Parent"
                           Kind = CompositeKind.XOR
                           Children = [ "Child1"; "Child2" ]
-                          InitialChild = Some "Child1" } ] }
+                          InitialChild = Some "Child1"
+                          CompletionTarget = None } ] }
 
               let res =
                   statefulResource "/docs/{id}" {
@@ -201,7 +207,7 @@ let ceOperationTests =
                   }
 
               let meta = getMetadata res |> Option.get
-              let hierarchy = meta.Hierarchy |> Option.get
+              let hierarchy = meta.Hierarchy
               // Verify the hierarchy has been built (ParentMap should contain Child1 -> Parent)
               Expect.equal
                   (Map.tryFind "Child1" hierarchy.ParentMap)
@@ -224,7 +230,8 @@ let hierarchicalResolutionTests =
                       [ { Id = "Active"
                           Kind = CompositeKind.XOR
                           Children = [ "Red" ]
-                          InitialChild = Some "Red" } ] }
+                          InitialChild = Some "Red"
+                          CompletionTarget = None } ] }
 
               let hierarchy = StateHierarchy.build spec
 
@@ -248,7 +255,8 @@ let hierarchicalResolutionTests =
                       [ { Id = "Active"
                           Kind = CompositeKind.XOR
                           Children = [ "Red" ]
-                          InitialChild = Some "Red" } ] }
+                          InitialChild = Some "Red"
+                          CompletionTarget = None } ] }
 
               let hierarchy = StateHierarchy.build spec
 
@@ -278,7 +286,8 @@ let hierarchicalResolutionTests =
                       [ { Id = "Active"
                           Kind = CompositeKind.XOR
                           Children = [ "Red" ]
-                          InitialChild = Some "Red" } ] }
+                          InitialChild = Some "Red"
+                          CompletionTarget = None } ] }
 
               let hierarchy = StateHierarchy.build spec
 
@@ -574,7 +583,8 @@ let deepHistoryXorEnforcementTests =
                       [ { Id = "Active"
                           Kind = CompositeKind.XOR
                           Children = [ "Red"; "Green" ]
-                          InitialChild = Some "Red" } ] }
+                          InitialChild = Some "Red"
+                          CompletionTarget = None } ] }
 
               let hierarchy = StateHierarchy.build spec
 
