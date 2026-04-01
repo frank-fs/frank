@@ -434,7 +434,13 @@ module HierarchicalRuntime =
                     let after = ActiveStateConfiguration.toSet nextConfig
                     let newlyEntered = Set.difference after before
 
-                    let nextAccRev = Set.fold (fun acc s -> s :: acc) accRev newlyEntered
+                    // Sort by depth (parent before child) for SCXML-compliant entry ordering
+                    let sortedNewlyEntered =
+                        newlyEntered
+                        |> Set.toList
+                        |> List.sortBy (fun s -> Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
+
+                    let nextAccRev = sortedNewlyEntered |> List.fold (fun acc s -> s :: acc) accRev
 
                     (nextConfig, nextAccRev))
                 (configAfterExit, [])

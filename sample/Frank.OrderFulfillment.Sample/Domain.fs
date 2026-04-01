@@ -84,7 +84,6 @@ let orderTransition (state: OrderState) (event: OrderEvent) (_ctx: unit) =
     | Authorize, CancelOrder -> TransitionResult.Transitioned(Cancelled, ())
     | Capture, CapturePayment -> TransitionResult.Transitioned(Fulfillment, ())
     | Capture, RetryPayment -> TransitionResult.Transitioned(Retry, ())
-    | Fulfillment, FulfillOrder -> TransitionResult.Transitioned(Shipped, ())
     | Shipped, ConfirmDelivery -> TransitionResult.Transitioned(Delivered, ())
     | _, _ -> TransitionResult.Invalid $"No transition from {state} on {event}"
 

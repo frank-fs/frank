@@ -150,7 +150,6 @@ let handlePlaceOrder = eventHandler PlaceOrder
 let handleAuthorizePayment = eventHandler AuthorizePayment
 let handleCapturePayment = eventHandler CapturePayment
 let handleRecoverFromRetry = eventHandler RecoverFromRetry
-let handleFulfillOrder = eventHandler FulfillOrder
 let handleConfirmDelivery = eventHandler ConfirmDelivery
 
 // ===========================================================================
@@ -319,7 +318,7 @@ let orderResource =
         inState (forState Authorize [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleAuthorizePayment ])
         inState (forState Capture [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleCapturePayment ])
         inState (forState Retry [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleRecoverFromRetry ])
-        inState (forState Fulfillment [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleFulfillOrder ])
+        inState (forState Fulfillment [ StateHandlerBuilder.get getOrderState ])
         inState (forState Shipped [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleConfirmDelivery ])
         inState (forState Pick [ StateHandlerBuilder.get getOrderState ])
         inState (forState PickDone [ StateHandlerBuilder.get getOrderState ])
