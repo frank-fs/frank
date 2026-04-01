@@ -68,6 +68,7 @@ let private buildDocumentFromExtracted (resourceName: string) (extracted: Extrac
                           Target = Some stateName
                           Event = Some httpMethod
                           Guard = None
+                          GuardHref = None
                           Action = None
                           Parameters = []
                           Position = Some syntheticPos

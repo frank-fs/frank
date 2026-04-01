@@ -364,7 +364,7 @@ let jsonParserEdgeCaseTests =
                   stateA.Annotations
                   |> List.exists (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsGuardExt "role=X") -> true
+                      | AlpsAnnotation(AlpsGuardExt("role=X", _)) -> true
                       | _ -> false)
 
               // unknown ext should remain as AlpsExtension

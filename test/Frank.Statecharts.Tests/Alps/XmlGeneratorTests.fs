@@ -160,6 +160,7 @@ let xmlGeneratorTests =
                               Target = Some "A"
                               Event = Some "doSafe"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -193,6 +194,7 @@ let xmlGeneratorTests =
                               Target = Some "A"
                               Event = Some "safe_t"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -202,6 +204,7 @@ let xmlGeneratorTests =
                               Target = Some "A"
                               Event = Some "unsafe_t"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -211,6 +214,7 @@ let xmlGeneratorTests =
                               Target = Some "A"
                               Event = Some "idempotent_t"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -244,6 +248,7 @@ let xmlGeneratorTests =
                               Target = Some "A"
                               Event = Some "doThing"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -283,6 +288,7 @@ let xmlGeneratorTests =
                               Target = Some "B"
                               Event = Some "go"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -319,6 +325,7 @@ let xmlGeneratorTests =
                               Target = Some "http://example.com/other"
                               Event = Some "go"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -415,6 +422,7 @@ let xmlGeneratorDocTests =
                               Target = Some "A"
                               Event = Some "go"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -504,6 +512,7 @@ let xmlGeneratorExtLinkTests =
                               Target = Some "A"
                               Event = Some "go"
                               Guard = Some "role=admin"
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -546,6 +555,7 @@ let xmlGeneratorParamTests =
                               Target = Some "A"
                               Event = Some "submit"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = [ "name"; "email" ]
                               Position = None
@@ -628,6 +638,7 @@ let xmlGeneratorRoundTripTests =
                               Target = Some "home"
                               Event = Some "go"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
@@ -796,4 +807,30 @@ let xmlGeneratorRoundTripTests =
               let xml = generateAlpsXml ast
               let reparsed = parseAlpsXml xml
               Expect.isEmpty reparsed.Errors "re-parse succeeds"
-              Expect.equal ast reparsed.Document "onboarding AST → XML → AST round-trip" ]
+              Expect.equal ast reparsed.Document "onboarding AST → XML → AST round-trip"
+
+          // Issue #166: XML href round-trip (mirrors JSON acceptance test)
+          testCase "XML round-trip preserves href on typed extension cases"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"payload","type":"semantic"},{"id":"Idle","type":"semantic","ext":[{"id":"projectedRole","href":"https://example.com/extensions/projectedRole","value":"server"},{"id":"availableInStates","href":"https://example.com/extensions/availableInStates","value":"Idle"}],"descriptor":[{"id":"start","type":"unsafe","rt":"#Active","ext":[{"id":"guard","href":"https://example.com/extensions/guard","value":"isReady"},{"id":"clientObligation","href":"https://example.com/extensions/clientObligation","value":"must-ack"}],"descriptor":[{"href":"#payload"}]}]},{"id":"Active","type":"semantic","ext":[{"id":"projectedRole","value":"client"}]}]}}"""
+
+              let ast = (parseAlpsJson json).Document
+              let xml = generateAlpsXml ast
+              let reparsed = parseAlpsXml xml
+              Expect.isEmpty reparsed.Errors "XML re-parse succeeds"
+              Expect.equal reparsed.Document ast "XML round-trip preserves all data including href"
+
+              // Also verify at XML level
+              let xdoc = parseXml xml
+              let alps = alpsRoot xdoc
+              let descs = alps.Elements(XName.Get "descriptor") |> Seq.toList
+              let idleDesc = descs |> List.find (fun d -> d.Attribute(XName.Get "id").Value = "Idle")
+              let roleExt = idleDesc.Elements(XName.Get "ext") |> Seq.head
+              let hrefAttr = roleExt.Attribute(XName.Get "href")
+              Expect.isNotNull hrefAttr "href attribute present on projectedRole ext"
+
+              Expect.equal
+                  hrefAttr.Value
+                  "https://example.com/extensions/projectedRole"
+                  "projectedRole href preserved in XML" ]

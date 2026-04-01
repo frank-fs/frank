@@ -24,6 +24,7 @@ let private mkMessage sender receiver style dir label parameters =
       Target = Some receiver
       Event = Some label
       Guard = None
+      GuardHref = None
       Action = None
       Parameters = parameters
       Position = Some pos

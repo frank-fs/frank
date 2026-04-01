@@ -26,6 +26,7 @@ let private buildDocWithDataDescriptor () =
                 Target = Some "gameState"
                 Event = Some "makeMove"
                 Guard = None
+                GuardHref = None
                 Action = None
                 Parameters = [ "position" ]
                 Position = None

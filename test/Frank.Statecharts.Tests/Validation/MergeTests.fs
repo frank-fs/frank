@@ -31,6 +31,7 @@ let private makeTransition source target event annotations =
       Target = Some target
       Event = Some event
       Guard = None
+      GuardHref = None
       Action = None
       Parameters = []
       Position = None

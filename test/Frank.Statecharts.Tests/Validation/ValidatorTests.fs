@@ -38,6 +38,7 @@ let makeDocument (stateIds: string list) (transitions: (string * string option *
                   Target = target
                   Event = event
                   Guard = None
+                  GuardHref = None
                   Action = None
                   Parameters = []
                   Position = None

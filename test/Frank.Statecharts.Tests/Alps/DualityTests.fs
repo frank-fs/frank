@@ -224,7 +224,7 @@ let private collectDualityAnnotations (doc: StatechartDocument) =
         anns
         |> List.choose (fun a ->
             match a with
-            | AlpsAnnotation(AlpsDuality(kind, value)) -> Some(kind, value)
+            | AlpsAnnotation(AlpsDuality(kind, value, _)) -> Some(kind, value)
             | _ -> None)
 
     let stateAnns = getStates doc |> List.collect (fun s -> fromAnnotations s.Annotations)
@@ -260,7 +260,7 @@ let dualityRoundTripTests =
                   beginPicking.Annotations
                   |> List.choose (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsDuality(CutPoint, value)) -> Some value
+                      | AlpsAnnotation(AlpsDuality(CutPoint, value, _)) -> Some value
                       | _ -> None)
 
               Expect.hasLength cutPoints 1 "beginPicking has one cutPoint annotation"
@@ -277,7 +277,7 @@ let dualityRoundTripTests =
                       s.Annotations
                       |> List.tryPick (fun a ->
                           match a with
-                          | AlpsAnnotation(AlpsDuality(ClientObligation, v)) -> Some v
+                          | AlpsAnnotation(AlpsDuality(ClientObligation, v, _)) -> Some v
                           | _ -> None)
 
               Expect.equal (stateObligation "Submitted") (Some "may-poll") "Submitted has may-poll obligation"
@@ -295,7 +295,7 @@ let dualityRoundTripTests =
                       t.Annotations
                       |> List.exists (fun a ->
                           match a with
-                          | AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")) -> true
+                          | AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true", _)) -> true
                           | _ -> false))
 
               let names = advancingTransitions |> List.choose (fun t -> t.Event) |> Set.ofList
@@ -318,7 +318,7 @@ let dualityRoundTripTests =
                   submitPayment.Annotations
                   |> List.choose (fun a ->
                       match a with
-                      | AlpsAnnotation(AlpsDuality(DualOf, value)) -> Some value
+                      | AlpsAnnotation(AlpsDuality(DualOf, value, _)) -> Some value
                       | _ -> None)
 
               Expect.hasLength dualOfValues 1 "submitPayment has one dualOf annotation"

@@ -22,6 +22,7 @@ let makeTransition source target event =
       Target = target
       Event = event
       Guard = None
+      GuardHref = None
       Action = None
       Parameters = []
       Position = None

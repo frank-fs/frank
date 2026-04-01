@@ -33,6 +33,7 @@ let private parseTransitions (stateId: string) (stateElem: JsonElement) : Transi
                 Target = target
                 Event = if eventName = "" then None else Some eventName
                 Guard = None
+                GuardHref = None
                 Action = None
                 Parameters = []
                 Position = None

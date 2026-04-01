@@ -49,13 +49,13 @@ let subDuTypeTests =
           // AlpsMeta uses sub-DU kinds (not string IDs)
           testCase "AlpsRole takes AlpsRoleKind, not string id"
           <| fun () ->
-              let meta = AlpsRole(ProjectedRole, "admin")
-              Expect.equal meta (AlpsRole(ProjectedRole, "admin")) "AlpsRole(ProjectedRole, value)"
+              let meta = AlpsRole(ProjectedRole, "admin", None)
+              Expect.equal meta (AlpsRole(ProjectedRole, "admin", None)) "AlpsRole(ProjectedRole, value)"
 
           testCase "AlpsDuality takes AlpsDualityKind, not string id"
           <| fun () ->
-              let meta = AlpsDuality(ClientObligation, "must-ack")
-              Expect.equal meta (AlpsDuality(ClientObligation, "must-ack")) "AlpsDuality(ClientObligation, value)" ]
+              let meta = AlpsDuality(ClientObligation, "must-ack", None)
+              Expect.equal meta (AlpsDuality(ClientObligation, "must-ack", None)) "AlpsDuality(ClientObligation, value)" ]
 
 /// Tests that classifyExtension maps to sub-DU kinds.
 [<Tests>]
@@ -72,7 +72,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "admin" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRole, "admin"))) "projectedRole → ProjectedRole"
+              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRole, "admin", None))) "projectedRole → ProjectedRole"
 
           testCase "protocolState URI → AlpsRole(ProtocolState, _)"
           <| fun () ->
@@ -85,7 +85,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole(ProtocolState, "authenticated")))
+                  (AlpsAnnotation(AlpsRole(ProtocolState, "authenticated", None)))
                   "protocolState → ProtocolState"
 
           testCase "bare projectedRole → AlpsRole(ProjectedRole, _) (backward compat)"
@@ -96,7 +96,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "viewer" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRole, "viewer"))) "bare projectedRole → ProjectedRole"
+              Expect.equal result (AlpsAnnotation(AlpsRole(ProjectedRole, "viewer", None))) "bare projectedRole → ProjectedRole"
 
           testCase "bare protocolState → AlpsRole(ProtocolState, _) (backward compat)"
           <| fun () ->
@@ -109,7 +109,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsRole(ProtocolState, "running")))
+                  (AlpsAnnotation(AlpsRole(ProtocolState, "running", None)))
                   "bare protocolState → ProtocolState"
 
           // Duality classification
@@ -124,7 +124,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack", None)))
                   "clientObligation → ClientObligation"
 
           testCase "advancesProtocol URI → AlpsDuality(AdvancesProtocol, _)"
@@ -138,7 +138,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true", None)))
                   "advancesProtocol → AdvancesProtocol"
 
           testCase "dualOf URI → AlpsDuality(DualOf, _)"
@@ -149,7 +149,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "serverAction" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOf, "serverAction"))) "dualOf → DualOf"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOf, "serverAction", None))) "dualOf → DualOf"
 
           testCase "cutPoint URI → AlpsDuality(CutPoint, _)"
           <| fun () ->
@@ -159,7 +159,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "true" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true"))) "cutPoint → CutPoint"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true", None))) "cutPoint → CutPoint"
 
           testCase "bare clientObligation → AlpsDuality(ClientObligation, _) (backward compat)"
           <| fun () ->
@@ -172,7 +172,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")))
+                  (AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack", None)))
                   "bare clientObligation → ClientObligation"
 
           testCase "bare advancesProtocol → AlpsDuality(AdvancesProtocol, _) (backward compat)"
@@ -186,7 +186,7 @@ let classifyExtensionSubDuTests =
 
               Expect.equal
                   result
-                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")))
+                  (AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true", None)))
                   "bare advancesProtocol → AdvancesProtocol"
 
           testCase "bare dualOf → AlpsDuality(DualOf, _) (backward compat)"
@@ -197,7 +197,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "serverAction" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOf, "serverAction"))) "bare dualOf → DualOf"
+              Expect.equal result (AlpsAnnotation(AlpsDuality(DualOf, "serverAction", None))) "bare dualOf → DualOf"
 
           testCase "bare cutPoint → AlpsDuality(CutPoint, _) (backward compat)"
           <| fun () ->
@@ -207,7 +207,7 @@ let classifyExtensionSubDuTests =
                     Value = Some "true" }
 
               let result = classifyExtension ext
-              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true"))) "bare cutPoint → CutPoint" ]
+              Expect.equal result (AlpsAnnotation(AlpsDuality(CutPoint, "true", None))) "bare cutPoint → CutPoint" ]
 
 /// Tests that generators round-trip correctly with sub-DU kinds.
 [<Tests>]
@@ -217,7 +217,7 @@ let generatorRoundTripSubDuTests =
         [ testCase "getExtAnnotations emits correct ext id for ProjectedRole"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsRole(ProjectedRole, "admin")) ]
+                  [ AlpsAnnotation(AlpsRole(ProjectedRole, "admin", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -229,7 +229,7 @@ let generatorRoundTripSubDuTests =
           testCase "getExtAnnotations emits correct ext id for ProtocolState"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsRole(ProtocolState, "authenticated")) ]
+                  [ AlpsAnnotation(AlpsRole(ProtocolState, "authenticated", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -239,7 +239,7 @@ let generatorRoundTripSubDuTests =
           testCase "getExtAnnotations emits correct ext id for ClientObligation"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")) ]
+                  [ AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -249,7 +249,7 @@ let generatorRoundTripSubDuTests =
           testCase "getExtAnnotations emits correct ext id for AdvancesProtocol"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true")) ]
+                  [ AlpsAnnotation(AlpsDuality(AdvancesProtocol, "true", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -259,7 +259,7 @@ let generatorRoundTripSubDuTests =
           testCase "getExtAnnotations emits correct ext id for DualOf"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsDuality(DualOf, "serverAction")) ]
+                  [ AlpsAnnotation(AlpsDuality(DualOf, "serverAction", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -269,7 +269,7 @@ let generatorRoundTripSubDuTests =
           testCase "getExtAnnotations emits correct ext id for CutPoint"
           <| fun () ->
               let annotations =
-                  [ AlpsAnnotation(AlpsDuality(CutPoint, "true")) ]
+                  [ AlpsAnnotation(AlpsDuality(CutPoint, "true", None)) ]
 
               let exts = Frank.Statecharts.Alps.GeneratorCommon.getExtAnnotations annotations
               Expect.hasLength exts 1 "one ext"
@@ -290,8 +290,8 @@ let generatorRoundTripSubDuTests =
                               Activities = None
                               Position = None
                               Annotations =
-                                [ AlpsAnnotation(AlpsRole(ProjectedRole, "server"))
-                                  AlpsAnnotation(AlpsAvailableInStates [ "Idle" ]) ] }
+                                [ AlpsAnnotation(AlpsRole(ProjectedRole, "server", None))
+                                  AlpsAnnotation(AlpsAvailableInStates([ "Idle" ], None)) ] }
                         StateDecl
                             { Identifier = Some "Active"
                               Label = None
@@ -300,19 +300,20 @@ let generatorRoundTripSubDuTests =
                               Activities = None
                               Position = None
                               Annotations =
-                                [ AlpsAnnotation(AlpsRole(ProtocolState, "running"))
-                                  AlpsAnnotation(AlpsDuality(DualOf, "start")) ] }
+                                [ AlpsAnnotation(AlpsRole(ProtocolState, "running", None))
+                                  AlpsAnnotation(AlpsDuality(DualOf, "start", None)) ] }
                         TransitionElement
                             { Source = "Idle"
                               Target = Some "Active"
                               Event = Some "start"
                               Guard = Some "isReady"
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
                               Annotations =
                                 [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
-                                  AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack")) ] } ]
+                                  AlpsAnnotation(AlpsDuality(ClientObligation, "must-ack", None)) ] } ]
                     DataEntries = []
                     Annotations = [ AlpsAnnotation(AlpsVersion "1.0") ] }
 
@@ -337,12 +338,13 @@ let transitionExtractorSubDuTests =
                               Target = Some "Active"
                               Event = Some "start"
                               Guard = None
+                              GuardHref = None
                               Action = None
                               Parameters = []
                               Position = None
                               Annotations =
                                 [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
-                                  AlpsAnnotation(AlpsRole(ProjectedRole, "admin")) ] } ]
+                                  AlpsAnnotation(AlpsRole(ProjectedRole, "admin", None)) ] } ]
                     DataEntries = []
                     Annotations = [] }
 
@@ -363,7 +365,7 @@ let transitionExtractorSubDuTests =
                     Elements = []
                     DataEntries = []
                     Annotations =
-                      [ AlpsAnnotation(AlpsRole(ProjectedRole, "PlayerX,PlayerO,Spectator")) ] }
+                      [ AlpsAnnotation(AlpsRole(ProjectedRole, "PlayerX,PlayerO,Spectator", None)) ] }
 
               let roles = Frank.Statecharts.TransitionExtractor.extractRoles doc
               Expect.hasLength roles 3 "three roles"
@@ -377,7 +379,7 @@ let transitionExtractorSubDuTests =
                     Elements = []
                     DataEntries = []
                     Annotations =
-                      [ AlpsAnnotation(AlpsRole(ProtocolState, "authenticated")) ] }
+                      [ AlpsAnnotation(AlpsRole(ProtocolState, "authenticated", None)) ] }
 
               let roles = Frank.Statecharts.TransitionExtractor.extractRoles doc
               Expect.isEmpty roles "ProtocolState roles not extracted as projected roles" ]

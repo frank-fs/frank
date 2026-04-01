@@ -1,5 +1,6 @@
 module Frank.Statecharts.Tests.Alps.RoundTripTests
 
+open System.Text.Json
 open Expecto
 open Frank.Statecharts.Ast
 open Frank.Statecharts.Alps.JsonParser
@@ -541,3 +542,156 @@ let amundsenRoundTripTests =
               let generated = generateAlpsJson original
               let roundTripped = parseOk generated "re-parse failed"
               Expect.equal roundTripped original "role extensions round-trip preserves AST" ]
+
+// ---------------------------------------------------------------------------
+// Issue #166: ALPS ext href preservation (round-trip fidelity)
+// ---------------------------------------------------------------------------
+
+/// Helper: parse ALPS JSON, assert no errors, generate back to string.
+let private roundTripGenerate (json: string) =
+    let result = parseAlpsJson json
+    Expect.isEmpty result.Errors "parse failed"
+    generateAlpsJson result.Document
+
+/// Helper: get href string from an ext element at a given index.
+let private getExtHref (desc: JsonElement) (index: int) =
+    let ext = desc.GetProperty("ext").[index]
+
+    match ext.TryGetProperty("href") with
+    | true, h -> Some(h.GetString())
+    | false, _ -> None
+
+[<Tests>]
+let hrefPreservationTests =
+    testList
+        "Alps.RoundTrip.HrefPreservation"
+        [
+          // -----------------------------------------------------------------
+          // Acceptance test 1: Round-trip preserves href on typed extension cases
+          // -----------------------------------------------------------------
+
+          testCase "round-trip preserves href on AlpsRole (projectedRole)"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"Idle","type":"semantic","ext":[{"id":"projectedRole","href":"https://example.com/extensions/projectedRole","value":"server"}],"descriptor":[{"id":"go","type":"unsafe","rt":"#Idle"}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let desc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let href = getExtHref desc 0
+              Expect.equal href (Some "https://example.com/extensions/projectedRole") "projectedRole href preserved"
+
+          testCase "round-trip preserves href on AlpsGuardExt (guard)"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"A","type":"semantic","descriptor":[{"id":"go","type":"unsafe","rt":"#A","ext":[{"id":"guard","href":"https://example.com/extensions/guard","value":"isReady"}]}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              let href = getExtHref transDesc 0
+              Expect.equal href (Some "https://example.com/extensions/guard") "guard href preserved"
+
+          testCase "round-trip preserves href on AlpsDuality (clientObligation)"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"A","type":"semantic","descriptor":[{"id":"go","type":"unsafe","rt":"#A","ext":[{"id":"clientObligation","href":"https://example.com/extensions/clientObligation","value":"must-ack"}]}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              let href = getExtHref transDesc 0
+              Expect.equal href (Some "https://example.com/extensions/clientObligation") "clientObligation href preserved"
+
+          testCase "round-trip preserves href on AlpsAvailableInStates"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"Idle","type":"semantic","ext":[{"id":"availableInStates","href":"https://example.com/extensions/availableInStates","value":"Idle,Active"}],"descriptor":[{"id":"go","type":"unsafe","rt":"#Idle"}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let desc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let href = getExtHref desc 0
+              Expect.equal href (Some "https://example.com/extensions/availableInStates") "availableInStates href preserved"
+
+          testCase "round-trip preserves href on AlpsDuality (dualOf)"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"A","type":"semantic","descriptor":[{"id":"complete","type":"safe","rt":"#A","ext":[{"id":"dualOf","href":"https://example.com/extensions/dualOf","value":"start"}]}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let stateDesc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let transDesc = stateDesc.GetProperty("descriptor").[0]
+              let href = getExtHref transDesc 0
+              Expect.equal href (Some "https://example.com/extensions/dualOf") "dualOf href preserved"
+
+          testCase "typed extensions without href omit it cleanly"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"Idle","type":"semantic","ext":[{"id":"projectedRole","value":"server"}],"descriptor":[{"id":"go","type":"unsafe","rt":"#Idle"}]}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let desc = parsed.RootElement.GetProperty("alps").GetProperty("descriptor").[0]
+              let href = getExtHref desc 0
+              Expect.equal href None "no href when absent in input"
+
+          // -----------------------------------------------------------------
+          // Acceptance test 2: Untyped extension href preservation (regression)
+          // -----------------------------------------------------------------
+
+          testCase "round-trip preserves href on untyped extension (AlpsExtension)"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","ext":[{"id":"customExtension","href":"https://example.com/custom","value":"foo"}]}}"""
+
+              let generated = roundTripGenerate json
+              use parsed = JsonDocument.Parse(generated)
+              let href = getExtHref (parsed.RootElement.GetProperty("alps")) 0
+              Expect.equal href (Some "https://example.com/custom") "untyped ext href preserved"
+
+          // -----------------------------------------------------------------
+          // Acceptance test 3: Projected profile preserves href through transformation
+          // Projection preserves state annotations (Map.filter by state key).
+          // If typed DU cases carry href through parse→AST→generate, projection
+          // (which doesn't modify annotations) also preserves it.
+          // This test verifies href survives a full round-trip on a multi-state
+          // document with role extensions — the projection scenario.
+          // -----------------------------------------------------------------
+
+          testCase "role extension href survives round-trip in projection scenario"
+          <| fun _ ->
+              let json =
+                  """{"alps":{"version":"1.0","descriptor":[{"id":"payload","type":"semantic"},{"id":"Idle","type":"semantic","ext":[{"id":"projectedRole","href":"https://example.com/extensions/projectedRole","value":"server"},{"id":"availableInStates","href":"https://example.com/extensions/availableInStates","value":"Idle"}],"descriptor":[{"id":"start","type":"unsafe","rt":"#Active","descriptor":[{"href":"#payload"}]}]},{"id":"Active","type":"semantic","ext":[{"id":"projectedRole","value":"client"}]}]}}"""
+
+              let result = parseAlpsJson json
+              Expect.isEmpty result.Errors "parse failed"
+              let generated = generateAlpsJson result.Document
+              let reparsed = parseAlpsJson generated
+              Expect.isEmpty reparsed.Errors "re-parse failed"
+              // Full AST equality after round-trip
+              Expect.equal reparsed.Document result.Document "AST round-trip preserves all data including href"
+              // Also verify at JSON level
+              use parsed = JsonDocument.Parse(generated)
+              let alps = parsed.RootElement.GetProperty("alps")
+              let idleDesc = alps.GetProperty("descriptor").[1]
+              let roleHref = getExtHref idleDesc 0
+              let statesHref = getExtHref idleDesc 1
+
+              Expect.equal
+                  roleHref
+                  (Some "https://example.com/extensions/projectedRole")
+                  "projectedRole href preserved through projection scenario"
+
+              Expect.equal
+                  statesHref
+                  (Some "https://example.com/extensions/availableInStates")
+                  "availableInStates href preserved through projection scenario"
+
+              // Active has no href — should be omitted
+              let activeDesc = alps.GetProperty("descriptor").[2]
+              let activeRoleHref = getExtHref activeDesc 0
+              Expect.equal activeRoleHref None "no href on Active's projectedRole (absent in input)" ]

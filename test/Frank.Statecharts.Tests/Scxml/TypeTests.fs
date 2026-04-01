@@ -43,6 +43,7 @@ let typeTests =
                     Target = Some "submitted"
                     Event = Some "submit"
                     Guard = Some "isValid"
+                    GuardHref = None
                     Action = None
                     Parameters = []
                     Position = Some { Line = 3; Column = 5 }
