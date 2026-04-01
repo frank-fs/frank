@@ -145,8 +145,23 @@ type DeriveResult =
         ProtocolSinks: string list
         /// States where multiple roles have competing MustSelect transitions (#226 enhancement 3).
         RaceConditions: RaceCondition list
-        /// Circular wait cycles in role dependency graph (#226 enhancement 5).
-        /// Each cycle is a list of (role, state) edges forming the cycle.
+        /// Mutual obligation cycles in the role dependency graph (#226 enhancement 5,
+        /// #253 cross-state edges).
+        ///
+        /// Each cycle is a list of (role, state) nodes forming a closed dependency chain.
+        /// A cycle means: role A depends on role B in one state, and role B depends on
+        /// role A in another state (or transitively through other roles/states).
+        ///
+        /// Formalism caveat (Harel): In a flat FSM, the system occupies one state at a
+        /// time — these cycles represent mutual obligation chains, not Coffman deadlocks
+        /// (which require simultaneous waiting via AND-state parallel composition).
+        /// Treat as a liveness diagnostic: cycles indicate tightly coupled role obligations
+        /// that could indicate problematic protocol design.
+        ///
+        /// Duality note (Wadler): CircularWaits does NOT satisfy the involution property.
+        /// AdvancesProtocol is structural (not flipped by deriveReverse), so the waiter
+        /// classification differs between forward and reversed derivations. The analysis
+        /// assumes cooperative liveness — roles eventually exercise all advancing capabilities.
         CircularWaits: (string * string) list list
         /// Formalism-bound warnings: conditions where the derivation is a known approximation
         /// rather than the full MPST dual. See the module-level MPST FORMALISM BOUNDS comment
@@ -282,10 +297,6 @@ let private detectRaceConditions (annotations: Map<string * string, DualAnnotati
             let descriptorsByRole =
                 entries |> List.map (fun (_, role, descs) -> role, descs) |> Map.ofList
 
-            // Check for overlapping descriptors across roles
-            let allDescriptorSets =
-                descriptorsByRole |> Map.toList |> List.map (fun (_, descs) -> Set.ofList descs)
-
             // Check if any two DIFFERENT roles share a descriptor
             let rolePairs =
                 let roleDescs = descriptorsByRole |> Map.toList
@@ -309,24 +320,37 @@ let private detectRaceConditions (annotations: Map<string * string, DualAnnotati
         else
             None)
 
-/// Build a role dependency graph: role R depends on role R' in state S if
-/// R has only non-advancing transitions (MayPoll) in S AND R' has MustSelect in S,
-/// meaning R NEEDS R' to act for the protocol to advance from S.
+/// Build a map from (role, sourceState) to the target states of that role's advancing
+/// transitions. Uses role projections (not the raw statechart) so the transition target
+/// map is consistent with the obligation classification that drives waiter/actor roles.
 ///
-/// A MayPoll-only role may be a legitimate observer, not "waiting" — so we only
-/// create a dependency edge when the observer role has no alternative path forward
-/// (no MustSelect in any other state reachable from S without R' acting first).
-///
-/// Returns adjacency list: (waiting (role, state), waited-on (role, state)).
-let private buildRoleDependencyGraph
+/// Formalism note: guarded transitions are treated as always-fireable. This is a sound
+/// over-approximation (may report cycles that guards prevent) but cannot detect stuck
+/// states where guards block the only exit. Guard satisfiability requires runtime
+/// evaluation, which is outside the scope of static dual analysis.
+let private buildRoleTransitionTargets
+    (projections: Map<string, ExtractedStatechart>)
+    : Map<string * string, string list> =
+    projections
+    |> Map.toList
+    |> List.collect (fun (roleName, proj) ->
+        proj.Transitions
+        |> List.filter (fun t -> t.Source <> t.Target)
+        |> List.groupBy (fun t -> t.Source)
+        |> List.map (fun (source, ts) ->
+            (roleName, source), ts |> List.map (fun t -> t.Target) |> List.distinct))
+    |> Map.ofList
+
+/// Classify roles in each state as waiters (MayPoll-only, no advancing) or actors (MustSelect).
+/// Returns (state, waitingRoles, mustSelectRoles) triples.
+let private classifyRolesByState
     (annotations: Map<string * string, DualAnnotation list>)
-    : ((string * string) * (string * string)) list =
-    // Group by state
+    : (string * string list * string list) list =
     let byState =
         annotations |> Map.toList |> List.groupBy (fun ((_, state), _) -> state)
 
     byState
-    |> List.collect (fun (state, entries) ->
+    |> List.map (fun (state, entries) ->
         let roleObligations =
             entries
             |> List.map (fun ((role, _), anns) ->
@@ -346,26 +370,69 @@ let private buildRoleDependencyGraph
 
         let waitingRoles =
             roleObligations
-            // Only roles with no advancing transitions are truly "waiting" — not just observing
             |> List.filter (fun (_, _, onlyMPOrComplete, hasAdvancing) -> onlyMPOrComplete && not hasAdvancing)
             |> List.map (fun (r, _, _, _) -> r)
 
-        // Each waiting role depends on each must-select role in this state
-        waitingRoles
-        |> List.collect (fun waiter -> mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
+        state, waitingRoles, mustSelectRoles)
 
-/// Detect circular waits in role dependency graph (#226 enhancement 5).
+/// Build intra-state dependency edges: (waiter, S) → (actor, S).
+/// Each waiting role depends on each must-select role in the same state.
+/// These edges alone form a DAG (a role cannot be both waiter and actor in one state).
+let private buildIntraStateEdges
+    (classifications: (string * string list * string list) list)
+    : ((string * string) * (string * string)) list =
+    classifications
+    |> List.collect (fun (state, waitingRoles, mustSelectRoles) ->
+        waitingRoles
+        |> List.collect (fun waiter ->
+            mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
+
+/// Build cross-state dependency edges: (waiter, S) → (actor, T) where actor transitions
+/// from S to T. These edges capture the obligation chain across states — "waiter is
+/// blocked in S until actor advances to T, where obligations may reverse." Without
+/// cross-state edges, the dependency graph is a DAG by construction and no cycles can
+/// ever be detected (issue #253).
+let private buildCrossStateEdges
+    (classifications: (string * string list * string list) list)
+    (roleTransitionTargets: Map<string * string, string list>)
+    : ((string * string) * (string * string)) list =
+    classifications
+    |> List.collect (fun (state, waitingRoles, mustSelectRoles) ->
+        waitingRoles
+        |> List.collect (fun waiter ->
+            mustSelectRoles
+            |> List.collect (fun actor ->
+                let targets =
+                    roleTransitionTargets
+                    |> Map.tryFind (actor, state)
+                    |> Option.defaultValue []
+
+                targets |> List.map (fun target -> ((waiter, state), (actor, target))))))
+
+/// Build the full role dependency graph by composing intra-state and cross-state edges.
+/// Returns adjacency list: (waiting (role, state), waited-on (role, state)).
+let private buildRoleDependencyGraph
+    (annotations: Map<string * string, DualAnnotation list>)
+    (roleTransitionTargets: Map<string * string, string list>)
+    : ((string * string) * (string * string)) list =
+    let classifications = classifyRolesByState annotations
+    buildIntraStateEdges classifications @ buildCrossStateEdges classifications roleTransitionTargets
+
+/// Detect circular waits in role dependency graph (#226 enhancement 5, #253 cross-state).
 /// Uses (role, state) pairs as graph nodes, not just role names, so that cycles
 /// accurately reflect the state context in which the dependency occurs.
-/// A circular wait is: (RoleA, S1) waits for (RoleB, S1), (RoleB, S2) waits for (RoleA, S2).
-let private detectCircularWaits (annotations: Map<string * string, DualAnnotation list>) : (string * string) list list =
-    let edges = buildRoleDependencyGraph annotations
+/// A circular wait is: (RoleA, S1) waits for (RoleB, S2), (RoleB, S2) waits for (RoleA, S1).
+let private detectCircularWaits
+    (annotations: Map<string * string, DualAnnotation list>)
+    (roleTransitionTargets: Map<string * string, string list>)
+    : (string * string) list list =
+    let edges = buildRoleDependencyGraph annotations roleTransitionTargets
 
     // Build adjacency: (role, state) -> [(target role, target state)]
     let adjacency =
         edges
         |> List.groupBy fst
-        |> List.map (fun (node, es) -> node, es |> List.map snd)
+        |> List.map (fun (node, es) -> node, es |> List.map snd |> List.distinct)
         |> Map.ofList
 
     let allNodes = edges |> List.collect (fun (a, b) -> [ a; b ]) |> List.distinct
@@ -377,16 +444,17 @@ let private detectCircularWaits (annotations: Map<string * string, DualAnnotatio
 
     let rec dfs (node: string * string) (path: (string * string) list) =
         if Set.contains node inStack then
-            // Found a cycle - extract it from the path.
+            // Found a cycle - extract it from the path (stored in reverse order).
             // Mark the cycle endpoint as visited so it is not re-entered from
             // a different DFS root, preventing duplicate cycle reporting.
             visited <- Set.add node visited
 
-            let cycleStart = path |> List.tryFindIndex (fun n -> n = node)
+            let forwardPath = List.rev path
+            let cycleStart = forwardPath |> List.tryFindIndex (fun n -> n = node)
 
             match cycleStart with
             | Some idx ->
-                let cycle = path |> List.skip idx
+                let cycle = forwardPath |> List.skip idx
                 cycles <- cycle :: cycles
             | None -> ()
         elif not (Set.contains node visited) then
@@ -396,7 +464,7 @@ let private detectCircularWaits (annotations: Map<string * string, DualAnnotatio
             let neighbors = adjacency |> Map.tryFind node |> Option.defaultValue []
 
             for target in neighbors do
-                dfs target (path @ [ node ])
+                dfs target (node :: path)
 
             inStack <- Set.remove node inStack
 
@@ -490,7 +558,9 @@ let private deriveCoreEnhanced
         let annotationsWithGroups = assignChoiceGroups annotations
         let sinks = detectProtocolSinks reachableStates statechart projections
         let raceConditions = detectRaceConditions annotationsWithGroups
-        let circularWaits = detectCircularWaits annotationsWithGroups
+
+        let roleTransitionTargets = buildRoleTransitionTargets projections
+        let circularWaits = detectCircularWaits annotationsWithGroups roleTransitionTargets
 
         { Annotations = annotationsWithGroups
           ProtocolSinks = sinks
@@ -631,11 +701,19 @@ let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult)
                         ann.DualOf
                         |> Option.map (fun d -> if d.StartsWith("#") then d.Substring(1) else $"#{d}") }))
 
-    // Re-derive RaceConditions and CircularWaits from reversed annotations.
+    // Re-derive RaceConditions, CircularWaits, and ProtocolSinks from reversed annotations.
     // These depend on obligations (which role has MustSelect), so they must be
     // re-computed rather than carried from the forward result.
     let reverseRaceConditions = detectRaceConditions reverseAnnotations
-    let reverseCircularWaits = detectCircularWaits reverseAnnotations
+
+    // Projections are needed for both circular wait targets and protocol sink detection.
+    // Structural targets don't change under obligation reversal — only who's a waiter/actor changes.
+    let projections =
+        if statechart.Roles.IsEmpty then Map.empty
+        else Projection.projectAll statechart
+
+    let roleTransitionTargets = buildRoleTransitionTargets projections
+    let reverseCircularWaits = detectCircularWaits reverseAnnotations roleTransitionTargets
 
     // Re-derive ProtocolSinks from the statechart's structural projections.
     // ProtocolSinks is obligation-independent (determined by transition graph structure),
@@ -650,7 +728,6 @@ let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult)
         if statechart.Roles.IsEmpty then
             []
         else
-            let projections = Projection.projectAll statechart
             detectProtocolSinks reachableStates statechart projections
 
     { Annotations = reverseAnnotations
