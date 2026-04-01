@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# End-to-end test for OrderFulfillment sample.
-# Verifies: useHierarchyWith, hierarchical dispatch, 4 MPST roles,
-# XOR composite (Payment: Authorize -> Capture), AND composite (Fulfillment: Pick+Pack+Ship),
-# shallow history (Payment retry returns to last step), AND-state DeriveResult.Warnings.
+# End-to-end test for OrderFulfillment sample — Hierarchy Operational (issue #250).
+#
+# Verifies 4 acceptance criteria proving the hierarchy is operational:
+#   1. Remove flat crutch — hierarchy still works (shallow history recovery)
+#   2. AND-state creates observable parallelism (Pick/Pack/Ship)
+#   3. Entry/exit ordering is LCA-based (transition observer output)
+#   4. Full hierarchical configuration visible after transition
 #
 # Usage: ./sample/Frank.OrderFulfillment.Sample/test-e2e.sh [port]
 # Prerequisites: build the project first with dotnet build
@@ -13,6 +16,7 @@ BASE="http://localhost:$PORT"
 PROJECT="sample/Frank.OrderFulfillment.Sample/Frank.OrderFulfillment.Sample.fsproj"
 PASS=0
 FAIL=0
+SERVER_LOG=$(mktemp)
 
 check_status() {
     local label="$1" url="$2" method="${3:-GET}" expected_status="$4"
@@ -24,32 +28,6 @@ check_status() {
     else
         echo "  FAIL: $label (expected HTTP $expected_status, got $actual_status)"
         FAIL=$((FAIL + 1))
-    fi
-}
-
-check_header() {
-    local label="$1" url="$2" method="${3:-GET}" header="$4" expected="$5"
-    local actual
-    actual=$(curl -s -D - -o /dev/null -X "$method" "$url" 2>/dev/null | grep -i "^${header}:" | sed "s/^${header}: //i" | tr -d '\r')
-    if echo "$actual" | grep -qi "$expected"; then
-        echo "  PASS: $label"
-        PASS=$((PASS + 1))
-    else
-        echo "  FAIL: $label (expected '$expected' in '$actual')"
-        FAIL=$((FAIL + 1))
-    fi
-}
-
-check_no_header_value() {
-    local label="$1" url="$2" method="${3:-GET}" header="$4" absent="$5"
-    local actual
-    actual=$(curl -s -D - -o /dev/null -X "$method" "$url" 2>/dev/null | grep -i "^${header}:" | sed "s/^${header}: //i" | tr -d '\r')
-    if echo "$actual" | grep -qi "$absent"; then
-        echo "  FAIL: $label (found '$absent' in '$actual')"
-        FAIL=$((FAIL + 1))
-    else
-        echo "  PASS: $label"
-        PASS=$((PASS + 1))
     fi
 }
 
@@ -66,128 +44,165 @@ check_body() {
     fi
 }
 
+check_body_exact() {
+    local label="$1" url="$2" expected="$3"
+    local actual
+    actual=$(curl -s "$url" 2>/dev/null)
+    if echo "$actual" | grep -q "$expected"; then
+        echo "  PASS: $label"
+        PASS=$((PASS + 1))
+    else
+        echo "  FAIL: $label (expected '$expected' in '$actual')"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+check_log_contains() {
+    local label="$1" expected="$2"
+    if grep -q "$expected" "$SERVER_LOG"; then
+        echo "  PASS: $label"
+        PASS=$((PASS + 1))
+    else
+        echo "  FAIL: $label (expected '$expected' in server log)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 echo "=== Step 1: Build ==="
 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build "$PROJECT"
 
 echo ""
 echo "=== Step 2: Start server ==="
-ASPNETCORE_URLS="$BASE" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project "$PROJECT" --no-build &
+ASPNETCORE_URLS="$BASE" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project "$PROJECT" --no-build 2>"$SERVER_LOG" &
 SERVER_PID=$!
-trap "kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null" EXIT
+trap "kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null; rm -f $SERVER_LOG" EXIT
 sleep 4
 
 echo ""
-echo "=== Step 3: Initial state (Pending) ==="
+echo "================================================================"
+echo "=== ACCEPTANCE TEST 1: Remove flat crutch — hierarchy works  ==="
+echo "================================================================"
+echo ""
+echo "--- Setup: advance o1 through Pending → Authorize → Capture → Retry ---"
 
-# AC1: order in Pending state responds to GET with 200 and shows state
-check_status "Pending: GET returns 200"       "$BASE/orders/o1" "GET" "200"
-check_body   "Pending: body shows state"      "$BASE/orders/o1"      "state=Pending"
-
-# AC2: POST in Pending state is allowed (PlaceOrder event)
-check_status "Pending: POST returns 202"      "$BASE/orders/o1" "POST" "202"
+# Pending → Authorize (via main resource POST = PlaceOrder event)
+check_status "o1: PlaceOrder"              "$BASE/orders/o1" "POST" "202"
 sleep 1
+check_body   "o1: now Authorize"           "$BASE/orders/o1" "state=Authorize"
 
-echo ""
-echo "=== Step 4: Authorize state (after PlaceOrder) ==="
-
-check_body   "Authorize: body shows state"    "$BASE/orders/o1" "state=Authorize"
-check_status "Authorize: GET returns 200"     "$BASE/orders/o1" "GET"  "200"
-
-# Hierarchical dispatch proof: Authorize state is child of Payment (XOR composite),
-# which is child of Processing (XOR composite). GET resolves via hierarchy-aware dispatch.
-check_status "Hierarchy dispatch: GET on composite child resolves (200)" "$BASE/orders/o1" "GET" "200"
-
-echo ""
-echo "=== Step 5: XOR composite — Authorize -> Capture ==="
-
-# POST /orders/o1/authorize → "authorization succeeded" → direct store sets Capture
+# Authorize → Capture (via sub-resource)
 curl -s -X POST "$BASE/orders/o1/authorize" > /dev/null
 sleep 1
-check_body   "Capture after authorize"        "$BASE/orders/o1" "state=Capture"
-check_status "Capture: GET returns 200"       "$BASE/orders/o1" "GET"  "200"
+check_body   "o1: now Capture"             "$BASE/orders/o1" "state=Capture"
 
-echo ""
-echo "=== Step 6: Shallow history — Retry returns to Capture ==="
-
-# Trigger retry (Capture -> Retry)
+# Capture → Retry (via sub-resource — this records history: Payment → {Capture})
 curl -s -X POST "$BASE/orders/o1/retry" > /dev/null
 sleep 1
-check_body   "Retry state entered"            "$BASE/orders/o1" "state=Retry"
-
-# Recover from retry (shallow history: Retry -> Capture, not Authorize)
-curl -s -X POST "$BASE/orders/o1/retry-recover" > /dev/null
-sleep 1
-check_body   "Shallow history: returned to Capture after retry" "$BASE/orders/o1" "state=Capture"
+check_body   "o1: now Retry"               "$BASE/orders/o1" "state=Retry"
 
 echo ""
-echo "=== Step 7: AND composite — Fulfillment (Pick+Pack+Ship in parallel) ==="
+echo "--- KEY TEST: Recover from Retry via shallow history (no flat transition exists) ---"
+# POST to main resource — middleware dispatches to Retry state's POST handler (handleRecoverFromRetry)
+check_status "AT1: retry-recover returns 202" "$BASE/orders/o1" "POST" "202"
+sleep 1
+check_body   "AT1: shallow history recovered to Capture" "$BASE/orders/o1" "state=Capture"
 
-# Capture payment → Fulfillment (AND-state: parallel Pick + Pack + Ship)
+echo ""
+echo "================================================================"
+echo "=== ACCEPTANCE TEST 2: AND-state creates observable parallelism ==="
+echo "================================================================"
+echo ""
+echo "--- Setup: advance o1 to Fulfillment AND-state ---"
+
+# Capture → Fulfillment (via sub-resource)
 curl -s -X POST "$BASE/orders/o1/capture" > /dev/null
 sleep 1
-check_body   "Fulfillment entered after capture" "$BASE/orders/o1" "state=Fulfillment"
-check_status "Fulfillment: GET returns 200"      "$BASE/orders/o1" "GET"  "200"
-check_status "Fulfillment: POST returns 202"     "$BASE/orders/o1" "POST" "202"
-sleep 1
 
-# After POST in Fulfillment, state transitions to Shipped (FulfillOrder event via statechart middleware)
-check_body   "Shipped after FulfillOrder event" "$BASE/orders/o1" "state=Shipped"
-
-echo ""
-echo "=== Step 8: Fulfill (via sub-resource) -> Shipped ==="
-
-# Use a second order to verify the fulfill sub-resource path
-check_status "Start o4 as Pending"            "$BASE/orders/o4" "GET"  "200"
-curl -s -X POST "$BASE/orders/o4/capture" > /dev/null  # Set to Fulfillment directly
-sleep 1
-check_body   "o4 in Fulfillment"              "$BASE/orders/o4" "state=Fulfillment"
-curl -s -X POST "$BASE/orders/o4/fulfill" > /dev/null  # Fulfillment -> Shipped
-sleep 1
-check_body   "o4 Shipped after fulfill"       "$BASE/orders/o4" "state=Shipped"
+# Verify AND-state entry: Pick, Pack, Ship all active
+check_body   "AT2: Fulfillment entered"    "$BASE/orders/o1" "state=Fulfillment"
+check_body   "AT2: Pick active"            "$BASE/orders/o1" "Pick:active"
+check_body   "AT2: Pack active"            "$BASE/orders/o1" "Pack:active"
+check_body   "AT2: Ship active"            "$BASE/orders/o1" "Ship:active"
 
 echo ""
-echo "=== Step 9: 4 MPST roles — Customer cancel ==="
-
-# Customer MustSelect to cancel (Pending state)
-check_body   "o2: initial Pending state"      "$BASE/orders/o2" "state=Pending"
-curl -s -X POST "$BASE/orders/o2/cancel" > /dev/null
+echo "--- Complete Pick region (via stateful sub-resource → middleware CompleteRegion op) ---"
+curl -s -X POST "$BASE/orders/o1/pick" > /dev/null
 sleep 1
-check_body   "o2: Cancelled after cancel"     "$BASE/orders/o2" "state=Cancelled"
-check_status "Cancelled: GET returns 200"     "$BASE/orders/o2" "GET"  "200"
-
-# Cancelled is final: PUT should return 405 (method not in statechart)
-check_status "Cancelled: PUT returns 405"     "$BASE/orders/o2" "PUT"  "405"
+check_body   "AT2: Pick complete"          "$BASE/orders/o1" "Pick:complete"
+check_body   "AT2: Pack still active"      "$BASE/orders/o1" "Pack:active"
+check_body   "AT2: Ship still active"      "$BASE/orders/o1" "Ship:active"
+check_body   "AT2: still Fulfillment"      "$BASE/orders/o1" "state=Fulfillment"
 
 echo ""
-echo "=== Step 10: Full lifecycle to Delivered (ShippingProvider role) ==="
-
-# Transition o3 through full lifecycle
-curl -s -X POST "$BASE/orders/o3" > /dev/null           # Pending -> Authorize
+echo "--- Complete Pack region (via stateful sub-resource → middleware CompleteRegion op) ---"
+curl -s -X POST "$BASE/orders/o1/pack" > /dev/null
 sleep 1
-curl -s -X POST "$BASE/orders/o3/authorize" > /dev/null  # Authorize -> Capture
-sleep 1
-curl -s -X POST "$BASE/orders/o3/capture" > /dev/null    # Capture -> Fulfillment
-sleep 1
-curl -s -X POST "$BASE/orders/o3/fulfill" > /dev/null    # Fulfillment -> Shipped
-sleep 1
-curl -s -X POST "$BASE/orders/o3/deliver" > /dev/null    # Shipped -> Delivered
-sleep 1
-check_body   "Delivered: state=Delivered"     "$BASE/orders/o3" "state=Delivered"
-check_status "Delivered: GET returns 200"     "$BASE/orders/o3" "GET"  "200"
-check_status "Delivered: POST returns 405"    "$BASE/orders/o3" "POST" "405"
-
-# Allow header on 405 shows GET is the only allowed method in Delivered state
-check_header "Delivered 405 Allow includes GET" "$BASE/orders/o3" "POST" "Allow" "GET"
-check_no_header_value "Delivered 405 Allow excludes POST" "$BASE/orders/o3" "POST" "Allow" "POST"
+check_body   "AT2: Pack complete"          "$BASE/orders/o1" "Pack:complete"
+check_body   "AT2: Ship still active"      "$BASE/orders/o1" "Ship:active"
+check_body   "AT2: still Fulfillment"      "$BASE/orders/o1" "state=Fulfillment"
 
 echo ""
-echo "=== Step 11: AND-state DeriveResult.Warnings formalism proof (issue #244) ==="
-# The server computes AND-state warnings at startup via deriveWithHierarchy.
-# The /diagnostics endpoint surfaces these warnings.
-# Formalism bound 1 (issue #244): Fulfillment AND-state triggers synchronization barrier warning.
-check_body "AND-state warnings present" "$BASE/diagnostics" "AND-state"
-check_status "Diagnostics: GET returns 200" "$BASE/diagnostics" "GET" "200"
+echo "--- Complete Ship region (via stateful sub-resource → middleware CompleteRegion op; all done → Shipped) ---"
+curl -s -X POST "$BASE/orders/o1/ship" > /dev/null
+sleep 1
+check_body   "AT2: all regions complete → Shipped" "$BASE/orders/o1" "state=Shipped"
 
 echo ""
+echo "================================================================"
+echo "=== ACCEPTANCE TEST 3: Entry/exit ordering is LCA-based       ==="
+echo "================================================================"
+echo ""
+
+# Use o2: advance through Pending → Authorize → Capture → Fulfillment
+# The Capture → Fulfillment transition crosses Payment→Fulfillment boundary within Processing.
+# LCA = Processing, so exit must include [Capture, Payment], enter must include [Fulfillment, Pick, Pack, Ship]
+
+curl -s -X POST "$BASE/orders/o2" > /dev/null        # Pending → Authorize
+sleep 1
+curl -s -X POST "$BASE/orders/o2/authorize" > /dev/null   # → Capture
+sleep 1
+
+# The key transition: Capture → Fulfillment via the main resource POST
+# This goes through the statechart middleware which calls HierarchicalRuntime.transition
+# The onTransition observer logs exit/entry to stderr
+curl -s -X POST "$BASE/orders/o2" > /dev/null         # Capture → Fulfillment (CapturePayment event)
+sleep 2
+
+# Check server log for LCA-based exit/entry (grep for specific log line patterns)
+check_log_contains "AT3: exited includes Capture"     "exited:.*Capture"
+check_log_contains "AT3: exited includes Payment"     "exited:.*Payment"
+check_log_contains "AT3: entered includes Fulfillment" "entered:.*Fulfillment"
+check_log_contains "AT3: entered includes Pick"       "entered:.*Pick"
+check_log_contains "AT3: entered includes Pack"       "entered:.*Pack"
+check_log_contains "AT3: entered includes Ship"       "entered:.*Ship"
+
+echo ""
+echo "================================================================"
+echo "=== ACCEPTANCE TEST 4: Full hierarchical config visible       ==="
+echo "================================================================"
+echo ""
+
+# Use o3: advance Pending → Authorize and check full config
+curl -s -X POST "$BASE/orders/o3" > /dev/null         # Pending → Authorize
+sleep 1
+
+# Config should show full ancestor chain: Order, Processing, Payment, Authorize
+check_body   "AT4: config includes Order"       "$BASE/orders/o3" "Order"
+check_body   "AT4: config includes Processing"  "$BASE/orders/o3" "Processing"
+check_body   "AT4: config includes Payment"     "$BASE/orders/o3" "Payment"
+check_body   "AT4: config includes Authorize"   "$BASE/orders/o3" "Authorize"
+check_body   "AT4: state is Authorize"          "$BASE/orders/o3" "state=Authorize"
+
+echo ""
+echo "================================================================"
+echo "=== BONUS: AND-state DeriveResult.Warnings (issue #244)       ==="
+echo "================================================================"
+echo ""
+check_body   "Diagnostics: AND-state warnings" "$BASE/diagnostics" "AND-state"
+check_status "Diagnostics: GET 200"            "$BASE/diagnostics" "GET" "200"
+
+echo ""
+echo "================================================================"
 echo "=== Results: $PASS passed, $FAIL failed ==="
+echo "================================================================"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

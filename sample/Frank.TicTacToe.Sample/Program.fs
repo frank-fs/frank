@@ -62,14 +62,14 @@ let resolveStateKey (app: IApplicationBuilder) =
 let getGameState (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<TicTacToeState, int>>)
-            :?> IStateMachineStore<TicTacToeState, int>
+            ctx.RequestServices.GetService(typeof<IStatechartsStore<TicTacToeState, int>>)
+            :?> IStatechartsStore<TicTacToeState, int>
 
-        let! stateResult = store.GetState(ctx.Request.RouteValues["gameId"] :?> string)
+        let! stateResult = store.Load(ctx.Request.RouteValues["gameId"] :?> string)
 
         let state, moveCount =
             match stateResult with
-            | Some(s, c) -> (s, c)
+            | Some snapshot -> (snapshot.State, snapshot.Context)
             | None -> (gameMachine.Initial, gameMachine.InitialContext)
 
         let key = stateKeyOf state
@@ -123,10 +123,15 @@ let seedInitialState (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
 
     let store =
-        app.ApplicationServices.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+        app.ApplicationServices.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
     lifetime.ApplicationStarted.Register(fun () ->
-        store.SetState "game1" gameMachine.Initial gameMachine.InitialContext
+        store.Save
+            "game1"
+            { State = gameMachine.Initial
+              Context = gameMachine.InitialContext
+              HierarchyConfig = ActiveStateConfiguration.empty
+              HistoryRecord = HistoryRecord.empty }
         |> fun t -> t.Wait())
     |> ignore
 
@@ -140,7 +145,7 @@ let main args =
         useDefaults
 
         service (fun services ->
-            services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+            services.AddStatechartsStore<TicTacToeState, int>() |> ignore
             services)
 
         // Pipeline order matters:

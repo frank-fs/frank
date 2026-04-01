@@ -14,6 +14,12 @@ type IStatechartFeature<'S, 'C> =
     abstract State: 'S option
     abstract Context: 'C option
 
+/// Feature for accessing hierarchical state configuration on HttpContext.
+/// Set by the getCurrentStateKey closure when hierarchy is configured.
+type IHierarchyFeature =
+    abstract ActiveConfiguration: ActiveStateConfiguration
+    abstract History: HistoryRecord
+
 /// Extension methods for reading/writing statechart state via HttpContext.Features.
 [<AutoOpen>]
 module HttpContextStatechartExtensions =
@@ -36,3 +42,15 @@ module HttpContextStatechartExtensions =
             // Dual registration: same object, two type keys (standard ASP.NET Core pattern)
             ctx.Features.Set<IStatechartFeature>(feature)
             ctx.Features.Set<IStatechartFeature<'S, 'C>>(feature)
+
+        member ctx.SetHierarchyFeature(config: ActiveStateConfiguration, history: HistoryRecord) =
+            let feature =
+                { new IHierarchyFeature with
+                    member _.ActiveConfiguration = config
+                    member _.History = history }
+
+            ctx.Features.Set<IHierarchyFeature>(feature)
+
+        member ctx.GetHierarchyFeature() : IHierarchyFeature option =
+            let f = ctx.Features.Get<IHierarchyFeature>()
+            if obj.ReferenceEquals(f, null) then None else Some f

@@ -101,7 +101,7 @@ let nonAdminUser () =
     ClaimsPrincipal(ClaimsIdentity([| Claim("owner", "false") |], "test"))
 
 let addStore (services: IServiceCollection) =
-    services.AddStateMachineStore<TestState, int>() |> ignore
+    services.AddStatechartsStore<TestState, int>() |> ignore
 
 /// Run a test with a TestServer and HttpClient, ensuring proper disposal.
 let withServer resource configServices configUser (f: HttpClient -> Task) =
@@ -273,7 +273,7 @@ let middlewareTests =
                       let evt = capturedEvent.Value
                       Expect.equal evt.PreviousState Active "Previous state should be Active"
                       Expect.equal evt.NewState Active "New state should be Active (DoAction stays Active)"
-                      Expect.equal evt.Event DoAction "Event should be DoAction"
+                      Expect.equal evt.Event (Some DoAction) "Event should be Some DoAction"
                   }))
                   .GetAwaiter()
                   .GetResult()

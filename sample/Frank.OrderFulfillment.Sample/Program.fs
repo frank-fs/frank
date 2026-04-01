@@ -15,8 +15,10 @@
 ///
 /// All transitions go through the primary stateful resource `/orders/{orderId}`.
 /// The POST handler at each state fires the state-specific event.
-/// Dedicated sub-endpoints (cancel, retry, retry-recover) directly manipulate
+/// Dedicated sub-endpoints (cancel, retry, authorize, capture, etc.) directly manipulate
 /// the store for demo purposes so the e2e test can force specific transitions.
+/// Region-completion sub-resources (/pick, /pack, /ship) use statefulResource + middleware
+/// to prove the library handles ALL hierarchy operations — no direct store manipulation.
 ///
 /// Pipeline order:
 ///   1. State key resolver — reads store, sets IStatechartFeature
@@ -77,23 +79,66 @@ let resolveStateKey (app: IApplicationBuilder) =
 // Handlers — state-aware HTTP responses
 // ===========================================================================
 
-/// Returns current order state as plain text: "state=<Key>;orderId=<id>"
+// ===========================================================================
+// Shared helpers — eliminate duplication across handlers
+// ===========================================================================
+
+let private defaultSnapshot: InstanceSnapshot<OrderState, unit> =
+    { State = orderMachine.Initial
+      Context = ()
+      HierarchyConfig = ActiveStateConfiguration.empty
+      HistoryRecord = HistoryRecord.empty }
+
+let private ensureConfig (stateKey: string) (snapshot: InstanceSnapshot<OrderState, unit>) =
+    if ActiveStateConfiguration.isEmpty snapshot.HierarchyConfig then
+        HierarchicalRuntime.enterState orderHierarchy stateKey ActiveStateConfiguration.empty
+    else
+        snapshot.HierarchyConfig
+
+/// Returns current order state as plain text with hierarchical config and AND-region statuses.
 let getOrderState (ctx: HttpContext) : Task =
     task {
         let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
+            ctx.RequestServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
 
         let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        let! result = store.GetState orderId
+        let! result = store.Load orderId
 
         let state =
             match result with
-            | Some(s, _) -> s
+            | Some snapshot -> snapshot.State
             | None -> orderMachine.Initial
 
         let key = stateKeyOf state
-        do! ctx.Response.WriteAsync($"state={key};orderId={orderId}")
+
+        let hierFeature = ctx.GetHierarchyFeature()
+
+        let configStr, regionStr =
+            match hierFeature with
+            | Some f ->
+                let activeSet = ActiveStateConfiguration.toSet f.ActiveConfiguration
+                let cfg = activeSet |> Set.toList |> String.concat ","
+
+                let regions =
+                    if ActiveStateConfiguration.isActive "Fulfillment" f.ActiveConfiguration then
+                        let statuses =
+                            fulfillmentRegionNames
+                            |> List.map (fun region ->
+                                let displayName = regionDisplayNames |> Map.find region
+                                let activeKey = regionActiveStates |> Map.find region
+                                let doneKey = regionDoneStates |> Map.find region
+                                let status =
+                                    if ActiveStateConfiguration.isActive doneKey f.ActiveConfiguration then "complete"
+                                    elif ActiveStateConfiguration.isActive activeKey f.ActiveConfiguration then "active"
+                                    else "unknown"
+                                $"{displayName}:{status}")
+                        ";regions=" + String.concat "," statuses
+                    else ""
+
+                cfg, regions
+            | None -> key, ""
+
+        do! ctx.Response.WriteAsync($"state={key};config={configStr}{regionStr};orderId={orderId}")
     }
     :> Task
 
@@ -106,9 +151,32 @@ let private eventHandler (event: OrderEvent) (ctx: HttpContext) : Task =
 let handlePlaceOrder = eventHandler PlaceOrder
 let handleAuthorizePayment = eventHandler AuthorizePayment
 let handleCapturePayment = eventHandler CapturePayment
-let handleRecoverFromRetry = eventHandler RecoverFromRetry
-let handleFulfillOrder = eventHandler FulfillOrder
 let handleConfirmDelivery = eventHandler ConfirmDelivery
+
+/// Retry recovery via middleware hierarchy op: uses shallow history on Payment composite
+/// to restore the last active Payment child (Capture by default).
+let handleRecoverFromRetry (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (RecoverHistory("Payment", Frank.Statecharts.Ast.HistoryKind.Shallow))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Pick AND-state region via middleware hierarchy op.
+let handlePickComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Pick", "PickDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Pack AND-state region via middleware hierarchy op.
+let handlePackComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Pack", "PackDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
+
+/// Complete the Ship AND-state region via middleware hierarchy op.
+let handleShipComplete (ctx: HttpContext) : Task =
+    StateMachineContext.setHierarchyOp ctx (CompleteRegion("Ship", "ShipDone"))
+    ctx.Response.StatusCode <- 202
+    Task.CompletedTask
 
 // ===========================================================================
 // Direct store manipulation helpers (sub-resource endpoints for e2e testing)
@@ -116,21 +184,26 @@ let handleConfirmDelivery = eventHandler ConfirmDelivery
 // ===========================================================================
 
 /// Directly set an order to a target state, bypassing statechart guards (for e2e testing).
+/// Computes proper hierarchical transition so config and history are kept consistent.
 let private directSetState (targetState: OrderState) (ctx: HttpContext) : Task =
     task {
-        let store =
-            ctx.RequestServices.GetService(typeof<IStateMachineStore<OrderState, unit>>)
-            :?> IStateMachineStore<OrderState, unit>
-
+        let store = ctx.RequestServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
         let orderId = ctx.Request.RouteValues["orderId"] :?> string
-        do! store.SetState orderId targetState ()
+        let! current = store.Load orderId
+        let snapshot = current |> Option.defaultValue defaultSnapshot
+
+        let sourceKey = stateKeyOf snapshot.State
+        let targetKey = stateKeyOf targetState
+        let currentConfig = ensureConfig sourceKey snapshot
+        let result = HierarchicalRuntime.transition orderHierarchy currentConfig sourceKey targetKey snapshot.HistoryRecord
+
+        do! store.Save orderId { State = targetState; Context = (); HierarchyConfig = result.Configuration; HistoryRecord = result.HistoryRecord }
         ctx.Response.StatusCode <- 202
     }
     :> Task
 
 let directCancelOrder = directSetState Cancelled
 let directRetryPayment = directSetState Retry
-let directRetryRecover = directSetState Capture
 let directCapture = directSetState Capture
 let directFulfillment = directSetState Fulfillment
 let directShipped = directSetState Shipped
@@ -169,16 +242,70 @@ let orderResource =
         inState (forState Authorize [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleAuthorizePayment ])
         inState (forState Capture [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleCapturePayment ])
         inState (forState Retry [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleRecoverFromRetry ])
-        inState (forState Fulfillment [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleFulfillOrder ])
+        inState (forState Fulfillment [ StateHandlerBuilder.get getOrderState ])
         inState (forState Shipped [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handleConfirmDelivery ])
+        inState (forState Pick [ StateHandlerBuilder.get getOrderState ])
+        inState (forState PickDone [ StateHandlerBuilder.get getOrderState ])
+        inState (forState Pack [ StateHandlerBuilder.get getOrderState ])
+        inState (forState PackDone [ StateHandlerBuilder.get getOrderState ])
+        inState (forState Ship [ StateHandlerBuilder.get getOrderState ])
+        inState (forState ShipDone [ StateHandlerBuilder.get getOrderState ])
         inState (forState Delivered [ StateHandlerBuilder.get getOrderState ])
         inState (forState Cancelled [ StateHandlerBuilder.get getOrderState ])
+
+        // Transition observer: log exited/entered states for each hierarchy transition.
+        onTransition (fun evt ->
+            if not (List.isEmpty evt.ExitedStates) || not (List.isEmpty evt.EnteredStates) then
+                eprintfn "  exited: [%s]" (String.concat "; " evt.ExitedStates)
+                eprintfn "  entered: [%s]" (String.concat "; " evt.EnteredStates))
 
         // Key acceptance criterion: useHierarchyWith CE operation wires hierarchical runtime.
         // HierarchySpec defines:
         //   - Processing (XOR): [Payment; Fulfillment]
         //   - Payment (XOR):    [Authorize; Capture; Retry]  (shallow history on retry-recover)
         //   - Fulfillment (AND): [Pick; Pack; Ship]           (parallel regions, AND-state warning)
+        useHierarchyWith orderHierarchySpec
+    }
+
+/// Sub-resource for Pick AND-region completion.
+/// POST /orders/{orderId}/pick → CompleteRegion("Pick","PickDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
+let pickResource =
+    statefulResource "/orders/{orderId}/pick" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Pick [ StateHandlerBuilder.post handlePickComplete ])
+        useHierarchyWith orderHierarchySpec
+    }
+
+/// Sub-resource for Pack AND-region completion.
+/// POST /orders/{orderId}/pack → CompleteRegion("Pack","PackDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
+let packResource =
+    statefulResource "/orders/{orderId}/pack" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Pack [ StateHandlerBuilder.post handlePackComplete ])
+        useHierarchyWith orderHierarchySpec
+    }
+
+/// Sub-resource for Ship AND-region completion.
+/// POST /orders/{orderId}/ship → CompleteRegion("Ship","ShipDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
+let shipResource =
+    statefulResource "/orders/{orderId}/ship" {
+        machine orderMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
+        inState (forState Ship [ StateHandlerBuilder.post handleShipComplete ])
         useHierarchyWith orderHierarchySpec
     }
 
@@ -203,13 +330,6 @@ let retryResource =
     resource "/orders/{orderId}/retry" {
         name "OrderRetry"
         post (RequestDelegate(fun ctx -> directRetryPayment ctx))
-    }
-
-// POST /orders/{orderId}/retry-recover → "retry recovery" → state = Capture (shallow history proof)
-let retryRecoverResource =
-    resource "/orders/{orderId}/retry-recover" {
-        name "OrderRetryRecover"
-        post (RequestDelegate(fun ctx -> directRetryRecover ctx))
     }
 
 // POST /orders/{orderId}/capture → "payment captured" → state = Fulfillment (AND-state)
@@ -270,6 +390,12 @@ let computeAndStateWarnings (logger: ILogger) : string list =
               "Capture"
               "Retry"
               "Fulfillment"
+              "Pick"
+              "PickDone"
+              "Pack"
+              "PackDone"
+              "Ship"
+              "ShipDone"
               "Shipped"
               "Delivered"
               "Cancelled" ]
@@ -349,7 +475,7 @@ let seedInitialStates (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
 
     let store =
-        app.ApplicationServices.GetRequiredService<IStateMachineStore<OrderState, unit>>()
+        app.ApplicationServices.GetRequiredService<IStatechartsStore<OrderState, unit>>()
 
     let logger =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger("OrderFulfillment.Seed")
@@ -357,8 +483,7 @@ let seedInitialStates (app: IApplicationBuilder) =
     lifetime.ApplicationStarted.Register(fun () ->
         // Seed 3 order instances for e2e test scenarios
         for orderId in [ "o1"; "o2"; "o3" ] do
-            store.SetState orderId orderMachine.Initial orderMachine.InitialContext
-            |> fun t -> t.Wait()
+            store.Save orderId defaultSnapshot |> fun t -> t.Wait()
 
         // Compute AND-state warnings and cache for /diagnostics
         let warnings = computeAndStateWarnings logger
@@ -411,7 +536,7 @@ let main args =
         useDefaults
 
         service (fun services ->
-            services.AddStateMachineStore<OrderState, unit>() |> ignore
+            services.AddStatechartsStore<OrderState, unit>() |> ignore
             services.AddSingleton<ResolvableWarnings>() |> ignore
             services)
 
@@ -429,11 +554,16 @@ let main args =
         // Primary stateful resource (demonstrates hierarchy + 4 MPST roles)
         resource orderResource
 
+        // Region-completion stateful resources — each dispatches through middleware
+        // (CompleteRegion hierarchy op via handlePickComplete/handlePackComplete/handleShipComplete)
+        resource pickResource
+        resource packResource
+        resource shipResource
+
         // Direct state manipulation sub-resources (e2e test control paths)
         resource cancelResource
         resource authorizeResource
         resource retryResource
-        resource retryRecoverResource
         resource captureResource
         resource fulfillResource
         resource deliverResource

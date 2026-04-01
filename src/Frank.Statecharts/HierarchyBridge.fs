@@ -58,7 +58,8 @@ module HierarchyBridge =
                     [ { Id = parentId
                         Kind = compositeKind node
                         Children = identifiableChildren
-                        InitialChild = findInitialChild node.Children } ]
+                        InitialChild = findInitialChild node.Children
+                        CompletionTarget = None } ]
 
             let childSpecs = node.Children |> List.collect collectComposites
             thisSpec @ childSpecs

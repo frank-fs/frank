@@ -159,7 +159,7 @@ let spectator () =
     ClaimsPrincipal(ClaimsIdentity([||], "test"))
 
 let addGameStore (services: IServiceCollection) =
-    services.AddStateMachineStore<TicTacToeState, int>() |> ignore
+    services.AddStatechartsStore<TicTacToeState, int>() |> ignore
 
 let withGameServer (resource: Resource) configUser (f: TestServer -> HttpClient -> Task) =
     task {
@@ -176,9 +176,16 @@ let withGameServer (resource: Resource) configUser (f: TestServer -> HttpClient 
 
 let prePopulateState (server: TestServer) instanceId (state: TicTacToeState) (moveCount: int) =
     let store =
-        server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+        server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
-    (store.SetState instanceId state moveCount).GetAwaiter().GetResult()
+    (store.Save
+        instanceId
+        { State = state
+          Context = moveCount
+          HierarchyConfig = ActiveStateConfiguration.empty
+          HistoryRecord = HistoryRecord.empty })
+        .GetAwaiter()
+        .GetResult()
 
 // === Tests ===
 
@@ -443,7 +450,7 @@ let transitionHookTests =
                       let evt = capturedEvent.Value
                       Expect.equal evt.PreviousState XTurn "Previous state should be XTurn"
                       Expect.equal evt.NewState OTurn "New state should be OTurn"
-                      Expect.equal evt.Event (MakeMove 0) "Event should be MakeMove 0"
+                      Expect.equal evt.Event (Some(MakeMove 0)) "Event should be Some(MakeMove 0)"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -479,13 +486,13 @@ let transitionHookTests =
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", content)
 
                       let store =
-                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
-                      let! stateOpt = store.GetState "game1"
+                      let! stateOpt = store.Load "game1"
                       Expect.isSome stateOpt "Store should have state for game1"
-                      let (state, moveCount) = stateOpt.Value
-                      Expect.equal state OTurn "State should be OTurn after first move"
-                      Expect.equal moveCount 1 "Move count should be 1"
+                      let snapshot = stateOpt.Value
+                      Expect.equal snapshot.State OTurn "State should be OTurn after first move"
+                      Expect.equal snapshot.Context 1 "Move count should be 1"
                   }))
                   .GetAwaiter()
                   .GetResult() ]
@@ -536,33 +543,33 @@ let storeLifecycleTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
                       // Move 1: XTurn -> OTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
-                      let! s1 = store.GetState "game1"
-                      Expect.equal (fst s1.Value) OTurn "After move 1: OTurn"
+                      let! s1 = store.Load "game1"
+                      Expect.equal s1.Value.State OTurn "After move 1: OTurn"
 
                       // Move 2: OTurn -> XTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
-                      let! s2 = store.GetState "game1"
-                      Expect.equal (fst s2.Value) XTurn "After move 2: XTurn"
+                      let! s2 = store.Load "game1"
+                      Expect.equal s2.Value.State XTurn "After move 2: XTurn"
 
                       // Move 3: XTurn -> OTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
-                      let! s3 = store.GetState "game1"
-                      Expect.equal (fst s3.Value) OTurn "After move 3: OTurn"
+                      let! s3 = store.Load "game1"
+                      Expect.equal s3.Value.State OTurn "After move 3: OTurn"
 
                       // Move 4: OTurn -> XTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
-                      let! s4 = store.GetState "game1"
-                      Expect.equal (fst s4.Value) XTurn "After move 4: XTurn"
+                      let! s4 = store.Load "game1"
+                      Expect.equal s4.Value.State XTurn "After move 4: XTurn"
 
                       // Move 5: XTurn -> Won "X" (moveCount >= 5)
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
-                      let! s5 = store.GetState "game1"
-                      Expect.equal (fst s5.Value) (Won "X") "After move 5: Won X"
-                      Expect.equal (snd s5.Value) 5 "Move count should be 5"
+                      let! s5 = store.Load "game1"
+                      Expect.equal s5.Value.State (Won "X") "After move 5: Won X"
+                      Expect.equal s5.Value.Context 5 "Move count should be 5"
 
                       // Won state blocks POST (405)
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
@@ -586,7 +593,7 @@ let multipleInstanceTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
                       // Move game1: XTurn -> OTurn
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", new StringContent(""))
@@ -596,14 +603,14 @@ let multipleInstanceTests =
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game2", new StringContent(""))
 
                       // game1 should be OTurn (1 move)
-                      let! s1 = store.GetState "game1"
-                      Expect.equal (fst s1.Value) OTurn "game1 should be OTurn"
-                      Expect.equal (snd s1.Value) 1 "game1 move count should be 1"
+                      let! s1 = store.Load "game1"
+                      Expect.equal s1.Value.State OTurn "game1 should be OTurn"
+                      Expect.equal s1.Value.Context 1 "game1 move count should be 1"
 
                       // game2 should be XTurn (2 moves)
-                      let! s2 = store.GetState "game2"
-                      Expect.equal (fst s2.Value) XTurn "game2 should be XTurn"
-                      Expect.equal (snd s2.Value) 2 "game2 move count should be 2"
+                      let! s2 = store.Load "game2"
+                      Expect.equal s2.Value.State XTurn "game2 should be XTurn"
+                      Expect.equal s2.Value.Context 2 "game2 move count should be 2"
                   }))
                   .GetAwaiter()
                   .GetResult() ]
@@ -819,10 +826,10 @@ let observerResilienceTests =
 
                       // Verify state was still persisted
                       let store =
-                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
-                      let! stateOpt = store.GetState "game1"
-                      Expect.equal (fst stateOpt.Value) OTurn "Transition should still be persisted"
+                      let! stateOpt = store.Load "game1"
+                      Expect.equal stateOpt.Value.State OTurn "Transition should still be persisted"
 
                       // Verify second observer was still called (observers are independent)
                       Expect.isTrue secondObserverCalled "Second observer should run despite first throwing"
@@ -1026,7 +1033,7 @@ let buildHierarchicalResource (sm: StateMachine<HierarchicalGameState, Hierarchi
     }
 
 let addHierarchicalStore (services: IServiceCollection) =
-    services.AddStateMachineStore<HierarchicalGameState, HierarchicalContext>()
+    services.AddStatechartsStore<HierarchicalGameState, HierarchicalContext>()
     |> ignore
 
 let withHierarchicalServer (resource: Resource) configUser (f: TestServer -> HttpClient -> Task) =
@@ -1046,9 +1053,16 @@ let withHierarchicalServer (resource: Resource) configUser (f: TestServer -> Htt
 
 let prePopulateHierarchical (server: TestServer) instanceId (state: HierarchicalGameState) (ctx: HierarchicalContext) =
     let store =
-        server.Services.GetRequiredService<IStateMachineStore<HierarchicalGameState, HierarchicalContext>>()
+        server.Services.GetRequiredService<IStatechartsStore<HierarchicalGameState, HierarchicalContext>>()
 
-    (store.SetState instanceId state ctx).GetAwaiter().GetResult()
+    (store.Save
+        instanceId
+        { State = state
+          Context = ctx
+          HierarchyConfig = ActiveStateConfiguration.empty
+          HistoryRecord = HistoryRecord.empty })
+        .GetAwaiter()
+        .GetResult()
 
 [<Tests>]
 let hierarchicalStatechartTests =
@@ -1078,11 +1092,11 @@ let hierarchicalStatechartTests =
 
                       let store =
                           server.Services.GetRequiredService<
-                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                              IStatechartsStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
-                      let! stateOpt = store.GetState "g1"
-                      Expect.equal (fst stateOpt.Value) (Playing OTurn) "Should transition to Playing OTurn"
+                      let! stateOpt = store.Load "g1"
+                      Expect.equal stateOpt.Value.State (Playing OTurn) "Should transition to Playing OTurn"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -1098,11 +1112,11 @@ let hierarchicalStatechartTests =
 
                       let store =
                           server.Services.GetRequiredService<
-                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                              IStatechartsStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
-                      let! stateOpt = store.GetState "g1"
-                      let (_, ctx) = stateOpt.Value
+                      let! stateOpt = store.Load "g1"
+                      let ctx = stateOpt.Value.Context
                       Expect.equal ctx.MoveCount 1 "Move count should be 1"
 
                       match ctx.Assignment with
@@ -1131,11 +1145,11 @@ let hierarchicalStatechartTests =
 
                       let store =
                           server.Services.GetRequiredService<
-                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                              IStatechartsStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
-                      let! stateOpt = store.GetState "g1"
-                      Expect.equal (fst stateOpt.Value) Disposed "Should transition to Disposed"
+                      let! stateOpt = store.Load "g1"
+                      Expect.equal stateOpt.Value.State Disposed "Should transition to Disposed"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -1223,15 +1237,15 @@ let hierarchicalStatechartTests =
                   task {
                       let store =
                           server.Services.GetRequiredService<
-                              IStateMachineStore<HierarchicalGameState, HierarchicalContext>
+                              IStatechartsStore<HierarchicalGameState, HierarchicalContext>
                            >()
 
                       // Move 1: Playing XTurn -> Playing OTurn (assigns player X)
                       let! (_: HttpResponseMessage) = client.PostAsync("/hgames/g1", new StringContent(""))
-                      let! s1 = store.GetState "g1"
-                      Expect.equal (fst s1.Value) (Playing OTurn) "Move 1: Playing OTurn"
+                      let! s1 = store.Load "g1"
+                      Expect.equal s1.Value.State (Playing OTurn) "Move 1: Playing OTurn"
 
-                      match (snd s1.Value).Assignment with
+                      match s1.Value.Context.Assignment with
                       | XOnly id -> Expect.equal id "X" "Player X should be assigned"
                       | other -> failtest $"Expected XOnly, got {other}"
                   }))
@@ -1425,7 +1439,7 @@ let parameterizedStateKeyTests =
               (withGameServer res None (fun server client ->
                   task {
                       let store =
-                          server.Services.GetRequiredService<IStateMachineStore<TicTacToeState, int>>()
+                          server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
 
                       // Play through 5 moves to reach Won "X"
                       for _ in 1..5 do
@@ -1434,10 +1448,10 @@ let parameterizedStateKeyTests =
 
                           ()
 
-                      let! finalState = store.GetState "game1"
+                      let! finalState = store.Load "game1"
 
                       Expect.equal
-                          (fst finalState.Value)
+                          finalState.Value.State
                           (TicTacToeState.Won "X")
                           "Should reach Won 'X' after 5 moves"
 
@@ -1519,7 +1533,7 @@ let private getRolesHandler (ctx: HttpContext) : Task =
     ctx.Response.WriteAsync(String.Join(",", roles |> Set.toList |> List.sort))
 
 let private addRoleTestStore (services: IServiceCollection) =
-    services.AddStateMachineStore<MiddlewareTests.TestState, int>() |> ignore
+    services.AddStatechartsStore<MiddlewareTests.TestState, int>() |> ignore
 
 let private withRoleServer (resource: Resource) configUser (f: HttpClient -> Task) =
     task {

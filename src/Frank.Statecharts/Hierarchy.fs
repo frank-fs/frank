@@ -34,7 +34,10 @@ type CompositeStateSpec =
     { Id: string
       Kind: CompositeKind
       Children: string list
-      InitialChild: string option }
+      InitialChild: string option
+      /// For AND composites: the target state key to transition to when all regions complete.
+      /// None for XOR composites and AND composites without auto-completion.
+      CompletionTarget: string option }
 
 /// Input specification for building a StateHierarchy.
 type HierarchySpec = { States: CompositeStateSpec list }
@@ -55,6 +58,11 @@ type StateHierarchy =
         LcaCache: Map<string * string, string>
         /// Pre-computed depth (distance from root) for every state
         DepthMap: Map<string, int>
+        /// Pre-computed all descendants (recursive) for every composite state
+        DescendantMap: Map<string, string list>
+        /// AND composite state -> completion target state key
+        /// Populated from CompositeStateSpec.CompletionTarget for AND-kind specs.
+        CompletionTargets: Map<string, string>
     }
 
 /// The set of currently active state IDs in a hierarchical statechart.
@@ -81,6 +89,16 @@ type HierarchicalTransitionResult =
         HistoryRecord: HistoryRecord
     }
 
+/// Hierarchy-level operations routed through the statechart middleware.
+/// Allows handlers to trigger AND-state region completion and history recovery
+/// without bypassing middleware guard evaluation.
+type HierarchyOp =
+    /// Complete an AND-state region by transitioning from activeState to doneState.
+    /// The middleware will auto-detect completion and fire the completion target transition.
+    | CompleteRegion of activeState: string * doneState: string
+    /// Re-enter a composite state using shallow or deep history pseudo-state semantics.
+    | RecoverHistory of compositeId: string * kind: Frank.Statecharts.Ast.HistoryKind
+
 // ==========================================================================
 // ActiveStateConfiguration module
 // ==========================================================================
@@ -101,6 +119,10 @@ module ActiveStateConfiguration =
 
     let toSet (config: ActiveStateConfiguration) : Set<string> = config.ActiveStates
 
+    let isEmpty (config: ActiveStateConfiguration) : bool = Set.isEmpty config.ActiveStates
+
+    let ofSet (states: Set<string>) : ActiveStateConfiguration = { ActiveStates = states }
+
 // ==========================================================================
 // HistoryRecord module
 // ==========================================================================
@@ -115,6 +137,10 @@ module HistoryRecord =
 
     let tryGet (compositeStateId: string) (history: HistoryRecord) : ActiveStateConfiguration option =
         Map.tryFind compositeStateId history.Entries
+
+    let toMap (history: HistoryRecord) : Map<string, ActiveStateConfiguration> = history.Entries
+
+    let ofMap (entries: Map<string, ActiveStateConfiguration>) : HistoryRecord = { Entries = entries }
 
 // ==========================================================================
 // StateHierarchy module
@@ -196,12 +222,34 @@ module StateHierarchy =
                     | None -> None))
             |> Map.ofList
 
+        // Pre-compute all descendants for every composite state
+        let descendantMap =
+            spec.States
+            |> List.map (fun s ->
+                let rec collectDescendants stateId =
+                    match Map.tryFind stateId childrenMap with
+                    | Some children -> children |> List.collect (fun c -> c :: collectDescendants c)
+                    | None -> []
+
+                (s.Id, collectDescendants s.Id))
+            |> Map.ofList
+
+        let completionTargets =
+            spec.States
+            |> List.choose (fun s ->
+                match s.Kind, s.CompletionTarget with
+                | CompositeKind.AND, Some target -> Some(s.Id, target)
+                | _ -> None)
+            |> Map.ofList
+
         { ParentMap = parentMap
           ChildrenMap = childrenMap
           InitialChild = initialChild
           StateKind = stateKind
           LcaCache = lcaCache
-          DepthMap = depthMap }
+          DepthMap = depthMap
+          DescendantMap = descendantMap
+          CompletionTargets = completionTargets }
 
     /// Compute the ancestry path from a state up to the root (inclusive).
     /// Returns root-to-leaf order: root first, then its child, down to the state itself.
@@ -251,20 +299,9 @@ module StateHierarchy =
 module HierarchicalRuntime =
 
     /// Collect all descendant state IDs of a composite state (recursive).
+    /// Uses the pre-computed DescendantMap for O(1) lookup.
     let private allDescendants (hierarchy: StateHierarchy) (stateId: string) : string list =
-        let rec loop states =
-            states
-            |> List.collect (fun s ->
-                let descendants =
-                    match Map.tryFind s hierarchy.ChildrenMap with
-                    | Some kids -> loop kids
-                    | None -> []
-
-                s :: descendants)
-
-        match Map.tryFind stateId hierarchy.ChildrenMap with
-        | Some children -> loop children
-        | None -> []
+        Map.tryFind stateId hierarchy.DescendantMap |> Option.defaultValue []
 
     /// Enter a state, recursively activating initial children for composite states.
     /// For AND composites, all children are entered. For XOR, only the initial child.
@@ -371,21 +408,34 @@ module HierarchicalRuntime =
         : HierarchicalTransitionResult =
         // For self-transitions (source = target), use external semantics:
         // exit the state and re-enter it, resetting composite children to initial.
-        let exitStates, entryStates =
+        let exitStates, entryStates, lcaOpt =
             if source = target then
-                ([ source ], [ target ])
+                ([ source ], [ target ], None)
             else
                 let lca =
-                    StateHierarchy.computeLCA hierarchy source target |> Option.defaultValue source
+                    StateHierarchy.computeLCA hierarchy source target
+                    |> Option.defaultWith (fun () ->
+                        failwithf
+                            "No LCA found for (%s, %s) — disconnected hierarchy. Ensure all states share a common ancestor."
+                            source
+                            target)
 
                 let exits = exitPath hierarchy source lca
                 let entries = entryPath hierarchy target lca
-                (exits, entries)
+                (exits, entries, Some lca)
 
-        // Exit phase: record history for exited composite states, folding into input history
+        // Record history for the LCA if it's a composite. The LCA is NOT being exited,
+        // but its active child is changing. Record what was active before so shallow/deep
+        // history pseudo-states can restore it later (e.g., Capture→Retry within Payment).
+        let historyWithLca =
+            match lcaOpt with
+            | Some lca -> exitCompositeState hierarchy lca config history
+            | None -> history
+
+        // Exit phase: record history for exited composite states, folding into LCA history
         let updatedHistory =
             exitStates
-            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) history
+            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) historyWithLca
 
         // Remove exited states and all descendants of exited composite states.
         // For AND composites, this deactivates all regions; for XOR, any active child subtree.
@@ -414,7 +464,13 @@ module HierarchicalRuntime =
                     let after = ActiveStateConfiguration.toSet nextConfig
                     let newlyEntered = Set.difference after before
 
-                    let nextAccRev = Set.fold (fun acc s -> s :: acc) accRev newlyEntered
+                    // Sort by depth (parent before child) for SCXML-compliant entry ordering
+                    let sortedNewlyEntered =
+                        newlyEntered
+                        |> Set.toList
+                        |> List.sortBy (fun s -> Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
+
+                    let nextAccRev = sortedNewlyEntered |> List.fold (fun acc s -> s :: acc) accRev
 
                     (nextConfig, nextAccRev))
                 (configAfterExit, [])
@@ -487,6 +543,61 @@ module HierarchicalRuntime =
             match Map.tryFind compositeStateId hierarchy.InitialChild with
             | Some initial -> enterState hierarchy initial config
             | None -> config
+
+    /// Check whether all regions of an AND composite have a leaf that is a final state.
+    /// Returns true when every direct child region of compositeId has at least one active
+    /// descendant (or itself) in finalStates.
+    let isCompositeComplete
+        (hierarchy: StateHierarchy)
+        (config: ActiveStateConfiguration)
+        (compositeId: string)
+        (finalStates: Set<string>)
+        : bool =
+        match Map.tryFind compositeId hierarchy.ChildrenMap with
+        | None -> false
+        | Some children ->
+            children
+            |> List.forall (fun child ->
+                let descendants = child :: (allDescendants hierarchy child)
+
+                descendants
+                |> List.exists (fun d -> ActiveStateConfiguration.isActive d config && Set.contains d finalStates))
+
+    /// Walk up the parent chain from stateId to find the nearest AND composite that has a
+    /// CompletionTarget configured. Returns (compositeId, targetKey) or None.
+    let findCompletionTarget (hierarchy: StateHierarchy) (stateId: string) : (string * string) option =
+        let rec loop current =
+            match Map.tryFind current hierarchy.ParentMap with
+            | None -> None
+            | Some parent ->
+                match Map.tryFind parent hierarchy.StateKind with
+                | Some CompositeKind.AND ->
+                    match Map.tryFind parent hierarchy.CompletionTargets with
+                    | Some target -> Some(parent, target)
+                    | None -> loop parent
+                | _ -> loop parent
+
+        loop stateId
+
+    /// Find the deepest active leaf state (non-composite) in the active configuration.
+    /// For XOR-only configurations, returns the single active leaf.
+    /// For AND-states with multiple active leaves, returns the deepest by hierarchy depth;
+    /// ties are broken lexicographically (deterministic but arbitrary).
+    /// Callers operating on AND-state configurations should use ActiveStateConfiguration.toSet instead.
+    let leafState (hierarchy: StateHierarchy) (config: ActiveStateConfiguration) : string option =
+        let activeStates = ActiveStateConfiguration.toSet config
+
+        let leaves =
+            activeStates |> Set.filter (fun s -> not (Map.containsKey s hierarchy.StateKind))
+
+        if Set.isEmpty leaves then
+            None
+        else
+            leaves
+            |> Set.toList
+            |> List.sortByDescending (fun s ->
+                Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
+            |> List.tryHead
 
     /// Collect all ancestor state IDs from a given state up to the root (exclusive of stateId itself).
     let private ancestorStates (hierarchy: StateHierarchy) (stateId: string) : string list =

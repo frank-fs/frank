@@ -69,7 +69,8 @@ let private xorHierarchySpec: HierarchySpec =
         [ { Id = "Active"
             Kind = CompositeKind.XOR
             Children = [ "XTurn"; "OTurn" ]
-            InitialChild = Some "XTurn" } ] }
+            InitialChild = Some "XTurn"
+            CompletionTarget = None } ] }
 
 let private xorHierarchy: StateHierarchy = StateHierarchy.build xorHierarchySpec
 
@@ -82,7 +83,8 @@ let private andHierarchySpec: HierarchySpec =
         [ { Id = "Voting"
             Kind = CompositeKind.AND
             Children = [ "RegionA"; "RegionB" ]
-            InitialChild = None } ] }
+            InitialChild = None
+            CompletionTarget = None } ] }
 
 let private andHierarchy: StateHierarchy = StateHierarchy.build andHierarchySpec
 
@@ -95,11 +97,13 @@ let private mixedHierarchySpec: HierarchySpec =
         [ { Id = "Root"
             Kind = CompositeKind.XOR
             Children = [ "Voting"; "Done" ]
-            InitialChild = Some "Voting" }
+            InitialChild = Some "Voting"
+            CompletionTarget = None }
           { Id = "Voting"
             Kind = CompositeKind.AND
             Children = [ "RegionA"; "RegionB" ]
-            InitialChild = None } ] }
+            InitialChild = None
+            CompletionTarget = None } ] }
 
 let private mixedHierarchy: StateHierarchy = StateHierarchy.build mixedHierarchySpec
 

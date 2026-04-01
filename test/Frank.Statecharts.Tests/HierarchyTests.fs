@@ -46,11 +46,13 @@ let stateHierarchyBuildTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               Expect.equal
                   (Map.tryFind TrafficLight.active hierarchy.ParentMap)
@@ -87,11 +89,13 @@ let stateHierarchyBuildTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               Expect.equal
                   (Map.tryFind TrafficLight.root hierarchy.ChildrenMap)
@@ -111,11 +115,13 @@ let stateHierarchyBuildTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               Expect.equal
                   (Map.tryFind TrafficLight.root hierarchy.InitialChild)
@@ -135,11 +141,13 @@ let stateHierarchyBuildTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               Expect.equal (Map.tryFind TrafficLight.root hierarchy.StateKind) (Some CompositeKind.XOR) "Root is XOR"
 
@@ -166,11 +174,13 @@ let stateHierarchyBuildTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let containment = StateHierarchy.toContainment hierarchy
 
@@ -224,11 +234,13 @@ let lcaTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let lca = StateHierarchy.computeLCA hierarchy TrafficLight.red TrafficLight.green
               Expect.equal lca (Some TrafficLight.active) "LCA of Red and Green is Active"
@@ -241,11 +253,13 @@ let lcaTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let lca = StateHierarchy.computeLCA hierarchy TrafficLight.active TrafficLight.red
               Expect.equal lca (Some TrafficLight.active) "LCA of Active and Red is Active"
@@ -258,11 +272,13 @@ let lcaTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let lca = StateHierarchy.computeLCA hierarchy TrafficLight.red TrafficLight.off
               Expect.equal lca (Some TrafficLight.root) "LCA of Red and Off is Root"
@@ -275,7 +291,8 @@ let lcaTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active } ] }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None } ] }
 
               let lca =
                   StateHierarchy.computeLCA hierarchy TrafficLight.active TrafficLight.active
@@ -298,11 +315,13 @@ let xorCompositeTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let config =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
@@ -321,7 +340,8 @@ let xorCompositeTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active } ] }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None } ] }
 
               let config =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.off ActiveStateConfiguration.empty
@@ -337,11 +357,13 @@ let xorCompositeTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // Start in Red (inside Active)
               let initial =
@@ -384,11 +406,13 @@ let entryExitOrderingTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let initial =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
@@ -413,11 +437,13 @@ let entryExitOrderingTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let initial =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
@@ -438,11 +464,13 @@ let entryExitOrderingTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // Start in Off
               let initial =
@@ -502,15 +530,18 @@ let andCompositeTests =
                           [ { Id = Device.device
                               Kind = CompositeKind.AND
                               Children = [ Device.display; Device.network ]
-                              InitialChild = None }
+                              InitialChild = None
+                              CompletionTarget = None }
                             { Id = Device.display
                               Kind = CompositeKind.XOR
                               Children = [ Device.screenOn; Device.screenOff ]
-                              InitialChild = Some Device.screenOn }
+                              InitialChild = Some Device.screenOn
+                              CompletionTarget = None }
                             { Id = Device.network
                               Kind = CompositeKind.XOR
                               Children = [ Device.connected; Device.disconnected ]
-                              InitialChild = Some Device.connected } ] }
+                              InitialChild = Some Device.connected
+                              CompletionTarget = None } ] }
 
               let config =
                   HierarchicalRuntime.enterState hierarchy Device.device ActiveStateConfiguration.empty
@@ -529,15 +560,18 @@ let andCompositeTests =
                           [ { Id = Device.device
                               Kind = CompositeKind.AND
                               Children = [ Device.display; Device.network ]
-                              InitialChild = None }
+                              InitialChild = None
+                              CompletionTarget = None }
                             { Id = Device.display
                               Kind = CompositeKind.XOR
                               Children = [ Device.screenOn; Device.screenOff ]
-                              InitialChild = Some Device.screenOn }
+                              InitialChild = Some Device.screenOn
+                              CompletionTarget = None }
                             { Id = Device.network
                               Kind = CompositeKind.XOR
                               Children = [ Device.connected; Device.disconnected ]
-                              InitialChild = Some Device.connected } ] }
+                              InitialChild = Some Device.connected
+                              CompletionTarget = None } ] }
 
               let initial =
                   HierarchicalRuntime.enterState hierarchy Device.device ActiveStateConfiguration.empty
@@ -578,11 +612,13 @@ let historyTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // Start in Green (inside Active)
               let initial =
@@ -628,11 +664,13 @@ let historyTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // No prior history - should default to initial child
               let config =
@@ -661,15 +699,18 @@ let historyTests =
                           [ { Id = "Machine"
                               Kind = CompositeKind.XOR
                               Children = [ "Active"; "Idle" ]
-                              InitialChild = Some "Active" }
+                              InitialChild = Some "Active"
+                              CompletionTarget = None }
                             { Id = "Active"
                               Kind = CompositeKind.XOR
                               Children = [ "SubModeA"; "SubModeB" ]
-                              InitialChild = Some "SubModeA" }
+                              InitialChild = Some "SubModeA"
+                              CompletionTarget = None }
                             { Id = "SubModeA"
                               Kind = CompositeKind.XOR
                               Children = [ "ChildX"; "ChildY" ]
-                              InitialChild = Some "ChildX" } ] }
+                              InitialChild = Some "ChildX"
+                              CompletionTarget = None } ] }
 
               // Build up state: Machine -> Active -> SubModeA -> ChildY
               let initial =
@@ -711,7 +752,8 @@ let httpMappingTests =
                           [ { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let parentMethods = [ "GET"; "OPTIONS" ]
               let childMethods = [ "POST"; "DELETE" ]
@@ -738,7 +780,8 @@ let httpMappingTests =
                           [ { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let parentHandlers =
                   [ ("GET", "parent-get-handler"); ("POST", "parent-post-handler") ]
@@ -781,11 +824,13 @@ let optInTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // Same input should produce same output (pure function)
               let config1 =
@@ -891,11 +936,13 @@ let resolveAllowedMethodsAncestryTests =
                           [ { Id = TrafficLight.root
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.active; TrafficLight.off ]
-                              InitialChild = Some TrafficLight.active }
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
                             { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let stateHandlerMap =
                   Map.ofList
@@ -935,15 +982,18 @@ let historyAccumulationTests =
                           [ { Id = "Root"
                               Kind = CompositeKind.XOR
                               Children = [ "GroupA"; "GroupB" ]
-                              InitialChild = Some "GroupA" }
+                              InitialChild = Some "GroupA"
+                              CompletionTarget = None }
                             { Id = "GroupA"
                               Kind = CompositeKind.XOR
                               Children = [ "A1"; "A2" ]
-                              InitialChild = Some "A1" }
+                              InitialChild = Some "A1"
+                              CompletionTarget = None }
                             { Id = "GroupB"
                               Kind = CompositeKind.XOR
                               Children = [ "B1"; "B2" ]
-                              InitialChild = Some "B1" } ] }
+                              InitialChild = Some "B1"
+                              CompletionTarget = None } ] }
 
               // Enter GroupA -> A1, then move to A2
               let initial =
@@ -987,19 +1037,23 @@ let andCompositeExitTests =
                           [ { Id = "Outer"
                               Kind = CompositeKind.XOR
                               Children = [ Device.device; "Standby" ]
-                              InitialChild = Some Device.device }
+                              InitialChild = Some Device.device
+                              CompletionTarget = None }
                             { Id = Device.device
                               Kind = CompositeKind.AND
                               Children = [ Device.display; Device.network ]
-                              InitialChild = None }
+                              InitialChild = None
+                              CompletionTarget = None }
                             { Id = Device.display
                               Kind = CompositeKind.XOR
                               Children = [ Device.screenOn; Device.screenOff ]
-                              InitialChild = Some Device.screenOn }
+                              InitialChild = Some Device.screenOn
+                              CompletionTarget = None }
                             { Id = Device.network
                               Kind = CompositeKind.XOR
                               Children = [ Device.connected; Device.disconnected ]
-                              InitialChild = Some Device.connected } ] }
+                              InitialChild = Some Device.connected
+                              CompletionTarget = None } ] }
 
               // Enter Device -> all regions active
               let initial =
@@ -1054,7 +1108,8 @@ let selfTransitionTests =
                           [ { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               let initial =
                   HierarchicalRuntime.enterState hierarchy TrafficLight.active ActiveStateConfiguration.empty
@@ -1106,7 +1161,8 @@ let xorExclusivityTests =
                           [ { Id = TrafficLight.active
                               Kind = CompositeKind.XOR
                               Children = [ TrafficLight.red; TrafficLight.yellow; TrafficLight.green ]
-                              InitialChild = Some TrafficLight.red } ] }
+                              InitialChild = Some TrafficLight.red
+                              CompletionTarget = None } ] }
 
               // Manually create invalid config: both Red and Green active in XOR composite
               let invalidConfig =
