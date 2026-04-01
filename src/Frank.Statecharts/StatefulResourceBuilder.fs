@@ -114,7 +114,11 @@ type TransitionEvent<'State, 'Event, 'Context> =
       PreviousContext: 'Context
       NewState: 'State
       NewContext: 'Context
-      Event: 'Event
+      /// The event that triggered the transition.
+      /// None for hierarchy operations (CompleteRegion, RecoverHistory) that are not
+      /// driven by a domain event — using None instead of Unchecked.defaultof avoids
+      /// null reference exceptions in observers that inspect this field.
+      Event: 'Event option
       Timestamp: DateTimeOffset
       User: ClaimsPrincipal option
       /// States exited in LCA-based order (source up to but not including LCA).
@@ -499,7 +503,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                               PreviousContext = currentContext
                               NewState = finalState
                               NewContext = currentContext
-                              Event = Unchecked.defaultof<'E>
+                              Event = None
                               Timestamp = DateTimeOffset.UtcNow
                               User = if isNull (box ctx.User) then None else Some ctx.User
                               ExitedStates = finalResult.ExitedStates
@@ -508,6 +512,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         return TransitionAttemptResult.Succeeded(box evt)
 
                     | RecoverHistory(compositeId, kind) ->
+                        // Determine the target config using history, then find the leaf state
+                        // within that config. Use HierarchicalRuntime.transition (not
+                        // enterWithHistory directly) so we get proper LCA-based exit/entry paths.
                         let targetConfig =
                             HierarchicalRuntime.enterWithHistory
                                 hierarchy
@@ -518,6 +525,19 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                         match HierarchicalRuntime.leafState hierarchy targetConfig with
                         | Some leafKey ->
+                            let sourceKey = stateKey currentState
+
+                            // Compute LCA-based exit/entry paths via the transition function.
+                            // This gives correct ExitedStates/EnteredStates rather than
+                            // fabricated single-element lists.
+                            let hResult =
+                                HierarchicalRuntime.transition
+                                    hierarchy
+                                    currentConfig
+                                    sourceKey
+                                    leafKey
+                                    currentHistory
+
                             let newState =
                                 Map.tryFind leafKey reverseKeyMap |> Option.defaultValue currentState
 
@@ -525,8 +545,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
                                 store.Save instanceId {
                                     State = newState
                                     Context = currentContext
-                                    HierarchyConfig = targetConfig
-                                    HistoryRecord = currentHistory
+                                    HierarchyConfig = hResult.Configuration
+                                    HistoryRecord = hResult.HistoryRecord
                                 }
 
                             let evt: TransitionEvent<'S, 'E, 'C> =
@@ -534,11 +554,11 @@ type StatefulResourceBuilder(routeTemplate: string) =
                                   PreviousContext = currentContext
                                   NewState = newState
                                   NewContext = currentContext
-                                  Event = Unchecked.defaultof<'E>
+                                  Event = None
                                   Timestamp = DateTimeOffset.UtcNow
                                   User = if isNull (box ctx.User) then None else Some ctx.User
-                                  ExitedStates = [ stateKey currentState ]
-                                  EnteredStates = [ leafKey ] }
+                                  ExitedStates = hResult.ExitedStates
+                                  EnteredStates = hResult.EnteredStates }
 
                             return TransitionAttemptResult.Succeeded(box evt)
                         | None -> return TransitionAttemptResult.NoEvent
@@ -586,7 +606,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                                   PreviousContext = context
                                   NewState = newState
                                   NewContext = newContext
-                                  Event = event
+                                  Event = Some event
                                   Timestamp = DateTimeOffset.UtcNow
                                   User = if isNull (box ctx.User) then None else Some ctx.User
                                   ExitedStates = hResult.ExitedStates

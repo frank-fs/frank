@@ -413,7 +413,12 @@ module HierarchicalRuntime =
                 ([ source ], [ target ], None)
             else
                 let lca =
-                    StateHierarchy.computeLCA hierarchy source target |> Option.defaultValue source
+                    StateHierarchy.computeLCA hierarchy source target
+                    |> Option.defaultWith (fun () ->
+                        failwithf
+                            "No LCA found for (%s, %s) — disconnected hierarchy. Ensure all states share a common ancestor."
+                            source
+                            target)
 
                 let exits = exitPath hierarchy source lca
                 let entries = entryPath hierarchy target lca
@@ -574,8 +579,11 @@ module HierarchicalRuntime =
 
         loop stateId
 
-    /// Find the deepest active leaf state in the configuration.
-    /// Returns the state with the highest depth value that is not itself a composite.
+    /// Find the deepest active leaf state (non-composite) in the active configuration.
+    /// For XOR-only configurations, returns the single active leaf.
+    /// For AND-states with multiple active leaves, returns the deepest by hierarchy depth;
+    /// ties are broken lexicographically (deterministic but arbitrary).
+    /// Callers operating on AND-state configurations should use ActiveStateConfiguration.toSet instead.
     let leafState (hierarchy: StateHierarchy) (config: ActiveStateConfiguration) : string option =
         let activeStates = ActiveStateConfiguration.toSet config
 

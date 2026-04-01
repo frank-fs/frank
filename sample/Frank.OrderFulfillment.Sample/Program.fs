@@ -267,8 +267,12 @@ let orderResource =
         useHierarchyWith orderHierarchySpec
     }
 
-/// Sub-resource for completing the Pick AND-region via the middleware hierarchy op path.
+/// Sub-resource for Pick AND-region completion.
 /// POST /orders/{orderId}/pick → CompleteRegion("Pick","PickDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
 let pickResource =
     statefulResource "/orders/{orderId}/pick" {
         machine orderMachine
@@ -277,8 +281,12 @@ let pickResource =
         useHierarchyWith orderHierarchySpec
     }
 
-/// Sub-resource for completing the Pack AND-region via the middleware hierarchy op path.
+/// Sub-resource for Pack AND-region completion.
 /// POST /orders/{orderId}/pack → CompleteRegion("Pack","PackDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
 let packResource =
     statefulResource "/orders/{orderId}/pack" {
         machine orderMachine
@@ -287,8 +295,12 @@ let packResource =
         useHierarchyWith orderHierarchySpec
     }
 
-/// Sub-resource for completing the Ship AND-region via the middleware hierarchy op path.
+/// Sub-resource for Ship AND-region completion.
 /// POST /orders/{orderId}/ship → CompleteRegion("Ship","ShipDone") via middleware.
+/// Shares orderMachine and orderHierarchySpec with the parent orderResource —
+/// guards, transition function, and state metadata are inherited.
+/// This coupling is acceptable for a sample; production designs should
+/// consider region-scoped state machines for independent guard evaluation.
 let shipResource =
     statefulResource "/orders/{orderId}/ship" {
         machine orderMachine

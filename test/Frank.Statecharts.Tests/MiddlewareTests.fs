@@ -273,7 +273,7 @@ let middlewareTests =
                       let evt = capturedEvent.Value
                       Expect.equal evt.PreviousState Active "Previous state should be Active"
                       Expect.equal evt.NewState Active "New state should be Active (DoAction stays Active)"
-                      Expect.equal evt.Event DoAction "Event should be DoAction"
+                      Expect.equal evt.Event (Some DoAction) "Event should be Some DoAction"
                   }))
                   .GetAwaiter()
                   .GetResult()

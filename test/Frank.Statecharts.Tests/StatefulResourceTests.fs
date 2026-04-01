@@ -450,7 +450,7 @@ let transitionHookTests =
                       let evt = capturedEvent.Value
                       Expect.equal evt.PreviousState XTurn "Previous state should be XTurn"
                       Expect.equal evt.NewState OTurn "New state should be OTurn"
-                      Expect.equal evt.Event (MakeMove 0) "Event should be MakeMove 0"
+                      Expect.equal evt.Event (Some(MakeMove 0)) "Event should be Some(MakeMove 0)"
                   }))
                   .GetAwaiter()
                   .GetResult()
