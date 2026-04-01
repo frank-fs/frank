@@ -106,7 +106,13 @@ type TransitionEvent<'State, 'Event, 'Context> =
       NewContext: 'Context
       Event: 'Event
       Timestamp: DateTimeOffset
-      User: ClaimsPrincipal option }
+      User: ClaimsPrincipal option
+      /// States exited in LCA-based order (source up to but not including LCA).
+      /// Empty for flat FSM resources (no hierarchy configured).
+      ExitedStates: string list
+      /// States entered in LCA-based order (LCA down to target).
+      /// Empty for flat FSM resources (no hierarchy configured).
+      EnteredStates: string list }
 
 /// Accumulator for the statefulResource CE.
 type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
@@ -273,12 +279,17 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         None)
                 |> Set.ofList
 
+        // Pre-compute hierarchy once; captured by both getCurrentStateKey and executeTransition closures.
+        let hierarchy = spec.HierarchySpec |> Option.map StateHierarchy.build
+
         // Precomputed state key extractor: DU case name for unions, ToString() for others.
         let stateKey (state: 'S) = StateKeyExtractor.keyOf state
 
         let initialStateKey = stateKey machine.Initial
 
-        // Closure: resolve state from store, set typed values on IStatechartFeature
+        // Closure: resolve state from store, set typed values on IStatechartFeature.
+        // Also sets IHierarchyFeature when hierarchy is configured, computing initial config
+        // from the persisted snapshot (or bootstrapping from the leaf state on first access).
         let getCurrentStateKey (sp: IServiceProvider) (ctx: HttpContext) (instanceId: string) : Task<string> =
             let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
 
@@ -287,10 +298,33 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                 match result with
                 | Some snapshot ->
-                    ctx.SetStatechartState(stateKey snapshot.State, snapshot.State, snapshot.Context, instanceId)
-                    return stateKey snapshot.State
+                    let sk = stateKey snapshot.State
+                    ctx.SetStatechartState(sk, snapshot.State, snapshot.Context, instanceId)
+
+                    match hierarchy with
+                    | Some h ->
+                        let config =
+                            if snapshot.HierarchyConfig |> ActiveStateConfiguration.toSet |> Set.isEmpty then
+                                // First access after upgrade or initial store: bootstrap from leaf state
+                                HierarchicalRuntime.enterState h sk ActiveStateConfiguration.empty
+                            else
+                                snapshot.HierarchyConfig
+
+                        ctx.SetHierarchyFeature(config, snapshot.HistoryRecord)
+                    | None -> ()
+
+                    return sk
                 | None ->
                     ctx.SetStatechartState(initialStateKey, machine.Initial, machine.InitialContext, instanceId)
+
+                    match hierarchy with
+                    | Some h ->
+                        let config =
+                            HierarchicalRuntime.enterState h initialStateKey ActiveStateConfiguration.empty
+
+                        ctx.SetHierarchyFeature(config, HistoryRecord.empty)
+                    | None -> ()
+
                     return initialStateKey
             }
 
@@ -351,7 +385,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         | Allowed -> GuardResult.compose acc (pred guardCtx))
                     GuardResult.identity
 
-        // Closure: get event from Items, run transition, persist, return result
+        // Closure: get event from Items, run transition, persist, return result.
+        // When hierarchy is configured, calls HierarchicalRuntime.transition to compute
+        // LCA-based exit/entry, records history, and persists updated config.
         let executeTransition
             (sp: IServiceProvider)
             (ctx: HttpContext)
@@ -369,13 +405,39 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     match result with
                     | TransitionResult.Transitioned(newState, newContext) ->
                         let store = sp.GetRequiredService<IStatechartsStore<'S, 'C>>()
+                        let sourceKey = stateKey state
+                        let targetKey = stateKey newState
+
+                        let exitedStates, enteredStates, newConfig, newHistory =
+                            match hierarchy with
+                            | Some h ->
+                                let hierFeature = ctx.GetHierarchyFeature()
+
+                                let currentConfig =
+                                    match hierFeature with
+                                    | Some f -> f.ActiveConfiguration
+                                    | None ->
+                                        ActiveStateConfiguration.empty
+                                        |> ActiveStateConfiguration.add sourceKey
+
+                                let currentHistory =
+                                    match hierFeature with
+                                    | Some f -> f.History
+                                    | None -> HistoryRecord.empty
+
+                                let hResult =
+                                    HierarchicalRuntime.transition h currentConfig sourceKey targetKey currentHistory
+
+                                (hResult.ExitedStates, hResult.EnteredStates, hResult.Configuration, hResult.HistoryRecord)
+                            | None ->
+                                ([], [], ActiveStateConfiguration.empty, HistoryRecord.empty)
 
                         do!
                             store.Save instanceId {
                                 State = newState
                                 Context = newContext
-                                HierarchyConfig = ActiveStateConfiguration.empty
-                                HistoryRecord = HistoryRecord.empty
+                                HierarchyConfig = newConfig
+                                HistoryRecord = newHistory
                             }
 
                         let evt: TransitionEvent<'S, 'E, 'C> =
@@ -385,7 +447,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                               NewContext = newContext
                               Event = event
                               Timestamp = DateTimeOffset.UtcNow
-                              User = if isNull (box ctx.User) then None else Some ctx.User }
+                              User = if isNull (box ctx.User) then None else Some ctx.User
+                              ExitedStates = exitedStates
+                              EnteredStates = enteredStates }
 
                         return TransitionAttemptResult.Succeeded(box evt)
                     | TransitionResult.Blocked reason -> return TransitionAttemptResult.Blocked reason
@@ -420,7 +484,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
               ExecuteTransition = executeTransition
               Roles = spec.Roles
               ResolveRoles = resolveRoles
-              Hierarchy = spec.HierarchySpec |> Option.map StateHierarchy.build }
+              Hierarchy = hierarchy }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.

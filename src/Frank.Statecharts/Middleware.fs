@@ -26,12 +26,18 @@ module BlockReasonMapping =
 /// Checks endpoint metadata for StateMachineMetadata; passes through if absent.
 type StateMachineMiddleware(next: RequestDelegate) =
 
-    /// Resolve handlers for the current state. Hierarchy = Some uses parent fallback.
-    static member private ResolveHandlers(meta: StateMachineMetadata, stateKey: string) =
+    /// Resolve handlers for the current state.
+    /// Hierarchy = None: flat lookup by state key (existing behavior).
+    /// Hierarchy = Some: reads persisted ActiveStateConfiguration from IHierarchyFeature
+    /// (set by getCurrentStateKey) for LCA-based parent fallback and child override.
+    static member private ResolveHandlers(meta: StateMachineMetadata, stateKey: string, ctx: HttpContext) =
         match meta.Hierarchy with
         | None -> Map.tryFind stateKey meta.StateHandlerMap
         | Some hierarchy ->
-            let config = ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
+            let config =
+                match ctx.GetHierarchyFeature() with
+                | Some f -> f.ActiveConfiguration
+                | None -> ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
 
             let resolved =
                 HierarchicalRuntime.resolveHandlers hierarchy meta.StateHandlerMap config
@@ -39,13 +45,20 @@ type StateMachineMiddleware(next: RequestDelegate) =
             if List.isEmpty resolved then None else Some resolved
 
     /// Resolve allowed methods for the 405 Allow header.
+    /// Hierarchy = None: extract methods from pre-resolved handlers.
+    /// Hierarchy = Some: reads persisted ActiveStateConfiguration from IHierarchyFeature
+    /// for the full union of methods across active states and their ancestors.
     static member private ResolveAllowedMethods
-        (meta: StateMachineMetadata, stateKey: string, handlers: (string * RequestDelegate) list)
+        (meta: StateMachineMetadata, stateKey: string, handlers: (string * RequestDelegate) list, ctx: HttpContext)
         =
         match meta.Hierarchy with
         | None -> handlers |> List.map fst |> List.distinct
         | Some hierarchy ->
-            let config = ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
+            let config =
+                match ctx.GetHierarchyFeature() with
+                | Some f -> f.ActiveConfiguration
+                | None -> ActiveStateConfiguration.empty |> ActiveStateConfiguration.add stateKey
+
             let methodOnlyMap = meta.StateHandlerMap |> Map.map (fun _ v -> v |> List.map fst)
 
             HierarchicalRuntime.resolveAllowedMethods hierarchy methodOnlyMap config
@@ -83,7 +96,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
             // Step 2: Check if HTTP method is allowed in current state.
             // When Hierarchy = Some, use hierarchical resolution (parent fallback).
             // When Hierarchy = None, use flat dispatch (existing behavior, zero breaking changes).
-            let handlers = StateMachineMiddleware.ResolveHandlers(meta, stateKey)
+            let handlers = StateMachineMiddleware.ResolveHandlers(meta, stateKey, ctx)
 
             match handlers with
             | None -> ctx.Response.StatusCode <- 405
@@ -97,7 +110,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
                     ctx.Response.StatusCode <- 405
 
                     let allowedMethods =
-                        StateMachineMiddleware.ResolveAllowedMethods(meta, stateKey, handlers)
+                        StateMachineMiddleware.ResolveAllowedMethods(meta, stateKey, handlers, ctx)
 
                     ctx.Response.Headers["Allow"] <- StringValues(String.Join(", ", allowedMethods))
                 | Some(_, handler) ->
