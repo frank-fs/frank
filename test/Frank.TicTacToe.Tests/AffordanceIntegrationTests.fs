@@ -639,6 +639,8 @@ let projectedProfileTests =
               builder.Services.AddRouting() |> ignore
               builder.Services.AddLogging() |> ignore
               builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
+              // Register role lookup in DI so AffordanceMiddleware's OnStarting callback can resolve it.
+              builder.Services.AddSingleton<RoleProfileLookup>(roleLookup) |> ignore
               let app = builder.Build()
 
               app.UseRouting() |> ignore

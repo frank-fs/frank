@@ -68,6 +68,9 @@ let private withDualServer
         let builder = WebApplication.CreateBuilder([||])
         builder.WebHost.UseTestServer() |> ignore
         builder.Services.AddRouting() |> ignore
+        // Register lookups in DI so AffordanceMiddleware's OnStarting callback can resolve them.
+        builder.Services.AddSingleton<RoleProfileLookup>(roleLookup) |> ignore
+        builder.Services.AddSingleton<DualProfileLookup>(dualLookup) |> ignore
         let app = builder.Build()
 
         app.UseRouting() |> ignore

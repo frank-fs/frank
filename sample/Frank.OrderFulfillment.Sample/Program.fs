@@ -21,9 +21,9 @@
 /// to prove the library handles ALL hierarchy operations — no direct store manipulation.
 ///
 /// Pipeline order:
-///   1. State key resolver — reads store, sets IStatechartFeature
-///   2. Affordance middleware — injects Link + Allow headers
-///   3. Statechart middleware — hierarchical dispatch (useHierarchyWith)
+///   1. Affordance middleware — OnStarting callback injects Link + Allow headers
+///      (deferred until response is sent, after statechart middleware resolves state + roles)
+///   2. Statechart middleware — hierarchical dispatch (useHierarchyWith)
 module Frank.OrderFulfillment.Sample.Program
 
 open System
@@ -42,6 +42,9 @@ open Frank.ContentNegotiation
 open Frank.Resources.Model
 open Frank.OrderFulfillment.Sample.Domain
 
+// ALPS profile base URI for affordance Link headers.
+let [<Literal>] AlpsBaseUri = "http://localhost:5060/alps"
+
 // ===========================================================================
 // State key helper (mirrors StateKeyExtractor — internal in Frank.Statecharts)
 // ===========================================================================
@@ -52,139 +55,6 @@ let private stateKeyOf (state: OrderState) : string =
     let cases = FSharpType.GetUnionCases(typeof<OrderState>, true)
     let caseNames = cases |> Array.map (fun c -> c.Name)
     caseNames.[tagReader (box state)]
-
-// ===========================================================================
-// State key bridge middleware
-// ===========================================================================
-
-/// Resolves statechart state key from the store and sets IStatechartFeature.
-/// Also resolves roles so the affordance middleware can apply role-scoped headers
-/// before the statechart middleware runs.
-/// Must run AFTER routing and BEFORE affordance + statechart middleware.
-let resolveStateKey (app: IApplicationBuilder) =
-    app.Use(
-        Func<HttpContext, Func<Task>, Task>(fun ctx next ->
-            task {
-                let endpoint = ctx.GetEndpoint()
-
-                if not (isNull endpoint) then
-                    let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
-
-                    if not (obj.ReferenceEquals(metadata, null)) then
-                        let instanceId = metadata.ResolveInstanceId ctx
-                        let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-
-                        // Resolve roles early so the affordance middleware (which runs before
-                        // statechart middleware) can use role-scoped pre-computed entries.
-                        if not (List.isEmpty metadata.Roles) then
-                            let resolvedRoles = metadata.ResolveRoles ctx
-                            ctx.SetRoles(resolvedRoles)
-
-                do! next.Invoke()
-            }
-            :> Task)
-    )
-
-/// Response-intercepting middleware that re-applies role-scoped Allow/Link headers
-/// just before the response is sent. The affordance middleware sets headers before
-/// calling next, but the statechart middleware (which runs later in the pipeline)
-/// unconditionally overwrites Allow. This middleware uses OnStarting to re-apply
-/// role-scoped headers so they get the final word on the response.
-let roleHeaderOverlay (app: IApplicationBuilder) =
-    app.Use(
-        Func<HttpContext, Func<Task>, Task>(fun ctx next ->
-            task {
-                ctx.Response.OnStarting(fun () ->
-                    task {
-                        let roles = ctx.GetRoles()
-
-                        if not (Set.isEmpty roles) then
-                            let lookup =
-                                ctx.RequestServices
-                                    .GetService<System.Collections.Generic.Dictionary<string, PreComputedAffordance>>()
-
-                            if not (isNull lookup) then
-                                let endpoint = ctx.GetEndpoint()
-
-                                if not (isNull endpoint) then
-                                    let routeTemplate =
-                                        match endpoint with
-                                        | :? Microsoft.AspNetCore.Routing.RouteEndpoint as re ->
-                                            re.RoutePattern.RawText
-                                        | _ -> null
-
-                                    if not (isNull routeTemplate) then
-                                        let stateKey =
-                                            let f = ctx.Features.Get<IStatechartFeature>()
-
-                                            if obj.ReferenceEquals(f, null) then
-                                                null
-                                            else
-                                                match f.StateKey with
-                                                | Some key -> key
-                                                | None -> null
-
-                                        let effectiveStateKey =
-                                            if not (isNull stateKey) then
-                                                stateKey
-                                            else
-                                                AffordanceMap.WildcardStateKey
-
-                                        let resolved =
-                                            roles
-                                            |> Seq.tryPick (fun role ->
-                                                let key =
-                                                    AffordanceMap.lookupKeyWithRole
-                                                        routeTemplate
-                                                        effectiveStateKey
-                                                        role
-
-                                                match lookup.TryGetValue(key) with
-                                                | true, entry -> Some entry
-                                                | false, _ -> None)
-                                            |> Option.orElseWith (fun () ->
-                                                let authKey =
-                                                    AffordanceMap.lookupKeyAuthenticated
-                                                        routeTemplate
-                                                        effectiveStateKey
-
-                                                match lookup.TryGetValue(authKey) with
-                                                | true, entry -> Some entry
-                                                | false, _ -> None)
-
-                                        match resolved with
-                                        | Some entry ->
-                                            ctx.Response.Headers["Allow"] <- entry.AllowHeaderValue
-
-                                            if entry.HasTemplateLinks then
-                                                let routeValues = ctx.Request.RouteValues
-
-                                                let resolvedLinks =
-                                                    entry.LinkHeaderValues.ToArray()
-                                                    |> Array.map (fun link ->
-                                                        let mutable result = link
-
-                                                        for kv in routeValues do
-                                                            result <-
-                                                                result.Replace(
-                                                                    sprintf "{%s}" kv.Key,
-                                                                    string kv.Value
-                                                                )
-
-                                                        result)
-
-                                                ctx.Response.Headers["Link"] <-
-                                                    Microsoft.Extensions.Primitives.StringValues(resolvedLinks)
-                                            else
-                                                ctx.Response.Headers["Link"] <- entry.LinkHeaderValues
-                                        | None -> ()
-                    }
-                    :> Task)
-
-                do! next.Invoke()
-            }
-            :> Task)
-    )
 
 // ===========================================================================
 // Handlers — state-aware HTTP responses
@@ -368,6 +238,9 @@ let orderResult =
         transition AuthorizePayment Authorize Capture (RestrictedTo [ "PaymentService" ])
         transition CapturePayment Capture Fulfillment (RestrictedTo [ "PaymentService" ])
         transition RetryPayment Capture Retry (RestrictedTo [ "PaymentService" ])
+        // RecoverFromRetry uses hierarchy op (setHierarchyOp), not domain event.
+        // Declared to give PaymentService agency in Retry for hierarchy op constraint check.
+        transition RecoverFromRetry Retry Capture (RestrictedTo [ "PaymentService" ])
         transition ConfirmDelivery Shipped Delivered (RestrictedTo [ "ShippingProvider" ])
 
         // State handlers — each state's POST fires the state-specific lifecycle event
@@ -495,6 +368,10 @@ let deliverResource =
 type ResolvableWarnings() =
     member val Warnings: string list = [] with get, set
 
+/// Serialize a value to JSON using System.Text.Json.
+let private toJson (value: 'T) : string =
+    System.Text.Json.JsonSerializer.Serialize(value)
+
 /// Compute AND-state DeriveResult.Warnings at startup.
 /// The Fulfillment AND-state triggers a warning about synchronization barriers
 /// not being modeled in the dual derivation engine (formalism bound 1 per issue #244).
@@ -577,28 +454,54 @@ let diagnosticsResource =
                     | true, values when values.Count > 0 -> Some(values.[0])
                     | _ -> None
 
+                ctx.Response.ContentType <- "application/health+json"
+
                 match roleParam with
                 | Some roleName ->
                     let projected = Projection.projectForRole roleName orderResult.Statechart
 
-                    let transitionDescriptions =
+                    let transitions =
                         projected.Transitions
-                        |> List.map (fun t -> $"{t.Event}: {t.Source} -> {t.Target}")
+                        |> List.map (fun t ->
+                            {| event = t.Event
+                               source = t.Source
+                               target = t.Target |})
 
-                    let body =
-                        $"role={roleName}; transitions={projected.Transitions.Length}; "
-                        + (String.concat "; " transitionDescriptions)
+                    let response =
+                        {| status = "pass"
+                           description = $"Order fulfillment statechart projection for role: {roleName}"
+                           checks =
+                            {| ``projected-transitions`` =
+                                [| {| status = "pass"
+                                      observedValue = transitions |} |] |} |}
 
-                    do! ctx.Response.WriteAsync(body)
+                    do! ctx.Response.WriteAsync(toJson response)
                 | None ->
-                    let body =
-                        if warnings.IsEmpty then
-                            "warnings=none"
-                        else
-                            let joined = String.concat "; " warnings
-                            $"AND-state warnings: {joined}"
+                    let warningStatus = if warnings.IsEmpty then "pass" else "warn"
 
-                    do! ctx.Response.WriteAsync(body)
+                    let allProjections = Projection.projectAll orderResult.Statechart
+
+                    let roleProjectionValue =
+                        orderResult.Statechart.Roles
+                        |> List.map (fun role ->
+                            let projected = allProjections |> Map.tryFind role.Name
+                            let count = projected |> Option.map (fun sc -> sc.Transitions.Length) |> Option.defaultValue 0
+                            role.Name, {| transitions = count |})
+                        |> dict
+
+                    let response =
+                        {| status = warningStatus
+                           description = "Order fulfillment statechart diagnostics"
+                           checks =
+                            {| ``and-state-warnings`` =
+                                [| {| status = warningStatus
+                                      observedValue = warnings
+                                      observedUnit = "warnings" |} |]
+                               ``role-projection`` =
+                                [| {| status = "pass"
+                                      observedValue = roleProjectionValue |} |] |} |}
+
+                    do! ctx.Response.WriteAsync(toJson response)
             }
             :> Task))
     }
@@ -621,14 +524,10 @@ let main args =
         useRoleHeaderAuth
 
         // Pipeline order:
-        // 1. Role-scoped header overlay (OnStarting callback — re-applies role-scoped Allow/Link
-        //    after the statechart middleware has set its unconditional Allow header)
-        plug roleHeaderOverlay
-        // 2. State key resolver (reads store, sets IStatechartFeature + resolves roles)
-        plug resolveStateKey
-        // 3. Affordance middleware (reads IStatechartFeature + roles, injects Link + Allow headers)
-        useRuntimeAffordances orderResult.Statechart "http://localhost:5060/alps"
-        // 4. Statechart middleware (hierarchical dispatch via useHierarchyWith)
+        // 1. Affordance middleware (OnStarting callback — reads IStatechartFeature + roles
+        //    just before response is sent, after statechart middleware has resolved state + roles)
+        useRuntimeAffordances orderResult.Statechart AlpsBaseUri
+        // 2. Statechart middleware (hierarchical dispatch via useHierarchyWith)
         useStatecharts
 
         // Seed order instances and compute AND-state warnings after services are built

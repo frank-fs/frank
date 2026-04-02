@@ -197,7 +197,7 @@ let middlewareTests =
                       let! body = response.Content.ReadAsStringAsync()
                       Expect.stringContains body "urn:frank:error:forbidden" "body should contain type URI"
                       Expect.stringContains body "Forbidden" "body should contain title"
-                      Expect.stringContains body "role not authorized" "body should contain detail"
+                      Expect.stringContains body "Role not authorized" "body should contain detail"
                   }))
                   .GetAwaiter()
                   .GetResult()

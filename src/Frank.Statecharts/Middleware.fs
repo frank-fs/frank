@@ -17,47 +17,49 @@ module BlockReasonMapping =
         | PreconditionFailed -> 412
         | Custom(code, _) -> code
 
-    let toMessage (reason: BlockReason) =
+    let private titleOf (reason: BlockReason) =
         match reason with
-        | Forbidden -> Some "Forbidden: role not authorized for this transition"
-        | Custom(_, message) -> Some message
-        | _ -> None
+        | Forbidden -> "Forbidden"
+        | NotYourTurn -> "Conflict"
+        | InvalidTransition -> "Bad Request"
+        | PreconditionFailed -> "Precondition Failed"
+        | Custom _ -> "Error"
+
+    let private typeSlugOf (reason: BlockReason) =
+        match reason with
+        | Forbidden -> "forbidden"
+        | NotYourTurn -> "not-your-turn"
+        | InvalidTransition -> "invalid-transition"
+        | PreconditionFailed -> "precondition-failed"
+        | Custom _ -> "custom"
+
+    let private detailOf (reason: BlockReason) =
+        match reason with
+        | Forbidden -> "Role not authorized for this transition"
+        | NotYourTurn -> "Not your turn to act in this state"
+        | InvalidTransition -> "No valid transition for this event in current state"
+        | PreconditionFailed -> "Precondition not met for this transition"
+        | Custom(_, message) -> message
+
+    /// Escape a string for safe interpolation into a JSON string value.
+    let private jsonEscape (s: string) =
+        s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r")
 
     let writeProblemResponse (ctx: HttpContext) (reason: BlockReason) =
         task {
             let status = toStatusCode reason
             ctx.Response.StatusCode <- status
+            ctx.Response.ContentType <- "application/problem+json"
 
-            match toMessage reason with
-            | Some msg ->
-                ctx.Response.ContentType <- "application/problem+json"
+            let body =
+                sprintf
+                    """{"type":"urn:frank:error:%s","title":"%s","status":%d,"detail":"%s"}"""
+                    (typeSlugOf reason)
+                    (titleOf reason)
+                    status
+                    (jsonEscape (detailOf reason))
 
-                let title =
-                    match reason with
-                    | Forbidden -> "Forbidden"
-                    | NotYourTurn -> "Conflict"
-                    | InvalidTransition -> "Bad Request"
-                    | PreconditionFailed -> "Precondition Failed"
-                    | Custom _ -> "Error"
-
-                let typeSlug =
-                    match reason with
-                    | Forbidden -> "forbidden"
-                    | NotYourTurn -> "not-your-turn"
-                    | InvalidTransition -> "invalid-transition"
-                    | PreconditionFailed -> "precondition-failed"
-                    | Custom _ -> "custom"
-
-                let body =
-                    sprintf
-                        """{"type":"urn:frank:error:%s","title":"%s","status":%d,"detail":"%s"}"""
-                        typeSlug
-                        title
-                        status
-                        msg
-
-                do! ctx.Response.WriteAsync(body)
-            | None -> ()
+            do! ctx.Response.WriteAsync(body)
         }
 
 /// State-aware middleware that intercepts requests to stateful resources.

@@ -58,7 +58,8 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
 
     /// Apply role-projected profile Link header overlay.
     /// Swaps the global ALPS profile link for a role-specific one when roles are resolved.
-    let applyRoleProfileOverlay (ctx: HttpContext) (routeTemplate: string) (roles: Set<string>) =
+    /// Returns true if the Link header was actually modified (for Vary header decision).
+    let applyRoleProfileOverlay (ctx: HttpContext) (routeTemplate: string) (roles: Set<string>) : bool =
         let roleLookup = ctx.RequestServices.GetService<RoleProfileLookup>()
 
         if not (isNull roleLookup) then
@@ -79,8 +80,16 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
                         if existingLinks.Count > 0 then
                             ctx.Response.Headers["Link"] <-
                                 LinkHeaderRewriter.replaceProfileLink existingLinks linkValue
-                    | None -> ()
-            | _ -> ()
+
+                            true
+                        else
+                            false
+                    | None -> false
+                else
+                    false
+            | _ -> false
+        else
+            false
 
     /// Apply dual profile Link header overlay.
     /// Swaps the profile link for a dual-annotated variant when Prefer: return=dual is present.
@@ -189,19 +198,20 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
 
                             resolved |> Option.iter (applyHeaders ctx)
 
-                            // When the resolved entry came from a role-specific key, add Vary: Authorization
-                            // so caches do not serve one role's headers to a different role's client.
-                            if usedRoleKey then
+                            // Apply profile overlays in order: role-projected, then dual.
+                            // These read Link headers set by applyHeaders above and swap
+                            // the profile entry for a role-specific or dual-annotated variant.
+                            let profileModified = applyRoleProfileOverlay ctx routeTemplate roles
+                            applyDualProfileOverlay ctx routeTemplate roles effectiveStateKey
+
+                            // Add Vary: Authorization when the response is role-dependent:
+                            // either the affordance entry was role-specific, or the profile
+                            // overlay swapped the Link header for a role-specific variant.
+                            if usedRoleKey || profileModified then
                                 let current = ctx.Response.Headers["Vary"].ToString()
 
                                 if not (current.Contains("Authorization", StringComparison.OrdinalIgnoreCase)) then
                                     ctx.Response.Headers.Append("Vary", StringValues("Authorization"))
-
-                            // Apply profile overlays in order: role-projected, then dual.
-                            // These read Link headers set by applyHeaders above and swap
-                            // the profile entry for a role-specific or dual-annotated variant.
-                            applyRoleProfileOverlay ctx routeTemplate roles
-                            applyDualProfileOverlay ctx routeTemplate roles effectiveStateKey
 
                             Task.CompletedTask
                         with ex ->

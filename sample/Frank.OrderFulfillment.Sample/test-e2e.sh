@@ -257,7 +257,8 @@ check_json   "o1: now Retry"               "$BASE/orders/o1" ".state" "Retry"
 echo ""
 echo "--- KEY TEST: Recover from Retry via shallow history (no flat transition exists) ---"
 # POST to main resource — middleware dispatches to Retry state's POST handler (handleRecoverFromRetry)
-check_status "AT1: retry-recover returns 202" "$BASE/orders/o1" "POST" "202"
+# PaymentService role required: Retry is a PaymentService state in MPST projection
+check_status_with_role "AT1: retry-recover returns 202" "$BASE/orders/o1" "POST" "PaymentService" "202"
 sleep 1
 check_json   "AT1: shallow history recovered to Capture" "$BASE/orders/o1" ".state" "Capture"
 
@@ -427,8 +428,10 @@ echo "================================================================"
 echo "=== BONUS: AND-state DeriveResult.Warnings (issue #244)       ==="
 echo "================================================================"
 echo ""
-check_body   "Diagnostics: AND-state warnings" "$BASE/diagnostics" "AND-state"
+check_body   "Diagnostics: and-state-warnings key present" "$BASE/diagnostics" "and-state-warnings"
+check_body   "Diagnostics: role-projection key present"    "$BASE/diagnostics" "role-projection"
 check_status "Diagnostics: GET 200"            "$BASE/diagnostics" "GET" "200"
+check_content_type "Diagnostics: Content-Type health+json" "$BASE/diagnostics" "*/*" "application/health+json"
 
 echo ""
 echo "================================================================"
@@ -487,9 +490,9 @@ check_body "RP-AT4: Customer projection includes cancel" "$BASE/diagnostics?role
 check_body "RP-AT4: PaymentService projection includes authorize" "$BASE/diagnostics?role=PaymentService" "AuthorizePayment"
 check_body "RP-AT4: PaymentService projection includes capture" "$BASE/diagnostics?role=PaymentService" "CapturePayment"
 
-# Projections must be structurally different (different transition counts)
-CUSTOMER_COUNT=$(curl -s "$BASE/diagnostics?role=Customer" 2>/dev/null | grep -o "transitions=[0-9]*" | cut -d= -f2)
-PAYMENT_COUNT=$(curl -s "$BASE/diagnostics?role=PaymentService" 2>/dev/null | grep -o "transitions=[0-9]*" | cut -d= -f2)
+# Projections must be structurally different (different transition counts via JSON)
+CUSTOMER_COUNT=$(curl -s "$BASE/diagnostics?role=Customer" 2>/dev/null | jq -r '.checks["projected-transitions"][0].observedValue | length' 2>/dev/null || echo "")
+PAYMENT_COUNT=$(curl -s "$BASE/diagnostics?role=PaymentService" 2>/dev/null | jq -r '.checks["projected-transitions"][0].observedValue | length' 2>/dev/null || echo "")
 
 if [ -n "$CUSTOMER_COUNT" ] && [ -n "$PAYMENT_COUNT" ] && [ "$CUSTOMER_COUNT" != "$PAYMENT_COUNT" ]; then
     echo "  PASS: RP-AT4: Customer ($CUSTOMER_COUNT) and PaymentService ($PAYMENT_COUNT) have different transition counts"

@@ -431,6 +431,12 @@ type StatefulResourceBuilder(routeTemplate: string) =
         let closedWorld =
             not (List.isEmpty spec.Roles) && not (List.isEmpty spec.TransitionDeclarations)
 
+        // Pure helper: does a RoleConstraint allow a given set of user roles?
+        let constraintAllowsRoles (userRoles: Set<string>) (c: RoleConstraint) : bool =
+            match c with
+            | Unrestricted -> true
+            | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles)
+
         // Partition guards by DU case for two-phase evaluation
         let accessGuards =
             machine.Guards
@@ -483,13 +489,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 let constraintResult =
                     match constraintMap.TryFind(stateKey', eventKey) with
                     | Some constraints ->
-                        if
-                            constraints
-                            |> List.exists (fun c ->
-                                match c with
-                                | Unrestricted -> true
-                                | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles))
-                        then
+                        if constraints |> List.exists (constraintAllowsRoles userRoles) then
                             Allowed
                         else
                             Blocked Forbidden
@@ -525,10 +525,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
                 spec.TransitionDeclarations
                 |> List.exists (fun t ->
-                    t.Source = currentStateKey
-                    && match t.Constraint with
-                       | Unrestricted -> true
-                       | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles))
+                    t.Source = currentStateKey && constraintAllowsRoles userRoles t.Constraint)
 
         // Pure computation: determines what save (if any) and result to produce.
         // Extracted from task body to avoid FS3511 in Release builds (complex match
