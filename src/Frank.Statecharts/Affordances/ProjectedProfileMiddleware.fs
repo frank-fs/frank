@@ -1,10 +1,10 @@
 namespace Frank.Affordances
 
+open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Primitives
-open Frank.Statecharts
 
 /// Replaces the profile entry in a Link header StringValues with a role-specific value.
 /// Returns the original values unchanged if no profile entry is found.
@@ -50,14 +50,15 @@ module VaryHeader =
         else
             let current = existing.ToString()
 
-            if not (current.Contains(value)) then
+            if not (current.Contains(value, StringComparison.OrdinalIgnoreCase)) then
                 ctx.Response.Headers["Vary"] <- StringValues(current + ", " + value)
 
-/// ASP.NET Core convention-based middleware that replaces the global ALPS profile
-/// Link header with a role-specific one when the authenticated user has resolved roles.
+/// ASP.NET Core convention-based middleware that adds Vary: Authorization when
+/// the matched route has role projections. The actual profile link swapping is
+/// handled by AffordanceMiddleware's OnStarting callback (which has access to
+/// resolved roles from StateMachineMiddleware).
 ///
-/// Runs after AffordanceMiddleware (which sets the base Link headers).
-/// Additive: always calls next regardless of whether headers were modified.
+/// Runs after AffordanceMiddleware. Additive: always calls next.
 type ProjectedProfileMiddleware(next: RequestDelegate, roleLookup: RoleProfileLookup) =
 
     member _.InvokeAsync(ctx: HttpContext) : Task =
@@ -71,31 +72,11 @@ type ProjectedProfileMiddleware(next: RequestDelegate, roleLookup: RoleProfileLo
 
             if not (isNull routeTemplate) then
                 match roleLookup.TryGetValue(routeTemplate) with
-                | true, roleMap ->
+                | true, _ ->
                     // This route has role projections — Vary: Authorization applies to all
-                    // responses (RFC 7234 §4.1: Vary describes the selection algorithm,
+                    // responses (RFC 7234 section 4.1: Vary describes the selection algorithm,
                     // not whether this specific response was affected).
                     VaryHeader.append ctx "Authorization"
-
-                    let roles = ctx.GetRoles()
-
-                    if not (Set.isEmpty roles) then
-                        // First match wins; Set iteration order is alphabetical.
-                        let profileLinkValue =
-                            roles
-                            |> Seq.tryPick (fun role ->
-                                match roleMap.TryGetValue(role) with
-                                | true, v -> Some v
-                                | _ -> None)
-
-                        match profileLinkValue with
-                        | Some linkValue ->
-                            let existingLinks = ctx.Response.Headers["Link"]
-
-                            if existingLinks.Count > 0 then
-                                ctx.Response.Headers["Link"] <-
-                                    LinkHeaderRewriter.replaceProfileLink existingLinks linkValue
-                        | None -> ()
                 | _ -> ()
 
         next.Invoke(ctx)

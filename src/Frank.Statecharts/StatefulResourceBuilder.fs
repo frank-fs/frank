@@ -413,6 +413,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
+        // Note: Map<string * string, _> allocates a tuple per TryFind call.
+        // Acceptable for constraint maps (typically < 20 entries). If profiling shows this as hot,
+        // switch to Dictionary<struct(string * string), _> with custom comparer.
         // Pre-compute constraint map: (sourceStateKey, eventKey) -> RoleConstraint list.
         // Grouped by key so guarded branching (same event from same state with different
         // constraints) preserves all constraints instead of silently dropping duplicates.

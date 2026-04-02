@@ -24,7 +24,12 @@ type RoleHeaderAuthHandler(options: IOptionsMonitor<AuthenticationSchemeOptions>
             if System.String.IsNullOrWhiteSpace(roleValue) then
                 Task.FromResult(AuthenticateResult.NoResult())
             else
-                let claims = [ Claim(ClaimTypes.Role, roleValue) ]
+                let roles =
+                    roleValue.Split(',')
+                    |> Array.map (fun s -> s.Trim())
+                    |> Array.filter (fun s -> s.Length > 0)
+
+                let claims = roles |> Array.map (fun r -> Claim(ClaimTypes.Role, r)) |> Array.toList
                 let identity = ClaimsIdentity(claims, this.Scheme.Name)
                 let principal = ClaimsPrincipal(identity)
                 let ticket = AuthenticationTicket(principal, this.Scheme.Name)

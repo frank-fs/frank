@@ -25,6 +25,9 @@ module AffordancePreCompute =
     /// Format a single link relation as an RFC 8288 Link header value.
     let internal formatLinkValue (href: string) (rel: string) : string = sprintf "<%s>; rel=\"%s\"" href rel
 
+    // Note: Base entry AllowedMethods comes from AffordanceMapEntry.AllowedMethods (caller-provided).
+    // Role entries derive AllowedMethods from their filtered link relations + GET + OPTIONS.
+    // This asymmetry is intentional: base is the unauthenticated fallback; role entries are derived.
     /// Pre-compute header strings for all entries in the affordance map.
     /// Returns a dictionary indexed by composite key for O(1) request-time lookup.
     /// Also generates role-scoped entries keyed by route|state|role for role-filtered

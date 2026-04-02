@@ -68,12 +68,16 @@ module AffordanceMap =
     let SelfRelation = "self"
 
     /// Build a composite lookup key from route template and state key.
-    let lookupKey (routeTemplate: string) (stateKey: string) : string = routeTemplate + KeySeparator + stateKey
+    let lookupKey (routeTemplate: string) (stateKey: string) : string =
+        String.Concat(routeTemplate, KeySeparator, stateKey)
 
     /// Build a composite lookup key from route template, state key, and role.
     let lookupKeyWithRole (routeTemplate: string) (stateKey: string) (role: string) : string =
-        routeTemplate + KeySeparator + stateKey + KeySeparator + role
+        String.Concat(routeTemplate, KeySeparator, stateKey, KeySeparator, role)
 
+    // "~authenticated" is used as a sentinel role key for the authenticated fallback entry.
+    // Despite the name, this entry is also used for unauthenticated users (who get only
+    // role-agnostic links). The name refers to the DI/lookup convention, not the auth state.
     /// Sentinel role name for "authenticated but no matching role" fallback entry.
     /// Contains links available to all roles (Roles = []) only.
     [<Literal>]
@@ -205,7 +209,12 @@ module AffordanceMap =
             sc.StateNames
             |> List.map (fun stateKey ->
                 let transitions =
-                    sc.Transitions |> List.filter (fun t -> t.Source = stateKey)
+                    sc.Transitions
+                    |> List.filter (fun t -> t.Source = stateKey)
+                    |> List.filter (fun t ->
+                        match t.Constraint with
+                        | RestrictedTo [] -> false // dead transition: no role can trigger it
+                        | _ -> true)
 
                 let linkRelations =
                     transitions
