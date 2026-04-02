@@ -151,7 +151,7 @@ let middlewareTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       // Active state only has POST; GET should be 405
                       let! (response: HttpResponseMessage) = client.GetAsync("/items/1")
@@ -169,7 +169,7 @@ let middlewareTests =
                       inState (forState Active [ StateHandlerBuilder.post (fun ctx -> ctx.Response.WriteAsync("ok")) ])
                   }
 
-              (withServer res addStore (Some(nonAdminUser ())) (fun client ->
+              (withServer res.Resource addStore (Some(nonAdminUser ())) (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/guarded/1", content)
@@ -201,7 +201,7 @@ let middlewareTests =
                       inState (forState Active [ StateHandlerBuilder.post (fun ctx -> ctx.Response.WriteAsync("ok")) ])
                   }
 
-              (withServer res addStore (Some(nonAdminUser ())) (fun client ->
+              (withServer res.Resource addStore (Some(nonAdminUser ())) (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/turn/1", content)
@@ -229,7 +229,7 @@ let middlewareTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       // POST to transition from Active to Completed
                       let content = new StringContent("")
@@ -264,7 +264,7 @@ let middlewareTests =
                       onTransition (fun evt -> capturedEvent <- Some evt)
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (_response: HttpResponseMessage) = client.PostAsync("/hook/1", content)
@@ -293,7 +293,7 @@ let middlewareTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       // Request with unknown instance ID - should default to Initial (Active)
                       let! (response: HttpResponseMessage) = client.GetAsync("/new/never-seen-before")
@@ -319,7 +319,7 @@ let middlewareTests =
                       )
                   }
 
-              (withServer res addStore (Some(adminUser ())) (fun client ->
+              (withServer res.Resource addStore (Some(adminUser ())) (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/auth/1", content)
@@ -351,7 +351,7 @@ let middlewareTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       // First POST to transition to Completed
                       let content1 = new StringContent("")
@@ -382,7 +382,7 @@ let middlewareTests =
                       inState (forState Active [ StateHandlerBuilder.post (fun _ -> Task.CompletedTask) ])
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/custom/1", content)
@@ -408,7 +408,7 @@ let middlewareTests =
                       onTransition (fun _ -> transitioned <- true)
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let! (response: HttpResponseMessage) = client.GetAsync("/readonly/1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should succeed"
@@ -442,7 +442,7 @@ let accessControlGuardTests =
                       )
                   }
 
-              (withServer res addStore (Some(adminUser ())) (fun client ->
+              (withServer res.Resource addStore (Some(adminUser ())) (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/ac-block/1", content)
@@ -473,7 +473,7 @@ let accessControlGuardTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/ac-allow/1", content)
@@ -514,7 +514,7 @@ let eventValidationGuardTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/ev-capture/1", content)
@@ -555,7 +555,7 @@ let eventValidationGuardTests =
                       onTransition (fun _ -> transitioned <- true)
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/ev-block/1", content)
@@ -604,7 +604,7 @@ let eventValidationGuardTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/mixed/1", content)
@@ -638,7 +638,7 @@ let eventValidationGuardTests =
                       )
                   }
 
-              (withServer res addStore None (fun client ->
+              (withServer res.Resource addStore None (fun client ->
                   task {
                       let! (response: HttpResponseMessage) = client.GetAsync("/ev-skip/1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should succeed"

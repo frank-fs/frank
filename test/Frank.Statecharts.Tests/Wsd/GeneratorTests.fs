@@ -51,7 +51,8 @@ let private makeMetadata
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent)
       Roles = []
       ResolveRoles = fun _ -> Set.empty
-      Hierarchy = StateHierarchy.build { States = [] } }
+      Hierarchy = StateHierarchy.build { States = [] }
+      Statechart = None }
 
 // --- Test state machines ---
 
@@ -341,7 +342,8 @@ let generatorTests =
                     ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent)
                     Roles = []
                     ResolveRoles = fun _ -> Set.empty
-                    Hierarchy = StateHierarchy.build { States = [] } }
+                    Hierarchy = StateHierarchy.build { States = [] }
+                    Statechart = None }
 
               let result = generate { ResourceName = "bad" } metadata
 

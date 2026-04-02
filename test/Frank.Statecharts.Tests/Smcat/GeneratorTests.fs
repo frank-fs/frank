@@ -53,7 +53,8 @@ let private makeMetadata
       ExecuteTransition = fun _ _ _ -> Task.FromResult(TransitionAttemptResult.NoEvent)
       Roles = []
       ResolveRoles = fun _ -> Set.empty
-      Hierarchy = StateHierarchy.build { States = [] } }
+      Hierarchy = StateHierarchy.build { States = [] }
+      Statechart = None }
 
 let private simpleMachine guards stateMetadata : StateMachine<TestState, TestEvent, unit> =
     { Initial = Idle

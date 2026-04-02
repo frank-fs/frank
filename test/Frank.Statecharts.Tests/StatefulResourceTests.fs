@@ -197,7 +197,7 @@ let methodFilteringTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -210,7 +210,7 @@ let methodFilteringTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should be allowed in XTurn"
@@ -224,7 +224,7 @@ let methodFilteringTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let! (response: HttpResponseMessage) = client.DeleteAsync("/games/game1")
                       Expect.equal response.StatusCode HttpStatusCode.MethodNotAllowed "DELETE should be 405"
@@ -236,7 +236,7 @@ let methodFilteringTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" (Won "X") 5
                       let content = new StringContent("")
@@ -254,7 +254,7 @@ let methodFilteringTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" (Won "X") 5
                       let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
@@ -271,7 +271,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(playerX ())) (fun _server client ->
+              (withGameServer res.Resource (Some(playerX ())) (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -284,7 +284,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(playerO ())) (fun _server client ->
+              (withGameServer res.Resource (Some(playerO ())) (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -298,7 +298,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(spectator ())) (fun _server client ->
+              (withGameServer res.Resource (Some(spectator ())) (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -311,7 +311,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(playerO ())) (fun server client ->
+              (withGameServer res.Resource (Some(playerO ())) (fun server client ->
                   task {
                       prePopulateState server "game1" OTurn 1
                       let content = new StringContent("")
@@ -325,7 +325,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(playerX ())) (fun server client ->
+              (withGameServer res.Resource (Some(playerX ())) (fun server client ->
                   task {
                       prePopulateState server "game1" OTurn 1
                       let content = new StringContent("")
@@ -340,7 +340,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(spectator ())) (fun server client ->
+              (withGameServer res.Resource (Some(spectator ())) (fun server client ->
                   task {
                       prePopulateState server "game1" OTurn 1
                       let content = new StringContent("")
@@ -354,7 +354,7 @@ let guardTests =
           <| fun () ->
               let res = buildGameResource guardedGameMachine
 
-              (withGameServer res (Some(spectator ())) (fun server client ->
+              (withGameServer res.Resource (Some(spectator ())) (fun server client ->
                   task {
                       prePopulateState server "game1" (Won "X") 5
                       let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
@@ -379,7 +379,7 @@ let guardTests =
 
               let res = buildGameResource moveCountLimitMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" XTurn 4
                       let content = new StringContent("")
@@ -407,7 +407,7 @@ let guardTests =
 
               let res = buildGameResource moveCountLimitMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" XTurn 2
                       let content = new StringContent("")
@@ -441,7 +441,7 @@ let transitionHookTests =
                       )
                   }
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -467,7 +467,7 @@ let transitionHookTests =
                       inState (forState XTurn [ StateHandlerBuilder.post handleMove ])
                   }
 
-              (withGameServer res (Some(spectator ())) (fun _server client ->
+              (withGameServer res.Resource (Some(spectator ())) (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -480,7 +480,7 @@ let transitionHookTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       let content = new StringContent("")
                       let! (_: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -505,7 +505,7 @@ let affordanceTests =
           <| fun () ->
               let res = buildAffordanceResource ()
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should succeed"
@@ -520,7 +520,7 @@ let affordanceTests =
           <| fun () ->
               let res = buildAffordanceResource ()
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" (Won "X") 5
                       let! (response: HttpResponseMessage) = client.GetAsync("/games/game1")
@@ -540,7 +540,7 @@ let storeLifecycleTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       let store =
                           server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
@@ -590,7 +590,7 @@ let multipleInstanceTests =
           <| fun () ->
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       let store =
                           server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
@@ -632,7 +632,7 @@ let transitionBlockedTests =
 
               let res = buildGameResource blockingMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -658,7 +658,7 @@ let transitionBlockedTests =
 
               let res = buildGameResource blockingMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -703,7 +703,7 @@ let responseStartedTests =
                   }
 
               // Response should still be 200 because it was already started by the handler
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -744,7 +744,7 @@ let multipleGuardTests =
 
               let res = buildGameResource multiGuardMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -780,7 +780,7 @@ let multipleGuardTests =
 
               let res = buildGameResource multiGuardMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -814,7 +814,7 @@ let observerResilienceTests =
                       )
                   }
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
@@ -1072,7 +1072,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res (Some(playerX ())) (fun _server client ->
+              (withHierarchicalServer res.Resource (Some(playerX ())) (fun _server client ->
                   task {
                       let! (response: HttpResponseMessage) = client.GetAsync("/hgames/g1")
                       Expect.equal response.StatusCode HttpStatusCode.OK "GET should work in Playing XTurn"
@@ -1084,7 +1084,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+              (withHierarchicalServer res.Resource (Some(playerX ())) (fun server client ->
                   task {
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
@@ -1105,7 +1105,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+              (withHierarchicalServer res.Resource (Some(playerX ())) (fun server client ->
                   task {
                       let content = new StringContent("")
                       let! (_: HttpResponseMessage) = client.PostAsync("/hgames/g1", content)
@@ -1130,7 +1130,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res None (fun server client ->
+              (withHierarchicalServer res.Resource None (fun server client ->
                   task {
                       // Pre-populate as Draw (which has DELETE handler for disposal)
                       prePopulateHierarchical
@@ -1158,7 +1158,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res None (fun server client ->
+              (withHierarchicalServer res.Resource None (fun server client ->
                   task {
                       prePopulateHierarchical server "g1" Disposed initialContext
 
@@ -1176,7 +1176,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res None (fun server client ->
+              (withHierarchicalServer res.Resource None (fun server client ->
                   task {
                       // Won sub-state: POST handler is available but does nothing
                       // (handlePlayingPost checks actual sub-state and skips Won)
@@ -1215,7 +1215,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res (Some(playerO ())) (fun _server client ->
+              (withHierarchicalServer res.Resource (Some(playerO ())) (fun _server client ->
                   task {
                       // Initial state is Playing XTurn — Player O should get 409
                       let content = new StringContent("")
@@ -1233,7 +1233,7 @@ let hierarchicalStatechartTests =
           <| fun () ->
               let res = buildHierarchicalResource hierarchicalMachine
 
-              (withHierarchicalServer res (Some(playerX ())) (fun server client ->
+              (withHierarchicalServer res.Resource (Some(playerX ())) (fun server client ->
                   task {
                       let store =
                           server.Services.GetRequiredService<
@@ -1259,7 +1259,7 @@ let hierarchicalStatechartTests =
               let thirdPlayer =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("player", "X"); Claim("userId", "user3") |], "test"))
 
-              (withHierarchicalServer res (Some thirdPlayer) (fun server client ->
+              (withHierarchicalServer res.Resource (Some thirdPlayer) (fun server client ->
                   task {
                       // Pre-populate with both players assigned
                       prePopulateHierarchical
@@ -1341,7 +1341,7 @@ let parameterizedStateKeyTests =
                       inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
                   }
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       // Transition to Won "X"
                       prePopulateState server "game1" (TicTacToeState.Won "X") 5
@@ -1389,7 +1389,7 @@ let parameterizedStateKeyTests =
                       inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
                   }
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       prePopulateState server "game1" (TicTacToeState.Won "X") 5
                       // GET should work (registered via Won "X")
@@ -1436,7 +1436,7 @@ let parameterizedStateKeyTests =
                       inState (forState TicTacToeState.Draw [ StateHandlerBuilder.get getGameState ])
                   }
 
-              (withGameServer res None (fun server client ->
+              (withGameServer res.Resource None (fun server client ->
                   task {
                       let store =
                           server.Services.GetRequiredService<IStatechartsStore<TicTacToeState, int>>()
@@ -1498,7 +1498,7 @@ let simpleDuBackwardCompatibilityTests =
               // (which registers handlers for XTurn, OTurn, Won, Draw) still works.
               let res = buildGameResource gameMachine
 
-              (withGameServer res None (fun _server client ->
+              (withGameServer res.Resource None (fun _server client ->
                   task {
                       // XTurn (initial state) should have GET + POST
                       let! (getResp: HttpResponseMessage) = client.GetAsync("/games/game1")
@@ -1566,7 +1566,7 @@ let roleDefinitionTests =
                       )
                   }
 
-              let endpoint = resource.Endpoints[0]
+              let endpoint = resource.Resource.Endpoints[0]
               let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
               Expect.isNotNull (box metadata) "should have StateMachineMetadata"
               let roleNames = metadata.Roles |> List.map (fun r -> r.Name) |> List.sort
@@ -1610,7 +1610,7 @@ let roleDefinitionTests =
               let userA =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("role", "a") |], "test"))
 
-              (withRoleServer resource (Some userA) (fun client ->
+              (withRoleServer resource.Resource (Some userA) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for role=a user"
@@ -1627,7 +1627,7 @@ let roleDefinitionTests =
               let userB =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("role", "b") |], "test"))
 
-              (withRoleServer resource (Some userB) (fun client ->
+              (withRoleServer resource.Resource (Some userB) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for role=b user"
@@ -1658,7 +1658,7 @@ let roleDefinitionTests =
               // Anonymous user (no auth type) should match only Observer
               let anonymous = ClaimsPrincipal(ClaimsIdentity())
 
-              (withRoleServer resource (Some anonymous) (fun client ->
+              (withRoleServer resource.Resource (Some anonymous) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for anonymous user"
@@ -1690,7 +1690,7 @@ let roleDefinitionTests =
               let superUser =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("role", "a"); Claim("role", "b") |], "test"))
 
-              (withRoleServer resource (Some superUser) (fun client ->
+              (withRoleServer resource.Resource (Some superUser) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/roles/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "should be 200 for user with all claims"
@@ -1731,7 +1731,7 @@ let roleDefinitionTests =
               let allowedUser =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("access", "granted") |], "test"))
 
-              (withRoleServer resource (Some allowedUser) (fun client ->
+              (withRoleServer resource.Resource (Some allowedUser) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/guarded-role/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "allowed user should get 200"
@@ -1743,7 +1743,7 @@ let roleDefinitionTests =
               let deniedUser =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("access", "denied") |], "test"))
 
-              (withRoleServer resource (Some deniedUser) (fun client ->
+              (withRoleServer resource.Resource (Some deniedUser) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/guarded-role/1")
                       Expect.equal resp.StatusCode HttpStatusCode.Forbidden "denied user should get 403"
@@ -1782,7 +1782,7 @@ let roleDefinitionTests =
               let allowedUser =
                   ClaimsPrincipal(ClaimsIdentity([| Claim("access", "granted") |], "test"))
 
-              (withRoleServer resource (Some allowedUser) (fun client ->
+              (withRoleServer resource.Resource (Some allowedUser) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/undeclared-role/1")
                       Expect.equal resp.StatusCode HttpStatusCode.Forbidden "undeclared role should never match -> 403"
@@ -1802,7 +1802,7 @@ let roleDefinitionTests =
                       )
                   }
 
-              (withRoleServer resource None (fun client ->
+              (withRoleServer resource.Resource None (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/noRoles/1")
                       Expect.equal resp.StatusCode HttpStatusCode.OK "no-role resource should be 200"
@@ -1814,7 +1814,7 @@ let roleDefinitionTests =
 
               // Also verify HasRole returns false
               let metadata =
-                  resource.Endpoints[0].Metadata.GetMetadata<StateMachineMetadata>()
+                  resource.Resource.Endpoints[0].Metadata.GetMetadata<StateMachineMetadata>()
 
               Expect.isEmpty metadata.Roles "Roles list should be empty"
 
@@ -1834,7 +1834,7 @@ let roleDefinitionTests =
 
               let user = ClaimsPrincipal(ClaimsIdentity([||], "test"))
 
-              (withRoleServer resource (Some user) (fun client ->
+              (withRoleServer resource.Resource (Some user) (fun client ->
                   task {
                       let! (resp: HttpResponseMessage) = client.GetAsync("/exception-role/1")
                       // Request should still succeed — bad predicate is logged and skipped
@@ -1882,7 +1882,7 @@ let roleDefinitionTests =
                       )
                   }
 
-              (withRoleServer resource None (fun client ->
+              (withRoleServer resource.Resource None (fun client ->
                   task {
                       let! (_: HttpResponseMessage) = client.PostAsync("/ev-guard/1", new StringContent(""))
                       Expect.isTrue guardCalled.Value "EventValidation guard should have been called"

@@ -237,8 +237,8 @@ let hasHeader (response: HttpResponseMessage) (name: string) : bool =
 
 let withServer (f: TestServer -> HttpClient -> Task) =
     task {
-        let resource = buildGameResource ()
-        use server = buildTestServer resource
+        let result = buildGameResource ()
+        use server = buildTestServer result.Resource
         use client = server.CreateClient()
 
         do! f server client
@@ -632,7 +632,7 @@ let projectedProfileTests =
                       |> List.map (fun e -> { e with ProfileUrl = "/alps/games" }) }
 
               let preComputed = AffordancePreCompute.preCompute profileAffordanceMap
-              let resource = buildGameResource ()
+              let gameResult = buildGameResource ()
 
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
@@ -658,7 +658,7 @@ let projectedProfileTests =
 
               (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
 
-              app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+              app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(gameResult.Resource.Endpoints)))
               |> ignore
 
               app.Start()

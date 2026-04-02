@@ -101,6 +101,10 @@ type StateMachineMetadata =
         /// in a synthetic __root__ XOR composite at Run time). Middleware always uses
         /// HierarchicalRuntime.resolveHandlers/resolveAllowedMethods for dispatch.
         Hierarchy: StateHierarchy
+        /// Extracted statechart snapshot built at Run time from CE state.
+        /// Contains state names, transitions (with role constraints), roles, and guard names.
+        /// Used by the spec pipeline to avoid re-running reflection at export time.
+        Statechart: ExtractedStatechart option
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -141,7 +145,16 @@ type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'St
         /// Opt-in hierarchy spec. When Some, the Run method wires StateHierarchy.build into
         /// StateMachineMetadata.Hierarchy, enabling hierarchical dispatch in middleware.
         HierarchySpec: HierarchySpec option
+        /// MPST role-constrained transition declarations added via the `transition` CE operation.
+        TransitionDeclarations: TransitionSpec list
     }
+
+/// The result of evaluating a statefulResource CE.
+/// Contains the routing Resource and an extracted statechart snapshot
+/// (state names, transitions with role constraints, roles, guard names).
+type StatefulResourceResult =
+    { Resource: Resource
+      Statechart: ExtractedStatechart }
 
 /// Helper functions for building per-state handler lists.
 [<RequireQualifiedAccess>]
@@ -179,7 +192,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
           ResolveInstanceId = None
           Metadata = []
           Roles = []
-          HierarchySpec = None }
+          HierarchySpec = None
+          TransitionDeclarations = [] }
 
     /// Register a pre-built state machine definition.
     [<CustomOperation("machine")>]
@@ -235,7 +249,28 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with
             HierarchySpec = Some hierarchySpec }
 
-    member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : Resource =
+    /// Declare an MPST role-constrained transition.
+    /// The event, source, and target are resolved to string keys via StateKeyExtractor.keyOf.
+    /// Multiple transition declarations may be added; they accumulate in TransitionDeclarations.
+    [<CustomOperation("transition")>]
+    member _.Transition
+        (
+            spec: StatefulResourceSpec<'S, 'E, 'C>,
+            event: 'E,
+            source: 'S,
+            target: 'S,
+            roleConstraint: RoleConstraint
+        ) =
+        { spec with
+            TransitionDeclarations =
+                { Event = StateKeyExtractor.keyOf event
+                  Source = StateKeyExtractor.keyOf source
+                  Target = StateKeyExtractor.keyOf target
+                  Guard = None
+                  Constraint = roleConstraint }
+                :: spec.TransitionDeclarations }
+
+    member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : StatefulResourceResult =
         let machine =
             spec.Machine
             |> Option.defaultWith (fun () -> failwith "statefulResource requires a machine definition")
@@ -615,6 +650,26 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 | AccessControl(name, _) -> name
                 | EventValidation(name, _) -> name)
 
+        // Build ExtractedStatechart from CE state.
+        // StateNames: union of StateHandlerMap keys and StateMetadata keys, deduplicated.
+        let stateNames =
+            (Map.toList spec.StateHandlerMap |> List.map fst)
+            @ (Map.toList stateMetadataMap |> List.map fst)
+            |> List.distinct
+
+        let extractedStatechart: ExtractedStatechart =
+            { RouteTemplate = routeTemplate
+              StateNames = stateNames
+              InitialStateKey = initialStateKey
+              GuardNames = guardNames
+              StateMetadata = stateMetadataMap
+              Roles =
+                spec.Roles
+                |> List.map (fun r ->
+                    { Frank.Resources.Model.RoleInfo.Name = r.Name
+                      Description = None })
+              Transitions = spec.TransitionDeclarations }
+
         let metadata: StateMachineMetadata =
             { Machine = box machine
               StateHandlerMap = spec.StateHandlerMap
@@ -631,7 +686,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
               ExecuteTransition = executeTransition
               Roles = spec.Roles
               ResolveRoles = resolveRoles
-              Hierarchy = hierarchy }
+              Hierarchy = hierarchy
+              Statechart = Some extractedStatechart }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.
@@ -651,7 +707,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     [ fun (builder: EndpointBuilder) -> builder.Metadata.Add(metadata) ]
                     @ spec.Metadata }
 
-        resourceSpec.Build(routeTemplate)
+        let resource = resourceSpec.Build(routeTemplate)
+
+        { Resource = resource
+          Statechart = extractedStatechart }
 
 [<AutoOpen>]
 module StatefulResourceBuilderModule =
