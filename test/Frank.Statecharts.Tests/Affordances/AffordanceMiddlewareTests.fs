@@ -380,7 +380,7 @@ let preComputeTests =
               Expect.isFalse (authLinksStr.Contains("offerDraw")) "Auth fallback should NOT have offerDraw"
               Expect.isTrue (authLinksStr.Contains("viewGame")) "Auth fallback should have viewGame"
 
-          testCase "Allow header identical across role variants"
+          testCase "Allow header for role entry reflects only role-visible methods"
           <| fun _ ->
               let map =
                   { Version = AffordanceMap.currentVersion
@@ -400,10 +400,17 @@ let preComputeTests =
               let baseKey = AffordanceMap.lookupKey "/games/{gameId}" "XTurn"
               let roleKey = AffordanceMap.lookupKeyWithRole "/games/{gameId}" "XTurn" "PlayerX"
 
+              // Base entry uses entry.AllowedMethods directly (unchanged)
+              Expect.equal
+                  (result.[baseKey].AllowHeaderValue.ToString())
+                  "GET, POST"
+                  "Base Allow header should reflect AllowedMethods"
+
+              // Role entry derives Allow from role-visible link methods (GET + OPTIONS always + POST from makeMove)
               Expect.equal
                   (result.[roleKey].AllowHeaderValue.ToString())
-                  (result.[baseKey].AllowHeaderValue.ToString())
-                  "Allow header should be identical for base and role variant"
+                  "GET, OPTIONS, POST"
+                  "PlayerX Allow header should include GET, OPTIONS, and POST (from makeMove transition)"
 
           testCase "Links with Roles=[] appear in all role variants"
           <| fun _ ->
@@ -575,7 +582,7 @@ let roleFilteredMiddlewareTests =
                   .GetAwaiter()
                   .GetResult()
 
-          testCase "Allow header identical for all roles"
+          testCase "Allow header reflects role-visible methods: PlayerX sees POST, PlayerO does not"
           <| fun _ ->
               let mutable playerXAllow = ""
               let mutable playerOAllow = ""
@@ -608,4 +615,7 @@ let roleFilteredMiddlewareTests =
                   .GetAwaiter()
                   .GetResult()
 
-              Expect.equal playerXAllow playerOAllow "Allow header should be identical for PlayerX and PlayerO" ]
+              // PlayerX has a role-specific POST transition (makeMove) plus role-agnostic GET (viewGame)
+              Expect.equal playerXAllow "GET, OPTIONS, POST" "PlayerX Allow should include POST (makeMove transition)"
+              // PlayerO has no role-specific entry; falls back to auth entry with only role-agnostic links (viewGame GET)
+              Expect.equal playerOAllow "GET, OPTIONS" "PlayerO Allow should NOT include POST (no matching role transitions)" ]

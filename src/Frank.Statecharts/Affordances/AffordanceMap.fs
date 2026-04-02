@@ -64,16 +64,28 @@ module AffordancePreCompute =
                 let roleKey =
                     AffordanceMap.lookupKeyWithRole entry.RouteTemplate entry.StateKey role
 
+                let roleFilteredLinks =
+                    entry.LinkRelations
+                    |> List.filter (fun lr -> lr.Roles = [] || List.contains role lr.Roles)
+
+                let roleMethods =
+                    roleFilteredLinks
+                    |> List.map (fun lr -> lr.Method)
+                    |> fun ms -> "GET" :: "OPTIONS" :: ms
+                    |> List.distinct
+                    |> List.sort
+
+                let roleAllowHeader = StringValues(String.Join(", ", roleMethods))
+
                 let roleLinkValues =
                     [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
                            formatLinkValue entry.ProfileUrl "profile"
 
-                       for lr in entry.LinkRelations do
-                           if lr.Roles = [] || List.contains role lr.Roles then
-                               formatLinkValue lr.Href lr.Rel |]
+                       for lr in roleFilteredLinks do
+                           formatLinkValue lr.Href lr.Rel |]
 
                 dict.[roleKey] <-
-                    { AllowHeaderValue = allowHeader
+                    { AllowHeaderValue = roleAllowHeader
                       LinkHeaderValues = StringValues(roleLinkValues)
                       HasTemplateLinks = roleLinkValues |> Array.exists (fun v -> v.Contains("{")) }
 
@@ -83,16 +95,27 @@ module AffordancePreCompute =
                 let authKey =
                     AffordanceMap.lookupKeyAuthenticated entry.RouteTemplate entry.StateKey
 
+                let authFilteredLinks =
+                    entry.LinkRelations |> List.filter (fun lr -> lr.Roles = [])
+
+                let authMethods =
+                    authFilteredLinks
+                    |> List.map (fun lr -> lr.Method)
+                    |> fun ms -> "GET" :: "OPTIONS" :: ms
+                    |> List.distinct
+                    |> List.sort
+
+                let authAllowHeader = StringValues(String.Join(", ", authMethods))
+
                 let authLinkValues =
                     [| if not (String.IsNullOrEmpty entry.ProfileUrl) then
                            formatLinkValue entry.ProfileUrl "profile"
 
-                       for lr in entry.LinkRelations do
-                           if lr.Roles = [] then
-                               formatLinkValue lr.Href lr.Rel |]
+                       for lr in authFilteredLinks do
+                           formatLinkValue lr.Href lr.Rel |]
 
                 dict.[authKey] <-
-                    { AllowHeaderValue = allowHeader
+                    { AllowHeaderValue = authAllowHeader
                       LinkHeaderValues = StringValues(authLinkValues)
                       HasTemplateLinks = authLinkValues |> Array.exists (fun v -> v.Contains("{")) }
 
