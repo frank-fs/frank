@@ -1186,6 +1186,156 @@ let xorExclusivityTests =
               Expect.equal activeChildren.Head TrafficLight.yellow "That child is Yellow" ]
 
 // ==========================================================================
+// Issue #265: enterState must include all ancestors up to root
+//
+// Hierarchy: Order > Processing > Payment > Authorize
+//            Order > Pending (initial)
+//
+// Harel semantics: a state is active iff it or any descendant is the
+// current atomic state. All ancestors must be in the active configuration.
+// ==========================================================================
+
+/// State identifiers for the order fulfillment hierarchy (issue #265).
+[<RequireQualifiedAccess>]
+module OrderFulfillment =
+    let order = "Order"
+    let pending = "Pending"
+    let processing = "Processing"
+    let payment = "Payment"
+    let authorize = "Authorize"
+
+/// Build the order fulfillment hierarchy used by issue #265 tests.
+let private orderHierarchy =
+    StateHierarchy.build
+        { States =
+            [ { Id = OrderFulfillment.order
+                Kind = CompositeKind.XOR
+                Children = [ OrderFulfillment.pending; OrderFulfillment.processing ]
+                InitialChild = Some OrderFulfillment.pending
+                CompletionTarget = None }
+              { Id = OrderFulfillment.processing
+                Kind = CompositeKind.XOR
+                Children = [ OrderFulfillment.payment ]
+                InitialChild = Some OrderFulfillment.payment
+                CompletionTarget = None }
+              { Id = OrderFulfillment.payment
+                Kind = CompositeKind.XOR
+                Children = [ OrderFulfillment.authorize ]
+                InitialChild = Some OrderFulfillment.authorize
+                CompletionTarget = None } ] }
+
+[<Tests>]
+let enterStateAncestorTests =
+    testList
+        "Issue #265: enterState includes all ancestors"
+        [
+          // Acceptance test 1: Initial entry includes root
+          testCase "initial entry into Pending includes Order (root)"
+          <| fun () ->
+              let config =
+                  HierarchicalRuntime.enterState orderHierarchy OrderFulfillment.pending ActiveStateConfiguration.empty
+
+              let active = ActiveStateConfiguration.toSet config
+
+              Expect.isTrue
+                  (Set.contains OrderFulfillment.order active)
+                  "Order (root) must be in active config when entering Pending"
+
+              Expect.isTrue
+                  (Set.contains OrderFulfillment.pending active)
+                  "Pending must be in active config"
+
+              Expect.equal active (Set.ofList [ OrderFulfillment.order; OrderFulfillment.pending ]) "Active config = {Order, Pending}"
+
+          // Acceptance test 2: Transition preserves full ancestor chain
+          testCase "transition Pending → Authorize includes all four ancestors"
+          <| fun () ->
+              // Start with initial entry into Pending
+              let initialConfig =
+                  HierarchicalRuntime.enterState orderHierarchy OrderFulfillment.pending ActiveStateConfiguration.empty
+
+              // Transition Pending → Authorize
+              let result =
+                  HierarchicalRuntime.transition
+                      orderHierarchy
+                      initialConfig
+                      OrderFulfillment.pending
+                      OrderFulfillment.authorize
+                      HistoryRecord.empty
+
+              let active = ActiveStateConfiguration.toSet result.Configuration
+
+              Expect.equal
+                  active
+                  (Set.ofList
+                      [ OrderFulfillment.order
+                        OrderFulfillment.processing
+                        OrderFulfillment.payment
+                        OrderFulfillment.authorize ])
+                  "Active config = {Order, Processing, Payment, Authorize}"
+
+          // Acceptance test 3: Root never absent from active config
+          testCase "Order is always in active config for any reachable state"
+          <| fun () ->
+              // Test every reachable atomic state
+              let allAtomicStates =
+                  [ OrderFulfillment.pending; OrderFulfillment.authorize ]
+
+              for atomicState in allAtomicStates do
+                  let config =
+                      HierarchicalRuntime.enterState orderHierarchy atomicState ActiveStateConfiguration.empty
+
+                  Expect.isTrue
+                      (ActiveStateConfiguration.isActive OrderFulfillment.order config)
+                      (sprintf "Order must be active when in state %s" atomicState)
+
+          // Harel finding 5: enterWithHistory must include ancestors even on
+          // degenerate path where no child enterState call occurs.
+          // Shallow history on a composite with no matching child AND no initial child
+          // returns without calling enterState — ancestors would be missing.
+          testCase "enterWithHistory includes ancestors on degenerate shallow path"
+          <| fun () ->
+              // Root (XOR) > Inner (XOR, no initial child, no children in history)
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Root"
+                              Kind = CompositeKind.XOR
+                              Children = [ "Inner"; "Other" ]
+                              InitialChild = Some "Inner"
+                              CompletionTarget = None }
+                            { Id = "Inner"
+                              Kind = CompositeKind.XOR
+                              Children = [ "A"; "B" ]
+                              // No initial child — degenerate
+                              InitialChild = None
+                              CompletionTarget = None } ] }
+
+              // Fabricate a history record where Inner's recorded config has a state
+              // that is NOT a current child of Inner (simulates stale/empty match)
+              let staleHistory =
+                  HistoryRecord.record "Inner" ActiveStateConfiguration.empty HistoryRecord.empty
+
+              // enterWithHistory on Inner from empty config with stale history:
+              // shallow history finds no matching child, no initial child → returns early
+              let restored =
+                  HierarchicalRuntime.enterWithHistory
+                      hierarchy
+                      HistoryKind.Shallow
+                      "Inner"
+                      ActiveStateConfiguration.empty
+                      staleHistory
+
+              // Root must still be in config — enterWithHistory must add ancestors
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive "Root" restored)
+                  "Root must be in config even on degenerate enterWithHistory path"
+
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive "Inner" restored)
+                  "Inner must be in config" ]
+
+// ==========================================================================
 // Composite StateKind in AST
 // ==========================================================================
 

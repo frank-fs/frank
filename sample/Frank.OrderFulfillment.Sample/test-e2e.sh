@@ -157,6 +157,7 @@ check_content_type() {
     fi
 }
 
+
 check_log_contains() {
     local label="$1" expected="$2"
     if grep -q "$expected" "$SERVER_LOG"; then
@@ -286,7 +287,8 @@ echo ""
 curl -s -X POST "$BASE/orders/o3" > /dev/null         # Pending → Authorize
 sleep 1
 
-# Config should show ancestor chain: Processing, Payment, Authorize
+# Config should show full ancestor chain: Order, Processing, Payment, Authorize (issue #265)
+check_json_contains "AT4: config includes Order"       "$BASE/orders/o3" ".config[]" "Order"
 check_json_contains "AT4: config includes Processing"  "$BASE/orders/o3" ".config[]" "Processing"
 check_json_contains "AT4: config includes Payment"     "$BASE/orders/o3" ".config[]" "Payment"
 check_json_contains "AT4: config includes Authorize"   "$BASE/orders/o3" ".config[]" "Authorize"
