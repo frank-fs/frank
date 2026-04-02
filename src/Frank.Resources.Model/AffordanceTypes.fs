@@ -174,3 +174,65 @@ module AffordanceMap =
     /// Load an AffordanceMap from a RuntimeState.
     let fromRuntimeState (state: RuntimeState) : AffordanceMap =
         generateFromResources state.Resources state.BaseUri
+
+    /// Convert a PascalCase or camelCase identifier to kebab-case.
+    /// "AuthorizePayment" → "authorize-payment", "makeMove" → "make-move"
+    let toKebabCase (name: string) : string =
+        if System.String.IsNullOrEmpty(name) then
+            name
+        else
+            let sb = System.Text.StringBuilder()
+
+            for i in 0 .. name.Length - 1 do
+                let c = name.[i]
+
+                if i > 0 && System.Char.IsUpper(c) then
+                    sb.Append('-') |> ignore
+
+                sb.Append(System.Char.ToLowerInvariant(c)) |> ignore
+
+            sb.ToString()
+
+    /// Generate an AffordanceMap from an ExtractedStatechart for CE-based apps.
+    /// Each transition becomes an AffordanceLinkRelation with Roles derived from RoleConstraint.
+    /// Method is "POST" for all transitions (MustSelect semantics).
+    /// Rel is the event name converted to kebab-case.
+    let fromStatechart (baseUri: string) (sc: ExtractedStatechart) : AffordanceMap =
+        let slug = ResourceModel.resourceSlug sc.RouteTemplate
+        let profile = profileUrl baseUri slug
+
+        let entries =
+            sc.StateNames
+            |> List.map (fun stateKey ->
+                let transitions =
+                    sc.Transitions |> List.filter (fun t -> t.Source = stateKey)
+
+                let linkRelations =
+                    transitions
+                    |> List.map (fun t ->
+                        let roles =
+                            match t.Constraint with
+                            | Unrestricted -> []
+                            | RestrictedTo r -> r
+
+                        { AffordanceLinkRelation.Rel = toKebabCase t.Event
+                          AffordanceLinkRelation.Href = sc.RouteTemplate
+                          AffordanceLinkRelation.Method = "POST"
+                          AffordanceLinkRelation.Title = None
+                          AffordanceLinkRelation.Roles = roles })
+
+                let allowedMethods =
+                    let hasTransitions = not (List.isEmpty transitions)
+
+                    [ "GET"; "OPTIONS" ] @ (if hasTransitions then [ "POST" ] else [])
+                    |> List.distinct
+                    |> List.sort
+
+                { AffordanceMapEntry.RouteTemplate = sc.RouteTemplate
+                  AffordanceMapEntry.StateKey = stateKey
+                  AffordanceMapEntry.AllowedMethods = allowedMethods
+                  AffordanceMapEntry.LinkRelations = linkRelations
+                  AffordanceMapEntry.ProfileUrl = profile })
+
+        { Version = currentVersion
+          Entries = entries }
