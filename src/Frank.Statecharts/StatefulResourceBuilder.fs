@@ -413,12 +413,20 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
-        // Pre-compute constraint map: (sourceStateKey, eventKey) -> RoleConstraint.
-        // Captured by the evaluateEventGuards closure for role constraint checking.
-        let constraintMap: Map<string * string, RoleConstraint> =
+        // Pre-compute constraint map: (sourceStateKey, eventKey) -> RoleConstraint list.
+        // Grouped by key so guarded branching (same event from same state with different
+        // constraints) preserves all constraints instead of silently dropping duplicates.
+        let constraintMap: Map<string * string, RoleConstraint list> =
             spec.TransitionDeclarations
-            |> List.map (fun t -> (t.Source, t.Event), t.Constraint)
+            |> List.groupBy (fun t -> (t.Source, t.Event))
+            |> List.map (fun (key, transitions) -> key, transitions |> List.map (fun t -> t.Constraint))
             |> Map.ofList
+
+        // Closed-world assumption: when both roles and transitions are declared, undeclared
+        // transitions are denied (403) rather than allowed. This prevents privilege escalation
+        // when an author declares constraints but misses a transition.
+        let closedWorld =
+            not (List.isEmpty spec.Roles) && not (List.isEmpty spec.TransitionDeclarations)
 
         // Partition guards by DU case for two-phase evaluation
         let accessGuards =
@@ -461,22 +469,30 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
                 let state = feature.State.Value
                 let context = feature.Context.Value
+                let userRoles = ctx.GetRoles()
 
                 // Role constraint check: block if transition is RestrictedTo roles the user lacks.
+                // With grouped constraints, ANY matching constraint allows the transition
+                // (supports guarded branching to different targets with different role requirements).
                 let eventKey = StateKeyExtractor.keyOf event
                 let stateKey' = StateKeyExtractor.keyOf state
 
                 let constraintResult =
                     match constraintMap.TryFind(stateKey', eventKey) with
-                    | Some(RestrictedTo roles) ->
-                        let userRoles = ctx.GetRoles()
-
-                        if roles |> List.exists (fun r -> Set.contains r userRoles) then
+                    | Some constraints ->
+                        if
+                            constraints
+                            |> List.exists (fun c ->
+                                match c with
+                                | Unrestricted -> true
+                                | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles))
+                        then
                             Allowed
                         else
                             Blocked NotAllowed
-                    | Some Unrestricted -> Allowed
-                    | None -> Allowed // undeclared transitions are allowed
+                    | None ->
+                        // Closed-world: undeclared transitions denied when roles + transitions declared.
+                        if closedWorld then Blocked NotAllowed else Allowed
 
                 match constraintResult with
                 | Blocked _ -> constraintResult
@@ -486,7 +502,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                           CurrentState = state
                           Event = event
                           Context = context
-                          Roles = ctx.GetRoles() }
+                          Roles = userRoles }
 
                     eventGuards
                     |> List.fold
@@ -496,6 +512,21 @@ type StatefulResourceBuilder(routeTemplate: string) =
                             | Allowed -> GuardResult.compose acc (pred guardCtx))
                         GuardResult.identity
 
+        // Pure helper: checks whether the user has agency (any declared transition from current
+        // state that they're allowed to trigger). Used by hierarchy op branch in computeTransition.
+        let hasHierarchyAgency (ctx: HttpContext) (currentStateKey: string) : bool =
+            if not closedWorld then
+                true
+            else
+                let userRoles = ctx.GetRoles()
+
+                spec.TransitionDeclarations
+                |> List.exists (fun t ->
+                    t.Source = currentStateKey
+                    && match t.Constraint with
+                       | Unrestricted -> true
+                       | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles))
+
         // Pure computation: determines what save (if any) and result to produce.
         // Extracted from task body to avoid FS3511 in Release builds (complex match
         // expressions inside task CE prevent static state machine compilation).
@@ -504,13 +535,18 @@ type StatefulResourceBuilder(routeTemplate: string) =
             | Some op ->
                 let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
 
+                // Role constraint check for hierarchy ops: closed-world requires agency.
+                let currentStateKey = stateKey feature.State.Value
+
+                if not (hasHierarchyAgency ctx currentStateKey) then
+                    None, TransitionAttemptResult.Blocked NotAllowed
+                else
+
                 let currentConfig, currentHistory =
                     match ctx.GetHierarchyFeature() with
                     | Some f -> f.ActiveConfiguration, f.History
                     | None ->
-                        let sk = stateKey feature.State.Value
-
-                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sk),
+                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add currentStateKey),
                         HistoryRecord.empty
 
                 let currentState = feature.State.Value
