@@ -136,7 +136,7 @@ let main args =
     webHost args {
         service (fun services ->
             services
-                .AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
+                .AddMvcCore()
                 .AddJsonOptions(fun opts ->
                     opts.JsonSerializerOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
                     opts.JsonSerializerOptions.Converters.Add(Serialization.JsonStringEnumConverter()))
