@@ -404,7 +404,8 @@ let testStateMachineMetadata (stateResolver: string -> string) : StateMachineMet
       ExecuteTransition = fun _sp _ctx _instanceId -> Task.FromResult(TransitionAttemptResult.NoEvent)
       Roles = []
       ResolveRoles = fun _ -> Set.empty
-      Hierarchy = StateHierarchy.build { States = [] } }
+      Hierarchy = StateHierarchy.build { States = [] }
+      Statechart = None }
 
 /// Run a test against a WebApplication-based server with OPTIONS discovery middleware
 /// and an affordance lookup, using MapGet/MapPost endpoints with StateMachineMetadata.

@@ -262,7 +262,8 @@ let factoryTests =
                       fun _ _ _ -> System.Threading.Tasks.Task.FromResult(TransitionAttemptResult.NoEvent)
                     Roles = []
                     ResolveRoles = fun _ -> Set.empty
-                    Hierarchy = StateHierarchy.build { States = [] } }
+                    Hierarchy = StateHierarchy.build { States = [] }
+                    Statechart = None }
 
               let endpoint =
                   Endpoint(null, EndpointMetadataCollection(metadata :> obj), "test-endpoint")

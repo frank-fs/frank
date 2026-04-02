@@ -44,6 +44,8 @@ let private withServer
         let builder = WebApplication.CreateBuilder([||])
         builder.WebHost.UseTestServer() |> ignore
         builder.Services.AddRouting() |> ignore
+        // Register role lookup in DI so AffordanceMiddleware's OnStarting callback can resolve it.
+        builder.Services.AddSingleton<RoleProfileLookup>(roleLookup) |> ignore
         let app = builder.Build()
 
         app.UseRouting() |> ignore

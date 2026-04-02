@@ -101,6 +101,10 @@ type StateMachineMetadata =
         /// in a synthetic __root__ XOR composite at Run time). Middleware always uses
         /// HierarchicalRuntime.resolveHandlers/resolveAllowedMethods for dispatch.
         Hierarchy: StateHierarchy
+        /// Extracted statechart snapshot built at Run time from CE state.
+        /// Contains state names, transitions (with role constraints), roles, and guard names.
+        /// Used by the spec pipeline to avoid re-running reflection at export time.
+        Statechart: ExtractedStatechart option
     }
 
 /// Per-state handler accumulator used during CE evaluation.
@@ -141,7 +145,16 @@ type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'St
         /// Opt-in hierarchy spec. When Some, the Run method wires StateHierarchy.build into
         /// StateMachineMetadata.Hierarchy, enabling hierarchical dispatch in middleware.
         HierarchySpec: HierarchySpec option
+        /// MPST role-constrained transition declarations added via the `transition` CE operation.
+        TransitionDeclarations: TransitionSpec list
     }
+
+/// The result of evaluating a statefulResource CE.
+/// Contains the routing Resource and an extracted statechart snapshot
+/// (state names, transitions with role constraints, roles, guard names).
+type StatefulResourceResult =
+    { Resource: Resource
+      Statechart: ExtractedStatechart }
 
 /// Helper functions for building per-state handler lists.
 [<RequireQualifiedAccess>]
@@ -179,7 +192,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
           ResolveInstanceId = None
           Metadata = []
           Roles = []
-          HierarchySpec = None }
+          HierarchySpec = None
+          TransitionDeclarations = [] }
 
     /// Register a pre-built state machine definition.
     [<CustomOperation("machine")>]
@@ -235,7 +249,28 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with
             HierarchySpec = Some hierarchySpec }
 
-    member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : Resource =
+    /// Declare an MPST role-constrained transition.
+    /// The event, source, and target are resolved to string keys via StateKeyExtractor.keyOf.
+    /// Multiple transition declarations may be added; they accumulate in TransitionDeclarations.
+    [<CustomOperation("transition")>]
+    member _.Transition
+        (
+            spec: StatefulResourceSpec<'S, 'E, 'C>,
+            event: 'E,
+            source: 'S,
+            target: 'S,
+            roleConstraint: RoleConstraint
+        ) =
+        { spec with
+            TransitionDeclarations =
+                { Event = StateKeyExtractor.keyOf event
+                  Source = StateKeyExtractor.keyOf source
+                  Target = StateKeyExtractor.keyOf target
+                  Guard = None
+                  Constraint = roleConstraint }
+                :: spec.TransitionDeclarations }
+
+    member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : StatefulResourceResult =
         let machine =
             spec.Machine
             |> Option.defaultWith (fun () -> failwith "statefulResource requires a machine definition")
@@ -378,6 +413,30 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
+        // Note: Map<string * string, _> allocates a tuple per TryFind call.
+        // Acceptable for constraint maps (typically < 20 entries). If profiling shows this as hot,
+        // switch to Dictionary<struct(string * string), _> with custom comparer.
+        // Pre-compute constraint map: (sourceStateKey, eventKey) -> RoleConstraint list.
+        // Grouped by key so guarded branching (same event from same state with different
+        // constraints) preserves all constraints instead of silently dropping duplicates.
+        let constraintMap: Map<string * string, RoleConstraint list> =
+            spec.TransitionDeclarations
+            |> List.groupBy (fun t -> (t.Source, t.Event))
+            |> List.map (fun (key, transitions) -> key, transitions |> List.map (fun t -> t.Constraint))
+            |> Map.ofList
+
+        // Closed-world assumption: when both roles and transitions are declared, undeclared
+        // transitions are denied (403) rather than allowed. This prevents privilege escalation
+        // when an author declares constraints but misses a transition.
+        let closedWorld =
+            not (List.isEmpty spec.Roles) && not (List.isEmpty spec.TransitionDeclarations)
+
+        // Pure helper: does a RoleConstraint allow a given set of user roles?
+        let constraintAllowsRoles (userRoles: Set<string>) (c: RoleConstraint) : bool =
+            match c with
+            | Unrestricted -> true
+            | RestrictedTo roles -> roles |> List.exists (fun r -> Set.contains r userRoles)
+
         // Partition guards by DU case for two-phase evaluation
         let accessGuards =
             machine.Guards
@@ -413,27 +472,60 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         // Closure: evaluate event-validation guards after handler has set the event (post-handler)
         let evaluateEventGuards (ctx: HttpContext) : GuardResult =
-            let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
-            let state = feature.State.Value
-            let context = feature.Context.Value
-
             match StateMachineContext.tryGetEvent<'E> ctx with
             | None -> Allowed // No event set -- skip event guards
             | Some event ->
-                let guardCtx: EventValidationContext<'S, 'E, 'C> =
-                    { User = ctx.User
-                      CurrentState = state
-                      Event = event
-                      Context = context
-                      Roles = ctx.GetRoles() }
+                let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+                let state = feature.State.Value
+                let context = feature.Context.Value
+                let userRoles = ctx.GetRoles()
 
-                eventGuards
-                |> List.fold
-                    (fun acc (_, pred) ->
-                        match acc with
-                        | Blocked _ -> acc
-                        | Allowed -> GuardResult.compose acc (pred guardCtx))
-                    GuardResult.identity
+                // Role constraint check: block if transition is RestrictedTo roles the user lacks.
+                // With grouped constraints, ANY matching constraint allows the transition
+                // (supports guarded branching to different targets with different role requirements).
+                let eventKey = StateKeyExtractor.keyOf event
+                let stateKey' = StateKeyExtractor.keyOf state
+
+                let constraintResult =
+                    match constraintMap.TryFind(stateKey', eventKey) with
+                    | Some constraints ->
+                        if constraints |> List.exists (constraintAllowsRoles userRoles) then
+                            Allowed
+                        else
+                            Blocked Forbidden
+                    | None ->
+                        // Closed-world: undeclared transitions denied when roles + transitions declared.
+                        if closedWorld then Blocked Forbidden else Allowed
+
+                match constraintResult with
+                | Blocked _ -> constraintResult
+                | Allowed ->
+                    let guardCtx: EventValidationContext<'S, 'E, 'C> =
+                        { User = ctx.User
+                          CurrentState = state
+                          Event = event
+                          Context = context
+                          Roles = userRoles }
+
+                    eventGuards
+                    |> List.fold
+                        (fun acc (_, pred) ->
+                            match acc with
+                            | Blocked _ -> acc
+                            | Allowed -> GuardResult.compose acc (pred guardCtx))
+                        GuardResult.identity
+
+        // Pure helper: checks whether the user has agency (any declared transition from current
+        // state that they're allowed to trigger). Used by hierarchy op branch in computeTransition.
+        let hasHierarchyAgency (ctx: HttpContext) (currentStateKey: string) : bool =
+            if not closedWorld then
+                true
+            else
+                let userRoles = ctx.GetRoles()
+
+                spec.TransitionDeclarations
+                |> List.exists (fun t ->
+                    t.Source = currentStateKey && constraintAllowsRoles userRoles t.Constraint)
 
         // Pure computation: determines what save (if any) and result to produce.
         // Extracted from task body to avoid FS3511 in Release builds (complex match
@@ -443,13 +535,18 @@ type StatefulResourceBuilder(routeTemplate: string) =
             | Some op ->
                 let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
 
+                // Role constraint check for hierarchy ops: closed-world requires agency.
+                let currentStateKey = stateKey feature.State.Value
+
+                if not (hasHierarchyAgency ctx currentStateKey) then
+                    None, TransitionAttemptResult.Blocked Forbidden
+                else
+
                 let currentConfig, currentHistory =
                     match ctx.GetHierarchyFeature() with
                     | Some f -> f.ActiveConfiguration, f.History
                     | None ->
-                        let sk = stateKey feature.State.Value
-
-                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add sk),
+                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add currentStateKey),
                         HistoryRecord.empty
 
                 let currentState = feature.State.Value
@@ -615,6 +712,26 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 | AccessControl(name, _) -> name
                 | EventValidation(name, _) -> name)
 
+        // Build ExtractedStatechart from CE state.
+        // StateNames: union of StateHandlerMap keys and StateMetadata keys, deduplicated.
+        let stateNames =
+            (Map.toList spec.StateHandlerMap |> List.map fst)
+            @ (Map.toList stateMetadataMap |> List.map fst)
+            |> List.distinct
+
+        let extractedStatechart: ExtractedStatechart =
+            { RouteTemplate = routeTemplate
+              StateNames = stateNames
+              InitialStateKey = initialStateKey
+              GuardNames = guardNames
+              StateMetadata = stateMetadataMap
+              Roles =
+                spec.Roles
+                |> List.map (fun r ->
+                    { Frank.Resources.Model.RoleInfo.Name = r.Name
+                      Description = None })
+              Transitions = spec.TransitionDeclarations }
+
         let metadata: StateMachineMetadata =
             { Machine = box machine
               StateHandlerMap = spec.StateHandlerMap
@@ -631,7 +748,8 @@ type StatefulResourceBuilder(routeTemplate: string) =
               ExecuteTransition = executeTransition
               Roles = spec.Roles
               ResolveRoles = resolveRoles
-              Hierarchy = hierarchy }
+              Hierarchy = hierarchy
+              Statechart = Some extractedStatechart }
 
         // Collect distinct HTTP methods across all states.
         // Middleware dispatches the real state-specific handler; endpoints just need routing targets.
@@ -651,7 +769,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     [ fun (builder: EndpointBuilder) -> builder.Metadata.Add(metadata) ]
                     @ spec.Metadata }
 
-        resourceSpec.Build(routeTemplate)
+        let resource = resourceSpec.Build(routeTemplate)
+
+        { Resource = resource
+          Statechart = extractedStatechart }
 
 [<AutoOpen>]
 module StatefulResourceBuilderModule =

@@ -176,4 +176,278 @@ let affordanceMapTests =
 
               let map = AffordanceMap.generateFromResources [ resource ] "http://example.com/alps"
               for entry in map.Entries do
-                  Expect.contains entry.AllowedMethods "OPTIONS" (sprintf "OPTIONS must be in AllowedMethods for state %s" entry.StateKey) ]
+                  Expect.contains entry.AllowedMethods "OPTIONS" (sprintf "OPTIONS must be in AllowedMethods for state %s" entry.StateKey)
+
+          // toKebabCase
+          testCase "toKebabCase converts PascalCase to kebab-case"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "AuthorizePayment") "authorize-payment" "PascalCase two words"
+              Expect.equal (AffordanceMap.toKebabCase "PlaceOrder") "place-order" "PascalCase two words"
+              Expect.equal (AffordanceMap.toKebabCase "makeMove") "make-move" "camelCase"
+              Expect.equal (AffordanceMap.toKebabCase "getGame") "get-game" "camelCase get prefix"
+
+          testCase "toKebabCase leaves single-word lowercase unchanged"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "play") "play" "already lowercase"
+
+          testCase "toKebabCase handles single uppercase word"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "Move") "move" "single PascalCase word"
+
+          testCase "toKebabCase handles empty string"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "") "" "empty string round-trips"
+
+          // fromStatechart
+          testCase "fromStatechart produces one entry per state"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn"; "OTurn"; "GameOver" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted }
+                        { Event = "makeMove"
+                          Source = "OTurn"
+                          Target = "XTurn"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              Expect.equal map.Entries.Length 3 "One entry per state"
+
+          testCase "fromStatechart uses currentVersion"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/items"
+                    StateNames = [ "Active" ]
+                    InitialStateKey = "Active"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              Expect.equal map.Version AffordanceMap.currentVersion "Version must match currentVersion"
+
+          testCase "fromStatechart converts event names to kebab-case rel"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let rel = entry.LinkRelations |> List.head |> _.Rel
+              Expect.equal rel "make-move" "Event name should be kebab-cased"
+
+          testCase "fromStatechart sets Method to POST for all transitions"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Pending" ]
+                    InitialStateKey = "Pending"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "authorizePayment"
+                          Source = "Pending"
+                          Target = "Authorized"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let methods = entry.LinkRelations |> List.map _.Method
+              Expect.allEqual methods "POST" "All transition methods must be POST"
+
+          testCase "fromStatechart AllowedMethods includes GET OPTIONS POST when transitions exist"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              Expect.contains entry.AllowedMethods "GET" "GET required"
+              Expect.contains entry.AllowedMethods "OPTIONS" "OPTIONS required per RFC 7231"
+              Expect.contains entry.AllowedMethods "POST" "POST required when transitions exist"
+
+          testCase "fromStatechart AllowedMethods excludes POST for terminal state"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "GameOver" ]
+                    InitialStateKey = "GameOver"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              Expect.contains entry.AllowedMethods "GET" "GET required for terminal state"
+              Expect.contains entry.AllowedMethods "OPTIONS" "OPTIONS required for terminal state"
+              Expect.isFalse (List.contains "POST" entry.AllowedMethods) "POST must not appear when no transitions"
+              Expect.isEmpty entry.LinkRelations "No link relations for terminal state"
+
+          testCase "fromStatechart Unrestricted constraint maps to empty Roles"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
+              Expect.isEmpty lr.Roles "Unrestricted constraint should yield empty Roles list"
+
+          testCase "fromStatechart RestrictedTo constraint maps to Roles list"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PlayerX" ] } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
+              Expect.equal lr.Roles [ "PlayerX" ] "RestrictedTo roles should be preserved"
+
+          testCase "fromStatechart only includes transitions sourced from each state"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn"; "OTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PlayerX" ] }
+                        { Event = "makeMove"
+                          Source = "OTurn"
+                          Target = "XTurn"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PlayerO" ] } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let xEntry = map.Entries |> List.find (fun e -> e.StateKey = "XTurn")
+              let oEntry = map.Entries |> List.find (fun e -> e.StateKey = "OTurn")
+              Expect.equal xEntry.LinkRelations.Length 1 "XTurn should have exactly one transition"
+              Expect.equal (xEntry.LinkRelations |> List.head |> _.Roles) [ "PlayerX" ] "XTurn transition is PlayerX only"
+              Expect.equal oEntry.LinkRelations.Length 1 "OTurn should have exactly one transition"
+              Expect.equal (oEntry.LinkRelations |> List.head |> _.Roles) [ "PlayerO" ] "OTurn transition is PlayerO only"
+
+          testCase "fromStatechart sets ProfileUrl from baseUri and route slug"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              Expect.equal entry.ProfileUrl "http://example.com/alps/games" "ProfileUrl should use resource slug"
+
+          testCase "fromStatechart sets RouteTemplate on each entry"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Pending"; "Shipped" ]
+                    InitialStateKey = "Pending"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              for entry in map.Entries do
+                  Expect.equal entry.RouteTemplate "/orders/{orderId}" "RouteTemplate must match statechart"
+
+          testCase "fromStatechart Href on link relations equals route template"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
+              Expect.equal lr.Href "/games/{gameId}" "Href should be the route template"
+
+          testCase "fromStatechart returns empty Entries for statechart with no states"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/items"
+                    StateNames = []
+                    InitialStateKey = ""
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              Expect.isEmpty map.Entries "No states means no entries" ]

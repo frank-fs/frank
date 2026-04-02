@@ -52,6 +52,31 @@ module WebHostBuilderExtensions =
                             app.UseMiddleware<AffordanceMiddleware>() |> ignore
                             app }
 
+        /// Register the affordance middleware with an AffordanceMap generated at startup
+        /// from an ExtractedStatechart. For CE-based apps that don't use CLI-generated model.bin.
+        /// Transitions become role-scoped Link/Allow headers via AffordancePreCompute.
+        [<CustomOperation("useRuntimeAffordances")>]
+        member _.UseRuntimeAffordances(spec: WebHostSpec, chart: ExtractedStatechart, baseUri: string) : WebHostSpec =
+            let map = AffordanceMap.fromStatechart baseUri chart
+            let preComputed = AffordancePreCompute.preCompute map
+
+            if preComputed.Count = 0 then
+                spec
+            else
+                { spec with
+                    Services =
+                        spec.Services
+                        >> fun services ->
+                            services.AddSingleton<Dictionary<string, PreComputedAffordance>>(preComputed)
+                            |> ignore
+
+                            services
+                    Middleware =
+                        spec.Middleware
+                        >> fun app ->
+                            app.UseMiddleware<AffordanceMiddleware>() |> ignore
+                            app }
+
         /// Auto-load the AffordanceMap from the entry assembly's embedded model.bin.
         /// Registers a DI factory that lazily loads from the assembly (FW-3).
         /// Falls back to empty dictionary when the entry assembly is null

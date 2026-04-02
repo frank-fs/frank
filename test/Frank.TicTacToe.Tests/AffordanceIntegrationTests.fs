@@ -237,8 +237,8 @@ let hasHeader (response: HttpResponseMessage) (name: string) : bool =
 
 let withServer (f: TestServer -> HttpClient -> Task) =
     task {
-        let resource = buildGameResource ()
-        use server = buildTestServer resource
+        let result = buildGameResource ()
+        use server = buildTestServer result.Resource
         use client = server.CreateClient()
 
         do! f server client
@@ -632,13 +632,15 @@ let projectedProfileTests =
                       |> List.map (fun e -> { e with ProfileUrl = "/alps/games" }) }
 
               let preComputed = AffordancePreCompute.preCompute profileAffordanceMap
-              let resource = buildGameResource ()
+              let gameResult = buildGameResource ()
 
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
               builder.Services.AddLogging() |> ignore
               builder.Services.AddStatechartsStore<TicTacToeState, int>() |> ignore
+              // Register role lookup in DI so AffordanceMiddleware's OnStarting callback can resolve it.
+              builder.Services.AddSingleton<RoleProfileLookup>(roleLookup) |> ignore
               let app = builder.Build()
 
               app.UseRouting() |> ignore
@@ -658,7 +660,7 @@ let projectedProfileTests =
 
               (app :> IApplicationBuilder).UseMiddleware<StateMachineMiddleware>() |> ignore
 
-              app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(resource.Endpoints)))
+              app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource(gameResult.Resource.Endpoints)))
               |> ignore
 
               app.Start()

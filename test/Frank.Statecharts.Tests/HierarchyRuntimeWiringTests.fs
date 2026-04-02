@@ -163,7 +163,7 @@ let ceOperationTests =
                       )
                   }
 
-              let meta = getMetadata res
+              let meta = getMetadata res.Resource
               Expect.isSome meta "StateMachineMetadata should be present"
               // Hierarchy is always built; verify it reflects the provided spec (Draft is a child of Root)
               let h = meta.Value.Hierarchy
@@ -180,7 +180,7 @@ let ceOperationTests =
                       )
                   }
 
-              let meta = getMetadata res
+              let meta = getMetadata res.Resource
               Expect.isSome meta "StateMachineMetadata should be present"
               // Without useHierarchyWith, flat FSM is auto-wrapped in synthetic __root__ XOR composite
               let h = meta.Value.Hierarchy
@@ -206,7 +206,7 @@ let ceOperationTests =
                       )
                   }
 
-              let meta = getMetadata res |> Option.get
+              let meta = getMetadata res.Resource |> Option.get
               let hierarchy = meta.Hierarchy
               // Verify the hierarchy has been built (ParentMap should contain Child1 -> Parent)
               Expect.equal
@@ -323,7 +323,7 @@ let middlewareIntegrationTests =
                       )
                   }
 
-              (withDocServer res (fun client ->
+              (withDocServer res.Resource (fun client ->
                   task {
                       let! (response: HttpResponseMessage) = client.DeleteAsync("/docs/1")
                       Expect.equal response.StatusCode HttpStatusCode.MethodNotAllowed "DELETE should be 405"
@@ -555,7 +555,7 @@ let stateMetadataKeyTests =
                       )
                   }
 
-              let meta = getMetadata res |> Option.get
+              let meta = getMetadata res.Resource |> Option.get
               // "Won" should be the key (not "Won \"X\"" which string cast would produce)
               Expect.isTrue
                   (Map.containsKey "Won" meta.StateMetadataMap)

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Auth/Frank.Auth.fsproj" />
     <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
     <ProjectReference Include="../../src/Frank.Resources.Model/Frank.Resources.Model.fsproj" />
   </ItemGroup>

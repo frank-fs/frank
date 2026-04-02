@@ -21,9 +21,9 @@
 /// to prove the library handles ALL hierarchy operations — no direct store manipulation.
 ///
 /// Pipeline order:
-///   1. State key resolver — reads store, sets IStatechartFeature
-///   2. Affordance middleware — injects Link + Allow headers
-///   3. Statechart middleware — hierarchical dispatch (useHierarchyWith)
+///   1. Affordance middleware — OnStarting callback injects Link + Allow headers
+///      (deferred until response is sent, after statechart middleware resolves state + roles)
+///   2. Statechart middleware — hierarchical dispatch (useHierarchyWith)
 module Frank.OrderFulfillment.Sample.Program
 
 open System
@@ -35,10 +35,15 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Frank.Builder
+open Frank.Auth
 open Frank.Statecharts
 open Frank.Affordances
 open Frank.ContentNegotiation
+open Frank.Resources.Model
 open Frank.OrderFulfillment.Sample.Domain
+
+// ALPS profile base URI for affordance Link headers.
+let [<Literal>] AlpsBaseUri = "http://localhost:5060/alps"
 
 // ===========================================================================
 // State key helper (mirrors StateKeyExtractor — internal in Frank.Statecharts)
@@ -50,31 +55,6 @@ let private stateKeyOf (state: OrderState) : string =
     let cases = FSharpType.GetUnionCases(typeof<OrderState>, true)
     let caseNames = cases |> Array.map (fun c -> c.Name)
     caseNames.[tagReader (box state)]
-
-// ===========================================================================
-// State key bridge middleware
-// ===========================================================================
-
-/// Resolves statechart state key from the store and sets IStatechartFeature.
-/// Must run AFTER routing and BEFORE statechart middleware.
-let resolveStateKey (app: IApplicationBuilder) =
-    app.Use(
-        Func<HttpContext, Func<Task>, Task>(fun ctx next ->
-            task {
-                let endpoint = ctx.GetEndpoint()
-
-                if not (isNull endpoint) then
-                    let metadata = endpoint.Metadata.GetMetadata<StateMachineMetadata>()
-
-                    if not (obj.ReferenceEquals(metadata, null)) then
-                        let instanceId = metadata.ResolveInstanceId ctx
-                        let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-                        ()
-
-                do! next.Invoke()
-            }
-            :> Task)
-    )
 
 // ===========================================================================
 // Handlers — state-aware HTTP responses
@@ -231,7 +211,7 @@ let directDelivered = directSetState Delivered
 ///   - XOR Processing / Payment (exclusive: Authorize | Capture | Retry)
 ///   - AND Fulfillment (parallel: Pick + Pack + Ship)
 ///   Middleware uses HierarchicalRuntime.resolveHandlers for dispatch with parent fallback.
-let orderResource =
+let orderResult =
     statefulResource "/orders/{orderId}" {
         machine orderMachine
         resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
@@ -248,6 +228,20 @@ let orderResource =
         role "PaymentService" (fun user -> user.IsInRole("PaymentService"))
         role "Warehouse" (fun user -> user.IsInRole("Warehouse"))
         role "ShippingProvider" (fun user -> user.IsInRole("ShippingProvider"))
+
+        // MPST role-constrained transition declarations:
+        // Each role only declares transitions from states where it has agency.
+        // Unrestricted = shared-input (any role may trigger).
+        // RestrictedTo = directed message (only listed roles may trigger).
+        transition PlaceOrder Pending Authorize Unrestricted
+        transition CancelOrder Pending Cancelled (RestrictedTo [ "Customer" ])
+        transition AuthorizePayment Authorize Capture (RestrictedTo [ "PaymentService" ])
+        transition CapturePayment Capture Fulfillment (RestrictedTo [ "PaymentService" ])
+        transition RetryPayment Capture Retry (RestrictedTo [ "PaymentService" ])
+        // RecoverFromRetry uses hierarchy op (setHierarchyOp), not domain event.
+        // Declared to give PaymentService agency in Retry for hierarchy op constraint check.
+        transition RecoverFromRetry Retry Capture (RestrictedTo [ "PaymentService" ])
+        transition ConfirmDelivery Shipped Delivered (RestrictedTo [ "ShippingProvider" ])
 
         // State handlers — each state's POST fires the state-specific lifecycle event
         inState (forState Pending [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handlePlaceOrder ])
@@ -374,6 +368,10 @@ let deliverResource =
 type ResolvableWarnings() =
     member val Warnings: string list = [] with get, set
 
+/// Serialize a value to JSON using System.Text.Json.
+let private toJson (value: 'T) : string =
+    System.Text.Json.JsonSerializer.Serialize(value)
+
 /// Compute AND-state DeriveResult.Warnings at startup.
 /// The Fulfillment AND-state triggers a warning about synchronization barriers
 /// not being modeled in the dual derivation engine (formalism bound 1 per issue #244).
@@ -382,87 +380,11 @@ let computeAndStateWarnings (logger: ILogger) : string list =
     // Build the hierarchy so deriveWithHierarchy detects AND-state composites.
     let hierarchy = StateHierarchy.build orderHierarchySpec |> Some
 
-    let roleNames = [ "Customer"; "PaymentService"; "Warehouse"; "ShippingProvider" ]
+    // Use the extracted statechart from the CE (includes role-constrained transitions).
+    let statechart = orderResult.Statechart
 
-    let mkTransition src tgt evt : Frank.Resources.Model.TransitionSpec =
-        { Source = src
-          Target = tgt
-          Event = evt
-          Guard = None
-          Constraint = Frank.Resources.Model.Unrestricted }
-
-    // Minimal ExtractedStatechart built from domain knowledge.
-    let statechart: Frank.Resources.Model.ExtractedStatechart =
-        { RouteTemplate = "/orders/{orderId}"
-          InitialStateKey = "Pending"
-          GuardNames = []
-          StateNames =
-            [ "Pending"
-              "Authorize"
-              "Capture"
-              "Retry"
-              "Fulfillment"
-              "Pick"
-              "PickDone"
-              "Pack"
-              "PackDone"
-              "Ship"
-              "ShipDone"
-              "Shipped"
-              "Delivered"
-              "Cancelled" ]
-          Transitions =
-            [ mkTransition "Pending" "Authorize" "placeOrder"
-              mkTransition "Pending" "Cancelled" "cancelOrder"
-              mkTransition "Authorize" "Capture" "authorizePayment"
-              mkTransition "Authorize" "Cancelled" "cancelOrder"
-              mkTransition "Capture" "Fulfillment" "capturePayment"
-              mkTransition "Capture" "Retry" "retryPayment"
-              mkTransition "Retry" "Capture" "recoverFromRetry"
-              mkTransition "Fulfillment" "Shipped" "fulfillOrder"
-              mkTransition "Shipped" "Delivered" "confirmDelivery" ]
-          StateMetadata =
-            Map.ofList
-                [ "Delivered",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET" ]
-                    IsFinal = true
-                    Description = Some "terminal" }
-                  "Cancelled",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET" ]
-                    IsFinal = true
-                    Description = Some "terminal" }
-                  "Pending",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Authorize",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Capture",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Retry",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Fulfillment",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Shipped",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None } ]
-          Roles =
-            roleNames
-            |> List.map (fun n ->
-                { Frank.Resources.Model.RoleInfo.Name = n
-                  Description = None }) }
-
-    // Per-role projection: each role sees the full statechart for this demo.
-    let projections = roleNames |> List.map (fun r -> r, statechart) |> Map.ofList
+    // Per-role projection using the Projection module.
+    let projections = Projection.projectAll statechart
 
     // deriveWithHierarchy detects AND-state composites and surfaces formalism bound 1.
     let result =
@@ -493,8 +415,8 @@ let seedInitialStates (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger("OrderFulfillment.Seed")
 
     lifetime.ApplicationStarted.Register(fun () ->
-        // Seed 3 order instances for e2e test scenarios
-        for orderId in [ "o1"; "o2"; "o3" ] do
+        // Seed 4 order instances for e2e test scenarios (o4 for role projection tests)
+        for orderId in [ "o1"; "o2"; "o3"; "o4" ] do
             store.Save orderId defaultSnapshot |> fun t -> t.Wait()
 
         // Compute AND-state warnings and cache for /diagnostics
@@ -526,14 +448,60 @@ let diagnosticsResource =
                     else
                         warningsRef.Warnings
 
-                let body =
-                    if warnings.IsEmpty then
-                        "warnings=none"
-                    else
-                        let joined = String.concat "; " warnings
-                        $"AND-state warnings: {joined}"
+                // Role projection: ?role=X returns a projected view of the statechart.
+                let roleParam =
+                    match ctx.Request.Query.TryGetValue("role") with
+                    | true, values when values.Count > 0 -> Some(values.[0])
+                    | _ -> None
 
-                do! ctx.Response.WriteAsync(body)
+                ctx.Response.ContentType <- "application/health+json"
+
+                match roleParam with
+                | Some roleName ->
+                    let projected = Projection.projectForRole roleName orderResult.Statechart
+
+                    let transitions =
+                        projected.Transitions
+                        |> List.map (fun t ->
+                            {| event = t.Event
+                               source = t.Source
+                               target = t.Target |})
+
+                    let response =
+                        {| status = "pass"
+                           description = $"Order fulfillment statechart projection for role: {roleName}"
+                           checks =
+                            {| ``projected-transitions`` =
+                                [| {| status = "pass"
+                                      observedValue = transitions |} |] |} |}
+
+                    do! ctx.Response.WriteAsync(toJson response)
+                | None ->
+                    let warningStatus = if warnings.IsEmpty then "pass" else "warn"
+
+                    let allProjections = Projection.projectAll orderResult.Statechart
+
+                    let roleProjectionValue =
+                        orderResult.Statechart.Roles
+                        |> List.map (fun role ->
+                            let projected = allProjections |> Map.tryFind role.Name
+                            let count = projected |> Option.map (fun sc -> sc.Transitions.Length) |> Option.defaultValue 0
+                            role.Name, {| transitions = count |})
+                        |> dict
+
+                    let response =
+                        {| status = warningStatus
+                           description = "Order fulfillment statechart diagnostics"
+                           checks =
+                            {| ``and-state-warnings`` =
+                                [| {| status = warningStatus
+                                      observedValue = warnings
+                                      observedUnit = "warnings" |} |]
+                               ``role-projection`` =
+                                [| {| status = "pass"
+                                      observedValue = roleProjectionValue |} |] |} |}
+
+                    do! ctx.Response.WriteAsync(toJson response)
             }
             :> Task))
     }
@@ -552,25 +520,27 @@ let main args =
             services.AddSingleton<ResolvableWarnings>() |> ignore
             services)
 
+        // X-Role header authentication for development/testing (reads roles from X-Role header)
+        useRoleHeaderAuth
+
         // Pipeline order:
-        // 1. State key resolver (reads store, sets IStatechartFeature on HttpContext.Features)
-        plug resolveStateKey
-        // 2. Affordance middleware (reads IStatechartFeature, injects Link + Allow headers)
-        useAffordances
-        // 3. Statechart middleware (hierarchical dispatch via useHierarchyWith)
+        // 1. Affordance middleware (OnStarting callback — reads IStatechartFeature + roles
+        //    just before response is sent, after statechart middleware has resolved state + roles)
+        useRuntimeAffordances orderResult.Statechart AlpsBaseUri
+        // 2. Statechart middleware (hierarchical dispatch via useHierarchyWith)
         useStatecharts
 
         // Seed order instances and compute AND-state warnings after services are built
         plug seedInitialStates
 
         // Primary stateful resource (demonstrates hierarchy + 4 MPST roles)
-        resource orderResource
+        resource orderResult.Resource
 
         // Region-completion stateful resources — each dispatches through middleware
         // (CompleteRegion hierarchy op via handlePickComplete/handlePackComplete/handleShipComplete)
-        resource pickResource
-        resource packResource
-        resource shipResource
+        resource pickResource.Resource
+        resource packResource.Resource
+        resource shipResource.Resource
 
         // Direct state manipulation sub-resources (e2e test control paths)
         resource cancelResource

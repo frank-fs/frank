@@ -158,6 +158,9 @@ module Projection =
         |> pruneUnreachableStatesWithHierarchy containment
         |> filterTransitionsByRole roleName
 
+    // Note: Projected StateNames are globally reachable states (not pruned per role).
+    // In MPST, a role observes all globally-reachable states because other roles advance
+    // the state machine through them. The transitions are filtered but states are global.
     /// Project for all roles defined in the statechart.
     /// Returns empty map if statechart has no roles (no-op).
     /// Prunes unreachable states once, then filters per role.

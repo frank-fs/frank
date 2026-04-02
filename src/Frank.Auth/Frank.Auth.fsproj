@@ -11,6 +11,7 @@
     <Compile Include="AuthConfig.fs" />
     <Compile Include="EndpointAuth.fs" />
     <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="RoleHeaderAuthHandler.fs" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 
