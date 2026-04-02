@@ -646,3 +646,130 @@ let eventValidationGuardTests =
                   }))
                   .GetAwaiter()
                   .GetResult() ]
+
+[<Tests>]
+let httpComplianceTests =
+    testList
+        "HTTP compliance (RFC 9110)"
+        [ testCase "405 includes Allow header when ResolveHandlers returns None"
+          <| fun () ->
+              // Active registered with empty handlers — ResolveHandlers returns None
+              let res =
+                  statefulResource "/no-handlers/{id}" {
+                      machine testMachine
+                      inState (forState Active [])
+
+                      inState (
+                          forState
+                              Completed
+                              [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("done")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      // Initial state is Active with no handlers — hits the None branch
+                      let! (response: HttpResponseMessage) = client.GetAsync("/no-handlers/1")
+                      Expect.equal response.StatusCode HttpStatusCode.MethodNotAllowed "Should return 405"
+
+                      // RFC 9110 Section 15.5.6: Allow header MUST be present on 405
+                      Expect.isTrue
+                          (response.Content.Headers.Contains("Allow"))
+                          "Allow header must be present on 405 even when no handlers exist"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "405 includes Allow header listing available methods"
+          <| fun () ->
+              let res =
+                  statefulResource "/method-mismatch/{id}" {
+                      machine testMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx -> ctx.Response.WriteAsync("posted")) ]
+                      )
+
+                      inState (
+                          forState
+                              Completed
+                              [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("done")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      // Active state only has POST; GET should be 405 with Allow: POST
+                      let! (response: HttpResponseMessage) = client.GetAsync("/method-mismatch/1")
+                      Expect.equal response.StatusCode HttpStatusCode.MethodNotAllowed "Should return 405"
+
+                      // Allow header must list available methods
+                      let allowValues = response.Content.Headers.Allow |> Seq.toList
+                      Expect.contains allowValues "POST" "Allow should list POST"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "202 response includes Content-Location after transition"
+          <| fun () ->
+              let res =
+                  statefulResource "/cloc/{id}" {
+                      machine testMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.post (fun ctx ->
+                                    StateMachineContext.setEvent ctx DoAction
+                                    ctx.Response.StatusCode <- 202
+                                    Task.CompletedTask) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let content = new StringContent("")
+                      let! (response: HttpResponseMessage) = client.PostAsync("/cloc/1", content)
+                      Expect.equal (int response.StatusCode) 202 "Should return 202"
+
+                      // RFC 9110 Section 15.3.3: 202 should include Content-Location
+                      Expect.isNotNull
+                          response.Content.Headers.ContentLocation
+                          "Content-Location must be present on 202 after transition"
+
+                      Expect.stringContains
+                          (response.Content.Headers.ContentLocation.ToString())
+                          "/cloc/1"
+                          "Content-Location should point to resource URI"
+                  }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          testCase "Successful response includes Allow header"
+          <| fun () ->
+              let res =
+                  statefulResource "/with-allow/{id}" {
+                      machine testMachine
+
+                      inState (
+                          forState
+                              Active
+                              [ StateHandlerBuilder.get (fun ctx -> ctx.Response.WriteAsync("reading"))
+                                StateHandlerBuilder.post (fun ctx -> ctx.Response.WriteAsync("posting")) ]
+                      )
+                  }
+
+              (withServer res addStore None (fun client ->
+                  task {
+                      let! (response: HttpResponseMessage) = client.GetAsync("/with-allow/1")
+                      Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                      // Allow header should be present on all responses for HATEOAS
+                      let allowValues = response.Content.Headers.Allow |> Seq.toList
+                      Expect.contains allowValues "GET" "Allow should list GET"
+                      Expect.contains allowValues "POST" "Allow should list POST"
+                  }))
+                  .GetAwaiter()
+                  .GetResult() ]

@@ -37,6 +37,7 @@ open Microsoft.Extensions.Logging
 open Frank.Builder
 open Frank.Statecharts
 open Frank.Affordances
+open Frank.ContentNegotiation
 open Frank.OrderFulfillment.Sample.Domain
 
 // ===========================================================================
@@ -95,7 +96,8 @@ let private ensureConfig (stateKey: string) (snapshot: InstanceSnapshot<OrderSta
     else
         snapshot.HierarchyConfig
 
-/// Returns current order state as plain text with hierarchical config and AND-region statuses.
+/// Returns current order state with hierarchical config and AND-region statuses.
+/// Uses content negotiation per RFC 9110 Section 12 — Content-Type matches Accept header.
 let getOrderState (ctx: HttpContext) : Task =
     task {
         let store =
@@ -113,32 +115,42 @@ let getOrderState (ctx: HttpContext) : Task =
 
         let hierFeature = ctx.GetHierarchyFeature()
 
-        let configStr, regionStr =
+        let config, regions =
             match hierFeature with
             | Some f ->
                 let activeSet = ActiveStateConfiguration.toSet f.ActiveConfiguration
-                let cfg = activeSet |> Set.toList |> String.concat ","
+                let cfg = activeSet |> Set.toList
 
                 let regions =
                     if ActiveStateConfiguration.isActive "Fulfillment" f.ActiveConfiguration then
-                        let statuses =
-                            fulfillmentRegionNames
-                            |> List.map (fun region ->
-                                let displayName = regionDisplayNames |> Map.find region
-                                let activeKey = regionActiveStates |> Map.find region
-                                let doneKey = regionDoneStates |> Map.find region
-                                let status =
-                                    if ActiveStateConfiguration.isActive doneKey f.ActiveConfiguration then "complete"
-                                    elif ActiveStateConfiguration.isActive activeKey f.ActiveConfiguration then "active"
-                                    else "unknown"
-                                $"{displayName}:{status}")
-                        ";regions=" + String.concat "," statuses
-                    else ""
+                        fulfillmentRegionNames
+                        |> List.map (fun region ->
+                            let displayName = regionDisplayNames |> Map.find region
+                            let activeKey = regionActiveStates |> Map.find region
+                            let doneKey = regionDoneStates |> Map.find region
+
+                            let status =
+                                if ActiveStateConfiguration.isActive doneKey f.ActiveConfiguration then
+                                    "complete"
+                                elif ActiveStateConfiguration.isActive activeKey f.ActiveConfiguration then
+                                    "active"
+                                else
+                                    "unknown"
+
+                            {| name = displayName; status = status |})
+                    else
+                        []
 
                 cfg, regions
-            | None -> key, ""
+            | None -> [ key ], []
 
-        do! ctx.Response.WriteAsync($"state={key};config={configStr}{regionStr};orderId={orderId}")
+        let body =
+            {| state = key
+               config = config
+               orderId = orderId
+               regions = regions |}
+
+        do! ctx.Negotiate(200, body)
     }
     :> Task
 

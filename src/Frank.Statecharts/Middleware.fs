@@ -43,9 +43,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
     /// Resolve allowed methods for the 405 Allow header using hierarchical dispatch.
     /// Reads persisted ActiveStateConfiguration from IHierarchyFeature
     /// for the full union of methods across active states and their ancestors.
-    static member private ResolveAllowedMethods
-        (meta: StateMachineMetadata, stateKey: string, _handlers: (string * RequestDelegate) list, ctx: HttpContext)
-        =
+    static member private ResolveAllowedMethods(meta: StateMachineMetadata, stateKey: string, ctx: HttpContext) =
         let config =
             match ctx.GetHierarchyFeature() with
             | Some f -> f.ActiveConfiguration
@@ -89,6 +87,12 @@ type StateMachineMiddleware(next: RequestDelegate) =
             // Always uses hierarchical resolution (flat FSMs are auto-wrapped in __root__ XOR).
             let handlers = StateMachineMiddleware.ResolveHandlers(meta, stateKey, ctx)
 
+            // RFC 9110: Set Allow header on all responses (mandatory on 405, useful for HATEOAS on all).
+            let allowedMethods =
+                StateMachineMiddleware.ResolveAllowedMethods(meta, stateKey, ctx)
+
+            ctx.Response.Headers["Allow"] <- StringValues(String.Join(", ", allowedMethods))
+
             match handlers with
             | None -> ctx.Response.StatusCode <- 405
             | Some handlers ->
@@ -97,13 +101,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
                     |> List.tryFind (fun (m, _) -> String.Equals(m, httpMethod, StringComparison.OrdinalIgnoreCase))
 
                 match methodMatch with
-                | None ->
-                    ctx.Response.StatusCode <- 405
-
-                    let allowedMethods =
-                        StateMachineMiddleware.ResolveAllowedMethods(meta, stateKey, handlers, ctx)
-
-                    ctx.Response.Headers["Allow"] <- StringValues(String.Join(", ", allowedMethods))
+                | None -> ctx.Response.StatusCode <- 405
                 | Some(_, handler) ->
                     // Step 3: Evaluate guards
                     let guardResult = meta.EvaluateGuards ctx
@@ -142,6 +140,11 @@ type StateMachineMiddleware(next: RequestDelegate) =
                             match transResult with
                             | TransitionAttemptResult.NoEvent -> ()
                             | TransitionAttemptResult.Succeeded evt ->
+                                // RFC 9110 Section 15.3.3: 202 should include Content-Location
+                                if ctx.Response.StatusCode = 202 && not ctx.Response.HasStarted then
+                                    let uri = ctx.Request.PathBase.Add(ctx.Request.Path).Value
+                                    ctx.Response.Headers["Content-Location"] <- StringValues(uri)
+
                                 for observer in meta.TransitionObservers do
                                     try
                                         observer evt
