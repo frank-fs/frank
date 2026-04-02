@@ -180,18 +180,28 @@ module AffordanceMap =
         generateFromResources state.Resources state.BaseUri
 
     /// Convert a PascalCase or camelCase identifier to kebab-case.
-    /// "AuthorizePayment" → "authorize-payment", "makeMove" → "make-move"
+    /// "AuthorizePayment" → "authorize-payment", "getHTMLParser" → "get-html-parser"
     let toKebabCase (name: string) : string =
         if System.String.IsNullOrEmpty(name) then
             name
         else
-            let sb = System.Text.StringBuilder()
+            let sb = System.Text.StringBuilder(name.Length + 2)
 
             for i in 0 .. name.Length - 1 do
                 let c = name.[i]
 
                 if i > 0 && System.Char.IsUpper(c) then
-                    sb.Append('-') |> ignore
+                    let prevIsLower = System.Char.IsLower(name.[i - 1])
+
+                    let isEndOfAcronym =
+                        i >= 2
+                        && System.Char.IsUpper(name.[i - 1])
+                        && System.Char.IsUpper(name.[i - 2])
+                        && i + 1 < name.Length
+                        && System.Char.IsLower(name.[i + 1])
+
+                    if prevIsLower || isEndOfAcronym then
+                        sb.Append('-') |> ignore
 
                 sb.Append(System.Char.ToLowerInvariant(c)) |> ignore
 

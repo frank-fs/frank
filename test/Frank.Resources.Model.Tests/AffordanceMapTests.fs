@@ -198,6 +198,30 @@ let affordanceMapTests =
           <| fun _ ->
               Expect.equal (AffordanceMap.toKebabCase "") "" "empty string round-trips"
 
+          testCase "toKebabCase keeps acronym at start together"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "OAuthCallback") "oauth-callback" "acronym at start"
+
+          testCase "toKebabCase keeps acronym in middle together"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "getHTMLParser") "get-html-parser" "acronym in middle"
+
+          testCase "toKebabCase handles all-caps"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "HTML") "html" "all-caps becomes lowercase"
+
+          testCase "toKebabCase handles single letter before word"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "ATest") "atest" "single letter word"
+
+          testCase "toKebabCase splits three-letter acronym prefix"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "ABTest") "ab-test" "three-letter acronym prefix"
+
+          testCase "toKebabCase handles multiple consecutive acronyms"
+          <| fun _ ->
+              Expect.equal (AffordanceMap.toKebabCase "HTTPSURLParser") "httpsurl-parser" "multiple acronyms"
+
           // fromStatechart
           testCase "fromStatechart produces one entry per state"
           <| fun _ ->
