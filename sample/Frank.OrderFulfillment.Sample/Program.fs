@@ -35,9 +35,11 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Frank.Builder
+open Frank.Auth
 open Frank.Statecharts
 open Frank.Affordances
 open Frank.ContentNegotiation
+open Frank.Resources.Model
 open Frank.OrderFulfillment.Sample.Domain
 
 // ===========================================================================
@@ -56,7 +58,9 @@ let private stateKeyOf (state: OrderState) : string =
 // ===========================================================================
 
 /// Resolves statechart state key from the store and sets IStatechartFeature.
-/// Must run AFTER routing and BEFORE statechart middleware.
+/// Also resolves roles so the affordance middleware can apply role-scoped headers
+/// before the statechart middleware runs.
+/// Must run AFTER routing and BEFORE affordance + statechart middleware.
 let resolveStateKey (app: IApplicationBuilder) =
     app.Use(
         Func<HttpContext, Func<Task>, Task>(fun ctx next ->
@@ -69,7 +73,113 @@ let resolveStateKey (app: IApplicationBuilder) =
                     if not (obj.ReferenceEquals(metadata, null)) then
                         let instanceId = metadata.ResolveInstanceId ctx
                         let! _stateKey = metadata.GetCurrentStateKey ctx.RequestServices ctx instanceId
-                        ()
+
+                        // Resolve roles early so the affordance middleware (which runs before
+                        // statechart middleware) can use role-scoped pre-computed entries.
+                        if not (List.isEmpty metadata.Roles) then
+                            let resolvedRoles = metadata.ResolveRoles ctx
+                            ctx.SetRoles(resolvedRoles)
+
+                do! next.Invoke()
+            }
+            :> Task)
+    )
+
+/// Response-intercepting middleware that re-applies role-scoped Allow/Link headers
+/// just before the response is sent. The affordance middleware sets headers before
+/// calling next, but the statechart middleware (which runs later in the pipeline)
+/// unconditionally overwrites Allow. This middleware uses OnStarting to re-apply
+/// role-scoped headers so they get the final word on the response.
+let roleHeaderOverlay (app: IApplicationBuilder) =
+    app.Use(
+        Func<HttpContext, Func<Task>, Task>(fun ctx next ->
+            task {
+                ctx.Response.OnStarting(fun () ->
+                    task {
+                        let roles = ctx.GetRoles()
+
+                        if not (Set.isEmpty roles) then
+                            let lookup =
+                                ctx.RequestServices
+                                    .GetService<System.Collections.Generic.Dictionary<string, PreComputedAffordance>>()
+
+                            if not (isNull lookup) then
+                                let endpoint = ctx.GetEndpoint()
+
+                                if not (isNull endpoint) then
+                                    let routeTemplate =
+                                        match endpoint with
+                                        | :? Microsoft.AspNetCore.Routing.RouteEndpoint as re ->
+                                            re.RoutePattern.RawText
+                                        | _ -> null
+
+                                    if not (isNull routeTemplate) then
+                                        let stateKey =
+                                            let f = ctx.Features.Get<IStatechartFeature>()
+
+                                            if obj.ReferenceEquals(f, null) then
+                                                null
+                                            else
+                                                match f.StateKey with
+                                                | Some key -> key
+                                                | None -> null
+
+                                        let effectiveStateKey =
+                                            if not (isNull stateKey) then
+                                                stateKey
+                                            else
+                                                AffordanceMap.WildcardStateKey
+
+                                        let resolved =
+                                            roles
+                                            |> Seq.tryPick (fun role ->
+                                                let key =
+                                                    AffordanceMap.lookupKeyWithRole
+                                                        routeTemplate
+                                                        effectiveStateKey
+                                                        role
+
+                                                match lookup.TryGetValue(key) with
+                                                | true, entry -> Some entry
+                                                | false, _ -> None)
+                                            |> Option.orElseWith (fun () ->
+                                                let authKey =
+                                                    AffordanceMap.lookupKeyAuthenticated
+                                                        routeTemplate
+                                                        effectiveStateKey
+
+                                                match lookup.TryGetValue(authKey) with
+                                                | true, entry -> Some entry
+                                                | false, _ -> None)
+
+                                        match resolved with
+                                        | Some entry ->
+                                            ctx.Response.Headers["Allow"] <- entry.AllowHeaderValue
+
+                                            if entry.HasTemplateLinks then
+                                                let routeValues = ctx.Request.RouteValues
+
+                                                let resolvedLinks =
+                                                    entry.LinkHeaderValues.ToArray()
+                                                    |> Array.map (fun link ->
+                                                        let mutable result = link
+
+                                                        for kv in routeValues do
+                                                            result <-
+                                                                result.Replace(
+                                                                    sprintf "{%s}" kv.Key,
+                                                                    string kv.Value
+                                                                )
+
+                                                        result)
+
+                                                ctx.Response.Headers["Link"] <-
+                                                    Microsoft.Extensions.Primitives.StringValues(resolvedLinks)
+                                            else
+                                                ctx.Response.Headers["Link"] <- entry.LinkHeaderValues
+                                        | None -> ()
+                    }
+                    :> Task)
 
                 do! next.Invoke()
             }
@@ -231,7 +341,7 @@ let directDelivered = directSetState Delivered
 ///   - XOR Processing / Payment (exclusive: Authorize | Capture | Retry)
 ///   - AND Fulfillment (parallel: Pick + Pack + Ship)
 ///   Middleware uses HierarchicalRuntime.resolveHandlers for dispatch with parent fallback.
-let orderResource =
+let orderResult =
     statefulResource "/orders/{orderId}" {
         machine orderMachine
         resolveInstanceId (fun ctx -> ctx.Request.RouteValues["orderId"] :?> string)
@@ -248,6 +358,17 @@ let orderResource =
         role "PaymentService" (fun user -> user.IsInRole("PaymentService"))
         role "Warehouse" (fun user -> user.IsInRole("Warehouse"))
         role "ShippingProvider" (fun user -> user.IsInRole("ShippingProvider"))
+
+        // MPST role-constrained transition declarations:
+        // Each role only declares transitions from states where it has agency.
+        // Unrestricted = shared-input (any role may trigger).
+        // RestrictedTo = directed message (only listed roles may trigger).
+        transition PlaceOrder Pending Authorize Unrestricted
+        transition CancelOrder Pending Cancelled (RestrictedTo [ "Customer" ])
+        transition AuthorizePayment Authorize Capture (RestrictedTo [ "PaymentService" ])
+        transition CapturePayment Capture Fulfillment (RestrictedTo [ "PaymentService" ])
+        transition RetryPayment Capture Retry (RestrictedTo [ "PaymentService" ])
+        transition ConfirmDelivery Shipped Delivered (RestrictedTo [ "ShippingProvider" ])
 
         // State handlers — each state's POST fires the state-specific lifecycle event
         inState (forState Pending [ StateHandlerBuilder.get getOrderState; StateHandlerBuilder.post handlePlaceOrder ])
@@ -382,87 +503,11 @@ let computeAndStateWarnings (logger: ILogger) : string list =
     // Build the hierarchy so deriveWithHierarchy detects AND-state composites.
     let hierarchy = StateHierarchy.build orderHierarchySpec |> Some
 
-    let roleNames = [ "Customer"; "PaymentService"; "Warehouse"; "ShippingProvider" ]
+    // Use the extracted statechart from the CE (includes role-constrained transitions).
+    let statechart = orderResult.Statechart
 
-    let mkTransition src tgt evt : Frank.Resources.Model.TransitionSpec =
-        { Source = src
-          Target = tgt
-          Event = evt
-          Guard = None
-          Constraint = Frank.Resources.Model.Unrestricted }
-
-    // Minimal ExtractedStatechart built from domain knowledge.
-    let statechart: Frank.Resources.Model.ExtractedStatechart =
-        { RouteTemplate = "/orders/{orderId}"
-          InitialStateKey = "Pending"
-          GuardNames = []
-          StateNames =
-            [ "Pending"
-              "Authorize"
-              "Capture"
-              "Retry"
-              "Fulfillment"
-              "Pick"
-              "PickDone"
-              "Pack"
-              "PackDone"
-              "Ship"
-              "ShipDone"
-              "Shipped"
-              "Delivered"
-              "Cancelled" ]
-          Transitions =
-            [ mkTransition "Pending" "Authorize" "placeOrder"
-              mkTransition "Pending" "Cancelled" "cancelOrder"
-              mkTransition "Authorize" "Capture" "authorizePayment"
-              mkTransition "Authorize" "Cancelled" "cancelOrder"
-              mkTransition "Capture" "Fulfillment" "capturePayment"
-              mkTransition "Capture" "Retry" "retryPayment"
-              mkTransition "Retry" "Capture" "recoverFromRetry"
-              mkTransition "Fulfillment" "Shipped" "fulfillOrder"
-              mkTransition "Shipped" "Delivered" "confirmDelivery" ]
-          StateMetadata =
-            Map.ofList
-                [ "Delivered",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET" ]
-                    IsFinal = true
-                    Description = Some "terminal" }
-                  "Cancelled",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET" ]
-                    IsFinal = true
-                    Description = Some "terminal" }
-                  "Pending",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Authorize",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Capture",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Retry",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Fulfillment",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None }
-                  "Shipped",
-                  { Frank.Resources.Model.StateInfo.AllowedMethods = [ "GET"; "POST" ]
-                    IsFinal = false
-                    Description = None } ]
-          Roles =
-            roleNames
-            |> List.map (fun n ->
-                { Frank.Resources.Model.RoleInfo.Name = n
-                  Description = None }) }
-
-    // Per-role projection: each role sees the full statechart for this demo.
-    let projections = roleNames |> List.map (fun r -> r, statechart) |> Map.ofList
+    // Per-role projection using the Projection module.
+    let projections = Projection.projectAll statechart
 
     // deriveWithHierarchy detects AND-state composites and surfaces formalism bound 1.
     let result =
@@ -493,8 +538,8 @@ let seedInitialStates (app: IApplicationBuilder) =
         app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger("OrderFulfillment.Seed")
 
     lifetime.ApplicationStarted.Register(fun () ->
-        // Seed 3 order instances for e2e test scenarios
-        for orderId in [ "o1"; "o2"; "o3" ] do
+        // Seed 4 order instances for e2e test scenarios (o4 for role projection tests)
+        for orderId in [ "o1"; "o2"; "o3"; "o4" ] do
             store.Save orderId defaultSnapshot |> fun t -> t.Wait()
 
         // Compute AND-state warnings and cache for /diagnostics
@@ -526,14 +571,34 @@ let diagnosticsResource =
                     else
                         warningsRef.Warnings
 
-                let body =
-                    if warnings.IsEmpty then
-                        "warnings=none"
-                    else
-                        let joined = String.concat "; " warnings
-                        $"AND-state warnings: {joined}"
+                // Role projection: ?role=X returns a projected view of the statechart.
+                let roleParam =
+                    match ctx.Request.Query.TryGetValue("role") with
+                    | true, values when values.Count > 0 -> Some(values.[0])
+                    | _ -> None
 
-                do! ctx.Response.WriteAsync(body)
+                match roleParam with
+                | Some roleName ->
+                    let projected = Projection.projectForRole roleName orderResult.Statechart
+
+                    let transitionDescriptions =
+                        projected.Transitions
+                        |> List.map (fun t -> $"{t.Event}: {t.Source} -> {t.Target}")
+
+                    let body =
+                        $"role={roleName}; transitions={projected.Transitions.Length}; "
+                        + (String.concat "; " transitionDescriptions)
+
+                    do! ctx.Response.WriteAsync(body)
+                | None ->
+                    let body =
+                        if warnings.IsEmpty then
+                            "warnings=none"
+                        else
+                            let joined = String.concat "; " warnings
+                            $"AND-state warnings: {joined}"
+
+                    do! ctx.Response.WriteAsync(body)
             }
             :> Task))
     }
@@ -552,25 +617,31 @@ let main args =
             services.AddSingleton<ResolvableWarnings>() |> ignore
             services)
 
+        // X-Role header authentication for development/testing (reads roles from X-Role header)
+        useRoleHeaderAuth
+
         // Pipeline order:
-        // 1. State key resolver (reads store, sets IStatechartFeature on HttpContext.Features)
+        // 1. Role-scoped header overlay (OnStarting callback — re-applies role-scoped Allow/Link
+        //    after the statechart middleware has set its unconditional Allow header)
+        plug roleHeaderOverlay
+        // 2. State key resolver (reads store, sets IStatechartFeature + resolves roles)
         plug resolveStateKey
-        // 2. Affordance middleware (reads IStatechartFeature, injects Link + Allow headers)
-        useAffordances
-        // 3. Statechart middleware (hierarchical dispatch via useHierarchyWith)
+        // 3. Affordance middleware (reads IStatechartFeature + roles, injects Link + Allow headers)
+        useRuntimeAffordances orderResult.Statechart "http://localhost:5060/alps"
+        // 4. Statechart middleware (hierarchical dispatch via useHierarchyWith)
         useStatecharts
 
         // Seed order instances and compute AND-state warnings after services are built
         plug seedInitialStates
 
         // Primary stateful resource (demonstrates hierarchy + 4 MPST roles)
-        resource orderResource
+        resource orderResult.Resource
 
         // Region-completion stateful resources — each dispatches through middleware
         // (CompleteRegion hierarchy op via handlePickComplete/handlePackComplete/handleShipComplete)
-        resource pickResource
-        resource packResource
-        resource shipResource
+        resource pickResource.Resource
+        resource packResource.Resource
+        resource shipResource.Resource
 
         // Direct state manipulation sub-resources (e2e test control paths)
         resource cancelResource
