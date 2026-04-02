@@ -6,7 +6,7 @@ open Frank.Resources.Model
 /// Why a guard blocked a transition. Maps to HTTP status codes in middleware.
 [<Struct>]
 type BlockReason =
-    | NotAllowed
+    | Forbidden
     | NotYourTurn
     | InvalidTransition
     | PreconditionFailed

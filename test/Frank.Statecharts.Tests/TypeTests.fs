@@ -49,12 +49,12 @@ let blockReasonTests =
               | _ -> failtest "Expected Custom"
           }
 
-          test "NotAllowed can be constructed and matched" {
-              let reason = NotAllowed
+          test "Forbidden can be constructed and matched" {
+              let reason = Forbidden
 
               match reason with
-              | NotAllowed -> ()
-              | _ -> failtest "Expected NotAllowed"
+              | Forbidden -> ()
+              | _ -> failtest "Expected Forbidden"
           }
 
           test "NotYourTurn can be constructed and matched" {
@@ -164,7 +164,7 @@ let guardTests =
                           if ctx.User.IsInRole("Admin") then
                               Allowed
                           else
-                              Blocked(NotAllowed)
+                              Blocked(Forbidden)
                   )
 
               let adminIdentity = ClaimsIdentity([ Claim(ClaimTypes.Role, "Admin") ], "test")
@@ -189,7 +189,7 @@ let guardTests =
                           if ctx.User.IsInRole("Admin") then
                               Allowed
                           else
-                              Blocked(NotAllowed)
+                              Blocked(Forbidden)
                   )
 
               let userIdentity = ClaimsIdentity([ Claim(ClaimTypes.Role, "User") ], "test")
@@ -202,7 +202,7 @@ let guardTests =
                     Roles = Set.empty }
 
               match adminGuard with
-              | AccessControl(_, pred) -> Expect.equal (pred ctx) (Blocked(NotAllowed)) "non-admin should be blocked"
+              | AccessControl(_, pred) -> Expect.equal (pred ctx) (Blocked(Forbidden)) "non-admin should be blocked"
               | _ -> failtest "Expected AccessControl"
           }
 

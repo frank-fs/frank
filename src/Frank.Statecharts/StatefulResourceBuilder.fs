@@ -489,10 +489,10 @@ type StatefulResourceBuilder(routeTemplate: string) =
                         then
                             Allowed
                         else
-                            Blocked NotAllowed
+                            Blocked Forbidden
                     | None ->
                         // Closed-world: undeclared transitions denied when roles + transitions declared.
-                        if closedWorld then Blocked NotAllowed else Allowed
+                        if closedWorld then Blocked Forbidden else Allowed
 
                 match constraintResult with
                 | Blocked _ -> constraintResult
@@ -539,7 +539,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 let currentStateKey = stateKey feature.State.Value
 
                 if not (hasHierarchyAgency ctx currentStateKey) then
-                    None, TransitionAttemptResult.Blocked NotAllowed
+                    None, TransitionAttemptResult.Blocked Forbidden
                 else
 
                 let currentConfig, currentHistory =

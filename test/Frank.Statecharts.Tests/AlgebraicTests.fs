@@ -14,7 +14,7 @@ let private genBlockReason: Gen<BlockReason> =
     let defaultArbs = ArbMap.defaults
 
     Gen.oneof
-        [ gen { return NotAllowed }
+        [ gen { return Forbidden }
           gen { return NotYourTurn }
           gen { return InvalidTransition }
           gen { return PreconditionFailed }
@@ -87,7 +87,7 @@ let transitionResultBindTests =
 
           testCase "bind over Blocked short-circuits"
           <| fun _ ->
-              let result: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let result: TransitionResult<string, int> = TransitionResult.Blocked Forbidden
               let mutable called = false
 
               let bound =
@@ -97,7 +97,7 @@ let transitionResultBindTests =
                           TransitionResult.Transitioned(s, c))
                       result
 
-              Expect.equal bound (TransitionResult.Blocked NotAllowed) "Blocked short-circuits"
+              Expect.equal bound (TransitionResult.Blocked Forbidden) "Blocked short-circuits"
               Expect.isFalse called "function not called on Blocked"
 
           testCase "bind over Invalid short-circuits"
@@ -162,8 +162,8 @@ let guardResultAlgebraTests =
 
           testCase "compose Allowed and Blocked yields Blocked"
           <| fun _ ->
-              let result = GuardResult.compose Allowed (Blocked NotAllowed)
-              Expect.equal result (Blocked NotAllowed) "Allowed AND Blocked = Blocked"
+              let result = GuardResult.compose Allowed (Blocked Forbidden)
+              Expect.equal result (Blocked Forbidden) "Allowed AND Blocked = Blocked"
 
           testCase "compose Blocked and Allowed yields Blocked"
           <| fun _ ->
@@ -172,7 +172,7 @@ let guardResultAlgebraTests =
 
           testCase "compose two Blocked yields first Blocked"
           <| fun _ ->
-              let result = GuardResult.compose (Blocked NotYourTurn) (Blocked NotAllowed)
+              let result = GuardResult.compose (Blocked NotYourTurn) (Blocked Forbidden)
               Expect.equal result (Blocked NotYourTurn) "first Blocked wins"
 
           testCase "alternative two Allowed yields Allowed"
@@ -182,7 +182,7 @@ let guardResultAlgebraTests =
 
           testCase "alternative Allowed and Blocked yields Allowed"
           <| fun _ ->
-              let result = GuardResult.alternative Allowed (Blocked NotAllowed)
+              let result = GuardResult.alternative Allowed (Blocked Forbidden)
               Expect.equal result Allowed "Allowed OR Blocked = Allowed"
 
           testCase "alternative Blocked and Allowed yields Allowed"
@@ -192,8 +192,8 @@ let guardResultAlgebraTests =
 
           testCase "alternative two Blocked yields second Blocked"
           <| fun _ ->
-              let result = GuardResult.alternative (Blocked NotYourTurn) (Blocked NotAllowed)
-              Expect.equal result (Blocked NotAllowed) "both Blocked: second wins" ]
+              let result = GuardResult.alternative (Blocked NotYourTurn) (Blocked Forbidden)
+              Expect.equal result (Blocked Forbidden) "both Blocked: second wins" ]
 
 // ===========================================================================
 // Property-based tests: Functor laws for TransitionResult.map
@@ -214,7 +214,7 @@ let transitionResultFunctorLaws =
 
           testCase "map id = id (Blocked)"
           <| fun _ ->
-              let result: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let result: TransitionResult<string, int> = TransitionResult.Blocked Forbidden
               let mapped = TransitionResult.map id id result
               Expect.equal mapped result "map id on Blocked = id"
 
@@ -349,7 +349,7 @@ let transitionResultMonadLaws =
 
           testCase "right identity holds for Blocked"
           <| fun _ ->
-              let m: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let m: TransitionResult<string, int> = TransitionResult.Blocked Forbidden
               let result = TransitionResult.bind TransitionResult.pure' m
               Expect.equal result m "bind pure' on Blocked = id"
 
@@ -400,7 +400,7 @@ let transitionResultApplicativeLaws =
 
           testCase "identity holds for Blocked"
           <| fun _ ->
-              let v: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let v: TransitionResult<string, int> = TransitionResult.Blocked Forbidden
               let idResult = TransitionResult.pure' id id
               Expect.equal (TransitionResult.apply idResult v) v "apply (pure id) Blocked = Blocked"
 
@@ -441,9 +441,9 @@ let transitionResultApplicativeLaws =
               let fResult =
                   TransitionResult.pure' (fun (s: string) -> s + "!") (fun (c: int) -> c + 1)
 
-              let xResult: TransitionResult<string, int> = TransitionResult.Blocked NotAllowed
+              let xResult: TransitionResult<string, int> = TransitionResult.Blocked Forbidden
               let result = TransitionResult.apply fResult xResult
-              Expect.equal result (TransitionResult.Blocked NotAllowed) "Blocked value short-circuits"
+              Expect.equal result (TransitionResult.Blocked Forbidden) "Blocked value short-circuits"
 
           testCase "interchange: apply u (pure y) = apply (pure (fun f -> f y)) u"
           <| fun _ ->
@@ -491,7 +491,7 @@ let transitionResultApplicativeLaws =
           testCase "composition law holds when u is Blocked"
           <| fun _ ->
               let blockedU: TransitionResult<string -> string, int -> int> =
-                  TransitionResult.Blocked NotAllowed
+                  TransitionResult.Blocked Forbidden
 
               let v =
                   TransitionResult.pure' (fun (x: string) -> x.ToUpperInvariant()) (fun (x: int) -> x + 10)

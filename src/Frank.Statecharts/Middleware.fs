@@ -11,7 +11,7 @@ open Microsoft.Extensions.Primitives
 module BlockReasonMapping =
     let toStatusCode (reason: BlockReason) =
         match reason with
-        | NotAllowed -> 403
+        | Forbidden -> 403
         | NotYourTurn -> 409
         | InvalidTransition -> 400
         | PreconditionFailed -> 412
@@ -19,8 +19,46 @@ module BlockReasonMapping =
 
     let toMessage (reason: BlockReason) =
         match reason with
+        | Forbidden -> Some "Forbidden: role not authorized for this transition"
         | Custom(_, message) -> Some message
         | _ -> None
+
+    let writeProblemResponse (ctx: HttpContext) (reason: BlockReason) =
+        task {
+            let status = toStatusCode reason
+            ctx.Response.StatusCode <- status
+
+            match toMessage reason with
+            | Some msg ->
+                ctx.Response.ContentType <- "application/problem+json"
+
+                let title =
+                    match reason with
+                    | Forbidden -> "Forbidden"
+                    | NotYourTurn -> "Conflict"
+                    | InvalidTransition -> "Bad Request"
+                    | PreconditionFailed -> "Precondition Failed"
+                    | Custom _ -> "Error"
+
+                let typeSlug =
+                    match reason with
+                    | Forbidden -> "forbidden"
+                    | NotYourTurn -> "not-your-turn"
+                    | InvalidTransition -> "invalid-transition"
+                    | PreconditionFailed -> "precondition-failed"
+                    | Custom _ -> "custom"
+
+                let body =
+                    sprintf
+                        """{"type":"urn:frank:error:%s","title":"%s","status":%d,"detail":"%s"}"""
+                        typeSlug
+                        title
+                        status
+                        msg
+
+                do! ctx.Response.WriteAsync(body)
+            | None -> ()
+        }
 
 /// State-aware middleware that intercepts requests to stateful resources.
 /// Checks endpoint metadata for StateMachineMetadata; passes through if absent.
@@ -107,12 +145,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
                     let guardResult = meta.EvaluateGuards ctx
 
                     match guardResult with
-                    | Blocked reason ->
-                        ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
-
-                        match BlockReasonMapping.toMessage reason with
-                        | Some msg -> do! ctx.Response.WriteAsync(msg)
-                        | None -> ()
+                    | Blocked reason -> do! BlockReasonMapping.writeProblemResponse ctx reason
                     | Allowed ->
                         // Step 4: Invoke the state-specific handler
                         do! handler.Invoke(ctx)
@@ -123,11 +156,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
                         match eventGuardResult with
                         | Blocked reason ->
                             if not ctx.Response.HasStarted then
-                                ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
-
-                                match BlockReasonMapping.toMessage reason with
-                                | Some msg -> do! ctx.Response.WriteAsync(msg)
-                                | None -> ()
+                                do! BlockReasonMapping.writeProblemResponse ctx reason
                             else
                                 logger.LogWarning(
                                     "Event guard blocked for instance {InstanceId} but response already started",
@@ -156,11 +185,7 @@ type StateMachineMiddleware(next: RequestDelegate) =
                                         )
                             | TransitionAttemptResult.Blocked reason ->
                                 if not ctx.Response.HasStarted then
-                                    ctx.Response.StatusCode <- BlockReasonMapping.toStatusCode reason
-
-                                    match BlockReasonMapping.toMessage reason with
-                                    | Some msg -> do! ctx.Response.WriteAsync(msg)
-                                    | None -> ()
+                                    do! BlockReasonMapping.writeProblemResponse ctx reason
                                 else
                                     logger.LogWarning(
                                         "Transition blocked for instance {InstanceId} but response already started",

@@ -64,14 +64,14 @@ let turnGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
                 elif ctx.User.HasClaim("player", "O") then
                     Blocked NotYourTurn
                 else
-                    Blocked NotAllowed
+                    Blocked Forbidden
             | OTurn ->
                 if ctx.User.HasClaim("player", "O") then
                     Allowed
                 elif ctx.User.HasClaim("player", "X") then
                     Blocked NotYourTurn
                 else
-                    Blocked NotAllowed
+                    Blocked Forbidden
             | Won _
             | Draw -> Allowed
     )
@@ -385,8 +385,10 @@ let guardTests =
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
                       Expect.equal (int response.StatusCode) 429 "Should return 429 when move count at limit"
+                      let ct = response.Content.Headers.ContentType.MediaType
+                      Expect.equal ct "application/problem+json" "Should be problem+json"
                       let! body = response.Content.ReadAsStringAsync()
-                      Expect.equal body "Too many moves" "Should return custom message"
+                      Expect.stringContains body "Too many moves" "Should return custom message in detail"
                   }))
                   .GetAwaiter()
                   .GetResult()
@@ -663,8 +665,10 @@ let transitionBlockedTests =
                       let content = new StringContent("")
                       let! (response: HttpResponseMessage) = client.PostAsync("/games/game1", content)
                       Expect.equal (int response.StatusCode) 503 "Should return custom 503"
+                      let ct = response.Content.Headers.ContentType.MediaType
+                      Expect.equal ct "application/problem+json" "Should be problem+json"
                       let! body = response.Content.ReadAsStringAsync()
-                      Expect.equal body "Service unavailable" "Should return custom message"
+                      Expect.stringContains body "Service unavailable" "Should return custom message in detail"
                   }))
                   .GetAwaiter()
                   .GetResult() ]
@@ -728,7 +732,7 @@ let multipleGuardTests =
               let mutable secondGuardCalled = false
 
               let firstGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
-                  AccessControl("AlwaysBlocks", fun _ -> Blocked NotAllowed)
+                  AccessControl("AlwaysBlocks", fun _ -> Blocked Forbidden)
 
               let secondGuard: Guard<TicTacToeState, TicTacToeEvent, int> =
                   AccessControl(
@@ -933,14 +937,14 @@ let hierarchicalTurnGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, H
                 elif ctx.User.HasClaim("player", "O") then
                     Blocked NotYourTurn
                 else
-                    Blocked NotAllowed
+                    Blocked Forbidden
             | Playing OTurn ->
                 if ctx.User.HasClaim("player", "O") then
                     Allowed
                 elif ctx.User.HasClaim("player", "X") then
                     Blocked NotYourTurn
                 else
-                    Blocked NotAllowed
+                    Blocked Forbidden
             | _ -> Allowed
     )
 
@@ -961,7 +965,7 @@ let participantGuard: Guard<HierarchicalGameState, HierarchicalGameEvent, Hierar
                 | BothAssigned(xId, oId) ->
                     let userId = ctx.User.FindFirst("userId")
 
-                    if isNull userId then Blocked NotAllowed
+                    if isNull userId then Blocked Forbidden
                     elif userId.Value = xId || userId.Value = oId then Allowed
                     else Blocked(Custom(403, "Game is full"))
     )
@@ -1276,8 +1280,10 @@ let hierarchicalStatechartTests =
                       // because userId=user3 is neither user1 nor user2
                       Expect.equal (int response.StatusCode) 403 "Third player should be blocked by participant guard"
 
+                      let ct = response.Content.Headers.ContentType.MediaType
+                      Expect.equal ct "application/problem+json" "Should be problem+json"
                       let! body = response.Content.ReadAsStringAsync()
-                      Expect.equal body "Game is full" "Should get custom message from participant guard"
+                      Expect.stringContains body "Game is full" "Should get custom message from participant guard in detail"
                   }))
                   .GetAwaiter()
                   .GetResult() ]
@@ -1711,7 +1717,7 @@ let roleDefinitionTests =
                                     if ctx.HasRole "Allowed" then
                                         Allowed
                                     else
-                                        Blocked NotAllowed
+                                        Blocked Forbidden
                             ) ] }
 
               let resource =
@@ -1762,7 +1768,7 @@ let roleDefinitionTests =
                                     if ctx.HasRole "NonexistentRole" then
                                         Allowed
                                     else
-                                        Blocked NotAllowed
+                                        Blocked Forbidden
                             ) ] }
 
               let resource =

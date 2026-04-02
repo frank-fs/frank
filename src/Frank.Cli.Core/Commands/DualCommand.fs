@@ -185,7 +185,7 @@ let checkLaws () : Result<CheckLawsResult, string> =
         let defaultArbs = ArbMap.defaults
 
         Gen.oneof
-            [ gen { return NotAllowed }
+            [ gen { return Forbidden }
               gen { return NotYourTurn }
               gen { return InvalidTransition }
               gen { return PreconditionFailed }
