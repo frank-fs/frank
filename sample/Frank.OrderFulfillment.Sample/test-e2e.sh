@@ -57,6 +57,23 @@ check_body_exact() {
     fi
 }
 
+# Check that a state name is an exact member of the config= field.
+# Extracts config= up to the next semicolon, wraps in commas, and matches ,<name>,
+# to avoid substring false positives (e.g., "Order" matching "orderId").
+check_config() {
+    local label="$1" url="$2" expected="$3"
+    local actual config
+    actual=$(curl -s "$url" 2>/dev/null)
+    config=$(echo "$actual" | grep -o 'config=[^;]*' | sed 's/config=//')
+    if echo ",$config," | grep -q ",$expected,"; then
+        echo "  PASS: $label"
+        PASS=$((PASS + 1))
+    else
+        echo "  FAIL: $label (expected '$expected' as member of config='$config')"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 check_log_contains() {
     local label="$1" expected="$2"
     if grep -q "$expected" "$SERVER_LOG"; then
@@ -187,10 +204,11 @@ curl -s -X POST "$BASE/orders/o3" > /dev/null         # Pending → Authorize
 sleep 1
 
 # Config should show full ancestor chain: Order, Processing, Payment, Authorize
-check_body   "AT4: config includes Order"       "$BASE/orders/o3" "Order"
-check_body   "AT4: config includes Processing"  "$BASE/orders/o3" "Processing"
-check_body   "AT4: config includes Payment"     "$BASE/orders/o3" "Payment"
-check_body   "AT4: config includes Authorize"   "$BASE/orders/o3" "Authorize"
+# Use check_config for exact member matching — avoids "Order" matching "orderId" (issue #265)
+check_config "AT4: config includes Order"       "$BASE/orders/o3" "Order"
+check_config "AT4: config includes Processing"  "$BASE/orders/o3" "Processing"
+check_config "AT4: config includes Payment"     "$BASE/orders/o3" "Payment"
+check_config "AT4: config includes Authorize"   "$BASE/orders/o3" "Authorize"
 check_body   "AT4: state is Authorize"          "$BASE/orders/o3" "state=Authorize"
 
 echo ""

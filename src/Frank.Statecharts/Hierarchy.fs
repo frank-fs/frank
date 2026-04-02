@@ -303,14 +303,29 @@ module HierarchicalRuntime =
     let private allDescendants (hierarchy: StateHierarchy) (stateId: string) : string list =
         Map.tryFind stateId hierarchy.DescendantMap |> Option.defaultValue []
 
+    /// Add all ancestors of a state up to the root to the active configuration.
+    /// Harel semantics: a state is active iff it or any descendant is the current atomic state;
+    /// all ancestors must be in the active configuration.
+    let private addAncestors (hierarchy: StateHierarchy) (stateId: string) (config: ActiveStateConfiguration) =
+        let rec loop current config =
+            match Map.tryFind current hierarchy.ParentMap with
+            | Some parent -> loop parent (ActiveStateConfiguration.add parent config)
+            | None -> config
+
+        loop stateId config
+
     /// Enter a state, recursively activating initial children for composite states.
     /// For AND composites, all children are entered. For XOR, only the initial child.
     /// Enforces XOR exclusivity: entering a child of an XOR composite deactivates siblings.
+    /// Adds all ancestors up to root per Harel semantics (issue #265).
     let rec enterState
         (hierarchy: StateHierarchy)
         (stateId: string)
         (config: ActiveStateConfiguration)
         : ActiveStateConfiguration =
+        // Harel semantics: all ancestors must be in the active configuration
+        let config = addAncestors hierarchy stateId config
+
         // Enforce XOR exclusivity: if parent is XOR, deactivate sibling children and their descendants
         let config =
             match Map.tryFind stateId hierarchy.ParentMap with
@@ -489,6 +504,9 @@ module HierarchicalRuntime =
         (config: ActiveStateConfiguration)
         (history: HistoryRecord)
         : ActiveStateConfiguration =
+        // Harel semantics: all ancestors must be in the active configuration,
+        // even on degenerate paths where no child enterState call occurs (issue #265).
+        let config = addAncestors hierarchy compositeStateId config
         let config = ActiveStateConfiguration.add compositeStateId config
 
         match HistoryRecord.tryGet compositeStateId history with
