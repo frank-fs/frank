@@ -413,6 +413,13 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     return initialStateKey
             }
 
+        // Pre-compute constraint map: (sourceStateKey, eventKey) -> RoleConstraint.
+        // Captured by the evaluateEventGuards closure for role constraint checking.
+        let constraintMap: Map<string * string, RoleConstraint> =
+            spec.TransitionDeclarations
+            |> List.map (fun t -> (t.Source, t.Event), t.Constraint)
+            |> Map.ofList
+
         // Partition guards by DU case for two-phase evaluation
         let accessGuards =
             machine.Guards
@@ -448,27 +455,46 @@ type StatefulResourceBuilder(routeTemplate: string) =
 
         // Closure: evaluate event-validation guards after handler has set the event (post-handler)
         let evaluateEventGuards (ctx: HttpContext) : GuardResult =
-            let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
-            let state = feature.State.Value
-            let context = feature.Context.Value
-
             match StateMachineContext.tryGetEvent<'E> ctx with
             | None -> Allowed // No event set -- skip event guards
             | Some event ->
-                let guardCtx: EventValidationContext<'S, 'E, 'C> =
-                    { User = ctx.User
-                      CurrentState = state
-                      Event = event
-                      Context = context
-                      Roles = ctx.GetRoles() }
+                let feature = ctx.Features.Get<IStatechartFeature<'S, 'C>>()
+                let state = feature.State.Value
+                let context = feature.Context.Value
 
-                eventGuards
-                |> List.fold
-                    (fun acc (_, pred) ->
-                        match acc with
-                        | Blocked _ -> acc
-                        | Allowed -> GuardResult.compose acc (pred guardCtx))
-                    GuardResult.identity
+                // Role constraint check: block if transition is RestrictedTo roles the user lacks.
+                let eventKey = StateKeyExtractor.keyOf event
+                let stateKey' = StateKeyExtractor.keyOf state
+
+                let constraintResult =
+                    match constraintMap.TryFind(stateKey', eventKey) with
+                    | Some(RestrictedTo roles) ->
+                        let userRoles = ctx.GetRoles()
+
+                        if roles |> List.exists (fun r -> Set.contains r userRoles) then
+                            Allowed
+                        else
+                            Blocked NotAllowed
+                    | Some Unrestricted -> Allowed
+                    | None -> Allowed // undeclared transitions are allowed
+
+                match constraintResult with
+                | Blocked _ -> constraintResult
+                | Allowed ->
+                    let guardCtx: EventValidationContext<'S, 'E, 'C> =
+                        { User = ctx.User
+                          CurrentState = state
+                          Event = event
+                          Context = context
+                          Roles = ctx.GetRoles() }
+
+                    eventGuards
+                    |> List.fold
+                        (fun acc (_, pred) ->
+                            match acc with
+                            | Blocked _ -> acc
+                            | Allowed -> GuardResult.compose acc (pred guardCtx))
+                        GuardResult.identity
 
         // Pure computation: determines what save (if any) and result to produce.
         // Extracted from task body to avoid FS3511 in Release builds (complex match
