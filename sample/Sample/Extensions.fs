@@ -24,13 +24,14 @@ type Frank.Builder.WebHostBuilder with
                 spec.Services(services).AddLogging(fun builder -> f builder |> ignore) }
 
     /// Extension to the WebHostBuilder computation expression
-    /// to enable content negotiation with XML and JSON.
+    /// to add XML data contract serializer formatters for content negotiation.
+    /// JSON and 406 Not Acceptable are handled by Frank's default pipeline.
     [<CustomOperation("useContentNegotiation")>]
     member __.UseContentNegotiation(spec:Frank.Builder.WebHostSpec) =
         { spec with
             Services = fun services ->
                 spec.Services(services)
-                    .AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
+                    .AddMvcCore()
                     .AddXmlDataContractSerializerFormatters()
                     |> ignore
                 services }
