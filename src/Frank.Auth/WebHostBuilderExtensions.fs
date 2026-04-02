@@ -35,3 +35,22 @@ module WebHostBuilderExtensions =
                         options.AddPolicy(name, fun policy ->
                             configure policy)) |> ignore
                     services }
+
+        /// Register X-Role header authentication for development/testing.
+        /// Reads roles from the X-Role header and creates ClaimsIdentity with role claims.
+        /// Unauthenticated requests (no X-Role header) proceed without identity.
+        [<CustomOperation("useRoleHeaderAuth")>]
+        member _.UseRoleHeaderAuth(spec: WebHostSpec) : WebHostSpec =
+            { spec with
+                Services =
+                    spec.Services >> fun services ->
+                        services
+                            .AddAuthentication(RoleHeaderAuthHandler.SchemeName)
+                            .AddScheme<AuthenticationSchemeOptions, RoleHeaderAuthHandler>(
+                                RoleHeaderAuthHandler.SchemeName, ignore)
+                        |> ignore
+                        services
+                Middleware =
+                    spec.Middleware >> fun app ->
+                        app.UseAuthentication() |> ignore
+                        app }
