@@ -23,6 +23,8 @@ DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test test/Frank.Tests/
 
 Always run `dotnet build Frank.sln` and `dotnet test` before claiming work is complete.
 
+**Sample E2E tests:** Sample apps may have `test-e2e.sh` scripts that serve as acceptance tests against library code. Check for these (`find sample/ -name "test-e2e.sh"`) and run them when working on issues that affect sample behavior. These scripts start the sample, make HTTP requests, and verify responses — they test the library through the sample, not the sample itself.
+
 ## Project Structure
 
 - `src/` — Library projects, multi-target net8.0/net9.0/net10.0
