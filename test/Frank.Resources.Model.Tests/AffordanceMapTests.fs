@@ -263,7 +263,7 @@ let affordanceMapTests =
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               Expect.equal map.Version AffordanceMap.currentVersion "Version must match currentVersion"
 
-          testCase "fromStatechart converts event names to kebab-case rel"
+          testCase "fromStatechart uses ALPS profile fragment URI for transition rels"
           <| fun _ ->
               let sc: ExtractedStatechart =
                   { RouteTemplate = "/games/{gameId}"
@@ -283,7 +283,7 @@ let affordanceMapTests =
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
               let rel = entry.LinkRelations |> List.head |> _.Rel
-              Expect.equal rel "make-move" "Event name should be kebab-cased"
+              Expect.equal rel "http://example.com/alps/games#makeMove" "Rel should be ALPS profile fragment URI"
 
           testCase "fromStatechart maps unsafe transition (default) to POST method"
           <| fun _ ->
@@ -561,4 +561,208 @@ let affordanceMapTests =
                     Transitions = [] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
-              Expect.isEmpty map.Entries "No states means no entries" ]
+              Expect.isEmpty map.Entries "No states means no entries"
+
+          // #271 Phase 1: MayPoll link relation generation
+          testCase "fromStatechart adds monitor rel for role with no transitions in state"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Authorize" ]
+                    InitialStateKey = "Authorize"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "PaymentService"; Description = None } ]
+                    Transitions =
+                      [ { Event = "AuthorizePayment"
+                          Source = "Authorize"
+                          Target = "Shipped"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PaymentService" ]
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.find (fun e -> e.StateKey = "Authorize")
+              let monitorRel = entry.LinkRelations |> List.tryFind (fun lr -> lr.Rel = "monitor")
+              Expect.isSome monitorRel "Role with no transitions should get monitor rel"
+              let monitor = monitorRel.Value
+              Expect.equal monitor.Method "GET" "Monitor rel should be GET"
+              Expect.equal monitor.Roles [ "Customer" ] "Monitor rel should be scoped to MayPoll role"
+              Expect.equal monitor.Href "/orders/{orderId}" "Monitor rel should target resource"
+
+          testCase "fromStatechart does not add monitor rel for role with transitions"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Authorize" ]
+                    InitialStateKey = "Authorize"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "PaymentService"; Description = None } ]
+                    Transitions =
+                      [ { Event = "AuthorizePayment"
+                          Source = "Authorize"
+                          Target = "Shipped"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PaymentService" ]
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.find (fun e -> e.StateKey = "Authorize")
+              let paymentServiceMonitor =
+                  entry.LinkRelations
+                  |> List.tryFind (fun lr -> lr.Rel = "monitor" && lr.Roles = [ "PaymentService" ])
+              Expect.isNone paymentServiceMonitor "Role with transitions should not get monitor rel"
+
+          testCase "fromStatechart no monitor rels when Roles list is empty"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let monitorRels = entry.LinkRelations |> List.filter (fun lr -> lr.Rel = "monitor")
+              Expect.isEmpty monitorRels "No monitor rels when no roles defined"
+
+          testCase "fromStatechart unrestricted transition means no monitor rels for any role"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "PlayerX"; Description = None }
+                        { Name = "PlayerO"; Description = None } ]
+                    Transitions =
+                      [ { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let monitorRels = entry.LinkRelations |> List.filter (fun lr -> lr.Rel = "monitor")
+              Expect.isEmpty monitorRels "Unrestricted transitions mean all roles participate — no monitor rels"
+
+          testCase "fromStatechart multiple roles with no transitions each get own monitor rel"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Processing" ]
+                    InitialStateKey = "Processing"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "Auditor"; Description = None }
+                        { Name = "Warehouse"; Description = None } ]
+                    Transitions =
+                      [ { Event = "ShipOrder"
+                          Source = "Processing"
+                          Target = "Shipped"
+                          Guard = None
+                          Constraint = RestrictedTo [ "Warehouse" ]
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let monitorRels = entry.LinkRelations |> List.filter (fun lr -> lr.Rel = "monitor")
+              Expect.equal monitorRels.Length 2 "Two roles without transitions should each get monitor rel"
+              let monitorRoles = monitorRels |> List.collect _.Roles |> List.sort
+              Expect.equal monitorRoles [ "Auditor"; "Customer" ] "Monitor rels for Auditor and Customer"
+
+          // #271 Phase 2: ALPS profile fragment URI rels
+          testCase "fromStatechart ALPS fragment URI preserves PascalCase event name"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Pending" ]
+                    InitialStateKey = "Pending"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "AuthorizePayment"
+                          Source = "Pending"
+                          Target = "Authorized"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let rel = entry.LinkRelations |> List.head |> _.Rel
+              Expect.equal rel "http://example.com/alps/orders#AuthorizePayment" "PascalCase preserved in ALPS fragment"
+
+          testCase "fromStatechart no bare kebab-case rels in output"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Authorize" ]
+                    InitialStateKey = "Authorize"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "PaymentService"; Description = None } ]
+                    Transitions =
+                      [ { Event = "AuthorizePayment"
+                          Source = "Authorize"
+                          Target = "Shipped"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PaymentService" ]
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let allRels =
+                  map.Entries
+                  |> List.collect (fun e -> e.LinkRelations |> List.map _.Rel)
+              for rel in allRels do
+                  let isIana = rel = "monitor"
+                  let isUri = rel.Contains("#") || rel.Contains("://")
+                  Expect.isTrue (isIana || isUri) (sprintf "Rel '%s' must be IANA-registered or a valid URI" rel)
+
+          testCase "fromStatechart monitor rel stays IANA-registered not ALPS URI"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Authorize" ]
+                    InitialStateKey = "Authorize"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "PaymentService"; Description = None } ]
+                    Transitions =
+                      [ { Event = "AuthorizePayment"
+                          Source = "Authorize"
+                          Target = "Shipped"
+                          Guard = None
+                          Constraint = RestrictedTo [ "PaymentService" ]
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let monitorRel = entry.LinkRelations |> List.tryFind (fun lr -> lr.Rel = "monitor")
+              Expect.isSome monitorRel "Should have monitor rel"
+              Expect.equal monitorRel.Value.Rel "monitor" "monitor should be bare IANA-registered rel" ]

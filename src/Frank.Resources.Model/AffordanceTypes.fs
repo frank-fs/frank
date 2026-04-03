@@ -216,7 +216,8 @@ module AffordanceMap =
     /// Generate an AffordanceMap from an ExtractedStatechart for CE-based apps.
     /// Each transition becomes an AffordanceLinkRelation with Roles derived from RoleConstraint.
     /// Method derived from TransitionSafety: Safe→GET, Unsafe→POST, Idempotent→PUT.
-    /// Rel is the event name converted to kebab-case.
+    /// Rel is an ALPS profile fragment URI: "{profileUrl}#{EventName}".
+    /// Roles with no transitions from a state get a "monitor" GET rel (IANA RFC 5765).
     let fromStatechart (baseUri: string) (sc: ExtractedStatechart) : AffordanceMap =
         let slug = ResourceModel.resourceSlug sc.RouteTemplate
         let profile = profileUrl baseUri slug
@@ -232,7 +233,7 @@ module AffordanceMap =
                         | RestrictedTo [] -> false // dead transition: no role can trigger it
                         | _ -> true)
 
-                let linkRelations =
+                let transitionRels =
                     transitions
                     |> List.map (fun t ->
                         let roles =
@@ -246,11 +247,36 @@ module AffordanceMap =
                             | Unsafe -> "POST"
                             | Idempotent -> "PUT"
 
-                        { AffordanceLinkRelation.Rel = toKebabCase t.Event
+                        { AffordanceLinkRelation.Rel = sprintf "%s#%s" profile t.Event
                           AffordanceLinkRelation.Href = sc.RouteTemplate
                           AffordanceLinkRelation.Method = method
                           AffordanceLinkRelation.Title = None
                           AffordanceLinkRelation.Roles = roles })
+
+                // MayPoll: roles with no transitions from this state get a monitor GET rel.
+                // A role "has transitions" if any transition is Unrestricted or RestrictedTo includes the role.
+                let hasUnrestricted = transitions |> List.exists (fun t -> t.Constraint = Unrestricted)
+
+                let monitorRels =
+                    if hasUnrestricted then
+                        [] // All roles participate in unrestricted transitions
+                    else
+                        sc.Roles
+                        |> List.filter (fun role ->
+                            transitions
+                            |> List.exists (fun t ->
+                                match t.Constraint with
+                                | RestrictedTo roles -> roles |> List.contains role.Name
+                                | Unrestricted -> true)
+                            |> not)
+                        |> List.map (fun role ->
+                            { AffordanceLinkRelation.Rel = "monitor"
+                              AffordanceLinkRelation.Href = sc.RouteTemplate
+                              AffordanceLinkRelation.Method = "GET"
+                              AffordanceLinkRelation.Title = None
+                              AffordanceLinkRelation.Roles = [ role.Name ] })
+
+                let linkRelations = transitionRels @ monitorRels
 
                 let allowedMethods =
                     let hasUnsafe = transitions |> List.exists (fun t -> t.Safety = Unsafe)

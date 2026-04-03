@@ -1,92 +1,99 @@
 ## Thesis
 
-HTTP method semantics are a protocol-level contract. Safe methods (GET) guarantee no side effects; unsafe methods (POST) do not. When Frank maps statechart transitions to HTTP affordances, it must respect this distinction. A read-only observation transition advertised as POST prevents caching, breaks prefetch, and violates RFC 9110 §9.2.1.
+In MPST, MayPoll is a first-class protocol obligation — a role observing state changes made by other roles. The affordance surface must make observation affordances visible to clients, not just transition affordances. A role with MayPoll obligations but no transitions must still receive guidance on what to do (GET the resource to observe).
+
+Additionally, link relation values must be valid per RFC 8288 §2.1.2 — either IANA-registered or extension relation URIs. Bare kebab-case strings are neither.
 
 ## Current problem
 
-`AffordanceMap.fromStatechart` hardcodes `Method = "POST"` for all transitions. A `getGame` or `viewStatus` transition is semantically safe (read-only) but is advertised as POST in Allow headers and Link relations.
+Two issues:
 
-## Definition: "correct method mapping"
+1. **MayPoll invisible.** \`AffordanceMap.fromStatechart\` only generates link relations for transitions (MustSelect/POST). A role with MayPoll in a state has zero link rels — indistinguishable from "no affordances." The protocol expects them to poll, but the affordance surface gives no guidance.
 
-Transitions carry safe/unsafe semantics. Safe transitions map to GET, unsafe transitions map to POST. The ALPS descriptor `type` attribute (`safe`, `unsafe`, `idempotent`) is the authoritative source when available.
+2. **Invalid link relation values.** Link rels use bare kebab-case strings (\`authorize-payment\`) which are neither IANA-registered nor valid extension URIs per RFC 8288 §2.1.2. ALPS-based rels should use the ALPS profile fragment URI: \`rel="http://example.com/alps/orders#authorizePayment"\`.
+
+## Definition: "complete affordance surface"
+
+Every MPST obligation (MustSelect AND MayPoll) produces a link relation. MayPoll produces a GET link relation. All link relation values are valid per RFC 8288 — either IANA-registered or extension relation URIs derived from the ALPS profile.
 
 ## Proposed solution
 
-Extend `TransitionSpec` (or the `transition` CE operation) with a safety annotation. Derive from ALPS descriptor type when available. Default to `unsafe` (POST) when unspecified — safe is the explicit opt-in.
+1. Generate MayPoll link relations in \`AffordanceMap.fromStatechart\` — Method = "GET", rel derived from state or obligation name.
+2. Use ALPS profile fragment URIs as link relation values: \`rel="{profileUri}#{descriptorId}"\` instead of bare kebab-case strings.
 
 ## Architectural constraints
 
-- Method mapping MUST be computed in `AffordanceMap.fromStatechart` (library), not overridden per-handler in sample code
-- Safety semantics MUST flow from the statechart/ALPS metadata, not from handler registration
-- Sample handlers MUST NOT set HTTP methods directly to work around incorrect mapping
+- MayPoll link generation MUST be in \`AffordanceMap.fromStatechart\` (library), not hand-coded in sample handlers
+- ALPS URI construction MUST be in the affordance pipeline, not per-handler
+- Sample handlers MUST NOT add custom Link headers to compensate for missing MayPoll rels
 
 ## Implementation sequence
 
-1. Add safety field to `TransitionSpec` or transition metadata — checkpoint: type compiles, existing tests pass
-2. Update `AffordanceMap.fromStatechart` to use safety for method selection — checkpoint: unit tests show GET for safe, POST for unsafe
-3. Wire ALPS descriptor type to safety annotation in extraction pipeline — checkpoint: ALPS profile with `type="safe"` produces GET transition
-4. Update sample to declare safe transitions — checkpoint: E2E shows GET for observation transitions
+1. Add MayPoll link relation generation to \`AffordanceMap.fromStatechart\` — checkpoint: unit tests show GET rels for MayPoll states
+2. Switch link relation values to ALPS profile fragment URIs — checkpoint: unit tests show URI-based rels
+3. Update sample to declare ALPS profile base URI — checkpoint: E2E shows correct ALPS fragment rels in Link headers
+4. Verify MayPoll roles receive link guidance — checkpoint: Customer in Authorize state gets a GET link rel
 
 ## Acceptance tests
 
-### 1. Safe transition maps to GET
-
-```fsharp
-// Transition marked safe in statechart
-AffordanceMap.fromStatechart extractedStatechart
-→ entry for safe transition has Method = "GET"
-```
-
-### 2. Unsafe transition maps to POST (default)
-
-```fsharp
-// Transition with no safety annotation
-AffordanceMap.fromStatechart extractedStatechart
-→ entry for unmarked transition has Method = "POST"
-```
-
-### 3. ALPS type annotation drives safety
-
-```fsharp
-// ALPS descriptor with type="safe"
-→ extracted transition carries safe = true
-→ affordance entry has Method = "GET"
-```
-
-### 4. Allow header reflects correct methods
+### 1. MayPoll role gets observation link relation
 
 ```
-GET /orders/o1 (in state with both safe and unsafe transitions)
-→ Allow: GET, POST (not just POST for everything)
+GET /orders/o1 -H "X-Role: Customer" (in Authorize state — Customer is MayPoll)
+→ 200
+→ Link header includes a GET-method rel for observing the order
+```
+
+Without this, Customer sees zero link rels in Authorize state despite having a protocol obligation.
+
+### 2. MustSelect role still gets transition link relations
+
+```
+GET /orders/o1 -H "X-Role: PaymentService" (in Authorize state — PaymentService is MustSelect)
+→ 200
+→ Link header includes POST-method rel for authorize-payment
+```
+
+Existing behavior preserved.
+
+### 3. Link relation values are valid URIs
+
+```
+GET /orders/o1
+→ Link header rels are ALPS profile fragment URIs
+→ e.g., rel="http://example.com/alps/orders#authorizePayment"
+→ NOT: rel="authorize-payment"
+```
+
+### 4. Bare kebab-case rels no longer appear
+
+```
+GET /orders/o1
+→ No Link header contains a bare kebab-case rel value
+→ All rels are either IANA-registered or valid extension URIs
 ```
 
 ## Dependencies
 
-- Independent of: #268, #270, #273
-- Affects: #251 (role projection needs correct methods per transition)
-- Affects: #271 (MayPoll is inherently safe/GET)
+- Depends on: #269 (safe method transitions — MayPoll rels need GET method mapping)
+- Depends on: #270 (toKebabCase — affects descriptor ID formatting)
+- Affects: #251 (role projection needs MayPoll rels to show different per-role views)
 
 ## Expert sources
 
-- **Miller** (review of #251): "conflates safe and unsafe transitions"
-- **Amundsen** (review of #251): "ALPS descriptors carry safe/unsafe/idempotent type"
+- **Amundsen** (review of #251): "MayPoll obligations invisible — roles with no transitions have no affordance guidance"
+- **Miller** (review of #251): "kebab-case bare strings are not valid ALPS extension relation URIs per RFC 8288"
 ### Design (from affordance pipeline exploration)
 
-**Files:**
-- `src/Frank.Resources.Model/ResourceTypes.fs` — add `IsSafe: bool` to `TransitionSpec` (default false)
-- `src/Frank.Resources.Model/AffordanceTypes.fs` — `AffordanceMap.fromStatechart` line 229: replace `Method = "POST"` with `Method = if t.IsSafe then "GET" else "POST"`
-- `src/Frank.Statecharts/StatefulResourceBuilder.fs` — new `safeTransition` CE operation (follows `useX`/`useXWith` naming pattern to avoid overload ambiguity)
+**MayPoll rels:**
 
-**Usage:**
-```fsharp
-// Existing (unchanged — defaults to unsafe/POST):
-transition PlaceOrder Pending Authorize Unrestricted
+In `AffordanceMap.fromStatechart` (AffordanceTypes.fs), after generating transition rels: for each state, for each role's projection, if the role has zero transitions from that state → add a GET link rel with `rel="monitor"` (IANA-registered, RFC 5765).
 
-// New — safe/GET:
-safeTransition ViewStatus Authorize Authorize Unrestricted
-```
+**ALPS extension URIs:**
 
-No ALPS integration in this issue — `safeTransition` is the CE-level mechanism. ALPS descriptor type → IsSafe derivation is a follow-up.
+`fromStatechart` already receives `baseUri: string` (added in PR #274). Change rel generation (line 227) from `Rel = toKebabCase t.Event` to `Rel = sprintf "%s#%s" baseUri t.Event`.
+
+Produces: `rel="http://example.com/alps/orders#AuthorizePayment"` — valid RFC 8288 extension URI and dereferenceable ALPS descriptor reference. Keep PascalCase in fragment (ALPS descriptor IDs are PascalCase). Kebab-case moves to display/logging only.
 
 ---
 
