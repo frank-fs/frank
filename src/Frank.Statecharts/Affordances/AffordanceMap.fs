@@ -18,12 +18,45 @@ type PreComputedAffordance =
         /// Middleware must resolve templates against ctx.Request.RouteValues at request time
         /// because RFC 8288 Link targets must be URIs, not URI Templates.
         HasTemplateLinks: bool
+        /// The HTTP methods permitted for this affordance, e.g. ["GET"; "OPTIONS"; "POST"].
+        /// Stored as a sorted, distinct list to allow merge without re-parsing AllowHeaderValue.
+        Methods: string list
     }
 
 module AffordancePreCompute =
 
     /// Format a single link relation as an RFC 8288 Link header value.
     let internal formatLinkValue (href: string) (rel: string) : string = sprintf "<%s>; rel=\"%s\"" href rel
+
+    /// Merge multiple pre-computed affordance entries into one.
+    /// Used when a user holds multiple roles: the merged entry contains the union
+    /// of methods (deduplicated, sorted) and the union of link relations (deduplicated).
+    let internal merge (entries: PreComputedAffordance list) : PreComputedAffordance =
+        match entries with
+        | [] -> failwith "merge requires at least one entry"
+        | [ single ] -> single
+        | _ ->
+            let allMethods =
+                entries
+                |> List.collect _.Methods
+                |> List.distinct
+                |> List.sort
+
+            // Deduplication relies on consistent formatting from formatLinkValue:
+            // the same (href, rel) pair always produces a byte-identical string,
+            // so Array.distinct is sufficient to collapse duplicates across role entries.
+            let allLinks =
+                entries
+                |> Array.ofList
+                |> Array.collect (fun e -> e.LinkHeaderValues.ToArray())
+                |> Array.distinct
+
+            let hasTemplates = entries |> List.exists _.HasTemplateLinks
+
+            { AllowHeaderValue = StringValues(String.Join(", ", allMethods))
+              LinkHeaderValues = StringValues(allLinks)
+              HasTemplateLinks = hasTemplates
+              Methods = allMethods }
 
     // Note: Base entry AllowedMethods comes from AffordanceMapEntry.AllowedMethods (caller-provided).
     // Role entries derive AllowedMethods from their filtered link relations + GET + OPTIONS.
@@ -54,7 +87,8 @@ module AffordancePreCompute =
             dict.[key] <-
                 { AllowHeaderValue = allowHeader
                   LinkHeaderValues = linkHeader
-                  HasTemplateLinks = hasTemplates }
+                  HasTemplateLinks = hasTemplates
+                  Methods = entry.AllowedMethods }
 
             // Collect distinct roles from link relations
             let distinctRoles =
@@ -90,7 +124,8 @@ module AffordancePreCompute =
                 dict.[roleKey] <-
                     { AllowHeaderValue = roleAllowHeader
                       LinkHeaderValues = StringValues(roleLinkValues)
-                      HasTemplateLinks = roleLinkValues |> Array.exists (fun v -> v.Contains("{")) }
+                      HasTemplateLinks = roleLinkValues |> Array.exists (fun v -> v.Contains("{"))
+                      Methods = roleMethods }
 
             // Generate authenticated fallback entry: only role-agnostic links
             // Used when user has roles but none match any role-specific entry
@@ -120,6 +155,7 @@ module AffordancePreCompute =
                 dict.[authKey] <-
                     { AllowHeaderValue = authAllowHeader
                       LinkHeaderValues = StringValues(authLinkValues)
-                      HasTemplateLinks = authLinkValues |> Array.exists (fun v -> v.Contains("{")) }
+                      HasTemplateLinks = authLinkValues |> Array.exists (fun v -> v.Contains("{"))
+                      Methods = authMethods }
 
         dict

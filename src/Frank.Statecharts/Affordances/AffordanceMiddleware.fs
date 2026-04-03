@@ -59,6 +59,10 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
     /// Apply role-projected profile Link header overlay.
     /// Swaps the global ALPS profile link for a role-specific one when roles are resolved.
     /// Returns true if the Link header was actually modified (for Vary header decision).
+    ///
+    /// Note: For multi-role users, profile overlay still uses first-match (alphabetical)
+    /// because RFC 6906 requires one rel="profile" per response. Composite profiles
+    /// for multi-role users is a Phase 2 enhancement.
     let applyRoleProfileOverlay (ctx: HttpContext) (routeTemplate: string) (roles: Set<string>) : bool =
         let roleLookup = ctx.RequestServices.GetService<RoleProfileLookup>()
 
@@ -158,32 +162,48 @@ type AffordanceMiddleware(next: RequestDelegate, lookup: Dictionary<string, PreC
 
                             let baseKey = AffordanceMap.lookupKey routeTemplate effectiveStateKey
 
-                            // Resolve entry: role-specific > authenticated fallback > base.
-                            // Role matching uses Set iteration order (alphabetical for strings).
-                            // When multiple roles match, the first alphabetically wins.
-                            // Role priority ordering is a potential Phase 2 enhancement.
+                            // Resolve entry: collect all matching role entries and merge > authenticated fallback > base.
+                            // Multi-role users see the union of their roles' affordances.
                             let roles = ctx.GetRoles()
                             let hasRoles = not (Set.isEmpty roles)
 
                             let resolved, usedRoleKey =
                                 if hasRoles then
-                                    let roleSpecific =
-                                        roles
-                                        |> Seq.tryPick (fun role ->
-                                            tryLookup (
-                                                AffordanceMap.lookupKeyWithRole routeTemplate effectiveStateKey role
-                                            ))
+                                    if Set.count roles = 1 then
+                                        // Fast path: single role, no list allocation
+                                        let role = Seq.head roles
 
-                                    match roleSpecific with
-                                    | Some entry -> Some entry, true
-                                    | None ->
-                                        let fallback =
-                                            tryLookup (
-                                                AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey
-                                            )
-                                            |> Option.orElseWith (fun () -> tryLookup baseKey)
+                                        match tryLookup (AffordanceMap.lookupKeyWithRole routeTemplate effectiveStateKey role) with
+                                        | Some entry -> Some entry, true
+                                        | None ->
+                                            let fallback =
+                                                tryLookup (
+                                                    AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey
+                                                )
+                                                |> Option.orElseWith (fun () -> tryLookup baseKey)
 
-                                        fallback, false
+                                            fallback, false
+                                    else
+                                        // Multi-role: collect all matching entries and merge
+                                        let roleEntries =
+                                            roles
+                                            |> Seq.choose (fun role ->
+                                                tryLookup (
+                                                    AffordanceMap.lookupKeyWithRole routeTemplate effectiveStateKey role
+                                                ))
+                                            |> Seq.toList
+
+                                        match roleEntries with
+                                        | [] ->
+                                            let fallback =
+                                                tryLookup (
+                                                    AffordanceMap.lookupKeyAuthenticated routeTemplate effectiveStateKey
+                                                )
+                                                |> Option.orElseWith (fun () -> tryLookup baseKey)
+
+                                            fallback, false
+                                        | [ single ] -> Some single, true
+                                        | multiple -> Some(AffordancePreCompute.merge multiple), true
                                 else
                                     // Unauthenticated: use authenticated fallback (role-agnostic links only).
                                     // Showing role-restricted transitions to unauthenticated users violates
