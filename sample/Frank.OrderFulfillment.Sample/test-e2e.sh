@@ -510,7 +510,7 @@ echo ""
 
 # #271 AT1: MayPoll role gets observation link relation
 # Customer in Authorize state has no transitions — should get rel="monitor" GET link
-check_header "#271 AT1: Customer gets monitor link in Authorize" "$BASE/orders/o3" "Link" "monitor" "Customer"
+check_header "#271 AT1: Customer gets monitor link in Authorize" "$BASE/orders/o3" "Link" 'rel="monitor"' "Customer"
 
 # #271 AT2: MustSelect role still gets transition link relations
 # PaymentService in Authorize has AuthorizePayment transition — gets ALPS fragment URI link

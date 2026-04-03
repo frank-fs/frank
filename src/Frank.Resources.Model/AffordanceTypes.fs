@@ -217,8 +217,13 @@ module AffordanceMap =
     /// Each transition becomes an AffordanceLinkRelation with Roles derived from RoleConstraint.
     /// Method derived from TransitionSafety: Safe→GET, Unsafe→POST, Idempotent→PUT.
     /// Rel is an ALPS profile fragment URI: "{profileUrl}#{EventName}".
-    /// Roles with no transitions from a state get a "monitor" GET rel (IANA RFC 5765).
+    /// Roles with no transitions from a state get a "monitor" GET rel (IANA link relation
+    /// registry; registered via RFC 5765 for SIP but applicable to HTTP observation semantics).
+    /// Terminal states (no transitions for any role) do not generate monitor rels.
     let fromStatechart (baseUri: string) (sc: ExtractedStatechart) : AffordanceMap =
+        if System.String.IsNullOrWhiteSpace(baseUri) then
+            invalidArg (nameof baseUri) "baseUri must be a non-empty URI for ALPS profile fragment construction"
+
         let slug = ResourceModel.resourceSlug sc.RouteTemplate
         let profile = profileUrl baseUri slug
 
@@ -247,36 +252,40 @@ module AffordanceMap =
                             | Unsafe -> "POST"
                             | Idempotent -> "PUT"
 
-                        { AffordanceLinkRelation.Rel = sprintf "%s#%s" profile t.Event
+                        { AffordanceLinkRelation.Rel = String.Concat(profile, "#", t.Event)
                           AffordanceLinkRelation.Href = sc.RouteTemplate
                           AffordanceLinkRelation.Method = method
                           AffordanceLinkRelation.Title = None
                           AffordanceLinkRelation.Roles = roles })
 
                 // MayPoll: roles with no transitions from this state get a monitor GET rel.
-                // A role "has transitions" if any transition is Unrestricted or RestrictedTo includes the role.
+                // Only when SOME roles have transitions (not terminal states where nobody acts).
                 let hasUnrestricted = transitions |> List.exists (fun t -> t.Constraint = Unrestricted)
 
                 let monitorRels =
-                    if hasUnrestricted then
-                        [] // All roles participate in unrestricted transitions
+                    if hasUnrestricted || List.isEmpty transitions then
+                        [] // All roles participate (unrestricted) or terminal state (no actions)
                     else
-                        sc.Roles
-                        |> List.filter (fun role ->
+                        let activeRoles =
                             transitions
-                            |> List.exists (fun t ->
+                            |> List.collect (fun t ->
                                 match t.Constraint with
-                                | RestrictedTo roles -> roles |> List.contains role.Name
-                                | Unrestricted -> true)
-                            |> not)
+                                | RestrictedTo roles -> roles
+                                | Unrestricted -> [])
+                            |> Set.ofList
+
+                        sc.Roles
+                        |> List.filter (fun role -> not (activeRoles.Contains role.Name))
                         |> List.map (fun role ->
                             { AffordanceLinkRelation.Rel = "monitor"
                               AffordanceLinkRelation.Href = sc.RouteTemplate
                               AffordanceLinkRelation.Method = "GET"
-                              AffordanceLinkRelation.Title = None
+                              AffordanceLinkRelation.Title = Some stateKey
                               AffordanceLinkRelation.Roles = [ role.Name ] })
 
-                let linkRelations = transitionRels @ monitorRels
+                let linkRelations =
+                    if List.isEmpty monitorRels then transitionRels
+                    else transitionRels @ monitorRels
 
                 let allowedMethods =
                     let hasUnsafe = transitions |> List.exists (fun t -> t.Safety = Unsafe)

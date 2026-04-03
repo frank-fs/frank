@@ -591,6 +591,7 @@ let affordanceMapTests =
               Expect.equal monitor.Method "GET" "Monitor rel should be GET"
               Expect.equal monitor.Roles [ "Customer" ] "Monitor rel should be scoped to MayPoll role"
               Expect.equal monitor.Href "/orders/{orderId}" "Monitor rel should target resource"
+              Expect.equal monitor.Title (Some "Authorize") "Monitor rel should include state name as Title"
 
           testCase "fromStatechart does not add monitor rel for role with transitions"
           <| fun _ ->
@@ -690,6 +691,26 @@ let affordanceMapTests =
               Expect.equal monitorRels.Length 2 "Two roles without transitions should each get monitor rel"
               let monitorRoles = monitorRels |> List.collect _.Roles |> List.sort
               Expect.equal monitorRoles [ "Auditor"; "Customer" ] "Monitor rels for Auditor and Customer"
+              for mr in monitorRels do
+                  Expect.equal mr.Title (Some "Processing") "Monitor rels should include state name as Title"
+
+          testCase "fromStatechart no monitor rels in terminal state with roles"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/orders/{orderId}"
+                    StateNames = [ "Delivered"; "Cancelled" ]
+                    InitialStateKey = "Delivered"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles =
+                      [ { Name = "Customer"; Description = None }
+                        { Name = "PaymentService"; Description = None } ]
+                    Transitions = [] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              for entry in map.Entries do
+                  let monitorRels = entry.LinkRelations |> List.filter (fun lr -> lr.Rel = "monitor")
+                  Expect.isEmpty monitorRels (sprintf "Terminal state %s should not get monitor rels" entry.StateKey)
 
           // #271 Phase 2: ALPS profile fragment URI rels
           testCase "fromStatechart ALPS fragment URI preserves PascalCase event name"
@@ -734,13 +755,16 @@ let affordanceMapTests =
                           Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              // Known IANA link relations used by the system
+              let ianaRels = Set.ofList [ "monitor"; "self"; "profile" ]
               let allRels =
                   map.Entries
                   |> List.collect (fun e -> e.LinkRelations |> List.map _.Rel)
               for rel in allRels do
-                  let isIana = rel = "monitor"
-                  let isUri = rel.Contains("#") || rel.Contains("://")
-                  Expect.isTrue (isIana || isUri) (sprintf "Rel '%s' must be IANA-registered or a valid URI" rel)
+                  let isIana = ianaRels.Contains rel
+                  let mutable uri = Unchecked.defaultof<System.Uri>
+                  let isUri = System.Uri.TryCreate(rel, System.UriKind.Absolute, &uri)
+                  Expect.isTrue (isIana || isUri) (sprintf "Rel '%s' must be IANA-registered or a valid absolute URI" rel)
 
           testCase "fromStatechart monitor rel stays IANA-registered not ALPS URI"
           <| fun _ ->
