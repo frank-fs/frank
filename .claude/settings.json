@@ -48,5 +48,62 @@
       "Edit(file_path:.claude/worktrees/**)",
       "Write(file_path:.claude/worktrees/**)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown'); worktree=$(git rev-parse --show-toplevel 2>/dev/null || echo 'unknown'); echo '=== Frank Session ==='; echo \"Branch:   $branch\"; echo \"Worktree: $worktree\"; if [ \"$branch\" = \"master\" ] || [ \"$branch\" = \"main\" ]; then echo ''; echo 'WARNING: On master branch. Edits will be blocked.'; echo 'Create a worktree first:'; echo '  git worktree add .worktrees/<name> -b <branch>'; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$branch\" = \"master\" ] || [ \"$branch\" = \"main\" ]; then echo 'BLOCKED: Cannot edit files on master. Create a worktree first:' >&2; echo '  git worktree add .worktrees/<name> -b <branch>' >&2; exit 2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=\"$TOOL_INPUT_FILE_PATH\"; if echo \"$file\" | grep -q '\\.fs$'; then dotnet fantomas \"$file\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== Verification Sequence ==='; echo 'Before claiming work is complete:'; echo '1. dotnet build Frank.sln'; echo '2. dotnet test Frank.sln --filter FullyQualifiedName!~Sample'; echo '3. dotnet test test/Frank.Tests/'; echo '4. find sample/ -name test-e2e.sh -exec echo Run: {} \\;'; echo '5. /verification-before-completion'; echo '6. /simplify'; echo '7. /expert-review'; echo 'Address all findings before opening a PR.'"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown'); worktree=$(git rev-parse --show-toplevel 2>/dev/null || echo 'unknown'); echo '=== Context Compacted ==='; echo \"Branch: $branch | Worktree: $worktree\"; echo 'CONSTITUTION: Resource-oriented design. CE is the API. Library not framework. No silent exception swallowing. use bindings for IDisposable. No duplicated logic.'; echo 'WORKFLOW: Work on worktrees only. Run full verification sequence before PRs.'"
+          }
+        ]
+      }
+    ]
   }
 }

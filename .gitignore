@@ -56,8 +56,10 @@ nupkg/*
 !nupkg/.gitkeep
 
 # AI tool config directories
-.claude/
+.claude/*
 !.claude/settings.json
+!.claude/agents/
+!.claude/skills/
 .codex/
 .opencode/
 .windsurf/
