@@ -3,6 +3,9 @@ module Frank.Affordances.Tests.AffordanceMiddlewareTests
 open System.Net
 open System.Net.Http
 open Expecto
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Primitives
 open Frank.Affordances
 open Frank.Resources.Model
@@ -619,3 +622,220 @@ let roleFilteredMiddlewareTests =
               Expect.equal playerXAllow "GET, HEAD, OPTIONS, POST" "PlayerX Allow should include POST (makeMove transition)"
               // PlayerO has no role-specific entry; falls back to auth entry with only role-agnostic links (viewGame GET)
               Expect.equal playerOAllow "GET, HEAD, OPTIONS" "PlayerO Allow should NOT include POST (no matching role transitions)" ]
+
+[<Tests>]
+let mergeTests =
+    testList
+        "AffordancePreCompute.merge"
+        [ testCase "merges two entries: union of methods, union of rels"
+          <| fun _ ->
+              let entry1 =
+                  { AllowHeaderValue = StringValues("GET, HEAD, OPTIONS, POST")
+                    LinkHeaderValues =
+                      StringValues(
+                          [| "<https://example.com/alps/orders>; rel=\"profile\""
+                             "</orders/{orderId}/refund>; rel=\"refund\"" |]
+                      )
+                    HasTemplateLinks = true
+                    Methods = [ "GET"; "HEAD"; "OPTIONS"; "POST" ] }
+
+              let entry2 =
+                  { AllowHeaderValue = StringValues("GET, HEAD, OPTIONS, PUT")
+                    LinkHeaderValues =
+                      StringValues(
+                          [| "<https://example.com/alps/orders>; rel=\"profile\""
+                             "</orders/{orderId}/ship>; rel=\"ship\"" |]
+                      )
+                    HasTemplateLinks = true
+                    Methods = [ "GET"; "HEAD"; "OPTIONS"; "PUT" ] }
+
+              let merged = AffordancePreCompute.merge [ entry1; entry2 ]
+
+              // Allow: union of methods, sorted
+              Expect.equal
+                  (merged.AllowHeaderValue.ToString())
+                  "GET, HEAD, OPTIONS, POST, PUT"
+                  "Merged Allow should be union of both entries' methods"
+
+              // Link: union of rels, deduplicated (profile appears once)
+              let links = merged.LinkHeaderValues.ToArray()
+              Expect.equal links.Length 3 "Should have 3 links: profile + refund + ship (no duplicate profile)"
+
+              let allLinks = links |> String.concat " "
+              Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile"
+              Expect.isTrue (allLinks.Contains("rel=\"refund\"")) "Should contain refund"
+              Expect.isTrue (allLinks.Contains("rel=\"ship\"")) "Should contain ship"
+
+              // HasTemplateLinks: true if any entry has templates
+              Expect.isTrue merged.HasTemplateLinks "Should have template links"
+
+          testCase "merge preserves HasTemplateLinks=false when no entries have templates"
+          <| fun _ ->
+              let entry1 =
+                  { AllowHeaderValue = StringValues("GET, HEAD, OPTIONS")
+                    LinkHeaderValues =
+                      StringValues([| "<https://example.com/alps/orders>; rel=\"profile\"" |])
+                    HasTemplateLinks = false
+                    Methods = [ "GET"; "HEAD"; "OPTIONS" ] }
+
+              let entry2 =
+                  { AllowHeaderValue = StringValues("GET, HEAD, OPTIONS, POST")
+                    LinkHeaderValues =
+                      StringValues(
+                          [| "<https://example.com/alps/orders>; rel=\"profile\""
+                             "</orders/123/ship>; rel=\"ship\"" |]
+                      )
+                    HasTemplateLinks = false
+                    Methods = [ "GET"; "HEAD"; "OPTIONS"; "POST" ] }
+
+              let merged = AffordancePreCompute.merge [ entry1; entry2 ]
+              Expect.isFalse merged.HasTemplateLinks "Should be false when no entries have template links"
+
+          testCase "merge single entry returns it unchanged"
+          <| fun _ ->
+              let entry =
+                  { AllowHeaderValue = StringValues("GET, HEAD, OPTIONS, POST")
+                    LinkHeaderValues =
+                      StringValues(
+                          [| "<https://example.com/alps/orders>; rel=\"profile\""
+                             "</orders/{orderId}/refund>; rel=\"refund\"" |]
+                      )
+                    HasTemplateLinks = true
+                    Methods = [ "GET"; "HEAD"; "OPTIONS"; "POST" ] }
+
+              let merged = AffordancePreCompute.merge [ entry ]
+              Expect.equal (merged.AllowHeaderValue.ToString()) "GET, HEAD, OPTIONS, POST" "Single entry methods unchanged"
+              Expect.equal (merged.LinkHeaderValues.ToArray().Length) 2 "Single entry links unchanged" ]
+
+[<Tests>]
+let multiRoleMiddlewareTests =
+    // Build lookup with two roles that have distinct affordances for the same (route, state)
+    let multiRoleMap =
+        { Version = AffordanceMap.currentVersion
+          Entries =
+            [ { RouteTemplate = "/orders/{orderId}"
+                StateKey = "Fulfillment"
+                AllowedMethods = [ "GET"; "HEAD"; "OPTIONS"; "POST"; "PUT" ]
+                LinkRelations =
+                  [ { Rel = "refund"
+                      Href = "/orders/{orderId}/refund"
+                      Method = "POST"
+                      Title = None
+                      Roles = [ "PaymentService" ] }
+                    { Rel = "ship"
+                      Href = "/orders/{orderId}/ship"
+                      Method = "POST"
+                      Title = None
+                      Roles = [ "Warehouse" ] }
+                    { Rel = "pack"
+                      Href = "/orders/{orderId}/pack"
+                      Method = "PUT"
+                      Title = None
+                      Roles = [ "Warehouse" ] }
+                    { Rel = "view-order"
+                      Href = "/orders/{orderId}"
+                      Method = "GET"
+                      Title = None
+                      Roles = [] } ]
+                ProfileUrl = "https://example.com/alps/orders" } ] }
+
+    let multiRoleLookup = AffordancePreCompute.preCompute multiRoleMap
+
+    let orderEndpoints (endpoints: IEndpointRouteBuilder) =
+        endpoints.MapGet(
+            "/orders/{orderId}",
+            RequestDelegate(fun ctx -> ctx.Response.WriteAsync("OK"))
+        )
+        |> ignore
+
+    testList
+        "AffordanceMiddleware multi-role resolution"
+        [
+          // Acceptance test 1: Multi-role user sees union of affordances
+          testCase "multi-role user sees union of methods and rels from both PaymentService and Warehouse"
+          <| fun _ ->
+              (withAffordanceServer
+                  multiRoleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("Fulfillment", "Fulfillment", 0)
+                      ctx.SetRoles(Set [ "PaymentService"; "Warehouse" ]))
+                  orderEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/orders/o1")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          // Allow header includes methods from BOTH roles
+                          let allow = getHeaderValues response "Allow" |> String.concat ", "
+                          Expect.isTrue (allow.Contains("POST")) "Allow should include POST (from refund + ship)"
+                          Expect.isTrue (allow.Contains("PUT")) "Allow should include PUT (from pack)"
+                          Expect.isTrue (allow.Contains("GET")) "Allow should include GET"
+
+                          // Link header includes rels from BOTH roles
+                          let links = getHeaderValues response "Link"
+                          let allLinks = links |> String.concat " "
+                          Expect.isTrue (allLinks.Contains("rel=\"refund\"")) "Should contain refund (PaymentService)"
+                          Expect.isTrue (allLinks.Contains("rel=\"ship\"")) "Should contain ship (Warehouse)"
+                          Expect.isTrue (allLinks.Contains("rel=\"pack\"")) "Should contain pack (Warehouse)"
+                          Expect.isTrue (allLinks.Contains("rel=\"view-order\"")) "Should contain view-order (all roles)"
+                          Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile"
+
+                          // Vary: Authorization must be present for role-dependent responses
+                          let vary = getHeaderValues response "Vary" |> String.concat ", "
+                          Expect.isTrue (vary.Contains("Authorization")) "Vary should include Authorization for multi-role response"
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          // Acceptance test 2: Single-role behavior unchanged
+          testCase "single-role user sees only their role's affordances (no regression)"
+          <| fun _ ->
+              (withAffordanceServer
+                  multiRoleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("Fulfillment", "Fulfillment", 0)
+                      ctx.SetRoles(Set [ "PaymentService" ]))
+                  orderEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/orders/o1")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          let links = getHeaderValues response "Link"
+                          let allLinks = links |> String.concat " "
+                          Expect.isTrue (allLinks.Contains("rel=\"refund\"")) "PaymentService should see refund"
+                          Expect.isFalse (allLinks.Contains("rel=\"ship\"")) "PaymentService should NOT see ship"
+                          Expect.isFalse (allLinks.Contains("rel=\"pack\"")) "PaymentService should NOT see pack"
+                          Expect.isTrue (allLinks.Contains("rel=\"view-order\"")) "Should see view-order (all roles)"
+                      }))
+                  .GetAwaiter()
+                  .GetResult()
+
+          // Acceptance test 3: No role duplication in merged output
+          testCase "multi-role merged output has no duplicate methods or rels"
+          <| fun _ ->
+              (withAffordanceServer
+                  multiRoleLookup
+                  (fun ctx ->
+                      ctx.SetStatechartState("Fulfillment", "Fulfillment", 0)
+                      ctx.SetRoles(Set [ "PaymentService"; "Warehouse" ]))
+                  orderEndpoints
+                  (fun client ->
+                      task {
+                          let! (response: HttpResponseMessage) = client.GetAsync("/orders/o1")
+
+                          Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
+
+                          // Check Allow header has no duplicate methods
+                          let allow = getHeaderValues response "Allow" |> String.concat ", "
+                          let methods = allow.Split(',') |> Array.map (fun s -> s.Trim()) |> Array.toList
+                          Expect.equal methods (methods |> List.distinct) "Allow header should have no duplicate methods"
+
+                          // Check Link header has no duplicate rels
+                          let links = getHeaderValues response "Link"
+                          Expect.equal links (links |> List.distinct) "Link header should have no duplicate rels"
+                      }))
+                  .GetAwaiter()
+                  .GetResult() ]
