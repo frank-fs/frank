@@ -161,7 +161,7 @@ let main args =
         // Seed game state after services are built
         plug seedInitialState
 
-        resource gameResource.Resource
+        resource gameResource
         resource sseResource
     }
 

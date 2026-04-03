@@ -534,13 +534,13 @@ let main args =
         plug seedInitialStates
 
         // Primary stateful resource (demonstrates hierarchy + 4 MPST roles)
-        resource orderResult.Resource
+        resource orderResult
 
         // Region-completion stateful resources — each dispatches through middleware
         // (CompleteRegion hierarchy op via handlePickComplete/handlePackComplete/handleShipComplete)
-        resource pickResource.Resource
-        resource packResource.Resource
-        resource shipResource.Resource
+        resource pickResource
+        resource packResource
+        resource shipResource
 
         // Direct state manipulation sub-resources (e2e test control paths)
         resource cancelResource

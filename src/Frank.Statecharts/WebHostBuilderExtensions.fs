@@ -8,6 +8,13 @@ open Frank.Builder
 module WebHostBuilderExtensions =
     type WebHostBuilder with
 
+        /// Register a stateful resource directly from a StatefulResourceResult.
+        /// Avoids the need to access .Resource on the result — pit of success.
+        [<CustomOperation("resource")>]
+        member __.Resource(spec: WebHostSpec, result: StatefulResourceResult) : WebHostSpec =
+            { spec with
+                Endpoints = Array.append spec.Endpoints result.Resource.Endpoints }
+
         /// Register Frank.Statecharts middleware.
         /// Middleware runs after routing, before endpoint execution.
         /// Recommended order: useAuthentication -> useStatecharts -> (LinkedData)
