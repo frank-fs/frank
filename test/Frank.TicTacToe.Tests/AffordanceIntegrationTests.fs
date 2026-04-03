@@ -155,6 +155,25 @@ let buildGameResource () =
         inState (forState Draw [ StateHandlerBuilder.get getGameState ])
     }
 
+/// Resource with both safe (observation) and unsafe (mutation) transitions declared.
+/// Used to test that safeTransition produces Safety=Safe → GET in affordance projection.
+let buildGameResourceWithSafeTransitions () =
+    statefulResource "/games/{gameId}" {
+        machine gameMachine
+        resolveInstanceId (fun ctx -> ctx.Request.RouteValues["gameId"] :?> string)
+        // Safe observation transitions (GET) — self-loops that don't modify state
+        safeTransition (MakeMove 0) XTurn XTurn Unrestricted
+        safeTransition (MakeMove 0) OTurn OTurn Unrestricted
+        // Unsafe game-play transitions (POST)
+        transition (MakeMove 0) XTurn OTurn Unrestricted
+        transition (MakeMove 0) OTurn XTurn Unrestricted
+        inState (forState XTurn [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ])
+        inState (forState OTurn [ StateHandlerBuilder.get getGameState; StateHandlerBuilder.post handleMove ])
+        inState (forState (Won "X") [ StateHandlerBuilder.get getGameState ])
+        inState (forState (Won "O") [ StateHandlerBuilder.get getGameState ])
+        inState (forState Draw [ StateHandlerBuilder.get getGameState ])
+    }
+
 // === Test infrastructure ===
 
 /// Middleware shim that resolves the statechart state key from the store
@@ -689,3 +708,79 @@ let projectedProfileTests =
               })
                   .GetAwaiter()
                   .GetResult() ]
+
+/// Tests for safeTransition CE operation and its effect on affordance projection.
+[<Tests>]
+let safeTransitionTests =
+    testList
+        "safeTransition CE"
+        [
+
+          testCase "safeTransition creates TransitionSpec with Safety = Safe"
+          <| fun _ ->
+              let result = buildGameResourceWithSafeTransitions ()
+              let safeTransitions = result.Statechart.Transitions |> List.filter (fun t -> t.Safety = Safe)
+              let safeSources = safeTransitions |> List.map _.Source |> List.sort
+              Expect.equal safeSources [ "OTurn"; "XTurn" ] "Safe transitions should be self-loops on XTurn and OTurn"
+
+          testCase "transition creates TransitionSpec with Safety = Unsafe"
+          <| fun _ ->
+              let result = buildGameResourceWithSafeTransitions ()
+
+              let unsafeTransitions =
+                  result.Statechart.Transitions |> List.filter (fun t -> t.Safety <> Safe)
+
+              let unsafeTargets = unsafeTransitions |> List.map _.Target |> List.sort
+              Expect.equal unsafeTargets [ "OTurn"; "XTurn" ] "Unsafe transitions should be XTurn→OTurn and OTurn→XTurn"
+
+          testCase "fromStatechart maps safeTransition to GET and transition to POST"
+          <| fun _ ->
+              let result = buildGameResourceWithSafeTransitions ()
+
+              let map =
+                  AffordanceMap.fromStatechart "http://example.com/alps" result.Statechart
+
+              let xTurnEntry =
+                  map.Entries |> List.find (fun e -> e.StateKey = "XTurn")
+
+              let getMethods =
+                  xTurnEntry.LinkRelations
+                  |> List.filter (fun lr -> lr.Method = "GET")
+
+              let postMethods =
+                  xTurnEntry.LinkRelations
+                  |> List.filter (fun lr -> lr.Method = "POST")
+
+              Expect.equal getMethods.Length 1 "XTurn should have 1 GET link relation (safe observation)"
+              Expect.equal postMethods.Length 1 "XTurn should have 1 POST link relation (unsafe mutation)"
+
+          testCase "AllowedMethods includes both GET and POST when safe and unsafe transitions exist"
+          <| fun _ ->
+              let result = buildGameResourceWithSafeTransitions ()
+
+              let map =
+                  AffordanceMap.fromStatechart "http://example.com/alps" result.Statechart
+
+              let xTurnEntry =
+                  map.Entries |> List.find (fun e -> e.StateKey = "XTurn")
+
+              Expect.contains xTurnEntry.AllowedMethods "GET" "GET required"
+              Expect.contains xTurnEntry.AllowedMethods "OPTIONS" "OPTIONS required"
+              Expect.contains xTurnEntry.AllowedMethods "POST" "POST required when unsafe transitions exist"
+
+          testCase "Terminal state with no transitions has no POST in AllowedMethods"
+          <| fun _ ->
+              let result = buildGameResourceWithSafeTransitions ()
+
+              let map =
+                  AffordanceMap.fromStatechart "http://example.com/alps" result.Statechart
+
+              let wonEntry =
+                  map.Entries |> List.find (fun e -> e.StateKey = "Won")
+
+              Expect.contains wonEntry.AllowedMethods "GET" "GET required for terminal state"
+              Expect.contains wonEntry.AllowedMethods "OPTIONS" "OPTIONS required for terminal state"
+
+              Expect.isFalse
+                  (List.contains "POST" wonEntry.AllowedMethods)
+                  "POST must not appear when no transitions" ]

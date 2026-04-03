@@ -13,7 +13,8 @@ let private mkTransition event source target guard roleConstraint =
       Source = source
       Target = target
       Guard = guard
-      Constraint = roleConstraint }
+      Constraint = roleConstraint
+      Safety = Unsafe }
 
 let private ticTacToeChart: ExtractedStatechart =
     { RouteTemplate = "/games/{gameId}"

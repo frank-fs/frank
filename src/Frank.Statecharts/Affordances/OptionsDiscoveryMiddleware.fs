@@ -71,6 +71,7 @@ type OptionsDiscoveryMiddleware
                          else
                              meta.HttpMethods :> seq<_>)
                      |> Set.ofSeq
+                     |> Set.add "HEAD"
                      |> Set.add "OPTIONS"
 
                  let allowValue = StringValues(System.String.Join(", ", methods))

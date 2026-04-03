@@ -129,7 +129,7 @@ module AffordanceMap =
             let methods =
                 resource.HttpCapabilities
                 |> List.map _.Method
-                |> fun ms -> "OPTIONS" :: ms
+                |> fun ms -> "HEAD" :: "OPTIONS" :: ms
                 |> List.distinct
                 |> List.sort
 
@@ -153,7 +153,7 @@ module AffordanceMap =
                 let methods =
                     capsForState
                     |> List.map _.Method
-                    |> fun ms -> "OPTIONS" :: ms
+                    |> fun ms -> "HEAD" :: "OPTIONS" :: ms
                     |> List.distinct
                     |> List.sort
 
@@ -207,9 +207,15 @@ module AffordanceMap =
 
             sb.ToString()
 
+    // Pre-computed AllowedMethods lists including HEAD per RFC 9110 §9.3.2.
+    let private safeOnlyMethods = [ "GET"; "HEAD"; "OPTIONS" ]
+    let private safeUnsafeMethods = [ "GET"; "HEAD"; "OPTIONS"; "POST" ]
+    let private safeIdempotentMethods = [ "GET"; "HEAD"; "OPTIONS"; "PUT" ]
+    let private safeUnsafeIdempotentMethods = [ "GET"; "HEAD"; "OPTIONS"; "POST"; "PUT" ]
+
     /// Generate an AffordanceMap from an ExtractedStatechart for CE-based apps.
     /// Each transition becomes an AffordanceLinkRelation with Roles derived from RoleConstraint.
-    /// Method is "POST" for all transitions (MustSelect semantics).
+    /// Method derived from TransitionSafety: Safe→GET, Unsafe→POST, Idempotent→PUT.
     /// Rel is the event name converted to kebab-case.
     let fromStatechart (baseUri: string) (sc: ExtractedStatechart) : AffordanceMap =
         let slug = ResourceModel.resourceSlug sc.RouteTemplate
@@ -234,18 +240,27 @@ module AffordanceMap =
                             | Unrestricted -> []
                             | RestrictedTo r -> r
 
+                        let method =
+                            match t.Safety with
+                            | Safe -> "GET"
+                            | Unsafe -> "POST"
+                            | Idempotent -> "PUT"
+
                         { AffordanceLinkRelation.Rel = toKebabCase t.Event
                           AffordanceLinkRelation.Href = sc.RouteTemplate
-                          AffordanceLinkRelation.Method = "POST"
+                          AffordanceLinkRelation.Method = method
                           AffordanceLinkRelation.Title = None
                           AffordanceLinkRelation.Roles = roles })
 
                 let allowedMethods =
-                    let hasTransitions = not (List.isEmpty transitions)
+                    let hasUnsafe = transitions |> List.exists (fun t -> t.Safety = Unsafe)
+                    let hasIdempotent = transitions |> List.exists (fun t -> t.Safety = Idempotent)
 
-                    [ "GET"; "OPTIONS" ] @ (if hasTransitions then [ "POST" ] else [])
-                    |> List.distinct
-                    |> List.sort
+                    match hasUnsafe, hasIdempotent with
+                    | true, true -> safeUnsafeIdempotentMethods
+                    | true, false -> safeUnsafeMethods
+                    | false, true -> safeIdempotentMethods
+                    | false, false -> safeOnlyMethods
 
                 { AffordanceMapEntry.RouteTemplate = sc.RouteTemplate
                   AffordanceMapEntry.StateKey = stateKey

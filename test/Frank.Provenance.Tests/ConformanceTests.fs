@@ -12,7 +12,8 @@ let private mkTransition event source target roleConstraint =
       Source = source
       Target = target
       Guard = None
-      Constraint = roleConstraint }
+      Constraint = roleConstraint
+      Safety = Unsafe }
 
 /// TicTacToe-like statechart with two players and a spectator.
 let private ticTacToeChart: ExtractedStatechart =

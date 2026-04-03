@@ -118,6 +118,15 @@ type RoleConstraint =
     | Unrestricted
     | RestrictedTo of string list
 
+/// HTTP method safety classification per RFC 9110 §9.2.1 and ALPS descriptor type.
+type TransitionSafety =
+    /// Read-only, no side effects. Maps to GET.
+    | Safe
+    /// Side effects, not idempotent. Maps to POST.
+    | Unsafe
+    /// Side effects, idempotent (replacement semantics). Maps to PUT.
+    | Idempotent
+
 /// A single transition in the extracted statechart.
 /// Domain-neutral: no ALPS/SCXML/format-specific concepts.
 /// Pre-resolved: extraction resolves guard + state → RoleConstraint eagerly.
@@ -134,6 +143,8 @@ type TransitionSpec =
         Guard: string option
         /// Pre-resolved role constraint. RestrictedTo [] = dead transition (no role can trigger).
         Constraint: RoleConstraint
+        /// HTTP method safety classification. Default: Unsafe (POST).
+        Safety: TransitionSafety
     }
 
 /// Structured representation of a single stateful resource extracted from source.
