@@ -14,23 +14,27 @@ let private ticTacToeTransitions =
         Source = "XTurn"
         Target = "OTurn"
         Guard = Some "TurnGuard"
-        Constraint = RestrictedTo [ "PlayerX" ] }
+        Constraint = RestrictedTo [ "PlayerX" ]
+        Safety = Unsafe }
       { Event = "MakeMove"
         Source = "XTurn"
         Target = "Won"
         Guard = Some "TurnGuard"
-        Constraint = RestrictedTo [ "PlayerX" ] }
+        Constraint = RestrictedTo [ "PlayerX" ]
+        Safety = Unsafe }
       // PlayerO moves from OTurn
       { Event = "MakeMove"
         Source = "OTurn"
         Target = "XTurn"
         Guard = Some "TurnGuard"
-        Constraint = RestrictedTo [ "PlayerO" ] }
+        Constraint = RestrictedTo [ "PlayerO" ]
+        Safety = Unsafe }
       { Event = "MakeMove"
         Source = "OTurn"
         Target = "Won"
         Guard = Some "TurnGuard"
-        Constraint = RestrictedTo [ "PlayerO" ] } ]
+        Constraint = RestrictedTo [ "PlayerO" ]
+        Safety = Unsafe } ]
 
 let private capabilities: HttpCapability list =
     [ { Method = "GET"
@@ -152,7 +156,8 @@ let projectionPipelineTests =
                             Source = "XTurn"
                             Target = "XTurn"
                             Guard = None
-                            Constraint = Unrestricted } ]
+                            Constraint = Unrestricted
+                            Safety = Unsafe } ]
 
                     let filtered = filterCapabilitiesByTransitions selfLoopTransitions capabilities
 

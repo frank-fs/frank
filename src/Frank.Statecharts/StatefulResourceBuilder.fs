@@ -249,17 +249,14 @@ type StatefulResourceBuilder(routeTemplate: string) =
         { spec with
             HierarchySpec = Some hierarchySpec }
 
-    /// Declare an MPST role-constrained transition.
-    /// The event, source, and target are resolved to string keys via StateKeyExtractor.keyOf.
-    /// Multiple transition declarations may be added; they accumulate in TransitionDeclarations.
-    [<CustomOperation("transition")>]
-    member _.Transition
+    member private _.AddTransition
         (
             spec: StatefulResourceSpec<'S, 'E, 'C>,
             event: 'E,
             source: 'S,
             target: 'S,
-            roleConstraint: RoleConstraint
+            roleConstraint: RoleConstraint,
+            safety: TransitionSafety
         ) =
         { spec with
             TransitionDeclarations =
@@ -267,8 +264,26 @@ type StatefulResourceBuilder(routeTemplate: string) =
                   Source = StateKeyExtractor.keyOf source
                   Target = StateKeyExtractor.keyOf target
                   Guard = None
-                  Constraint = roleConstraint }
+                  Constraint = roleConstraint
+                  Safety = safety }
                 :: spec.TransitionDeclarations }
+
+    /// Declare an MPST role-constrained transition. Default safety: Unsafe (POST).
+    [<CustomOperation("transition")>]
+    member this.Transition(spec, event, source, target, roleConstraint) =
+        this.AddTransition(spec, event, source, target, roleConstraint, Unsafe)
+
+    /// Declare a safe (read-only, GET) MPST role-constrained transition.
+    /// Use for observation transitions (e.g., getGame, viewStatus) that don't modify state.
+    [<CustomOperation("safeTransition")>]
+    member this.SafeTransition(spec, event, source, target, roleConstraint) =
+        this.AddTransition(spec, event, source, target, roleConstraint, Safe)
+
+    /// Declare an idempotent (PUT) MPST role-constrained transition.
+    /// Use for replacement transitions where repeating the operation has the same effect.
+    [<CustomOperation("idempotentTransition")>]
+    member this.IdempotentTransition(spec, event, source, target, roleConstraint) =
+        this.AddTransition(spec, event, source, target, roleConstraint, Idempotent)
 
     member _.Run(spec: StatefulResourceSpec<'S, 'E, 'C>) : StatefulResourceResult =
         let machine =

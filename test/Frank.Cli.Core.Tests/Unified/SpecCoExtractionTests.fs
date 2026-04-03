@@ -242,7 +242,8 @@ let specCoExtractionTests =
                               Source = "XTurn"
                               Target = "OTurn"
                               Guard = None
-                              Constraint = Unrestricted }
+                              Constraint = Unrestricted
+                              Safety = Unsafe }
 
                         let resource =
                             makeResourceWithStates "games" [ "XTurn"; "OTurn" ] [ existingTransition ]
@@ -320,7 +321,8 @@ let specCoExtractionTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted }
+                          Constraint = Unrestricted
+                          Safety = Unsafe }
 
                     let resource = makeResourceWithStates "games" [ "XTurn"; "OTurn" ] [ existing ]
                     let result = applySpecTransitions [ doc ] [ resource ]

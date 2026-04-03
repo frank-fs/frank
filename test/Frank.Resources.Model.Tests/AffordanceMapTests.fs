@@ -237,12 +237,14 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted }
+                          Constraint = Unrestricted
+                          Safety = Unsafe }
                         { Event = "makeMove"
                           Source = "OTurn"
                           Target = "XTurn"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               Expect.equal map.Entries.Length 3 "One entry per state"
@@ -275,14 +277,15 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
               let rel = entry.LinkRelations |> List.head |> _.Rel
               Expect.equal rel "make-move" "Event name should be kebab-cased"
 
-          testCase "fromStatechart sets Method to POST for all transitions"
+          testCase "fromStatechart maps unsafe transition (default) to POST method"
           <| fun _ ->
               let sc: ExtractedStatechart =
                   { RouteTemplate = "/orders/{orderId}"
@@ -296,12 +299,35 @@ let affordanceMapTests =
                           Source = "Pending"
                           Target = "Authorized"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
               let methods = entry.LinkRelations |> List.map _.Method
               Expect.allEqual methods "POST" "All transition methods must be POST"
+
+          testCase "fromStatechart maps safe transition to GET method"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "getGame"
+                          Source = "XTurn"
+                          Target = "XTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Safe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              let lr = entry.LinkRelations |> List.head
+              Expect.equal lr.Method "GET" "Safe transition should map to GET"
 
           testCase "fromStatechart AllowedMethods includes GET OPTIONS POST when transitions exist"
           <| fun _ ->
@@ -317,7 +343,8 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -343,6 +370,61 @@ let affordanceMapTests =
               Expect.isFalse (List.contains "POST" entry.AllowedMethods) "POST must not appear when no transitions"
               Expect.isEmpty entry.LinkRelations "No link relations for terminal state"
 
+          testCase "fromStatechart AllowedMethods excludes POST when only safe transitions exist"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "getGame"
+                          Source = "XTurn"
+                          Target = "XTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Safe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              Expect.contains entry.AllowedMethods "GET" "GET required"
+              Expect.contains entry.AllowedMethods "OPTIONS" "OPTIONS required"
+              Expect.isFalse
+                  (List.contains "POST" entry.AllowedMethods)
+                  "POST must not appear when only safe transitions exist"
+
+          testCase
+              "fromStatechart AllowedMethods includes GET and POST when both safe and unsafe transitions exist"
+          <| fun _ ->
+              let sc: ExtractedStatechart =
+                  { RouteTemplate = "/games/{gameId}"
+                    StateNames = [ "XTurn" ]
+                    InitialStateKey = "XTurn"
+                    GuardNames = []
+                    StateMetadata = Map.empty
+                    Roles = []
+                    Transitions =
+                      [ { Event = "getGame"
+                          Source = "XTurn"
+                          Target = "XTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Safe }
+                        { Event = "makeMove"
+                          Source = "XTurn"
+                          Target = "OTurn"
+                          Guard = None
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
+
+              let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
+              let entry = map.Entries |> List.head
+              Expect.contains entry.AllowedMethods "GET" "GET required"
+              Expect.contains entry.AllowedMethods "OPTIONS" "OPTIONS required"
+              Expect.contains entry.AllowedMethods "POST" "POST required when unsafe transitions exist"
+
           testCase "fromStatechart Unrestricted constraint maps to empty Roles"
           <| fun _ ->
               let sc: ExtractedStatechart =
@@ -357,7 +439,8 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
@@ -377,7 +460,8 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = RestrictedTo [ "PlayerX" ] } ] }
+                          Constraint = RestrictedTo [ "PlayerX" ]
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
@@ -397,12 +481,14 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = RestrictedTo [ "PlayerX" ] }
+                          Constraint = RestrictedTo [ "PlayerX" ]
+                          Safety = Unsafe }
                         { Event = "makeMove"
                           Source = "OTurn"
                           Target = "XTurn"
                           Guard = None
-                          Constraint = RestrictedTo [ "PlayerO" ] } ] }
+                          Constraint = RestrictedTo [ "PlayerO" ]
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let xEntry = map.Entries |> List.find (fun e -> e.StateKey = "XTurn")
@@ -456,7 +542,8 @@ let affordanceMapTests =
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
-                          Constraint = Unrestricted } ] }
+                          Constraint = Unrestricted
+                          Safety = Unsafe } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head

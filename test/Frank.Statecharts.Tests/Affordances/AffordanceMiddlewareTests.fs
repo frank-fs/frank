@@ -231,7 +231,7 @@ let preComputeTests =
               Expect.isTrue (allLinks.Contains("rel=\"profile\"")) "Should contain profile"
               Expect.isTrue (allLinks.Contains("rel=\"makeMove\"")) "Should contain makeMove"
               // Allow header should still have GET
-              Expect.equal (entry.AllowHeaderValue.ToString()) "GET, OPTIONS, POST" "Allow should list GET, OPTIONS, and POST"
+              Expect.equal (entry.AllowHeaderValue.ToString()) "GET, HEAD, OPTIONS, POST" "Allow should list GET, HEAD, OPTIONS, and POST"
 
           testCase "omits profile link when ProfileUrl is empty"
           <| fun _ ->
@@ -406,11 +406,11 @@ let preComputeTests =
                   "GET, POST"
                   "Base Allow header should reflect AllowedMethods"
 
-              // Role entry derives Allow from role-visible link methods (GET + OPTIONS always + POST from makeMove)
+              // Role entry derives Allow from role-visible link methods (GET + HEAD + OPTIONS always + POST from makeMove)
               Expect.equal
                   (result.[roleKey].AllowHeaderValue.ToString())
-                  "GET, OPTIONS, POST"
-                  "PlayerX Allow header should include GET, OPTIONS, and POST (from makeMove transition)"
+                  "GET, HEAD, OPTIONS, POST"
+                  "PlayerX Allow header should include GET, HEAD, OPTIONS, and POST (from makeMove transition)"
 
           testCase "Links with Roles=[] appear in all role variants"
           <| fun _ ->
@@ -616,6 +616,6 @@ let roleFilteredMiddlewareTests =
                   .GetResult()
 
               // PlayerX has a role-specific POST transition (makeMove) plus role-agnostic GET (viewGame)
-              Expect.equal playerXAllow "GET, OPTIONS, POST" "PlayerX Allow should include POST (makeMove transition)"
+              Expect.equal playerXAllow "GET, HEAD, OPTIONS, POST" "PlayerX Allow should include POST (makeMove transition)"
               // PlayerO has no role-specific entry; falls back to auth entry with only role-agnostic links (viewGame GET)
-              Expect.equal playerOAllow "GET, OPTIONS" "PlayerO Allow should NOT include POST (no matching role transitions)" ]
+              Expect.equal playerOAllow "GET, HEAD, OPTIONS" "PlayerO Allow should NOT include POST (no matching role transitions)" ]

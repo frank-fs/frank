@@ -387,12 +387,14 @@ let unifiedCacheTests =
                                 Source = "XTurn"
                                 Target = "OTurn"
                                 Guard = Some "TurnGuard"
-                                Constraint = RestrictedTo [ "PlayerX" ] }
+                                Constraint = RestrictedTo [ "PlayerX" ]
+                                Safety = Unsafe }
                               { Event = "MakeMove"
                                 Source = "OTurn"
                                 Target = "XTurn"
                                 Guard = Some "TurnGuard"
-                                Constraint = RestrictedTo [ "PlayerO" ] } ]
+                                Constraint = RestrictedTo [ "PlayerO" ]
+                                Safety = Unsafe } ]
 
                         let roles: RoleInfo list =
                             [ { Name = "PlayerX"; Description = None }

@@ -74,7 +74,7 @@ module AffordancePreCompute =
                 let roleMethods =
                     roleFilteredLinks
                     |> List.map (fun lr -> lr.Method)
-                    |> fun ms -> "GET" :: "OPTIONS" :: ms
+                    |> fun ms -> "GET" :: "HEAD" :: "OPTIONS" :: ms
                     |> List.distinct
                     |> List.sort
 
@@ -104,7 +104,7 @@ module AffordancePreCompute =
                 let authMethods =
                     authFilteredLinks
                     |> List.map (fun lr -> lr.Method)
-                    |> fun ms -> "GET" :: "OPTIONS" :: ms
+                    |> fun ms -> "GET" :: "HEAD" :: "OPTIONS" :: ms
                     |> List.distinct
                     |> List.sort
 

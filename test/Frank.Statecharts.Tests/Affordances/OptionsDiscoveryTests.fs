@@ -134,8 +134,9 @@ let us1Tests =
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
+                          Expect.contains allowHeader "HEAD" "Allow header should contain HEAD"
                           Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
-                          Expect.equal (Set.count allowHeader) 2 "Allow header should contain exactly GET and OPTIONS"
+                          Expect.equal (Set.count allowHeader) 3 "Allow header should contain exactly GET, HEAD, and OPTIONS"
 
                           let! body = response.Content.ReadAsStringAsync()
                           Expect.equal body "" "Response body should be empty"
@@ -309,8 +310,9 @@ let us1Tests =
                           Expect.equal response2.StatusCode HttpStatusCode.NoContent "OPTIONS /health should return 204"
                           let allow2 = response2.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allow2 "GET" "/health Allow should contain GET"
+                          Expect.contains allow2 "HEAD" "/health Allow should contain HEAD"
                           Expect.contains allow2 "OPTIONS" "/health Allow should contain OPTIONS"
-                          Expect.equal (Set.count allow2) 2 "/health Allow should contain exactly GET and OPTIONS"
+                          Expect.equal (Set.count allow2) 3 "/health Allow should contain exactly GET, HEAD, and OPTIONS"
                       })
           } ]
 
@@ -381,8 +383,9 @@ let parameterizedRouteTests =
 
                           let allowHeader = response.Content.Headers.Allow |> Set.ofSeq
                           Expect.contains allowHeader "GET" "Allow header should contain GET"
+                          Expect.contains allowHeader "HEAD" "Allow header should contain HEAD"
                           Expect.contains allowHeader "OPTIONS" "Allow header should contain OPTIONS"
-                          Expect.equal (Set.count allowHeader) 2 "Allow header should contain exactly GET and OPTIONS"
+                          Expect.equal (Set.count allowHeader) 3 "Allow header should contain exactly GET, HEAD, and OPTIONS"
                       })
           } ]
 

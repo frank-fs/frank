@@ -484,12 +484,14 @@ let projectionIntegrationTests =
                                 Source = "XTurn"
                                 Target = "OTurn"
                                 Guard = None
-                                Constraint = RestrictedTo [ "PlayerX" ] }
+                                Constraint = RestrictedTo [ "PlayerX" ]
+                                Safety = Unsafe }
                               { Event = "MakeMove"
                                 Source = "OTurn"
                                 Target = "XTurn"
                                 Guard = None
-                                Constraint = RestrictedTo [ "PlayerO" ] } ] }
+                                Constraint = RestrictedTo [ "PlayerO" ]
+                                Safety = Unsafe } ] }
 
                     let caps =
                         [ { Method = "GET"
