@@ -216,8 +216,14 @@ module AffordanceMap =
     /// Generate an AffordanceMap from an ExtractedStatechart for CE-based apps.
     /// Each transition becomes an AffordanceLinkRelation with Roles derived from RoleConstraint.
     /// Method derived from TransitionSafety: Safe→GET, Unsafe→POST, Idempotent→PUT.
-    /// Rel is the event name converted to kebab-case.
+    /// Rel is an ALPS profile fragment URI: "{profileUrl}#{EventName}".
+    /// Roles with no transitions from a state get a "monitor" GET rel (IANA link relation
+    /// registry; registered via RFC 5765 for SIP but applicable to HTTP observation semantics).
+    /// Terminal states (no transitions for any role) do not generate monitor rels.
     let fromStatechart (baseUri: string) (sc: ExtractedStatechart) : AffordanceMap =
+        if System.String.IsNullOrWhiteSpace(baseUri) then
+            invalidArg (nameof baseUri) "baseUri must be a non-empty URI for ALPS profile fragment construction"
+
         let slug = ResourceModel.resourceSlug sc.RouteTemplate
         let profile = profileUrl baseUri slug
 
@@ -232,7 +238,7 @@ module AffordanceMap =
                         | RestrictedTo [] -> false // dead transition: no role can trigger it
                         | _ -> true)
 
-                let linkRelations =
+                let transitionRels =
                     transitions
                     |> List.map (fun t ->
                         let roles =
@@ -246,11 +252,40 @@ module AffordanceMap =
                             | Unsafe -> "POST"
                             | Idempotent -> "PUT"
 
-                        { AffordanceLinkRelation.Rel = toKebabCase t.Event
+                        { AffordanceLinkRelation.Rel = String.Concat(profile, "#", t.Event)
                           AffordanceLinkRelation.Href = sc.RouteTemplate
                           AffordanceLinkRelation.Method = method
                           AffordanceLinkRelation.Title = None
                           AffordanceLinkRelation.Roles = roles })
+
+                // MayPoll: roles with no transitions from this state get a monitor GET rel.
+                // Only when SOME roles have transitions (not terminal states where nobody acts).
+                let hasUnrestricted = transitions |> List.exists (fun t -> t.Constraint = Unrestricted)
+
+                let monitorRels =
+                    if hasUnrestricted || List.isEmpty transitions then
+                        [] // All roles participate (unrestricted) or terminal state (no actions)
+                    else
+                        let activeRoles =
+                            transitions
+                            |> List.collect (fun t ->
+                                match t.Constraint with
+                                | RestrictedTo roles -> roles
+                                | Unrestricted -> [])
+                            |> Set.ofList
+
+                        sc.Roles
+                        |> List.filter (fun role -> not (activeRoles.Contains role.Name))
+                        |> List.map (fun role ->
+                            { AffordanceLinkRelation.Rel = "monitor"
+                              AffordanceLinkRelation.Href = sc.RouteTemplate
+                              AffordanceLinkRelation.Method = "GET"
+                              AffordanceLinkRelation.Title = Some stateKey
+                              AffordanceLinkRelation.Roles = [ role.Name ] })
+
+                let linkRelations =
+                    if List.isEmpty monitorRels then transitionRels
+                    else transitionRels @ monitorRels
 
                 let allowedMethods =
                     let hasUnsafe = transitions |> List.exists (fun t -> t.Safety = Unsafe)

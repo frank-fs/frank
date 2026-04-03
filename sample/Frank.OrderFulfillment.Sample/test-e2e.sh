@@ -457,11 +457,11 @@ echo "================================================================"
 echo ""
 
 # Same order (o4) in Authorize state:
-# PaymentService GET → Link includes authorize-payment
-check_header "RP-AT2: PaymentService Link includes authorize-payment" "$BASE/orders/o4" "Link" "authorize-payment" "PaymentService"
+# PaymentService GET → Link includes AuthorizePayment (ALPS fragment URI)
+check_header "RP-AT2: PaymentService Link includes AuthorizePayment" "$BASE/orders/o4" "Link" "AuthorizePayment" "PaymentService"
 
-# Customer GET → Link does NOT include authorize-payment
-check_header_absent "RP-AT2: Customer Link excludes authorize-payment" "$BASE/orders/o4" "Link" "authorize-payment" "Customer"
+# Customer GET → Link does NOT include AuthorizePayment
+check_header_absent "RP-AT2: Customer Link excludes AuthorizePayment" "$BASE/orders/o4" "Link" "AuthorizePayment" "Customer"
 
 echo ""
 echo "================================================================"
@@ -501,6 +501,29 @@ else
     echo "  FAIL: RP-AT4: transition counts should differ (Customer=$CUSTOMER_COUNT, PaymentService=$PAYMENT_COUNT)"
     FAIL=$((FAIL + 1))
 fi
+
+echo ""
+echo "================================================================"
+echo "=== ACCEPTANCE TEST: #271 MayPoll + ALPS Link Relations       ==="
+echo "================================================================"
+echo ""
+
+# #271 AT1: MayPoll role gets observation link relation
+# Customer in Authorize state has no transitions — should get rel="monitor" GET link
+check_header "#271 AT1: Customer gets monitor link in Authorize" "$BASE/orders/o3" "Link" 'rel="monitor"' "Customer"
+
+# #271 AT2: MustSelect role still gets transition link relations
+# PaymentService in Authorize has AuthorizePayment transition — gets ALPS fragment URI link
+check_header "#271 AT2: PaymentService gets AuthorizePayment link" "$BASE/orders/o3" "Link" "AuthorizePayment" "PaymentService"
+
+# #271 AT3: Link relation values are valid URIs (ALPS fragment URIs)
+# PaymentService Link should contain alps/orders# (profile fragment URI, not bare kebab-case)
+check_header "#271 AT3: Link rels are ALPS fragment URIs" "$BASE/orders/o3" "Link" "alps/orders#" "PaymentService"
+
+# #271 AT4: Bare kebab-case rels no longer appear
+# Old format "authorize-payment" should not be in any Link header
+check_header_absent "#271 AT4: no bare kebab-case rels (PaymentService)" "$BASE/orders/o3" "Link" "authorize-payment" "PaymentService"
+check_header_absent "#271 AT4: no bare kebab-case rels (Customer)" "$BASE/orders/o3" "Link" "authorize-payment" "Customer"
 
 echo ""
 echo "================================================================"
