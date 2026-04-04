@@ -25,7 +25,7 @@
       "Bash(pkill:*)",
       "Bash(chmod:*)",
       "Bash(bash:*)",
-      "Bash(python3:*)",
+      "Bash(uv:*)",
       "Bash(open:*)",
       "Bash(printf:*)",
       "Bash(test:*)",
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$branch\" = \"master\" ] || [ \"$branch\" = \"main\" ]; then echo 'BLOCKED: Cannot edit files on master. Create a worktree first:' >&2; echo '  git worktree add .worktrees/<name> -b <branch>' >&2; exit 2; fi"
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); repo_root=$(git rev-parse --show-toplevel 2>/dev/null); file=\"$TOOL_INPUT_FILE_PATH\"; case \"$file\" in \"$repo_root\"/*) if [ \"$branch\" = \"master\" ] || [ \"$branch\" = \"main\" ]; then echo \"BLOCKED: Cannot edit files on master. Create a worktree first:\" >&2; echo \"  git worktree add .worktrees/<name> -b <branch>\" >&2; exit 2; fi;; esac"
           }
         ]
       }
