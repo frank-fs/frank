@@ -110,6 +110,7 @@ These principles govern all code changes.
 - **Never triage expert findings without consent.** When presenting expert review results, all findings are potentially blocking until the user says otherwise. Do not sort into "fix now" vs "follow-up" or "framework bug" vs "sample issue" — present them and let the user decide.
 
 ### Implementation
+- **Never hide AST round-trip lossiness.** If a format parser encounters a field that has no home in `TransitionEdge`/`StateNode`/`StatechartDocument`, that is a gap in the AST — report it, don't silently drop data. Format-specific visual styling (smcat colors) goes in annotations. Semantic information (roles, payload types, composite kinds) must be first-class AST fields. Round-trip tests (parse → AST → generate same format) are required for every format; any information loss is a failing test.
 - **Never blame pre-existing issues.** Surface, investigate, and file issues. Never dismiss problems as "not my change."
 - **Portable concept filter.** When scoping work, ask: "Is this a portable concept or an F#-specific detail?" Portable concepts (statechart semantics, ALPS discovery, affordance projection) get full investment. F#-specific details (CE syntax, DU encoding, .NET middleware) are implemented but not over-invested.
 - **No lightweight API.** Never suggest a simplified `frank.get "/path" handler` alternative. The CE is the design. On-ramp is solved by docs/examples.
