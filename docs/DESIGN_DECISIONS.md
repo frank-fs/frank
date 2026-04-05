@@ -34,7 +34,7 @@ let authorizeToFulfilling<'r> (lca: string) (alg: TransitionAlgebra<'r>) : 'r =
 
 **1b. Does Enter handle composite entry recursively, or does the program explicitly call Fork?**
 
-**Decision**: Option B — Explicit Fork in algebra programs. However, the CE auto-generates algebra programs from `transition` declarations using the known hierarchy, so users don't write Fork manually for standard transitions. `onTransition` is the escape hatch for custom transition logic beyond standard hierarchy traversal.
+**Decision**: Option B — Explicit Fork in algebra programs. The CE auto-generates algebra programs from `transition` declarations using the known hierarchy, so users never write Fork manually. Customization happens through interpreters, not custom programs (see Decision 4).
 
 **Rationale**: Explicit Fork is correct at the algebra level — the DualAlgebra needs to see Fork to accumulate per-region obligations, and interpreters shouldn't hide behavior. But requiring users to hand-write Fork in CE code is a pit of failure (three ways to get it wrong: forget Fork, wrong children, forget child Enter). The synthesis: the CE knows the hierarchy and auto-generates correct programs with Fork included. The algebra is explicit; the CE is the pit of success.
 
@@ -46,9 +46,6 @@ transition PlaceOrder Authorize Fulfilling Unrestricted
 // alg.Exit "Authorize" |> alg.Sequence (alg.Enter "Fulfilling")
 //   |> alg.Sequence (alg.Fork ["Pick"; "Pack"; "Ship"])
 //   |> alg.Sequence (alg.Enter "Picking") |> ...
-
-// Escape hatch for custom logic (validated at startup):
-onTransition PlaceOrder (fun lca alg -> ...)
 ```
 
 **1c. Is 'r always unit, or does it vary per interpreter?**
