@@ -26,7 +26,9 @@ let private mkTransition event source target guard roleConstraint =
       Target = target
       Guard = guard
       Constraint = roleConstraint
-      Safety = Unsafe }
+      Safety = Unsafe
+      SenderRole = None
+      ReceiverRole = None }
 
 // ---------------------------------------------------------------------------
 // Minimal flat statechart fixture (XTurn -> OTurn -> XWins, 2 roles)

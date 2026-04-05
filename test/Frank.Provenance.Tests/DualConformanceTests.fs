@@ -16,7 +16,9 @@ let private mkTransition event source target guard roleConstraint =
       Target = target
       Guard = guard
       Constraint = roleConstraint
-      Safety = Unsafe }
+      Safety = Unsafe
+      SenderRole = None
+      ReceiverRole = None }
 
 let private now = DateTimeOffset(2026, 3, 28, 12, 0, 0, TimeSpan.Zero)
 

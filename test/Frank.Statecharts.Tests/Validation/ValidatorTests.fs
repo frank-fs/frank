@@ -41,6 +41,9 @@ let makeDocument (stateIds: string list) (transitions: (string * string option *
                   GuardHref = None
                   Action = None
                   Parameters = []
+                  SenderRole = None
+                  ReceiverRole = None
+                  PayloadType = None
                   Position = None
                   Annotations = [] })
 

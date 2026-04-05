@@ -25,6 +25,9 @@ let makeTransition source target event =
       GuardHref = None
       Action = None
       Parameters = []
+      SenderRole = None
+      ReceiverRole = None
+      PayloadType = None
       Position = None
       Annotations = [] }
 

@@ -27,6 +27,9 @@ let private mkMessage sender receiver style dir label parameters =
       GuardHref = None
       Action = None
       Parameters = parameters
+      SenderRole = None
+      ReceiverRole = None
+      PayloadType = None
       Position = Some pos
       Annotations = [ WsdAnnotation(WsdTransitionStyle { ArrowStyle = style; Direction = dir }) ] }
 

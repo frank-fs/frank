@@ -242,6 +242,9 @@ and StateNode =
       Annotations: Annotation list }
 
 /// A directed edge between states (FR-003).
+/// SenderRole, ReceiverRole, and PayloadType are protocol-layer metadata
+/// from communication-oriented formats (WSD, Scribble), not statechart-intrinsic
+/// properties. They are None for all statechart-native formats (SCXML, smcat, XState).
 and TransitionEdge =
     { Source: string
       Target: string option
@@ -250,6 +253,9 @@ and TransitionEdge =
       GuardHref: string option
       Action: string option
       Parameters: string list
+      SenderRole: string option
+      ReceiverRole: string option
+      PayloadType: string option
       Position: SourcePosition option
       Annotations: Annotation list }
 

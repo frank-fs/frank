@@ -412,7 +412,19 @@ let edgeCaseTests =
               let result = parseString xml
               let states = stateDecls result.Document
               Expect.equal states.Length 1 "one state"
-              Expect.equal states.[0].Identifier (Some "s1") "state id" ]
+              Expect.equal states.[0].Identifier (Some "s1") "state id"
+
+          // === AC-2: Non-WSD parsers default SenderRole/ReceiverRole/PayloadType to None (issue #307) ===
+          testCase "AC-2: SCXML transition has SenderRole = None, ReceiverRole = None, PayloadType = None"
+          <| fun _ ->
+              let xml =
+                  """<?xml version="1.0"?><scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle"><state id="idle"><transition event="submit" target="submitted"/></state><state id="submitted"/></scxml>"""
+              let result = parseString xml
+              Expect.isEmpty result.Errors "no parse errors"
+              let t = (transitionsFrom "idle" result.Document).[0]
+              Expect.isNone t.SenderRole "SenderRole = None for SCXML (no participant semantics)"
+              Expect.isNone t.ReceiverRole "ReceiverRole = None for SCXML (no participant semantics)"
+              Expect.isNone t.PayloadType "PayloadType = None for SCXML" ]
 
 // === User Story 3: Data Model Parsing (T022) ===
 

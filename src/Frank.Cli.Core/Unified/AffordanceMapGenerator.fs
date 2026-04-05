@@ -23,15 +23,7 @@ let compositeKey (routeTemplate: string) (stateKey: string) : string =
 /// "/games/{gameId}" -> "games", "/health" -> "health",
 /// "/api/v1/games/{id}" -> "api-v1-games"
 let deriveSlug (routeTemplate: string) : string =
-    let segments =
-        routeTemplate.TrimStart('/').Split('/')
-        |> Array.filter (fun s -> not (s.StartsWith("{") && s.EndsWith("}")))
-        |> Array.filter (fun s -> not (String.IsNullOrWhiteSpace s))
-
-    match segments with
-    | [||] -> "root"
-    | [| single |] -> single
-    | multiple -> String.Join("-", multiple)
+    ResourceModel.resourceSlug routeTemplate
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Entry Generation (T032)

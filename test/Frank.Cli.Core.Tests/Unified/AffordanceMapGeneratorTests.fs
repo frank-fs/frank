@@ -169,7 +169,7 @@ let affordanceMapGeneratorTests =
                 testCase "root route"
                 <| fun _ ->
                     let slug = AffordanceMapGenerator.deriveSlug "/"
-                    Expect.equal slug "root" "Root route" ]
+                    Expect.equal slug "resource" "Root route" ]
 
           testList
               "generate - structure"

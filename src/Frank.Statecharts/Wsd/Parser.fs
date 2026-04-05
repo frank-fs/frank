@@ -314,12 +314,16 @@ let private parseMessage (state: ParserState) : unit =
                   GuardHref = None
                   Action = None
                   Parameters = parameters
+                  SenderRole = Some senderName
+                  ReceiverRole = Some receiverName
+                  PayloadType = None
                   Position = Some senderToken.Position
                   Annotations =
-                      [ WsdAnnotation(
-                            WsdTransitionStyle
-                                { ArrowStyle = arrowStyle
-                                  Direction = direction }) ] }
+                    [ WsdAnnotation(
+                          WsdTransitionStyle
+                              { ArrowStyle = arrowStyle
+                                Direction = direction }
+                      ) ] }
 
             state.Elements <- TransitionElement transitionEdge :: state.Elements
             skipToNewline state
@@ -394,13 +398,21 @@ let private parseTitleDirective (state: ParserState) : unit =
         addWarning state startToken.Position "Duplicate title directive" (Some "Remove the duplicate title")
 
     state.Title <- Some titleText
-    state.Elements <- DirectiveElement(TitleDirective(titleText, Some startToken.Position)) :: state.Elements
+
+    state.Elements <-
+        DirectiveElement(TitleDirective(titleText, Some startToken.Position))
+        :: state.Elements
+
     skipToNewline state
 
 let private parseAutoNumberDirective (state: ParserState) : unit =
     let startToken = advance state // consume AutoNumber keyword
     state.AutoNumber <- true
-    state.Elements <- DirectiveElement(AutoNumberDirective(Some startToken.Position)) :: state.Elements
+
+    state.Elements <-
+        DirectiveElement(AutoNumberDirective(Some startToken.Position))
+        :: state.Elements
+
     skipToNewline state
 
 // T022: Note parsing with WP06 guard parser integration

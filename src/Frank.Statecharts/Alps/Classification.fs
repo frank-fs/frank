@@ -294,6 +294,9 @@ let extractTransitions
                   GuardHref = extractGuardHref r.Extensions
                   Action = None
                   Parameters = extractParameters r.Children
+                  SenderRole = None
+                  ReceiverRole = None
+                  PayloadType = None
                   Position = None
                   Annotations = buildTransitionAnnotations kind child r }
         | _ -> None)

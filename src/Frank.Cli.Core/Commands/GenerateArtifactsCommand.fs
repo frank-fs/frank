@@ -127,19 +127,19 @@ let execute
                         | Some name ->
                             machines
                             |> List.filter (fun m ->
-                                let slug = FormatPipeline.resourceSlug m.RouteTemplate
+                                let slug = ResourceModel.resourceSlug m.RouteTemplate
                                 slug = name || m.RouteTemplate.Contains(name))
 
                     match resourceFilter, filtered with
                     | Some name, [] ->
                         let available =
-                            machines |> List.map (fun m -> FormatPipeline.resourceSlug m.RouteTemplate)
+                            machines |> List.map (fun m -> ResourceModel.resourceSlug m.RouteTemplate)
 
                         return Error(ResourceNotFound(name, available))
                     | _ ->
                         let formatResults =
                             [ for m in filtered do
-                                  let slug = FormatPipeline.resourceSlug m.RouteTemplate
+                                  let slug = ResourceModel.resourceSlug m.RouteTemplate
 
                                   for fmt in formats do
                                       match FormatPipeline.generateFormatFromExtracted fmt slug m with

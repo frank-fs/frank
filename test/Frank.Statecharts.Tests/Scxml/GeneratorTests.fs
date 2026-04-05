@@ -92,7 +92,7 @@ let generatorTests =
                         TransitionElement
                             { Source = "active"; Target = Some "submitted"
                               Event = Some "submit"; Guard = Some "isValid"; GuardHref = None
-                              Action = None; Parameters = []; Position = None; Annotations = [] } ]
+                              Action = None; Parameters = []; SenderRole = None; ReceiverRole = None; PayloadType = None; Position = None; Annotations = [] } ]
                     DataEntries = []
                     Annotations = [] }
 
@@ -245,7 +245,7 @@ let generatorAdvancedTests =
                         TransitionElement
                             { Source = "s1"; Target = Some "s1"
                               Event = Some "tick"; Guard = None; GuardHref = None
-                              Action = None; Parameters = []; Position = None
+                              Action = None; Parameters = []; SenderRole = None; ReceiverRole = None; PayloadType = None; Position = None
                               Annotations = [ ScxmlAnnotation(ScxmlTransitionType(true)) ] } ]
                     DataEntries = []
                     Annotations = [] }
@@ -272,7 +272,7 @@ let generatorAdvancedTests =
                         TransitionElement
                             { Source = "s1"; Target = Some "s2"
                               Event = Some "fork"; Guard = None; GuardHref = None
-                              Action = None; Parameters = []; Position = None
+                              Action = None; Parameters = []; SenderRole = None; ReceiverRole = None; PayloadType = None; Position = None
                               Annotations = [ ScxmlAnnotation(ScxmlMultiTarget([ "s2"; "s3" ])) ] } ]
                     DataEntries = []
                     Annotations = [] }

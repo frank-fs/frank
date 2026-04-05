@@ -475,4 +475,16 @@ participant Client
               let clientDecls =
                   stateDecls result |> List.filter (fun s -> s.Identifier = Some "Client")
 
-              Expect.isGreaterThanOrEqual clientDecls.Length 1 "Client appears as declared" ]
+              Expect.isGreaterThanOrEqual clientDecls.Length 1 "Client appears as declared"
+
+          // === AC-1: SenderRole and ReceiverRole populated from WSD participants (issue #307) ===
+          testCase "AC-1: WSD message populates SenderRole and ReceiverRole on TransitionEdge"
+          <| fun _ ->
+              let result = parseWsd "Client->Server: doThing\n"
+              Expect.isEmpty result.Errors "no errors"
+              let edges = transitions result
+              Expect.hasLength edges 1 "one transition"
+              let edge = edges.[0]
+              Expect.equal edge.SenderRole (Some "Client") "SenderRole = Client"
+              Expect.equal edge.ReceiverRole (Some "Server") "ReceiverRole = Server"
+              Expect.isNone edge.PayloadType "PayloadType = None (WSD has no payload type syntax)" ]

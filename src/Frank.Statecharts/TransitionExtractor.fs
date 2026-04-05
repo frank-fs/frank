@@ -54,5 +54,7 @@ let extract (doc: StatechartDocument) : TransitionSpec list =
                   Target = edge.Target |> Option.defaultValue edge.Source
                   Guard = edge.Guard
                   Constraint = resolveConstraint edge.Annotations
-                  Safety = Unsafe }
+                  Safety = Unsafe
+                  SenderRole = edge.SenderRole
+                  ReceiverRole = edge.ReceiverRole }
         | _ -> None)

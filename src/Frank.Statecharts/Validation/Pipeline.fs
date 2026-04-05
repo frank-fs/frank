@@ -6,8 +6,11 @@ open Frank.Statecharts.Ast
 module Pipeline =
 
     let private emptyReport =
-        { TotalChecks = 0; TotalSkipped = 0; TotalFailures = 0
-          Checks = []; Failures = [] }
+        { TotalChecks = 0
+          TotalSkipped = 0
+          TotalFailures = 0
+          Checks = []
+          Failures = [] }
 
     /// Look up the parser function for a given format tag.
     /// Returns None for formats with no registered parser (e.g., XState).
@@ -24,16 +27,21 @@ module Pipeline =
     /// (FormatParseResult * FormatArtifact) on success or a PipelineError.
     let private parseSource (tag: FormatTag) (source: string) =
         match parserFor tag with
-        | None -> Error (UnsupportedFormat tag)
+        | None -> Error(UnsupportedFormat tag)
         | Some parser ->
             let result = parser source
+
             let pr =
                 { Format = tag
                   Errors = result.Errors
                   Warnings = result.Warnings
                   Succeeded = List.isEmpty result.Errors }
-            let art = { Format = tag; Document = result.Document }
-            Ok (pr, art)
+
+            let art =
+                { Format = tag
+                  Document = result.Document }
+
+            Ok(pr, art)
 
     /// Validate format sources with custom rules prepended to built-in rules.
     let validateSourcesWithRules
@@ -41,7 +49,9 @@ module Pipeline =
         (sources: (FormatTag * string) list)
         : PipelineResult =
         if List.isEmpty sources then
-            { ParseResults = []; Report = emptyReport; Errors = [] }
+            { ParseResults = []
+              Report = emptyReport
+              Errors = [] }
         else
             let duplicates =
                 sources
@@ -51,13 +61,15 @@ module Pipeline =
                 |> List.map (fun (tag, _) -> DuplicateFormat tag)
 
             if not (List.isEmpty duplicates) then
-                { ParseResults = []; Report = emptyReport; Errors = duplicates }
+                { ParseResults = []
+                  Report = emptyReport
+                  Errors = duplicates }
             else
                 let parseResults, artifacts, pipelineErrors =
                     (([], [], []), sources)
                     ||> List.fold (fun (prs, arts, errs) (tag, source) ->
                         match parseSource tag source with
-                        | Ok (pr, art) -> (pr :: prs, art :: arts, errs)
+                        | Ok(pr, art) -> (pr :: prs, art :: arts, errs)
                         | Error e -> (prs, arts, e :: errs))
                     |> fun (prs, arts, errs) -> (List.rev prs, List.rev arts, List.rev errs)
 
@@ -69,8 +81,7 @@ module Pipeline =
                   Errors = pipelineErrors }
 
     /// Validate format sources using built-in self-consistency and cross-format rules.
-    let validateSources (sources: (FormatTag * string) list) : PipelineResult =
-        validateSourcesWithRules [] sources
+    let validateSources (sources: (FormatTag * string) list) : PipelineResult = validateSourcesWithRules [] sources
 
     // -------------------------------------------------------------------------
     // T007 – Format priority (lower number = higher priority; wins on conflict)
@@ -90,7 +101,7 @@ module Pipeline =
     // -------------------------------------------------------------------------
 
     /// Empty document used as the identity element for the merge fold.
-    let private emptyDocument : StatechartDocument =
+    let private emptyDocument: StatechartDocument =
         { Title = None
           InitialStateId = None
           Elements = []
@@ -115,7 +126,8 @@ module Pipeline =
     let private otherElementsOf (doc: StatechartDocument) : StatechartElement list =
         doc.Elements
         |> List.filter (function
-            | StateDecl _ | TransitionElement _ -> false
+            | StateDecl _
+            | TransitionElement _ -> false
             | _ -> true)
 
     /// Merge two StateNode values: keep structural fields from base (higher priority),
@@ -123,8 +135,8 @@ module Pipeline =
     let private mergeState (base': StateNode) (enriching: StateNode) : StateNode =
         { base' with
             // Fill None fields from enriching (enrichment, not override)
-            Label = match base'.Label with Some _ -> base'.Label | None -> enriching.Label
-            Activities = match base'.Activities with Some _ -> base'.Activities | None -> enriching.Activities
+            Label = base'.Label |> Option.orElse enriching.Label
+            Activities = base'.Activities |> Option.orElse enriching.Activities
             // Structural fields (Kind, Children) stay with base (higher priority)
             // Annotations accumulate from both
             Annotations = base'.Annotations @ enriching.Annotations }
@@ -134,15 +146,22 @@ module Pipeline =
     let private mergeTransition (base': TransitionEdge) (enriching: TransitionEdge) : TransitionEdge =
         { base' with
             // Fill None fields from enriching
-            Guard = match base'.Guard with Some _ -> base'.Guard | None -> enriching.Guard
-            Action = match base'.Action with Some _ -> base'.Action | None -> enriching.Action
+            Guard = base'.Guard |> Option.orElse enriching.Guard
+            GuardHref = base'.GuardHref |> Option.orElse enriching.GuardHref
+            Action = base'.Action |> Option.orElse enriching.Action
+            SenderRole = base'.SenderRole |> Option.orElse enriching.SenderRole
+            ReceiverRole = base'.ReceiverRole |> Option.orElse enriching.ReceiverRole
+            PayloadType = base'.PayloadType |> Option.orElse enriching.PayloadType
             // Annotations accumulate
             Annotations = base'.Annotations @ enriching.Annotations }
 
     /// Merge DataEntry lists: union by Name, preferring base entries on conflict.
     let private mergeDataEntries (base': DataEntry list) (enriching: DataEntry list) : DataEntry list =
         let baseNames = base' |> List.map (fun d -> d.Name) |> Set.ofList
-        let newEntries = enriching |> List.filter (fun d -> not (Set.contains d.Name baseNames))
+
+        let newEntries =
+            enriching |> List.filter (fun d -> not (Set.contains d.Name baseNames))
+
         base' @ newEntries
 
     /// Core two-document merge: base wins on structural conflict,
@@ -170,10 +189,7 @@ module Pipeline =
                 | None -> s)
 
         // Collect identifiers already covered by the base
-        let baseStateIds =
-            baseStates
-            |> List.choose (fun s -> s.Identifier)
-            |> Set.ofList
+        let baseStateIds = baseStates |> List.choose (fun s -> s.Identifier) |> Set.ofList
 
         // Add unmatched states from enriching doc (T011: union for non-overlapping)
         let unmatchedEnrichingStates =
@@ -181,7 +197,7 @@ module Pipeline =
             |> List.filter (fun s ->
                 match s.Identifier with
                 | Some id -> not (Set.contains id baseStateIds)
-                | None -> true)  // anonymous states always added
+                | None -> true) // anonymous states always added
 
         let allStates = mergedBaseStates @ unmatchedEnrichingStates
 
@@ -193,9 +209,7 @@ module Pipeline =
         let transitionKey (t: TransitionEdge) = (t.Source, t.Target, t.Event)
 
         let enrichingTransitionMap =
-            enrichingTransitions
-            |> List.map (fun t -> transitionKey t, t)
-            |> Map.ofList
+            enrichingTransitions |> List.map (fun t -> transitionKey t, t) |> Map.ofList
 
         let mergedBaseTransitions =
             baseTransitions
@@ -204,10 +218,7 @@ module Pipeline =
                 | Some enrichingT -> mergeTransition t enrichingT
                 | None -> t)
 
-        let baseTransitionKeys =
-            baseTransitions
-            |> List.map transitionKey
-            |> Set.ofList
+        let baseTransitionKeys = baseTransitions |> List.map transitionKey |> Set.ofList
 
         let unmatchedEnrichingTransitions =
             enrichingTransitions
@@ -225,8 +236,8 @@ module Pipeline =
             @ otherElements
 
         // --- Document-level fields ---
-        { Title = match base'.Title with Some _ -> base'.Title | None -> enriching.Title
-          InitialStateId = match base'.InitialStateId with Some _ -> base'.InitialStateId | None -> enriching.InitialStateId
+        { Title = base'.Title |> Option.orElse enriching.Title
+          InitialStateId = base'.InitialStateId |> Option.orElse enriching.InitialStateId
           Elements = allElements
           DataEntries = mergeDataEntries base'.DataEntries enriching.DataEntries
           Annotations = base'.Annotations @ enriching.Annotations }
@@ -253,17 +264,23 @@ module Pipeline =
                 sources
                 |> List.map (fun (tag, source) ->
                     match parserFor tag with
-                    | Some parser -> Ok (tag, (parser source).Document)
-                    | None -> Error (UnsupportedFormat tag))
+                    | Some parser -> Ok(tag, (parser source).Document)
+                    | None -> Error(UnsupportedFormat tag))
 
             let errors =
-                parsedOrErrors |> List.choose (function Error e -> Some e | Ok _ -> None)
+                parsedOrErrors
+                |> List.choose (function
+                    | Error e -> Some e
+                    | Ok _ -> None)
 
             if not (List.isEmpty errors) then
                 Error errors
             else
                 let parsed =
-                    parsedOrErrors |> List.choose (function Ok v -> Some v | Error _ -> None)
+                    parsedOrErrors
+                    |> List.choose (function
+                        | Ok v -> Some v
+                        | Error _ -> None)
 
                 // Sort by priority ascending so the highest-priority format is first
                 let sorted = parsed |> List.sortBy (fun (tag, _) -> formatPriority tag)

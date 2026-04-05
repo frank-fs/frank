@@ -17,30 +17,35 @@ type StateInfo =
 /// would create a circular dependency; moving to Frank.Statecharts.Core would force
 /// Frank.Resources.Model to take a dependency on it, breaking its zero-dep guarantee.
 ///
-/// Design trade-off: does not carry XOR/AND composite kind information.
-/// This is sufficient for current analyses (livelock detection only needs
-/// "do descendants progress?" which is answerable from containment alone)
-/// but insufficient for richer analyses that require distinguishing exclusive
-/// vs parallel composition (e.g., AND-state synchronization checks).
-/// The full CompositeKind is available in Frank.Statecharts.StateHierarchy
-/// for analyses that need it.
+/// XOR (exclusive) vs AND (parallel) composite state classification.
+/// Intentional duplication of Frank.Statecharts.CompositeKind (2 lines)
+/// to preserve Frank.Resources.Model's zero-dependency guarantee.
+type CompositeKind =
+    | XOR
+    | AND
+
 type StateContainment =
     {
         /// Parent state -> ordered list of child states.
         ParentOf: Map<string, string list>
         /// Child state -> parent state.
         ChildOf: Map<string, string>
+        /// Composite state -> XOR or AND classification.
+        CompositeKinds: Map<string, CompositeKind>
     }
 
 module StateContainment =
 
     let empty: StateContainment =
         { ParentOf = Map.empty
-          ChildOf = Map.empty }
+          ChildOf = Map.empty
+          CompositeKinds = Map.empty }
 
     let isEmpty (c: StateContainment) : bool = Map.isEmpty c.ParentOf
 
-    /// Build a StateContainment from a list of (parent, children) pairs.
+    /// Build a StateContainment from (parent, children) pairs.
+    /// CompositeKinds is left empty; callers with composite kind
+    /// information should set it via record-with syntax.
     let ofPairs (pairs: (string * string list) list) : StateContainment =
         let parentOf = pairs |> Map.ofList
 
@@ -50,7 +55,8 @@ module StateContainment =
             |> Map.ofList
 
         { ParentOf = parentOf
-          ChildOf = childOf }
+          ChildOf = childOf
+          CompositeKinds = Map.empty }
 
     /// Get all children of a state (empty if atomic).
     let children (state: string) (c: StateContainment) : string list =
@@ -145,6 +151,10 @@ type TransitionSpec =
         Constraint: RoleConstraint
         /// HTTP method safety classification. Default: Unsafe (POST).
         Safety: TransitionSafety
+        /// Who initiates this transition (participant name from WSD/Scribble).
+        SenderRole: string option
+        /// Who is affected by this transition (participant name from WSD/Scribble).
+        ReceiverRole: string option
     }
 
 /// Structured representation of a single stateful resource extracted from source.
@@ -227,18 +237,14 @@ type UnifiedExtractionState =
 module ResourceModel =
 
     /// Derive a filename-safe slug from a route template.
-    /// "/games/{gameId}" -> "games", "/health" -> "health"
+    /// "/games/{id}" -> "games", "/api/orders/{orderId}" -> "api-orders"
     let resourceSlug (routeTemplate: string) : string =
         routeTemplate.TrimStart('/')
-        |> fun s ->
-            match s.IndexOf('/') with
-            | -1 -> s
-            | i -> s.Substring(0, i)
-        |> fun s ->
-            match s.IndexOf('{') with
-            | -1 -> s
-            | i -> s.Substring(0, i).TrimEnd('/')
-        |> fun s -> if String.IsNullOrEmpty(s) then "root" else s
+        |> _.Split('/')
+        |> Array.filter (fun s -> not (s.StartsWith("{") && s.EndsWith("}")))
+        |> Array.map (fun s -> s.Replace(" ", "-"))
+        |> String.concat "-"
+        |> fun s -> if String.IsNullOrEmpty(s) then "resource" else s
 
     /// Empty derived fields for resources without statecharts.
     let emptyDerivedFields: DerivedResourceFields =

@@ -17,7 +17,9 @@ let private mkTransition event source target guard roleConstraint =
       Target = target
       Guard = guard
       Constraint = roleConstraint
-      Safety = Unsafe }
+      Safety = Unsafe
+      SenderRole = None
+      ReceiverRole = None }
 
 /// Helper: look up annotations for a specific (role, state) pair.
 let private annotationsFor role state (result: DeriveResult) =

@@ -114,23 +114,25 @@ type StateHandlers<'State when 'State: equality> =
 
 /// Event fired after a successful state transition.
 type TransitionEvent<'State, 'Event, 'Context> =
-    { PreviousState: 'State
-      PreviousContext: 'Context
-      NewState: 'State
-      NewContext: 'Context
-      /// The event that triggered the transition.
-      /// None for hierarchy operations (CompleteRegion, RecoverHistory) that are not
-      /// driven by a domain event — using None instead of Unchecked.defaultof avoids
-      /// null reference exceptions in observers that inspect this field.
-      Event: 'Event option
-      Timestamp: DateTimeOffset
-      User: ClaimsPrincipal option
-      /// States exited in LCA-based order (source up to but not including LCA).
-      /// Empty for flat FSM resources (no hierarchy configured).
-      ExitedStates: string list
-      /// States entered in LCA-based order (LCA down to target).
-      /// Empty for flat FSM resources (no hierarchy configured).
-      EnteredStates: string list }
+    {
+        PreviousState: 'State
+        PreviousContext: 'Context
+        NewState: 'State
+        NewContext: 'Context
+        /// The event that triggered the transition.
+        /// None for hierarchy operations (CompleteRegion, RecoverHistory) that are not
+        /// driven by a domain event — using None instead of Unchecked.defaultof avoids
+        /// null reference exceptions in observers that inspect this field.
+        Event: 'Event option
+        Timestamp: DateTimeOffset
+        User: ClaimsPrincipal option
+        /// States exited in LCA-based order (source up to but not including LCA).
+        /// Empty for flat FSM resources (no hierarchy configured).
+        ExitedStates: string list
+        /// States entered in LCA-based order (LCA down to target).
+        /// Empty for flat FSM resources (no hierarchy configured).
+        EnteredStates: string list
+    }
 
 /// Accumulator for the statefulResource CE.
 type StatefulResourceSpec<'State, 'Event, 'Context when 'State: equality and 'State: comparison> =
@@ -265,7 +267,9 @@ type StatefulResourceBuilder(routeTemplate: string) =
                   Target = StateKeyExtractor.keyOf target
                   Guard = None
                   Constraint = roleConstraint
-                  Safety = safety }
+                  Safety = safety
+                  SenderRole = None
+                  ReceiverRole = None }
                 :: spec.TransitionDeclarations }
 
     /// Declare an MPST role-constrained transition. Default safety: Unsafe (POST).
@@ -377,7 +381,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 StateHierarchy.build
                     { States =
                         [ { Id = "__root__"
-                            Kind = XOR
+                            Kind = Frank.Statecharts.CompositeKind.XOR
                             Children = stateKeys
                             InitialChild = Some initialStateKey
                             CompletionTarget = None } ] }
@@ -539,8 +543,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                 let userRoles = ctx.GetRoles()
 
                 spec.TransitionDeclarations
-                |> List.exists (fun t ->
-                    t.Source = currentStateKey && constraintAllowsRoles userRoles t.Constraint)
+                |> List.exists (fun t -> t.Source = currentStateKey && constraintAllowsRoles userRoles t.Constraint)
 
         // Pure computation: determines what save (if any) and result to produce.
         // Extracted from task body to avoid FS3511 in Release builds (complex match
@@ -557,100 +560,99 @@ type StatefulResourceBuilder(routeTemplate: string) =
                     None, TransitionAttemptResult.Blocked Forbidden
                 else
 
-                let currentConfig, currentHistory =
-                    match ctx.GetHierarchyFeature() with
-                    | Some f -> f.ActiveConfiguration, f.History
-                    | None ->
-                        (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add currentStateKey),
-                        HistoryRecord.empty
+                    let currentConfig, currentHistory =
+                        match ctx.GetHierarchyFeature() with
+                        | Some f -> f.ActiveConfiguration, f.History
+                        | None ->
+                            (ActiveStateConfiguration.empty |> ActiveStateConfiguration.add currentStateKey),
+                            HistoryRecord.empty
 
-                let currentState = feature.State.Value
-                let currentContext = feature.Context.Value
+                    let currentState = feature.State.Value
+                    let currentContext = feature.Context.Value
 
-                match op with
-                | CompleteRegion(activeStateKey, doneStateKey) ->
-                    let regionResult =
-                        HierarchicalRuntime.transition
-                            hierarchy
-                            currentConfig
-                            activeStateKey
-                            doneStateKey
-                            currentHistory
-
-                    // Check if the AND composite owning this region is now complete.
-                    // If so, fire the completion target transition automatically.
-                    let finalResult, finalState =
-                        match HierarchicalRuntime.findCompletionTarget hierarchy doneStateKey with
-                        | Some(compositeId, targetKey) when
-                            HierarchicalRuntime.isCompositeComplete
+                    match op with
+                    | CompleteRegion(activeStateKey, doneStateKey) ->
+                        let regionResult =
+                            HierarchicalRuntime.transition
                                 hierarchy
-                                regionResult.Configuration
-                                compositeId
-                                finalStates
-                            ->
-                            let r2 =
-                                HierarchicalRuntime.transition
+                                currentConfig
+                                activeStateKey
+                                doneStateKey
+                                currentHistory
+
+                        // Check if the AND composite owning this region is now complete.
+                        // If so, fire the completion target transition automatically.
+                        let finalResult, finalState =
+                            match HierarchicalRuntime.findCompletionTarget hierarchy doneStateKey with
+                            | Some(compositeId, targetKey) when
+                                HierarchicalRuntime.isCompositeComplete
                                     hierarchy
                                     regionResult.Configuration
                                     compositeId
-                                    targetKey
-                                    regionResult.HistoryRecord
+                                    finalStates
+                                ->
+                                let r2 =
+                                    HierarchicalRuntime.transition
+                                        hierarchy
+                                        regionResult.Configuration
+                                        compositeId
+                                        targetKey
+                                        regionResult.HistoryRecord
 
-                            r2, (Map.tryFind targetKey reverseKeyMap |> Option.defaultValue currentState)
-                        | _ -> regionResult, currentState
-
-                    let snapshot: InstanceSnapshot<'S, 'C> =
-                        { State = finalState
-                          Context = currentContext
-                          HierarchyConfig = finalResult.Configuration
-                          HistoryRecord = finalResult.HistoryRecord }
-
-                    let evt: TransitionEvent<'S, 'E, 'C> =
-                        { PreviousState = currentState
-                          PreviousContext = currentContext
-                          NewState = finalState
-                          NewContext = currentContext
-                          Event = None
-                          Timestamp = DateTimeOffset.UtcNow
-                          User = if isNull (box ctx.User) then None else Some ctx.User
-                          ExitedStates = finalResult.ExitedStates
-                          EnteredStates = finalResult.EnteredStates }
-
-                    Some snapshot, TransitionAttemptResult.Succeeded(box evt)
-
-                | RecoverHistory(compositeId, kind) ->
-                    let targetConfig =
-                        HierarchicalRuntime.enterWithHistory hierarchy kind compositeId currentConfig currentHistory
-
-                    match HierarchicalRuntime.leafState hierarchy targetConfig with
-                    | Some leafKey ->
-                        let sourceKey = stateKey currentState
-
-                        let hResult =
-                            HierarchicalRuntime.transition hierarchy currentConfig sourceKey leafKey currentHistory
-
-                        let newState =
-                            Map.tryFind leafKey reverseKeyMap |> Option.defaultValue currentState
+                                r2, (Map.tryFind targetKey reverseKeyMap |> Option.defaultValue currentState)
+                            | _ -> regionResult, currentState
 
                         let snapshot: InstanceSnapshot<'S, 'C> =
-                            { State = newState
+                            { State = finalState
                               Context = currentContext
-                              HierarchyConfig = hResult.Configuration
-                              HistoryRecord = hResult.HistoryRecord }
+                              HierarchyConfig = finalResult.Configuration
+                              HistoryRecord = finalResult.HistoryRecord }
 
                         let evt: TransitionEvent<'S, 'E, 'C> =
                             { PreviousState = currentState
                               PreviousContext = currentContext
-                              NewState = newState
+                              NewState = finalState
                               NewContext = currentContext
                               Event = None
                               Timestamp = DateTimeOffset.UtcNow
                               User = if isNull (box ctx.User) then None else Some ctx.User
-                              ExitedStates = hResult.ExitedStates
-                              EnteredStates = hResult.EnteredStates }
+                              ExitedStates = finalResult.ExitedStates
+                              EnteredStates = finalResult.EnteredStates }
 
                         Some snapshot, TransitionAttemptResult.Succeeded(box evt)
-                    | None -> None, TransitionAttemptResult.NoEvent
+
+                    | RecoverHistory(compositeId, kind) ->
+                        let targetConfig =
+                            HierarchicalRuntime.enterWithHistory hierarchy kind compositeId currentConfig currentHistory
+
+                        match HierarchicalRuntime.leafState hierarchy targetConfig with
+                        | Some leafKey ->
+                            let sourceKey = stateKey currentState
+
+                            let hResult =
+                                HierarchicalRuntime.transition hierarchy currentConfig sourceKey leafKey currentHistory
+
+                            let newState = Map.tryFind leafKey reverseKeyMap |> Option.defaultValue currentState
+
+                            let snapshot: InstanceSnapshot<'S, 'C> =
+                                { State = newState
+                                  Context = currentContext
+                                  HierarchyConfig = hResult.Configuration
+                                  HistoryRecord = hResult.HistoryRecord }
+
+                            let evt: TransitionEvent<'S, 'E, 'C> =
+                                { PreviousState = currentState
+                                  PreviousContext = currentContext
+                                  NewState = newState
+                                  NewContext = currentContext
+                                  Event = None
+                                  Timestamp = DateTimeOffset.UtcNow
+                                  User = if isNull (box ctx.User) then None else Some ctx.User
+                                  ExitedStates = hResult.ExitedStates
+                                  EnteredStates = hResult.EnteredStates }
+
+                            Some snapshot, TransitionAttemptResult.Succeeded(box evt)
+                        | None -> None, TransitionAttemptResult.NoEvent
 
             | None ->
                 match StateMachineContext.tryGetEvent<'E> ctx with
@@ -674,12 +676,7 @@ type StatefulResourceBuilder(routeTemplate: string) =
                                 HistoryRecord.empty
 
                         let hResult =
-                            HierarchicalRuntime.transition
-                                hierarchy
-                                currentConfig
-                                sourceKey
-                                targetKey
-                                currentHistory
+                            HierarchicalRuntime.transition hierarchy currentConfig sourceKey targetKey currentHistory
 
                         let snapshot: InstanceSnapshot<'S, 'C> =
                             { State = newState
