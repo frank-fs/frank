@@ -53,6 +53,18 @@ These principles govern all code changes.
 7. **No Silent Exception Swallowing.** Middleware/request code MUST log via `ILogger`. No bare `with _ ->` catch-alls.
 8. **No Duplicated Logic.** Same function in 2+ modules → extract to shared module before merge. Copy-paste is a review blocker.
 
+## Code Discipline (Holzmann Rules)
+
+Adapted from Gerard Holzmann's "Power of Ten" (NASA/JPL). These apply to all code — library, test, and sample. AI-generated code violates them routinely. Rules that overlap with F#'s inherent strengths are noted; they remain here because they apply when generating code in any language and because AI can still violate them even in F#.
+
+9. **Keep It Linear.** Max two levels of nesting. No control flow requiring a diagram. Flatten with early returns, pipeline operators, or extracted functions. F#'s pipeline style and pattern matching naturally enforce this — but AI still generates nested `match`-in-`match`-in-`if`. Push back when it does.
+10. **Bound Every Loop.** Every loop, retry, poll, and recursive call needs an explicit maximum. No "practically never exceeds N." What happens when the cap is hit must be defined. AI-generated retry logic and recursive crawlers routinely lack caps.
+11. **One Function, One Job.** Describable in one sentence without "and." Hard limit: 60 lines. Long functions mean the decomposition hasn't happened yet. (Extends #8.)
+12. **State Your Assumptions.** Preconditions and invariants belong in code — `invalidArg`, `invalidOp`, `assert`, or `failwith` — not in comments. At least one precondition check per public function at system boundaries. F#'s Hindley-Milner type inference already encodes many assumptions at compile time, which is a genuine advantage — runtime assertions cover what the type system cannot (value ranges, non-empty collections, valid state transitions).
+13. **Narrow Your State.** No module-level `mutable`. Pass dependencies explicitly. Data lives as close to its use as possible. F# defaults to immutable bindings, which helps — but AI still reaches for class-level fields and module-level state. (Extends #2.)
+14. **Surface Your Side Effects.** I/O, mutations, and network calls must be obvious at the call site. Don't bury writes inside helpers with innocent names. Structural separation: pure computation functions vs side-effectful orchestration. (Extends #2.)
+15. **One Layer of Indirection.** Minimize abstraction depth. If tracing a call requires navigating more than one layer of dynamic dispatch or callback, simplify. Favour linear composition over decoded elegance. (Extends #4.)
+
 ## F# Patterns
 
 - **CE builders**: `ResourceBuilder`, `WebHostBuilder` — the CE ceremony IS the pit of success. Never suggest simplifying it.
@@ -89,13 +101,14 @@ These principles govern all code changes.
 - **`writePresent` (omit-on-absent) vs `writeOptional` (null-on-absent) JSON semantics**: New fields that most documents won't populate should use `writePresent` (omits key entirely when None). Existing fields that consumers expect should use `writeOptional` (emits null). Both helpers in `StatechartDocumentJson.fs`.
 - **Reflection-based DU sync tests for intentionally-duplicated types**: When a DU is duplicated across zero-dep assemblies (e.g., `CompositeKind`), add a test using `FSharpType.GetUnionCases` to assert case count equality. Catches divergence at test time since there's no compile-time coupling between the two definitions.
 - **`CompositeKind` shadowing across assemblies**: Files that `open Frank.Resources.Model` and use `Frank.Statecharts.CompositeKind` hit shadowing. Use fully-qualified `Frank.Statecharts.CompositeKind.XOR` explicitly. Discovered in `Dual.fs` and `StatefulResourceBuilder.fs`.
+- **Precondition assertions**: Use `invalidArg` for argument validation, `invalidOp` for state violations, `failwith` for logic errors. At module boundaries, check before proceeding — don't rely on downstream code to fail with a cryptic message. Types encode what they can; assertions cover value ranges, non-empty collections, and valid state transitions.
 
 ## Workflow Rules
 
 ### Git workflow
-- **Keep master clean by working on a worktree within `.worktrees/`.** Every change — features, fixes, docs, config — follows: create worktree → work on branch → push → create PR → merge on approval. This keeps master free of in-progress commits so parallel branches can always use local master as a clean base.
+- **Trunk-based development.** Commit directly to master. Use worktrees for multi-commit features or work that benefits from isolation (parallel agents, risky experiments). Small, targeted changes — config, docs, single-file fixes, rule updates — go straight to master without a branch or PR.
 - **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
-- **Never merge without explicit approval.** Merging to master is a destructive op — always ask first.
+- **Never push without explicit approval.** Pushing to remote master is a destructive op — always ask first.
 - **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first. The branch with the most shared-file changes merges last to minimize rebase churn.
 - **Always use `isolation: "worktree"` for implementation/fix agents.** Non-isolated agents lack Bash/Read permissions even when pointed at accessible paths. For fix agents on existing branches, include `git fetch origin <branch> && git checkout <branch>` in the prompt. The agent's `EnterWorktree` tool handles worktree creation.
 - **Worktree agent Bash commands must be standalone.** Compound commands (`cd /path && dotnet build`) don't match pre-approved `Bash(dotnet:*)` patterns. Instruct agents to run `cd /path/to/worktree` as a separate Bash call first (working directory persists), then run standalone commands (`dotnet build Frank.sln`). Also `mkdir -p nupkg` in each worktree before building.

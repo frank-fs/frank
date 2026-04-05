@@ -418,7 +418,7 @@ let integrationTests =
                     use server = app.GetTestServer()
 
                     let store = server.Services.GetRequiredService<IProvenanceStore>()
-                    let istore = store :> IProvenanceStore
+                    let istore = store
 
                     // Append exactly MaxRecords + 1 records to trigger eviction.
                     let baseTime = DateTimeOffset.UtcNow

@@ -197,7 +197,8 @@ let projectAllStrictTests =
                       errors
                       |> List.filter (fun e ->
                           match e with
-                          | Projection.UnmappedTransition _ -> true)
+                          | Projection.UnmappedTransition _ -> true
+                          | _ -> false)
 
                   Expect.equal unmapped.Length 5 "5 Unrestricted transitions flagged"
 
@@ -212,7 +213,8 @@ let projectAllStrictTests =
                       errors
                       |> List.filter (fun e ->
                           match e with
-                          | Projection.DeadTransition _ -> true)
+                          | Projection.DeadTransition _ -> true
+                          | _ -> false)
 
                   Expect.equal dead.Length 1 "1 dead transition flagged"
 
@@ -227,7 +229,8 @@ let projectAllStrictTests =
                       errors
                       |> List.filter (fun e ->
                           match e with
-                          | Projection.UnmappedTransition _ -> true)
+                          | Projection.UnmappedTransition _ -> true
+                          | _ -> false)
 
                   Expect.equal unmapped.Length 2 "2 Unrestricted view transitions flagged"
 

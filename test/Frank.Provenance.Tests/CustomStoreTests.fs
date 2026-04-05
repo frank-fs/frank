@@ -108,7 +108,7 @@ let customStoreTests =
         [ testList
               "US4-SC1: Custom store receives records instead of default"
               [ testAsync "Custom IProvenanceStore registered before useProvenance receives all Append calls" {
-                    let customStore = TestCustomStore()
+                    let customStore = new TestCustomStore()
 
                     let appBuilder = WebApplication.CreateBuilder([||])
                     appBuilder.WebHost.UseTestServer() |> ignore
