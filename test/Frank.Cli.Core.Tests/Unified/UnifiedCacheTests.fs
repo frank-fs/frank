@@ -388,13 +388,17 @@ let unifiedCacheTests =
                                 Target = "OTurn"
                                 Guard = Some "TurnGuard"
                                 Constraint = RestrictedTo [ "PlayerX" ]
-                                Safety = Unsafe }
+                                Safety = Unsafe
+                                SenderRole = None
+                                ReceiverRole = None }
                               { Event = "MakeMove"
                                 Source = "OTurn"
                                 Target = "XTurn"
                                 Guard = Some "TurnGuard"
                                 Constraint = RestrictedTo [ "PlayerO" ]
-                                Safety = Unsafe } ]
+                                Safety = Unsafe
+                                SenderRole = None
+                                ReceiverRole = None } ]
 
                         let roles: RoleInfo list =
                             [ { Name = "PlayerX"; Description = None }

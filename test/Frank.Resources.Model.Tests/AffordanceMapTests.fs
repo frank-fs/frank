@@ -238,13 +238,17 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None }
                         { Event = "makeMove"
                           Source = "OTurn"
                           Target = "XTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               Expect.equal map.Entries.Length 3 "One entry per state"
@@ -278,7 +282,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -300,7 +306,9 @@ let affordanceMapTests =
                           Target = "Authorized"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -322,7 +330,9 @@ let affordanceMapTests =
                           Target = "XTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Safe } ] }
+                          Safety = Safe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -344,7 +354,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -385,7 +397,9 @@ let affordanceMapTests =
                           Target = "XTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Safe } ] }
+                          Safety = Safe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -411,13 +425,17 @@ let affordanceMapTests =
                           Target = "XTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Safe }
+                          Safety = Safe
+                          SenderRole = None
+                          ReceiverRole = None }
                         { Event = "makeMove"
                           Source = "XTurn"
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -440,7 +458,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
@@ -461,7 +481,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = RestrictedTo [ "PlayerX" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
@@ -482,13 +504,17 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = RestrictedTo [ "PlayerX" ]
-                          Safety = Unsafe }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None }
                         { Event = "makeMove"
                           Source = "OTurn"
                           Target = "XTurn"
                           Guard = None
                           Constraint = RestrictedTo [ "PlayerO" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let xEntry = map.Entries |> List.find (fun e -> e.StateKey = "XTurn")
@@ -543,7 +569,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let lr = map.Entries |> List.head |> _.LinkRelations |> List.head
@@ -581,7 +609,9 @@ let affordanceMapTests =
                           Target = "Shipped"
                           Guard = None
                           Constraint = RestrictedTo [ "PaymentService" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.find (fun e -> e.StateKey = "Authorize")
@@ -610,7 +640,9 @@ let affordanceMapTests =
                           Target = "Shipped"
                           Guard = None
                           Constraint = RestrictedTo [ "PaymentService" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.find (fun e -> e.StateKey = "Authorize")
@@ -634,7 +666,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -658,7 +692,9 @@ let affordanceMapTests =
                           Target = "OTurn"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -683,7 +719,9 @@ let affordanceMapTests =
                           Target = "Shipped"
                           Guard = None
                           Constraint = RestrictedTo [ "Warehouse" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -728,7 +766,9 @@ let affordanceMapTests =
                           Target = "Authorized"
                           Guard = None
                           Constraint = Unrestricted
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head
@@ -752,7 +792,9 @@ let affordanceMapTests =
                           Target = "Shipped"
                           Guard = None
                           Constraint = RestrictedTo [ "PaymentService" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               // Known IANA link relations used by the system
@@ -783,7 +825,9 @@ let affordanceMapTests =
                           Target = "Shipped"
                           Guard = None
                           Constraint = RestrictedTo [ "PaymentService" ]
-                          Safety = Unsafe } ] }
+                          Safety = Unsafe
+                          SenderRole = None
+                          ReceiverRole = None } ] }
 
               let map = AffordanceMap.fromStatechart "http://example.com/alps" sc
               let entry = map.Entries |> List.head

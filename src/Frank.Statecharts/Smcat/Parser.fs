@@ -58,7 +58,7 @@ let private addError
     (example: string)
     : unit =
     if not state.ErrorLimitReached then
-        let failure : ParseFailure =
+        let failure: ParseFailure =
             { Position = Some pos
               Description = desc
               Expected = expected
@@ -71,7 +71,7 @@ let private addError
             state.ErrorLimitReached <- true
 
 let private addWarning (state: ParserState) (pos: SourcePosition) (desc: string) (suggestion: string option) : unit =
-    let warning : ParseWarning =
+    let warning: ParseWarning =
         { Position = Some pos
           Description = desc
           Suggestion = suggestion }
@@ -150,10 +150,8 @@ let private skipToNextStatement (state: ParserState) : unit =
         | Newline ->
             advance state |> ignore // consume newline
             found <- true
-        | RightBrace ->
-            found <- true // don't consume -- let composite state handler deal with it
-        | _ ->
-            advance state |> ignore // skip unknown token
+        | RightBrace -> found <- true // don't consume -- let composite state handler deal with it
+        | _ -> advance state |> ignore // skip unknown token
 
     // Guarantee forward progress: if we didn't advance at all, force-advance
     if state.Position = startPos && (peek state).Kind <> Eof then
@@ -511,7 +509,8 @@ and private parseTransition
             let nextTok = peek state
 
             match nextTok.Kind with
-            | Identifier _ | QuotedString _ ->
+            | Identifier _
+            | QuotedString _ ->
                 // There are extra tokens after the target that look like label text but no colon
                 addError
                     state
@@ -532,7 +531,7 @@ and private parseTransition
                     elif depth > 0 then InternalTransition
                     else ExternalTransition
 
-                let edge : TransitionEdge =
+                let edge: TransitionEdge =
                     { Source = sourceName
                       Target = Some targetName
                       Event = None
@@ -540,6 +539,9 @@ and private parseTransition
                       GuardHref = None
                       Action = None
                       Parameters = []
+                      SenderRole = None
+                      ReceiverRole = None
+                      PayloadType = None
                       Position = Some startPos
                       Annotations = [ SmcatAnnotation(SmcatTransition transitionKind) ] }
 
@@ -598,7 +600,9 @@ and private parseTransition
                                             (sprintf "%s => %s: event [guard];" sourceName targetName)
 
                                         inBracket <- false
-                                    | Semicolon | Comma | Newline ->
+                                    | Semicolon
+                                    | Comma
+                                    | Newline ->
                                         // T021: Unclosed bracket terminated by statement end
                                         addError
                                             state
@@ -650,7 +654,7 @@ and private parseTransition
                 let annotations =
                     attrAnnotations @ [ SmcatAnnotation(SmcatTransition transitionKind) ]
 
-                let edge : TransitionEdge =
+                let edge: TransitionEdge =
                     { Source = sourceName
                       Target = Some targetName
                       Event = ev
@@ -658,6 +662,9 @@ and private parseTransition
                       GuardHref = None
                       Action = ac
                       Parameters = []
+                      SenderRole = None
+                      ReceiverRole = None
+                      PayloadType = None
                       Position = Some startPos
                       Annotations = annotations }
 
@@ -741,7 +748,7 @@ and private tryHandleInvalidArrow
                     elif targetName = name then SelfTransition
                     else ExternalTransition
 
-                let edge : TransitionEdge =
+                let edge: TransitionEdge =
                     { Source = name
                       Target = Some targetName
                       Event = None
@@ -749,13 +756,15 @@ and private tryHandleInvalidArrow
                       GuardHref = None
                       Action = None
                       Parameters = []
+                      SenderRole = None
+                      ReceiverRole = None
+                      PayloadType = None
                       Position = Some startPos
                       Annotations = [ SmcatAnnotation(SmcatTransition transitionKind) ] }
 
                 elements.Add(TransitionElement edge)
                 consumeTerminator state
-            | None ->
-                skipToNextStatement state
+            | None -> skipToNextStatement state
 
             true
         else
@@ -778,145 +787,144 @@ and private parseStateDeclaration
         () // Invalid arrow was detected and handled
     else
 
-    // Check for colon (activities or label)
-    let activities =
-        match (peek state).Kind with
-        | Colon ->
-            advance state |> ignore
-            // Check if activities follow
-            let tok = peek state
-
-            match tok.Kind with
-            | EntrySlash
-            | ExitSlash
-            | Ellipsis ->
-                let act = parseActivities state
-                Some act
-            | _ ->
-                // Not activity tokens after colon; could be an identifier (label text)
-                // For now, skip -- state declarations with colon + non-activity text
-                // are uncommon; basic handling covers the spec requirements
-                None
-        | _ -> None
-
-    // Check for attributes
-    let attributes =
-        match (peek state).Kind with
-        | LeftBracket ->
-            advance state |> ignore
-            parseAttributes state
-        | _ -> []
-
-    // Extract label from attributes if present
-    let label =
-        attributes
-        |> List.tryFind (fun a -> a.Key = "label")
-        |> Option.map (fun a -> a.Value)
-
-    // Check for composite children
-    let (childStateNodes, childOtherElements) =
-        match (peek state).Kind with
-        | LeftBrace ->
-            advance state |> ignore
-            let childDoc = parseDocument state (depth + 1)
-            // Consume the closing brace
-            match expect state RightBrace with
-            | Some _ -> ()
-            | None ->
+        // Check for colon (activities or label)
+        let activities =
+            match (peek state).Kind with
+            | Colon ->
+                advance state |> ignore
+                // Check if activities follow
                 let tok = peek state
 
-                addError
+                match tok.Kind with
+                | EntrySlash
+                | ExitSlash
+                | Ellipsis ->
+                    let act = parseActivities state
+                    Some act
+                | _ ->
+                    // Not activity tokens after colon; could be an identifier (label text)
+                    // For now, skip -- state declarations with colon + non-activity text
+                    // are uncommon; basic handling covers the spec requirements
+                    None
+            | _ -> None
+
+        // Check for attributes
+        let attributes =
+            match (peek state).Kind with
+            | LeftBracket ->
+                advance state |> ignore
+                parseAttributes state
+            | _ -> []
+
+        // Extract label from attributes if present
+        let label =
+            attributes
+            |> List.tryFind (fun a -> a.Key = "label")
+            |> Option.map (fun a -> a.Value)
+
+        // Check for composite children
+        let (childStateNodes, childOtherElements) =
+            match (peek state).Kind with
+            | LeftBrace ->
+                advance state |> ignore
+                let childDoc = parseDocument state (depth + 1)
+                // Consume the closing brace
+                match expect state RightBrace with
+                | Some _ -> ()
+                | None ->
+                    let tok = peek state
+
+                    addError
+                        state
+                        tok.Position
+                        "Expected closing '}' for composite state"
+                        "'}'"
+                        (tokenDescription tok)
+                        (sprintf "%s { ... };" name)
+
+                // Extract child state nodes and other elements (transitions)
+                let childStates =
+                    childDoc.Elements
+                    |> List.choose (fun el ->
+                        match el with
+                        | StateDecl node -> Some node
+                        | _ -> None)
+
+                let otherElements =
+                    childDoc.Elements
+                    |> List.filter (fun el ->
+                        match el with
+                        | StateDecl _ -> false
+                        | _ -> true)
+
+                (childStates, otherElements)
+            | _ -> ([], [])
+
+        let stateType = inferStateType name attributes
+
+        // T023: Warning for pseudo-state naming convention vs explicit type attribute mismatch
+        let typeAttr =
+            attributes
+            |> List.tryFind (fun a -> a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
+
+        match typeAttr with
+        | Some attr ->
+            let inferredFromName = inferStateType name []
+
+            if inferredFromName <> Regular && inferredFromName <> stateType then
+                addWarning
                     state
-                    tok.Position
-                    "Expected closing '}' for composite state"
-                    "'}'"
-                    (tokenDescription tok)
-                    (sprintf "%s { ... };" name)
+                    startPos
+                    (sprintf
+                        "State name '%s' matches naming convention for %A state type, but explicit attribute overrides to %s"
+                        name
+                        inferredFromName
+                        attr.Value)
+                    (Some "Consider renaming the state or removing the explicit type attribute")
+        | None -> ()
 
-            // Extract child state nodes and other elements (transitions)
-            let childStates =
-                childDoc.Elements
-                |> List.choose (fun el ->
-                    match el with
-                    | StateDecl node -> Some node
-                    | _ -> None)
-
-            let otherElements =
-                childDoc.Elements
-                |> List.filter (fun el ->
-                    match el with
-                    | StateDecl _ -> false
-                    | _ -> true)
-
-            (childStates, otherElements)
-        | _ -> ([], [])
-
-    let stateType = inferStateType name attributes
-
-    // T023: Warning for pseudo-state naming convention vs explicit type attribute mismatch
-    let typeAttr =
-        attributes
-        |> List.tryFind (fun a ->
-            a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
-
-    match typeAttr with
-    | Some attr ->
-        let inferredFromName = inferStateType name []
-
-        if inferredFromName <> Regular && inferredFromName <> stateType then
+        // T023: Warning for duplicate state declarations
+        if state.DeclaredStates.Contains(name) then
             addWarning
                 state
                 startPos
-                (sprintf
-                    "State name '%s' matches naming convention for %A state type, but explicit attribute overrides to %s"
-                    name
-                    inferredFromName
-                    attr.Value)
-                (Some "Consider renaming the state or removing the explicit type attribute")
-    | None -> ()
-
-    // T023: Warning for duplicate state declarations
-    if state.DeclaredStates.Contains(name) then
-        addWarning
-            state
-            startPos
-            (sprintf "State '%s' declared multiple times" name)
-            (Some "Combine state attributes into a single declaration")
-    else
-        state.DeclaredStates <- state.DeclaredStates.Add(name)
-
-    // T014 + T015: Compute SmcatStateType annotation to track type origin (explicit vs inferred)
-    let hasExplicitType =
-        attributes
-        |> List.exists (fun a -> a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
-
-    let typeAnnotation =
-        if hasExplicitType then
-            [ SmcatAnnotation(SmcatStateType(stateType, Explicit)) ]
-        elif stateType <> Regular then
-            [ SmcatAnnotation(SmcatStateType(stateType, Inferred)) ]
+                (sprintf "State '%s' declared multiple times" name)
+                (Some "Combine state attributes into a single declaration")
         else
-            []
+            state.DeclaredStates <- state.DeclaredStates.Add(name)
 
-    // Convert attributes to annotations (excluding "type" which is consumed by inferStateType)
-    let annotations = typeAnnotation @ (attributesToAnnotations attributes)
+        // T014 + T015: Compute SmcatStateType annotation to track type origin (explicit vs inferred)
+        let hasExplicitType =
+            attributes
+            |> List.exists (fun a -> a.Key.Equals("type", System.StringComparison.OrdinalIgnoreCase))
 
-    let stateNode : StateNode =
-        { Identifier = Some name
-          Label = label
-          Kind = stateType
-          Children = childStateNodes
-          Activities = activities
-          Position = Some startPos
-          Annotations = annotations }
+        let typeAnnotation =
+            if hasExplicitType then
+                [ SmcatAnnotation(SmcatStateType(stateType, Explicit)) ]
+            elif stateType <> Regular then
+                [ SmcatAnnotation(SmcatStateType(stateType, Inferred)) ]
+            else
+                []
 
-    elements.Add(StateDecl stateNode)
+        // Convert attributes to annotations (excluding "type" which is consumed by inferStateType)
+        let annotations = typeAnnotation @ (attributesToAnnotations attributes)
 
-    // Add child transitions (and other non-state elements) to the parent elements list
-    for el in childOtherElements do
-        elements.Add(el)
+        let stateNode: StateNode =
+            { Identifier = Some name
+              Label = label
+              Kind = stateType
+              Children = childStateNodes
+              Activities = activities
+              Position = Some startPos
+              Annotations = annotations }
 
-    consumeTerminator state
+        elements.Add(StateDecl stateNode)
+
+        // Add child transitions (and other non-state elements) to the parent elements list
+        for el in childOtherElements do
+            elements.Add(el)
+
+        consumeTerminator state
 
 // T017: Public API
 

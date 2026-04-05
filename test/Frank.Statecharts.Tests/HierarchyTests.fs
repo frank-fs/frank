@@ -216,7 +216,72 @@ let stateHierarchyBuildTests =
                   |> Set.ofList
 
               Expect.contains rootDescendants TrafficLight.active "Root descendants include Active"
-              Expect.contains rootDescendants TrafficLight.red "Root descendants include Red (grandchild)" ]
+              Expect.contains rootDescendants TrafficLight.red "Root descendants include Red (grandchild)"
+
+          // AC-5: toContainment preserves CompositeKinds
+          testCase "toContainment maps CompositeKind.XOR and CompositeKind.AND to StateContainment.CompositeKinds"
+          <| fun () ->
+              // Build a hierarchy with mixed composite kinds:
+              // Root (XOR) -> [ Active (AND parallel), Off ]
+              // Active (AND) -> [ SubA, SubB ]
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = TrafficLight.root
+                              Kind = CompositeKind.XOR
+                              Children = [ TrafficLight.active; TrafficLight.off ]
+                              InitialChild = Some TrafficLight.active
+                              CompletionTarget = None }
+                            { Id = TrafficLight.active
+                              Kind = CompositeKind.AND
+                              Children = [ "SubA"; "SubB" ]
+                              InitialChild = None
+                              CompletionTarget = None } ] }
+
+              let containment = StateHierarchy.toContainment hierarchy
+
+              // Root is XOR — should map to Frank.Resources.Model.CompositeKind.XOR
+              Expect.equal
+                  (Map.tryFind TrafficLight.root containment.CompositeKinds)
+                  (Some Frank.Resources.Model.CompositeKind.XOR)
+                  "Root maps to CompositeKind.XOR in StateContainment"
+
+              // Active is AND — should map to Frank.Resources.Model.CompositeKind.AND
+              Expect.equal
+                  (Map.tryFind TrafficLight.active containment.CompositeKinds)
+                  (Some Frank.Resources.Model.CompositeKind.AND)
+                  "Active maps to CompositeKind.AND in StateContainment"
+
+              // Atomic states must not appear in CompositeKinds
+              Expect.isNone
+                  (Map.tryFind TrafficLight.off containment.CompositeKinds)
+                  "Off (atomic) must not appear in CompositeKinds"
+
+              Expect.isNone
+                  (Map.tryFind "SubA" containment.CompositeKinds)
+                  "SubA (atomic) must not appear in CompositeKinds"
+
+          // Empty hierarchy edge case: toContainment on a hierarchy built from an empty spec
+          // should return a StateContainment with all maps empty, not throw.
+          testCase "toContainment on empty hierarchy produces empty CompositeKinds"
+          <| fun () ->
+              let hierarchy = StateHierarchy.build { States = [] }
+              let containment = StateHierarchy.toContainment hierarchy
+              Expect.isEmpty (Map.toList containment.CompositeKinds) "CompositeKinds must be empty for empty hierarchy"
+
+          // Reflection-based sync test: the two intentionally-duplicated CompositeKind DUs
+          // (Frank.Statecharts.CompositeKind and Frank.Resources.Model.CompositeKind) must
+          // stay in sync. If a case is added to one but not the other, this test catches it.
+          testCase "CompositeKind DU case count matches between assemblies"
+          <| fun () ->
+              let modelCases =
+                  Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(
+                      typeof<Frank.Resources.Model.CompositeKind>)
+
+              let hierarchyCases =
+                  Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<CompositeKind>)
+
+              Expect.equal modelCases.Length hierarchyCases.Length "CompositeKind DUs must stay in sync" ]
 
 // ==========================================================================
 // Sub-task A: LCA computation

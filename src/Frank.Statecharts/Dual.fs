@@ -337,8 +337,7 @@ let private buildRoleTransitionTargets
         proj.Transitions
         |> List.filter (fun t -> t.Source <> t.Target)
         |> List.groupBy (fun t -> t.Source)
-        |> List.map (fun (source, ts) ->
-            (roleName, source), ts |> List.map (fun t -> t.Target) |> List.distinct))
+        |> List.map (fun (source, ts) -> (roleName, source), ts |> List.map (fun t -> t.Target) |> List.distinct))
     |> Map.ofList
 
 /// Classify roles in each state as waiters (MayPoll-only, no advancing) or actors (MustSelect).
@@ -384,8 +383,7 @@ let private buildIntraStateEdges
     classifications
     |> List.collect (fun (state, waitingRoles, mustSelectRoles) ->
         waitingRoles
-        |> List.collect (fun waiter ->
-            mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
+        |> List.collect (fun waiter -> mustSelectRoles |> List.map (fun actor -> ((waiter, state), (actor, state)))))
 
 /// Build cross-state dependency edges: (waiter, S) → (actor, T) where actor transitions
 /// from S to T. These edges capture the obligation chain across states — "waiter is
@@ -403,9 +401,7 @@ let private buildCrossStateEdges
             mustSelectRoles
             |> List.collect (fun actor ->
                 let targets =
-                    roleTransitionTargets
-                    |> Map.tryFind (actor, state)
-                    |> Option.defaultValue []
+                    roleTransitionTargets |> Map.tryFind (actor, state) |> Option.defaultValue []
 
                 targets |> List.map (fun target -> ((waiter, state), (actor, target))))))
 
@@ -416,7 +412,9 @@ let private buildRoleDependencyGraph
     (roleTransitionTargets: Map<string * string, string list>)
     : ((string * string) * (string * string)) list =
     let classifications = classifyRolesByState annotations
-    buildIntraStateEdges classifications @ buildCrossStateEdges classifications roleTransitionTargets
+
+    buildIntraStateEdges classifications
+    @ buildCrossStateEdges classifications roleTransitionTargets
 
 /// Detect circular waits in role dependency graph (#226 enhancement 5, #253 cross-state).
 /// Uses (role, state) pairs as graph nodes, not just role names, so that cycles
@@ -501,7 +499,7 @@ let private detectAndStateWarnings (hierarchy: StateHierarchy option) : string l
         |> Map.toList
         |> List.choose (fun (stateId, kind) ->
             match kind with
-            | CompositeKind.AND ->
+            | Frank.Statecharts.CompositeKind.AND ->
                 Some
                     $"AND-state dual derivation gap: composite state '{stateId}' uses AND (parallel) composition. \
 Synchronization barriers across parallel regions are not modeled by dual derivation. \
@@ -709,11 +707,15 @@ let deriveReverse (statechart: ExtractedStatechart) (clientResult: DeriveResult)
     // Projections are needed for both circular wait targets and protocol sink detection.
     // Structural targets don't change under obligation reversal — only who's a waiter/actor changes.
     let projections =
-        if statechart.Roles.IsEmpty then Map.empty
-        else Projection.projectAll statechart
+        if statechart.Roles.IsEmpty then
+            Map.empty
+        else
+            Projection.projectAll statechart
 
     let roleTransitionTargets = buildRoleTransitionTargets projections
-    let reverseCircularWaits = detectCircularWaits reverseAnnotations roleTransitionTargets
+
+    let reverseCircularWaits =
+        detectCircularWaits reverseAnnotations roleTransitionTargets
 
     // Re-derive ProtocolSinks from the statechart's structural projections.
     // ProtocolSinks is obligation-independent (determined by transition graph structure),

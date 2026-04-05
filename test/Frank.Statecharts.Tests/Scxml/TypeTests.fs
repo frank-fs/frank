@@ -46,6 +46,9 @@ let typeTests =
                     GuardHref = None
                     Action = None
                     Parameters = []
+                    SenderRole = None
+                    ReceiverRole = None
+                    PayloadType = None
                     Position = Some { Line = 3; Column = 5 }
                     Annotations = [] }
 

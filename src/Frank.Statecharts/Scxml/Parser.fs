@@ -13,7 +13,9 @@ let private extractPosition (obj: XObject) : SourcePosition option =
     let lineInfo = obj :> IXmlLineInfo
 
     if lineInfo.HasLineInfo() then
-        Some { Line = lineInfo.LineNumber; Column = lineInfo.LinePosition }
+        Some
+            { Line = lineInfo.LineNumber
+              Column = lineInfo.LinePosition }
     else
         None
 
@@ -31,6 +33,7 @@ let private isElement (localName: string) (el: XElement) : bool =
 // Check if an element is a state-like element (state, parallel, or final)
 let private isStateElement (el: XElement) : bool =
     let n = el.Name.LocalName
+
     (n = "state" || n = "parallel" || n = "final")
     && (el.Name.Namespace = scxmlNs || el.Name.Namespace = XNamespace.None)
 
@@ -67,9 +70,7 @@ let private knownStateChildElements =
 let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
     let targets =
         match attrValue "target" el with
-        | Some t ->
-            t.Split(' ', System.StringSplitOptions.RemoveEmptyEntries)
-            |> Array.toList
+        | Some t -> t.Split(' ', System.StringSplitOptions.RemoveEmptyEntries) |> Array.toList
         | None -> []
 
     let isInternal =
@@ -90,6 +91,9 @@ let private parseTransition (sourceId: string) (el: XElement) : TransitionEdge =
       GuardHref = None
       Action = None
       Parameters = []
+      SenderRole = None
+      ReceiverRole = None
+      PayloadType = None
       Position = extractPosition el
       Annotations = annotations }
 
@@ -99,9 +103,7 @@ let private parseDataEntries (parent: XElement) : DataEntry list * Annotation li
     let dataEls =
         parent.Elements()
         |> Seq.filter (fun el -> el.Name.LocalName = "datamodel")
-        |> Seq.collect (fun dm ->
-            dm.Elements()
-            |> Seq.filter (fun el -> el.Name.LocalName = "data"))
+        |> Seq.collect (fun dm -> dm.Elements() |> Seq.filter (fun el -> el.Name.LocalName = "data"))
         |> Seq.toList
 
     let entries =
@@ -135,10 +137,7 @@ let private parseDataEntries (parent: XElement) : DataEntry list * Annotation li
     entries, srcAnnotations
 
 // Parse a <history> element into StateNode
-let private parseHistory
-    (warnings: ResizeArray<ParseWarning>)
-    (el: XElement)
-    : StateNode =
+let private parseHistory (warnings: ResizeArray<ParseWarning>) (el: XElement) : StateNode =
     let historyId = attrValue "id" el
 
     let astHistoryKind, stateKind =
@@ -149,10 +148,7 @@ let private parseHistory
             // Invalid history type value -- emit warning, default to Shallow
             warnings.Add(
                 { ParseWarning.Position = extractPosition el
-                  Description =
-                    sprintf
-                        "Invalid <history> type value '%s'; defaulting to 'shallow'"
-                        invalid
+                  Description = sprintf "Invalid <history> type value '%s'; defaulting to 'shallow'" invalid
                   Suggestion = Some "Use 'shallow' or 'deep'" }
             )
 
@@ -175,10 +171,7 @@ let private parseHistory
       Annotations = [ ScxmlAnnotation(ScxmlHistory(historyIdStr, astHistoryKind, defaultTarget)) ] }
 
 // Collect warnings for unknown child elements within a state
-let private collectChildWarnings
-    (warnings: ResizeArray<ParseWarning>)
-    (el: XElement)
-    : unit =
+let private collectChildWarnings (warnings: ResizeArray<ParseWarning>) (el: XElement) : unit =
     el.Elements()
     |> Seq.iter (fun child ->
         let localName = child.Name.LocalName
@@ -189,8 +182,7 @@ let private collectChildWarnings
         then
             warnings.Add(
                 { ParseWarning.Position = extractPosition child
-                  Description =
-                    sprintf "Unknown element <%s> inside <%s>" localName el.Name.LocalName
+                  Description = sprintf "Unknown element <%s> inside <%s>" localName el.Name.LocalName
                   Suggestion = None }
             ))
 
@@ -280,10 +272,7 @@ let rec private parseState
 
     let entryActions =
         onEntryElements
-        |> List.collect (fun onEntryEl ->
-            onEntryEl.Elements()
-            |> Seq.map executableContentDescription
-            |> Seq.toList)
+        |> List.collect (fun onEntryEl -> onEntryEl.Elements() |> Seq.map executableContentDescription |> Seq.toList)
 
     // Parse <onexit> blocks (T004)
     let onExitElements =
@@ -299,16 +288,17 @@ let rec private parseState
 
     let exitActions =
         onExitElements
-        |> List.collect (fun onExitEl ->
-            onExitEl.Elements()
-            |> Seq.map executableContentDescription
-            |> Seq.toList)
+        |> List.collect (fun onExitEl -> onExitEl.Elements() |> Seq.map executableContentDescription |> Seq.toList)
 
     // Build StateActivities when any entry or exit content exists (T003/T004)
     let activities =
         match entryActions, exitActions with
         | [], [] -> None
-        | _ -> Some { Entry = entryActions; Exit = exitActions; Do = [] }
+        | _ ->
+            Some
+                { Entry = entryActions
+                  Exit = exitActions
+                  Do = [] }
 
     // Parse <initial> child elements (T005)
     let initialElementAnnotations =
@@ -351,10 +341,7 @@ let rec private parseState
     stateNode, ownTransitions @ childTransitions, stateDataEntries @ childDataEntries
 
 // Collect warnings for unknown child elements at root <scxml> level
-let private collectRootWarnings
-    (warnings: ResizeArray<ParseWarning>)
-    (root: XElement)
-    : unit =
+let private collectRootWarnings (warnings: ResizeArray<ParseWarning>) (root: XElement) : unit =
     let knownRootChildren =
         set [ "state"; "parallel"; "final"; "datamodel"; "script"; "initial" ]
 
@@ -368,8 +355,7 @@ let private collectRootWarnings
         then
             warnings.Add(
                 { ParseWarning.Position = extractPosition child
-                  Description =
-                    sprintf "Unknown element <%s> inside <scxml>" localName
+                  Description = sprintf "Unknown element <%s> inside <scxml>" localName
                   Suggestion = None }
             ))
 
@@ -390,17 +376,18 @@ let private parseDocument (xdoc: XDocument) : ParseResult =
           Errors =
             [ { Position = None
                 Description = "Empty XML document: no root element found"
-                Expected = ""; Found = ""; CorrectiveExample = "" } ]
+                Expected = ""
+                Found = ""
+                CorrectiveExample = "" } ]
           Warnings = [] }
     elif not (isElement "scxml" root) then
         { Document = emptyDoc
           Errors =
             [ { Position = extractPosition root
-                Description =
-                    sprintf
-                        "Expected root element <scxml> but found <%s>"
-                        root.Name.LocalName
-                Expected = ""; Found = ""; CorrectiveExample = "" } ]
+                Description = sprintf "Expected root element <scxml> but found <%s>" root.Name.LocalName
+                Expected = ""
+                Found = ""
+                CorrectiveExample = "" } ]
           Warnings = [] }
     else
         // Accumulate warnings during parsing
@@ -423,9 +410,7 @@ let private parseDocument (xdoc: XDocument) : ParseResult =
             | Some id -> Some id
             | None ->
                 // Per W3C section 3.2: use first child state's id
-                stateNodes
-                |> List.tryHead
-                |> Option.bind (fun s -> s.Identifier)
+                stateNodes |> List.tryHead |> Option.bind (fun s -> s.Identifier)
 
         // Collect warnings for unknown root children
         collectRootWarnings warnings root
@@ -484,9 +469,14 @@ let private tryParseWith (loadFn: unit -> XDocument) : ParseResult =
               DataEntries = []
               Annotations = [] }
           Errors =
-            [ { Position = Some { Line = ex.LineNumber; Column = ex.LinePosition }
+            [ { Position =
+                  Some
+                      { Line = ex.LineNumber
+                        Column = ex.LinePosition }
                 Description = ex.Message
-                Expected = ""; Found = ""; CorrectiveExample = "" } ]
+                Expected = ""
+                Found = ""
+                CorrectiveExample = "" } ]
           Warnings = [] }
 
 // Parse SCXML from a string

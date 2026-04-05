@@ -604,4 +604,23 @@ A->B: hello
               Expect.equal (stateDecls result1).Length (stateDecls result2).Length "participants match"
               Expect.equal result1.Errors.Length result2.Errors.Length "errors match"
               Expect.equal (transitions result1).Length (transitions result2).Length "messages match"
-          } ]
+          }
+
+          // WSD round-trip preserves SenderRole/ReceiverRole by construction:
+          // WSD maps sender→Source and receiver→Target, so Source=SenderRole
+          // and Target=ReceiverRole for WSD format. The serializer reconstructs
+          // arrows from Source/Target, and re-parsing populates SenderRole/ReceiverRole
+          // from the same participant names.
+          testCase "SenderRole and ReceiverRole survive WSD round-trip"
+          <| fun _ ->
+              let source = "Client->Server: doThing\n"
+              let result1 = parseWsd source
+              let t1 = (transitions result1) |> List.head
+              Expect.equal t1.SenderRole (Some "Client") "first parse SenderRole"
+              Expect.equal t1.ReceiverRole (Some "Server") "first parse ReceiverRole"
+
+              let regenerated = Frank.Statecharts.Wsd.Serializer.serialize result1.Document
+              let result2 = parseWsd regenerated
+              let t2 = (transitions result2) |> List.head
+              Expect.equal t2.SenderRole (Some "Client") "round-trip SenderRole"
+              Expect.equal t2.ReceiverRole (Some "Server") "round-trip ReceiverRole" ]

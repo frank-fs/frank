@@ -15,9 +15,7 @@ module StatechartProjection =
     let buildDocument (resourceName: string) (sc: RuntimeStatechart) : StatechartDocument =
         let orderedStates =
             let others =
-                sc.StateNames
-                |> List.filter (fun s -> s <> sc.InitialStateKey)
-                |> List.sort
+                sc.StateNames |> List.filter (fun s -> s <> sc.InitialStateKey) |> List.sort
 
             sc.InitialStateKey :: others
 
@@ -43,9 +41,7 @@ module StatechartProjection =
                       { Target = sc.InitialStateKey
                         Content = ""
                         Position = Some syntheticPos
-                        Annotations =
-                          [ WsdAnnotation(WsdNotePosition Over)
-                            WsdAnnotation(WsdGuardData pairs) ] } ]
+                        Annotations = [ WsdAnnotation(WsdNotePosition Over); WsdAnnotation(WsdGuardData pairs) ] } ]
 
         let transitionElements =
             orderedStates
@@ -62,9 +58,16 @@ module StatechartProjection =
                               GuardHref = None
                               Action = None
                               Parameters = []
+                              SenderRole = None
+                              ReceiverRole = None
+                              PayloadType = None
                               Position = Some syntheticPos
                               Annotations =
-                                [ WsdAnnotation(WsdTransitionStyle { ArrowStyle = Solid; Direction = Forward }) ] })
+                                [ WsdAnnotation(
+                                      WsdTransitionStyle
+                                          { ArrowStyle = Solid
+                                            Direction = Forward }
+                                  ) ] })
                 | None -> [])
 
         { Title = Some resourceName

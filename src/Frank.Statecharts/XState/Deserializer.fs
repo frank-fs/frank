@@ -36,6 +36,9 @@ let private parseTransitions (stateId: string) (stateElem: JsonElement) : Transi
                 GuardHref = None
                 Action = None
                 Parameters = []
+                SenderRole = None
+                ReceiverRole = None
+                PayloadType = None
                 Position = None
                 Annotations = [] } ]
 
@@ -114,8 +117,7 @@ let deserialize (json: string) : ParseResult =
                     transitions <- transitions @ stateTransitions
 
                 let elements =
-                    (states |> List.map StateDecl)
-                    @ (transitions |> List.map TransitionElement)
+                    (states |> List.map StateDecl) @ (transitions |> List.map TransitionElement)
 
                 let document =
                     { Title = title

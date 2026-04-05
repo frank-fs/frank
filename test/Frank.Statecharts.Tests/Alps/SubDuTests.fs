@@ -310,6 +310,9 @@ let generatorRoundTripSubDuTests =
                               GuardHref = None
                               Action = None
                               Parameters = []
+                              SenderRole = None
+                              ReceiverRole = None
+                              PayloadType = None
                               Position = None
                               Annotations =
                                 [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
@@ -341,6 +344,9 @@ let transitionExtractorSubDuTests =
                               GuardHref = None
                               Action = None
                               Parameters = []
+                              SenderRole = None
+                              ReceiverRole = None
+                              PayloadType = None
                               Position = None
                               Annotations =
                                 [ AlpsAnnotation(AlpsTransitionType AlpsTransitionKind.Unsafe)
@@ -382,4 +388,33 @@ let transitionExtractorSubDuTests =
                       [ AlpsAnnotation(AlpsRole(ProtocolState, "authenticated", None)) ] }
 
               let roles = Frank.Statecharts.TransitionExtractor.extractRoles doc
-              Expect.isEmpty roles "ProtocolState roles not extracted as projected roles" ]
+              Expect.isEmpty roles "ProtocolState roles not extracted as projected roles"
+
+          // === AC-4: TransitionExtractor propagates SenderRole/ReceiverRole to TransitionSpec (issue #307) ===
+          testCase "AC-4: extract propagates SenderRole and ReceiverRole from TransitionEdge to TransitionSpec"
+          <| fun () ->
+              let doc: StatechartDocument =
+                  { Title = None
+                    InitialStateId = None
+                    Elements =
+                      [ TransitionElement
+                            { Source = "Client"
+                              Target = Some "Server"
+                              Event = Some "doThing"
+                              Guard = None
+                              GuardHref = None
+                              Action = None
+                              Parameters = []
+                              SenderRole = Some "Client"
+                              ReceiverRole = Some "Server"
+                              PayloadType = None
+                              Position = None
+                              Annotations = [] } ]
+                    DataEntries = []
+                    Annotations = [] }
+
+              let specs = Frank.Statecharts.TransitionExtractor.extract doc
+              Expect.hasLength specs 1 "one transition spec"
+              let spec = specs.[0]
+              Expect.equal spec.SenderRole (Some "Client") "SenderRole propagated to TransitionSpec"
+              Expect.equal spec.ReceiverRole (Some "Server") "ReceiverRole propagated to TransitionSpec" ]

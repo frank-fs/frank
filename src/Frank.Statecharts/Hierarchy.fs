@@ -31,13 +31,15 @@ type CompositeKind =
 
 /// Specification for a single composite state, used as input to StateHierarchy.build.
 type CompositeStateSpec =
-    { Id: string
-      Kind: CompositeKind
-      Children: string list
-      InitialChild: string option
-      /// For AND composites: the target state key to transition to when all regions complete.
-      /// None for XOR composites and AND composites without auto-completion.
-      CompletionTarget: string option }
+    {
+        Id: string
+        Kind: CompositeKind
+        Children: string list
+        InitialChild: string option
+        /// For AND composites: the target state key to transition to when all regions complete.
+        /// None for XOR composites and AND composites without auto-completion.
+        CompletionTarget: string option
+    }
 
 /// Input specification for building a StateHierarchy.
 type HierarchySpec = { States: CompositeStateSpec list }
@@ -289,7 +291,18 @@ module StateHierarchy =
     /// Convert a StateHierarchy to a lightweight StateContainment for use
     /// in hierarchy-aware projection and validation functions in Frank.Resources.Model.
     let toContainment (hierarchy: StateHierarchy) : Frank.Resources.Model.StateContainment =
-        Frank.Resources.Model.StateContainment.ofPairs (Map.toList hierarchy.ChildrenMap)
+        let containment =
+            Frank.Resources.Model.StateContainment.ofPairs (Map.toList hierarchy.ChildrenMap)
+
+        let compositeKinds =
+            hierarchy.StateKind
+            |> Map.map (fun _ kind ->
+                match kind with
+                | CompositeKind.XOR -> Frank.Resources.Model.CompositeKind.XOR
+                | CompositeKind.AND -> Frank.Resources.Model.CompositeKind.AND)
+
+        { containment with
+            CompositeKinds = compositeKinds }
 
 // ==========================================================================
 // HierarchicalRuntime module
@@ -606,15 +619,15 @@ module HierarchicalRuntime =
         let activeStates = ActiveStateConfiguration.toSet config
 
         let leaves =
-            activeStates |> Set.filter (fun s -> not (Map.containsKey s hierarchy.StateKind))
+            activeStates
+            |> Set.filter (fun s -> not (Map.containsKey s hierarchy.StateKind))
 
         if Set.isEmpty leaves then
             None
         else
             leaves
             |> Set.toList
-            |> List.sortByDescending (fun s ->
-                Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
+            |> List.sortByDescending (fun s -> Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
             |> List.tryHead
 
     /// Collect all ancestor state IDs from a given state up to the root (exclusive of stateId itself).

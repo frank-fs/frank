@@ -41,6 +41,9 @@ let partialPopulationTests =
                     GuardHref = None
                     Action = None
                     Parameters = []
+                    SenderRole = None
+                    ReceiverRole = None
+                    PayloadType = None
                     Position = Some { Line = 3; Column = 1 }
                     Annotations =
                         [ WsdAnnotation(
@@ -140,6 +143,9 @@ let partialPopulationTests =
                     GuardHref = None
                     Action = None
                     Parameters = []
+                    SenderRole = None
+                    ReceiverRole = None
+                    PayloadType = None
                     Position = None
                     Annotations = [ AlpsAnnotation(AlpsTransitionType Idempotent) ] }
 
@@ -191,6 +197,9 @@ let partialPopulationTests =
                     GuardHref = None
                     Action = Some "logDone"
                     Parameters = []
+                    SenderRole = None
+                    ReceiverRole = None
+                    PayloadType = None
                     Position = None
                     Annotations = [] }
 

@@ -25,6 +25,10 @@ let private writeOptional (w: Utf8JsonWriter) (name: string) (value: string opti
     | Some v -> w.WriteString(name, v)
     | None -> w.WriteNull(name)
 
+/// Write a string property only when Some; omit entirely when None.
+let private writePresent (w: Utf8JsonWriter) (name: string) (value: string option) =
+    value |> Option.iter (fun v -> w.WriteString(name, v))
+
 let rec private writeStateNode (w: Utf8JsonWriter) (state: StateNode) =
     w.WriteStartObject()
     w.WriteString("type", "state")
@@ -50,6 +54,9 @@ let private writeTransition (w: Utf8JsonWriter) (t: TransitionEdge) =
     writeOptional w "event" t.Event
     writeOptional w "guard" t.Guard
     writeOptional w "action" t.Action
+    writePresent w "senderRole" t.SenderRole
+    writePresent w "receiverRole" t.ReceiverRole
+    writePresent w "payloadType" t.PayloadType
     w.WriteEndObject()
 
 let private writeNote (w: Utf8JsonWriter) (note: NoteContent) =
@@ -99,71 +106,15 @@ and private writeGroup (w: Utf8JsonWriter) (group: GroupBlock) =
     w.WriteEndArray()
     w.WriteEndObject()
 
-// Flattened collectors kept for backward compatibility
-let private collectStates (elements: StatechartElement list) =
-    let rec collect (els: StatechartElement list) =
-        els
-        |> List.collect (fun el ->
-            match el with
-            | StateDecl s -> s :: collectChildren s.Children
-            | GroupElement g -> g.Branches |> List.collect (fun b -> collect b.Elements)
-            | _ -> [])
-
-    and collectChildren (children: StateNode list) =
-        children |> List.collect (fun c -> c :: collectChildren c.Children)
-
-    collect elements
-
-let private collectTransitions (elements: StatechartElement list) =
-    elements
-    |> List.choose (fun el ->
-        match el with
-        | TransitionElement t -> Some t
-        | _ -> None)
-
-let private writeStateLegacy (w: Utf8JsonWriter) (state: StateNode) =
-    w.WriteStartObject()
-    writeOptional w "identifier" state.Identifier
-    w.WriteString("kind", stateKindToString state.Kind)
-    writeOptional w "label" state.Label
-    w.WriteEndObject()
-
-let private writeTransitionLegacy (w: Utf8JsonWriter) (t: TransitionEdge) =
-    w.WriteStartObject()
-    w.WriteString("source", t.Source)
-    writeOptional w "target" t.Target
-    writeOptional w "event" t.Event
-    writeOptional w "guard" t.Guard
-    writeOptional w "action" t.Action
-    w.WriteEndObject()
-
 let private writeDocumentInline (writer: Utf8JsonWriter) (doc: StatechartDocument) =
     writer.WriteStartObject()
     writeOptional writer "title" doc.Title
     writeOptional writer "initialStateId" doc.InitialStateId
 
-    // Elements array preserving full AST hierarchy
     writer.WriteStartArray("elements")
 
     for el in doc.Elements do
         writeElement writer el
-
-    writer.WriteEndArray()
-
-    // Flattened arrays for backward compatibility
-    let states = collectStates doc.Elements
-    writer.WriteStartArray("states")
-
-    for s in states do
-        writeStateLegacy writer s
-
-    writer.WriteEndArray()
-
-    let transitions = collectTransitions doc.Elements
-    writer.WriteStartArray("transitions")
-
-    for t in transitions do
-        writeTransitionLegacy writer t
 
     writer.WriteEndArray()
 
