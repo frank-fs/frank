@@ -14,149 +14,120 @@ These must be resolved before implementation begins. Two implementers given the 
 
 ### 1. TransitionAlgebra<'r> exact record shape
 
-**Issue**: [#286](https://github.com/frank-fs/frank/issues/286)  
-**Status**: OPEN
+**Issue**: [#286](https://github.com/frank-fs/frank/issues/286)
+**Status**: RESOLVED
 
-The issue shows an illustrative record shape and says "the shape will evolve during implementation." Three specific questions:
+Three sub-decisions on the algebra's record shape, all resolved:
 
 **1a. Is ComputeLCA part of the algebra or a pure utility?**
 
-ComputeLCA doesn't mutate state — it's a query on StateHierarchy, not an operation. Should it be:
+**Decision**: Option B — LCA is a parameter, not an algebra operation. ComputeLCA is a pure query on `StateHierarchy`, computed once externally and passed to the program. The algebra is a pure effect algebra (Exit, Enter, Fork, Sequence) with no query operations.
 
-- **Option A**: An algebra field (`ComputeLCA: string * string -> string option`). Pro: programs are self-contained. Con: the algebra is a mix of queries and mutations.
-- **Option B**: A standalone function on StateHierarchy, called before the algebra. Programs receive the LCA as a parameter. Pro: cleaner separation. Con: programs need extra context.
+**Rationale**: Keeps the algebra clean for tagless final — interpreters only implement effects, not hierarchy queries. Interpreter composition is trivial (no conflicting query implementations). The generator computes LCA at generation time; the program receives it as data. No realistic scenario requires interpreter-specific LCA behavior.
 
 ```fsharp
-// Option A: LCA in the algebra
-let authorizeToFulfilling (alg: TransitionAlgebra<unit>) =
-    let _lca = alg.ComputeLCA("Authorize", "Fulfilling")
+// LCA computed externally, passed to program
+let authorizeToFulfilling<'r> (lca: string) (alg: TransitionAlgebra<'r>) : 'r =
     alg.Exit "Authorize"
-    alg.Enter "Fulfilling"
-
-// Option B: LCA as external parameter
-let authorizeToFulfilling (lca: string) (alg: TransitionAlgebra<unit>) =
-    alg.Exit "Authorize"
-    alg.Enter "Fulfilling"
+    |> alg.Sequence (alg.Enter "Fulfilling")
 ```
-
-**Recommendation**: Option A. Keeps programs self-contained, which matters for code generation (#283) — the generator doesn't need to know about external LCA computation.
 
 **1b. Does Enter handle composite entry recursively, or does the program explicitly call Fork?**
 
-When entering an AND-composite, the runtime must activate all child regions. Is this:
+**Decision**: Option B — Explicit Fork in algebra programs. However, the CE auto-generates algebra programs from `transition` declarations using the known hierarchy, so users don't write Fork manually for standard transitions. `onTransition` is the escape hatch for custom transition logic beyond standard hierarchy traversal.
 
-- **Option A**: Implicit — `alg.Enter "Fulfilling"` detects it's an AND-composite and internally calls Fork. Pro: programs are simpler. Con: the algebra hides behavior.
-- **Option B**: Explicit — the program calls `alg.Enter "Fulfilling"` then `alg.Fork ["Pick"; "Pack"; "Ship"]`. Pro: programs are transparent. Con: programs must know the hierarchy structure.
+**Rationale**: Explicit Fork is correct at the algebra level — the DualAlgebra needs to see Fork to accumulate per-region obligations, and interpreters shouldn't hide behavior. But requiring users to hand-write Fork in CE code is a pit of failure (three ways to get it wrong: forget Fork, wrong children, forget child Enter). The synthesis: the CE knows the hierarchy and auto-generates correct programs with Fork included. The algebra is explicit; the CE is the pit of success.
 
 ```fsharp
-// Option A: Enter handles Fork internally
-let authorizeToFulfilling (alg: TransitionAlgebra<unit>) =
-    alg.Exit "Authorize"
-    alg.Enter "Fulfilling"  // internally forks Pick, Pack, Ship
+// User writes this (declarative, pit of success):
+transition PlaceOrder Authorize Fulfilling Unrestricted
 
-// Option B: Program explicitly forks
-let authorizeToFulfilling (alg: TransitionAlgebra<unit>) =
-    alg.Exit "Authorize"
-    alg.Enter "Fulfilling"
-    alg.Fork ["Pick"; "Pack"; "Ship"]
-    alg.Enter "Picking"
-    alg.Enter "Packing"
-    alg.Enter "Shipping"
+// CE internally generates the algebra program:
+// alg.Exit "Authorize" |> alg.Sequence (alg.Enter "Fulfilling")
+//   |> alg.Sequence (alg.Fork ["Pick"; "Pack"; "Ship"])
+//   |> alg.Sequence (alg.Enter "Picking") |> ...
+
+// Escape hatch for custom logic (validated at startup):
+onTransition PlaceOrder (fun lca alg -> ...)
 ```
-
-**Recommendation**: Option B. Explicit Fork makes the AND-state semantics visible in the program, which is critical for the DualAlgebra (#288) — it needs to see Fork to accumulate per-region obligations. Option A would hide Fork inside Enter, making the DualAlgebra's job harder.
 
 **1c. Is 'r always unit, or does it vary per interpreter?**
 
-- **Option A**: `TransitionAlgebra<unit>` for all interpreters. Interpreters accumulate results via closure state (TraceAlgebra accumulates ExitedStates in a ResizeArray; DualAlgebra accumulates obligations). Pro: one program type for all algebras. Con: results are side effects, not return values.
-- **Option B**: `'r` varies — `TransitionAlgebra<HierarchicalTransitionResult>` for runtime, `TransitionAlgebra<DualResult>` for dual. Pro: results are explicit. Con: programs are parameterized by result type, complicating code generation.
+**Decision**: Option B — `'r` varies per interpreter. This is the fundamental property of tagless final: the representation type is abstract, and each interpreter chooses its own `'r`. Programs are polymorphic: `TransitionAlgebra<'r> -> 'r`.
 
-**Recommendation**: Option A. All algebras use `unit`. The accumulator-via-closure pattern is already established in the refinement comments on #257 and matches TraceAlgebra precedent. Code generation (#283) emits `TransitionAlgebra<unit> -> unit` functions.
+**Rationale**: `'r = unit` for all interpreters defeats the purpose of tagless final. Interpreters forced to accumulate results via closures build implicit continuations — the same stack-safety problem we chose tagless final to avoid (Free Monad's trampoline problem). With varying `'r`, each interpreter controls its result type: `RuntimeAlgebra<HierarchicalTransitionResult>`, `DualAlgebra<DualResult>`, etc. Codegen emits generic functions (`TransitionAlgebra<'r> -> 'r`), which F# handles natively.
 
 ---
 
 ### 2. ActiveStateConfiguration API surface in Abstractions
 
-**Issue**: [#286](https://github.com/frank-fs/frank/issues/286)  
-**Status**: OPEN
+**Issue**: [#286](https://github.com/frank-fs/frank/issues/286)
+**Status**: RESOLVED
 
-ActiveStateConfiguration must be in `Frank.Statecharts.Abstractions` because `RestoreHistory` returns `ActiveStateConfiguration option`. But how much of its API?
+**Decision**: Option B — export only the opaque type. Programs receive `ActiveStateConfiguration` from `RestoreHistory` and pass it through; they never construct or query it directly.
 
-Currently ActiveStateConfiguration has: `add`, `remove`, `isActive`, `toSet`, `empty`, `fromSet`.
-
-- **Option A**: Export the full module. Pro: generated code can manipulate configurations. Con: breaks encapsulation, generated code shouldn't be manipulating state directly.
-- **Option B**: Export only the opaque type. Pro: generated code can only pass it through (receive from RestoreHistory, hand to runtime). Con: if any algebra operation needs to construct or query a configuration, it can't.
-- **Option C**: Export the type + `empty` + `isActive` (read-only query). Pro: validation can check state membership. Con: still partially exposed.
-
-**Recommendation**: Option B. Generated transition programs should not manipulate ActiveStateConfiguration — that's the runtime's job. Programs call `RestoreHistory`, get back an `option`, and the runtime decides what to do with it. If ValidationAlgebra needs `isActive`, it constructs the configuration internally, not via the Abstractions package.
+**Rationale**: Consistent with Decision 1c (`'r` varies per interpreter) — programs are effect sequences that thread opaque values. If `ValidationAlgebra` needs `isActive`, it constructs configurations internally as part of its interpreter logic, not via the Abstractions export. Generated code and hand-written `onTransition` programs should not manipulate state — that's the interpreter's job.
 
 ---
 
 ### 3. DualAlgebra integration with existing Dual.fs
 
-**Issue**: [#288](https://github.com/frank-fs/frank/issues/288)  
-**Status**: OPEN
+**Issue**: [#288](https://github.com/frank-fs/frank/issues/288)
+**Status**: RESOLVED
 
-Dual.fs is 35KB with complex dual derivation logic. How does DualAlgebra relate to it?
+**Decision**: Option A — Replace `deriveWithHierarchy` entirely. The dual derivation IS a `DualAlgebra` interpreter. Run a program through it, get the result. No wrapping layer, no legacy API preservation.
 
-- **Option A**: Replace `deriveWithHierarchy` entirely. DualAlgebra IS the dual derivation. Pro: one code path. Con: high risk, massive refactor of working (if incomplete) code.
-- **Option B**: Compose alongside — DualAlgebra is an alternative dual derivation path for programs expressed against the algebra. `deriveWithHierarchy` remains for backward compatibility. Pro: incremental. Con: two code paths.
-- **Option C**: Wrap — `deriveWithHierarchy` internally runs programs through DualAlgebra. The existing API surface doesn't change; the implementation becomes algebra-based. Pro: safest migration. Con: requires expressing existing Dual.fs logic as algebra programs.
-
-**Recommendation**: Option C for v7.4.0. Wrap the existing API with algebra internals. The public interface (`DeriveResult`, `ClientObligation`, etc.) stays the same. The implementation changes from ad-hoc hierarchy traversal to algebra interpretation. This is the lowest-risk path that still closes the AND-state gap (because Fork is now visible to the dual logic).
+**Rationale**: Nothing is published — there are no external consumers to protect. Option C's wrapping layer would be pure overhead: an adapter between an API nobody depends on and the algebra that does the work. The existing implementation is incomplete, not just "working if incomplete" — the AND-state gap (MPST formalism bound 1) is a known hole. A clean algebra-native implementation with explicit Fork closes that gap by design. Public types (`DeriveResult`, `ClientObligation`, etc.) should be redesigned around what the algebra naturally produces rather than contorting the algebra to emit legacy types. The 3 MPST formalism bounds are documentation worth preserving; the implementation gets rewritten.
 
 ---
 
 ### 4. onTransition relationship to existing transition declarations
 
-**Issue**: [#282](https://github.com/frank-fs/frank/issues/282)  
-**Status**: OPEN
+**Issue**: [#282](https://github.com/frank-fs/frank/issues/282)
+**Status**: RESOLVED
 
-Today: `transition PlaceOrder Pending Authorize Unrestricted` declares metadata (source, target, constraint, safety).
-Proposed: `onTransition PlaceOrder authorizeToFulfilling` registers the algebra program.
+**Decision**: Option D (emerged from Decisions 1b and 1c) — `onTransition` does not exist. Every `transition` declaration auto-generates its algebra program from the hierarchy. Customization happens through interpreters, not custom programs.
 
-- **Option A**: Two separate CE operations. `transition` declares metadata; `onTransition` declares the program. Must match by event name. Pro: backward compatible, metadata and program are orthogonal. Con: easy to declare one without the other.
-- **Option B**: Combined operation: `transition PlaceOrder Pending Authorize Unrestricted authorizeToFulfilling`. Pro: can't have metadata without program. Con: breaks existing API, all samples must change.
-- **Option C**: `onTransition` is optional. If present, the middleware uses the algebra program. If absent, the middleware falls back to `HierarchicalRuntime.transition` (existing behavior). Pro: fully backward compatible, opt-in. Con: two code paths in middleware.
-
-**Recommendation**: Option C. The algebra is an opt-in layer. Resources that don't declare `onTransition` work exactly as they do today. Resources that do declare it get the algebra path. This matches the layered architecture — the thesis can be proven without the algebra (Layer 3), and the algebra (Layer 4) strengthens guarantees for resources that opt in.
+**Rationale**: The hierarchy fully determines the program — a transition from A to B through a given hierarchy always produces the same Exit/Enter/Fork sequence. That's what a statechart is. If you want different behavior, you write a custom interpreter (tagless final's customization axis), not a custom program. `onTransition` would mean "my statechart definition doesn't match my intended transitions" — that's a bug, not a customization point. One code path in the middleware, no override mechanism, no escape hatch to maintain. The original options (A: paired ops, B: combined op, C: optional override) all assumed `onTransition` exists in some form; none apply.
 
 ---
 
 ### 5. Codegen file structure
 
-**Issue**: [#283](https://github.com/frank-fs/frank/issues/283)  
-**Status**: OPEN
+**Issue**: [#283](https://github.com/frank-fs/frank/issues/283)
+**Status**: RESOLVED
 
-For `OrderStatechart.scxml`, what files does `frank-cli extract --format fsharp` generate?
+**Decision**: Option A — one file `OrderStatechart.Generated.fs` containing types (Event, State, Region, Role DUs) and transition programs.
 
-- **Option A**: One file `OrderStatechart.Generated.fs` containing types (Event, State, Region, Role DUs) and transition programs. Pro: simple, one file to manage. Con: large generated file, types and programs mixed.
-- **Option B**: Two files `OrderStatechart.Types.fs` + `OrderStatechart.Programs.fs`. Types first in compilation order. Pro: clean separation. Con: MSBuild targets must order both correctly.
-- **Option C**: One file per DU type + one for programs. Pro: granular. Con: many files, complex ordering.
-
-**Recommendation**: Option A. One file. The generated module is `OrderStatechart.Generated` with types at the top and programs below — F# compilation order within a file is top-to-bottom, so types naturally precede programs. The MSBuild targets (#284) only need to insert one file before user code, not manage ordering of multiple generated files.
+**Rationale**: F# top-to-bottom ordering within a file handles dependencies naturally (types precede programs). MSBuild targets (#284) only need to insert one file before user code. Users who want to split or customize can pull the generated code into their own files. Given Decision 4 (programs auto-generated, no `onTransition`), the generated file is purely derived from the statechart — users never edit it.
 
 ---
 
 ### 6. childOf reference mechanism
 
-**Issue**: [#293](https://github.com/frank-fs/frank/issues/293)  
-**Status**: OPEN
+**Issue**: [#293](https://github.com/frank-fs/frank/issues/293)
+**Status**: RESOLVED
 
-How does the child resource reference its parent?
+**Decision**: Option B — value binding. `childOf parentResource` where `parentResource` is the `let` binding of the parent.
 
-- **Option A**: By string name — `childOf "order"` matches `name "order"` on the parent statefulResource. Pro: simple, works at compile time (string literal). Con: stringly-typed, typos caught only by analyzer (FRANK102) or at startup.
-- **Option B**: By value binding — `childOf orderResource` where `orderResource` is the `let` binding of the parent. Pro: compiler-checked, refactoring-safe. Con: requires the parent to be in scope; cross-module references need explicit imports.
-- **Option C**: By route template — `childOf "/orders/{orderId}"` matches the parent's route. Pro: unambiguous. Con: verbose, route templates are implementation details.
+**Rationale**: Compiler-checked references for free — typos are compile errors, not analyzer warnings or startup failures. FRANK102 (nonexistent parent reference) becomes unnecessary for the common case. Cross-module references work via standard F# `open`. Refactoring-safe.
 
-**Recommendation**: Option B. Value binding gives compiler-checked references for free. FRANK102 becomes unnecessary for the common case (typos are compile errors, not analyzer warnings). Cross-module references work via standard F# `open` — no special resolution needed.
+Requires overloads accepting both `Resource` (from `resource` CE) and `StatefulResource` (from `statefulResource` CE), since a child stateful resource could be nested under either a plain resource or another stateful resource.
 
 ```fsharp
-// Option B example
+// Parent is a statefulResource
 let order = statefulResource "/orders/{orderId}" { ... }
 
 let pick = statefulResource "/orders/{orderId}/pick" {
-    childOf order   // compiler-checked reference
+    childOf order   // accepts StatefulResource
+    ...
+}
+
+// Parent is a plain resource
+let api = resource "/api" { ... }
+
+let orders = statefulResource "/api/orders/{orderId}" {
+    childOf api     // accepts Resource
     ...
 }
 ```
@@ -165,30 +136,30 @@ let pick = statefulResource "/orders/{orderId}/pick" {
 
 ### 7. How Frank.Statecharts.Analyzers invokes transition programs
 
-**Issue**: [#296](https://github.com/frank-fs/frank/issues/296)  
-**Status**: OPEN
+**Issue**: [#296](https://github.com/frank-fs/frank/issues/296)
+**Status**: RESOLVED
 
-The analyzer has FCS typed trees (source code), not a running application. How does it "run" transition programs through validation interpreters?
+**Decision**: The two paths have different validation triggers but share the same `ValidationAlgebra` interpreter and rules:
 
-Both the CE-first and SCXML-first paths produce the same thing: **a set of structured instructions** (algebra operations). The paths converge at the algebra:
+**SCXML-first — build-time analysis (Frank.Statecharts.Analyzers):**
+- Generated `.fs` files in `obj/` contain algebra programs (`TransitionAlgebra<'r> -> 'r`)
+- The FCS-based analyzer invokes them with a `ValidationAlgebra` at build time
+- Errors surface as compiler warnings/errors
 
-```
-CE-first:     F# code → run through algebra → instructions → generators/analyzers
-SCXML-first:  SCXML → parse → generate F# → run through algebra → instructions → generators/analyzers
-```
+**CE-first — startup validation (Frank.Statecharts, not the analyzer):**
+- The F# type system handles structural correctness at compile time (algebra operations type-check, `'r` unifies, `childOf` is compiler-checked via Decision 6)
+- Semantic properties are validated at startup inside `StatefulResourceBuilder.Run()` or during endpoint registration — the hierarchy and `transition` declarations are fully materialized, so auto-generated algebra programs can be run through `ValidationAlgebra` immediately
+- If validation fails, the app fails to start (same pattern as missing DI registrations or bad route templates)
+- No build-time CE extraction needed — the `transition` declarations ARE the source of truth; extracting them to regenerate what already exists would be circular
 
-The CE-first path is simpler — the program already exists as runnable F# code. Run it through a ValidationAlgebra or CollectorAlgebra and you have the instruction set. No parsing, no reconstruction.
+**Shared validation rules** (both paths, same `ValidationAlgebra` interpreter):
+- Unreachable states (no inbound transitions)
+- Guard gaps (event with guards that don't cover all cases)
+- AND-state deadlock (regions that can't all complete)
+- Missing Fork (AND-composite entered without forking regions)
+- Empty projections (role with no agency in any state)
 
-The SCXML-first path is harder — it requires parsing a design document, translating it into F# code, then running that code through the algebra. The translation step (#283) is where complexity lives.
-
-For the analyzer, this means:
-
-- **CE-first programs**: Run through ValidationAlgebra at analysis time. The program is a function `TransitionAlgebra<unit> -> unit` — call it with a validation algebra, read the results. The FCS typed tree gives you the function binding; invoking it with a stub algebra is straightforward.
-- **SCXML-first programs**: The generated `.fs` files in `obj/` contain the same functions. The analyzer can either invoke them (same as CE-first) or parse the generated file structurally (the template is predictable).
-
-**Recommendation**: The analyzer invokes transition programs through the algebra — same mechanism for both paths. The program is a function; the analyzer calls it with a validation/collector algebra and reads the accumulated results. This is the simplest approach and works for both CE-first and SCXML-first.
-
-#296's rules (unreachable states, guard gaps, empty projections, AND-state deadlock) are the compile-time safeguards against the v7.3.0 failure pattern. They must ship in v7.4.0.
+**Rationale**: The analyzer (`Frank.Statecharts.Analyzers`) serves the SCXML-first path. The startup validation pipeline (inside `Frank.Statecharts`) serves the CE-first path. Both use the same `ValidationAlgebra` interpreter and the same rules — the difference is when and where they're invoked, not what they check. The semantic validation rules (#296) must ship in v7.4.0 regardless of which path triggers them.
 
 ---
 
@@ -196,33 +167,32 @@ For the analyzer, this means:
 
 These can be decided during implementation without cross-issue impact.
 
-### 8. HistoryKind in Abstractions
+### 8. ~~HistoryKind in Abstractions~~ → Abstractions merged into Core
 
 **Issue**: [#286](https://github.com/frank-fs/frank/issues/286)
+**Status**: RESOLVED
 
-Duplicate the 3-case DU from `Frank.Statecharts.Ast`, or reference it?
+**Decision**: No separate `Frank.Statecharts.Abstractions` package. Merge algebra types (`TransitionAlgebra<'r>`, `ActiveStateConfiguration`) into `Frank.Statecharts.Core` alongside existing AST types and `HistoryKind`. One zero-dep foundation package.
 
-**Recommendation**: Duplicate. It's 3 lines. Avoids a dependency on Frank.Statecharts.Core from Abstractions.
-
-```fsharp
-type HistoryKind = Shallow | Deep
-```
-
-(Ast.HistoryKind has 3 cases but the third may be implementation-specific. Verify before duplicating.)
+**Rationale**: Both packages are zero-dep type definitions. Separating them creates a duplicate `HistoryKind` problem (same concept in two packages) and an extra package to maintain. Generated code (#283) references Core — the only cost is transitively including AST types it doesn't use, which has zero runtime impact. Eliminates the original duplication question entirely.
 
 ### 9. Instance ID separator for composite route keys
 
 **Issue**: [#293](https://github.com/frank-fs/frank/issues/293)
+**Status**: RESOLVED
 
-`::` was proposed for joining multiple route parameter values. Risk: a parameter value could contain `::`.
+**Decision**: `::` separator with URL-encoded parameter values. Example: `/tenants/{tenantId}/orders/{orderId}` → instance ID `tenant1::order42`.
 
-**Recommendation**: URL-encode parameter values before joining. `::` is safe as separator because `%3A%3A` won't appear in URL-encoded values. Example: `/tenants/{tenantId}/orders/{orderId}` → instance ID `tenant1::order42`.
+**Rationale**: URL-encoding makes collision structurally impossible — `::` in a parameter value becomes `%3A%3A` before joining. `::` is the conventional cons operator in functional languages; F# developers read it naturally.
 
 ### 10. 409/403/404 response body format
 
 **Issue**: [#294](https://github.com/frank-fs/frank/issues/294)
+**Status**: RESOLVED
 
-**Recommendation**: RFC 9457 Problem Details (`application/problem+json`). Consistent with ASP.NET Core's built-in problem details middleware. Example:
+**Decision**: RFC 9457 Problem Details. Frank provides the semantic content (`ProblemDetails` objects with type URI, title, detail, status) and writes through ASP.NET Core's `IProblemDetailsService` for formatting and content negotiation.
+
+**Rationale**: Frank's middleware structures error responses as `ProblemDetails` objects. Registration uses `TryAddSingleton` — first-wins, so if the user has already configured their own `IProblemDetailsService` (e.g., with custom `IProblemDetailsWriter` implementations for HTML), Frank defers. This respects "Library, Not Framework" (Constitution 3) and "ASP.NET Core Native" (Constitution 4). Content negotiation (JSON vs HTML vs XML) is ASP.NET Core's responsibility via the Accept header and registered writers — Frank never owns serialization. If no `IProblemDetailsService` is registered, fall back to plain status code with no body.
 
 ```json
 {
@@ -236,32 +206,52 @@ type HistoryKind = Shallow | Deep
 ### 11. frank-cli distribution for MSBuild
 
 **Issue**: [#284](https://github.com/frank-fs/frank/issues/284)
+**Status**: RESOLVED
 
-**Recommendation**: Bundle the CLI binary inside the Frank.Statecharts.Tools NuGet package (same pattern as FsGrpc.Tools). No separate tool install required. The MSBuild targets invoke the bundled binary directly. This eliminates the chicken-and-egg problem for #155 (frank init) — installing the NuGet package gets both the targets and the CLI.
+**Decision**: Use the existing `Frank.Cli` dotnet tool (already `PackAsTool = true`) with a tool manifest (`.config/dotnet-tools.json`). No separate `Frank.Statecharts.Tools` package needed. MSBuild targets shipped in the NuGet package run `dotnet tool restore` before invoking `frank extract`, which auto-installs the tool at the pinned version if not present. `frank init` (#155) creates the tool manifest as part of project scaffolding.
+
+**Rationale**: `Frank.Cli` is already a NuGet tool package. Bundling the binary in a separate Tools package would duplicate what already exists. The tool manifest is the idiomatic .NET pattern for version-pinned tool dependencies — `dotnet tool restore` handles auto-install.
 
 ### 12. frank init template engine
 
 **Issue**: [#155](https://github.com/frank-fs/frank/issues/155)
+**Status**: RESOLVED
 
-**Recommendation**: Raw string replacement with `%PLACEHOLDER%` markers. F# file templates are checked into the frank-cli project as embedded resources. No external template engine dependency. The placeholders are: `%PROJECT_NAME%`, `%ROOT_NAMESPACE%`, `%SCXML_FILE%`, `%RESOURCE_NAME%`.
+**Decision**: Three-layer approach with `dotnet new` for project scaffolding and Fantomas.Core for F# code generation:
+
+1. **`dotnet new frank-app`** — static project template (NuGet-distributed as `Frank.Templates`). Creates project structure, fsproj, Program.fs skeleton, and `.config/dotnet-tools.json` with Frank.Cli pinned. No statechart awareness. `dotnet tool restore` auto-installs frank.
+2. **`frank extract <file>.scxml`** — generates `<File>.Generated.fs` (types + algebra programs) using Fantomas.Core (already a project dependency). Independently useful for existing projects.
+3. **`frank scaffold`** — discovers `*.Generated.fs` files in the project, generates handler stubs and webHost CE wiring from the generated types. No SCXML input — reads the generated artifact. If no `.Generated.fs` found, alerts: "No generated files found. Run 'frank extract <file>.scxml' first." Uses Fantomas.Core. Independently useful to regenerate after statechart changes.
+4. **`frank init <file>.scxml`** — convenience wrapper that runs `extract` then `scaffold` in sequence.
+
+**Rationale**: Each command is independently useful and composable. `scaffold` reads from the generated artifact, not the source SCXML — simpler command and teaches the correct workflow through error messages. `dotnet new` stays in its lane (static project skeleton). Fantomas.Core handles all F# code generation with proper formatting — no raw string replacement. The `dotnet new` template naturally sets up the tool manifest (Decision 11), so `frank` is available by the time the user needs it.
 
 ### 13. Generated module naming conflicts
 
 **Issue**: [#283](https://github.com/frank-fs/frank/issues/283)
+**Status**: RESOLVED
 
-**Recommendation**: Error at generation time. If two SCXML files produce the same PascalCased module name, `frank-cli extract` fails with: `"Naming conflict: both 'OrderStatechart.scxml' and 'Order-Statechart.scxml' produce module name 'OrderStatechart.Generated'. Rename one of the SCXML files."`
+**Decision**: Error at generation time. If `frank extract` cannot disambiguate module names (e.g., two input files produce the same PascalCased module name), it alerts the caller with a clear message. The caller then refines the inputs (SCXML, ALPS, etc.) to resolve the conflict.
+
+**Rationale**: Fail early with actionable guidance rather than producing broken code. The caller owns the input naming — Frank shouldn't guess.
 
 ### 14. ALPS validator scope
 
 **Issue**: [#302](https://github.com/frank-fs/frank/issues/302)
+**Status**: RESOLVED
 
-**Recommendation**: Semantic consistency only (rt targets, cross-links, type matching). JSON schema validation is a separate concern — the ALPS spec doesn't have a formal JSON Schema, and structural validation is better handled by the parser.
+**Decision**: Semantic consistency only — rt targets, cross-links, type matching. Structural validation (required fields, correct types, unknown keys) is the parser's responsibility.
+
+**Rationale**: Clean split with no gap. The parser ensures structure; the validator ensures meaning. Duplicating structural checks in the validator adds no value.
 
 ### 15. CollectorAlgebra reconstruction owner
 
 **Issue**: [#290](https://github.com/frank-fs/frank/issues/290)
+**Status**: RESOLVED
 
-**Recommendation**: The CollectorAlgebra itself lives in `Frank.Statecharts` (near the other algebras). The reconstruction pipeline (collected edges + metadata → StatechartDocument) lives in `Frank.Cli.Core` (near FormatPipeline.fs). The algebra is runtime-available; the reconstruction is a CLI/build-time concern.
+**Decision**: `CollectorAlgebra` lives in `Frank.Statecharts.Core` (alongside `TransitionAlgebra<'r>` and `StatechartDocument`, per Decision 8). The reconstruction pipeline (collected operations + metadata → `StatechartDocument`) lives in `Frank.Cli.Core` (near FormatPipeline.fs).
+
+**Rationale**: `CollectorAlgebra` is a pure interpreter of `TransitionAlgebra<'r>` with no ASP.NET Core or runtime dependencies — it belongs with the types it interprets (Core). Reconstruction is a CLI/build-time concern that orchestrates the collector output into a document format.
 
 ---
 
@@ -269,7 +259,7 @@ type HistoryKind = Shallow | Deep
 
 Decisions that must be resolved together (changing one affects the other):
 
-- **1a + 1b + 5**: If ComputeLCA is in the algebra (1a=A) and Fork is explicit (1b=B), the generated file (5) must emit both ComputeLCA calls and Fork calls. All three affect what generated code looks like.
-- **1c + 4**: If 'r is always unit (1c=A) and onTransition is optional (4=C), the middleware needs to know whether to use the algebra path or the fallback path based on whether `onTransition` was declared.
+- **1a + 1b + 5** *(1a, 1b RESOLVED)*: LCA is a parameter (1a=B), Fork is explicit (1b=B). Generated files (5) emit programs that receive LCA as a parameter and include explicit Fork calls. The CE auto-generates these programs from `transition` declarations. Decision 5 can now be resolved independently.
+- **1c + 4** *(1c RESOLVED)*: `'r` varies per interpreter (1c=B). Programs are `TransitionAlgebra<'r> -> 'r`. Decision 4 (onTransition relationship) is reshaped: `onTransition` is the escape hatch for custom logic; standard transitions auto-generate algebra programs from the `transition` declaration. The middleware uses the algebra path when a program exists (auto-generated or custom), falls back to `HierarchicalRuntime.transition` otherwise.
 - **6 + FRANK102**: If childOf uses value binding (6=B), FRANK102 (nonexistent parent reference) becomes largely unnecessary — the compiler catches it. The analyzer rule can be simplified or removed.
 - **7 + #296 scope**: Frank.Statecharts.Analyzers invokes transition programs through the algebra — same mechanism for both CE-first and SCXML-first paths. Both produce functions; the analyzer calls them with validation/collector algebras.
