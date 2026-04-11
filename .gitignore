@@ -72,4 +72,5 @@ nupkg/*
 .amazonq/
 .github/copilot/
 sample/Frank.TicTacToe.Sample/frank/
+.remember/
 PROMPT.md
