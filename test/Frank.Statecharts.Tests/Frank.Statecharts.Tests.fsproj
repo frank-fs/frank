@@ -77,6 +77,8 @@
     <Compile Include="Affordances/LinkHeaderTests.fs" />
     <Compile Include="Affordances/DiscoveryEdgeCaseTests.fs" />
     <Compile Include="Affordances/DiscoveryCombinationTests.fs" />
+    <!-- Transition algebra equivalence tests (issue #286) -->
+    <Compile Include="HierarchyAlgebraTests.fs" />
     <!-- Hierarchical runtime tests (issue #136) -->
     <Compile Include="HierarchyTests.fs" />
     <!-- Hierarchy runtime wiring tests (issue #242) -->

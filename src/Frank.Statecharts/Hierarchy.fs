@@ -101,6 +101,13 @@ type HierarchyOp =
     /// Re-enter a composite state using shallow or deep history pseudo-state semantics.
     | RecoverHistory of compositeId: string * kind: Frank.Statecharts.Ast.HistoryKind
 
+/// The RuntimeInterpreter's representation type — a state transformer
+/// that threads configuration and history through a sequence of operations,
+/// accumulating exited and entered state lists.
+type RuntimeStep =
+    ActiveStateConfiguration * HistoryRecord
+        -> ActiveStateConfiguration * HistoryRecord * string list * string list
+
 // ==========================================================================
 // ActiveStateConfiguration module
 // ==========================================================================
@@ -288,6 +295,42 @@ module StateHierarchy =
 
             findLCA ancestryA None
 
+    /// Walk from source up to (but not including) lca via ParentMap.
+    /// Returns source-first order: [source; parent; ...; child-of-lca].
+    /// Internal: used by HierarchicalRuntime and TransitionProgram.
+    /// Promote to public if interpreters move to separate assemblies.
+    let internal exitPath (hierarchy: StateHierarchy) (source: string) (lca: string) : string list =
+        let maxDepth = hierarchy.DepthMap.Count
+
+        let rec loop current acc depth =
+            if current = lca then
+                acc
+            elif depth <= 0 then
+                invalidOp (sprintf "exitPath: exceeded max depth walking from '%s' toward '%s'" source lca)
+            else
+                match Map.tryFind current hierarchy.ParentMap with
+                | Some parent -> loop parent (current :: acc) (depth - 1)
+                | None -> current :: acc
+
+        loop source [] maxDepth |> List.rev
+
+    /// Walk from target up to (but not including) lca via ParentMap.
+    /// Returns lca-first order: [child-of-lca; ...; parent-of-target; target].
+    let internal entryPath (hierarchy: StateHierarchy) (target: string) (lca: string) : string list =
+        let maxDepth = hierarchy.DepthMap.Count
+
+        let rec loop current acc depth =
+            if current = lca then
+                acc
+            elif depth <= 0 then
+                invalidOp (sprintf "entryPath: exceeded max depth walking from '%s' toward '%s'" target lca)
+            else
+                match Map.tryFind current hierarchy.ParentMap with
+                | Some parent -> loop parent (current :: acc) (depth - 1)
+                | None -> current :: acc
+
+        loop target [] maxDepth
+
     /// Convert a StateHierarchy to a lightweight StateContainment for use
     /// in hierarchy-aware projection and validation functions in Frank.Resources.Model.
     let toContainment (hierarchy: StateHierarchy) : Frank.Resources.Model.StateContainment =
@@ -377,34 +420,9 @@ module HierarchicalRuntime =
             // Atomic state - nothing else to enter
             config
 
-    /// Collect the list of states to exit from source up to (but not including) LCA.
-    /// Order: source first, then parent, up to but not including LCA.
-    let private exitPath (hierarchy: StateHierarchy) (source: string) (lca: string) : string list =
-        let rec loop current acc =
-            if current = lca then
-                acc
-            else
-                match Map.tryFind current hierarchy.ParentMap with
-                | Some parent -> loop parent (current :: acc)
-                | None -> current :: acc
-
-        loop source [] |> List.rev
-
-    /// Collect the list of states to enter from LCA down to target.
-    /// Order: first child of LCA on the path to target, then its child, etc.
-    let private entryPath (hierarchy: StateHierarchy) (target: string) (lca: string) : string list =
-        let rec ancestryToLca current acc =
-            if current = lca then
-                acc
-            else
-                match Map.tryFind current hierarchy.ParentMap with
-                | Some parent -> ancestryToLca parent (current :: acc)
-                | None -> current :: acc
-
-        ancestryToLca target []
-
-    /// Exit a composite state, recording its active configuration in history.
-    let private exitCompositeState
+    /// Record a composite state's active descendant configuration in history.
+    /// No-op for atomic (non-composite) states.
+    let private recordCompositeHistory
         (hierarchy: StateHierarchy)
         (stateId: string)
         (config: ActiveStateConfiguration)
@@ -423,6 +441,17 @@ module HierarchicalRuntime =
 
             HistoryRecord.record stateId childConfig history
         | None -> history
+
+    /// Diff ActiveStateConfiguration before/after, sorted parent-before-child
+    /// for SCXML-compliant entry ordering.
+    let private enteredStatesSorted
+        (hierarchy: StateHierarchy)
+        (before: Set<string>)
+        (after: Set<string>)
+        : string list =
+        Set.difference after before
+        |> Set.toList
+        |> List.sortBy (fun s -> Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
 
     /// Perform a hierarchical state transition from source to target.
     /// Computes LCA, exits states from source up to LCA, enters states from LCA down to target.
@@ -448,8 +477,8 @@ module HierarchicalRuntime =
                             source
                             target)
 
-                let exits = exitPath hierarchy source lca
-                let entries = entryPath hierarchy target lca
+                let exits = StateHierarchy.exitPath hierarchy source lca
+                let entries = StateHierarchy.entryPath hierarchy target lca
                 (exits, entries, Some lca)
 
         // Record history for the LCA if it's a composite. The LCA is NOT being exited,
@@ -457,13 +486,13 @@ module HierarchicalRuntime =
         // history pseudo-states can restore it later (e.g., Capture→Retry within Payment).
         let historyWithLca =
             match lcaOpt with
-            | Some lca -> exitCompositeState hierarchy lca config history
+            | Some lca -> recordCompositeHistory hierarchy lca config history
             | None -> history
 
         // Exit phase: record history for exited composite states, folding into LCA history
         let updatedHistory =
             exitStates
-            |> List.fold (fun h exitState -> exitCompositeState hierarchy exitState config h) historyWithLca
+            |> List.fold (fun h exitState -> recordCompositeHistory hierarchy exitState config h) historyWithLca
 
         // Remove exited states and all descendants of exited composite states.
         // For AND composites, this deactivates all regions; for XOR, any active child subtree.
@@ -490,15 +519,8 @@ module HierarchicalRuntime =
                     let before = ActiveStateConfiguration.toSet currentConfig
                     let nextConfig = enterState hierarchy entryState currentConfig
                     let after = ActiveStateConfiguration.toSet nextConfig
-                    let newlyEntered = Set.difference after before
-
-                    // Sort by depth (parent before child) for SCXML-compliant entry ordering
-                    let sortedNewlyEntered =
-                        newlyEntered
-                        |> Set.toList
-                        |> List.sortBy (fun s -> Map.tryFind s hierarchy.DepthMap |> Option.defaultValue 0)
-
-                    let nextAccRev = sortedNewlyEntered |> List.fold (fun acc s -> s :: acc) accRev
+                    let sorted = enteredStatesSorted hierarchy before after
+                    let nextAccRev = sorted |> List.fold (fun acc s -> s :: acc) accRev
 
                     (nextConfig, nextAccRev))
                 (configAfterExit, [])
@@ -507,6 +529,58 @@ module HierarchicalRuntime =
           ExitedStates = exitStates
           EnteredStates = List.rev enteredStatesRev
           HistoryRecord = updatedHistory }
+
+    /// Enter a composite's initial child, or return config unchanged if none defined.
+    let private enterInitialChild
+        (hierarchy: StateHierarchy)
+        (compositeStateId: string)
+        (config: ActiveStateConfiguration)
+        : ActiveStateConfiguration =
+        match Map.tryFind compositeStateId hierarchy.InitialChild with
+        | Some initial -> enterState hierarchy initial config
+        | None -> config
+
+    /// Restore shallow history: re-enter the direct child that was last active.
+    let private restoreShallowHistory
+        (hierarchy: StateHierarchy)
+        (compositeStateId: string)
+        (previousConfig: ActiveStateConfiguration)
+        (config: ActiveStateConfiguration)
+        : ActiveStateConfiguration =
+        let children = Map.tryFind compositeStateId hierarchy.ChildrenMap |> Option.defaultValue []
+
+        let lastActiveChild =
+            children |> List.tryFind (fun child -> ActiveStateConfiguration.isActive child previousConfig)
+
+        match lastActiveChild with
+        | Some child -> enterState hierarchy child config
+        | None -> enterInitialChild hierarchy compositeStateId config
+
+    /// Restore deep history: walk down the composite hierarchy, re-entering
+    /// each previously active child via enterState (enforces XOR exclusivity).
+    let private restoreDeepHistory
+        (hierarchy: StateHierarchy)
+        (compositeStateId: string)
+        (previousConfig: ActiveStateConfiguration)
+        (config: ActiveStateConfiguration)
+        : ActiveStateConfiguration =
+        let previousStates = ActiveStateConfiguration.toSet previousConfig
+
+        let rec restoreSubtree (parentId: string) (c: ActiveStateConfiguration) : ActiveStateConfiguration =
+            let children = Map.tryFind parentId hierarchy.ChildrenMap |> Option.defaultValue []
+            let activeChildren = children |> List.filter (fun child -> Set.contains child previousStates)
+
+            activeChildren
+            |> List.fold
+                (fun acc child ->
+                    let acc = enterState hierarchy child acc
+
+                    match Map.tryFind child hierarchy.StateKind with
+                    | Some _ -> restoreSubtree child acc
+                    | None -> acc)
+                c
+
+        restoreSubtree compositeStateId config
 
     /// Enter a composite state using history (shallow or deep).
     /// Falls back to initial child when no history is recorded.
@@ -517,63 +591,92 @@ module HierarchicalRuntime =
         (config: ActiveStateConfiguration)
         (history: HistoryRecord)
         : ActiveStateConfiguration =
-        // Harel semantics: all ancestors must be in the active configuration,
-        // even on degenerate paths where no child enterState call occurs (issue #265).
+        // Harel semantics: all ancestors must be in the active configuration (issue #265).
         let config = addAncestors hierarchy compositeStateId config
         let config = ActiveStateConfiguration.add compositeStateId config
 
         match HistoryRecord.tryGet compositeStateId history with
-        | Some previousConfig ->
+        | Some prev ->
             match historyKind with
-            | Frank.Statecharts.Ast.HistoryKind.Shallow ->
-                // Shallow: restore only the direct child that was active
-                match Map.tryFind compositeStateId hierarchy.ChildrenMap with
-                | Some children ->
-                    let lastActiveChild =
-                        children
-                        |> List.tryFind (fun child -> ActiveStateConfiguration.isActive child previousConfig)
+            | Frank.Statecharts.Ast.HistoryKind.Shallow -> restoreShallowHistory hierarchy compositeStateId prev config
+            | Frank.Statecharts.Ast.HistoryKind.Deep -> restoreDeepHistory hierarchy compositeStateId prev config
+        | None -> enterInitialChild hierarchy compositeStateId config
 
-                    match lastActiveChild with
-                    | Some child -> enterState hierarchy child config
-                    | None ->
-                        // Fallback to initial
-                        match Map.tryFind compositeStateId hierarchy.InitialChild with
-                        | Some initial -> enterState hierarchy initial config
-                        | None -> config
-                | None -> config
-            | Frank.Statecharts.Ast.HistoryKind.Deep ->
-                // Deep: restore the full active configuration top-down via enterState.
-                // Must use enterState (not Set.fold) to enforce XOR exclusivity at each level.
-                //
-                // Algorithm: walk down the composite hierarchy, finding which direct child
-                // was active in previousConfig, re-entering via enterState (which enforces
-                // XOR exclusivity), then recursively restoring sub-composites.
-                let previousStates = ActiveStateConfiguration.toSet previousConfig
+    /// Construct a RuntimeInterpreter for the given hierarchy.
+    /// Internal — consumers should use runProgram, not the raw interpreter.
+    let internal createInterpreter
+        (hierarchy: StateHierarchy)
+        : Frank.Statecharts.Ast.TransitionAlgebra<RuntimeStep> =
+        { Exit = fun stateId (config, history) ->
+              // Pure state removal — programs must RecordHistory explicitly
+              // before Exit to capture history from the original config.
+              let config =
+                  let c = ActiveStateConfiguration.remove stateId config
+                  match Map.tryFind stateId hierarchy.StateKind with
+                  | Some _ ->
+                      allDescendants hierarchy stateId
+                      |> List.fold (fun c' s -> ActiveStateConfiguration.remove s c') c
+                  | None -> c
+              (config, history, [ stateId ], [])
 
-                // Recursive local helper: restore a subtree of previousConfig under `parentId`.
-                let rec restoreSubtree (parentId: string) (c: ActiveStateConfiguration) : ActiveStateConfiguration =
-                    let children = Map.tryFind parentId hierarchy.ChildrenMap |> Option.defaultValue []
+          Enter = fun stateId (config, history) ->
+              let before = ActiveStateConfiguration.toSet config
+              let config = enterState hierarchy stateId config
+              let after = ActiveStateConfiguration.toSet config
+              let entered = enteredStatesSorted hierarchy before after
+              (config, history, [], entered)
 
-                    let activeChildren =
-                        children |> List.filter (fun child -> Set.contains child previousStates)
+          // Protocol marker — actual region entry is performed by the prior Enter call.
+          Fork = fun _regions (config, history) ->
+              (config, history, [], [])
 
-                    activeChildren
-                    |> List.fold
-                        (fun acc child ->
-                            // Re-enter child via enterState to enforce XOR exclusivity.
-                            let acc = enterState hierarchy child acc
-                            // If child is composite, continue restoring its active sub-states.
-                            match Map.tryFind child hierarchy.StateKind with
-                            | Some _ -> restoreSubtree child acc
-                            | None -> acc)
-                        c
+          RecordHistory = fun compositeId (config, history) ->
+              let history = recordCompositeHistory hierarchy compositeId config history
+              (config, history, [], [])
 
-                restoreSubtree compositeStateId config
-        | None ->
-            // No history: fall back to initial child
-            match Map.tryFind compositeStateId hierarchy.InitialChild with
-            | Some initial -> enterState hierarchy initial config
-            | None -> config
+          RestoreHistory = fun (compositeId, kind) (config, history) ->
+              let before = ActiveStateConfiguration.toSet config
+              let config =
+                  enterWithHistory hierarchy kind compositeId config history
+              let after = ActiveStateConfiguration.toSet config
+              let entered = enteredStatesSorted hierarchy before after
+              (config, history, [], entered)
+
+          // TODO: exited1 @ exited2 is O(n) in left list; left-associative fold
+          // in sequenceOps makes this O(n²) for deep programs. N=3-8 today.
+          // If programs grow, switch to reversed accumulators + single List.rev in runProgram.
+          Bind = fun step1 step2 (config, history) ->
+              let (c1, h1, exited1, entered1) = step1 (config, history)
+              let (c2, h2, exited2, entered2) = (step2 ()) (c1, h1)
+              (c2, h2, exited1 @ exited2, entered1 @ entered2)
+
+          Return = fun () (config, history) ->
+              (config, history, [], [])
+
+          Zero = fun () (config, history) ->
+              (config, history, [], []) }
+
+    /// Run a program through the RuntimeInterpreter, producing a
+    /// HierarchicalTransitionResult from the initial state.
+    let runProgram
+        (hierarchy: StateHierarchy)
+        (config: ActiveStateConfiguration)
+        (history: HistoryRecord)
+        (program: Frank.Statecharts.Ast.TransitionAlgebra<RuntimeStep> -> RuntimeStep)
+        : HierarchicalTransitionResult =
+        let activeStates = ActiveStateConfiguration.toSet config
+
+        if not (Set.isEmpty activeStates)
+           && not (activeStates |> Set.forall (fun s -> Map.containsKey s hierarchy.DepthMap)) then
+            invalidArg (nameof config) "config contains states not present in hierarchy"
+
+        let interpreter = createInterpreter hierarchy
+        let step = program interpreter
+        let (finalConfig, finalHistory, exited, entered) = step (config, history)
+        { Configuration = finalConfig
+          ExitedStates = exited
+          EnteredStates = entered
+          HistoryRecord = finalHistory }
 
     /// Check whether all regions of an AND composite have a leaf that is a final state.
     /// Returns true when every direct child region of compositeId has at least one active
@@ -716,3 +819,96 @@ module HierarchicalRuntime =
                 Map.empty
 
         methodMap |> Map.toList
+
+// ==========================================================================
+// TransitionProgram builder — the safety boundary for program construction
+// ==========================================================================
+
+[<RequireQualifiedAccess>]
+module TransitionProgram =
+
+    /// Build thunked ops for a self-transition (external semantics: exit + re-enter).
+    let private selfTransitionOps
+        (hierarchy: StateHierarchy)
+        (source: string)
+        (alg: Frank.Statecharts.Ast.TransitionAlgebra<'r>)
+        : (unit -> 'r) list =
+        let recordOps =
+            if Map.containsKey source hierarchy.StateKind then
+                [ fun () -> alg.RecordHistory source ]
+            else
+                []
+
+        recordOps @ [ (fun () -> alg.Exit source); (fun () -> alg.Enter source) ]
+
+    /// Build thunked ops for a non-self transition: RecordHistory, Exit, Enter (+Fork).
+    let private transitionOps
+        (hierarchy: StateHierarchy)
+        (source: string)
+        (target: string)
+        (alg: Frank.Statecharts.Ast.TransitionAlgebra<'r>)
+        : (unit -> 'r) list =
+        let lca =
+            StateHierarchy.computeLCA hierarchy source target
+            |> Option.defaultWith (fun () ->
+                failwithf
+                    "No LCA for (%s, %s) — disconnected hierarchy. Ensure all states share a common ancestor."
+                    source
+                    target)
+
+        let exits = StateHierarchy.exitPath hierarchy source lca
+        let entries = StateHierarchy.entryPath hierarchy target lca
+
+        let recordOps =
+            lca :: exits
+            |> List.filter (fun s -> Map.containsKey s hierarchy.StateKind)
+            |> List.map (fun s () -> alg.RecordHistory s)
+
+        let exitOps = exits |> List.map (fun s () -> alg.Exit s)
+
+        let enterOps =
+            entries
+            |> List.collect (fun s ->
+                let enter () = alg.Enter s
+
+                match Map.tryFind s hierarchy.StateKind with
+                | Some CompositeKind.AND ->
+                    let children =
+                        Map.tryFind s hierarchy.ChildrenMap |> Option.defaultValue []
+
+                    [ enter; fun () -> alg.Fork children ]
+                | _ -> [ enter ])
+
+        recordOps @ exitOps @ enterOps
+
+    /// Sequence thunked ops via Bind, returning Return for empty programs.
+    let private sequenceOps (alg: Frank.Statecharts.Ast.TransitionAlgebra<'r>) (ops: (unit -> 'r) list) : 'r =
+        match ops with
+        | [] -> alg.Zero()
+        | first :: rest -> rest |> List.fold (fun acc op -> alg.Bind acc op) (first ())
+
+    /// Build a transition program equivalent to HierarchicalRuntime.transition.
+    /// This is the safety boundary for program construction — it ensures
+    /// RecordHistory is emitted for all composites before any Exit, so
+    /// history sees the original config. The algebra permits hand-written
+    /// programs but does not enforce correct ordering; this builder does.
+    /// Self-transitions use external semantics: exit and re-enter.
+    let fromTransition
+        (hierarchy: StateHierarchy)
+        (source: string)
+        (target: string)
+        : Frank.Statecharts.Ast.TransitionAlgebra<'r> -> 'r =
+        if System.String.IsNullOrWhiteSpace source then
+            invalidArg (nameof source) "source must be a non-empty state ID"
+
+        if System.String.IsNullOrWhiteSpace target then
+            invalidArg (nameof target) "target must be a non-empty state ID"
+
+        fun alg ->
+            let ops =
+                if source = target then
+                    selfTransitionOps hierarchy source alg
+                else
+                    transitionOps hierarchy source target alg
+
+            sequenceOps alg ops

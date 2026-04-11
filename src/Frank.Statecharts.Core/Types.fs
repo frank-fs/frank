@@ -295,3 +295,43 @@ type ParseResult =
     { Document: StatechartDocument
       Errors: ParseFailure list
       Warnings: ParseWarning list }
+
+// ---------------------------------------------------------------------------
+// Transition algebra (tagless-final)
+// ---------------------------------------------------------------------------
+
+/// Statechart transition operations as a tagless-final algebra.
+/// ONE algebra type; MANY interpreters (each provides a concrete 'r).
+/// Programs are polymorphic functions: TransitionAlgebra<'r> -> 'r.
+///
+/// Follows John Azariah's tagless-final pattern for F#: the algebra is a
+/// record of functions parameterized by the representation type 'r.
+/// Bind/Return/Zero live inside the record so each interpreter controls sequencing.
+/// See: https://johnazariah.github.io/2025/12/12/tagless-final-02-maps-branches-choices.html
+///
+/// Extensibility: adding a new field is a breaking change for all interpreters —
+/// intentional, since the compiler forces every interpreter to handle every operation.
+/// Programs are functions (not data) and cannot be serialized.
+type TransitionAlgebra<'r> =
+    {
+        /// Exit a state, deactivating it and all descendants.
+        Exit: string -> 'r
+        /// Enter a state, recursively activating initial children (XOR)
+        /// or all children (AND via Fork) per Harel semantics.
+        Enter: string -> 'r
+        /// AND-composite parallel region activation marker.
+        /// Identifies which regions must be entered concurrently.
+        Fork: string list -> 'r
+        /// Record the active configuration of a composite state for history.
+        RecordHistory: string -> 'r
+        /// Re-enter a composite state using shallow or deep history.
+        /// Interpreter closes over HistoryRecord — program never sees it.
+        RestoreHistory: string * HistoryKind -> 'r
+        /// Sequence two operations. Second is thunked for evaluation control.
+        Bind: 'r -> (unit -> 'r) -> 'r
+        /// Identity — wrap unit into the representation type.
+        Return: unit -> 'r
+        /// The empty program — no state change.
+        /// Both Zero and Return exist for CE builder compatibility.
+        Zero: unit -> 'r
+    }
