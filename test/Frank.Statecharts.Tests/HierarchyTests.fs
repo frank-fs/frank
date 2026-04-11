@@ -799,7 +799,191 @@ let historyTests =
 
               Expect.isTrue (ActiveStateConfiguration.isActive "ChildY" restored) "ChildY restored via deep history"
               Expect.isTrue (ActiveStateConfiguration.isActive "SubModeA" restored) "SubModeA restored"
-              Expect.isTrue (ActiveStateConfiguration.isActive "Active" restored) "Active restored" ]
+              Expect.isTrue (ActiveStateConfiguration.isActive "Active" restored) "Active restored"
+
+          testCase "deep history restores AND regions inside XOR composite"
+          <| fun () ->
+              // AT1: XOR -> XOR -> AND(RegionA XOR, RegionB XOR)
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Root"
+                              Kind = CompositeKind.XOR
+                              Children = [ "Active"; "Idle" ]
+                              InitialChild = Some "Active"
+                              CompletionTarget = None }
+                            { Id = "Active"
+                              Kind = CompositeKind.XOR
+                              Children = [ "Processing" ]
+                              InitialChild = Some "Processing"
+                              CompletionTarget = None }
+                            { Id = "Processing"
+                              Kind = CompositeKind.AND
+                              Children = [ "RegionA"; "RegionB" ]
+                              InitialChild = None
+                              CompletionTarget = None }
+                            { Id = "RegionA"
+                              Kind = CompositeKind.XOR
+                              Children = [ "StepA1"; "StepA2" ]
+                              InitialChild = Some "StepA1"
+                              CompletionTarget = None }
+                            { Id = "RegionB"
+                              Kind = CompositeKind.XOR
+                              Children = [ "StepB1"; "StepB2" ]
+                              InitialChild = Some "StepB1"
+                              CompletionTarget = None } ] }
+
+              // 1. Enter Root -> Active -> Processing -> RegionA/StepA1 + RegionB/StepB1
+              let initial =
+                  HierarchicalRuntime.enterState hierarchy "Root" ActiveStateConfiguration.empty
+
+              // 2. Transition RegionA: StepA1 -> StepA2
+              let moved =
+                  HierarchicalRuntime.transition hierarchy initial "StepA1" "StepA2" HistoryRecord.empty
+
+              // 3. Exit Active -> Idle (records history)
+              let exited =
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      moved.Configuration
+                      "StepA2"
+                      "Idle"
+                      moved.HistoryRecord
+
+              // 4. Re-enter Active via deep history
+              let restored =
+                  HierarchicalRuntime.enterWithHistory
+                      hierarchy
+                      HistoryKind.Deep
+                      "Active"
+                      exited.Configuration
+                      exited.HistoryRecord
+
+              Expect.isTrue (ActiveStateConfiguration.isActive "StepA2" restored) "RegionA restored to StepA2"
+              Expect.isFalse (ActiveStateConfiguration.isActive "StepA1" restored) "StepA1 not active (XOR)"
+              Expect.isTrue (ActiveStateConfiguration.isActive "StepB1" restored) "RegionB restored to StepB1"
+              Expect.isTrue (ActiveStateConfiguration.isActive "Processing" restored) "Processing active"
+              Expect.isTrue (ActiveStateConfiguration.isActive "Active" restored) "Active active"
+
+          testCase "deep history restores both AND regions with XOR enforcement"
+          <| fun () ->
+              // AT3: Same hierarchy as AT1, both regions advanced
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Root"
+                              Kind = CompositeKind.XOR
+                              Children = [ "Active"; "Idle" ]
+                              InitialChild = Some "Active"
+                              CompletionTarget = None }
+                            { Id = "Active"
+                              Kind = CompositeKind.XOR
+                              Children = [ "Processing" ]
+                              InitialChild = Some "Processing"
+                              CompletionTarget = None }
+                            { Id = "Processing"
+                              Kind = CompositeKind.AND
+                              Children = [ "RegionA"; "RegionB" ]
+                              InitialChild = None
+                              CompletionTarget = None }
+                            { Id = "RegionA"
+                              Kind = CompositeKind.XOR
+                              Children = [ "StepA1"; "StepA2" ]
+                              InitialChild = Some "StepA1"
+                              CompletionTarget = None }
+                            { Id = "RegionB"
+                              Kind = CompositeKind.XOR
+                              Children = [ "StepB1"; "StepB2" ]
+                              InitialChild = Some "StepB1"
+                              CompletionTarget = None } ] }
+
+              // 1. Enter and advance both regions
+              let initial =
+                  HierarchicalRuntime.enterState hierarchy "Root" ActiveStateConfiguration.empty
+
+              let movedA =
+                  HierarchicalRuntime.transition hierarchy initial "StepA1" "StepA2" HistoryRecord.empty
+
+              let movedB =
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      movedA.Configuration
+                      "StepB1"
+                      "StepB2"
+                      movedA.HistoryRecord
+
+              // 2. Exit to Idle (records history for Active)
+              let exited =
+                  HierarchicalRuntime.transition
+                      hierarchy
+                      movedB.Configuration
+                      "StepA2"
+                      "Idle"
+                      movedB.HistoryRecord
+
+              // 3. Deep history restore of Active
+              let restored =
+                  HierarchicalRuntime.enterWithHistory
+                      hierarchy
+                      HistoryKind.Deep
+                      "Active"
+                      exited.Configuration
+                      exited.HistoryRecord
+
+              Expect.isTrue (ActiveStateConfiguration.isActive "StepA2" restored) "RegionA restored to StepA2"
+              Expect.isTrue (ActiveStateConfiguration.isActive "StepB2" restored) "RegionB restored to StepB2"
+              Expect.isFalse (ActiveStateConfiguration.isActive "StepA1" restored) "StepA1 not active (XOR)"
+              Expect.isFalse (ActiveStateConfiguration.isActive "StepB1" restored) "StepB1 not active (XOR)" ]
+
+// ==========================================================================
+// XOR enforcement scoping (issue #310)
+// ==========================================================================
+
+[<Tests>]
+let xorEnforcementTests =
+    testList
+        "XOR enforcement scoping"
+        [ testCase "XOR enforcement scoped to immediate parent only"
+          <| fun () ->
+              // AT2: AND root with two XOR regions
+              let hierarchy =
+                  StateHierarchy.build
+                      { States =
+                          [ { Id = "Root"
+                              Kind = CompositeKind.AND
+                              Children = [ "Left"; "Right" ]
+                              InitialChild = None
+                              CompletionTarget = None }
+                            { Id = "Left"
+                              Kind = CompositeKind.XOR
+                              Children = [ "L1"; "L2" ]
+                              InitialChild = Some "L1"
+                              CompletionTarget = None }
+                            { Id = "Right"
+                              Kind = CompositeKind.XOR
+                              Children = [ "R1"; "R2" ]
+                              InitialChild = Some "R1"
+                              CompletionTarget = None } ] }
+
+              // 1. Enter Root -> Left/L1 + Right/R1
+              let initial =
+                  HierarchicalRuntime.enterState hierarchy "Root" ActiveStateConfiguration.empty
+
+              // 2. Transition Left: L1 -> L2
+              let result =
+                  HierarchicalRuntime.transition hierarchy initial "L1" "L2" HistoryRecord.empty
+
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive "L2" result.Configuration)
+                  "L2 active (transitioned)"
+
+              Expect.isFalse
+                  (ActiveStateConfiguration.isActive "L1" result.Configuration)
+                  "L1 not active (XOR sibling deactivated)"
+
+              Expect.isTrue
+                  (ActiveStateConfiguration.isActive "R1" result.Configuration)
+                  "R1 still active (different XOR parent, untouched)" ]
 
 // ==========================================================================
 // Sub-task F: HTTP mapping
