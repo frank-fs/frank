@@ -33,7 +33,8 @@ Together, these tracks make Frank applications into **reflective artifacts** —
 |------|----------|
 | `superpowers/specs/` | All feature specifications — from Spec Kit (001-016), Kitty Specs (ks-*), GitHub issues (gh-*), and Superpowers (date-prefixed) |
 | `superpowers/plans/` | All implementation plans — paired with specs |
-| [DECISIONS.md](DECISIONS.md) | Consolidated decision log with provenance and status tracking |
+| [DECISIONS.md](DECISIONS.md) | Complete decision catalog (~400 decisions organized by era) |
+| [AUDIT.md](AUDIT.md) | Contradictions, evolution timeline, suspect findings, dropped designs |
 
 ## Design Documents
 
