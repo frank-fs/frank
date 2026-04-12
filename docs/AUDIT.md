@@ -85,97 +85,97 @@ These features appear in earlier specs and then vanish without explicit cancella
 
 ## v7.4.0 Algebra and Interpreter Decisions
 
-Extracted from [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md). All resolved during issue refinement. **These are the correct designs — the code needs to match them, not the other way around.**
+Extracted from DESIGN_DECISIONS.md (now merged into [DECISIONS.md](DECISIONS.md)). All resolved during issue refinement. **These are the correct designs — the code needs to match them, not the other way around.**
 
 ### D-001: LCA is a parameter, not an algebra operation
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DESIGN_DECISIONS.md §1a
+- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1a
 - **Status**: Active
 - **Decision**: `ComputeLCA` is a pure query on `StateHierarchy`, computed once externally and passed to the program. The algebra is a pure effect algebra (Exit, Enter, Fork, Sequence) with no query operations.
 
 ### D-002: Explicit Fork in algebra programs
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DESIGN_DECISIONS.md §1b
+- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1b
 - **Status**: Active — **NOT IMPLEMENTED** (Fork is no-op in code, see C-1)
 - **Decision**: Fork is explicit at the algebra level — the DualAlgebra needs to see Fork to accumulate per-region obligations. The CE auto-generates algebra programs with Fork included.
 
 ### D-003: 'r varies per interpreter (tagless final)
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DESIGN_DECISIONS.md §1c
+- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1c
 - **Status**: Active — **PARTIALLY IMPLEMENTED** (RuntimeStep exists but uses flat lists)
 - **Decision**: `'r` varies per interpreter. Programs are polymorphic: `TransitionAlgebra<'r> -> 'r`. Each interpreter chooses its own `'r`.
 
 ### D-004: ActiveStateConfiguration is opaque
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DESIGN_DECISIONS.md §2
+- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §2
 - **Status**: Active — implemented
 - **Decision**: Export only the opaque type. Programs receive `ActiveStateConfiguration` from `RestoreHistory` and pass it through.
 
 ### D-005: DualAlgebra replaces deriveWithHierarchy entirely
 
-- **Source**: [#288](https://github.com/frank-fs/frank/issues/288), DESIGN_DECISIONS.md §3
+- **Source**: [#288](https://github.com/frank-fs/frank/issues/288), DECISIONS.md §3
 - **Status**: Active — **NOT IMPLEMENTED** (DualAlgebra does not exist)
 - **Decision**: Replace `deriveWithHierarchy` entirely. The dual derivation IS a `DualAlgebra` interpreter.
 
 ### D-006: onTransition does not exist
 
-- **Source**: [#282](https://github.com/frank-fs/frank/issues/282), DESIGN_DECISIONS.md §4
+- **Source**: [#282](https://github.com/frank-fs/frank/issues/282), DECISIONS.md §4
 - **Status**: Active — **NOT IMPLEMENTED** (onTransition hooks still in code, see C-5)
 - **Decision**: Every `transition` declaration auto-generates its algebra program from the hierarchy. Customization happens through interpreters, not custom programs.
 
 ### D-007: Single generated file per statechart
 
-- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DESIGN_DECISIONS.md §5
+- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DECISIONS.md §5
 - **Status**: Active — not yet reached (codegen not built)
 
 ### D-008: childOf uses value binding
 
-- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DESIGN_DECISIONS.md §6
+- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DECISIONS.md §6
 - **Status**: Active — not yet reached
 
 ### D-009: Two-path validation (build-time + startup)
 
-- **Source**: [#296](https://github.com/frank-fs/frank/issues/296), DESIGN_DECISIONS.md §7
+- **Source**: [#296](https://github.com/frank-fs/frank/issues/296), DECISIONS.md §7
 - **Status**: Active — not yet reached (ValidationAlgebra not built)
 
 ### D-010: Algebra types in Frank.Statecharts.Core
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DESIGN_DECISIONS.md §8
+- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §8
 - **Status**: Active — implemented (TransitionAlgebra is in Core)
 
 ### D-011: Instance ID uses :: separator
 
-- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DESIGN_DECISIONS.md §9
+- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DECISIONS.md §9
 - **Status**: Active — not yet reached
 
 ### D-012: RFC 9457 Problem Details for error responses
 
-- **Source**: [#294](https://github.com/frank-fs/frank/issues/294), DESIGN_DECISIONS.md §10
+- **Source**: [#294](https://github.com/frank-fs/frank/issues/294), DECISIONS.md §10
 - **Status**: Active — implemented
 
 ### D-013: frank-cli distributed via existing dotnet tool
 
-- **Source**: [#284](https://github.com/frank-fs/frank/issues/284), DESIGN_DECISIONS.md §11
+- **Source**: [#284](https://github.com/frank-fs/frank/issues/284), DECISIONS.md §11
 - **Status**: Active — implemented
 
 ### D-014: frank init uses three-layer approach
 
-- **Source**: [#155](https://github.com/frank-fs/frank/issues/155), DESIGN_DECISIONS.md §12
+- **Source**: [#155](https://github.com/frank-fs/frank/issues/155), DECISIONS.md §12
 - **Status**: Active — not yet reached
 
 ### D-015: Generated module naming conflicts are errors
 
-- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DESIGN_DECISIONS.md §13
+- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DECISIONS.md §13
 - **Status**: Active — not yet reached
 
 ### D-016: ALPS validator is semantic only
 
-- **Source**: [#302](https://github.com/frank-fs/frank/issues/302), DESIGN_DECISIONS.md §14
+- **Source**: [#302](https://github.com/frank-fs/frank/issues/302), DECISIONS.md §14
 - **Status**: Active — not yet reached
 
 ### D-017: CollectorAlgebra in Core, reconstruction in CLI
 
-- **Source**: [#290](https://github.com/frank-fs/frank/issues/290), DESIGN_DECISIONS.md §15
+- **Source**: [#290](https://github.com/frank-fs/frank/issues/290), DECISIONS.md §15
 - **Status**: Active — not yet reached
 
 ---

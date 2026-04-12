@@ -144,8 +144,8 @@ Adapted from Gerard Holzmann's "Power of Ten" (NASA/JPL). These apply to all cod
 - **v7.4.0 completes what v7.3.0 was supposed to deliver.** Everything in v7.4.0 scope was originally intended for v7.3.0 but was silently deferred by subagents who made autonomous scope decisions. The v7.3.0 implementation had extensive passing tests but failed when integrated — the hierarchy was flattened to a flat FSM, Link headers never appeared in HTTP responses, and the resource model was missing intended pieces.
 - **All CLAUDE.md rules, verification workflows, and acceptance criteria methodology exist because of v7.3.0's failure.** Falsifiable HTTP request/response ACs, e2e test requirements, expert panel review, and the "never auto-answer subagent questions" rule all came from this experience.
 - **Three thesis proof tracks** documented in [AGENT_HYPOTHESIS.md](docs/AGENT_HYPOTHESIS.md): Track A (REST agent navigates via links), Track B (reactive streaming agent via Datastar/SSE with deferred events), Track C (concurrent multi-role agents with role-projected SSE).
-- **Open design decisions** in [DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md) must be resolved before implementation to maximize session success probability.
-- **The resource model is the instruction set.** Both CE-first and SCXML-first paths produce the same structured instructions. Interpreters (runtime, validation, collection, etc.) are predefined library code, not generated. See DESIGN_DECISIONS.md for details.
+- **Design decisions** consolidated in [DECISIONS.md](docs/DECISIONS.md) (~400 decisions by era). Contradictions and suspect findings in [AUDIT.md](docs/AUDIT.md).
+- **The resource model is the instruction set.** Both CE-first and SCXML-first paths produce the same structured instructions. Interpreters (runtime, validation, collection, etc.) are predefined library code, not generated.
 
 ## Recurring Skills
 

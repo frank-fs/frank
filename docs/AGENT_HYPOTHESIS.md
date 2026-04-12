@@ -141,7 +141,7 @@ Track A at **~87%** is high confidence — 8 issues, all refined, with the e2e t
 
 Track A+B+C at **~70%** is achievable — proving the complete thesis (REST + reactive + concurrent agents, all role-projected, all hierarchical) within v7.4.0 is realistic with well-defined plans. Each track is independently valuable; even if only Track A ships initially, Tracks B and C follow with their infrastructure already in place.
 
-**Remaining risk**: 7 unresolved design decisions documented in [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md). Resolving these before implementation raises per-issue success to ~95% and thesis probability to ~75-90% across all tracks. See that document for the full list with context and recommended answers.
+**Remaining risk**: Design decisions now resolved and consolidated in [DECISIONS.md](DECISIONS.md). Contradictions between design and implementation documented in [AUDIT.md](AUDIT.md).
 
 ### Improving thesis probability
 
