@@ -27,7 +27,15 @@ The [Spec Pipeline](SPEC-PIPELINE.md) (tracked in [#57](https://github.com/frank
 
 Together, these tracks make Frank applications into **reflective artifacts** — systems that participate in their own evolution by exposing enough structure for agents to understand, evaluate, and propose changes.
 
-## Documents
+## Directory Guide
+
+| Path | Contents |
+|------|----------|
+| `superpowers/specs/` | All feature specifications — from Spec Kit (001-016), Kitty Specs (ks-*), GitHub issues (gh-*), and Superpowers (date-prefixed) |
+| `superpowers/plans/` | All implementation plans — paired with specs |
+| [DECISIONS.md](DECISIONS.md) | Consolidated decision log with provenance and status tracking |
+
+## Design Documents
 
 | Document | Description |
 |----------|-------------|
@@ -35,3 +43,16 @@ Together, these tracks make Frank applications into **reflective artifacts** —
 | [SPEC-PIPELINE.md](SPEC-PIPELINE.md) | Bidirectional design spec pipeline: WSD + SCXML + ALPS as the core trio, verification loop, LLM-assisted codegen philosophy, and CLI integration |
 | [STATECHARTS.md](STATECHARTS.md) | Application-level state machines: the `statefulResource` CE, guards, transitions, hierarchical statecharts, and the `IStateMachineStore` abstraction |
 | [COMPARISON.md](COMPARISON.md) | How Frank.Statecharts differs from Webmachine and Freya — application-level vs. protocol-level state machines |
+| [AGENT_HYPOTHESIS.md](AGENT_HYPOTHESIS.md) | Feature combination probability assessment for agentic API consumption |
+| [MULTI-PARTY_SESSIONS.md](MULTI-PARTY_SESSIONS.md) | Runtime enforcement of multi-party protocol discipline |
+| [REFERENCES.md](REFERENCES.md) | Cited works organized by category |
+| [VIEW_ENGINE_COMPARISON.md](VIEW_ENGINE_COMPARISON.md) | Comparison of HTML rendering approaches for Frank.Datastar |
+
+## Spec Naming Conventions
+
+| Prefix | Source | Era |
+|--------|--------|-----|
+| `001-016` | Spec Kit | v7.0–v7.2 (sound, released) |
+| `ks-001` through `ks-033` | Kitty Specs | v7.3.0 (sound subset migrated; suspect specs archived separately) |
+| `gh-NNN` | GitHub issues | v7.4.0 design specs extracted from issue bodies |
+| `YYYY-MM-DD-*` | Superpowers | v7.3.1+ design documents |

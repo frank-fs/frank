@@ -30,7 +30,7 @@ Always run `dotnet build Frank.sln` and `dotnet test` before claiming work is co
 - `src/` — Library projects, multi-target net8.0/net9.0/net10.0
 - `test/` — Test projects, target net10.0 only
 - `sample/` — Sample apps (TicTacToe, Datastar variants)
-- `.worktrees/` — Git worktrees for feature branches (gitignored)
+- `.claude/worktrees/` — Git worktrees for feature branches (gitignored)
 - `hooks/` — Git hooks (Fantomas pre-commit, Entire CLI)
 
 16 projects. Key assemblies:

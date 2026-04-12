@@ -14,8 +14,8 @@ Check all open PRs in this repo and shepherd them toward merge:
 
    b. **Merge conflicts**: If the PR has conflicts with master, rebase it:
       ```
-      git worktree add .worktrees/rebase-<number> <branch>
-      cd .worktrees/rebase-<number>
+      git worktree add .claude/worktrees/rebase-<number> <branch>
+      cd .claude/worktrees/rebase-<number>
       git rebase master
       git push --force-with-lease
       ```
