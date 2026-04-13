@@ -16,17 +16,15 @@ The v7.0–v7.2 foundation (54 decisions) is entirely unaffected — Datastar, A
 
 ### What's broken
 
-The hierarchy is real inside the runtime and invisible to everything outside it. Results are flat lists. Fork is a no-op. `TransitionStep` (the tree type) was specified but never created. `ExtractedStatechart` — the type that feeds every analysis tool, generator, projection, and CLI command — has no hierarchy field. The provenance bridge was never connected. The dual derivation operates on flat data. SHACL shapes are served but undiscoverable via hypermedia. The only observer mechanism (`onTransition`) is scheduled for removal with no replacement built.
+The hierarchy is real inside the runtime and invisible to everything outside it:
 
-### The bottleneck
-
-One type feeds ~15 functions across ~10 files:
-
-```
-ExtractedStatechart { StateNames: string list; Transitions: TransitionSpec list }
-```
-
-No hierarchy. No children. No composite kinds. This is the type every downstream system reads. The runtime has hierarchy via `StateHierarchy`. The consumers read the flat statechart. Two parallel views of the same data — one hierarchical, one flat — and the flat one won.
+- **Results are flat lists.** `HierarchicalTransitionResult` has `ExitedStates: string list` and `EnteredStates: string list`. The tree type (`TransitionStep`) specified in gh-286 was never created. All five banned anti-patterns from the spec are present in the code.
+- **Fork is a no-op.** `Fork = fun _regions (config, history) -> (config, history, [], [])` with a comment calling it a "Protocol marker." Every interpreter that needs Fork (Dual, Trace, Collector, Validation) cannot function. None of those interpreters exist.
+- **The provenance bridge was never connected.** `Frank.Provenance` registers an `IHostedService` that subscribes to `IObservable<TransitionEvent>` from DI. Nobody publishes it. The service starts, silently logs "No IObservable registered," and does nothing. The system was designed, implemented, shipped — and never wired to the runtime it observes. Even if it were connected, there are **two incompatible `TransitionEvent` types**: one generic with flat lists (`Frank.Statecharts`), one non-generic with singular state strings (`Frank.Provenance`). They share a name and nothing else.
+- **The dual derivation operates on flat data.** `Dual.fs` — 740 lines of code, zero references to `TransitionAlgebra`. Flat traversal over `TransitionSpec list`. A 30-line module comment documents three formalism bounds, including *"AND-state parallel composition is NOT handled — synchronization barriers silently dropped."* D-005 says replace it with a `DualAlgebra` interpreter. Nothing has started.
+- **SHACL shapes are served but invisible to navigation.** Shapes exist at `/shapes/{slug}` with content negotiation. The affordance middleware generates Link headers with ALPS profile URIs. The two systems have no awareness of each other. No Link header points to SHACL shapes. A discoverable framework with undiscoverable validation constraints.
+- **`onTransition` is the only observer mechanism — and it's scheduled for removal.** D-006 says eliminate it: "Customization happens through interpreters." But it's the only integration point for provenance, logging, and the OrderFulfillment e2e test. The replacement (TraceAlgebra) is one of the four interpreters that were designed and never built. Removing `onTransition` without TraceAlgebra makes the provenance gap permanent and breaks the thesis demo.
+- **`ExtractedStatechart` is the flat bottleneck.** One type feeds ~15 functions across ~10 files — every generator, every projection, every analysis tool, every CLI command. No hierarchy field. No children. No composite kinds. The runtime has hierarchy via `StateHierarchy`. Everything else reads the flat statechart.
 
 ### The dependency chain to the thesis
 
@@ -44,16 +42,16 @@ If the algebra types aren't right, nothing downstream can be right.
 
 The CLI tooling was built before the types were hierarchical. The parsers had nowhere to put their hierarchy data. The fix requires working inside-out:
 
-1. **Types first** — `ExtractedStatechart` gets hierarchy (or is replaced). `TransitionStep` tree exists. `HierarchicalTransitionResult` drops flat fields. These are the gh-286 decisions that were specified but never implemented.
-2. **Runtime second** — Fork becomes real. Interpreters (Runtime, Trace, Dual, Validation, Collector) built against tree types.
-3. **Consumers third** — Projection, ProgressAnalysis, AffordanceMap, Dual derivation updated to read hierarchy. The ~15 function blast radius.
-4. **CLI/generators last** — `frank extract`, format generators, `model.bin` pipeline updated. The parsers already capture hierarchy — they just need a non-flat container.
+1. **Types first** — `ExtractedStatechart` gets hierarchy (or is replaced). `TransitionStep` tree exists. `HierarchicalTransitionResult` drops flat fields. Two `TransitionEvent` types unified.
+2. **Runtime second** — Fork becomes real. Interpreters (Runtime, then Trace as onTransition replacement, then Dual, Validation, Collector) built against tree types.
+3. **Consumers third** — Projection, ProgressAnalysis, AffordanceMap, Dual derivation (replaced), SHACL Link headers wired into affordance middleware. The ~15 function blast radius.
+4. **CLI/generators last** — `frank extract`, format generators, `model.bin` pipeline. The parsers already capture hierarchy — they just need a non-flat container.
 
 Each layer can be tested independently before the next starts. Types compile-check. Runtime has unit tests. Consumers have integration tests. CLI has e2e tests.
 
 ### Recommendation
 
-A comprehensive reset of the statechart layer, working from types outward. The v7.0–v7.2 foundation, the AST, and the parsers are keepers. The runtime internals (LCA, history, auto-wrap) are correct but their output types need restructuring. Everything from `ExtractedStatechart` outward needs to be rebuilt against hierarchical types. The designs from gh-257 and gh-286 are the correct specifications — the code needs to match them.
+A comprehensive reset of the statechart layer, working from types outward. The v7.0–v7.2 foundation, the AST, and the parsers are keepers. The runtime internals (LCA, history, auto-wrap) are correct but their output types need restructuring. Everything from `ExtractedStatechart` outward needs to be rebuilt against hierarchical types. The provenance bridge needs to exist. The SHACL shapes need to be discoverable. The dual derivation needs to see Forks. The designs from gh-257 and gh-286 are the correct specifications — the code needs to match them.
 
 ---
 
@@ -79,7 +77,7 @@ Datastar SSE streaming. Frank.Auth. Frank.OpenApi. Middleware ordering. The `res
 
 ---
 
-### Act II: The Pivot That Wasn't (v7.3.0, Kitty Specs 003–004)
+### Act II: The Pivot That Wasn't (v7.3.0, Kitty Specs 003–010)
 
 **KS-003 (Statecharts Feasibility Research)** concludes hierarchy is viable. Five format targets identified (SCXML, smcat, WSD, ALPS, XState). `statefulResource` CE proposed. Complexity ceiling set at "simple to moderate." The research is thorough. Hierarchy is the goal.
 
@@ -88,15 +86,17 @@ Datastar SSE streaming. Frank.Auth. Frank.OpenApi. Middleware ordering. The `res
 - `StateMachine<'S,'E,'C>` — flat DU-based states, pure transition functions
 - `TransitionResult<'S,'C>` — flat DU: Transitioned, Blocked, Invalid
 - Guards in registration order, first Blocked short-circuits
-- `onTransition` observable hooks
+- `onTransition` observable hooks — **the only mechanism for anything outside the runtime to observe transitions.** Remember this. It becomes critical later.
 
 No hierarchy. No composite states. No AND-regions. No Fork. A flat FSM, cleanly implemented.
+
+**KS-006 (PROV-O State Change Tracking)** designs provenance against this flat model. `TransitionEvent` with singular `PreviousState` and `NewState` strings. One `ProvenanceRecord` per transition. The provenance system subscribes to an `IObservable<TransitionEvent>` from DI — but **nobody in `Frank.Statecharts` ever publishes one.** The `IHostedService` starts, logs "No IObservable<TransitionEvent> registered. Provenance tracking requires Frank.Statecharts integration," and silently does nothing. The system was designed (KS-006), implemented (PR #109), shipped — and never connected to the runtime it was supposed to observe. To make matters worse, KS-006 defines its *own* `Frank.Provenance.TransitionEvent` type — non-generic, with singular `PreviousState`/`NewState` strings — while `Frank.Statecharts` later creates a *different* `TransitionEvent<'S,'E,'C>` — generic, with flat `ExitedStates`/`EnteredStates` lists. Two types, same name, incompatible shapes. Even if the bridge existed, the types wouldn't match.
 
 **KS-010 (Production Readiness)** then *hardens* this flat runtime: `PreComputeUnionTagReader` for O(1) state key extraction, actor-serialized concurrency, Guard DU with AccessControl/EventValidation phases, SQLite store.
 
 The pivot was supposed to happen between KS-003 and KS-004. The research said "do hierarchy." The implementation said "flat first." Production readiness then cemented the flat baseline as if it were the final design.
 
-Nobody went back.
+Nobody went back. And the provenance system sat disconnected, waiting for a bridge that would never come.
 
 ---
 
@@ -121,6 +121,8 @@ And then the CLI:
 
 "Added later" is the most dangerous phrase in software engineering. It means "never."
 
+Meanwhile, **KS-005 (SHACL Validation)** builds shape derivation from F# types, serves shapes at `/shapes/{slug}` with content negotiation. The shapes exist. But the affordance middleware — which generates Link headers for ALPS profiles — has no awareness that SHACL shapes exist at all. No Link header ever points to `/shapes/{slug}`. A discoverable framework shipping with undiscoverable validation constraints. This gap is never addressed in any subsequent spec.
+
 ---
 
 ### Act IV: The Body in the Library (v7.3.1–v7.4.0, PRs 221–274)
@@ -143,11 +145,17 @@ The runtime computes genuine LCA-based exit/entry paths — then flattens them i
 
 The hierarchy is real inside the runtime. It's invisible to everything outside it.
 
+And outside the runtime, **`onTransition` is the only window.** The provenance system was supposed to observe through it, but was never connected. The e2e test observes through it, but only checks for individual state names in flat lists — a test that passes whether the hierarchy is real or faked. Every external system that needs to know about transitions — logging, provenance, diagnostics — depends on this one hook that D-006 will later say should be eliminated. With no replacement on the horizon.
+
+**PRs #227–235** build the dual derivation engine — 740 lines of `Dual.fs`. Session type duality, client obligations, race detection, circular wait analysis. Impressive scope. But `Dual.fs` has **zero references to `TransitionAlgebra`**. It's entirely a pre-algebra system: flat traversal over `TransitionSpec list`, flat `ExtractedStatechart` as input, flat per-state snapshots as output. A 30-line module comment documents three formalism bounds. The first: *"AND-state parallel composition is NOT handled — synchronization barriers silently dropped. When deriveWithHierarchy receives hierarchy containing AND-state composites, it emits a warning and proceeds with flat-FSM semantics."*
+
+The dual derivation was built during the era when hierarchy was becoming "operational." But because `ExtractedStatechart` had no hierarchy field, `Dual.fs` had no hierarchy to derive from. The AND-state gap isn't a limitation of the algorithm — it's a consequence of the flat bottleneck type. Seven hundred forty lines of analysis code that can never see Forks.
+
 ---
 
 ### Act V: The Detective's Notebook (v7.4.0 Design Decisions)
 
-**GH-257** designs the correct algebra: tagless-final `TransitionAlgebra<'r>`, four interpreter types (Runtime, Trace, Dual, Validation), pure synchronous interpreters with async concerns in middleware.
+**GH-257** designs the correct algebra: tagless-final `TransitionAlgebra<'r>`, four interpreter types (Runtime, Trace, Dual, Validation), pure synchronous interpreters with async concerns in middleware. Note the four interpreters: **TraceAlgebra** was designed to be the replacement for `onTransition` — an interpreter that collects transition information structurally rather than through a callback hook. **DualAlgebra** was designed to replace `Dual.fs` entirely, closing the AND-state gap by seeing Fork operations that the flat derivation can never see. Neither was built.
 
 **GH-286** specifies the fix in precise detail:
 - `TransitionStep` tree type: `Leaf of TransitionOp | Seq of TransitionStep list | Par of TransitionStep list`
@@ -158,63 +166,42 @@ The hierarchy is real inside the runtime. It's invisible to everything outside i
 
 The designs are correct. They were collaboratively refined. They specify exactly what the code should look like.
 
-The code was never updated. Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists.
+The code was never updated. Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists. TraceAlgebra doesn't exist, so `onTransition` can't be removed. DualAlgebra doesn't exist, so `Dual.fs` can't see Forks. The provenance bridge is still disconnected. The SHACL shapes are still invisible.
 
 ---
 
-### Act VI: The Suspects Lineup
+### Act VI: The Connections
 
-#### Suspect 1: The Provenance Bridge That Doesn't Exist
+This isn't six independent problems. It's one problem with six symptoms.
 
-`Frank.Provenance` registers an `IHostedService` that subscribes to `IObservable<TransitionEvent>` from DI. **Nobody publishes it.** The service starts, logs "No IObservable<TransitionEvent> registered," and silently does nothing.
+**The flat bottleneck type** (`ExtractedStatechart`) feeds every downstream consumer. Because it has no hierarchy, `Dual.fs` was built flat. Because `Dual.fs` is flat, it can't handle AND-states. Because the algebra interpreters were never built, there's no DualAlgebra to replace it. Because there's no TraceAlgebra, `onTransition` can't be removed. Because `onTransition` is the only observer, the provenance system was designed to use it — but was never connected. Because the provenance system uses its own `TransitionEvent` type (designed against the flat model from KS-006), even connecting it now would require type unification. Because SHACL shapes were built as a standalone system (KS-005) with no integration into the affordance middleware, they're invisible to the very hypermedia navigation system that's supposed to make Frank discoverable.
 
-Even if the bridge existed, there are **two incompatible `TransitionEvent` types**: `Frank.Statecharts.TransitionEvent<'S,'E,'C>` (generic, carries flat `ExitedStates`/`EnteredStates` lists) and `Frank.Provenance.TransitionEvent` (non-generic, carries singular `PreviousState`/`NewState` strings). They share a name. They share nothing else.
-
-The provenance system was designed (KS-006), implemented (PR #109), shipped — and never connected to the runtime it's supposed to observe.
-
-#### Suspect 2: The Dual Derivation That Can't See Forks
-
-`Dual.fs` — 740 lines of pre-algebra code. Zero references to `TransitionAlgebra`. Operates entirely on flat `ExtractedStatechart`. Has a 30-line module comment documenting three formalism bounds, including: *"AND-state parallel composition is NOT handled — synchronization barriers silently dropped."*
-
-D-005 says replace it entirely with a `DualAlgebra` interpreter. Nothing has started. Every consumer of `DeriveResult` — `DualAlpsGenerator`, `DualConformanceChecker`, `DualProfileOverlay` — assumes flat per-state snapshots. Replacing `Dual.fs` means rewriting all of them.
-
-#### Suspect 3: The SHACL Shapes Nobody Can Find
-
-SHACL shapes are served at `/shapes/{slug}` with content negotiation (Turtle, JSON-LD, RDF/XML). They exist. They're pre-computed at startup.
-
-The affordance middleware generates Link headers with ALPS profile URIs. It has no awareness of SHACL shapes. No Link header points to them. They are invisible to hypermedia navigation — a discoverable framework with undiscoverable validation constraints.
-
-#### Suspect 4: The Only Observer In Town
-
-`onTransition` is the only integration point between the statechart runtime and any external system. D-006 says eliminate it — "Customization happens through interpreters." But:
-
-- The OrderFulfillment e2e test depends on it (AT3 checks stderr logs from the hook)
-- 6+ unit tests directly test hook behavior
-- The provenance system's *intended* design uses it as the subscription mechanism
-- The replacement (TraceAlgebra interpreter) doesn't exist
-
-Removing `onTransition` without TraceAlgebra makes the provenance gap permanent and breaks the thesis demo.
-
-#### Suspect 5: `ExtractedStatechart` — The Flat Bottleneck
-
-The real culprit. Every analysis tool, every generator, every projection, every CLI command reads from `ExtractedStatechart`:
+One missing hierarchy field on one type. Everything follows from that.
 
 ```
-ExtractedStatechart { StateNames: string list; Transitions: TransitionSpec list }
-    ├── Wsd.Generator.generate()
-    ├── Smcat.Generator.generate()
-    ├── FormatPipeline.buildDocumentFromExtracted()
-    ├── Projection.projectForRole / projectAll
-    ├── Dual.derive* ("operates on flat ExtractedStatechart")
-    ├── ProgressAnalysis.analyzeProgress / detectDeadlocks
-    ├── AffordanceMap.fromStatechart
-    ├── ProjectionValidator.validate*
-    └── CLI TextOutput / JsonOutput
+ExtractedStatechart (no hierarchy)
+    │
+    ├── Dual.fs can't see Forks ──► AND-state gap ──► DualAlgebra designed but not built
+    │
+    ├── Fork is a no-op ──► RuntimeInterpreter broken ──► TraceAlgebra not built
+    │                                                          │
+    │                                                          ▼
+    │                                              onTransition can't be removed
+    │                                                          │
+    │                                                          ▼
+    │                                              Provenance bridge never connected
+    │                                              (also: two TransitionEvent types)
+    │
+    ├── Generators consume flat maps ──► CLI pipeline flat ──► model.bin flat
+    │                                                              │
+    │                                                              ▼
+    │                                                   Discovery surface incomplete
+    │                                                              │
+    │                                                              ▼
+    │                                                   Thesis cannot be demonstrated
+    │
+    └── AffordanceMap has no SHACL awareness ──► Shapes undiscoverable
 ```
-
-No hierarchy field. No children. No composite kinds. `StateMachineMetadata` carries *both* `Hierarchy: StateHierarchy` (hierarchical) and `Statechart: ExtractedStatechart option` (flat). The runtime reads the hierarchy. Everything else reads the flat statechart.
-
-One type. Fifteen functions. Ten files. That's the blast radius.
 
 ---
 
@@ -243,8 +230,8 @@ Dramatically better than v7.3.0. But not perfect:
 
 | Issue | Blocked by | Requirements at risk |
 |-------|-----------|---------------------|
-| #287 TraceInterpreter | #286 | Standalone trace, interpreter composition |
-| #288 DualInterpreter | #286, #257 | Closes AND-state gap (formalism bound 1) |
+| #287 TraceInterpreter | #286 | Standalone trace, interpreter composition — **onTransition replacement** |
+| #288 DualInterpreter | #286, #257 | Closes AND-state gap — **Dual.fs replacement** |
 | #289 ValidationInterpreter | #286 | Dry-run guard evaluation |
 | #290 CollectorInterpreter | #286 | CE-first format generation |
 | #282 Transition CE | #286 | Auto-generated algebra programs |
@@ -260,12 +247,15 @@ Dramatically better than v7.3.0. But not perfect:
 ### Root Cause: Each Layer Trusted The One Below
 
 1. **KS-003** concluded hierarchy was feasible. **KS-004** built flat.
-2. **Parsers** (KS-013/018/020/024) built correct hierarchical ASTs. **Mappers** flattened to Act II types.
-3. **KS-026** designed the CLI pipeline flat, with "compound states later."
-4. **PR #221/259** added hierarchy to the runtime but kept all result types flat.
-5. **GH-257/286** designed the correct algebra. Code was never updated.
+2. **KS-006** designed provenance against flat types — then was **never connected** to the runtime.
+3. **Parsers** (KS-013/018/020/024) built correct hierarchical ASTs. **Mappers** flattened to Act II types.
+4. **KS-005** built SHACL shapes. **Affordance middleware** was never told they exist.
+5. **KS-026** designed the CLI pipeline flat, with "compound states later."
+6. **PR #221/259** added hierarchy to the runtime but kept all result types flat.
+7. **PRs #227–235** built 740 lines of dual derivation against flat `ExtractedStatechart` — can never see Forks.
+8. **GH-257/286** designed the correct algebra with four interpreters. None were built. `onTransition` can't be removed without TraceAlgebra. `Dual.fs` can't be replaced without DualAlgebra.
 
-Each layer assumed the one below would eventually become hierarchical. None did.
+Each layer assumed the one below would eventually become hierarchical. None did. Each integration point assumed someone else would wire it. Nobody did.
 
 **The AST (KS-020) is the one layer that got hierarchy right.** Everything downstream (to runtime consumers) and upstream (to CLI/generators) flattens it.
 
@@ -295,11 +285,11 @@ The designs are sound. The AST is sound. The runtime *internally* computes hiera
 
 ## Reset Plan: Types First, Inside Out
 
-The CLI tooling was built before the types were hierarchical. The parsers captured hierarchy correctly but had nowhere to put it — `ExtractedStatechart` had no hierarchy field, so they flattened to fit the container. The fix requires working inside-out: get the types right, then propagate outward.
+The CLI tooling was built before the types were hierarchical. The parsers captured hierarchy correctly but had nowhere to put it — `ExtractedStatechart` had no hierarchy field, so they flattened to fit the container. The provenance system was designed but never connected. The SHACL shapes were served but never linked. The dual derivation was built flat because the types it read were flat. The fix requires working inside-out: get the types right, then propagate outward.
 
 ### Layer 1: Types (the foundation)
 
-**What to do**: Create the tree types specified in gh-286 that were never implemented.
+**What to do**: Create the tree types specified in gh-286 that were never implemented. Unify the two `TransitionEvent` types.
 
 | Type | Current | Target | Status |
 |------|---------|--------|--------|
@@ -307,13 +297,14 @@ The CLI tooling was built before the types were hierarchical. The parsers captur
 | `TransitionStep` | Does not exist | `Leaf of TransitionOp \| Seq of TransitionStep list \| Par of TransitionStep list` | New |
 | `HierarchicalTransitionResult` | `ExitedStates: string list, EnteredStates: string list` | `Steps: TransitionStep` (drop flat fields) | Breaking change |
 | `TransitionEvent<'S,'E,'C>` | `ExitedStates: string list, EnteredStates: string list` | `Steps: TransitionStep` (drop flat fields) | Breaking change |
+| `Frank.Provenance.TransitionEvent` | Non-generic, singular `PreviousState`/`NewState` | Unified with or bridged to `Frank.Statecharts.TransitionEvent` | Breaking change |
 | `ExtractedStatechart` | `StateNames: string list, Transitions: TransitionSpec list` | Add `StateContainment` or hierarchy field | Breaking change |
 
 **What's salvageable**: `TransitionAlgebra<'r>` type is correct and already in Core. `ActiveStateConfiguration`, `HistoryRecord`, `StateHierarchy`, `CompositeStateSpec` are all correct. The types that exist are fine — it's the types that don't exist and the flat fields on existing types.
 
 ### Layer 2: Runtime (interpreters)
 
-**What to do**: Make Fork real. Build interpreters against tree types.
+**What to do**: Make Fork real. Build interpreters against tree types. TraceAlgebra is the `onTransition` replacement — must exist before hooks can be removed.
 
 | Component | Current | Target | Salvageable? |
 |-----------|---------|--------|-------------|
@@ -322,8 +313,8 @@ The CLI tooling was built before the types were hierarchical. The parsers captur
 | `enterState` | Returns `ActiveStateConfiguration` only | Returns `(ActiveStateConfiguration * TransitionStep)` tuple | Modify signature |
 | `HierarchicalRuntime.transition` | Uses flat `RuntimeStep`, returns flat lists | Delegates to `TransitionProgram.runProgram` | Already partially there |
 | `TransitionProgram` builder | Generates correct op sequence including Fork | Unchanged — already emits Fork after Enter for AND composites | **Keep as-is** |
-| TraceInterpreter | Does not exist | Collects `TransitionStep` tree for observation | New |
-| DualInterpreter | Does not exist (740-line Dual.fs is pre-algebra) | Replaces `deriveWithHierarchy`, closes AND-state gap | New (Dual.fs consumers need rewrite) |
+| TraceInterpreter | Does not exist | Collects `TransitionStep` tree for observation — **replaces `onTransition`** | New |
+| DualInterpreter | Does not exist (740-line Dual.fs is pre-algebra) | Replaces `deriveWithHierarchy`, **closes AND-state gap by seeing Fork** | New (Dual.fs consumers need rewrite) |
 | ValidationInterpreter | Does not exist | Dry-run guard evaluation | New |
 | CollectorInterpreter | Does not exist | CE-first format generation | New |
 
@@ -331,7 +322,7 @@ The CLI tooling was built before the types were hierarchical. The parsers captur
 
 ### Layer 3: Consumers (the blast radius)
 
-**What to do**: Update ~15 functions to read hierarchy from the new types.
+**What to do**: Update ~15 functions to read hierarchy from the new types. Wire SHACL into affordance middleware. Connect provenance bridge.
 
 | Consumer | Current data source | Impact | Salvageable? |
 |----------|-------------------|--------|-------------|
@@ -340,13 +331,15 @@ The CLI tooling was built before the types were hierarchical. The parsers captur
 | `ProgressAnalysis.detectDeadlocks` | Flat `StateNames` iteration | Needs composite-state awareness | Algorithm rewrite |
 | `ProgressAnalysis.identifyReadOnlyRoles` | Flat projected statechart | Same | Algorithm rewrite |
 | `AffordanceMap.fromStatechart` | Flat state list | Needs hierarchy for composite affordances | Moderate rewrite |
+| `AffordanceMiddleware` | No SHACL awareness | Add SHACL shape Link headers alongside ALPS profile links | Addition |
 | `Dual.derive*` (740 lines) | Flat `ExtractedStatechart` | Full replacement with DualInterpreter (Layer 2) | **Replace entirely** |
 | `ProjectionValidator.validate*` | Flat validation | Hierarchy-aware validation | Moderate rewrite |
 | `DualProfileOverlay` | Flat `DeriveResult` | Follows DualInterpreter rewrite | Rewrite |
 | `DualConformanceChecker` | Flat `DeriveResult` | Follows DualInterpreter rewrite | Rewrite |
 | `StateMachineMiddleware` | `StateHandlerMap` (flat) + `HierarchicalRuntime` (hierarchical) | Already hierarchy-aware for dispatch — just needs tree-typed results | **Minor changes** |
 | `computeTransition` closure | Copies flat lists to `TransitionEvent` | Copies `TransitionStep` tree instead | **Trivial** |
-| `onTransition` hooks | Receives flat `TransitionEvent` | Receives tree-typed `TransitionEvent` — or replaced by TraceInterpreter | Depends on D-DD6 timeline |
+| Provenance bridge | Does not exist | Wire `IObservable<TransitionEvent>` publisher in middleware | New |
+| `onTransition` hooks | Receives flat `TransitionEvent` | Replaced by TraceInterpreter (Layer 2) | Remove after TraceAlgebra exists |
 
 **What's salvageable**: The middleware dispatch logic is already hierarchy-aware — it uses `HierarchicalRuntime.resolveHandlers` with parent-fallback. The `computeTransition` closure just copies fields. Role projection (Allow/Link header generation) works correctly. The functions that need rewriting are the analysis functions (projection, progress, dual, validation) that currently iterate flat lists.
 
@@ -368,17 +361,6 @@ The CLI tooling was built before the types were hierarchical. The parsers captur
 
 **What's salvageable**: The **parsers** (smcat, SCXML, ALPS, WSD) all correctly capture hierarchy from source formats. They produce hierarchical ASTs. The problem is only on the *generation* side — where hierarchical AST data flows back out through flat types. The parser code is a keeper. The generator code needs rewriting to read hierarchy from the types rather than flat maps.
 
-### The provenance and SHACL gaps
-
-These are not part of the core reset but should be addressed:
-
-| Gap | Fix | When |
-|-----|-----|------|
-| Provenance bridge never connected | Wire `IObservable<TransitionEvent>` publisher in statechart middleware | After Layer 2 (needs tree-typed events) |
-| Two incompatible `TransitionEvent` types | Unify or bridge `Frank.Provenance.TransitionEvent` with `Frank.Statecharts.TransitionEvent<'S,'E,'C>` | After Layer 1 (type design) |
-| SHACL shapes undiscoverable | Add SHACL shape Link headers in affordance middleware | After Layer 3 (affordance rewrite) |
-| Dual derivation AND-state gap | DualInterpreter with Fork semantics | Layer 2 |
-
 ### Order of operations
 
 ```
@@ -386,16 +368,14 @@ Layer 1 (types) ──────► compile-check, no runtime changes
     │
     ▼
 Layer 2 (runtime) ────► unit tests against tree assertions
-    │
+    │                   TraceAlgebra enables onTransition removal
+    │                   DualAlgebra enables Dual.fs replacement
     ▼
 Layer 3 (consumers) ──► integration tests, projection/analysis correct
-    │
+    │                   Provenance bridge wired
+    │                   SHACL shapes linked in affordance middleware
     ▼
 Layer 4 (CLI/gen) ────► e2e tests, round-trip verification
-    │
-    ▼
-Gaps (provenance, ────► integration tests
-      SHACL, dual)
 ```
 
 Each layer is independently testable. Types compile-check. Runtime has unit tests with tree-shape assertions. Consumers have integration tests. CLI has e2e tests. No layer depends on the one above it being complete.
