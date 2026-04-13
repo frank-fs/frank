@@ -51,7 +51,46 @@ Each layer can be tested independently before the next starts. Types compile-che
 
 ### Recommendation
 
-A comprehensive reset of the statechart layer, working from types outward. The v7.0–v7.2 foundation, the AST, and the parsers are keepers. The runtime internals (LCA, history, auto-wrap) are correct but their output types need restructuring. Everything from `ExtractedStatechart` outward needs to be rebuilt against hierarchical types. The provenance bridge needs to exist. The SHACL shapes need to be discoverable. The dual derivation needs to see Forks. The designs from gh-257 and gh-286 — which emerged from the discovery of these problems, not from the original plan — represent the correct target. The code needs to match them.
+Modified Brooks: rebuild the statechart *output* layer on the sound foundation. Don't throw away the whole thing — the v7.0–v7.2 foundation is a real framework. Excise the flat output types, broken bridges, and adversarial context. Design the replacement type architecture, then rebuild outward.
+
+**Keep** (correct algorithms, working infrastructure):
+
+- `Frank` core — resource/webHost CEs, endpoint metadata, middleware pipeline
+- `Frank.Auth`, `Frank.OpenApi`, `Frank.Datastar` — hierarchy-agnostic, working
+- `Frank.Discovery` — JSON Home, OPTIONS middleware
+- Format parsers (WSD, SCXML, smcat, ALPS) — all correctly capture hierarchy
+- `TransitionAlgebra<'r>` type definition
+- `TransitionProgram` builder — already emits Fork correctly
+- `StateHierarchy.build`, `computeLCA`, exit/entry path calculation — correct algorithms
+- History mechanism (shallow/deep, record/restore) — correct algorithms
+- Auto-wrap logic, `ActiveStateConfiguration`, `HistoryRecord`, `CompositeStateSpec`
+- Role projection (Allow/Link header generation) — working e2e
+- `StateMachineMiddleware` dispatch logic — hierarchy-aware
+
+**Excise** (flat types, broken bridges, adversarial context):
+
+- `HierarchicalTransitionResult` flat fields — attracts every implementation back to flat
+- `TransitionEvent<'S,'E,'C>` flat fields — carries flat to all observers
+- `RuntimeInterpreter` Fork/Bind/Enter implementations — no-op Fork, flat list concatenation
+- `ExtractedStatechart` — flat bottleneck, no hierarchy, missing half the concerns
+- `Dual.fs` (740 lines) — pre-algebra, zero `TransitionAlgebra` refs, AND-state gap
+- `DualAlpsGenerator`, `DualConformanceChecker`, `DualProfileOverlay` — built on flat `DeriveResult`
+- `Frank.Provenance.TransitionEvent` — incompatible type, disconnected bridge
+- `FormatPipeline.buildDocumentFromExtracted` — flat document builder
+- `Wsd.Generator.generate` / `Smcat.Generator.generate` — read flat `StateHandlerMap`
+- All test assertions on `ExitedStates`/`EnteredStates` flat lists — make shortcuts invisible
+- `onTransition` CE operation — must stay until TraceAlgebra exists, then remove
+
+**Excise to avoid recurring patterns** (process, not code):
+
+- **Claude as implementer of global invariants.** The type architecture, hierarchy semantics, Fork — anything where correctness requires holding the full stack in view — must be designed and implemented by the user. Claude as sounding board for these: yes. Claude as implementer: no. The repeated collapse-to-flat proves the tool cannot sustain non-local invariants across a long implementation session.
+- **Expert review evaluating what's shown.** The skill needs a mode that reviews against original requirements, not current code. "Does this match issue #286's acceptance criteria?" rather than "Is this implementation sound?" The latter always says yes because the easy version *is* sound.
+- **Tests that verify symptoms instead of mechanisms.** "Right states activated" passes with both flat and hierarchical implementations. "Par node exists with correct children" only passes with the correct one. Every hierarchy test must assert tree *shape*, not list *contents*.
+- **The assumption that `string list` is a representation.** If a type carries `string list` where a tree is expected, that's a flattening, not an encoding. Make it a CLAUDE.md rule: no `string list` on result types that should carry tree structure.
+
+**Division of labor for the rebuild:**
+
+The user designs the type architecture (with Claude as sounding board) and implements the core types and Fork. Once tree types exist with tree-shape test assertions written by the user, Claude can fill in locally-verifiable parts: generators (parsers already done), middleware wiring, CLI updates. The sounding board is valuable. The implementer is reliable only for work with clear local verification.
 
 ---
 
