@@ -427,35 +427,57 @@ The AST correctly represents composite state nesting and LCA-based entry/exit. I
 
 ---
 
-## Reset Plan: Type Architecture First, Inside Out
+## Reset Plan: Finish the Merge, Then Build Outward
 
-The scope of the reset is larger than "fix `ExtractedStatechart` and propagate." The types across all assemblies need to form one coherent system that spans the full design space: statecharts with hierarchy, roles with role-based projections, guards, ALPS semantics, SHACL constraints, provenance, and discovery. Currently they are seven separate type systems that don't compose.
+The root cause is a type migration that was mostly successful for flat and then never finished. `Frank.Statecharts.Core` should have been deleted after its types moved to `Frank.Resources.Model`. It wasn't. Hierarchy landed in the wrong assembly. Two type systems diverged. Everything downstream built against the wrong one.
 
-The fix still works inside-out, but Layer 1 is now "design a coherent type architecture" rather than "add a hierarchy field to `ExtractedStatechart`."
+The reset is not "design a new type architecture from scratch." It's: finish the merge, delete the leftover, and then propagate hierarchy through the now-unified types.
 
-### Layer 1: Type architecture (the foundation)
+### Layer 0: Finish the merge (the actual root fix)
 
-**What to do**: Design a coherent type system that spans the full design space. This is not just "create `TransitionStep`" — it's deciding how hierarchy, roles with role-based projections, guards, ALPS semantics, SHACL constraints, and provenance compose through a unified set of types. Currently seven assemblies each define their own view of a statechart with no shared center.
+**What to do**: Complete the type unification that was reported as done but wasn't.
 
-Key questions to resolve before implementation:
-- What is the "portable statechart" type that carries hierarchy, roles, guards, and semantic annotations through the whole system? Is it `ExtractedStatechart` expanded, or a new type?
-- How do SHACL shapes, ALPS profiles, and affordance maps reference each other? Currently they're three separate systems with separate data paths.
-- How does provenance observe transitions? One `TransitionEvent` type or two? Generic or non-generic? Tree-structured or flat?
+1. **Move hierarchical AST types** from `Frank.Statecharts.Core/Types.fs` (`namespace Frank.Statecharts.Ast`) into `Frank.Resources.Model`. The types to move: `StatechartDocument`, `StateNode`, `TransitionEdge`, `StateKind`, `StateActivities`, `DataEntry`, `Annotation` DU, `HistoryKind`, `TransitionAlgebra<'r>`, `ParseResult`, and all supporting types.
+
+2. **Merge with existing `Frank.Resources.Model` types**. The flat types there (`ExtractedStatechart`, `TransitionSpec`, `StateContainment`) are the successfully-migrated flat versions. They need hierarchy added — either by enriching them with fields from the AST types, or by replacing them with the AST types directly where they duplicate.
+
+3. **Delete `Frank.Statecharts.Core`**. It was supposed to have been deleted. It has one file. After the types move, it has no purpose.
+
+4. **Update 32 imports**. 28 files in `Frank.Statecharts` and 4 in `Frank.Cli.Core` that `open Frank.Statecharts.Ast` need to import from `Frank.Resources.Model` instead.
+
+5. **Resolve the "circular dependency" concern** documented in `ResourceTypes.fs`. The dependency direction must be: `Frank.Resources.Model` (zero deps, holds all shared types) ← `Frank.Statecharts` (depends on Resources.Model) ← `Frank.Cli.Core` (depends on Statecharts).
+
+**This is the user's work.** The merge is a global invariant — it determines the dependency direction for the entire project. Claude cannot be trusted to complete it without reintroducing the split (the merge was reported as done before). The user designs the unified type set and verifies the imports.
+
+### Layer 1: Tree types and Fork (hierarchy in the unified types)
+
+**What to do**: With one type system in `Frank.Resources.Model`, add the tree types from gh-286 and make Fork real.
+
+- `TransitionOp`, `TransitionStep` (Leaf/Seq/Par) — new types in the unified assembly
+- `HierarchicalTransitionResult` drops flat `ExitedStates`/`EnteredStates`, gains `Steps: TransitionStep`
+- `TransitionEvent` unified (one type, not two incompatible ones) with tree-structured results
+- `ExtractedStatechart` gains hierarchy (from the merged AST types) — or is replaced by `StatechartDocument` directly
+- Fork/Join given semantic distinction (not just a cosmetic label)
+
+**This is also the user's work.** Tree-shape test assertions written by the user before any implementation. Claude as sounding board for type design, not implementer.
+
+Key design questions to resolve:
+- Does `ExtractedStatechart` survive as a projection of `StatechartDocument`, or does `StatechartDocument` replace it entirely?
+- How do roles with role-based projections, SHACL constraints, and ALPS semantics flow through the unified types?
 - Does `TransitionEdge` carry scope/LCA, or is that always computed at runtime?
-- Are Fork and Join semantically distinct in the AST, or just labels?
+- One `TransitionEvent` type or a bridge between provenance and statechart events?
 
-The gh-286 tree types (`TransitionOp`, `TransitionStep`) are part of the answer but not all of it. The type architecture must support the full design space, not just the hierarchy.
-
-| Type area | Current state | Needs |
-|-----------|--------------|-------|
+| Type area | Current state | Target |
+|-----------|--------------|--------|
+| Shared types | Split across two zero-dep assemblies | One assembly: `Frank.Resources.Model` |
 | Runtime output | Flat `string list` fields | Tree-structured `TransitionStep` |
-| Resource model | `ExtractedStatechart` — flat, no hierarchy | Hierarchy + roles + SHACL + ALPS as first-class |
+| Resource model | `ExtractedStatechart` — flat, no hierarchy | Hierarchy from merged AST types |
 | Provenance | Incompatible `TransitionEvent` type, disconnected bridge | Unified event type, wired bridge |
 | Discovery | Affordance middleware has no SHACL awareness | SHACL shapes linked from affordance system |
 | AST | Fork/Join cosmetic, multi-target in annotations only | Semantic pseudo-states, normalized multi-target |
 | Dual derivation | 740 lines on flat types, zero algebra references | DualAlgebra interpreter on tree types |
 
-**What's salvageable**: `TransitionAlgebra<'r>` is correct. `ActiveStateConfiguration`, `HistoryRecord`, `StateHierarchy`, `CompositeStateSpec` are correct. The AST's composite nesting and annotation system are correct. The runtime's LCA/history/auto-wrap internals are correct. The role projection and HTTP compliance layers work. These are real foundations — but they need a coherent type architecture connecting them.
+**What's salvageable**: `TransitionAlgebra<'r>` is correct. `ActiveStateConfiguration`, `HistoryRecord`, `StateHierarchy`, `CompositeStateSpec` are correct. The AST's composite nesting and annotation system are correct. The runtime's LCA/history/auto-wrap internals are correct. The role projection and HTTP compliance layers work. The parsers all correctly produce hierarchical ASTs. These are real foundations — they just need to live in one assembly and flow through one type system.
 
 ### Layer 2: Runtime (interpreters)
 
@@ -522,6 +544,12 @@ The gh-286 tree types (`TransitionOp`, `TransitionStep`) are part of the answer 
 Layer 1 (types) ──────► compile-check, no runtime changes
     │
     ▼
+Layer 0 (merge) ──────► compile-check, 32 import updates, delete Core
+    │                   USER DOES THIS — global invariant
+    ▼
+Layer 1 (tree types) ─► compile-check, tree-shape test assertions
+    │                   USER DOES THIS — writes tests before types
+    ▼
 Layer 2 (runtime) ────► unit tests against tree assertions
     │                   TraceAlgebra enables onTransition removal
     │                   DualAlgebra enables Dual.fs replacement
@@ -533,7 +561,7 @@ Layer 3 (consumers) ──► integration tests, projection/analysis correct
 Layer 4 (CLI/gen) ────► e2e tests, round-trip verification
 ```
 
-Each layer is independently testable. Types compile-check. Runtime has unit tests with tree-shape assertions. Consumers have integration tests. CLI has e2e tests. No layer depends on the one above it being complete.
+Layer 0 is the root fix. Layer 1 is the tree types. Both are the user's work — global invariants that Claude cannot be trusted to sustain. Layers 2–4 have clear local verification and are candidates for Claude implementation with pre-written test assertions. Each layer is independently testable. No layer depends on the one above it being complete.
 
 ---
 
