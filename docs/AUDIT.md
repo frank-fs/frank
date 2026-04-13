@@ -94,9 +94,11 @@ No hierarchy. No composite states. No AND-regions. No Fork. A flat FSM, cleanly 
 
 **KS-010 (Production Readiness)** then *hardens* this flat runtime: `PreComputeUnionTagReader` for O(1) state key extraction, actor-serialized concurrency, Guard DU with AccessControl/EventValidation phases, SQLite store.
 
-The pivot was supposed to happen between KS-003 and KS-004. The research said "do hierarchy." The implementation said "flat first." Production readiness then cemented the flat baseline as if it were the final design.
+The pivot was supposed to happen between KS-003 and KS-004. The research said "do hierarchy." The implementation said "flat first." This wasn't an accident — it was a deliberate decision, and the right concern was raised at the time: would it be hard to add hierarchy later? Claude and the early expert review skill were consulted. The answer came back clearly: adding hierarchy later would be trivial to easy. That assessment — backed by the same expert apparatus that would later validate shortcuts — is what made "flat first" feel safe.
 
-Nobody went back. And the provenance system sat disconnected, waiting for a bridge that would never come.
+It wasn't. Production readiness (KS-010) cemented the flat baseline. Every downstream system built against it. And when hierarchy was attempted as a retrofit, it turned out to be the opposite of trivial — the flat types resisted hierarchy at every layer, and every implementation attempt collapsed back to flat.
+
+The original concern was correct. The reassurance was wrong. And the provenance system sat disconnected, waiting for a bridge that would never come.
 
 ---
 
