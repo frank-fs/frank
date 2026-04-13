@@ -292,7 +292,7 @@ Not everything is broken. The evidence shows clear bright lines:
 | Layer | Status | Evidence |
 |-------|--------|----------|
 | v7.0–v7.2 foundation | Sound | 54 decisions, all hierarchy-agnostic |
-| Shared AST (KS-020) | Sound | `StateNode.Children`, `StateKind.Parallel` — correct model |
+| Shared AST (KS-020) | Partial | Composite nesting and LCA correct; Fork/Join cosmetic, multi-target not normalized, scope not on edges (see below) |
 | Format parsers | Sound | All correctly capture hierarchy from source formats |
 | Runtime dispatch | Sound | `StateMachineMiddleware` → `HierarchicalRuntime` — hierarchy-aware |
 | LCA / exit-entry paths | Sound | Correct computation, just flattened at output |
@@ -303,28 +303,78 @@ Not everything is broken. The evidence shows clear bright lines:
 | v7.3.1 discipline | Sound | 13 issues, zero silent drops |
 | v7.4.0 designs | Sound | TransitionAlgebra, interpreters, banned anti-patterns — correct specs |
 
-The designs are sound — they emerged from painful experience and represent genuine understanding of the problem. The AST is sound. The runtime *internally* computes hierarchy correctly. The gap is between the runtime's internal hierarchy and everything that reads its results. The fix path is types first, then runtime output, then consumers, then CLI — inside out, each layer testable before the next starts.
+The designs are sound — they emerged from painful experience and represent genuine understanding of the problem. The runtime *internally* computes hierarchy correctly. The gap is between the runtime's internal hierarchy and everything that reads its results.
+
+But the gap is wider than "fix the output types." The types were designed piecemeal across different eras for different concerns, and they don't form a coherent whole.
+
+### The Piecemeal Type Problem
+
+| Assembly | Types | Designed for | Knows about |
+|----------|-------|-------------|-------------|
+| `Frank.Statecharts.Core` | `StatechartDocument`, `StateNode`, `TransitionEdge`, `TransitionAlgebra` | Format parsing + algebra | Hierarchy, annotations. Not roles with role-based projections, SHACL, provenance. |
+| `Frank.Statecharts` | `StateMachine<'S,'E,'C>`, `StateMachineMetadata`, `HierarchicalTransitionResult` | HTTP dispatch | Hierarchy (internal), guards, handlers. Not ALPS, SHACL, provenance. |
+| `Frank.Resources.Model` | `ExtractedStatechart`, `AffordanceMap`, `StateContainment`, `TransitionSpec` | CLI/tooling/affordances | Roles with role-based projections, transitions, safety. Not hierarchy (flat), not SHACL, not provenance. |
+| `Frank.Provenance` | `TransitionEvent`, `ProvenanceRecord` | Provenance tracking | Single PreviousState/NewState. Not hierarchy, not roles, not ALPS. |
+| `Frank.Validation` | `ShapeBuilder`, `ShapeCache`, `Validator` | SHACL validation | F# types → SHACL shapes. Not affordances, not ALPS, not statecharts. |
+| `Frank.LinkedData` | RDF content negotiation | Serving RDF | OWL ontologies. Not statecharts, not ALPS, not SHACL validation. |
+| `Frank.Discovery` | `JsonHomeMiddleware`, `OptionsDiscoveryMiddleware` | HTTP discovery | Link headers, JSON Home. Not ALPS, not SHACL, not affordances. |
+
+Each was designed in isolation. The "portable concept" that should unify them — carrying hierarchy, roles with role-based projections, guards, ALPS semantics, SHACL constraints, and provenance hooks through the whole system — doesn't exist as a single coherent type. `ExtractedStatechart` was supposed to be it, but it's flat and missing half the concerns.
+
+`StateContainment` exists separately but isn't on `ExtractedStatechart`. SHACL shapes are served but the affordance middleware doesn't know about them. ALPS annotations live on AST nodes but don't flow into the resource model. Provenance has its own event type that doesn't match the statechart's event type. The discovery middleware and the affordance middleware are separate systems with separate data paths.
+
+### AST Gaps
+
+The shared AST (`Frank.Statecharts.Core`) was the most carefully designed layer, but it's not complete for the full design space:
+
+| Harel Requirement | AST Status |
+|-------------------|-----------|
+| XOR composite states | Supported — `StateNode.Children` + `StateKind.Composite` |
+| AND-states (parallel) | Supported — `StateKind.Parallel` → `CompositeKind.AND` |
+| History (shallow/deep) | Supported — `StateKind.ShallowHistory`/`DeepHistory` |
+| Guards on transitions | Supported — `TransitionEdge.Guard` + `GuardHref` |
+| Entry/exit actions | Supported — `StateActivities` |
+| Eventless transitions | Supported — `TransitionEdge.Event = None` |
+| Annotations | Supported — per-format DU cases |
+| **Fork/Join** | **Cosmetic** — `StateKind.ForkJoin` exists but no semantic distinction between fork and join, no runtime operation |
+| **Multi-target transitions** | **Annotation only** — `TransitionEdge.Target` is single `string option`; multi-target stored in `ScxmlMultiTarget` annotation, not normalized |
+| **Transition scope** | **Missing** — no LCA/scope field on `TransitionEdge`; must be computed at runtime, can't do static validation |
+| **Internal transitions** | **Annotation only** — `ScxmlTransitionType(isInternal)` marked but runtime treats all transitions identically |
+| **Data model** | **String-based** — `DataEntry` has `Name` and `Expression option` as strings, no types, no scope, no evaluation |
+
+The AST correctly represents composite state nesting and LCA-based entry/exit. It does not fully represent Harel pseudo-state semantics, multi-target atomicity, or transition scope as first-class concepts.
 
 ---
 
-## Reset Plan: Types First, Inside Out
+## Reset Plan: Type Architecture First, Inside Out
 
-The CLI tooling was built before the types were hierarchical. The parsers captured hierarchy correctly but had nowhere to put it — `ExtractedStatechart` had no hierarchy field, so they flattened to fit the container. The provenance system was designed but never connected. The SHACL shapes were served but never linked. The dual derivation was built flat because the types it read were flat. The fix requires working inside-out: get the types right, then propagate outward.
+The scope of the reset is larger than "fix `ExtractedStatechart` and propagate." The types across all assemblies need to form one coherent system that spans the full design space: statecharts with hierarchy, roles with role-based projections, guards, ALPS semantics, SHACL constraints, provenance, and discovery. Currently they are seven separate type systems that don't compose.
 
-### Layer 1: Types (the foundation)
+The fix still works inside-out, but Layer 1 is now "design a coherent type architecture" rather than "add a hierarchy field to `ExtractedStatechart`."
 
-**What to do**: Create the tree types specified in gh-286 that were never implemented. Unify the two `TransitionEvent` types.
+### Layer 1: Type architecture (the foundation)
 
-| Type | Current | Target | Status |
-|------|---------|--------|--------|
-| `TransitionOp` | Does not exist | `Exited of string \| Entered of string \| HistoryRecorded of string \| HistoryRestored of string * HistoryKind` | New |
-| `TransitionStep` | Does not exist | `Leaf of TransitionOp \| Seq of TransitionStep list \| Par of TransitionStep list` | New |
-| `HierarchicalTransitionResult` | `ExitedStates: string list, EnteredStates: string list` | `Steps: TransitionStep` (drop flat fields) | Breaking change |
-| `TransitionEvent<'S,'E,'C>` | `ExitedStates: string list, EnteredStates: string list` | `Steps: TransitionStep` (drop flat fields) | Breaking change |
-| `Frank.Provenance.TransitionEvent` | Non-generic, singular `PreviousState`/`NewState` | Unified with or bridged to `Frank.Statecharts.TransitionEvent` | Breaking change |
-| `ExtractedStatechart` | `StateNames: string list, Transitions: TransitionSpec list` | Add `StateContainment` or hierarchy field | Breaking change |
+**What to do**: Design a coherent type system that spans the full design space. This is not just "create `TransitionStep`" — it's deciding how hierarchy, roles with role-based projections, guards, ALPS semantics, SHACL constraints, and provenance compose through a unified set of types. Currently seven assemblies each define their own view of a statechart with no shared center.
 
-**What's salvageable**: `TransitionAlgebra<'r>` type is correct and already in Core. `ActiveStateConfiguration`, `HistoryRecord`, `StateHierarchy`, `CompositeStateSpec` are all correct. The types that exist are fine — it's the types that don't exist and the flat fields on existing types.
+Key questions to resolve before implementation:
+- What is the "portable statechart" type that carries hierarchy, roles, guards, and semantic annotations through the whole system? Is it `ExtractedStatechart` expanded, or a new type?
+- How do SHACL shapes, ALPS profiles, and affordance maps reference each other? Currently they're three separate systems with separate data paths.
+- How does provenance observe transitions? One `TransitionEvent` type or two? Generic or non-generic? Tree-structured or flat?
+- Does `TransitionEdge` carry scope/LCA, or is that always computed at runtime?
+- Are Fork and Join semantically distinct in the AST, or just labels?
+
+The gh-286 tree types (`TransitionOp`, `TransitionStep`) are part of the answer but not all of it. The type architecture must support the full design space, not just the hierarchy.
+
+| Type area | Current state | Needs |
+|-----------|--------------|-------|
+| Runtime output | Flat `string list` fields | Tree-structured `TransitionStep` |
+| Resource model | `ExtractedStatechart` — flat, no hierarchy | Hierarchy + roles + SHACL + ALPS as first-class |
+| Provenance | Incompatible `TransitionEvent` type, disconnected bridge | Unified event type, wired bridge |
+| Discovery | Affordance middleware has no SHACL awareness | SHACL shapes linked from affordance system |
+| AST | Fork/Join cosmetic, multi-target in annotations only | Semantic pseudo-states, normalized multi-target |
+| Dual derivation | 740 lines on flat types, zero algebra references | DualAlgebra interpreter on tree types |
+
+**What's salvageable**: `TransitionAlgebra<'r>` is correct. `ActiveStateConfiguration`, `HistoryRecord`, `StateHierarchy`, `CompositeStateSpec` are correct. The AST's composite nesting and annotation system are correct. The runtime's LCA/history/auto-wrap internals are correct. The role projection and HTTP compliance layers work. These are real foundations — but they need a coherent type architecture connecting them.
 
 ### Layer 2: Runtime (interpreters)
 
