@@ -98,7 +98,7 @@ The user designs the type architecture (with Claude as sounding board) and imple
 
 ### Prologue: The Scene of the Crime
 
-Frank is an F# web framework built on three pillars: HATEOAS, Harel statecharts, and semantic discovery. The thesis is that a client should be able to distinguish a hierarchical statechart from a flat FSM by observing HTTP responses alone.
+Frank is an F# web framework testing the hypothesis that HATEOAS, statecharts, and semantic discovery compose into APIs that agents can navigate and use without prior knowledge beyond an entry-point URL. The hypothesis is unproven — proving it requires a naive client demo that hasn't been built yet, because the implementation gaps documented in this audit have prevented reaching that point.
 
 Over three months of Claude Code-assisted development, the hierarchy was designed correctly at every stage — and implemented as a flat FSM at every stage. The designs got more explicit. The code stayed flat. By the time anyone noticed, flat-FSM assumptions were embedded in ~15 functions across ~10 files, feeding every analysis tool, every generator, every test assertion, and every CLI command.
 
