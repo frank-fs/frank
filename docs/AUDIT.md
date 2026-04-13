@@ -1,325 +1,216 @@
 # Frank Design Audit
 
-Contradictions, evolution timeline, suspect decisions, and dropped designs identified during the April 2026 spec consolidation. This is the forensic analysis; the full decision catalog is in [DECISIONS.md](DECISIONS.md).
-
-**Status key**: Active = current and valid. Superseded = replaced by a later decision. Suspect = influenced by flat-semantics assumptions. Not Implemented = design is correct but code doesn't match.
+Forensic analysis of how flat-FSM semantics became embedded across the project, identified during the April 2026 spec consolidation. Traces contradictions through their full timeline from kitty-specs (where statechart work began) through v7.4.0 design decisions. The full decision catalog is in [DECISIONS.md](DECISIONS.md).
 
 ---
 
-## Contradictions and Evolution Timeline
+## The Flat-to-Hierarchy Timeline
 
-This section documents the flat-to-hierarchy pivot and identifies where decisions contradict each other, where designs were dropped, and where specs were correct but implementation diverged.
+### Era 1: Pre-statechart foundation (v7.0–v7.2, Spec Kit 001–016)
 
-### The Flat-to-Hierarchy Pivot
+Datastar SSE streaming, Frank.Auth, Frank.OpenApi, middleware ordering, Analyzers. **No statechart or FSM work existed yet.** These specs established the extension model, CE patterns, and ASP.NET Core integration that all later work builds on.
 
-| Era | Specs | Model | Status |
-|-----|-------|-------|--------|
-| v7.0–v7.2 (Spec Kit 001–016) | Datastar, Auth, OpenAPI, middleware | **Flat FSM** — intentional, correct for scope | Sound |
-| v7.3.0 (Kitty Specs 001–033) | Statecharts, parsers, CLI, discovery | **Hierarchy intended**, flat FSM implemented | Pivot point — designs say hierarchy, code stays flat |
-| v7.3.1 (Superpowers specs) | IStatechartFeature, JSON Home, projection | **Hierarchy expected** from v7.3.0 | Built on incorrect flat baseline |
-| v7.4.0 (GitHub issues, DESIGN_DECISIONS.md) | TransitionAlgebra, interpreters, analyzers | **Hierarchy explicit** — Fork must produce Par nodes | Designs correct, implementation still flat |
+Key decisions: single SSE channel per page (D-SK15), generic endpoint metadata extensibility (D-SK27), two-stage middleware pipeline (D-SK24), native SSE (D-SK32). All remain sound and hierarchy-agnostic.
 
-### Key Contradictions
+### Era 2: The pivot — hierarchy researched, flat runtime built (v7.3.0, Kitty Specs 001–010)
 
-#### C-1: Fork semantics — designed explicit, implemented as no-op
-- **Design** (D-002, gh-286): "Fork is explicit at the algebra level — the DualAlgebra needs to see Fork to accumulate per-region obligations."
-- **Code** (`Hierarchy.fs`): `Fork = fun _regions (config, history) -> (config, history, [], [])` — literal no-op with comment "Protocol marker."
-- **Impact**: Every interpreter that needs Fork (Dual, Trace, Collector, Validation) cannot function correctly.
+**KS-003 (Statecharts Feasibility)** researched hierarchy viability and concluded it was feasible. Identified SCXML, smcat, WSD, ALPS, XState as the five format targets. Established `statefulResource` CE as the API. Set the complexity ceiling at "simple to moderate" (D-KS-F12).
 
-#### C-2: TransitionStep tree — specified, never created
-- **Design** (gh-286 D-TA1): "`TransitionStep` tree (Leaf, Seq, Par) as fundamental runtime type preserving Harel AND-state parallelism. NO flatten functions."
-- **Code**: `TransitionStep` type does not exist. Results use `ExitedStates: string list` and `EnteredStates: string list`.
-- **Design** (gh-286 D-TA3): "`HierarchicalTransitionResult` drops flat fields — only Configuration, Steps: TransitionStep, HistoryRecord."
-- **Code**: `HierarchicalTransitionResult` has `ExitedStates: string list`, `EnteredStates: string list`. No `Steps` field.
+**KS-004 (Frank.Statecharts Core)** built the runtime — but as a flat FSM:
+- `StateMachine<'S,'E,'C>` typed state machine with pure transition functions (D-KS-S1)
+- `TransitionResult<'S,'C>` DU with Transitioned/Blocked/Invalid (D-KS-S2)
+- Guards evaluated in registration order, first Blocked short-circuits (D-KS-S4)
+- `onTransition` observable hooks (D-KS-S7) — later eliminated by D-006 but still in code
 
-#### C-3: Five banned anti-patterns — all present in code
-- **Design** (gh-286 D-TA5): "Five banned anti-patterns: no `flatten` functions, no `enteredStates` extractors, no flat `string list` fields on result types, no helper returning `string list` from tree input, no keeping flat fields 'for production consumers.'"
-- **Code**: All five patterns exist. `enterState` returns flat configuration. `Bind` concatenates flat lists via `@`.
+**KS-010 (Production Readiness)** hardened the flat runtime:
+- `FSharpValue.PreComputeUnionTagReader` for O(1) state key extraction (D-KS-P1)
+- Actor-serialized concurrency with unchanged `IStateMachineStore` interface (D-KS-P2)
+- Guard DU with AccessControl/EventValidation phases (D-KS-P3)
 
-#### C-4: Four interpreters designed, one implemented (broken)
-- **Design** (gh-257 D-TF3): "RuntimeAlgebra, TraceAlgebra, DualAlgebra, ValidationAlgebra."
-- **Code**: Only `RuntimeInterpreter` exists, with Fork as no-op. Trace, Dual, and Validation interpreters are unimplemented.
+**What happened**: The feasibility research (KS-003) said hierarchy was viable, but the implementation (KS-004) built flat. The flat runtime was then hardened (KS-010) as if it was the final design. This is the original sin — everything downstream built against the flat baseline.
 
-#### C-5: onTransition — proposed, then eliminated, code still uses hooks
-- **Design** (ks-004 D-S7, v7.3.0): `onTransition` observable hooks fire after successful transitions.
-- **Design** (D-006, v7.4.0): "onTransition does not exist. Customization happens through interpreters."
-- **Code**: `onTransition` hooks still exist in `StatefulResourceBuilder.fs`. The supersession was never applied to the codebase.
+### Era 3: Parsers capture hierarchy, mappers flatten it (v7.3.0, Kitty Specs 011–024)
 
-#### C-6: CLI pipeline — flat by design, never updated for hierarchy
-- **Design** (ks-026): Entire CLI pipeline built on flat `StateMachineMetadata`. Spec explicitly says "state-capability views, not full transition graphs."
-- **Impact**: `frank extract` → `frank compile` → `model.bin` is a flat pipeline. All generated artifacts (WSD, smcat, SCXML, ALPS, XState) are flat regardless of format capabilities. Validation compares hierarchical spec files against flat "code truth."
-- **Never revisited**: No subsequent spec or decision addresses making the CLI pipeline hierarchy-aware.
+The AST layer was designed correctly. The problem is downstream.
 
-#### C-7: SCXML history/invoke — parsed correctly, called "non-functional"
-- **Design** (ks-018): SCXML `<history>` and `<invoke>` labeled "non-functional annotations preserved for LLM context."
-- **Reality**: History is a fundamental Harel construct. Calling it "non-functional" means the runtime ignores it. The code actually does implement history in `Hierarchy.fs`, creating a contradiction between the spec (non-functional) and the code (functional but incomplete).
+**KS-020 (Shared AST)**: `StateNode.Children` and `StateKind` (including `Parallel`, `ShallowHistory`, `DeepHistory`) correctly model hierarchy. **The AST is sound.**
 
-#### C-8: Multi-target transitions — atomicity lost
-- **Design** (ks-018, ks-024): SCXML multi-target transitions split into one `TransitionEdge` per target.
-- **Reality**: SCXML multi-target transitions are a single atomic transition entering parallel regions. Splitting loses atomicity — converts a compound transition into multiple independent transitions (flat-FSM thinking).
+**KS-013 (smcat Parser)**: Parser correctly captures composite states with `{ }` blocks. But the mapper produces `StateMachine<'S,'E,'C>` — the flat generic type. Hierarchy goes in, flat comes out. ForkJoin is a classification label, not operational (D-SUS4). "The mapper produces a StateMachine-compatible representation" — confirming flat mapping (D-SUS6).
 
-### Dropped Designs
+**KS-018 (SCXML Parser)**: Parser captures `<parallel>`, `<history>`, `<invoke>` correctly. But history and invoke are labeled **"non-functional annotations preserved for LLM context"** (D-SUS1). Multi-target transitions split into one `TransitionEdge` per target, losing atomicity (D-SUS3). History is "structured but non-functional" (D-SUS7).
 
-These features appear in earlier specs and then vanish without explicit cancellation.
+**KS-024 (SCXML Migration)**: `TransitionEdge.Target` holds only the first target; full list relegated to annotation (D-SUS2). History default transitions stored in annotation, not as `TransitionElement` (D-SUS3). State-scoped data flattened to document level (D-SUS4). ForkJoin states silently skipped by generator (D-SUS5).
 
-#### Dropped-1: PROV-O Provenance (ks-006)
-- **Designed**: W3C PROV-O provenance recording via `TransitionObserver`, `ProvenanceRecord`, and `ProvenanceStore`.
-- **Status**: Implemented in v7.3.0 (PR #109), but designed against flat FSM semantics — single `PreviousState`/`NewState` per record.
-- **Problem**: AND-state compound transitions produce multiple state changes. The provenance model can't capture them.
-- **Not updated**: No subsequent spec revisits provenance for hierarchy.
+**KS-022 (smcat Migration)**: Generator uses flat `StateHandlerMap` as data source. Creates self-transitions per HTTP method rather than inter-state transitions (D-SUS5). Guards stored as unstructured notes (D-SUS4).
 
-#### Dropped-2: SHACL Validation (ks-005)
-- **Designed**: SHACL shape derivation from F# types, dual-path validation (SHACL + RFC 9457).
-- **Status**: Implemented in v7.3.0 (PR #109), functioning.
-- **Integration gap**: SHACL shapes are served at endpoints but never wired into the CLI validation pipeline or affordance map.
+**Pattern**: Every parser correctly captures hierarchy from its format. Every mapper/generator immediately flattens it back to the flat `StateMachine<'S,'E,'C>` or `StateMachineMetadata` types. The hierarchy information enters the system and is immediately discarded.
 
-#### Dropped-3: RDF SPARQL Validation (ks-015)
-- **Designed**: SPARQL queries over RDF output for cross-format graph isomorphism checks.
+### Era 4: CLI pipeline — flat by explicit design (v7.3.0, KS-026)
+
+**KS-026 (CLI Statechart Commands)** is the most deeply flat-dependent spec:
+- Extract command reads `StateMachineMetadata` — flat state→HTTP-methods map (D-SUS1)
+- "Transition targets between different states are NOT directly available from StateMachineMetadata" — explicitly acknowledged (D-SUS2)
+- All five format generators consume flat metadata via `Wsd.Generator.generate` (D-SUS3)
+- Validation compares hierarchical spec files against flat "code truth" (D-SUS4)
+- Risk register says **"Implement flat-state mapping first. Compound states can be added later."** (D-SUS8)
+
+The "added later" never happened. The entire `frank extract` → `frank compile` → `model.bin` → `useAffordances` pipeline is flat.
+
+### Era 5: Hierarchy "operational" — but the baseline was flat (v7.3.1–v7.4.0)
+
+**PR #221 (Hierarchical Runtime)**: Added `StateHierarchy`, `ActiveStateConfiguration`, LCA computation, entry/exit ordering. Opt-in via `StateMachineMetadata.Hierarchy: StateHierarchy option`.
+
+**PR #259 (Make Hierarchy Operational)**: Auto-wrapped flat FSMs in synthetic `__root__` XOR. Store redesigned to persist `InstanceSnapshot` with hierarchy config. `TransitionEvent` carries `ExitedStates`/`EnteredStates` — but as **flat lists**.
+
+**The gap**: The hierarchy runtime was wired in, but the result types, CLI pipeline, generators, provenance, and test assertions all remained flat. The runtime computes hierarchy internally, then flattens the results for every consumer.
+
+### Era 6: Correct designs, unimplemented (v7.4.0, GitHub issues)
+
+**GH-257 (Tagless Final Interpreter)**: Designed TransitionAlgebra, four interpreter types (Runtime, Trace, Dual, Validation), pure synchronous interpreters with async in middleware. **Correct design.**
+
+**GH-286 (TransitionAlgebra + RuntimeInterpreter)**: Specified TransitionStep tree (Leaf, Seq, Par), Fork producing Par nodes, HierarchicalTransitionResult dropping flat fields, five banned anti-patterns. **Correct design — code doesn't match any of it.**
+
+---
+
+## Contradictions (full timeline)
+
+### C-1: Fork semantics
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-013 D-SUS4 | ForkJoin is a "state type classification for detection purposes" — no operational meaning |
+| v7.3.0 | KS-018 D-SUS1 | `<parallel>` maps to "a compound state concept" — vague, non-operational |
+| v7.4.0 | D-002, gh-286 | "Fork is explicit at the algebra level — DualAlgebra needs to see Fork to accumulate per-region obligations" |
+| Code | `Hierarchy.fs` | `Fork = fun _regions (config, history) -> (config, history, [], [])` — no-op |
+
+**The contradiction spans 3 eras.** Fork was never operational in any kitty-spec. The v7.4.0 design (D-002) made it explicit, but the code was never updated.
+
+### C-2: Flat results
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-004 D-KS-S2 | `TransitionResult<'S,'C>` — flat DU with single new state |
+| v7.3.0 | KS-006 D-SUS1 | `TransitionEvent` has singular `PreviousState`/`NewState` |
+| v7.3.1 | PR #259 | `HierarchicalTransitionResult` has `ExitedStates: string list`, `EnteredStates: string list` |
+| v7.4.0 | gh-286 D-TA3 | "HierarchicalTransitionResult drops flat fields — only Configuration, Steps: TransitionStep, HistoryRecord" |
+| Code | `Hierarchy.fs` | Flat `string list` fields. `TransitionStep` type does not exist. |
+
+**The flat result type was designed in KS-004, carried through to KS-006 (PROV-O) and PR #259, and was never replaced despite gh-286 specifying its replacement.**
+
+### C-3: Parser→mapper hierarchy loss
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-020 | AST `StateNode.Children` + `StateKind.Parallel` — **hierarchy correctly modeled** |
+| v7.3.0 | KS-013 D-SUS6 | smcat mapper produces flat `StateMachine<>` from hierarchical AST |
+| v7.3.0 | KS-018 D-SUS3 | SCXML multi-target transitions split into individual edges |
+| v7.3.0 | KS-024 D-SUS2 | Only first target in `TransitionEdge.Target`; rest in annotation |
+| v7.3.0 | KS-022 D-SUS5 | Generator uses flat `StateHandlerMap`, creates self-transitions per HTTP method |
+
+**The AST was always correct. Every downstream consumer immediately flattens it. This is not a bug in any single spec — it's the consistent pattern across four format specs.**
+
+### C-4: CLI pipeline never updated
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-026 D-SUS1-8 | CLI pipeline explicitly designed for flat StateMachineMetadata |
+| v7.3.0 | KS-026 D-SUS8 | "Implement flat-state mapping first. Compound states can be added later." |
+| v7.3.1–v7.4.0 | — | No spec, issue, or PR addresses hierarchy-aware CLI pipeline |
+
+**"Added later" never happened. The CLI pipeline is the production path for generated artifacts — flat metadata in means flat artifacts out for all five formats.**
+
+### C-5: SCXML history — non-functional vs. implemented
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-018 D-SUS1 | `<history>` labeled "non-functional annotations preserved for LLM context" |
+| v7.3.0 | KS-024 D-SUS3 | History default transitions stored in annotations, not as transitions |
+| v7.3.1 | PR #221, #259 | History implemented in `Hierarchy.fs` — `RecordHistory`, `RestoreHistory`, shallow+deep |
+
+**The parser spec (KS-018) called history non-functional. The runtime (PR #221) implemented it. Neither was updated to reconcile.**
+
+### C-6: onTransition — designed, superseded, still present
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-004 D-KS-S7 | `onTransition` observable hooks fire after successful transitions |
+| v7.4.0 | D-006 | "onTransition does not exist. Customization happens through interpreters." |
+| Code | `StatefulResourceBuilder.fs` | `onTransition` hooks still present and called |
+
+**Legitimate evolution (hooks → interpreter customization) that was never applied to the codebase.**
+
+### C-7: Multi-target transition atomicity
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-018 D-SUS3 | SCXML multi-target transitions split into one edge per target |
+| v7.3.0 | KS-024 D-SUS2 | First target in primary field, rest in annotation |
+| Reality | SCXML spec | Multi-target = single atomic transition entering parallel regions |
+
+**Splitting a compound transition into individual edges converts AND-state semantics into sequential flat-FSM semantics.**
+
+### C-8: Cross-format merge without hierarchical scope
+
+| When | Source | Decision |
+|------|--------|----------|
+| v7.3.0 | KS-030 D-SUS3 | State matching by flat identifier (exact match) |
+| v7.3.0 | KS-030 D-SUS4 | Transition matching by flat (Source, Target, Event) triple |
+| Risk | Harel semantics | Same identifier can appear at different hierarchy levels. Same triple can have different meaning at different scopes. |
+
+**Merge rules work for flat state machines but produce incorrect results for hierarchical statecharts with same-named states at different levels.**
+
+---
+
+## Dropped Designs
+
+### PROV-O Provenance (KS-006)
+- **Designed**: W3C PROV-O recording via `TransitionObserver`, `ProvenanceRecord`, `ProvenanceStore`
+- **Implemented**: v7.3.0 (PR #109), but against flat semantics — single `PreviousState`/`NewState`
+- **Problem**: AND-state compound transitions produce multiple state changes that can't be captured
+- **Not updated**: No subsequent spec revisits provenance for hierarchy
+
+### SHACL Pipeline Integration (KS-005)
+- **Designed**: SHACL shape derivation from F# types, dual-path validation
+- **Implemented**: v7.3.0 (PR #109), functioning at endpoints
+- **Gap**: Never wired into CLI validation pipeline or affordance map
+
+### RDF SPARQL Validation (KS-015)
+- **Designed**: SPARQL queries over RDF output for cross-format graph isomorphism
 - **Status**: Test infrastructure only. No production code.
 
-#### Dropped-4: Full round-trip testing across formats
-- **Designed** (ks-003 D-F1): "Lossy-but-documented round-tripping... No behavioral information may be lost in runtime code itself."
-- **Status**: Parsers produce ASTs correctly, but generators consume flat `StateMachineMetadata` (see C-6), so hierarchy is lost in the code→spec direction. Round-trip is broken for hierarchical features.
+### Full Round-Trip Testing (KS-003)
+- **Designed** (D-KS-F1): "Lossy-but-documented round-tripping"
+- **Status**: Parsers→AST works. AST→generators uses flat metadata (C-4). Round-trip broken for hierarchy.
+
+### Four Interpreters (GH-257)
+- **Designed**: RuntimeAlgebra, TraceAlgebra, DualAlgebra, ValidationAlgebra
+- **Status**: Only RuntimeInterpreter exists, with Fork as no-op. Three interpreters never built.
 
 ---
 
-## v7.4.0 Algebra and Interpreter Decisions
+## Root Cause Analysis
 
-Extracted from DESIGN_DECISIONS.md (now merged into [DECISIONS.md](DECISIONS.md)). All resolved during issue refinement. **These are the correct designs — the code needs to match them, not the other way around.**
+The contradictions are not random. They follow a clear pattern:
 
-### D-001: LCA is a parameter, not an algebra operation
+1. **KS-003 concluded hierarchy was feasible.** KS-004 built flat.
+2. **Format parsers (KS-013/018/020/024) built correct hierarchical AST.** Mappers/generators flattened to the flat types from KS-004.
+3. **CLI pipeline (KS-026) was explicitly designed flat** with a "compound states later" note that was never revisited.
+4. **PR #221/259 added hierarchy to the runtime** but kept all result types and consumers flat.
+5. **GH-257/286 designed the correct algebra and tree types.** Code was never updated to match.
 
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1a
-- **Status**: Active
-- **Decision**: `ComputeLCA` is a pure query on `StateHierarchy`, computed once externally and passed to the program. The algebra is a pure effect algebra (Exit, Enter, Fork, Sequence) with no query operations.
+Each layer assumed the one below it would eventually become hierarchical. None of them did. The flat types from KS-004 became load-bearing across every consumer — CLI, generators, provenance, affordances, tests — and were never replaced.
 
-### D-002: Explicit Fork in algebra programs
-
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1b
-- **Status**: Active — **NOT IMPLEMENTED** (Fork is no-op in code, see C-1)
-- **Decision**: Fork is explicit at the algebra level — the DualAlgebra needs to see Fork to accumulate per-region obligations. The CE auto-generates algebra programs with Fork included.
-
-### D-003: 'r varies per interpreter (tagless final)
-
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §1c
-- **Status**: Active — **PARTIALLY IMPLEMENTED** (RuntimeStep exists but uses flat lists)
-- **Decision**: `'r` varies per interpreter. Programs are polymorphic: `TransitionAlgebra<'r> -> 'r`. Each interpreter chooses its own `'r`.
-
-### D-004: ActiveStateConfiguration is opaque
-
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §2
-- **Status**: Active — implemented
-- **Decision**: Export only the opaque type. Programs receive `ActiveStateConfiguration` from `RestoreHistory` and pass it through.
-
-### D-005: DualAlgebra replaces deriveWithHierarchy entirely
-
-- **Source**: [#288](https://github.com/frank-fs/frank/issues/288), DECISIONS.md §3
-- **Status**: Active — **NOT IMPLEMENTED** (DualAlgebra does not exist)
-- **Decision**: Replace `deriveWithHierarchy` entirely. The dual derivation IS a `DualAlgebra` interpreter.
-
-### D-006: onTransition does not exist
-
-- **Source**: [#282](https://github.com/frank-fs/frank/issues/282), DECISIONS.md §4
-- **Status**: Active — **NOT IMPLEMENTED** (onTransition hooks still in code, see C-5)
-- **Decision**: Every `transition` declaration auto-generates its algebra program from the hierarchy. Customization happens through interpreters, not custom programs.
-
-### D-007: Single generated file per statechart
-
-- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DECISIONS.md §5
-- **Status**: Active — not yet reached (codegen not built)
-
-### D-008: childOf uses value binding
-
-- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DECISIONS.md §6
-- **Status**: Active — not yet reached
-
-### D-009: Two-path validation (build-time + startup)
-
-- **Source**: [#296](https://github.com/frank-fs/frank/issues/296), DECISIONS.md §7
-- **Status**: Active — not yet reached (ValidationAlgebra not built)
-
-### D-010: Algebra types in Frank.Statecharts.Core
-
-- **Source**: [#286](https://github.com/frank-fs/frank/issues/286), DECISIONS.md §8
-- **Status**: Active — implemented (TransitionAlgebra is in Core)
-
-### D-011: Instance ID uses :: separator
-
-- **Source**: [#293](https://github.com/frank-fs/frank/issues/293), DECISIONS.md §9
-- **Status**: Active — not yet reached
-
-### D-012: RFC 9457 Problem Details for error responses
-
-- **Source**: [#294](https://github.com/frank-fs/frank/issues/294), DECISIONS.md §10
-- **Status**: Active — implemented
-
-### D-013: frank-cli distributed via existing dotnet tool
-
-- **Source**: [#284](https://github.com/frank-fs/frank/issues/284), DECISIONS.md §11
-- **Status**: Active — implemented
-
-### D-014: frank init uses three-layer approach
-
-- **Source**: [#155](https://github.com/frank-fs/frank/issues/155), DECISIONS.md §12
-- **Status**: Active — not yet reached
-
-### D-015: Generated module naming conflicts are errors
-
-- **Source**: [#283](https://github.com/frank-fs/frank/issues/283), DECISIONS.md §13
-- **Status**: Active — not yet reached
-
-### D-016: ALPS validator is semantic only
-
-- **Source**: [#302](https://github.com/frank-fs/frank/issues/302), DECISIONS.md §14
-- **Status**: Active — not yet reached
-
-### D-017: CollectorAlgebra in Core, reconstruction in CLI
-
-- **Source**: [#290](https://github.com/frank-fs/frank/issues/290), DECISIONS.md §15
-- **Status**: Active — not yet reached
-
----
-
-## Suspect Decisions from Kitty-Specs
-
-Mined from the 11 suspect kitty-specs. Ordered by severity of flat-semantics contamination.
-
-### KS-026: CLI pipeline is entirely flat
-
-- **Status**: Suspect — **most deeply flat-dependent spec**
-- **Decisions**: CLI extracts `StateMachineMetadata` (flat state→HTTP-methods map). All generators consume flat metadata. Validation compares hierarchical specs against flat "code truth." Risk register explicitly says "flat-state mapping first."
-- **Impact**: The entire spec pipeline (extract → validate → generate) must be redesigned for hierarchy.
-
-### KS-006: PROV-O models single-state transitions
-
-- **Status**: Suspect
-- **Decisions**: `PreviousState`/`NewState` as singular values. One `ProvenanceRecord` per transition. No compound transitions.
-- **Impact**: Cannot record AND-state transitions that exit/enter multiple states simultaneously.
-
-### KS-013/018/024: Parsers capture hierarchy, mappers flatten it
-
-- **Status**: Suspect (mappers), Sound (parsers)
-- **Pattern**: smcat/SCXML parsers correctly capture composite states and parallel regions in the AST. Then the mapper step flattens to `StateMachine<'S,'E,'C>` (flat generic type) or stores hierarchy in annotations rather than primary fields.
-- **Impact**: The AST layer is sound. The mapping/generation layer needs to preserve hierarchy end-to-end.
-
-### KS-020: Shared AST is structurally sound
-
-- **Status**: Sound
-- **Note**: `StateNode.Children` and `StateKind` (including `Parallel`, `ShallowHistory`, `DeepHistory`) correctly model hierarchy. The AST is not the problem.
-
-### KS-030: Merge uses flat identifier matching
-
-- **Status**: Suspect
-- **Decision**: State matching by flat identifier, transition matching by flat (Source, Target, Event) triple. No hierarchical scope.
-- **Impact**: Same-named states at different hierarchy levels would be incorrectly merged.
-
----
-
-## Sound Foundational Decisions (v7.0–v7.2)
-
-Key architectural decisions from the Spec Kit era that remain valid regardless of hierarchy.
-
-### D-018: Resource-oriented design (Constitution §1)
-- **Status**: Active
-- Resources are the primary abstraction, not URL patterns with handlers.
-
-### D-019: Library, not framework (Constitution §3)
-- **Status**: Active
-- No view engine, no ORM, no auth system. Compose with ASP.NET Core.
-
-### D-020: No lightweight API
-- **Status**: Active
-- The CE ceremony IS the pit of success.
-
-### D-021: Generic endpoint metadata extensibility
-- **Source**: spec 013 (Frank.Auth), PR #71
-- **Status**: Active
-- `(EndpointBuilder -> unit) list` convention functions. Foundation for Frank.Auth, Frank.OpenApi, and future extensions.
-
-### D-022: Two-stage middleware pipeline
-- **Source**: spec 011, PR #69
-- **Status**: Active
-- `plugBeforeRouting` (before `UseRouting()`) + `plug` (between routing and endpoints).
-
-### D-023: Native SSE over external dependency
-- **Source**: spec 014, PR #72
-- **Status**: Active
-- Direct `IBufferWriter<byte>` writes. Zero external NuGet dependencies.
-
-### D-024: TextWriter→Task streaming API
-- **Source**: spec 015, PR #73
-- **Status**: Active
-- View engines write to `TextWriter`; `SseDataLineWriter` bridges to SSE format.
-
-### D-025: Applicative over monad for TransitionResult
-- **Source**: PR #223
-- **Status**: Active
-- `TransitionResult.apply` as primary abstraction. All algebraic laws verified via FsCheck.
-
----
-
-## Key Evolution Decisions (v7.3.0–v7.4.0)
-
-### D-026: Opt-in hierarchy via StateHierarchy option
-- **Source**: PR #221
-- **Status**: Active — this is the current architecture
-- **Decision**: `StateMachineMetadata.Hierarchy: StateHierarchy option`. When `None`, flat FSM dispatch unchanged.
-
-### D-027: Auto-wrap flat FSMs in synthetic __root__ XOR
-- **Source**: PR #259 (`StatefulResourceBuilder.fs`)
-- **Status**: Active — implemented
-- **Decision**: ALL resources use hierarchical dispatch uniformly. Flat FSMs wrapped in `__root__` XOR composite.
-
-### D-028: Store redesign for hierarchy persistence
-- **Source**: PR #259
-- **Status**: Active — implemented
-- **Decision**: `IStatechartsStore<'S,'C>` with `InstanceSnapshot<'S,'C>` bundles State, Context, HierarchyConfig, HistoryRecord.
-
-### D-029: Closed-world semantics for role projection
-- **Source**: PR #274
-- **Status**: Active — implemented
-- **Decision**: When roles + transitions are declared, undeclared transitions blocked. Everything not explicitly declared is forbidden.
-
-### D-030: Multi-role users see union of affordances
-- **Source**: PR #279
-- **Status**: Active — implemented
-- **Decision**: Union of all matching roles' methods and link relations, not first-match.
-
-### D-031: TransitionSafety DU (Safe/Unsafe/Idempotent)
-- **Source**: PR #277
-- **Status**: Active — implemented
-- **Decision**: Three CE operations: `transition` (Unsafe/POST), `safeTransition` (Safe/GET), `idempotentTransition` (Idempotent/PUT).
-
-### D-032: Link relations use ALPS profile fragment URIs
-- **Source**: PR #281
-- **Status**: Active — implemented
-- **Decision**: `{profileUrl}#{EventName}` instead of bare kebab-case strings. RFC 8288 §2.1.2 compliant.
-
-### D-033: Tagless final over free monad
-- **Source**: gh-257
-- **Status**: Active
-- **Decision**: F# has first-class records of functions but no HKTs. Records compose trivially. Code generation is simpler.
-
----
-
-## Decision Dependencies
-
-- **D-001 + D-002 + D-007**: LCA is a parameter, Fork is explicit, generated files emit programs with both.
-- **D-003 + D-006**: `'r` varies per interpreter; `onTransition` doesn't exist — customization is through interpreters.
-- **D-008 + analyzer rules**: If childOf uses value binding, FRANK102 becomes largely unnecessary.
-- **D-009 + #296 scope**: Both paths use the same `ValidationAlgebra` interpreter and rules.
-- **D-026 + D-027**: Hierarchy is opt-in at spec level but universal at runtime dispatch level.
-- **D-029 + D-030**: Closed-world semantics + union-of-affordances for multi-role users.
+**The AST (KS-020) is the one layer that got hierarchy right.** Everything from the AST downward (to runtime) and upward (to CLI/generators) flattens it.
 
 ---
 
 ## Summary Statistics
 
-| Category | Count | Status |
-|----------|-------|--------|
-| Active, implemented | 18 | Stable foundation |
-| Active, not yet implemented | 8 | D-007 through D-017 (v7.4.0 roadmap) |
-| Active, **NOT implemented despite being specified** | 4 | D-002 (Fork), D-003 (TransitionStep), D-005 (DualAlgebra), D-006 (onTransition removal) |
-| Suspect (flat-semantics contamination) | 6 | KS-006, KS-013, KS-018, KS-024, KS-026, KS-030 |
-| Contradictions identified | 8 | C-1 through C-8 |
-| Dropped designs | 4 | PROV-O, SHACL integration, SPARQL, round-trip testing |
+| Category | Count |
+|----------|-------|
+| Contradictions (full timeline) | 8 (C-1 through C-8) |
+| Eras spanning contradictions | 3–4 eras per contradiction |
+| Dropped designs | 5 |
+| Kitty-spec decisions establishing flat baseline | ~30 across KS-004, KS-010, KS-013, KS-018, KS-022, KS-024, KS-026, KS-030 |
+| v7.4.0 designs correct but not implemented | 4 (Fork, TransitionStep, DualAlgebra, onTransition removal) |
+| Sound layers | AST (KS-020), parsers, foundational v7.0-v7.2 architecture |
