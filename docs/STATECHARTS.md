@@ -1,5 +1,7 @@
 # Frank.Statecharts
 
+> **Status (April 2026):** The flat FSM features described in "Core Concepts" below work correctly — state-dependent method filtering, guards, transitions, stores, and the `statefulResource` CE. The "Hierarchical Statecharts" section describes hierarchy via nested DUs, which works for *modeling* but does not provide true Harel hierarchical semantics (AND-state parallelism, Fork, tree-structured transition results). The runtime internally computes hierarchy (LCA, exit/entry paths) but results are flat lists. See [AUDIT.md](AUDIT.md) for the full analysis and reset plan.
+
 Frank.Statecharts adds application-level state machines to Frank, enabling resources whose HTTP surface changes based on persisted domain state. Each resource instance has its own state, and the framework enforces which HTTP methods are available, evaluates guards, and manages transitions automatically.
 
 State machines can be defined directly in F# (as shown below) or generated from design specifications such as SCXML, WSD, or ALPS profiles. See [SPEC-PIPELINE.md](SPEC-PIPELINE.md) for the design-to-implementation workflow.
@@ -130,6 +132,8 @@ services.AddStateMachineStore<GameState, int>()
 ```
 
 ## Hierarchical Statecharts
+
+> **Status:** This section describes modeling hierarchy via nested DUs, which is a valid F# pattern for representing compound states. However, this is not the same as Harel hierarchical statechart semantics — AND-state parallelism, Fork operations, history pseudo-states as first-class constructs, and tree-structured transition results. The runtime has a `StateHierarchy` type that computes LCA-based exit/entry paths (PR #221, #259), but its output is flat `string list` fields. The `TransitionStep` tree type specified in [gh-286](https://github.com/frank-fs/frank/issues/286) was never created. `onTransition` below is the only observer mechanism and is scheduled for replacement by a TraceAlgebra interpreter that does not yet exist. See [AUDIT.md](AUDIT.md) for the full timeline.
 
 Frank.Statecharts supports hierarchical (nested) state machines through F#'s discriminated unions -- no special framework support required.
 

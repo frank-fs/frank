@@ -1,5 +1,7 @@
 # Spec Pipeline: Bidirectional Design Specifications
 
+> **Status (April 2026):** The input direction (spec → code) is sound — all parsers correctly capture hierarchy from source formats into the shared AST. The output direction (code → spec) operates on flat `StateMachineMetadata` / `ExtractedStatechart` types that have no hierarchy field. Generated artifacts are flat regardless of the source format's capabilities. The pipeline is asymmetrically bidirectional: hierarchy goes in, flat comes out. See [AUDIT.md](AUDIT.md) Act III and contradiction C-3/C-4 for the full analysis.
+
 The spec pipeline enables a design-first development workflow for Frank applications. Start from a design document in any supported format, use LLM-assisted tooling to generate a working implementation, then extract specifications from the running application to verify and refine the design. The pipeline is bidirectional — every format works as both input and output.
 
 ## The Workflow
@@ -78,6 +80,8 @@ This is a deliberate design choice:
 - **Correctness comes from the verification loop.** Rather than trying to guarantee correct generation, the pipeline extracts the spec back from the running code and compares. This is more robust than template-based guarantees.
 
 ### Output Direction: Spec Extraction
+
+> **Status:** The generators consume `StateMachineMetadata.StateHandlerMap` (a flat state→HTTP-methods map) and `ExtractedStatechart` (flat `StateNames` list, no hierarchy). Generated output is a flat state-capability view regardless of whether the source statechart has hierarchy. The CLI spec (KS-026) explicitly described this as *"state-capability views, not full transition graphs"* with *"compound states added later"* — that "later" never happened. The parsers are ready to provide hierarchy; the generators need a non-flat type to consume it.
 
 The output direction reads `StateMachineMetadata` from a running Frank application (or from compiled assemblies via reflection) and generates spec documents. This is deterministic — the generators produce canonical representations of the current implementation.
 

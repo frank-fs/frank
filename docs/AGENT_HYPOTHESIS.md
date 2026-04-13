@@ -69,6 +69,8 @@ All v7.4.0 issues exist to fix these failures. Current feature status:
 
 ## Closing the Gap
 
+> **Status (April 2026):** All three thesis tracks depend on issue #286 (TransitionAlgebra types) as the critical path item. Implementation of #286 has been attempted multiple times — each attempt reintroduced flat-list patterns that the existing codebase gravitates toward. The per-issue probability estimates below assume #286 is complete and do not account for this repeated-failure pattern. The [April 2026 audit](AUDIT.md) documents 8 contradictions, 5 dropped designs, and a flat-data blast radius of ~15 functions in ~10 files that all need updating. The probability estimates should be read as conditional on resolving the flat-type bottleneck, not as unconditional forecasts.
+
 ### Three thesis proof tracks
 
 v7.4.0 proves the thesis through three progressively demanding demonstrations:

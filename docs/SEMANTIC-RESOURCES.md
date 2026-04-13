@@ -90,6 +90,8 @@ SHACL shapes as semantic request/response constraints. Complements F#'s structur
 
 ### Frank.Provenance (#77) — State Change History
 
+> **Status:** The provenance `IHostedService` registers for `IObservable<TransitionEvent>` from DI, but `Frank.Statecharts` never publishes one — the bridge was never wired. Additionally, `Frank.Provenance.TransitionEvent` (non-generic, singular `PreviousState`/`NewState`) and `Frank.Statecharts.TransitionEvent<'S,'E,'C>` (generic, flat `ExitedStates`/`EnteredStates` lists) are incompatible types. See [AUDIT.md](AUDIT.md) Suspect 1.
+
 PROV-O annotations for resource state changes, built on `Frank.Statecharts`' `onTransition` observable. Enables agents to reason about *how* the application reached its current state, not just what the state is.
 
 ### External SPARQL
