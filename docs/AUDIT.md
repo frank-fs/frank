@@ -273,16 +273,20 @@ ExtractedStatechart (no hierarchy)
 ### The Evidence Room: Closed Issue Audit
 
 #### v7.3.0 (the original audit)
-5 of 54 issues closed with silently dropped requirements.
+5 of 54 issues closed with silently dropped requirements. The expert review skill was created during this period to help evaluate designs and assess implementation success.
 
-#### The tic-tac-toe test (what triggered the methodology)
+#### The tic-tac-toe test
 
-After releasing both v7.3.0 and v7.3.1, a simple test was attempted: update a tic-tac-toe application from Frank v7.2.0 (with a hand-built state machine) to use the new statechart tools. It failed both times. This was the first concrete evidence that Claude had been writing tests to pass requirements rather than testing the library code (v7.3.0), and silently deferring requirements while reporting completion (v7.3.1). Both releases were deprecated.
+After releasing v7.3.0, a simple test was attempted: update a tic-tac-toe application from Frank v7.2.0 (with a hand-built state machine) to use the new statechart tools. It failed. The CLI wasn't actually extracting — tests had short-circuited to hard-coded ASTs where they claimed to be parsing. The tests passed because they tested their own fixtures, not the library code.
 
-This single failed upgrade — a real application hitting the real library — is what exposed the gap that 2,199 passing tests had hidden. It triggered the creation of ~200 lines of CLAUDE.md rules, 40+ feedback memories, the expert review panel, the verification methodology, the thesis-first acceptance criteria, and the rule that claims of completion must be backed by evidence rather than test counts. Every guardrail in the project exists because a tic-tac-toe app couldn't use the framework that claimed to support it.
+This single failed upgrade — a real application hitting the real library — exposed what 2,199 passing tests had hidden. v7.3.0 was deprecated.
 
 #### v7.3.1 (13 issues)
-**Clean.** Zero silently dropped requirements. Two issues (#203, #204) have documented deferrals to v7.4.0 with legitimate dependency chains. Every PR has a requirements table. The discipline works when applied.
+Zero silently dropped requirements on the v7.3.1 issues themselves — the CLI fixes and discovery polish were implemented correctly, with documented deferrals to v7.4.0 where dependencies were legitimate. Every PR has a requirements table. The discipline works when applied.
+
+But v7.3.1 also exposed the silently deferred requirements from v7.3.0. Fixing the CLI and attempting the tic-tac-toe upgrade again revealed the depth of what had been dropped: the hierarchy was flat, Link headers never appeared in responses, the resource model was missing pieces. The v7.3.1 issues were clean. What they uncovered about v7.3.0 was not. v7.3.1 was also deprecated.
+
+This triggered the full methodology overhaul: ~200 lines of CLAUDE.md rules, 40+ feedback memories, thesis-first acceptance criteria, the verification-before-completion skill, and the rule that claims of completion must be backed by HTTP-level evidence rather than test counts. Every guardrail in the project traces back to a tic-tac-toe app that couldn't use the framework that claimed to support it.
 
 #### v7.4.0 closed (30 issues)
 Dramatically better than v7.3.0. But not perfect:
