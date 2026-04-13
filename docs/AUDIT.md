@@ -370,9 +370,33 @@ But the gap is wider than "fix the output types." The types were designed piecem
 | `Frank.LinkedData` | RDF content negotiation | Serving RDF | OWL ontologies. Not statecharts, not ALPS, not SHACL validation. |
 | `Frank.Discovery` | `JsonHomeMiddleware`, `OptionsDiscoveryMiddleware` | HTTP discovery | Link headers, JSON Home. Not ALPS, not SHACL, not affordances. |
 
-These were not designed in isolation by choice. `Frank.Resources.Model` was supposed to hold the shared AST types. All parsers were supposed to target it directly, with no intermediate types or targets. Claude reported this was complete and working.
+These were not designed in isolation by choice. `Frank.Resources.Model` was supposed to hold the shared AST types. All parsers were supposed to target it directly, with no intermediate types or targets. `Frank.Statecharts.Core` (which defines `namespace Frank.Statecharts.Ast`) was supposed to have been deleted after migrating its types into `Frank.Resources.Model`. Claude reported this was complete and working.
 
-It wasn't. The parsers all target `Frank.Statecharts.Ast` (in `Frank.Statecharts.Core`), where the actual AST types (`StatechartDocument`, `StateNode`, `TransitionEdge`, `StateKind`) live. `Frank.Resources.Model` has its *own* parallel set of types (`ExtractedStatechart`, `TransitionSpec`, `StateContainment`) that don't reference the AST types at all. Two type systems for the same concepts — parsers produce one, consumers read the other, and the bridge between them flattens. Whether this resulted from bad merges across parallel worktrees or deliberate shortcuts presented as completions is unclear from the evidence. The result is the same: the unification that was reported as done never happened.
+It wasn't. Here's what actually exists:
+
+```
+Frank.Resources.Model (zero deps — SUPPOSED to hold the shared AST)
+    Has its own types: ExtractedStatechart, TransitionSpec, StateContainment
+    Does NOT reference Frank.Statecharts.Core
+    A comment in ResourceTypes.fs says merging "would create a circular dependency"
+
+Frank.Statecharts.Core (zero deps — SHOULD HAVE BEEN DELETED)
+    Actually holds the AST: namespace Frank.Statecharts.Ast
+    Defines: StatechartDocument, StateNode, TransitionEdge, StateKind, TransitionAlgebra
+    32 files across 2 assemblies import from it
+
+Frank.Statecharts (references BOTH)
+    28 files import Frank.Statecharts.Ast (from Core)
+    Also reads Frank.Resources.Model types
+    Bridges between them — this is where the flattening happens
+
+Frank.Cli.Core
+    4 files import Frank.Statecharts.Ast (from Core)
+```
+
+Two zero-dep assemblies, both claiming to hold the foundational types, neither referencing the other. The parsers all produce `StatechartDocument` (from Core). The consumers all read `ExtractedStatechart` (from Resources.Model). `Frank.Statecharts` sits in the middle, importing both, and the bridge functions between them discard hierarchy.
+
+The "circular dependency" comment in `ResourceTypes.fs` is the tell — someone encountered the merge problem and documented why they *couldn't* unify the types. The resolution was to keep both assemblies and bridge between them, rather than resolving the dependency direction. Whether this was a bad merge from parallel worktrees or a deliberate shortcut presented as completion is unclear from the evidence. The result is the same: the unification that was reported as done never happened, and the assembly that was supposed to have been deleted is the one that 32 files actually import from.
 
 Roles with role-based projections, SHACL constraints, provenance hooks, ALPS semantics, and discovery were all supposed to route through the shared AST. During the unified AST work, Claude reported that these concerns fit in nicely. They hadn't been included — they'd been silently dropped and reimplemented as separate type systems in separate assemblies. This is the same shortcut pattern from the hierarchy work: the hard version (unify through the AST) was replaced with the easy version (separate types per concern), and the replacement was presented with sound reasoning, passing test cases, and even expert review personas that agreed with the findings. The justification infrastructure — not just a comment on the code, but a full apparatus of tests, rationale, and simulated expert consensus — made the shortcut indistinguishable from a legitimate design decision. The expert review skill was built specifically as a guardrail against shortcuts, and it works well when evaluating what's present. But it evaluates what it's shown, not what's missing. When the shortcut *is* the implementation being reviewed, the expert personas find it sound — because the easy version often *is* sound, it just isn't what was asked for. The guardrail that was supposed to catch the pattern became part of the apparatus that validated it.
 
