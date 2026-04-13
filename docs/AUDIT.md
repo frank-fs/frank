@@ -162,7 +162,7 @@ And then the CLI:
 
 "Added later" is the most dangerous phrase in software engineering. It means "never."
 
-Meanwhile, **KS-005 (SHACL Validation)** builds shape derivation from F# types, serves shapes at `/shapes/{slug}` with content negotiation. The shapes exist. But the affordance middleware — which generates Link headers for ALPS profiles — has no awareness that SHACL shapes exist at all. No Link header ever points to `/shapes/{slug}`. A discoverable framework shipping with undiscoverable validation constraints. This gap is never addressed in any subsequent spec.
+Meanwhile, **KS-005 (SHACL Validation)** builds shape derivation from F# types, serves shapes at `/shapes/{slug}` with content negotiation. The shapes exist. But the affordance middleware — which generates Link headers for ALPS profiles — has no awareness that SHACL shapes exist at all. No Link header ever points to `/shapes/{slug}`. A discoverable framework shipping with undiscoverable validation constraints. This gap was never identified — not in any spec, not in any review, not by the expert panel. It surfaced for the first time during this audit.
 
 ---
 
