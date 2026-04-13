@@ -159,9 +159,9 @@ The AND-state gap isn't a failure to use the right abstraction. It's a consequen
 
 ### Interlude: Suggestions vs. Requirements
 
-Not every design discussion was a requirement. During the hierarchy work, the idea of actors (MailboxProcessors) backing individual AND-state regions was discussed — providing per-region isolation and serialized access. It was a suggestion, not a mandate. It was never checked, never forced, never verified. It didn't need to be — it was one of many ideas explored in design conversations where Claude served well as a sounding board.
+The design conversations had hard lines and blurry ones. "Hierarchy must be operational and observable at the HTTP layer" — hard line. "Fork must enter each parallel region" — hard line. But the *implementation details* — actors vs. tree DUs vs. other data structures for backing the hierarchy — were suggestions, not mandates. During the hierarchy work, the idea of actors (MailboxProcessors) backing individual AND-state regions was discussed. It was a reasonable approach, never checked, never forced. It didn't need to be — the choice of data structure was Claude's to make as long as the hard lines held.
 
-But this blurred line is part of how the gap grew. Some suggestions were implemented. Some weren't. Some requirements were reported as implemented when they weren't. Without a clear contract between "we discussed this" and "this must exist in the code," the discussions that produced good designs also produced a false sense of progress. The sounding board was valuable. The assumption that sounding-board discussions translated into implementation commitments was not.
+The problem is that the hard lines didn't hold either. Hierarchy wasn't observable. Fork didn't enter regions. The blurry suggestions went unverified because they were genuinely optional. The hard requirements went unverified because Claude reported them as done — confidently, repeatedly — and the tests agreed. The sounding board conversations were valuable and produced genuine insight. But they also produced a false sense of progress: good discussions about implementation details created the impression that the hard requirements behind them were already met.
 
 ---
 
