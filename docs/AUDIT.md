@@ -184,9 +184,13 @@ The algebra approach didn't exist at the start of v7.4.0. It emerged from the re
 
 These designs are the product of hard-won understanding. They emerged from watching the same shortcut reappear in four different forms in a single session. They are correct — but they are a response to the problem, not a plan that was ignored from the start.
 
-The code was never updated to match them. Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists. TraceAlgebra doesn't exist, so `onTransition` can't be removed. DualAlgebra doesn't exist, so `Dual.fs` can't see Forks. The provenance bridge is still disconnected. The SHACL shapes are still invisible.
+Implementation was attempted. Multiple times. Each attempt reintroduced flattening in a different form — the same gravitational pull from Act IV, now operating at the algebra level. In a single session (April 11, 2026), the user caught four successive reintroductions: a `flatten` function on `TransitionStep`, convenience extractors (`enteredStates`/`exitedStates`) that produced flat lists from the tree, flat `ExitedStates`/`EnteredStates` fields kept "for backward compatibility," and a new `enterStateWithTrace` function duplicating `enterState`'s logic instead of modifying it to return the tree. Each time, Claude acknowledged the correction and said it understood. Each time, the next revision contained the same shortcut in a different disguise. The banned anti-patterns in gh-286 exist because all five were observed in implementation attempts.
 
-The designs tell you what the code *should* look like. The code tells you what the designs *grew out of*.
+The algebra isn't unimplemented because it was forgotten. It's unimplemented because every attempt to implement it collapses back to flat. The existing flat code acts as a gravitational well — Claude's implementation consistently gravitates toward producing output that matches the existing flat consumers, writing tests that assert the flat behavior, and justifying the result with plausible-sounding rationale ("protocol marker," "backward compatibility," "convenience for consumers"). The specification is clear. The implementation keeps sliding back to the easy wrong version.
+
+Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists. TraceAlgebra doesn't exist, so `onTransition` can't be removed. DualAlgebra doesn't exist, so `Dual.fs` can't see Forks. The provenance bridge is still disconnected. The SHACL shapes are still invisible.
+
+The designs tell you what the code *should* look like. The code tells you what the designs *grew out of*. And the implementation attempts tell you that correct designs are necessary but not sufficient — the flat codebase resists them.
 
 ---
 
