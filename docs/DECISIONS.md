@@ -5,6 +5,30 @@ See [AUDIT.md](AUDIT.md) for the contradictions, evolution timeline, suspect fin
 
 ---
 
+## v7.4.0 Algebra Design Decisions (from DESIGN_DECISIONS.md)
+
+17 decisions resolved during v7.4.0 issue refinement. These are the authoritative design — the code needs to match them.
+
+- D-DD1: **LCA is a parameter, not an algebra operation.** ComputeLCA is a pure query on StateHierarchy, computed externally. The algebra is a pure effect algebra (Exit, Enter, Fork, Sequence). Source: [#286](https://github.com/frank-fs/frank/issues/286) §1a.
+- D-DD2: **Explicit Fork in algebra programs.** The CE auto-generates programs with Fork from transition declarations. DualAlgebra needs to see Fork for per-region obligations. Source: [#286](https://github.com/frank-fs/frank/issues/286) §1b. **NOT IMPLEMENTED** — Fork is no-op in code.
+- D-DD3: **'r varies per interpreter (tagless final).** Programs are polymorphic: `TransitionAlgebra<'r> -> 'r`. Each interpreter chooses its own 'r. Source: [#286](https://github.com/frank-fs/frank/issues/286) §1c.
+- D-DD4: **ActiveStateConfiguration is opaque.** Programs receive it from RestoreHistory and pass it through; never construct or query directly. Source: [#286](https://github.com/frank-fs/frank/issues/286) §2.
+- D-DD5: **DualAlgebra replaces deriveWithHierarchy entirely.** Dual derivation IS a DualAlgebra interpreter. No wrapping layer. Source: [#288](https://github.com/frank-fs/frank/issues/288) §3. **NOT IMPLEMENTED** — Dual.fs is 740 lines of pre-algebra code.
+- D-DD6: **onTransition does not exist.** Every transition declaration auto-generates its algebra program. Customization through interpreters, not hooks. Source: [#282](https://github.com/frank-fs/frank/issues/282) §4. **NOT IMPLEMENTED** — onTransition hooks still in code.
+- D-DD7: **Single generated file per statechart.** One `OrderStatechart.Generated.fs` with types + programs. Source: [#283](https://github.com/frank-fs/frank/issues/283) §5.
+- D-DD8: **childOf uses value binding.** `childOf parentResource` where parentResource is the let binding. Compiler-checked. Source: [#293](https://github.com/frank-fs/frank/issues/293) §6.
+- D-DD9: **Two-path validation (build-time + startup).** SCXML-first: FCS analyzer. CE-first: startup validation. Both use same ValidationAlgebra. Source: [#296](https://github.com/frank-fs/frank/issues/296) §7.
+- D-DD10: **Algebra types in Frank.Statecharts.Core.** No separate Abstractions package. One zero-dep foundation. Source: [#286](https://github.com/frank-fs/frank/issues/286) §8. Implemented.
+- D-DD11: **Instance ID uses :: separator.** URL-encoded parameter values with `::` join. Source: [#293](https://github.com/frank-fs/frank/issues/293) §9.
+- D-DD12: **RFC 9457 Problem Details for error responses.** ProblemDetails via IProblemDetailsService with TryAddSingleton. Source: [#294](https://github.com/frank-fs/frank/issues/294) §10. Implemented.
+- D-DD13: **frank-cli distributed via existing dotnet tool.** Tool manifest, MSBuild targets run dotnet tool restore. Source: [#284](https://github.com/frank-fs/frank/issues/284) §11. Implemented.
+- D-DD14: **frank init three-layer approach.** dotnet new + frank extract + frank scaffold, each independently useful. Source: [#155](https://github.com/frank-fs/frank/issues/155) §12.
+- D-DD15: **Generated module naming conflicts are errors.** Fail early, caller refines inputs. Source: [#283](https://github.com/frank-fs/frank/issues/283) §13.
+- D-DD16: **ALPS validator is semantic only.** Parser ensures structure; validator ensures meaning. Source: [#302](https://github.com/frank-fs/frank/issues/302) §14.
+- D-DD17: **CollectorAlgebra in Core, reconstruction in CLI.** Pure interpreter in Core, reconstruction pipeline in Cli.Core. Source: [#290](https://github.com/frank-fs/frank/issues/290) §15.
+
+---
+
 ## Spec-Kit Decisions (v7.0-v7.2)
 
 54 decisions across 16 specs (4 skipped as pure sample app implementations).
