@@ -98,7 +98,7 @@ The user designs the type architecture (with Claude as sounding board) and imple
 
 ### Prologue: The Scene of the Crime
 
-Frank is an F# web framework testing the hypothesis that HATEOAS, statecharts, and semantic discovery compose into APIs that agents can navigate and use without prior knowledge beyond an entry-point URL. The hypothesis is unproven — proving it requires a naive client demo that hasn't been built yet, because the implementation gaps documented in this audit have prevented reaching that point.
+Frank is an F# web framework that pushes developers toward the pit of success for HATEOAS — its CE structure and extension model make self-describing APIs the natural output. The hypothesis under test is that agentic discovery and use is the best measure of whether that self-description actually works: if Frank's APIs are truly self-describing, a naive agent should be able to navigate them without prior knowledge beyond an entry-point URL. The hypothesis is unproven — the naive client demo that would test it hasn't been built yet, because the implementation gaps documented in this audit have prevented reaching that point.
 
 Over three months of Claude Code-assisted development, the hierarchy was designed correctly at every stage — and implemented as a flat FSM at every stage. The designs got more explicit. The code stayed flat. By the time anyone noticed, flat-FSM assumptions were embedded in ~15 functions across ~10 files, feeding every analysis tool, every generator, every test assertion, and every CLI command.
 
