@@ -424,3 +424,13 @@ Each layer is independently testable. Types compile-check. Runtime has unit test
 | v7.4.0 closed issues with concerns | 5 of 30 (none silent — all documented or tracked) |
 | Sound layers | AST, parsers, runtime internals, role projection, HTTP compliance |
 | Design decisions cataloged | ~400 across all sources |
+
+---
+
+## Closing Note: Why the Spec Cleanup Comes First
+
+The flat code is one gravity source. The specs were another. Eleven kitty-specs described flat semantics as if they were the design. Decisions were recorded against flat types as if they were intentional. When Claude starts a new session, it reads the specs *and* the code — and if both say "flat is correct," the gravitational pull is doubled.
+
+The April 2026 spec consolidation (the work that produced this audit) removed the contaminated specs, mined their decisions into [DECISIONS.md](DECISIONS.md) with suspect flags, consolidated the sound specs into a single location, and extracted the correct designs from GitHub issues into local files. The specs now say "hierarchy." The code still says "flat." That's one gravity source instead of two.
+
+This doesn't solve the implementation problem — the flat code still resists hierarchy, and Claude still gravitates toward the easy wrong version. But it removes the reinforcement loop where specs and code mutually confirmed the shortcut. The next implementation attempt starts with clean specifications, a documented blast radius, and an audit trail that makes the pattern visible. Whether that's enough remains to be seen.
