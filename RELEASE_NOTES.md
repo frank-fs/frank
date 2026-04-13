@@ -1,8 +1,24 @@
-### New in 7.4.0
+### v7.3.0–v7.4.0: Status and Errata
+
+> **These release notes were written during development and describe intended features. An [April 2026 audit](docs/AUDIT.md) found significant gaps between what was described and what was implemented. The audit is the authoritative source for current state. Key findings:**
+>
+> - **Hierarchy is internal only.** The runtime computes LCA-based exit/entry paths correctly, but results are flat `string list` fields. The tree type (`TransitionStep`) specified in gh-286 was never created. Fork is a no-op. Hierarchy is invisible to every external consumer.
+> - **Provenance bridge never connected.** `Frank.Provenance` registers for `IObservable<TransitionEvent>` from DI. Nobody publishes it. The system silently does nothing. Additionally, two incompatible `TransitionEvent` types exist (generic vs. non-generic).
+> - **Dual derivation is flat.** `Dual.fs` (740 lines) has zero `TransitionAlgebra` references. AND-state parallel composition is explicitly not handled. The `DualAlgebra` interpreter designed to replace it was never built.
+> - **SHACL shapes are undiscoverable.** Shapes are served at `/shapes/{slug}` but no Link header points to them. The affordance middleware has no awareness of SHACL.
+> - **CLI pipeline is flat.** `frank extract` → `frank compile` → `model.bin` operates on flat `StateMachineMetadata`. All generated artifacts are flat regardless of source format capabilities.
+> - **`onTransition` is the only observer.** Scheduled for removal (D-006) but no replacement (TraceAlgebra) exists.
+> - **v7.3.0 had 5 of 54 issues closed with silently dropped requirements.** v7.3.1 was clean (0/13). v7.4.0 closed issues are mostly clean (5/30 with documented concerns, none silent).
+>
+> **See [docs/AUDIT.md](docs/AUDIT.md) for the full forensic analysis and reset plan.**
+
+---
+
+### New in 7.4.0 (unreleased — 35 open issues, see audit)
 
 Protocol composition, hierarchical statecharts, and session type duality — the algebraic foundations that make Frank's multi-party protocols composable and verifiable by construction.
 
-**Hierarchical Statechart Runtime**
+**Hierarchical Statechart Runtime** *(internal computation correct; output types still flat — see audit C-1, C-2)*
 
 - **Composite states** with LCA-based entry/exit, XOR (exclusive) and AND (parallel) regions (#136)
 - **History pseudo-states** — shallow and deep history with proper accumulation across transition sequences
@@ -10,7 +26,7 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 - **Closed-world projection** with containment-aware pruning — child states reachable via implicit initial-child entry are not pruned (#225)
 - **Hierarchy bug fixes** — ancestor traversal in `resolveAllowedMethods`, history accumulation threading, AND composite exit deactivation (#224)
 
-**Session Type Duality**
+**Session Type Duality** *(pre-algebra implementation; DualAlgebra replacement not started — see audit Act IV)*
 
 - **ALPS duality vocabulary** — `clientObligation`, `advancesProtocol`, `dualOf`, `cutPoint` extension elements with HTTPS dereferenceable URIs (#124)
 - **Dual derivation engine** — classifies each descriptor as MustSelect, MayPoll, or SessionComplete per (role, state) pair (#125)
@@ -20,7 +36,7 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 - **Circular wait detection** — DFS on (role, state) dependency graph with observer filtering (#226)
 - **Cut point enrichment** — structured `CutPointInfo` with URI template, authority boundary, link relation (#226)
 - **Content negotiation** — `Prefer: return=dual` serves client dual ALPS profiles via middleware (#126)
-- **Dual conformance checking** — validates provenance traces against derived client obligations (#126)
+- **Dual conformance checking** — validates provenance traces against derived client obligations (#126) *(provenance bridge not wired — see audit Suspect 1)*
 
 **Algebraic Composition**
 
@@ -28,7 +44,7 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 - **Guard monoids** with identity, composition, and FsCheck algebraic law verification (#119)
 - **Typed sub-DUs** for `AlpsRole` and `AlpsDuality` id fields (#167)
 
-**CLI**
+**CLI** *(operates on flat StateMachineMetadata — see audit C-4)*
 
 - **`frank dual`** command — derive client duals, `--check-dual` for obligation validation, `--check-laws` for algebraic properties (#181)
 - **`frank compile`** promoted to root command — fixes MSBuild integration where `frank semantic compile` was unreachable (#228)
@@ -38,7 +54,7 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 
 - **Livelock detection** — flags non-final states with only self-loop transitions (#175)
 - **Closed-world projection** with totality check — ensures every transition has explicit role assignment (#171)
-- **HTTP-dereferenceable shape URIs** for ALPS `def` elements (#174)
+- **HTTP-dereferenceable shape URIs** for ALPS `def` elements (#174) *(shapes served but not linked from affordance middleware — see audit Suspect 3)*
 
 **Performance**
 
@@ -52,7 +68,7 @@ Protocol composition, hierarchical statecharts, and session type duality — the
 - **FrankCliOutputPath resolution** — generated artifacts now land in `$(IntermediateOutputPath)frank/` (e.g., `obj/Debug/net10.0/frank/`) instead of a bare `frank/` relative path; fixed by moving the default from `.props` to `.targets` where `IntermediateOutputPath` is available
 - **CI build fix** — suppress NU5100 NuGet warning for MSBuild task packages (DLL intentionally in `tasks/` not `lib/`)
 
-### New in 7.3.1
+### New in 7.3.1 (see audit errata above)
 
 Patch release: state-aware OPTIONS, role-filtered Link rels, and ALPS profile completeness.
 
@@ -81,7 +97,7 @@ Patch release: state-aware OPTIONS, role-filtered Link rels, and ALPS profile co
 - Added orphaned `Wsd/LexerTests.fs` to fsproj (453 lines of tests that were never compiled)
 - Deleted 5 stale test file copies left from restructure
 
-### New in 7.3.0
+### New in 7.3.0 (see audit errata above)
 
 Self-describing, protocol-aware applications — legible to both human developers and machine agents, with formal multi-party session guarantees enforced at the HTTP boundary.
 
@@ -90,13 +106,13 @@ Self-describing, protocol-aware applications — legible to both human developer
 - **Role definitions** on stateful resources with typed guard projections
 - **Projection operator** derives per-role ALPS profiles from the global statechart
 - **Projected profile middleware** serves role-aware ALPS `Link` headers at zero per-request cost
-- **Progress analysis** detects deadlock and starvation at build time
+- **Progress analysis** detects deadlock and starvation at build time *(operates on flat ExtractedStatechart)*
 - **Projection consistency validator** with 4 MPST checks (safety, completeness, role independence, liveness)
-- **Post-hoc session conformance checking** via `Frank.Provenance`
+- **Post-hoc session conformance checking** via `Frank.Provenance` *(provenance bridge not wired — see audit)*
 - **Role-aware SHACL shape references** for projected content negotiation and validation
 - **`frank project` command** generates per-role ALPS profiles with `--base-uri` support
 
-**Bidirectional Spec Pipeline**
+**Bidirectional Spec Pipeline** *(input direction hierarchical; output direction flat — see audit C-3, C-4)*
 
 - **Shared statechart AST** (`Frank.Statecharts.Core`) — unified type model for all format parsers
 - **Cross-format validator** with Jaro-Winkler near-match detection across WSD, ALPS, SCXML, smcat, XState
