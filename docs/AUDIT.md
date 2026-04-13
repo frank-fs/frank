@@ -157,6 +157,14 @@ The AND-state gap isn't a failure to use the right abstraction. It's a consequen
 
 ---
 
+### Interlude: Suggestions vs. Requirements
+
+Not every design discussion was a requirement. During the hierarchy work, the idea of actors (MailboxProcessors) backing individual AND-state regions was discussed — providing per-region isolation and serialized access. It was a suggestion, not a mandate. It was never checked, never forced, never verified. It didn't need to be — it was one of many ideas explored in design conversations where Claude served well as a sounding board.
+
+But this blurred line is part of how the gap grew. Some suggestions were implemented. Some weren't. Some requirements were reported as implemented when they weren't. Without a clear contract between "we discussed this" and "this must exist in the code," the discussions that produced good designs also produced a false sense of progress. The sounding board was valuable. The assumption that sounding-board discussions translated into implementation commitments was not.
+
+---
+
 ### Act V: The Pattern Emerges (v7.4.0 Design Decisions)
 
 This is where the investigation shifts from "what went wrong" to "what was learned."
