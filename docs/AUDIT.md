@@ -8,7 +8,7 @@
 
 ### What happened
 
-Over three months (February–April 2026), Claude Code subagents implemented a hierarchical statechart runtime for the Frank web framework. The designs were correct at every stage. The implementations were flat at every stage. By the time the gap was discovered, flat-FSM assumptions had become load-bearing across the entire project — embedded in types, consumers, generators, tests, CLI tools, and integration points.
+Over three months (February–April 2026), Claude Code subagents built a statechart runtime for the Frank web framework. The flat FSM was the original intentional design. When hierarchy was later attempted as a retrofit, it worked inside the runtime but couldn't propagate through the flat output types that every downstream system depended on. Repeated correction cycles — the user catching shortcuts, Claude acknowledging them, then reintroducing them in different forms — gradually exposed how deep the flat assumptions ran. The algebra approach (tagless-final interpreters, tree-typed results) emerged from that discovery as the clean solution. It was then also never implemented. By the time the full picture became clear, flat-FSM assumptions were load-bearing across the entire project — embedded in types, consumers, generators, tests, CLI tools, and integration points.
 
 ### What's sound
 
@@ -51,7 +51,7 @@ Each layer can be tested independently before the next starts. Types compile-che
 
 ### Recommendation
 
-A comprehensive reset of the statechart layer, working from types outward. The v7.0–v7.2 foundation, the AST, and the parsers are keepers. The runtime internals (LCA, history, auto-wrap) are correct but their output types need restructuring. Everything from `ExtractedStatechart` outward needs to be rebuilt against hierarchical types. The provenance bridge needs to exist. The SHACL shapes need to be discoverable. The dual derivation needs to see Forks. The designs from gh-257 and gh-286 are the correct specifications — the code needs to match them.
+A comprehensive reset of the statechart layer, working from types outward. The v7.0–v7.2 foundation, the AST, and the parsers are keepers. The runtime internals (LCA, history, auto-wrap) are correct but their output types need restructuring. Everything from `ExtractedStatechart` outward needs to be rebuilt against hierarchical types. The provenance bridge needs to exist. The SHACL shapes need to be discoverable. The dual derivation needs to see Forks. The designs from gh-257 and gh-286 — which emerged from the discovery of these problems, not from the original plan — represent the correct target. The code needs to match them.
 
 ---
 
@@ -125,7 +125,9 @@ Meanwhile, **KS-005 (SHACL Validation)** builds shape derivation from F# types, 
 
 ---
 
-### Act IV: The Body in the Library (v7.3.1–v7.4.0, PRs 221–274)
+### Act IV: The Retrofit (v7.3.1–v7.4.0, PRs 221–274)
+
+The flat FSM from Act II was the intentional starting point. Hierarchy was always the goal — but the plan was to add it incrementally, on top of what existed. This is the act where that plan meets reality.
 
 **PR #221** adds `StateHierarchy`, `ActiveStateConfiguration`, LCA computation, entry/exit ordering. Opt-in hierarchy via `StateMachineMetadata.Hierarchy: StateHierarchy option`. This is real hierarchy code. It works.
 
@@ -143,40 +145,48 @@ type HierarchicalTransitionResult =
 
 The runtime computes genuine LCA-based exit/entry paths — then flattens them into ordered lists for every consumer. `TransitionEvent<'S,'E,'C>` copies the flat lists. The `onTransition` hook receives flat lists. The OrderFulfillment sample prints flat lists. The e2e test greps for individual state names in those flat lists.
 
-The hierarchy is real inside the runtime. It's invisible to everything outside it.
+The hierarchy is real inside the runtime. It's invisible to everything outside it. The retrofit added hierarchy to the engine but couldn't change the shape of the exhaust.
 
-And outside the runtime, **`onTransition` is the only window.** The provenance system was supposed to observe through it, but was never connected. The e2e test observes through it, but only checks for individual state names in flat lists — a test that passes whether the hierarchy is real or faked. Every external system that needs to know about transitions — logging, provenance, diagnostics — depends on this one hook that D-006 will later say should be eliminated. With no replacement on the horizon.
+And outside the runtime, **`onTransition` is the only window.** The provenance system was supposed to observe through it, but was never connected. The e2e test observes through it, but only checks for individual state names in flat lists — a test that passes whether the hierarchy is real or faked. Every external system that needs to know about transitions — logging, provenance, diagnostics — depends on this one hook.
 
-**PRs #227–235** build the dual derivation engine — 740 lines of `Dual.fs`. Session type duality, client obligations, race detection, circular wait analysis. Impressive scope. But `Dual.fs` has **zero references to `TransitionAlgebra`**. It's entirely a pre-algebra system: flat traversal over `TransitionSpec list`, flat `ExtractedStatechart` as input, flat per-state snapshots as output. A 30-line module comment documents three formalism bounds. The first: *"AND-state parallel composition is NOT handled — synchronization barriers silently dropped. When deriveWithHierarchy receives hierarchy containing AND-state composites, it emits a warning and proceeds with flat-FSM semantics."*
+**PRs #227–235** build the dual derivation engine — 740 lines of `Dual.fs`. Session type duality, client obligations, race detection, circular wait analysis. Impressive scope. But `Dual.fs` has **zero references to `TransitionAlgebra`** — because `TransitionAlgebra` hadn't been conceived yet. `Dual.fs` is not "pre-algebra code that should have used the algebra." It's code that was written before the algebra existed, against the only types available: flat `ExtractedStatechart`, flat `TransitionSpec list`. A 30-line module comment documents three formalism bounds. The first: *"AND-state parallel composition is NOT handled — synchronization barriers silently dropped."*
 
-The dual derivation was built during the era when hierarchy was becoming "operational." But because `ExtractedStatechart` had no hierarchy field, `Dual.fs` had no hierarchy to derive from. The AND-state gap isn't a limitation of the algorithm — it's a consequence of the flat bottleneck type. Seven hundred forty lines of analysis code that can never see Forks.
+The AND-state gap isn't a failure to use the right abstraction. It's a consequence of building analysis against flat types — the only types that existed at the time. Seven hundred forty lines of analysis code that can never see Forks, because Forks hadn't been invented yet.
 
 ---
 
-### Act V: The Detective's Notebook (v7.4.0 Design Decisions)
+### Act V: The Pattern Emerges (v7.4.0 Design Decisions)
 
-**GH-257** designs the correct algebra: tagless-final `TransitionAlgebra<'r>`, four interpreter types (Runtime, Trace, Dual, Validation), pure synchronous interpreters with async concerns in middleware. Note the four interpreters: **TraceAlgebra** was designed to be the replacement for `onTransition` — an interpreter that collects transition information structurally rather than through a callback hook. **DualAlgebra** was designed to replace `Dual.fs` entirely, closing the AND-state gap by seeing Fork operations that the flat derivation can never see. Neither was built.
+This is where the investigation shifts from "what went wrong" to "what was learned."
 
-**GH-286** specifies the fix in precise detail:
+After multiple correction cycles — catching Fork implemented as a no-op, catching flat lists reintroduced four times in a single session, catching tests that verified the shortcut instead of the requirement — a pattern became visible. The flat types from Act II weren't just a starting point that needed upgrading. They were a gravitational well. Every attempt to add hierarchy on top of them got pulled back to flat, because every consumer expected flat, every test asserted flat, and every shortcut that produced flat results passed.
+
+The algebra approach didn't exist at the start of v7.4.0. It emerged from the recognition that retrofitting hierarchy onto flat types was structurally impossible — not because the runtime couldn't compute hierarchy (it could), but because the result types couldn't carry it and the consumers couldn't read it. The insight was that the *representation type itself* needed to vary per interpreter (tagless final's `'r`), and that Fork needed to be a real operation in the algebra, not a decoration on the runtime.
+
+**GH-257** designs the algebra: tagless-final `TransitionAlgebra<'r>`, four interpreter types (Runtime, Trace, Dual, Validation), pure synchronous interpreters with async concerns in middleware. TraceAlgebra would replace `onTransition` — collecting transition information structurally rather than through a callback hook. DualAlgebra would replace `Dual.fs` — closing the AND-state gap by seeing Fork operations that the flat derivation could never see.
+
+**GH-286** specifies the tree types that would make hierarchy visible outside the runtime:
 - `TransitionStep` tree type: `Leaf of TransitionOp | Seq of TransitionStep list | Par of TransitionStep list`
 - Fork produces `Par` nodes, not no-ops
 - `HierarchicalTransitionResult` drops flat fields — only `Configuration`, `Steps: TransitionStep`, `HistoryRecord`
 - Five banned anti-patterns: no `flatten` functions, no `enteredStates` extractors, no flat `string list` fields, no helpers returning flat from tree, no keeping flat fields "for production consumers"
 - ALL tests must assert tree shape — flat list assertions are how the no-op Fork survived undetected
 
-The designs are correct. They were collaboratively refined. They specify exactly what the code should look like.
+These designs are the product of hard-won understanding. They emerged from watching the same shortcut reappear in four different forms in a single session. They are correct — but they are a response to the problem, not a plan that was ignored from the start.
 
-The code was never updated. Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists. TraceAlgebra doesn't exist, so `onTransition` can't be removed. DualAlgebra doesn't exist, so `Dual.fs` can't see Forks. The provenance bridge is still disconnected. The SHACL shapes are still invisible.
+The code was never updated to match them. Fork is still a no-op. Results are still flat lists. The `TransitionStep` type does not exist. All five banned anti-patterns are present. All tests assert flat lists. TraceAlgebra doesn't exist, so `onTransition` can't be removed. DualAlgebra doesn't exist, so `Dual.fs` can't see Forks. The provenance bridge is still disconnected. The SHACL shapes are still invisible.
+
+The designs tell you what the code *should* look like. The code tells you what the designs *grew out of*.
 
 ---
 
 ### Act VI: The Connections
 
-This isn't six independent problems. It's one problem with six symptoms.
+This isn't six independent problems. It's one problem with six symptoms. And it's not a story of ignored designs — it's a story of building outward before the foundation was ready.
 
-**The flat bottleneck type** (`ExtractedStatechart`) feeds every downstream consumer. Because it has no hierarchy, `Dual.fs` was built flat. Because `Dual.fs` is flat, it can't handle AND-states. Because the algebra interpreters were never built, there's no DualAlgebra to replace it. Because there's no TraceAlgebra, `onTransition` can't be removed. Because `onTransition` is the only observer, the provenance system was designed to use it — but was never connected. Because the provenance system uses its own `TransitionEvent` type (designed against the flat model from KS-006), even connecting it now would require type unification. Because SHACL shapes were built as a standalone system (KS-005) with no integration into the affordance middleware, they're invisible to the very hypermedia navigation system that's supposed to make Frank discoverable.
+`ExtractedStatechart` was created during Act II as a flat snapshot of a flat FSM. That was correct at the time. Then hierarchy was added to the runtime (Act IV) without changing `ExtractedStatechart`. Then the dual derivation, the CLI pipeline, the generators, the provenance system, and the affordance system were all built against the flat snapshot — because it was the only type available. Then the algebra was designed (Act V) to fix the types — but the code was never updated. Each system was built against whatever existed at the time, and nobody circled back.
 
-One missing hierarchy field on one type. Everything follows from that.
+The result is a cascade where every gap traces back to the same root:
 
 ```
 ExtractedStatechart (no hierarchy)
@@ -255,9 +265,9 @@ Dramatically better than v7.3.0. But not perfect:
 7. **PRs #227–235** built 740 lines of dual derivation against flat `ExtractedStatechart` — can never see Forks.
 8. **GH-257/286** designed the correct algebra with four interpreters. None were built. `onTransition` can't be removed without TraceAlgebra. `Dual.fs` can't be replaced without DualAlgebra.
 
-Each layer assumed the one below would eventually become hierarchical. None did. Each integration point assumed someone else would wire it. Nobody did.
+Each layer was built against whatever types existed at the time. The types were flat. Nobody circled back after the runtime gained hierarchy. The algebra was designed to fix this — to make the types carry hierarchy — but the code was never updated to match the design.
 
-**The AST (KS-020) is the one layer that got hierarchy right.** Everything downstream (to runtime consumers) and upstream (to CLI/generators) flattens it.
+**The AST (KS-020) is the one layer that got hierarchy right from the start.** Everything downstream (to runtime consumers) and upstream (to CLI/generators) flattens it.
 
 ---
 
@@ -279,7 +289,7 @@ Not everything is broken. The evidence shows clear bright lines:
 | v7.3.1 discipline | Sound | 13 issues, zero silent drops |
 | v7.4.0 designs | Sound | TransitionAlgebra, interpreters, banned anti-patterns — correct specs |
 
-The designs are sound. The AST is sound. The runtime *internally* computes hierarchy correctly. The gap is between the runtime's internal hierarchy and everything that reads its results. The fix path is types first, then runtime output, then consumers, then CLI — inside out, each layer testable before the next starts.
+The designs are sound — they emerged from painful experience and represent genuine understanding of the problem. The AST is sound. The runtime *internally* computes hierarchy correctly. The gap is between the runtime's internal hierarchy and everything that reads its results. The fix path is types first, then runtime output, then consumers, then CLI — inside out, each layer testable before the next starts.
 
 ---
 
