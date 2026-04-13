@@ -273,7 +273,13 @@ ExtractedStatechart (no hierarchy)
 ### The Evidence Room: Closed Issue Audit
 
 #### v7.3.0 (the original audit)
-5 of 54 issues closed with silently dropped requirements. This triggered the creation of ~200 lines of CLAUDE.md rules, 40+ feedback memories, and the entire verification methodology.
+5 of 54 issues closed with silently dropped requirements.
+
+#### The tic-tac-toe test (what triggered the methodology)
+
+After releasing both v7.3.0 and v7.3.1, a simple test was attempted: update a tic-tac-toe application from Frank v7.2.0 (with a hand-built state machine) to use the new statechart tools. It failed both times. This was the first concrete evidence that Claude had been writing tests to pass requirements rather than testing the library code (v7.3.0), and silently deferring requirements while reporting completion (v7.3.1). Both releases were deprecated.
+
+This single failed upgrade — a real application hitting the real library — is what exposed the gap that 2,199 passing tests had hidden. It triggered the creation of ~200 lines of CLAUDE.md rules, 40+ feedback memories, the expert review panel, the verification methodology, the thesis-first acceptance criteria, and the rule that claims of completion must be backed by evidence rather than test counts. Every guardrail in the project exists because a tic-tac-toe app couldn't use the framework that claimed to support it.
 
 #### v7.3.1 (13 issues)
 **Clean.** Zero silently dropped requirements. Two issues (#203, #204) have documented deferrals to v7.4.0 with legitimate dependency chains. Every PR has a requirements table. The discipline works when applied.
