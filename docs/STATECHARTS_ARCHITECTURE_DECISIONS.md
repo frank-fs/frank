@@ -58,7 +58,7 @@ Frank aims to provide:
 1. **F# idioms** — Computation expressions, immutability, type safety
 1. **ASP.NET Core integration** — Must work with existing middleware patterns
 1. **Independent utility** — Each capability should work without requiring all others
-1. **Quorum reuse** — Statechart runtime must be reusable outside Frank (e.g., workflow orchestration)
+1. **Reusability** — Statechart runtime must be reusable outside Frank for non-HTTP contexts
 
 ### 1.3 Prior Attempts and Why They Failed
 
@@ -325,7 +325,7 @@ let headers = view.Affordances |> List.map (LinkHeaderAlgebra().affordance)
 
 **Rationale**:
 
-- Reusable for Quorum workflow orchestration
+- Reusable for non-HTTP contexts (CLI tools, background services, etc.)
 - Testable without HTTP infrastructure
 - Potential F# ecosystem contribution
 - Clean separation of concerns
@@ -415,7 +415,7 @@ type StatechartDocument = {
 
 **Why rejected**:
 
-- Can’t reuse for non-HTTP (Quorum workflows)
+- Can’t reuse for non-HTTP contexts
 - Testing requires HTTP infrastructure
 - Violates dependency direction (stable → volatile)
 
@@ -1862,7 +1862,7 @@ let handleEvent event = async {
 |2026-04|AST + TF bridge                |Parsing needs AST, interpretation needs TF   |
 |2026-04|Composition model              |Unified view without unified type            |
 |2026-04|Projection is filtering        |Keeps algebras simple, filters compose       |
-|2026-04|Independent statecharts package|Quorum reuse, testability                    |
+|2026-04|Independent statecharts package|Reusability, testability                     |
 
 ### Appendix C: Open Questions
 
