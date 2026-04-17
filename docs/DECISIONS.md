@@ -3,6 +3,8 @@
 Complete catalog of all design decisions extracted from specs, issues, and PRs (~400 decisions).
 See [AUDIT.md](AUDIT.md) for the contradictions, evolution timeline, suspect findings, and dropped designs.
 
+> **Relationship to the living architecture:** This is a historical catalog. For the current architectural direction of the statecharts layer, see [STATECHARTS_ARCHITECTURE_DECISIONS.md](./STATECHARTS_ARCHITECTURE_DECISIONS.md). That document is a living specification — edited in place as decisions evolve — and supersedes individual entries here where they conflict. Supersession relationships are listed in its Appendix F. Entries in this file remain valuable for their source links, evolution timeline, and audit trail. New decisions from day-to-day work (issues, PRs) continue to accumulate here; decisions that change the statechart architecture itself are recorded in the living document and then mirrored here as D-A entries referencing it.
+
 ---
 
 ## v7.4.0 Algebra Design Decisions (from DESIGN_DECISIONS.md)
@@ -812,6 +814,47 @@ See [AUDIT.md](AUDIT.md) for the contradictions, evolution timeline, suspect fin
 
 ---
 
+## Architecture Document Decisions (v7.5 and forward)
+
+10 decisions captured from the living architectural specification [STATECHARTS_ARCHITECTURE_DECISIONS.md](./STATECHARTS_ARCHITECTURE_DECISIONS.md). Each entry summarizes the decision and cites the supersession or reinforcement relationships to prior entries in this file. Full rationale, type specifications, and implementation constraints live in the architecture document.
+
+- D-A1: **Separate types per concern.** Statecharts, validation, provenance, and linked data each own their types in their own packages. Composition via explicit bindings, not unified ASTs. Reinforces D-DD10 (algebra types in Core, no separate Abstractions); extends to Validation/Provenance/LinkedData as siblings. Source: STATECHARTS_ARCHITECTURE_DECISIONS.md §3 AD-1.
+- D-A2: **Three algebras with disjoint carriers.** `IStatechartBuilder<'r>` for structure, `ITransitionAlgebra<'r>` for transition behavior (six-op vocabulary + Fork as first-class), `IConfigurationPredicate<'r>` for state-set queries. Reinforces D-DD1 (LCA as parameter), D-DD3 (polymorphic `'r`), D-GH7 (tagless-final), D-GH8 (six-op vocabulary), D-GH13 (TransitionStep tree). Adds the three-way carrier separation. Source: §3 AD-2, §7.
+- D-A3: **Journal-sourced runtime.** `IStatechartJournal` is the source of truth; `AgentState` is a derived projection; snapshots are caching only. Supersedes D-KS8 (MailboxProcessor as default store), D-KS42 (actor-serialized unchanged interface), D-PR22 (`IStatechartsStore` with `InstanceSnapshot`). Source: §3 AD-3, §8.
+- D-A4: **AST and algebra bridged per algebra.** Each algebra has its own reify/reflect bridge. Formalizes D-GH26 (polymorphic transition programs), D-PR66 (applicative over monad). Source: §3 AD-4, §7.
+- D-A5: **Composition model with predicate keys.** Bindings (affordances, handlers, validation) keyed on `ConfigurationPredicate`, not `StateId`. Parallel regions compose correctly. Supersedes earlier `Map<StateId, _>` patterns; related to D-PR114 (one ALPS profile per role). Source: §3 AD-5, §6.7, §9.
+- D-A6: **Role projections are derived.** Mechanically projected from statechart plus `RoleParticipation` schema; manual overrides are analyzer-warned escape hatch (FRANK220). Supersedes hand-authored per-role data; formalizes D-PR13, D-PR14, D-PR77–D-PR79 (closed-world), D-GH1–D-GH6 (role schema). Source: §3 AD-6, §6.5, §10.
+- D-A7: **Statecharts package is independent.** `Statecharts.*` packages have zero Frank or HTTP dependencies. Reinforces D-KS7 (deep CE integration) and D-DD10 (zero-dep foundation). Source: §3 AD-7, §5.
+- D-A8: **Closed guard language.** Guards are a closed DU (`InState`, `InAny`, `EventDataEquals`, `VariableEquals`, `Compare`, `And`/`Or`/`Not`, `True`/`False`). No string-based guard expressions. Supersedes `Expression of string` in earlier drafts; formalizes D-KS15, D-KS21, D-KS43 under a statically analyzable form. Source: §3 AD-8, §6.1.
+- D-A9: **Scheduled events are first-class.** SCXML `<send delay>` and `<cancel>` supported via `IStatechartScheduler` with journaled durability. Completes prior timeout-tracking. Source: §3 AD-9, §6.2, §8.3.
+- D-A10: **Macrostep matches W3C SCXML algorithm exactly.** Direct transliteration of SCXML Appendix D; W3C IRP conformance testing. Reinforces D-PR75 (LCA ordering), D-PR18 (ancestors to root), D-PR25 (AND-state model). Source: §3 AD-10, §8.1.
+
+### Decisions completing prior NOT IMPLEMENTED entries
+
+The architecture document is the mechanism for completing three decisions flagged as NOT IMPLEMENTED in the v7.4.0 Algebra Design Decisions section:
+
+- **D-DD2 (explicit Fork in algebra programs)** → completed by `ITransitionAlgebra.fork` per D-A2, with a doc comment forbidding the no-op failure mode.
+- **D-DD5 (DualAlgebra replaces `Dual.fs`)** → completed by the `DualAlgebra` standard interpreter in the architecture doc §7.2. `Dual.fs` is excised per §13.6 after `DualAlgebra` ships.
+- **D-DD6 (onTransition does not exist)** → completed by `TraceAlgebra` per D-A3 (journal-sourced observation). `onTransition` is excised per §13.6 after `TraceAlgebra` ships.
+
+### Decisions explicitly superseded
+
+The following prior decisions are superseded by the architecture document. Where they appear in code or documentation, callers should migrate to the indicated replacement:
+
+| Prior decision / pattern | Superseded by |
+|---|---|
+| `HierarchicalTransitionResult.ExitedStates`/`.EnteredStates` flat fields (AUDIT Act IV) | `TransitionResult.Steps: TransitionStep` per D-A2 |
+| Two incompatible `TransitionEvent` types (`Frank.Statecharts` vs `Frank.Provenance`, AUDIT Act II/IV) | Single journal entry stream; `Statecharts.Provenance` derives PROV-O per D-A3 |
+| `ExtractedStatechart` as flat bottleneck (AUDIT §"Piecemeal Type Problem") | `StatechartDocument` referenced directly by `StatefulResourceBinding` per D-A5 |
+| `Frank.Statecharts.Core` assembly (should have been deleted during original merge) | Types merged into `Frank.Resources.Model`; Core deleted per D-A1 |
+| `Expression of string` guard syntax | Closed `Guard` DU per D-A8 |
+| Hand-authored per-role projections | Derived projections from `RoleParticipation` per D-A6 |
+| `onTransition` hooks as sole observer | Journal-sourced observation via `TraceAlgebra` per D-A3 |
+| `Dual.fs` (740 lines of pre-algebra derivation) | `DualAlgebra` interpreter per D-A2 |
+| FRANK101–108 / FRANK201–212 analyzer ranges (collided with D-GH19) | Renumbered to FRANK111–118 / FRANK211–222 |
+
+---
+
 ## Cross-Reference: Overlaps with DECISIONS.md
 
 | Source Decision | Overlaps DECISIONS.md |
@@ -851,4 +894,5 @@ See [AUDIT.md](AUDIT.md) for the contradictions, evolution timeline, suspect fin
 | GitHub Issue Spec Decisions (v7.4.0) | 46 |
 | Suspect Kitty-Spec Decisions (v7.3.0) | 79 (including summary) |
 | PR Decisions | 151 |
-| **Total** | **406** |
+| Architecture Document Decisions (v7.5+) | 10 |
+| **Total** | **416** |
