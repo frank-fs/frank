@@ -2,6 +2,8 @@
 
 *April 2026 — Forensic analysis of three months of Claude Code-assisted development. Full decision catalog in [DECISIONS.md](DECISIONS.md).*
 
+> **Status note:** The "Reset Plan" section below describes the go-forward approach at the time of audit. The current architectural target is captured in [STATECHARTS_ARCHITECTURE_DECISIONS.md](./STATECHARTS_ARCHITECTURE_DECISIONS.md), which adopts the Reset Plan's four-layer structure (finish-the-merge as Layer 0, tree types + Fork as Layer 1, interpreters as Layer 2, consumers/HTTP as Layer 3, CLI/generators as Layer 4) and extends it with the journal-sourced runtime, derived role projections, `Statecharts.Provenance` as a seam package, and first-class guards and timeouts. The audit's diagnostic content (Acts I–VI, Root Cause, AST Gaps, Piecemeal Type Problem) remains the canonical explanation of *why* those decisions are the right ones and is not superseded.
+
 ---
 
 ## Executive Summary
