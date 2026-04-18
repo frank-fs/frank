@@ -7,26 +7,33 @@
 
 ## Executive Summary
 
-Frank provides stateful HTTP resources backed by Harel statecharts. Resources expose state-dependent affordances, validate inputs against state-dependent SHACL shapes, serve RDF representations via content negotiation, emit PROV-O audit graphs derived from an event-sourced journal, and enforce multi-party protocols through mechanically derived role projections.
+Frank provides stateful HTTP resources backed by a denotational substrate of coalgebraic session types. Statecharts are one presentation of session-typed protocols; resources expose state-dependent affordances, validate inputs against SHACL shapes, serve RDF representations via content negotiation, emit PROV-O audit graphs as homomorphic projections of the protocol’s denotation, and enforce multi-party protocols through coalgebra-homomorphism-sound role projections.
 
-The architecture rests on seven load-bearing decisions:
+The architecture rests on fourteen load-bearing decisions:
 
-1. **Separate types per concern.** Statecharts, validation, provenance, and linked data each own their types in their own packages. Nothing is “embedded” — concerns compose through explicit bindings, not unified ASTs.
-1. **Three algebras with disjoint carriers.** `IStatechartBuilder<'r>` constructs structure, `ITransitionAlgebra<'r>` interprets transition behavior, `IConfigurationPredicate<'r>` evaluates predicates over active configurations. No algebra mixes carriers.
-1. **Journal-sourced runtime.** `IStatechartJournal` is the source of truth; in-memory `AgentState` is a derived projection. Snapshots cache; they do not persist. PROV-O is derived from the journal by a dedicated bridge package that keeps HTTP provenance and statechart provenance independently usable.
-1. **Predicate-keyed bindings.** Affordances, handlers, and validation attach to `ConfigurationPredicate`s, not single state IDs. Parallel regions compose correctly; single-state cases stay concise.
-1. **Derived role projections.** Following multi-party session types, per-role views are mechanically projected from a statechart plus a `RoleParticipation` schema. Hand-authored overrides are an analyzer-warned escape hatch.
-1. **First-class guards and timeouts.** Guards use a closed expression language. Scheduled events are first-class actions backed by a durable `IStatechartScheduler`.
-1. **SCXML conformance.** The macrostep algorithm is a direct transliteration of the W3C SCXML Algorithm for SCXML Interpretation. Where Frank deviates, the deviation is documented and tested.
+1. **Separate types per concern.** Five Core packages — session types, statecharts, validation, provenance, linked data — each own their types. Concerns compose through explicit bindings at the denotation level and through explicit composition packages at the builder level, not through a unified AST.
+1. **Algebras as the contract surface for each concern.** Ten tagless-final algebras across five concerns; each interpreter is a homomorphism into a specific carrier representing one way of using the concern’s values. The homomorphism-into-the-denotation property is the uniform soundness criterion.
+1. **Journal-sourced runtime as coalgebra unfolding.** Per-role `MailboxProcessor` actors are the runtime; the journal is what they produce by communicating. SQLite-per-actor as the default implementation, matching the Cloudflare Durable Objects / Gleam Warp pattern. LMDB as an alternative under memory pressure.
+1. **Homomorphism bridges, not AST conversion.** Each algebra has a lossless reflect/reify bridge between its AST and its polymorphic form. Parsing produces AST; interpretation uses the polymorphic form.
+1. **Composition model with predicate keys.** Statechart bindings attach to `ConfigurationPredicate`s, not single state IDs. Parallel regions compose correctly because predicates are conjunction-closed, matching how AND-states compose in the denotation.
+1. **Role projections are coalgebra homomorphisms, with pluggable assignment.** Projection soundness is the commutative-diagram property `αᵣ ∘ π_r = F(π_r) ∘ α`, verified by well-formedness checks. Role assignment via pluggable `RoleExtractor` interface; `ClaimsRoleExtractor` is the v1 default; actor-backed and external-service variants are user-implementable.
+1. **Core packages are independent of ASP.NET Core and of each other.** Every `Frank.*.Core` package depends only on FSharp.Core (plus `System.Security.Claims` for `Frank.SessionTypes.Core`). No Core depends on any other Core. Independence is enforced structurally.
+1. **Closed guard language is part of the denotation.** Guards are refinement predicates on message payloads; the closed form makes refinement satisfiability decidable via SMT, and refinement well-formedness is part of the denotational correctness claim.
+1. **Scheduled events are first-class.** SCXML `<send delay>` and `<cancel>` are journaled operations with a durable `IStatechartScheduler`; denotationally, they extend the coalgebraic functor with a time dimension.
+1. **SCXML operational algorithm as one adequate homomorphism.** The macrostep implementation is justified by an adequacy theorem relating it to the coalgebraic denotation. Property-based testing verifies adequacy in v1; mechanical proof is a v2/v3 aspiration.
+1. **Analyzer suite as extended type checker.** Six rule categories with hundred-block numbering (001–599 active, 600+ reserved). SMT-backed refinement checking, composition-failure detection, and codegen consistency are all part of the analyzer.
+1. **Codegen bridges from specifications to F# code.** V1 CE-driven codegen via Myriad for session types and statecharts (producing fully-implemented `MailboxProcessor` actors with typed hooks; typed state and event DUs). V2 format-driven codegen via the FSharp.GrpcCodeGenerator / FsGrpc.Tools pattern for WSD, SCXML, Scribble, AsyncAPI, SHACL, and other external formats. Codegen is where the architecture’s duality hypothesis lives operationally — formal specifications produce legible operational artifacts via verifiable transformation, and the feedback loop between hard formal structure and capable AI tooling is present in v1 through CE authoring.
+1. **Concerns extend Frank core via three contribution surfaces.** Every concern ships algebras (internal contract), nested CEs (authoring), and type extensions to `ResourceBuilder` and `WebHostBuilder` (composition). Composition packages contribute only type extensions. V1 ships eight composition packages; gaps in the composition grid are visible in the package list, not hidden inside packages doing two things.
+1. **Analyzer rules for composition.** FRANK400 series catches operation-name collisions, missing prerequisites, builder-output mismatches, and missing role-extractor registration at compile time, enforcing the Voltron discipline mechanically.
 
-The architecture is built **depth-first**. Each layer ships complete against its conformance suite before the layer above is started. No layer makes simplifying assumptions that the layer above will inherit as constraints.
+The architecture is built **depth-first**. Each phase ships complete against its conformance suite before the next is started. The denotational foundation is Phases 0a–0c (parallel Core package development, foundational composition packages for the translations the runtime depends on, CE-driven codegen infrastructure). The runtime realizes the denotation in Phase 1. Refinement verification, composition packages, HTTP integration, analyzers, and documentation follow in Phases 2–7. V2 format-driven codegen is named explicitly as Phase 8 so the deferred scope remains visible.
 
 -----
 
 ## Table of Contents
 
 1. [Problem Statement](#1-problem-statement)
-1. [Theoretical Foundations](#2-theoretical-foundations)
+1. [Denotational Foundations](#2-denotational-foundations)
 1. [Architectural Decisions](#3-architectural-decisions)
 1. [Rejected Alternatives](#4-rejected-alternatives)
 1. [Package Structure](#5-package-structure)
@@ -62,7 +69,7 @@ Frank aims to provide:
 1. **Hierarchy and parallelism are first-class.** Compound states, parallel (AND) regions, history (shallow and deep), and joins/forks across regions all work correctly. No piece of the design silently assumes a flat or non-parallel statechart.
 1. **F# idioms.** Computation expressions, immutability, type safety, exhaustive pattern matching.
 1. **ASP.NET Core integration.** Works with existing middleware patterns.
-1. **Independent utility.** `Statecharts.*` packages work without Frank or HTTP. Frank packages work without statecharts where the concern is independent.
+1. **Independent utility.** `Frank.Statecharts.Core`, `.Runtime`, `.Parsers`, `.Generators`, `.Multiparty`, and `.Provenance` (plus sibling `Frank.Validation.Core`, `Frank.Provenance.Core`, `Frank.LinkedData.Core`) work without ASP.NET Core or any HTTP context — consumable from CLI tools, background services, and offline analysis. Frank middleware packages work without statecharts where the concern is independent.
 1. **Reusability.** Statechart runtime is reusable outside Frank for non-HTTP contexts (CLIs, background workers, agent runtimes).
 
 ### 1.3 Prior Approaches Rejected
@@ -83,152 +90,321 @@ The common thread: each of these approaches made a simplifying assumption that t
 
 -----
 
-## 2. Theoretical Foundations
+## 2. Denotational Foundations
 
-### 2.1 Harel Statecharts (1987) and SCXML (W3C 2015)
+### 2.1 Why Denotational Semantics
 
-David Harel’s statecharts extend finite-state machines with hierarchy, orthogonality, broadcast, and history. The W3C SCXML recommendation gives an executable operational semantics for these features.
+Frank’s statechart layer makes claims that operational semantics cannot underwrite. *Per-role projections preserve observable behavior.* *Multiple interpreters of the same protocol agree on what they implement.* *Provenance derived from a journal faithfully records what happened.* *A protocol composed of fragments behaves as the composition of their behaviors.* Each of these is a statement about meaning — about what a protocol *is* — not a statement about what an algorithm produces step by step.
 
-Where Harel and SCXML diverge, **SCXML is the implementation contract for Frank**. SCXML is unambiguous, has a reference algorithm, and is the lingua franca for tooling (statechart-io, XState importers, scion, etc.). Harel-1987 is the conceptual contract: when intuition and SCXML diverge, the architecture exposes the divergence rather than papering over it.
+Operational semantics specifies an algorithm. Denotational semantics specifies what the algorithm is computing. The relationship between them is operational adequacy: the algorithm computes the denotation correctly. When you have only the algorithm, you have nothing to be adequate *to*; soundness questions reduce to “the algorithm produces what it produces,” which is unfalsifiable. The algorithm becomes the spec, and properties that should follow from the spec — projection soundness, interpreter agreement, provenance correctness — instead require ad-hoc proofs against algorithmic detail.
 
-Features adopted in full:
+Frank takes the denotation as primary. The SCXML algorithm becomes one homomorphism among several into representations of the denotation, justified by an adequacy theorem rather than by definition. The role-projection function becomes a structure-preserving map between denotations rather than a syntactic operation that happens to seem right. Provenance derivation becomes another homomorphism into a different carrier (PROV-O graphs), and “provenance is correct” becomes a checkable relationship between two homomorphisms of the same denotation.
 
-|Feature         |Description                                     |Frank relevance                    |
-|----------------|------------------------------------------------|-----------------------------------|
-|Hierarchy       |States contain substates (OR-decomposition)     |Resource nesting, visibility levels|
-|Orthogonality   |Parallel regions execute concurrently (AND)     |Multi-party protocols              |
-|Broadcast       |Internal events propagate within same macrostep |Event-driven coordination          |
-|History         |Shallow and deep history pseudostates           |Session resume, caching            |
-|Guards          |Conditions enabling/disabling transitions       |Authorization, business rules      |
-|Joins/forks     |Multi-source/multi-target transitions           |Cross-region synchronization       |
-|Final states    |Region completion signals to enclosing parallel |Workflow completion semantics      |
-|Internal events |Actions raise events processed in same macrostep|Reactive coordination              |
-|Scheduled events|`<send delay="…">` for timeouts                 |Workflow timeouts                  |
+This is more work than operational specification alone, and the work is concentrated in §2 and §3 — once the foundation is set, the downstream sections become specifications of *what* rather than apologetics for *how*.
 
-Critical semantic properties:
+### 2.2 The Denotation: Coalgebraic Session Types
 
-1. **Configuration** — Maximal orthogonal set of active states. Global property, non-compositional.
-1. **Macrostep** — Process external event plus all chained internal events to quiescence (no internal event pending).
-1. **Microstep** — Single set of non-conflicting transitions fired together.
-1. **Priority** — Inner transitions override outer; document order breaks ties.
-1. **Conflict** — Two transitions conflict if their exit sets overlap. Conflict resolution by priority.
+Frank’s denotation domain is **coalgebraic session types**: every protocol denotes both a global session type (in the Honda-Yoshida-Carbone tradition) and a coalgebra over a state space (in the Jacobs/Rutten tradition), where the two views are related by a precise mathematical correspondence. Neither view is primary. They are two faces of the same denotational object.
 
-These semantics are not compositional in the structure of the statechart. You cannot compute `currentConfiguration` by folding over the AST. This justifies the agent-based runtime and disqualifies a pure tagless-final encoding for execution.
+#### Global session types (the syntactic face)
+
+A **global type** `G` describes a multi-party protocol from a god’s-eye view. The grammar:
+
+```
+G ::=  end                              -- protocol terminates
+    |  μX. G                            -- recursive protocol
+    |  X                                -- recursion variable
+    |  p → q : { lᵢ⟨Tᵢ⟩. Gᵢ }ᵢ∈I       -- p sends q one of the labeled messages, continues per choice
+```
+
+The form `p → q : { lᵢ⟨Tᵢ⟩. Gᵢ }` says: role `p` sends to role `q` a message tagged with one of the labels `lᵢ`, carrying a payload of type `Tᵢ`, and the protocol continues as `Gᵢ` depending on which label was sent. The set `I` is non-empty; when it has size one, the message is unconditional; when larger, it is a *choice* point.
+
+A global type is **well-formed** if it satisfies three conditions central to the MPST theory:
+
+1. **Sender determinacy.** At every choice point `p → q : { lᵢ⟨Tᵢ⟩. Gᵢ }`, the sender `p` must be the same across all branches (no role ambiguity at choice points).
+1. **Knowledge of choice.** Every role whose subsequent behavior depends on which branch was taken must learn the choice through some message in that branch — explicitly or transitively.
+1. **No orphan messages.** Every message expected by some role must be sent by some role; every message sent must be expected by its receiver.
+
+Well-formedness is checkable on the global type by structural recursion. It is the syntactic precondition for soundness of projection.
+
+#### Coalgebras (the behavioral face)
+
+A **coalgebra** for a functor `F` is a pair `(S, α)` where `S` is a state space and `α : S → F(S)` is a structure map describing what one step of the system can do from each state. For session-typed multi-party systems, the relevant functor is:
+
+```
+F(X) = Role → ( SendBranch(Msg × X)
+              + ReceiveBranch(Msg → X)
+              + End )
+```
+
+Read: at each state, for each role, the system either *sends* a message and continues (a branch is the choice of which message to send), *receives* a message and continues (the continuation is indexed by which message arrives), or *terminates*. The coalgebra `(S, α)` for a specific protocol assigns to each state in `S` exactly which of these holds for each role.
+
+The coalgebra is the *meaning* of the protocol: it specifies, exhaustively, what behaviors are possible. Two protocols denote the same coalgebra (up to bisimulation) iff they have the same observable behavior.
+
+#### The duality
+
+The global session type `G` and the coalgebra `(S, α)` it denotes are related by a constructive correspondence: `G` is a syntactic *presentation* of `(S, α)`. The state space `S` is the set of subterms of `G` (modulo recursion unfolding). The structure map `α` is computed by structural recursion on `G`. The end state is `end`; the structure map at a choice point `p → q : { lᵢ⟨Tᵢ⟩. Gᵢ }` returns, for role `p`, a `SendBranch` over the labels `lᵢ` with continuations `Gᵢ`; for role `q`, a `ReceiveBranch` indexed similarly; for any other role, the same as the continuation `Gᵢ` (since their behavior doesn’t depend on this choice if knowledge-of-choice holds).
+
+This is a *duality* in the precise mathematical sense: for every well-formed global type there is a unique corresponding coalgebra, and the operations available on each side correspond:
+
+|Global type operation                 |Coalgebra operation                        |
+|--------------------------------------|-------------------------------------------|
+|Projection `G ↾ p` to role `p`        |Coalgebra homomorphism into `p`’s view     |
+|Composition of fragments by sequencing|Colimit of coalgebras over shared interface|
+|Recursion `μX. G`                     |Greatest fixed point of `α`                |
+|Well-formedness                       |Existence of bisimulation to canonical form|
+
+The duality is what justifies treating either view as primary depending on what we want to do. For specification and human authorship, the global type is convenient (sequential reading, named choice points, structural composition). For analysis and runtime implementation, the coalgebra is convenient (state-and-step structure maps directly onto actor implementations and onto bisimulation-based equivalence checking).
+
+#### Projection as homomorphism
+
+Per-role projection is the central operation Frank performs on protocols. The projection of global type `G` to role `r`, written `G ↾ r`, is a *local type* describing `r`’s view of the protocol — the messages `r` sends, the messages `r` receives, the choices `r` makes, the choices `r` learns about.
+
+The local type for role `r` is itself a coalgebra over `r`’s local state space. The projection function from global to local is, mathematically, a coalgebra homomorphism: a structure-preserving map from the global coalgebra `(S, α)` to the local coalgebra `(Sᵣ, αᵣ)` such that the diagram
+
+```
+    α
+S ─────► F(S)
+│           │
+│ π_r       │ F(π_r)
+▼           ▼
+Sᵣ ────► F(Sᵣ)
+    αᵣ
+```
+
+commutes. Equationally: `αᵣ ∘ π_r = F(π_r) ∘ α`. This is the *soundness criterion* for projection. It is not a wish; it is a mathematical statement that can be checked, and Frank checks it.
+
+The well-formedness conditions on global types are exactly the syntactic conditions under which this homomorphism exists for every role. Sender determinacy ensures the projection is single-valued. Knowledge of choice ensures the projection is well-defined after every choice point. No orphan messages ensures the local coalgebras compose back to the global coalgebra.
+
+When projection is sound — which the well-formedness check verifies — the per-role implementations Frank deploys are by construction faithful to the global protocol. There is no separate proof obligation; the soundness *is* the homomorphism, and the homomorphism follows from well-formedness.
+
+### 2.3 Refinements: Guards as Refined Message Types
+
+The classical MPST grammar above carries unrefined payload types `Tᵢ`. Frank extends this by allowing each label to carry a refinement predicate over the payload, drawn from the closed `Guard` language (§3, AD-8):
+
+```
+G ::=  ...
+    |  p → q : { lᵢ⟨Tᵢ | φᵢ⟩. Gᵢ }ᵢ∈I       -- payload typed Tᵢ refined by predicate φᵢ
+```
+
+A refined branch `lᵢ⟨Tᵢ | φᵢ⟩` is enabled only when the sender’s payload satisfies `φᵢ` and the receiver’s continuation can rely on `φᵢ` holding. Refinements turn business rules and authorization checks from runtime errors into protocol structure.
+
+Refinement well-formedness adds two conditions to the classical three:
+
+1. **Sender provability.** At each branch, the sender’s projection must be able to prove `φᵢ` of the payload it constructs. Unprovable refinements indicate either a bug in the protocol or a missing precondition earlier in the protocol.
+1. **Receiver completeness.** The disjunction of refinements at a choice point must cover the input space of the carried type, modulo a default branch. Incomplete coverage indicates a stuck protocol.
+
+These conditions are not always decidable in general, but they are decidable for the fragment of `Guard` Frank uses (Boolean combinations of equalities, comparisons, and state-predicates over a finite signature) by reduction to SMT. Frank’s analyzer suite (§3, AD-X) discharges these obligations at compile time by querying Z3 with the refinement obligations extracted from the typed AST.
+
+Refinements give Frank’s protocols the expressive power that, without them, would force authorization and validation logic into either runtime guards (operational, opaque to the projection theorem) or external specifications (separate from the protocol, drift-prone). With refinements, authorization is part of the protocol and is preserved by projection.
+
+### 2.4 The F# Realization
+
+The denotation lives in mathematics. The F# implementation lives in the artifact. The relationship between them is what Frank’s design is built on, and the relationship is mediated by four F# features that match the formal structure closely:
+
+#### Discriminated unions for the syntactic face
+
+Global types, local types, and refined branches are F# discriminated unions. Pattern matching is exhaustive by default. Structural recursion on protocol terms is the F# pattern matches the compiler verifies. The DU representation is the F# embodiment of the syntactic face of the denotation.
+
+```fsharp
+type GlobalType =
+    | End
+    | Mu of var: TypeVar * body: GlobalType
+    | Var of TypeVar
+    | Communication of
+        sender: RoleId *
+        receiver: RoleId *
+        branches: Branch list
+
+and Branch = {
+    Label: Label
+    PayloadType: PayloadType
+    Refinement: Guard option
+    Continuation: GlobalType
+}
+```
+
+The denotation correspondence: each value of `GlobalType` is a syntactic presentation of a coalgebra. The value need not carry the coalgebra explicitly; the coalgebra is *derivable* from the value by the structural-recursion procedure described in §2.2.
+
+#### Records of functions for the behavioral face
+
+Coalgebras are records of functions in F#. The structure map of the coalgebra is the record. This is the tagless-final encoding adapted to the coalgebraic setting:
+
+```fsharp
+type ICoalgebra<'S> =
+    abstract step : state: 'S -> role: RoleId -> Step<'S>
+
+and Step<'S> =
+    | SendBranch of Branch<'S> list
+    | ReceiveBranch of (Msg -> 'S option)
+    | EndStep
+
+and Branch<'S> = {
+    Label: Label
+    Payload: Msg
+    Continuation: 'S
+}
+```
+
+A specific protocol’s coalgebra is constructed from its global type by a function `coalgebraOf : GlobalType -> ICoalgebra<GlobalType>`. The state space `'S` is `GlobalType` itself (subterms of the original); the structure map is computed by pattern-matching on the current state.
+
+Multiple coalgebras can share a state space and differ only in their structure map — this is how distinct interpreters of the same protocol relate to one another. Each interpreter is a different `ICoalgebra<'S>` instance over the same `'S`. Agreement between interpreters becomes the statement that they yield bisimilar behavior, which is checkable by FsCheck properties at the value level.
+
+#### SRTP for generic operations on representations
+
+Some operations on protocols are independent of the specific representation: duality of session types, structural equality up to recursion unfolding, projection to a role. F#’s statically-resolved type parameters express these as compile-time-resolved generics over types that provide the required structural members:
+
+```fsharp
+let inline project< ^G when ^G : (static member Project : ^G * RoleId -> LocalType)>
+                  (g: ^G) (r: RoleId) : LocalType =
+    (^G : (static member Project : ^G * RoleId -> LocalType) (g, r))
+
+let inline dual< ^L when ^L : (static member Dual : ^L -> ^L)> (l: ^L) : ^L =
+    (^L : (static member Dual : ^L -> ^L) l)
+```
+
+This lets multiple representations of session types — the canonical `GlobalType` DU, an alternative graph encoding, a generated form produced by codegen — all participate in the same generic operations without an inheritance hierarchy or runtime dispatch. The duality between syntactic and behavioral faces is reflected in the fact that both sides can implement the same SRTP-resolved operations.
+
+#### Codegen for the bridge between specification and runtime
+
+Protocols specified externally (in Scribble notation, in AsyncAPI, in Frank’s own protocol DSL) are compiled to F# by source generators. The generator produces:
+
+1. The `GlobalType` value for the protocol.
+1. The per-role `LocalType` values, projected by the projection function.
+1. The coalgebra structure map.
+1. FsCheck properties asserting that projection is sound for this specific protocol.
+1. A `MailboxProcessor`-based runtime stub for each role (§2.4 below).
+
+The generated F# code is normal F# that the compiler typechecks normally. The constraints that make the generation sound are enforced by the generator at generation time. This is the technique TypeProviders use, except generated at build time as static F# rather than dynamically — which is more inspectable and more amenable to AI tooling.
+
+The codegen step is where the duality between formal structure and AI tooling lives operationally. The protocol specification is the formal artifact (or is straightforwardly translatable to one); the generated F# is the operational artifact; the relationship between them is a deterministic, verifiable transformation. AI tools that author or modify protocols work at the specification level and rely on codegen to produce correct runtime structure. AI tools that work with running Frank systems rely on the generated artifacts having predictable shape derived from the specifications.
+
+#### MailboxProcessor for the operational face
+
+Per-role local types deploy as `MailboxProcessor` actors. The match between the coalgebraic functor and `MailboxProcessor`’s operational model is direct:
+
+|Coalgebraic concept            |MailboxProcessor concept             |
+|-------------------------------|-------------------------------------|
+|State space `S`                |Actor’s internal state               |
+|Structure map `α`              |Actor’s `Receive` body               |
+|`SendBranch` step              |`Post` to another actor’s mailbox    |
+|`ReceiveBranch` step           |`Receive` with pattern matching      |
+|`EndStep`                      |Actor termination                    |
+|Bisimulation between coalgebras|Behavioral equivalence between actors|
+|Coalgebra colimit              |System of communicating actors       |
+
+The match is not approximate. `MailboxProcessor` is asynchronous by default (so asynchronous MPST is native, not an extension). `MailboxProcessor` has a built-in mailbox buffer (so buffer-bounded asynchronous variants are expressible directly). `MailboxProcessor` is purely functional in its message-handling code (so the homomorphism from coalgebra to actor is a translation, not an interpretation). Codegen produces, for each role, a `MailboxProcessor` whose `Receive` body is the local coalgebra’s structure map specialized to that role.
+
+The journal-sourced architecture and the actor-based deployment are the same mechanism viewed at different granularities: the journal is the causally-ordered event log of inter-actor messages, and the actors are the per-role state machines whose state is recoverable by replaying the journal. There is no separate runtime to maintain in addition to the actors; the actors *are* the runtime, and the journal is what they produce by communicating.
+
+### 2.5 The Operational Bridge: SCXML as One Homomorphism
+
+Frank’s operational behavior includes hierarchical states, history pseudostates, internal events, and the SCXML macrostep algorithm. None of these is part of the coalgebraic-session-type denotation as presented above. They are part of how Frank *implements* protocols in HTTP-shaped resources, not part of what the protocols *mean*.
+
+The relationship is: the SCXML algorithm is one homomorphism from the coalgebraic denotation into a particular operational representation (configurations, microsteps, history-tracked transitions). The algorithm is justified not by being the definition of meaning, but by an *adequacy theorem*: for every protocol expressible in Frank’s fragment, the SCXML algorithm computes a trace that is consistent with the coalgebraic denotation’s set of possible behaviors.
+
+This shifts the role of the SCXML transliteration in §8. It is no longer “the specification of what statecharts mean”; it is “the specification of one operational realization, with a stated adequacy property.” Where SCXML’s prose and algorithm disagree (and they do, in corners — the behavior of `<finalize>` in nested invocations, the ordering of history restoration in parallel regions when one region’s history is invalid), the denotation tells you which is correct. Where SCXML and the denotation diverge, the divergence is documented and the implementation follows the denotation.
+
+Hierarchy and history are not denotationally primitive in the coalgebraic-session-type framing. They are *encodings*: a hierarchical state with substates is encoded as a sub-protocol whose recursion structure mirrors the substate structure; history is encoded as additional state in the coalgebra carrying the last-active sub-configuration. The encoding is mechanical and is what the SCXML algorithm is implementing under the hood. Documenting the encoding makes hierarchy and history checkable against the denotation rather than treating them as operational add-ons.
+
+### 2.6 What This Foundation Buys
+
+The denotational foundation is not free — it concentrates work in §2 and §3 that operational specification alone could defer. The payoff is that subsequent sections become specifications of *what* rather than negotiations with *how*:
+
+- **§3 (Architectural Decisions)** recasts the algebras as homomorphisms into representations of the denotation. Each interpreter is justified by what homomorphism it implements; agreement between interpreters is the statement that they implement homomorphisms into related carriers.
+- **§7 (Algebra Specifications)** specifies the homomorphism each algebra implements, with the soundness criterion stated as the commutative-diagram law.
+- **§10 (Multi-Party Projections)** is the section where the foundation pays off most directly. Projection soundness is the homomorphism property; well-formedness is the precondition; the analyzer suite discharges the well-formedness obligations at compile time.
+- **§12 (Conformance and Falsifiability)** can state precise properties: bisimulation between interpreters, projection soundness for specific protocols, refinement satisfiability. Each property has an FsCheck or analyzer-based check.
+- **The MPST approximation paper** has its denotational target named. The publication contribution is the bridge between coalgebraic semantics and session-typed projection in a production framework — the duality made operational.
 
 References:
 
-- Harel, D. (1987). Statecharts: A Visual Formalism for Complex Systems. *SCP* 8(3).
-- W3C (2015). State Chart XML (SCXML): State Machine Notation for Control Abstraction. https://www.w3.org/TR/scxml/
-
-### 2.2 HMBS — Hypermedia Model Based on Statecharts (2001)
-
-De Oliveira, Turine, and Masiero’s HMBS model formally connects statecharts to hypermedia:
-
-```
-Hip = ⟨ST, P, m, ae, N⟩
-```
-
-|Component     |Definition                        |Frank analog                                        |
-|--------------|----------------------------------|----------------------------------------------------|
-|`ST`          |Statechart structure              |`StatechartDocument`                                |
-|`P`           |Set of pages (content units)      |HTTP handlers                                       |
-|`m : Sₛ → P`  |State-to-page mapping             |`Handlers : (ConfigurationPredicate × Handler) list`|
-|`ae : Anc → E`|Anchor-to-event mapping           |`Affordance.TransitionRef` (explicit, not by-name)  |
-|`N`           |Visibility level (hierarchy depth)|Projection depth                                    |
-
-Frank generalizes the mapping `m` from `Sₛ → P` (single state to page) to `ConfigPred → P` (predicate over configuration to page). This is the minimal change required to support parallel regions correctly while preserving the HMBS structure.
-
-Reference: de Oliveira, M.C.F., Turine, M.A.S., & Masiero, P.C. (2001). A Statechart-Based Model for Hypermedia Applications. *ACM TOIS* 19(1).
-
-### 2.3 Tagless-Final Encoding (2009)
-
-Carette, Kiselyov, and Shan’s tagless-final approach: programs are polymorphic over an algebra interface, allowing multiple interpretations of the same program.
-
-Tagless-final is used in Frank for *compositional* operations only — those whose result can be computed by folding over local structure. Three such operations exist, each with its own algebra:
-
-1. **Construction** (`IStatechartBuilder<'r>`) — building structural fragments.
-1. **Transition behavior** (`ITransitionAlgebra<'r>`) — interpreting what a transition does (Enter/Exit/RecordHistory/RaiseEvent).
-1. **Configuration queries** (`IConfigurationPredicate<'r>`) — evaluating predicates over the active configuration.
-
-Operations that are not compositional — macrostep execution, conflict detection, priority resolution — live in the runtime, not in algebras.
-
-Limitations that shape the design:
-
-1. Parsing into polymorphic programs is awkward. Parse into AST, then `reflect` to polymorphic form when interpretation is needed.
-1. Inspection requires reification.
-1. F# lacks type classes; interfaces stand in for them.
-
-Reference: Carette, J., Kiselyov, O., & Shan, C. (2009). Finally Tagless, Partially Evaluated. *JFP* 19(5).
-
-### 2.4 Multi-Party Session Types (Honda/Yoshida/Carbone 2008, 2016)
-
-Multi-party session types (MPST) describe a global protocol from which per-role local protocols are mechanically derived by **projection**. Projection is sound by construction: if the global protocol is well-formed, projected roles compose to implement it without deadlock or orphan messages.
-
-A statechart augmented with a role-participation schema — which role triggers which transition, which role observes which state — constitutes a global protocol approximation. Per-role projections are derivable. The MPST literature provides the well-formedness conditions to check on the global form.
-
-References:
-
-- Honda, K., Yoshida, N., & Carbone, M. (2008). Multiparty Asynchronous Session Types. *POPL 2008*.
 - Honda, K., Yoshida, N., & Carbone, M. (2016). Multiparty Asynchronous Session Types. *JACM* 63(1).
-- Deniélou, P.M., & Yoshida, N. (2012). Multiparty Session Types Meet Communicating Automata. *ESOP 2012*.
+- Jacobs, B. (2017). *Introduction to Coalgebra: Towards Mathematical Modelling of State-Based Systems*. Cambridge University Press.
+- Castellan, S., Yoshida, N. (2019). Two Sides of the Same Coin: Session Types and Game Semantics. *POPL 2019*.
+- Carette, J., Kiselyov, O., & Shan, C. (2009). Finally Tagless, Partially Evaluated. *JFP* 19(5).
+- Rutten, J.J.M.M. (2000). Universal coalgebra: a theory of systems. *TCS* 249(1).
+- W3C (2015). State Chart XML (SCXML). https://www.w3.org/TR/scxml/
+- Harel, D. (1987). Statecharts: A Visual Formalism for Complex Systems. *SCP* 8(3).
 
-### 2.5 Event Sourcing as Runtime Substrate
-
-The statechart agent is an event-sourced actor: the journal of events is the source of truth, in-memory state is a derived projection. This is the standard event-sourcing pattern (Fowler, 2005; Young, 2010), specialized to statechart events.
-
-This substrate satisfies three requirements simultaneously:
-
-1. Durability across process restart (replay journal on agent start).
-1. Provenance audit trail (the journal *is* the audit trail; PROV-O is a view over it).
-1. Snapshot consistency (snapshots are cached projections, validated by journal position).
-
-Reference: Young, G. (2010). CQRS and Event Sourcing. https://cqrs.wordpress.com/
-
-### 2.6 “Code as Model” (Azariah, 2025)
-
-Azariah’s elevator example demonstrates that the same abstract program can be interpreted for production execution, verification, visualization, and auditing.
-
-This principle applies to the *compositional* parts of Frank. Statechart **structure** (built via `IStatechartBuilder`) is interpretable as SCXML, ALPS, smcat, reachability graph, and more. Statechart **execution** is not; it lives in the runtime.
-
-Reference: Azariah, J. (2025). Tagless Final in F# - Part 6: The Power of Tagless-Final: Code as Model.
+Categorical detail for the duality between global types and coalgebras, the precise statement of projection as homomorphism, and the operational adequacy theorem for the SCXML algorithm appears in Appendix [TBD: §15.X to be added in pass 3].
 
 -----
 
 ## 3. Architectural Decisions
 
+The architectural decisions below are organized around the denotational foundation in §2. Each decision names what it commits Frank to — in terms of the denotation, the F# realization, and the properties the architecture claims. Concerns compose through three contribution surfaces (algebras, builders, type extensions), explicitly enumerated, so composition is never accidental and never hidden.
+
 ### AD-1: Separate Types Per Concern
 
-Each semantic concern (statecharts, validation, provenance, linked data) owns its type definitions in its own package.
+Each semantic concern — session types, statecharts, validation, provenance, linked data — owns its type definitions in its own Core package. Concerns compose through explicit bindings at the denotation level and through explicit type extensions at the builder level (AD-13), not through a unified AST.
 
-Concerns are orthogonal — each has independent value. This avoids circular dependencies, lets users pay only for what they use, and aligns with the single-responsibility principle.
+`Frank.SessionTypes.Core` holds global types, local types, refinement predicates, projection, the generic hook family, and the `RoleExtractor` interface. `Frank.Statecharts.Core` holds statechart AST, transition edges, and configuration predicates. `Frank.Validation.Core` holds SHACL shape types. `Frank.Provenance.Core` holds PROV-O types. `Frank.LinkedData.Core` holds RDF types. None depends structurally on the others; they are related at the denotational level by homomorphisms (AD-4) and at the integration level by explicit composition packages (AD-13).
 
-### AD-2: Three Algebras with Disjoint Carriers
+The rejected alternative — a unified AST embedding every concern into every other — was considered and rejected in §4. The rejection is grounded in what §2 establishes: the denotation is a mathematical object that multiple syntactic presentations refer to. Forcing one presentation to subsume the others is the wrong direction; presentations diverge, denotations compose, and composition happens at named joints.
 
-Structural interpretation uses three algebras whose carriers are semantically distinct:
+### AD-2: Algebras as the Contract Surface for Each Concern
 
-1. `IStatechartBuilder<'r>` — `'r` represents a statechart fragment (a state subtree or a transition set). Used for construction and structural interpretation (SCXML/ALPS/smcat generation, pretty printing, reachability).
-1. `ITransitionAlgebra<'r>` — `'r` represents the effect of a transition (composed Enter/Exit/RecordHistory/RaiseEvent operations). Used for runtime state updates and code generation from SCXML.
-1. `IConfigurationPredicate<'r>` — `'r` represents the truth value of a predicate over a configuration. Used for binding affordances/handlers/validation to configuration predicates and for symbolic analysis of satisfiability.
+Every concern exposes its operations as tagless-final algebras. Each algebra’s carrier is a type parameter `'r`; each interpreter is a homomorphism from the concern’s syntactic presentation into a specific carrier that represents one way of using the concern’s values. Algebras are the *internal contract surface* — the commitment a concern makes to interpreter implementers about what operations exist and what they mean.
 
-A single algebra over a uniform `'r` carrier would conflate incompatible concepts and force interpreters to inspect what kind of `'r` they have, defeating the point of tagless-final. Splitting eliminates the awkwardness and makes each algebra small and focused.
+Frank ships ten algebras across five concerns:
 
-### AD-3: Journal-Sourced Runtime
+**Session types (`Frank.SessionTypes.Core`):**
 
-`IStatechartJournal` is the source of truth for agent state. `AgentState` is a derived projection, recomputable by journal replay. `MailboxProcessor` serializes journal append plus projection update; it does not own the state.
+- `IProtocolBuilder<'r>` — constructs global session types. Interpreters: build a `GlobalType` DU; emit Scribble source; emit AsyncAPI; emit a graphical representation; emit a session-type summary for documentation.
+- `IProjectionAlgebra<'r>` — projects global types to per-role local types. Interpreters: compute the local type as a `LocalType` DU; compute the projection symbolically for analysis; compute per-role `MailboxProcessor` message handlers.
+- `ILocalTypeAlgebra<'r>` — operates on local types (duality, sequencing, composition). Interpreters: compute the dual; check structural conformance with a candidate implementation; derive the local type’s runtime behavior.
 
-Every `Fire` journal-appends before acknowledging. This is a synchronous I/O point; agents are not pure-memory-fast, but they are durable. Snapshots are a performance optimization (cache the projection at journal position N; validate cache by checking journal head). PROV-O records are derivable from the journal by a separate projection — no additional write path needed.
+**Statecharts (`Frank.Statecharts.Core`):**
 
-The journal interface is pluggable: in-memory (for tests), file-backed (single-node), database-backed, or NATS JetStream / Kafka (clustered).
+- `IStatechartBuilder<'r>` — constructs statechart structure. Interpreters: build the AST; emit SCXML, smcat, mermaid, ALPS; compute a reachability graph; translate to session-type form.
+- `ITransitionAlgebra<'r>` — interprets transition effects. Interpreters: runtime state update; generate F# source for a transition; symbolic analysis; trace collection.
+- `IConfigurationPredicate<'r>` — evaluates predicates over active configurations. Interpreters: Boolean evaluation; SMT satisfiability; predicate-overlap analysis.
 
-### AD-4: AST and Algebra Bridged Per Algebra
+**Validation (`Frank.Validation.Core`):**
 
-Each algebra has its own reify/reflect bridge to a corresponding AST type. `StatechartDocument` (AST) ↔ `Statechart` (polymorphic `IStatechartBuilder` program). `TransitionEdge` ↔ `TransitionProgram` (polymorphic `ITransitionAlgebra` program). Configuration predicates have no separate polymorphic form because the AST is already small enough to evaluate directly.
+- `IShapeBuilder<'r>` — constructs SHACL shapes. Interpreters: build the shape AST; emit Turtle; emit JSON-LD; derive shape descriptions from F# types at runtime (type → SHACL emission).
+- `IConstraintAlgebra<'r>` — checks and analyzes constraints. Interpreters: check a candidate RDF graph against a shape; symbolic satisfiability of the constraint language; constraint-to-refinement translation for integration with session-type refinements.
 
-Parsing produces AST. Interpretation uses algebra. Conversion is explicit.
+**Provenance (`Frank.Provenance.Core`):**
+
+- `IProvenanceBuilder<'r>` — constructs PROV-O graph fragments. Interpreters: build the RDF graph representing a provenance record; emit a PROV-O trace for visualization; derive provenance summaries for audit reports.
+
+**Linked data (`Frank.LinkedData.Core`):**
+
+- `IGraphBuilder<'r>` — constructs RDF graph fragments. Interpreters: build a dotNetRdf `IGraph`; emit Turtle, JSON-LD, or N-Triples; compute graph isomorphism certificates for round-trip testing.
+
+A single algebra over a uniform `'r` carrier would conflate incompatible concepts and force interpreters to inspect what kind of `'r` they have, defeating the point of tagless-final. More importantly, the ten algebras correspond to distinct mathematical structures in §2 — each concern has its own denotational object — and conflating them would blur the homomorphism claims that make the architecture sound.
+
+Each algebra has the same soundness criterion: an interpreter is valid iff it is a homomorphism into its carrier, meaning the structure-preservation equations of §2.2 hold. For session types specifically, projection soundness (§2.2’s commutative-diagram property `αᵣ ∘ π_r = F(π_r) ∘ α`) is checked by the analyzer suite (AD-11). For other algebras, soundness is verified by FsCheck properties over generated inputs.
+
+### AD-3: Journal-Sourced Runtime as Coalgebra Unfolding
+
+`IStatechartJournal` is the source of truth for agent state. `AgentState` is a derived projection, recomputable by journal replay. Per §2.4, the journal is the causally-ordered event log of per-role `MailboxProcessor` actors; the actors *are* the runtime, and the journal is what they produce by communicating. The architecture does not maintain a separate “runtime” layer distinct from the actors.
+
+Operationally: every `Fire` journal-appends before acknowledging, snapshots cache the projection at journal position N, and the journal interface is pluggable.
+
+Denotationally: the journal is an unfolding of the coalgebra `α : S → F(S)` along a specific event history. Each journal entry records one coalgebra step taken by one role. Replaying the journal reconstructs the state by composing the recorded steps. Provenance derivation (the journal-to-PROV-O homomorphism established in §2.5, implemented in the `Frank.Statecharts.Provenance` composition package) reads the journal and produces a PROV-O graph; this is *another* homomorphism, not a separate data path.
+
+**SQLite per actor as the default implementation.** The default `IStatechartJournal` is SQLite-per-actor: each `MailboxProcessor` actor owns a SQLite database file containing its journal (the event log) and snapshots (cached projections). Per-actor isolation matches the coalgebraic framing — each actor is a coalgebra over its own state space, and the denotation has no shared state between roles. Crash recovery per actor is a local operation: open the database, read the journal, reconstruct state; other actors are unaffected.
+
+Memory budget: ~400 KB per resident actor with default SQLite settings (configurable down to ~200 KB per actor by reducing page cache to 100 KiB via `PRAGMA cache_size`). At 10,000 resident actors on default settings, the budget is ~4 GB for SQLite bookkeeping alone; tuning for density is possible but bounds how much performance headroom hot actors have. The runtime closes idle actors’ SQLite handles after a configurable timeout (reopening at ~5 ms latency), preserving `MailboxProcessor` addressability while releasing storage resources. This matches the pattern validated by Cloudflare Durable Objects and by Gleam Warp, both of which use SQLite-per-actor at production scale.
+
+**LMDB as an alternative under memory pressure.** For deployments that exceed SQLite’s per-actor footprint, LMDB is a viable alternative: ~50 KB per-actor overhead, memory-mapped reads that can share backing pages across actors when the operating system permits, MVCC isolation, and append-only writes. LMDB’s trade-off is a weaker crash model — memory-mapped writes can leave the database in an inconsistent state under power loss, though LMDB’s MVCC design mitigates this for normal process crashes. Snapshot recovery requires more care than SQLite’s WAL mode provides. The `IStatechartJournal` interface remains pluggable so LMDB (or Redis, NATS JetStream, Kafka) can replace SQLite without changes to the runtime above.
+
+The interface is pluggable; SQLite-per-actor is the default and the target for operational adequacy testing in Phase 1.
+
+### AD-4: Homomorphism Bridges, Not AST Conversion
+
+Each algebra has a bridge between its syntactic presentation (an AST type) and its polymorphic form (a program over the algebra interface). `StatechartDocument` ↔ `Statechart`. `TransitionEdge` ↔ `TransitionProgram`. `GlobalType` ↔ `Protocol`. `NodeShape` ↔ `Shape`. `Graph` ↔ `GraphFragment`. And so on for each concern’s AST/polymorphic pair.
+
+These bridges are explicit homomorphisms: reflecting an AST into its polymorphic form does not lose information, and reifying a polymorphic form back produces an AST that denotes the same object. Parsing produces AST; interpretation uses the polymorphic form; conversion is explicit and lossless.
+
+Having *one bridge per algebra* rather than a universal reflect/reify mechanism follows from AD-2’s disjoint carriers. A universal mechanism would imply a universal carrier, which would imply a universal algebra, which would conflate the distinct mathematical structures. Each concern owns its bridge.
 
 ### AD-5: Composition Model with Predicate Keys
 
-Bindings (affordances, validation, handlers) are keyed on `ConfigurationPredicate`, not `StateId`. The composition model retains the extended HMBS tuple with this substitution.
+Statechart-keyed bindings (affordances, validation shapes, handlers) in a stateful resource are keyed on `ConfigurationPredicate`, not `StateId`. The composition model at the statechart-binding level uses predicate keys:
 
 ```fsharp
 type StatefulResourceBinding<'TEvent> = {
@@ -240,27 +416,64 @@ type StatefulResourceBinding<'TEvent> = {
 }
 ```
 
-A `Map<StateId, _>` key would silently drop expressivity for parallel regions — the common case of “this affordance only applies when region A is in `Approved` AND region B is in `PaymentCleared`” would be inexpressible. A predicate key (`InState s`, `InAll [s; t]`, etc.) is the minimal correct generalization. Single-state cases stay concise: `whenIn "Draft" [...]` desugars to `InState (StateId "Draft")`.
+A `Map<StateId, _>` key would silently drop expressivity for parallel regions — “this affordance only applies when region A is in `Approved` AND region B is in `PaymentCleared`” would be inexpressible. A predicate key (`InState s`, `InAll [s; t]`, etc.) is the minimal correct generalization that parallel composition requires. Single-state cases stay concise: `whenIn "Draft" [...]` desugars to `InState (StateId "Draft")`.
 
-Lookup is O(n × predicates) instead of O(log n) Map lookup, mitigated by predicate indexing on the leading `InState` term. Analyzers detect overlapping predicates (FRANK105) and unreachable predicates (FRANK205).
+This decision aligns composition with the coalgebraic denotation. At each active configuration, predicates applicable there select their bindings; the set of active bindings is determined by the configuration, which is determined by the coalgebra’s unfolding. Parallel regions compose correctly because predicates over configurations are conjunction-closed, matching how AND-states compose in the denotation.
 
-### AD-6: Role Projections Are Derived
+Lookup is O(n × predicates) instead of O(log n) Map lookup, mitigated by predicate indexing on the leading `InState` term. Analyzers detect overlapping predicates (FRANK215) and unsatisfiable predicates (FRANK216).
 
-Per-role projections are mechanically derived from the statechart plus a `RoleParticipation` schema. The schema specifies, per transition, the triggering role and observing roles. Manual `RoleOverride` exists as an escape hatch with analyzer warnings (FRANK210).
+`StatefulResourceBinding` is one of several concern-specific bindings (see AD-13); it is not the universal composition model. Other concerns have their own binding types produced by their own builders. The cross-concern composition model is the set of type extensions on Frank core’s builders (AD-13) plus the composition packages (AD-13) that weave concerns together.
 
-Authors specify role participation at the transition level (where the information naturally lives), not at every state. Projections are checked for completeness (every role has a defined view of every reachable configuration), progress (every role can eventually act), and deadlock-freedom. The schema is itself a first-class artifact — exportable as a multi-party protocol description.
+### AD-6: Role Projections Are Coalgebra Homomorphisms, with Pluggable Assignment
 
-Hand-authored projections were a correctness hazard at scale: no soundness check, every projection a place a bug could hide, duplication of transition-level information across per-state entries.
+Per-role projections are not mechanical syntactic operations that happen to seem right — they are coalgebra homomorphisms from the global denotation to per-role local denotations, as specified in §2.2. Frank derives them from the global session type (or, equivalently, from the statechart plus a `RoleParticipation` schema; the two surfaces produce the same `RoleParticipation`, per the session-type-to-statechart correspondence in §2.5).
 
-### AD-7: Statecharts Package Is Independent
+The soundness criterion is the commutative-diagram property `αᵣ ∘ π_r = F(π_r) ∘ α`. This is not a wish; it is a mathematical statement that Frank’s analyzer suite checks by verifying the well-formedness conditions of §2.2 and §2.3 (sender determinacy, knowledge of choice, no orphan messages, sender provability, receiver completeness).
 
-`Statecharts.Core`, `Statecharts.Runtime`, `Statecharts.Parsers`, `Statecharts.Generators`, and `Statecharts.Multiparty` have no dependencies on Frank, ASP.NET Core, or HTTP concepts. They are reusable for non-HTTP contexts: CLI tools, background services, agent runtimes, test harnesses that replay journals offline.
+Hand-authored `RoleOverride` exists as an escape hatch for cases where mechanical projection needs adjustment, but it produces analyzer warnings (FRANK220) and is expected to be rare. The primary pathway: authors specify role participation at the transition level (or write the protocol directly in `Frank.SessionTypes.Core`), well-formedness is machine-checked, projection is the homomorphism, and the per-role view that deploys as a `MailboxProcessor` actor is by construction faithful to the global protocol.
 
-Integration concepts (handlers, affordances, middleware) live in `Frank.Statecharts`.
+**Role assignment is pluggable.** Projection is the mathematical operation; *assignment* — how the runtime knows which role a given request belongs to — is the operational question of who’s playing which role. These are different concerns and are settled separately. Frank defines `RoleExtractor` as an interface:
 
-### AD-8: Closed Guard Language
+```fsharp
+type RoleExtractor =
+    HttpContext -> ProtocolInstance -> RoleId option
 
-Guards use a closed expression language, not arbitrary strings:
+and ProtocolInstance = {
+    ProtocolId: ProtocolId
+    InstanceScope: ResourcePath
+}
+```
+
+Role assignment is per-protocol-instance, not per-protocol-type. A user may be `X` in `/games/abc123` and `Viewer` in `/games/xyz789`, simultaneously. The extractor is called with the specific protocol-instance the request is targeting and returns the role (if any) the user has for that instance.
+
+**Hierarchical role scoping: most-specific-wins.** The runtime resolves role assignments by walking the resource hierarchy from most-specific to least-specific scope. A user who is `Viewer` at `/games` and `X` at `/games/abc123` is resolved as `X` when the request targets `/games/abc123` or any descendant. Standard hierarchical lookup pattern (as in URL routing, CSS specificity, filesystem permissions); analyzer rules FRANK225 and FRANK226 detect incompatible child-scope roles and unreachable parent-scope roles respectively.
+
+**Frank ships `Frank.SessionTypes.Core` with the `RoleExtractor` interface and a `ClaimsRoleExtractor` default implementation.** The default reads from `ClaimsPrincipal.Claims` using a Frank-specific claim URN (`urn:frank:session-role`; exact URN specified in §6). `System.Security.Claims` is base .NET (not ASP.NET-Core-specific), so the default implementation preserves AD-7’s independence properties.
+
+`ClaimsRoleExtractor` is suitable for static role assignment — claims issued at login, stable for the session. Other assignment patterns are user-implementable against the interface:
+
+- *Actor-backed role tracking* (for dynamic in-session role changes, the pattern used in `frank-fs/tic-tac-toe` where a user becomes `X` when joining a game and ceases to be `X` when leaving). A separate actor maintains authoritative role state; the extractor consults it per request.
+- *External-service role lookup* (for roles governed by an entitlement API, policy engine, or organizational directory). The extractor calls out to the service.
+
+Both patterns are straightforward to implement in user code. Optional future packages (`Frank.SessionTypes.ActorTracked`, `Frank.SessionTypes.External`) may ship if demand warrants; v1 provides the interface and the claims-based default only.
+
+Hand-authored projections without the denotational target are a correctness hazard at scale: no soundness check, every projection a place a bug could hide, duplication of transition-level information across per-state entries. With the denotational target, the soundness check *is* the well-formedness check, and the projection *is* the homomorphism.
+
+### AD-7: Core Packages Are Independent of ASP.NET Core and of Each Other
+
+Every `Frank.*.Core` package depends only on FSharp.Core and on `System.Security.Claims` where the Core package’s interface requires it (specifically `Frank.SessionTypes.Core`’s `ClaimsRoleExtractor`; `System.Security.Claims` is base .NET, not ASP.NET-Core-specific). None depends on ASP.NET Core or on HTTP concepts. They are reusable for non-HTTP contexts: CLI tools, background services, agent runtimes, test harnesses that replay journals offline.
+
+**A stronger independence property: each `Frank.*.Core` package depends on no other `Frank.*.Core` package.** This is a deliberate constraint. It means a user who imports `Frank.Validation.Core` for standalone SHACL work does not transitively pull in `Frank.SessionTypes.Core`, `Frank.Provenance.Core`, or any other concern’s types. Each concern’s Core is a true standalone package.
+
+The `Frank.` prefix is a project-wide naming convention, not a dependency claim. Independence here means *compiles and runs without ASP.NET Core and without other concerns*, which every `Frank.*.Core` package does.
+
+HTTP integration concepts (handlers, affordances, middleware, content negotiation) live in the non-Core packages: `Frank.Statecharts`, `Frank.Validation`, `Frank.Provenance`, `Frank.LinkedData`, `Frank.Discovery`, and in composition packages that require HTTP integration. These depend on ASP.NET Core by design.
+
+Composition packages (AD-13) are where concerns meet; they depend on the Core packages they compose. The composition-package-level dependencies are the *only* places cross-concern dependencies exist.
+
+### AD-8: Closed Guard Language Is Part of the Denotation
+
+Guards use a closed expression language that §2.3 incorporates into the denotation as refinement predicates on message payloads:
 
 ```fsharp
 type Guard =
@@ -275,9 +488,13 @@ type Guard =
     | Not of Guard
 ```
 
-A closed form is statically analyzable, comparable for equivalence, and evaluable without an embedded language runtime. SCXML import maps `cond="…"` expressions into the closed form; expressions outside the form fail at import time with clear errors. Analyzer rules reason about guard satisfiability symbolically.
+The closed form is load-bearing at multiple layers:
 
-An open extension point (`Custom of obj`) is reserved for future work if needed; v1 ships closed.
+- **Denotationally:** refinement session types from §2.3 require a decidable predicate language to keep projection soundness checkable. The closed `Guard` language is Frank’s decidable fragment.
+- **Operationally:** guards are statically analyzable, comparable for equivalence, and evaluable without an embedded language runtime.
+- **Analyzer-wise:** refinement satisfiability reduces to SMT queries over Boolean combinations of equalities, comparisons, and state predicates — a fragment Z3 handles efficiently.
+
+SCXML import maps `cond="…"` expressions into the closed form; expressions outside the form fail at import time with clear errors. An open extension point (`Custom of obj`) is reserved for future work if needed; v1 ships closed.
 
 ### AD-9: Scheduled Events Are First-Class
 
@@ -285,13 +502,137 @@ SCXML’s `<send delay="…">` and `<cancel>` are first-class. Scheduled events 
 
 Half of realistic HTTP workflows have timeouts. Deferring them forces every adopter to invent their own scheduler, which then doesn’t compose with snapshots, projections, or audit.
 
-`IStatechartScheduler` interface has implementations: in-memory (tests), file-backed (single-node), database-backed (multi-process). Scheduled events are durable across restart because they are journaled. Cancellation is journaled; the scheduler reconciles by skipping cancelled-then-fired events.
+`IStatechartScheduler` has implementations: in-memory (tests), file-backed (single-node), database-backed (multi-process). Scheduled events are durable across restart because they are journaled. Cancellation is journaled; the scheduler reconciles by skipping cancelled-then-fired events.
 
-### AD-10: Macrostep Matches W3C SCXML Algorithm Exactly
+Denotationally, scheduled events extend the coalgebraic functor with a time dimension — each step can optionally commit to a future event at a specified time. This is the natural fit for asynchronous MPST extensions; the scheduler is the operational realization of that time-indexed coalgebra.
 
-The macrostep implementation is a direct transliteration of the SCXML Algorithm for SCXML Interpretation (W3C SCXML Appendix D). Where Frank deviates, the deviation is documented and tested.
+### AD-10: SCXML Operational Algorithm as One Adequate Homomorphism
 
-SCXML conformance provides a published test suite (W3C SCXML 1.0 Implementation Report) and tooling interoperability. The runtime specification in §8 includes pseudocode that maps line-by-line to SCXML Appendix D.
+The macrostep implementation is a direct transliteration of the SCXML Algorithm for SCXML Interpretation (W3C SCXML Appendix D). The implementation is justified not by being the *definition* of what statecharts mean, but by an *operational adequacy theorem* relating it to the coalgebraic denotation of §2.2.
+
+Per §2.5, the SCXML algorithm is one homomorphism among several from the denotation into operational representations. The adequacy claim: for every protocol expressible in Frank’s fragment, the SCXML algorithm computes a trace consistent with the coalgebraic denotation’s set of possible behaviors. Where SCXML prose and algorithm disagree — and they do, in corners — the denotation is the arbiter, and the implementation follows the denotation.
+
+**Adequacy is verified by property-based testing in v1.** Frank builds a reference interpreter that operates directly on the coalgebraic structure map (`ITransitionAlgebra<'r>` with `'r` a reference-interpreter carrier, per AD-2); Phase 1’s conformance suite includes FsCheck properties asserting that the trace produced by the SCXML algorithm for any generated well-formed protocol is contained in the set of traces the reference interpreter produces. This is engineering-grade verification — bounded random testing across the protocol space, failures blocking PR merges, no formal proof but no unchecked claim either. Mechanical proof of operational adequacy (in Coq, Lean, or F*) is a known v2/v3 aspiration; the architecture aims high and gates just below with property-based testing.
+
+SCXML conformance is maintained where the W3C SCXML 1.0 Implementation Report Plan tests pass. Where Frank deviates for denotational correctness, the deviation is documented and tested. The runtime specification in §8 includes pseudocode that maps line-by-line to SCXML Appendix D, with specific deviations called out.
+
+Hierarchy and history are not denotationally primitive in the coalgebraic-session-type framing; they are encodings (§2.5). The encoding is mechanical and is what the SCXML algorithm implements under the hood. Statechart parsers and generators treat statecharts as a presentation of session-typed protocols, using the encoding to convert between the two presentations losslessly.
+
+### AD-11: Analyzer Suite as Extended Type Checker
+
+Frank’s analyzer suite is part of the language extension, not an add-on. The analyzers discharge proof obligations that F#’s type system cannot express but that the denotation requires.
+
+**Analyzer rule numbering is organized by category.** Each category occupies a hundred-block, giving room to grow:
+
+|Range       |Category   |Purpose                                                                                                                        |
+|------------|-----------|-------------------------------------------------------------------------------------------------------------------------------|
+|FRANK001–099|Conventions|Project-wide style and structural conventions (existing: `FRANK001` — module declarations only)                                |
+|FRANK100–199|Structural |Bindings-level and AST-level correctness — duplicate handlers, missing handlers, unresolved references, unreachable states     |
+|FRANK200–299|Semantic   |Denotational-level correctness — reachability, deadlock, predicate satisfiability, role completeness, role-override consistency|
+|FRANK300–399|Refinement |Session-type refinement correctness — sender provability, receiver completeness, refinement satisfiability via Z3              |
+|FRANK400–499|Composition|Cross-concern composition failures — operation-name collisions, missing prerequisites, builder-output mismatches               |
+|FRANK500–599|Codegen    |Per-protocol hook-record completeness, signature match, role coherence, generated-file hand-modification                       |
+|FRANK600+   |Reserved   |Future categories                                                                                                              |
+
+Within structural, 100–109 are reserved for the child-resource and codegen rules defined in D-GH19 (issue #285).
+
+Representative rules in each category (full list in §6 or §7; this AD commits Frank to the categories and to maintaining rules within them):
+
+- **Structural (FRANK110–118):** duplicate handler, missing handler coverage, unresolved transition reference, undefined transition target, overlapping predicates with conflicting affordances, reference to non-existent state, compound state missing initial child, final state has children.
+- **Semantic (FRANK210–222):** unreachable state, deadlock-reachable configuration, eventless-transition cycle, unreachable transition, unsatisfiable predicate, unsatisfiable guard, variable used but never assigned, scheduled event with no canceller, manual `RoleOverride` conflicts with derived projection (FRANK220), role with no triggerable transitions, configuration with no triggerable transition for any role, child-scope role incompatible with parent protocol (FRANK225), parent-scope role never assigned by any child (FRANK226).
+- **Refinement (FRANK300–301):** refinement on branch is unprovable by sender (sender provability), refinements at choice point do not cover input space (receiver completeness). Discharged via Microsoft.Z3.
+- **Composition (FRANK400–402, FRANK420):** operation-name collision across concerns (FRANK400); composition operation used without prerequisite concerns imported (FRANK401); builder output passed to incompatible operation (FRANK402); `useSessionTypes` called without a registered `RoleExtractor` (FRANK420).
+- **Codegen (FRANK500–510):** hook field required by protocol but not supplied in `roleHandlers { }` CE (FRANK500); hook supplied with wrong signature (FRANK501); hook supplied for role the caller isn’t implementing (FRANK502); stale hook supplied for field removed from protocol (FRANK503); generated file hand-modified without regeneration (FRANK510).
+
+Refinement rules invoke Microsoft.Z3 via the analyzer pipeline. Refinement obligations are extracted from the typed AST, shipped to Z3, and reported as compile errors with unsat-core highlighting when unsatisfiable. Verification time is bounded per protocol (30-second target).
+
+This is the F#-native analog of what dependently-typed languages enforce at the type level. The user experience is normal F# compile errors; the verification machinery is in the analyzer. AI tools working with Frank code target the analyzer rules as a checkable specification — the analyzer suite is a contract surface that AI generation can be held accountable to.
+
+### AD-12: Codegen Bridges from Specifications to F# Code
+
+Frank ships codegen in two flows with different v1 and v2 scopes, distinguished by the input: CE-driven codegen takes an F# CE value as input and runs at build time via Myriad; format-driven codegen takes an external specification file as input and runs via the gRPC-style MSBuild integration.
+
+**CE-driven codegen (v1).** Each concern’s nested CE produces a typed value (`GlobalType`, `StatechartDocument`, etc.). Myriad plugins operate on the CE source syntactically (via Fantomas AST extraction, not via CE evaluation) and produce specialized F# artifacts. The Myriad substrate sidesteps the chicken-and-egg problem that design-time type providers would introduce: the plugin reads source, not compiled values, so the protocol CE and the generated artifacts compile in a single build pass without multi-project or multi-pass ceremony.
+
+For session-typed protocols, CE-driven codegen via `Frank.SessionTypes.Codegen` produces **fully-implemented per-role `MailboxProcessor` actors**, not stubs. The generated actor includes: the projected local type as a strongly-typed message DU; the state machine (the actor’s `Receive` body) generated from the local type’s structure-map with message dispatch, state transitions, and conformance-checking-by-construction (a message the local type forbids is unrepresentable in the typed DU; unexpected incoming messages hit a generated default branch that records protocol violation); refinement enforcement at message boundaries (outgoing refinements checked for sender provability before send; incoming refinements trusted per sender provability obligation); outgoing message construction to the correct destination actor; and a generated `RoleHooks<ThisRole>` record type whose fields are typed to the application hooks this role needs.
+
+The `RoleHooks<...>` record is the contract surface between the protocol (generated) and the application (user-written). Its field count and signatures are determined by the local type — choice points that the protocol leaves to the application become hook fields, domain computations needed from received data become hook fields, side effects intrinsic to the role’s behavior become hook fields. **The hook signatures conform to a generic hook family defined in `Frank.SessionTypes.Core`.** This is the architectural contract surface for hooks regardless of generation path: the generic family is present in Core; the Myriad-generated `RoleHooks<...>` is a specialization of the generic family against the specific protocol’s user types. Users can opt out of Myriad codegen and write against the generic family directly — useful for simple protocols, testing, and non-MSBuild scenarios — but the default v1 path uses the Myriad-generated specialization for better ergonomics.
+
+Hooks are supplied via a hand-written `roleHandlers { }` CE shipped with `Frank.SessionTypes`; the CE’s `Run` produces an inhabited `RoleHooks<...>` record passed to the generated actor constructor. Analyzer rules FRANK500–503 check hook-record completeness at compile time.
+
+For statecharts, `Frank.Statecharts.Codegen` provides a Myriad plugin that operates on `statechart { }` CE source and produces typed state DUs (replacing stringly-typed `StateId`), typed event DUs (replacing stringly-typed `EventId`), and transition program functions that the runtime can execute without re-walking the AST.
+
+CE-driven codegen for other concerns is not included in v1. Validation, Provenance, and LinkedData ship without per-concern Myriad plugins in v1; runtime construction of their types via the algebra interfaces from `Frank.*.Core` is the v1 pathway. Runtime type → SHACL emission lives in `Frank.Validation.Core` as a serialization helper for content-negotiated shape descriptions; this is runtime serialization, not codegen.
+
+Phase 0c of the build plan (§11) delivers `Frank.SessionTypes.Codegen` and `Frank.Statecharts.Codegen`. The generated F# is normal F# that the compiler typechecks normally. Constraints that make the generation sound are enforced by the generator at generation time. This is the technique TypeProviders use, except generated at build time as static F# rather than dynamically — which is more inspectable and more amenable to AI tooling.
+
+**Format-driven codegen (v2).** Compilation from external specification formats to F# artifacts, using the FSharp.GrpcCodeGenerator / FsGrpc.Tools pattern referenced in issue #285 as the MSBuild-integration template. The pipeline is parser → AST → algebra interpreter → emitted F# file. Format-driven codegen presupposes the canonical F# shape produced by CE-driven codegen has stabilized, which is why it follows v1. Scope is finalized after v1 ships. Formats in view for Phase 8 include: WSD, SCXML, smcat, mermaid, XState, PlantUML (statecharts); Scribble, AsyncAPI (session types); SHACL files in Turtle, JSON-LD, N-Triples (validation); JSON Schema (validation); ALPS in YAML, XML, JSON (linked data and hypermedia); OpenAPI YAML/JSON (for the deferred `Frank.Validation.OpenApi` composition). The full v2 phase lives in §11 Phase 8; this AD names the direction.
+
+Codegen is where the duality hypothesis of the architecture lives operationally. In v1, the duality is embodied through CE authoring itself: the CE is both the specification and the implementation, with Myriad producing verified specializations and the F# compiler plus analyzer suite verifying both sides fit together. The AI-tools-and-formal-structure feedback loop is present in v1 — the harder the formal structure at the CE level, the more legible the generated artifacts become, and the more capable AI tooling becomes at extending the specifications. V2 broadens the specification surface to external formats; it doesn’t introduce the mechanism.
+
+Codegen lets Frank express combinators that F#’s type system cannot enforce at the type level: linear channel usage, type-level role enumeration, message-tag uniqueness. The generator enforces them at generation time; the generated code uses normal F# types. This is the F# realization of what Haskell and Idris achieve through type-level programming.
+
+### AD-13: Concerns Extend Frank Core via Three Contribution Surfaces
+
+Every concern contributes to Frank through exactly three surfaces:
+
+1. **Algebras** (AD-2) — the internal contract for interpreter implementers. Tagless-final, carrier-polymorphic, homomorphisms into the concern’s denotation.
+1. **Nested CEs (builders)** — the user-facing authoring surface for that concern’s values in isolation. Each nested CE’s `Run` produces a typed value (a `Graph`, a `NodeShape`, a `GlobalType`, a `StatechartDocument`, a `StatefulResourceBinding`, a `RoleParticipation`, etc.). Nested CEs are the pit-of-success for authoring the concern correctly; they are available whether or not Frank’s HTTP machinery is in use.
+1. **Type extensions to Frank core** — operations added to `ResourceBuilder` and `WebHostBuilder` via F# type extensions, accepting the nested CEs’ output values and integrating them with HTTP. This is the composition surface where the concern meets other concerns through the shared outer builders.
+
+The pattern follows the established Frank idiom from `Frank.Auth`, `Frank.OpenApi`, and `Frank.Datastar` (D-SK27, D-SK29, D-SK3, D-PR129), generalized to the full concern set.
+
+Contribution inventory (nested CEs, key operations, CE-driven codegen outputs):
+
+|Concern           |Algebras|Nested CEs                                                 |Key ResourceBuilder ops     |Key WebHostBuilder ops                                 |CE-driven codegen output (v1)                                                                               |
+|------------------|--------|-----------------------------------------------------------|----------------------------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+|Frank.SessionTypes|3       |`protocol { }`, `roleParticipation { }`, `roleHandlers { }`|`role`                      |`useSessionTypes`                                      |Specialized `RoleHooks<...>`, message DUs, `MailboxProcessor` actor, projection-soundness FsCheck properties|
+|Frank.Statecharts |3       |`statechart { }`, `stateful { }`                           |`stateful`                  |`useStatecharts`, `useRoleProjection`, `useAffordances`|Typed state DUs, typed event DUs, transition program functions                                              |
+|Frank.Validation  |2       |`shapes { }`                                               |`validate`, `validateWhenIn`|`useValidation`                                        |— (v2 via format-driven codegen)                                                                            |
+|Frank.Provenance  |1       |`provenance { }`                                           |`track`, `provenance`       |`useProvenance`                                        |—                                                                                                           |
+|Frank.LinkedData  |1       |`graph { }`                                                |`representation`, `graph`   |`useLinkedData`                                        |—                                                                                                           |
+
+Operations may be flat (accept a built value as a parameter) or accept nested-CE output directly (`stateful { ... }` inside `resource { }`). The choice is per-operation based on whether the carried value is simple or compound. Both flat and nested operations remain extensible — additional operations, additional sub-operations within nested CEs, and additional composition-package extensions can be added without modifying the concern’s Core.
+
+**Response representations delegate to ASP.NET Core, view engines, and existing Frank machinery.** Frank does not ship a representation system. Handlers return whatever ASP.NET Core can serialize (`IResult`, Oxpecker views, Giraffe view engine output, raw strings, JSON-serializable records); the handler context exposes Frank-specific values (active configuration, role projection, affordances) that the developer composes with their chosen view library’s primitives. Format negotiation for RDF formats is handled by `Frank.LinkedData`; other formats are configured at the ASP.NET Core host level via standard output formatters. Reactive UI integrations (Datastar, etc.) are hand-wired in application code per the `frank-fs/tic-tac-toe` pattern; no Frank package is needed because the existing machinery already supports it.
+
+**Composition packages contribute only type extensions.** A composition package named `Frank.X.Y` (where X and Y are two concerns) adds operations to `ResourceBuilder` and `WebHostBuilder` that make sense only when both `Frank.X` and `Frank.Y` are imported. Composition packages do not introduce new algebras and do not introduce new nested CEs. They weave existing concerns at the resource or webhost level.
+
+Frank v1 ships eight composition packages:
+
+- `Frank.Statecharts.SessionTypes` — statechart-to-session-type translation (§2.5); session-type-to-statechart presentation. *Built in Phase 0b (foundational for runtime).*
+- `Frank.SessionTypes.Validation` — refinements on message payloads (§2.3). *Built in Phase 0b (foundational for refinement-aware runtime).*
+- `Frank.SessionTypes.Auth` — role-based authorization composing `ClaimsPrincipal` with session-typed role constraints.
+- `Frank.Statecharts.Validation` — SHACL shapes bound to configuration predicates.
+- `Frank.Statecharts.Provenance` — journal-to-PROV-O homomorphism.
+- `Frank.Statecharts.LinkedData` — ALPS affordance derivation from statechart plus role projection.
+- `Frank.Validation.LinkedData` — SHACL shape Link headers and content-negotiated shape serving.
+- `Frank.Provenance.LinkedData` — PROV-O graphs as RDF, content-negotiated provenance serving.
+
+Deferred composition packages (v2 candidates, shipped if demand appears):
+
+- `Frank.Validation.OpenApi` — SHACL-to-OpenAPI-schema derivation. Most of the value is captured by format-driven codegen producing F# types from SHACL shapes (Phase 8); the composition becomes worthwhile if SHACL shapes become primary schema-authoring surface for Frank users.
+
+Out of scope (not planned):
+
+- `Frank.Statecharts.Datastar` — Datastar composition with role-projected SSE streams. Not planned because Datastar sits downstream of response data as a delivery choice; composition happens naturally in user-written handlers (per the `frank-fs/tic-tac-toe` pattern), without a Frank-provided package.
+- `Frank.Statecharts.OpenApi` — state-annotated OpenAPI. Not planned because OpenAPI is used in the standard way; users wanting state-aware hypermedia features look to ALPS, Link headers, and the affordance machinery that Frank already provides.
+
+**The Voltron property.** Every concern works standalone — algebras, nested CEs, operations all available via that concern’s Core plus its HTTP integration package. Every pair of concerns that Frank v1 supports has an explicit composition package; the composition is never implicit. When a composition gap appears (as with the historical “SHACL shapes not exposed to ALPS affordances” failure), the gap is a missing composition package, visible in the package list, not a silent omission inside a package that should have done two things.
+
+### AD-14: Analyzer Rules for Composition
+
+Operation-name collisions and composition-package prerequisites are checked by dedicated analyzer rules in the FRANK400 series (AD-11). Four rule categories at v1:
+
+**FRANK400 — Operation-name collision across concerns.** When two imported packages contribute operations with the same name to the same builder type, the analyzer reports the collision at compile time with both operations’ sources named. Users resolve by qualifying one of the uses or by not importing both packages. The collision itself does not prevent compilation, but the warning is promoted to an error if `<TreatWarningsAsErrors>` is set (per the existing FRANK09 convention from D-PR128).
+
+**FRANK401 — Composition operation used without prerequisite concerns.** Composition packages contribute operations that depend on types from two or more concerns. When such an operation is used in a CE where one of the prerequisite concerns is not imported, the analyzer reports the missing concern. Catches the failure mode where a user adds a composition-package dependency but forgets to import one of the underlying concerns.
+
+**FRANK402 — Builder output passed to an incompatible operation.** When a nested CE’s output is passed to an operation expecting a different concern’s type (e.g., a `GlobalType` value passed where a `NodeShape` is expected), the analyzer reports the mismatch. F#’s type system catches most cases of this; the analyzer catches cases where structural inference could produce ambiguity, particularly across type extensions that share operation names.
+
+**FRANK420 — `useSessionTypes` called without a registered `RoleExtractor`.** Session-type projection has no input without a role extractor; a missing extractor at webhost-config time is detectable statically. The analyzer flags the missing registration and lists the available default implementations.
+
+These rules enforce the Voltron discipline at compile time. AI tools generating Frank code target these rules as part of the analyzer contract surface; composition failures that would otherwise manifest as method-resolution ambiguity or runtime type errors are caught and reported in composition-package vocabulary.
 
 -----
 
@@ -382,156 +723,217 @@ Replaced by AD-8 closed guard language.
 
 ## 5. Package Structure
 
+Per AD-1, every semantic concern owns its types in its own Core package. Per AD-7, every Core package depends only on FSharp.Core (plus `System.Security.Claims` for `Frank.SessionTypes.Core`), not on ASP.NET Core and not on any other Core. Per AD-13, composition between concerns happens in explicit composition packages that contribute only type extensions. The layout below realizes these commitments.
+
 ### 5.1 Dependency Graph
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  LAYER 0: Statechart Formalism (FSharp.Core only)                           │
-│                                                                             │
-│  ┌─────────────────┐                                                        │
-│  │ Statecharts     │  AST, three algebras, ConfigurationPredicate,          │
-│  │ .Core           │  Guard, Action, parse-result types                     │
-│  └────────┬────────┘                                                        │
-│           │                                                                 │
-│  ┌────────┴────────┐  Journal interface, Scheduler interface,               │
-│  │ Statecharts     │  StatechartAgent, SCXML algorithm,                     │
-│  │ .Runtime        │  in-memory journal/scheduler implementations           │
-│  └────────┬────────┘                                                        │
-│           │                                                                 │
-│  ┌────────┴────────┐                                                        │
-│  │ Statecharts     │  WSD, SCXML, smcat parsers → AST                       │
-│  │ .Parsers        │                                                        │
-│  └────────┬────────┘                                                        │
-│           │                                                                 │
-│  ┌────────┴────────┐                                                        │
-│  │ Statecharts     │  AST → SCXML, XState, smcat, ALPS, mermaid             │
-│  │ .Generators     │                                                        │
-│  └────────┬────────┘                                                        │
-│           │                                                                 │
-│  ┌────────┴────────┐                                                        │
-│  │ Statecharts     │  RoleParticipation, projection algorithm,              │
-│  │ .Multiparty     │  global well-formedness checks                         │
-│  └─────────────────┘                                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 0: Concern Cores (FSharp.Core + optional System.Security.Claims)      │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                    │
+│  │ Frank.SessionTypes      │  │ Frank.Statecharts       │                    │
+│  │   .Core                 │  │   .Core                 │                    │
+│  │  3 algebras; global /   │  │  3 algebras; AST;       │                    │
+│  │  local types; generic   │  │  ConfigurationPredicate;│                    │
+│  │  hook family;           │  │  Guard; Action          │                    │
+│  │  RoleExtractor +        │  │                         │                    │
+│  │  ClaimsRoleExtractor    │  │                         │                    │
+│  └─────────────────────────┘  └─────────────────────────┘                    │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌──────────────┐  │
+│  │ Frank.Validation        │  │ Frank.Provenance        │  │ Frank.Linked │  │
+│  │   .Core                 │  │   .Core                 │  │   Data.Core  │  │
+│  │  2 algebras; SHACL      │  │  1 algebra; PROV-O      │  │ 1 algebra;   │  │
+│  │  shape types; type →    │  │  types                  │  │ RDF types    │  │
+│  │  SHACL serialization    │  │                         │  │              │  │
+│  └─────────────────────────┘  └─────────────────────────┘  └──────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  LAYER 0.5: Sibling Concerns (FSharp.Core only)                             │
-│                                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │ Validation      │  │ Provenance      │  │ LinkedData      │              │
-│  │ .Core           │  │ .Core           │  │ .Core           │              │
-│  └─────────────────┘  └────────┬────────┘  └─────────────────┘              │
-│                                │                                            │
-│                       ┌────────┴────────┐                                   │
-│                       │ Statecharts     │  Journal → PROV-O derivation      │
-│                       │ .Provenance     │  (deps: Statecharts.Core +        │
-│                       │                 │   Provenance.Core)                │
-│                       └─────────────────┘                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 0.5: Runtime and Phase 0c CE-Driven Codegen                           │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                    │
+│  │ Frank.Statecharts       │  │ Frank.SessionTypes      │                    │
+│  │   .Runtime              │  │   .Codegen              │                    │
+│  │  Journal interface,     │  │  Myriad plugin for      │                    │
+│  │  SQLite-per-actor       │  │  protocol { } CE →      │                    │
+│  │  default, Scheduler,    │  │  specialized RoleHooks, │                    │
+│  │  StatechartAgent,       │  │  MailboxProcessor       │                    │
+│  │  SCXML algorithm        │  │  actors                 │                    │
+│  └─────────────────────────┘  └─────────────────────────┘                    │
+│                                                                              │
+│                                 ┌─────────────────────────┐                  │
+│                                 │ Frank.Statecharts       │                  │
+│                                 │   .Codegen              │                  │
+│                                 │  Myriad plugin for      │                  │
+│                                 │  statechart { } CE →    │                  │
+│                                 │  typed state/event DUs  │                  │
+│                                 └─────────────────────────┘                  │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  LAYER 1: Frank HTTP Sibling Integrations (+ ASP.NET Core)                  │
-│                                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │ Frank           │  │ Frank           │  │ Frank           │              │
-│  │ .LinkedData     │  │ .Validation     │  │ .Provenance     │              │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘              │
-│                                                                             │
-│  ┌─────────────────┐                                                        │
-│  │ Frank           │  Static ALPS, Link headers, OPTIONS                    │
-│  │ .Discovery      │                                                        │
-│  └─────────────────┘                                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 0.75: V1 Composition Packages (Voltron grid)                          │
+│                                                                              │
+│  Eight composition packages, each contributing type extensions only:         │
+│                                                                              │
+│  Foundational (Phase 0b):                                                    │
+│    Frank.Statecharts.SessionTypes    (statechart ↔ session-type translation) │
+│    Frank.SessionTypes.Validation     (refinements on message payloads)       │
+│                                                                              │
+│  Standard (Phase 4):                                                         │
+│    Frank.SessionTypes.Auth           (role-based authorization)              │
+│    Frank.Statecharts.Validation      (SHACL bound to configuration preds)    │
+│    Frank.Statecharts.Provenance      (journal → PROV-O homomorphism)         │
+│    Frank.Statecharts.LinkedData      (ALPS affordances from statecharts)     │
+│    Frank.Validation.LinkedData       (SHACL Link headers, shape serving)    │
+│    Frank.Provenance.LinkedData       (PROV-O as RDF, audit serving)          │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  LAYER 2: Statechart Integration                                            │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ Frank.Statecharts                                                   │    │
-│  │  • StatefulResourceBinding (predicate-keyed composition)            │    │
-│  │  • StatefulResourceBuilder CE                                       │    │
-│  │  • State-dependent affordances, validation, provenance              │    │
-│  │  • Derived role projections                                         │    │
-│  │  • Middleware (useAffordances, useStatecharts, useRoleProjection)   │    │
-│  │  • Persistent journal/scheduler for ASP.NET Core hosting            │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ Frank.Statecharts.Analyzers                                         │    │
-│  │  • FRANK101–108: Structural validation                              │    │
-│  │  • FRANK201–212: Semantic validation (reachability, deadlock,       │    │
-│  │                  predicate overlap, role completeness)              │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 1: Frank HTTP Integrations (+ ASP.NET Core)                           │
+│                                                                              │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐   │
+│  │ Frank.SessionTypes  │  │ Frank.Statecharts   │  │ Frank.Validation    │   │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘   │
+│                                                                              │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐   │
+│  │ Frank.Provenance    │  │ Frank.LinkedData    │  │ Frank.Discovery     │   │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘   │
+│                                                                              │
+│  Each contributes type extensions to ResourceBuilder and WebHostBuilder       │
+│  per AD-13. Existing Frank.Auth, Frank.OpenApi, Frank.Datastar unchanged.    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 2: Analyzers                                                          │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │ Frank.Analyzers                                                      │    │
+│  │  • FRANK001–099: Conventions (existing FRANK001 etc.)                │    │
+│  │  • FRANK100–199: Structural (AST shape, bindings)                    │    │
+│  │  • FRANK200–299: Semantic (reachability, role completeness)          │    │
+│  │  • FRANK300–399: Refinement (SMT-backed, via Microsoft.Z3)           │    │
+│  │  • FRANK400–499: Composition (collisions, prerequisites, extractor)  │    │
+│  │  • FRANK500–599: Codegen (hook completeness, hand-modification)      │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Optional packages (not v1, user-implementable against interfaces):
+  Frank.SessionTypes.ActorTracked   (actor-backed RoleExtractor)
+  Frank.SessionTypes.External       (external-service RoleExtractor)
 ```
 
 ### 5.2 Package Descriptions
 
-|Package                      |Dependencies                                          |Responsibility                                       |
-|-----------------------------|------------------------------------------------------|-----------------------------------------------------|
-|`Statecharts.Core`           |FSharp.Core                                           |AST, three algebras, predicates, guards, actions     |
-|`Statecharts.Runtime`        |Statecharts.Core                                      |Journal, Scheduler, Agent, SCXML algorithm           |
-|`Statecharts.Parsers`        |Statecharts.Core                                      |WSD/SCXML/smcat → AST                                |
-|`Statecharts.Generators`     |Statecharts.Core                                      |AST → SCXML/XState/smcat/ALPS/mermaid                |
-|`Statecharts.Multiparty`     |Statecharts.Core                                      |RoleParticipation, projection, well-formedness       |
-|`Validation.Core`            |FSharp.Core                                           |SHACL types, shape algebra                           |
-|`Provenance.Core`            |FSharp.Core                                           |PROV-O types, provenance algebra                     |
-|`LinkedData.Core`            |FSharp.Core                                           |RDF types, graph algebra                             |
-|`Statecharts.Provenance`     |Statecharts.Core, Provenance.Core                     |Journal → PROV-O graph derivation                    |
-|`Frank.LinkedData`           |LinkedData.Core, Frank                                |Content negotiation middleware                       |
-|`Frank.Validation`           |Validation.Core, Frank                                |Request/response validation middleware               |
-|`Frank.Provenance`           |Provenance.Core, Frank                                |HTTP request audit middleware (statechart-unaware)   |
-|`Frank.Discovery`            |Frank                                                 |Static ALPS, Link headers, OPTIONS                   |
-|`Frank.Statecharts`          |Statecharts.*, Statecharts.Provenance, siblings, Frank|Composition model, CE, middleware, persistent journal|
-|`Frank.Statecharts.Analyzers`|Statecharts.Core                                      |Compile-time validation                              |
+**Core packages (Layer 0).** Each depends only on FSharp.Core plus the minimal type libraries the concern requires.
 
-### 5.3 Composition Matrix
+|Package                  |Dependencies                       |Responsibility                                                                                                                                                                                                        |
+|-------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`Frank.SessionTypes.Core`|FSharp.Core, System.Security.Claims|Global/local session types, refinements, projection; three algebras (`IProtocolBuilder`, `IProjectionAlgebra`, `ILocalTypeAlgebra`); generic hook family; `RoleExtractor` interface with `ClaimsRoleExtractor` default|
+|`Frank.Statecharts.Core` |FSharp.Core                        |Statechart AST, transition edges; three algebras (`IStatechartBuilder`, `ITransitionAlgebra`, `IConfigurationPredicate`); `Guard`, `Action`, `ConfigurationPredicate` types                                           |
+|`Frank.Validation.Core`  |FSharp.Core                        |SHACL shape types (`NodeShape`), two algebras (`IShapeBuilder`, `IConstraintAlgebra`); runtime type → SHACL emission helper for content-negotiated shape descriptions                                                 |
+|`Frank.Provenance.Core`  |FSharp.Core                        |PROV-O types; `IProvenanceBuilder` algebra                                                                                                                                                                            |
+|`Frank.LinkedData.Core`  |FSharp.Core, dotNetRdf             |RDF types (Graph, Triple, IRI); `IGraphBuilder` algebra                                                                                                                                                               |
 
-Each Frank.* middleware package is independently usable on a plain Frank resource. Any combination composes on the same resource through ASP.NET Core’s middleware pipeline and, when `Frank.Statecharts` is present, through `StatefulResourceBinding`’s optional fields.
+**Runtime and CE-driven codegen packages (Layer 0.5).** These depend on their respective Cores and provide runtime infrastructure and build-time generation.
 
-Each Frank.* package delivers standalone value:
+|Package                     |Dependencies                                    |Responsibility                                                                                                                                                                  |
+|----------------------------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`Frank.Statecharts.Runtime` |Frank.Statecharts.Core, Microsoft.Data.Sqlite   |Journal interface, SQLite-per-actor default implementation, Scheduler interface, `StatechartAgent`, SCXML algorithm transliteration                                             |
+|`Frank.SessionTypes.Codegen`|Frank.SessionTypes.Core, Myriad.Core, Myriad.Sdk|Myriad plugin generating specialized `RoleHooks<...>` records, message DUs, `MailboxProcessor` actors, and projection-soundness FsCheck properties from `protocol { }` CE source|
+|`Frank.Statecharts.Codegen` |Frank.Statecharts.Core, Myriad.Core, Myriad.Sdk |Myriad plugin generating typed state DUs, typed event DUs, and transition program functions from `statechart { }` CE source                                                     |
 
-|Package            |Standalone deliverable                                                        |
-|-------------------|------------------------------------------------------------------------------|
-|`Frank.Validation` |SHACL validation on request and response bodies. No statecharts required.     |
-|`Frank.LinkedData` |Content negotiation across RDF representations (Turtle, JSON-LD, N-Triples).  |
-|`Frank.Provenance` |HTTP-level audit: who called what, when, with what status. Statechart-unaware.|
-|`Frank.Discovery`  |Static ALPS document, Link headers, and OPTIONS responses computed at startup.|
-|`Frank.Statecharts`|Stateful resources with predicate-keyed bindings and derived role projections.|
+**V1 composition packages (Layer 0.75).** Each contributes type extensions only — no new algebras, no new nested CEs. Composition packages do not depend on ASP.NET Core unless their concern composition inherently requires HTTP integration (for instance, `Frank.Validation.LinkedData`’s shape-serving functionality).
 
-Pairwise combinations describe the combined capability when both packages are installed on the same resource:
+|Package                         |Dependencies                                                            |Responsibility                                                                                                                                              |
+|--------------------------------|------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`Frank.Statecharts.SessionTypes`|Frank.Statecharts.Core, Frank.SessionTypes.Core                         |Statechart-to-session-type translation per §2.5; session-type-to-statechart presentation; type extensions for interoperability between the two presentations|
+|`Frank.SessionTypes.Validation` |Frank.SessionTypes.Core, Frank.Validation.Core                          |Refinements on message payloads per §2.3; refinement satisfiability obligations for the analyzer (FRANK300–301)                                             |
+|`Frank.SessionTypes.Auth`       |Frank.SessionTypes.Core, Frank.Auth                                     |Role-based authorization composing `ClaimsPrincipal` with session-typed role constraints; `authorizeByRole` operation                                       |
+|`Frank.Statecharts.Validation`  |Frank.Statecharts.Core, Frank.Validation.Core                           |SHACL shapes bound to configuration predicates; state-dependent validation                                                                                  |
+|`Frank.Statecharts.Provenance`  |Frank.Statecharts.Core, Frank.Provenance.Core, Frank.Statecharts.Runtime|Journal-to-PROV-O homomorphism; derives PROV-O graphs from statechart journals                                                                              |
+|`Frank.Statecharts.LinkedData`  |Frank.Statecharts.Core, Frank.LinkedData.Core                           |ALPS affordance derivation from statechart plus role projection; semantic descriptions of stateful resources                                                |
+|`Frank.Validation.LinkedData`   |Frank.Validation.Core, Frank.LinkedData.Core, ASP.NET Core              |SHACL shape Link headers (`rel="describedby"`); content-negotiated shape serving                                                                            |
+|`Frank.Provenance.LinkedData`   |Frank.Provenance.Core, Frank.LinkedData.Core, ASP.NET Core              |PROV-O graphs as RDF; content-negotiated provenance serving                                                                                                 |
 
-|               |LinkedData                |Provenance          |Discovery                |Statecharts                                      |
-|---------------|--------------------------|--------------------|-------------------------|-------------------------------------------------|
-|**Validation** |Validate in, negotiate out|Validated + audited |Validated + discoverable |State-dependent SHACL                            |
-|**LinkedData** |—                         |Audit in RDF formats|RDF + ALPS + Link headers|State-dependent RDF views                        |
-|**Provenance** |—                         |—                   |Audited + discoverable   |Journal-derived PROV-O                           |
-|**Discovery**  |—                         |—                   |—                        |Static ALPS + dynamic affordances (complementary)|
-|**Statecharts**|—                         |—                   |—                        |—                                                |
+**HTTP integration packages (Layer 1).** Each concern has one HTTP-integration package that depends on its Core and on ASP.NET Core, contributing type extensions to `ResourceBuilder` and `WebHostBuilder`.
 
-Static ALPS (from `Frank.Discovery`) and state-dependent affordances (from `Frank.Statecharts`) are deliberately complementary rather than overlapping: static ALPS describes the protocol at design time; state-dependent affordances describe what a client can do right now at runtime. Adopters use both, not one or the other.
+|Package             |Dependencies                                            |Responsibility                                                                                                                                                                                                              |
+|--------------------|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`Frank.SessionTypes`|Frank.SessionTypes.Core, Frank                          |`roleHandlers { }` CE, `role` operation on `ResourceBuilder`, `useSessionTypes` on `WebHostBuilder`                                                                                                                         |
+|`Frank.Statecharts` |Frank.Statecharts.Core, Frank.Statecharts.Runtime, Frank|`statechart { }` and `stateful { }` CEs, `stateful` operation on `ResourceBuilder`, `useStatecharts`/`useRoleProjection`/`useAffordances` on `WebHostBuilder`; persistent journal/scheduler via ASP.NET Core hosted services|
+|`Frank.Validation`  |Frank.Validation.Core, Frank                            |`shapes { }` CE, `validate`/`validateWhenIn` operations, `useValidation`                                                                                                                                                    |
+|`Frank.Provenance`  |Frank.Provenance.Core, Frank                            |`provenance { }` CE, `track`/`provenance` operations, `useProvenance`                                                                                                                                                       |
+|`Frank.LinkedData`  |Frank.LinkedData.Core, Frank                            |`graph { }` CE, `representation`/`graph` operations, `useLinkedData`                                                                                                                                                        |
+|`Frank.Discovery`   |Frank                                                   |Static ALPS, Link headers, OPTIONS handlers (existing, unchanged)                                                                                                                                                           |
 
-Journal-derived PROV-O is the richer provenance mode: when `Frank.Statecharts` and `Frank.Provenance` are both present, `Statecharts.Provenance` produces Entity-per-configuration, Activity-per-transition, and Derivation-per-state-change records from the journal. `Frank.Provenance` alone continues to handle HTTP-level audit. The two modes coexist on one resource.
+**Analyzer package (Layer 2).**
 
-### 5.4 Usage Profiles
+|Package          |Dependencies                                                                        |Responsibility                                                                                                      |
+|-----------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+|`Frank.Analyzers`|Frank.Statecharts.Core, Frank.SessionTypes.Core, Frank.Validation.Core, Microsoft.Z3|All rule categories (FRANK001–599); SMT-backed refinement checks; composition-failure detection; codegen consistency|
 
-Four profiles cover the common adoption paths:
+**Existing Frank packages (unchanged structurally).** These predate this architecture revision and continue to work as documented in their respective decision records.
 
-1. **Plain REST with validation** — `Frank.Validation` only. Useful when the primary value is enforcing request/response shapes on an otherwise stateless HTTP API.
-1. **Agent-legible REST** — `Frank.Validation` + `Frank.LinkedData` + `Frank.Discovery`. Resources negotiate across RDF representations, advertise ALPS profiles, and validate inputs against SHACL. No state machine, no audit.
-1. **Stateful workflow with audit** — `Frank.Statecharts` + `Frank.Provenance` (+ `Statecharts.Provenance` transitively). Multi-party workflows with derived role projections and journal-derived PROV-O. Content negotiation optional.
-1. **Full semantic stack** — all five Frank.* packages. Self-describing, self-validating, self-auditing stateful resources that negotiate across representations and enforce multi-party protocols. This is the target for Frank’s v7.3.0 semantic-resources vision.
+|Package         |Status   |Notes                                                                 |
+|----------------|---------|----------------------------------------------------------------------|
+|`Frank.Auth`    |Unchanged|Produces `ClaimsPrincipal`; `Frank.SessionTypes.Auth` composes with it|
+|`Frank.OpenApi` |Unchanged|Standard OpenAPI generation from routes and F# types                  |
+|`Frank.Datastar`|Unchanged|SSE delivery; used in handlers, not as a Frank composition            |
 
-An adopter moves between profiles without refactoring: adding `Frank.Statecharts` to a profile-2 deployment is a dependency change and a CE invocation, not a rewrite. This is the payoff of AD-1 and the independent-utility constraint in §1.2.
+**Optional future packages (not v1, user-implementable).**
+
+|Package                          |Notes                                                                                                                                                                                                    |
+|---------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`Frank.SessionTypes.ActorTracked`|Actor-backed `RoleExtractor` for dynamic in-session role changes; the `frank-fs/tic-tac-toe` pattern. Users implement against the `RoleExtractor` interface in `Frank.SessionTypes.Core`.                |
+|`Frank.SessionTypes.External`    |External-service `RoleExtractor` for roles governed by an entitlement API, policy engine, or organizational directory.                                                                                   |
+|`Frank.Validation.OpenApi`       |SHACL-to-OpenAPI-schema derivation. Deferred; value largely subsumed by Phase 8 format-driven codegen. Shipped if demand appears.                                                                        |
+|`Frank.Validation.Provenance`    |PROV-O records of validation events (which shape applied to which request, with pass/fail and attribution). Deferred; user code against `IProvenanceBuilder` handles the narrow use case in the meantime.|
+
+### 5.3 Out-of-Scope Packages
+
+These pairings were considered and deliberately not shipped. The rationale is recorded so future revisions don’t accidentally revisit settled questions.
+
+- **`Frank.Statecharts.Datastar`** — Datastar composition with role-projected SSE streams. Not planned because Datastar sits downstream of response data as a delivery choice; composition happens naturally in user-written handlers (per the `frank-fs/tic-tac-toe` pattern) without a Frank-provided package.
+- **`Frank.Statecharts.OpenApi`** — State-annotated OpenAPI. Not planned because OpenAPI is used in the standard way; users wanting state-aware hypermedia features use ALPS, Link headers, and the affordance machinery Frank already provides. OpenAPI was not designed for runtime state semantics, and bending it to that purpose is the wrong direction.
+
+### 5.4 Adoption Profiles
+
+Five profiles cover the common adoption paths, from simplest to richest.
+
+1. **Validation-only REST.** `Frank.Validation` plus `Frank.Validation.Core`. Request/response SHACL validation on an otherwise stateless HTTP API. Zero statechart or session-type machinery.
+1. **Agent-legible REST.** `Frank.Validation` + `Frank.LinkedData` + `Frank.Discovery` + `Frank.Validation.LinkedData`. RDF content negotiation, SHACL shape discovery, static ALPS. No state machine or session types.
+1. **Session-typed service.** `Frank.SessionTypes` + `Frank.SessionTypes.Core` + optionally `Frank.SessionTypes.Codegen`. Multi-party protocols with per-role actors, projection soundness, and refinement checking. No statecharts required; session types are authored directly.
+1. **Stateful workflow with audit.** `Frank.Statecharts` + `Frank.Provenance` + `Frank.Statecharts.Provenance` + optionally `Frank.Statecharts.Codegen`. Statechart-driven workflows with journal-derived PROV-O audit.
+1. **Full semantic stack.** All five Core packages, all runtime/codegen packages, all eight composition packages, plus the HTTP integration packages. Self-describing, self-validating, self-auditing stateful resources that enforce multi-party protocols and negotiate across representations. This is the target for Frank’s semantic-resources vision.
+
+An adopter moves between profiles without refactoring: adding a concern is a dependency change and a set of new operations in the builder CE, not a rewrite. This is the payoff of AD-1 (separate types per concern), AD-7 (Core independence), and AD-13 (three contribution surfaces).
+
+### 5.5 Composition Matrix
+
+The v1 composition grid is complete with respect to the concern pairs Frank ships. A pairing not listed is either in the out-of-scope list (§5.3) or deliberately absent from v1.
+
+|                |SessionTypes|Statecharts |Validation  |Provenance                        |LinkedData                        |
+|----------------|------------|------------|------------|----------------------------------|----------------------------------|
+|**SessionTypes**|—           |✓ (Phase 0b)|✓ (Phase 0b)|(via Frank.Statecharts.Provenance)|(via Frank.Statecharts.LinkedData)|
+|**Statecharts** |✓           |—           |✓           |✓                                 |✓                                 |
+|**Validation**  |✓           |✓           |—           |(deferred to v2)                  |✓                                 |
+|**Provenance**  |(transitive)|✓           |(none)      |—                                 |✓                                 |
+|**LinkedData**  |(transitive)|✓           |✓           |✓                                 |—                                 |
+
+Plus `Frank.SessionTypes.Auth` in the grid as a composition with the existing `Frank.Auth` package.
+
+The Validation + Provenance cell is deferred to v2: a specific use case exists (emitting PROV-O records about validation events themselves — which SHACL shape was applied to which request, whether validation passed or failed, attributed to which user) but the use case is narrow enough that user code against `IProvenanceBuilder` handles it in the meantime. Promoted to a v1 package only if demand appears.
 
 -----
 
 ## 6. Type Specifications
 
-### 6.1 Statecharts.Core — Structure
+### 6.1 Frank.Statecharts.Core — Structure
 
 ```fsharp
-namespace Statecharts.Core
+namespace Frank.Statecharts.Core
 
 /// State decomposition type (Harel's ψ function)
 [<RequireQualifiedAccess>]
@@ -677,12 +1079,12 @@ and SourceLocation = { Line: int; Column: int; Source: string option }
 and ErrorSeverity = Info | Warning | Error
 ```
 
-### 6.2 Statecharts.Runtime — Journal, Scheduler, Agent
+### 6.2 Frank.Statecharts.Runtime — Journal, Scheduler, Agent
 
 ```fsharp
-namespace Statecharts.Runtime
+namespace Frank.Statecharts.Runtime
 
-open Statecharts.Core
+open Frank.Statecharts.Core
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Journal (AD-3): the source of truth for agent state
@@ -815,10 +1217,10 @@ module StatechartAgent =
         Async<IStatechartAgent>
 ```
 
-### 6.3 Validation.Core
+### 6.3 Frank.Validation.Core
 
 ```fsharp
-namespace Validation.Core
+namespace Frank.Validation.Core
 
 /// SHACL property path
 type PropertyPath =
@@ -884,10 +1286,10 @@ and Violation = {
 and Severity = Info | Warning | Violation
 ```
 
-### 6.4 Provenance.Core
+### 6.4 Frank.Provenance.Core
 
 ```fsharp
-namespace Provenance.Core
+namespace Frank.Provenance.Core
 
 type Entity = {
     Id: EntityId
@@ -948,12 +1350,12 @@ type ProvenanceGraph = {
 }
 ```
 
-### 6.5 Statecharts.Multiparty — Role Participation
+### 6.5 Frank.Statecharts.Multiparty — Role Participation
 
 ```fsharp
-namespace Statecharts.Multiparty
+namespace Frank.Statecharts.Multiparty
 
-open Statecharts.Core
+open Frank.Statecharts.Core
 
 type RoleId = RoleId of string
 
@@ -1025,18 +1427,18 @@ module Projection =
         WellFormednessIssue list
 ```
 
-### 6.6 Statecharts.Provenance — Journal → PROV-O Derivation
+### 6.6 Frank.Statecharts.Provenance — Journal → PROV-O Derivation
 
-This package sits at Layer 0.5 and bridges two otherwise-independent concerns: the statechart journal (a runtime primitive) and PROV-O graphs (a provenance primitive). It depends on `Statecharts.Core` and `Provenance.Core`; it does not depend on `Frank`, `Statecharts.Runtime` beyond the journal types, or `Frank.Provenance`.
+This package sits at Layer 0.5 and bridges two otherwise-independent concerns: the statechart journal (a runtime primitive) and PROV-O graphs (a provenance primitive). It depends on `Frank.Statecharts.Core` and `Frank.Provenance.Core`; it does not depend on the top-level `Frank` HTTP framework package, nor on `Frank.Statecharts.Runtime` beyond the journal types, nor on `Frank.Provenance`.
 
 The package exists so that `Frank.Provenance` remains statechart-unaware and the journal-to-PROV-O mapping is reusable from CLI tools, background workers, and test harnesses that replay journals offline.
 
 ```fsharp
-namespace Statecharts.Provenance
+namespace Frank.Statecharts.Provenance
 
-open Statecharts.Core
-open Statecharts.Runtime
-open Provenance.Core
+open Frank.Statecharts.Core
+open Frank.Statecharts.Runtime
+open Frank.Provenance.Core
 
 /// Configuration for deriving PROV-O from a statechart journal.
 type DerivationOptions = {
@@ -1103,18 +1505,18 @@ Mapping from journal entries to PROV-O:
 |`ExternalSnapshotTaken p`     |Annotation only; no new Entity                                                                                                                            |
 |`RuntimeError …`              |Activity ended with `prov:wasInvalidatedBy`                                                                                                               |
 
-Attribution to human agents (via `wasAttributedTo`) happens at the Frank.Statecharts layer, where `ProvenanceOptions.AgentExtractor` turns `HttpContext` into an `Agent`. `Statecharts.Provenance` is HTTP-unaware; the runtime agent is always the software agent unless Frank.Statecharts injects a human agent before calling `deriveAndAppend`.
+Attribution to human agents (via `wasAttributedTo`) happens at the Frank.Statecharts layer, where `ProvenanceOptions.AgentExtractor` turns `HttpContext` into an `Agent`. `Frank.Statecharts.Provenance` is HTTP-unaware; the runtime agent is always the software agent unless Frank.Statecharts injects a human agent before calling `deriveAndAppend`.
 
 ### 6.7 Frank.Statecharts — Composition Model
 
 ```fsharp
 namespace Frank.Statecharts
 
-open Statecharts.Core
-open Statecharts.Runtime
-open Statecharts.Multiparty
-open Validation.Core
-open Provenance.Core
+open Frank.Statecharts.Core
+open Frank.Statecharts.Runtime
+open Frank.Statecharts.Multiparty
+open Frank.Validation.Core
+open Frank.Provenance.Core
 
 /// Affordance definition with explicit transition reference (AD-5).
 type Affordance = {
@@ -1206,7 +1608,7 @@ type ProjectedView = {
 ### 7.1 IStatechartBuilder<’r> — Construction (AD-2)
 
 ```fsharp
-namespace Statecharts.Core
+namespace Frank.Statecharts.Core
 
 /// Algebra for building statechart structure.
 /// Carrier 'r represents a structural fragment (state subtree or transition collection).
@@ -1258,7 +1660,7 @@ module Statechart =
 Standard interpreters, each in its own module:
 
 ```fsharp
-namespace Statecharts.Core.Interpreters
+namespace Frank.Statecharts.Core.Interpreters
 
 /// Build the AST.
 type ReifyAlgebra = ...               // IStatechartBuilder<ASTFragment>
@@ -1288,7 +1690,7 @@ type SmcatAlgebra = ...                // IStatechartBuilder<string>
 ### 7.2 ITransitionAlgebra<’r> — Transition Behavior
 
 ```fsharp
-namespace Statecharts.Core
+namespace Frank.Statecharts.Core
 
 /// Algebra for interpreting what a transition does at runtime.
 /// Carrier 'r is the effect representation (e.g., AgentState -> AgentState,
@@ -1319,7 +1721,7 @@ type TransitionProgram = { Run: ITransitionAlgebra<'a> -> 'a }
 Standard interpreters:
 
 ```fsharp
-namespace Statecharts.Core.Interpreters
+namespace Frank.Statecharts.Core.Interpreters
 
 /// Interpret transitions as state updates (used by the runtime).
 type StateUpdateAlgebra = ...          // ITransitionAlgebra<AgentState -> AgentState * Action list>
@@ -1334,7 +1736,7 @@ type TraceAlgebra = ...                // ITransitionAlgebra<JournalEntryKind li
 ### 7.3 IConfigurationPredicate<’r> — Predicate Evaluation
 
 ```fsharp
-namespace Statecharts.Core
+namespace Frank.Statecharts.Core
 
 /// Algebra for evaluating predicates over configurations.
 /// Carrier 'r is the predicate result type (typically bool, but could be
@@ -1406,7 +1808,7 @@ type ALPSAlgebra() =
 ```
 
 ```fsharp
-namespace Provenance.Core
+namespace Frank.Provenance.Core
 
 type IProvOAlgebra<'r> =
     abstract entity : id: string -> 'r
@@ -1440,10 +1842,10 @@ type TurtleAlgebra(baseUri: string) =
 The macrostep implementation is a direct transliteration of the W3C SCXML Algorithm for SCXML Interpretation (Appendix D of the recommendation). Pseudocode below is annotated with SCXML procedure names; implementation is line-by-line.
 
 ```fsharp
-namespace Statecharts.Runtime
+namespace Frank.Statecharts.Runtime
 
 module internal Semantics =
-    open Statecharts.Core
+    open Frank.Statecharts.Core
 
     // SCXML §D.1: enterStates
     let enterStates
@@ -1659,7 +2061,7 @@ Crash recovery semantics:
 ### 8.3 Scheduler Implementations
 
 ```fsharp
-namespace Statecharts.Runtime.Schedulers
+namespace Frank.Statecharts.Runtime.Schedulers
 
 /// In-memory scheduler. Suitable for tests and non-durable scenarios.
 /// Scheduled sends are lost on process restart.
@@ -1885,7 +2287,7 @@ let orderResource = statefulResource "/orders/{id}" {
 ### 10.1 Derivation Algorithm
 
 ```fsharp
-namespace Statecharts.Multiparty
+namespace Frank.Statecharts.Multiparty
 
 module Projection =
 
@@ -2082,169 +2484,221 @@ module RoleProjection =
 
 ## 11. Build Plan
 
-The plan is strictly depth-first. Each layer ships complete (against its conformance suite) before the next layer is started. No layer assumes simplifications it intends to revisit.
+The plan is strictly depth-first. Each layer ships complete (against its conformance suite) before the next layer is started. No layer assumes simplifications it intends to revisit. Phase 0 splits into three sub-phases reflecting the denotational layering: 0a establishes concern Cores in parallel; 0b builds the foundational composition packages that the runtime depends on; 0c delivers the CE-driven codegen infrastructure. Phases 1 through 7 are v1; Phase 8 is named explicitly to document the deferred v2 scope.
 
-### Phase 0: Statecharts.Core (Weeks 1–3)
+### Phase 0a: Concern Cores (Weeks 1–4)
 
-Deliverables:
+Deliverables — all five Core packages in parallel, each with its algebras and types:
 
-- All AST types from §6.1.
-- `IStatechartBuilder<'r>`, `ITransitionAlgebra<'r>`, `IConfigurationPredicate<'r>`.
-- Reflect/reify for statecharts and transition programs.
-- All standard interpreters listed in §7.
-- `ConfigurationPredicate` evaluation and indexing.
-- Closed `Guard` evaluator.
+- **`Frank.SessionTypes.Core`:** Global and local session types per §2.2; refinement predicates per §2.3; projection function with the homomorphism law; three algebras (`IProtocolBuilder`, `IProjectionAlgebra`, `ILocalTypeAlgebra`); generic hook family; `RoleExtractor` interface with `ClaimsRoleExtractor` default implementation; SRTP-based generic operations.
+- **`Frank.Statecharts.Core`:** Statechart AST from §6.1 (presented as sugar over session types); closed `Guard` language; three algebras (`IStatechartBuilder`, `ITransitionAlgebra`, `IConfigurationPredicate`); `ConfigurationPredicate` evaluation and indexing; reflect/reify bridges per AD-4.
+- **`Frank.Validation.Core`:** SHACL shape types (`NodeShape`); two algebras (`IShapeBuilder`, `IConstraintAlgebra`); runtime type → SHACL emission helper.
+- **`Frank.Provenance.Core`:** PROV-O types; `IProvenanceBuilder` algebra.
+- **`Frank.LinkedData.Core`:** RDF types (Graph, Triple, IRI); `IGraphBuilder` algebra; interop with dotNetRdf.
+
+Conformance suite (applies to all five Cores):
+
+- Round-trip property: `reify (reflect doc) ≡ doc` for all generated documents in each concern.
+- All algebra interpreters total on all generated inputs (FsCheck).
+- Projection soundness: for all well-formed global types in the generated corpus, `αᵣ ∘ π_r = F(π_r) ∘ α` holds at every state-role pair.
+- Well-formedness checks have zero false positives on the curated known-good corpus, zero false negatives on the curated intentionally-broken corpus.
+- Type → SHACL emission round-trip for the supported F#-type fragment.
+
+Exit gate: all five Cores have at least three interpreters per algebra; projection soundness property holds on the session-type corpus; Core-to-Core dependency check confirms no `Frank.*.Core` depends on any other `Frank.*.Core` (per AD-7).
+
+### Phase 0b: Foundational Composition Packages (Weeks 4–5)
+
+Deliverables — two composition packages that the runtime depends on, with higher formal-verification bar:
+
+- **`Frank.Statecharts.SessionTypes`:** Statechart-to-session-type translation per §2.5; session-type-to-statechart presentation. Mechanically-checked translation correctness: for every well-formed statechart, `translate(s)` denotes the same coalgebra as `s` itself.
+- **`Frank.SessionTypes.Validation`:** Refinement predicates on message payloads per §2.3; refinement obligation extraction for the analyzer. Property-based proof that refined message types preserve the projection homomorphism.
 
 Conformance suite:
 
-- Round-trip property: `reify (reflect doc) ≡ doc` for all generated documents.
-- All interpreters total on all generated inputs (FsCheck).
-- `ConfigurationPredicate.eval` matches a reference implementation on 10,000 generated configurations.
-- Guard evaluator total on all guard expressions (FsCheck).
+- Uniform structural conformance: type extensions registered without collisions; no analyzer warnings on positive samples; warnings fire on negative samples.
+- Concern-specific property tests are **complete** (not sample):
+  - Translation correctness for the full statechart fragment Frank supports.
+  - Projection-preservation under refinements for the refinement fragment Frank supports.
+  - Round-trip: `present (translate s) ≡ s` up to structural equivalence.
 
-Exit gate: all three algebras have at least three interpreters each, all conformance properties pass, no `obj`-typed escapes anywhere.
+Exit gate: both composition packages pass the full concern-specific property suites; uniform structural conformance met.
 
-### Phase 1: Statecharts.Runtime (Weeks 3–7)
+### Phase 0c: CE-Driven Codegen (Weeks 5–7)
+
+Deliverables — Myriad plugins for the two concerns where CE-driven codegen is load-bearing:
+
+- **`Frank.SessionTypes.Codegen`:** Myriad plugin reading `protocol { }` CE source via Fantomas AST extraction; generates specialized `RoleHooks<...>` records, message DUs, `MailboxProcessor` actor implementations, and projection-soundness FsCheck properties.
+- **`Frank.Statecharts.Codegen`:** Myriad plugin reading `statechart { }` CE source; generates typed state DUs (replacing stringly-typed `StateId`), typed event DUs (replacing stringly-typed `EventId`), and transition program functions.
+
+Conformance suite:
+
+- Generated `MailboxProcessor` actors pass the projection-soundness properties from Phase 0a for every test protocol.
+- Generated `RoleHooks<...>` records conform to the generic hook family in `Frank.SessionTypes.Core`.
+- Analyzer rules FRANK500–503 (hook completeness) fire correctly on matched and mismatched test cases.
+- Hand-modified generated files are detected by FRANK510 on subsequent build.
+- Generated output round-trips: writing the same CE source produces identical generated files (deterministic generation).
+
+Exit gate: sample protocols generate working actors that pass all projection-soundness tests; all FRANK500–510 analyzer rules have positive and negative fixture coverage.
+
+### Phase 1: Runtime (Weeks 7–10)
 
 Deliverables:
 
-- `IStatechartJournal` with in-memory and file-backed implementations.
-- `IStatechartScheduler` with in-memory and file-backed implementations.
+- `IStatechartJournal` with in-memory and SQLite-per-actor implementations. SQLite implementation includes WAL mode, close-on-idle connection management, and per-actor file provisioning.
+- `IStatechartScheduler` with in-memory, file-backed, and SQLite-backed implementations.
 - `StatechartAgent` with full SCXML algorithm transliteration (§8.1).
+- Per-role `MailboxProcessor` actor runtime wired to `Frank.SessionTypes.Codegen` output.
+- Reference coalgebraic interpreter (the adequacy-check target from AD-10).
 - Crash recovery: agent restart from journal produces identical state.
-- Snapshot/replay: snapshots are validated against journal head.
-- Trace ordering matches SCXML reference.
 
 Conformance suite:
 
 - W3C SCXML 1.0 IRP test subset (compound, parallel, history, internal events, eventless transitions, send/cancel, datamodel — restricted to features Frank supports).
+- **Operational adequacy (AD-10):** for all well-formed protocols in the corpus, the trace produced by the SCXML algorithm is contained in the set of traces the reference interpreter produces (FsCheck).
 - Property: agent state after N events equals replayed state from journal of those N events.
 - Property: snapshot at position P, then N more events, equals fresh agent fed all P+N events.
 - Property: scheduled events fire at the correct time, survive restart.
+- SQLite-specific: memory budget stays within documented bounds (~400 KB per resident actor default, ~200 KB tuned); close-on-idle releases handles correctly; reopening works at expected latency.
 - Soak test: 100,000 events without memory leak; journal grows linearly; snapshot path stays bounded.
 
-Exit gate: all SCXML IRP tests Frank claims to support pass; restart-recovery property holds across all generated event sequences; scheduler tests pass under simulated process kill.
+Exit gate: all SCXML IRP tests Frank claims to support pass; operational adequacy property holds on corpus; restart-recovery property holds across all generated event sequences; SQLite memory budget verified.
 
-### Phase 2: Statecharts.Parsers and Statecharts.Generators (Weeks 7–9)
+### Phase 2: Generators to External Formats (Weeks 10–12)
 
-Deliverables:
+Deliverables — generators only, no parsers. Parsers move to Phase 8 alongside format-driven codegen.
 
-- WSD parser → AST.
-- SCXML parser → AST (full feature subset matching runtime).
-- smcat parser → AST.
-- Generators: SCXML, XState, smcat, mermaid, ALPS — all driven by `IStatechartBuilder` interpreters.
+- Generators from statechart AST to SCXML, smcat, mermaid, ALPS.
+- Generators from session-type AST to Scribble notation, AsyncAPI notation, textual documentation.
+- Generators from SHACL shapes to Turtle, JSON-LD (already partially in `Frank.Validation.Core`; this phase completes).
+- Generators from RDF graphs to Turtle, JSON-LD, N-Triples (via dotNetRdf).
 
 Conformance suite:
 
-- For each parser: parse → AST → generate → parse equals original AST (semantic round-trip).
 - For each generator: output validates against the format’s schema.
-- Cross-tool: SCXML produced by Frank loads in scion and qm-scxml without error.
+- Cross-tool interop: SCXML produced by Frank loads in scion and qm-scxml without error; Scribble output parses in Scribble tooling.
+- Generator determinism: same input produces identical output bytes.
 
-Exit gate: round-trip preservation on all sample files; cross-tool interop verified for SCXML and XState.
+Exit gate: schema validation passes for all generators on the sample corpus; cross-tool interop verified for SCXML and Scribble.
 
-### Phase 3: Statecharts.Multiparty (Weeks 9–11)
-
-Deliverables:
-
-- `RoleParticipation` types and projection algorithm (§10.1).
-- All five well-formedness checks (§10.2).
-- Generators: per-role local SCXML (the projection rendered as a sub-statechart).
-- Documentation: how to express common multi-party patterns.
-
-Conformance suite:
-
-- Property: for any well-formed global protocol, projecting all roles and re-composing produces a statechart bisimilar to the original (within Frank’s bisimulation definition — to be specified during Phase 3).
-- Property: well-formedness checks have no false positives on a curated corpus of known-good protocols.
-- Property: well-formedness checks have no false negatives on a curated corpus of intentionally-broken protocols.
-
-Exit gate: projection algorithm matches the published MPST projection rules on a documented mapping; well-formedness checks have an annotated test corpus.
-
-### Phase 4: Sibling Concerns (Weeks 11–13, parallelizable)
+### Phase 3: Refinement Verification (Weeks 12–14)
 
 Deliverables:
 
-- `Validation.Core`, `Provenance.Core`, `LinkedData.Core` — all to full target schema.
-- `Statecharts.Provenance` — journal → PROV-O derivation. Depends on `Statecharts.Core` (Phase 0) and `Provenance.Core` (this phase). Pure functions; no runtime state.
-- `Frank.Validation`, `Frank.Provenance`, `Frank.LinkedData`, `Frank.Discovery` — middleware integrations. `Frank.Provenance` ships HTTP-level audit only; journal-sourced PROV-O is wired up in Phase 5 via `Statecharts.Provenance`.
+- Microsoft.Z3 integration in `Frank.Analyzers`.
+- Refinement obligation extraction: given a typed AST of a protocol with refined branches, produce the SMT formulas that must be satisfiable for well-formedness.
+- Analyzer rules FRANK300–301 for sender provability and receiver completeness.
+- Unsat-core reporting: when a refinement is rejected, the analyzer surfaces the specific predicates and values that caused rejection.
 
 Conformance suite:
 
-- SHACL validator passes the W3C SHACL test suite (subset for shapes Frank supports).
-- PROV-O serialization round-trips through Apache Jena.
-- LinkedData round-trips Turtle ↔ JSON-LD ↔ N-Triples.
-- `Statecharts.Provenance`: for a curated corpus of journal sequences, `Derivation.derive` produces PROV-O graphs that round-trip through Apache Jena unchanged.
-- `Statecharts.Provenance`: property — `derive(entries[0..k]) ∪ derive(entries[k+1..n]) = derive(entries[0..n])` (append-only derivation).
+- For every protocol in the curated corpus, refinement verification terminates within 30 seconds per protocol.
+- Known-satisfiable refinements are accepted; known-unsatisfiable refinements are rejected with correct unsat-core.
+- The verifier is sound: no protocol with refinements violating sender provability or receiver completeness is accepted.
+- The verifier is complete on Frank’s decidable `Guard` fragment.
 
-Exit gate: each sibling package passes its respective standard’s conformance suite; `Statecharts.Provenance` derivation is pure and append-associative.
+Exit gate: curated corpus passes soundness and completeness checks; Z3 integration reproducible across platforms; unsat-core output human-readable.
 
-### Phase 5: Frank.Statecharts (Weeks 13–16)
+### Phase 4: Remaining Composition Packages (Weeks 14–17, parallelizable)
 
-Deliverables:
+Deliverables — the six composition packages not shipped in Phase 0b:
 
-- `StatefulResourceBinding` (predicate-keyed).
-- `StatefulResourceBuilder` CE.
-- `useStatecharts`, `useRoleProjection`, `useAffordances` middleware.
-- Persistent journal/scheduler implementations using ASP.NET Core hosted services.
-- Wiring: when `ProvenanceOptions` is present, `Frank.Statecharts` invokes `Statecharts.Provenance.Derivation.deriveAndAppend` after each successful `Fire`, injecting the human agent from `AgentExtractor`.
-- Full integration: derived projections feed Link headers; PROV-O is derived from the journal by `Statecharts.Provenance`.
+- `Frank.SessionTypes.Auth` — role-based authorization composing `ClaimsPrincipal` with session-typed role constraints.
+- `Frank.Statecharts.Validation` — SHACL shapes bound to configuration predicates.
+- `Frank.Statecharts.Provenance` — journal-to-PROV-O homomorphism.
+- `Frank.Statecharts.LinkedData` — ALPS affordance derivation from statechart plus role projection.
+- `Frank.Validation.LinkedData` — SHACL shape Link headers and content-negotiated shape serving.
+- `Frank.Provenance.LinkedData` — PROV-O graphs as RDF, content-negotiated provenance serving.
+
+Conformance suite: uniform structural conformance (type extensions registered, integration tests demonstrating joint behavior, analyzer rules fire appropriately) **plus complete concern-specific test suites** (not samples) per composition:
+
+- `Frank.SessionTypes.Auth`: role-authorization matrix coverage across protocols, roles, and claim configurations.
+- `Frank.Statecharts.Validation`: shape-per-predicate binding coverage; state-dependent validation fires for all reachable configurations.
+- `Frank.Statecharts.Provenance`: for every curated journal sequence, derive → round-trip through Apache Jena preserves the graph; `derive(entries[0..k]) ∪ derive(entries[k+1..n]) = derive(entries[0..n])`; derivation respects denotational equivalence (bisimilar journals yield isomorphic PROV-O graphs).
+- `Frank.Statecharts.LinkedData`: ALPS affordances match the role projection for all role × configuration combinations.
+- `Frank.Validation.LinkedData`: shape discovery endpoint returns correct Turtle/JSON-LD; Link headers point to correct shapes for all advertised resources.
+- `Frank.Provenance.LinkedData`: PROV-O content negotiation returns correctly-formatted RDF for all requested media types.
+
+Exit gate: all six packages meet structural conformance and have their complete concern-specific test suites passing.
+
+### Phase 5: HTTP Integration (Weeks 17–20)
+
+Deliverables — the HTTP integration packages that extend `ResourceBuilder` and `WebHostBuilder`:
+
+- `Frank.SessionTypes`: `roleHandlers { }` CE, `role` operation, `useSessionTypes` with role-extractor registration.
+- `Frank.Statecharts`: `statechart { }` and `stateful { }` CEs, `stateful` operation, `useStatecharts`/`useRoleProjection`/`useAffordances` middleware.
+- `Frank.Validation`: `shapes { }` CE, `validate`/`validateWhenIn` operations, `useValidation` middleware.
+- `Frank.Provenance`: `provenance { }` CE, `track`/`provenance` operations, `useProvenance` middleware.
+- `Frank.LinkedData`: `graph { }` CE, `representation`/`graph` operations, `useLinkedData` middleware.
+- `Frank.Discovery`: updates as needed for the new concerns (existing package, not a rewrite).
+- Persistent journal/scheduler wiring for ASP.NET Core hosted services.
 
 Conformance suite:
 
-- Order workflow sample: end-to-end test demonstrates each role sees only their projected affordances.
-- TicTacToe sample: multi-party game with derived role projections.
+- Order workflow sample: end-to-end test demonstrates each role sees only their projected affordances; CE authoring path produces the expected runtime behavior.
+- TicTacToe sample: multi-party game with derived role projections and the user-implemented `RoleExtractor` pattern.
 - Provenance sample: PROV-O graph derived from journal matches hand-constructed expected graph.
-- Property: across all role × configuration combinations, projected view affordances are exactly the intersection of (binding affordances satisfying predicate) and (role’s triggerable transitions).
-- Property: the PROV-O graph produced by running an agent end-to-end equals the graph produced by replaying the final journal through `Statecharts.Provenance.Derivation.replay`.
+- Property: across all role × configuration combinations on samples, projected view affordances are exactly the intersection of (binding affordances satisfying predicate) and (role’s triggerable transitions).
+- Property: live-run PROV-O equals replay-derived PROV-O (`Frank.Statecharts.Provenance.Derivation.replay` over the final journal).
+- End-to-end CE authoring path is exercised by at least three sample applications covering different profile combinations (§5.4).
 
-Exit gate: three samples pass full integration tests; projection consistency property holds; live-vs-replay provenance equivalence holds.
+Exit gate: three samples pass full integration tests; projection consistency holds; live-vs-replay provenance equivalence holds; CE authoring path produces working applications across adoption profiles.
 
-### Phase 6: Frank.Statecharts.Analyzers (Weeks 16–18)
+### Phase 6: Analyzer Completion (Weeks 20–22)
 
-Deliverables:
+Deliverables — `Frank.Analyzers` with complete rule coverage across all six categories from AD-11:
 
-|Rule    |Detects                                                   |
-|--------|----------------------------------------------------------|
-|FRANK101|Duplicate handler for the same predicate                  |
-|FRANK102|State has no handler for any reachable configuration      |
-|FRANK103|Affordance references unknown TransitionId                |
-|FRANK104|Transition target is undefined                            |
-|FRANK105|Two predicates overlap with conflicting affordances       |
-|FRANK106|Predicate references a state that doesn’t exist           |
-|FRANK107|Compound state missing required Initial                   |
-|FRANK108|Final state has children                                  |
-|FRANK201|Unreachable state                                         |
-|FRANK202|Deadlock-reachable configuration                          |
-|FRANK203|Livelock detected (eventless transition cycle)            |
-|FRANK204|Unreachable transition (source set never co-active)       |
-|FRANK205|Predicate is unsatisfiable for any reachable configuration|
-|FRANK206|Guard is unsatisfiable                                    |
-|FRANK207|Variable used in guard but never assigned                 |
-|FRANK208|Scheduled event with no canceller; potentially leaks      |
-|FRANK210|Manual RoleOverride conflicts with derived projection     |
-|FRANK211|Role has no triggerable transitions (orphan)              |
-|FRANK212|Configuration with no triggerable transition for any role |
+- FRANK001–099: conventions (existing rules preserved).
+- FRANK100–199: structural (duplicate handlers, missing handler coverage, unresolved transition references, etc.).
+- FRANK200–299: semantic (reachability, deadlock, predicate satisfiability, role completeness, hierarchical role consistency).
+- FRANK300–399: refinement (already integrated in Phase 3).
+- FRANK400–499: composition (operation-name collisions, missing prerequisites, builder-output mismatches, missing extractor registration).
+- FRANK500–599: codegen (hook completeness already integrated in Phase 0c; generated-file hand-modification detection).
 
 Conformance suite:
 
-- For each rule: positive cases (intentionally violating) and negative cases (intentionally clean) in test fixtures.
-- No false positives on the order, TicTacToe, and provenance samples.
+- Per-rule positive and negative test fixtures.
+- All rules fire with actionable messages on negative fixtures.
+- No rule fires on positive fixtures.
+- Analyzer performance: analyzing a 500-transition protocol completes in under 5 seconds; analyzing a 50-rule session-typed protocol with refinements completes in under 30 seconds.
 
-Exit gate: all rules pass positive/negative tests; samples produce zero analyzer warnings.
+Exit gate: per-rule fixtures cover all documented detection cases; analyzer runs in IDE and in CI with equivalent results.
 
-### Phase 7: Documentation and Samples (Weeks 18–20)
+### Phase 7: Documentation and Samples (Weeks 22–24)
 
-- Order Workflow sample (multi-party, derived projections, provenance from journal).
-- TicTacToe sample (capability-envelope hierarchy, multi-party).
-- API Documentation sample (ALPS, LinkedData content negotiation).
-- Conformance report: which SCXML features Frank supports, which it intentionally omits, and where it deviates.
+Deliverables:
 
-Exit gate: documentation review by an external reader (someone who has not been part of the design process) yields a working sample within an hour.
+- Order Workflow sample (multi-party session types, derived projections, journal-based provenance).
+- TicTacToe sample (hierarchical role scoping, actor-backed role tracking in user code).
+- API Documentation sample (ALPS, LinkedData content negotiation, SHACL shape serving).
+- Session-typed service sample (session types authored directly in `protocol { }` CE without statechart presentation).
+- Representation cookbook (short examples of handlers producing Oxpecker views, raw HTML, JSON, ASP.NET Core `IResult`, Datastar SSE — all using the `HttpContext`-exposed Frank context).
+- Conformance report documenting which SCXML features Frank supports, which it intentionally omits, and where it deviates from the SCXML algorithm in favor of denotational correctness.
+
+Exit gate: documentation review by an external reader (someone who has not been part of the design process) yields a working sample within an hour; the five adoption profiles in §5.4 each have a working sample.
+
+### Phase 8: External Formats and Format-Driven Codegen (v2, scope finalized post-v1)
+
+Format-driven codegen per AD-12, using the FSharp.GrpcCodeGenerator / FsGrpc.Tools MSBuild-integration template referenced in issue #285. Scope finalized after v1 ships based on CE-driven codegen experience and user demand.
+
+Formats in view (full list recorded for future reference; final v2 scope may be smaller):
+
+- **Statecharts:** WSD parser (one of the original formats inspiring the hypermedia-program direction per Amundsen’s work, where the idea of parsing structured workflow specifications into executable code originated), SCXML parser, smcat parser, mermaid stateDiagram-v2 parser, PlantUML state diagram parser, XState JSON parser. Each parses to `StatechartDocument` AST; codegen produces the same F# artifacts as `Frank.Statecharts.Codegen` from Phase 0c.
+- **Session types:** Scribble parser, AsyncAPI parser. Each parses to `GlobalType`; codegen produces `Frank.SessionTypes.Codegen`-equivalent artifacts.
+- **Validation:** SHACL file parser (Turtle, JSON-LD, N-Triples serializations), JSON Schema parser. Codegen produces F# record types matching shape structure (the shape → type direction deferred from v1).
+- **Linked data:** RDF graph parsers for Turtle, JSON-LD, N-Triples data files (as distinct from the shape-file imports above).
+- **Provenance:** PROV-O Turtle/JSON-LD parsers for importing external provenance records.
+- **Hypermedia:** ALPS YAML/XML/JSON parsers for importing existing ALPS profiles.
+- **OpenAPI:** OpenAPI YAML/JSON parser, for the deferred `Frank.Validation.OpenApi` composition if that path is pursued.
+
+Out-of-scope confirmation: no Datastar codegen (out-of-scope per AD-13); no OpenAPI-from-statechart codegen (out-of-scope per AD-13).
+
+No conformance criteria at this phase; v2 scope is finalized when v1 demonstrates which formats are most needed by users and which CE patterns have stabilized enough to serve as the canonical F# target.
 
 ### Calendar Reality
 
-Twenty weeks of focused work. Given competing priorities on Frank’s other v7.3.0 work (semantic resources, spec pipeline) and day-job context, an honest elapsed-time estimate is **8–12 months**. The phase boundaries are firm; the calendar between them is flexible.
+Twenty-four weeks of focused work (Phases 0a through 7). Given competing priorities on Frank’s other v7.3.0 work (semantic resources, spec pipeline) and day-job context, an honest elapsed-time estimate is **10–14 months**. The phase boundaries are firm; the calendar between them is flexible.
 
-The key discipline this plan enforces: no layer is started until the layer beneath it has passed its conformance gate. This is the trade-off for depth-first: slower arrival at visible HTTP behavior, but that behavior, when it arrives, rests on a foundation that doesn’t require revision.
+The key discipline this plan enforces: no layer is started until the layer beneath it has passed its conformance gate. The trade-off for depth-first: slower arrival at visible HTTP behavior, but that behavior, when it arrives, rests on a foundation that doesn’t require revision. The denotational layering means that when HTTP integration lands in Phase 5, the protocols it runs are well-formed, refinement-verified, projection-sound, and derived from CE authoring that the developer can trust — none of which can be bolted on later without rework.
 
 -----
 
@@ -2254,27 +2708,27 @@ Each layer has a published conformance suite. The suite is the architecture’s 
 
 ### 12.1 Test Suites by Layer
 
-|Layer                      |Test suite                                                                     |
-|---------------------------|-------------------------------------------------------------------------------|
-|Statecharts.Core           |FsCheck properties on AST round-trip, predicate evaluation, guard evaluation   |
-|Statecharts.Runtime        |W3C SCXML IRP subset; restart-recovery property; scheduler under simulated kill|
-|Statecharts.Parsers        |Round-trip on sample corpora; cross-tool load tests                            |
-|Statecharts.Generators     |Schema validation; cross-tool load tests                                       |
-|Statecharts.Multiparty     |MPST projection rule conformance; well-formedness check corpus                 |
-|Validation.Core            |W3C SHACL test suite (Frank-supported shapes)                                  |
-|Provenance.Core            |PROV-O serialization round-trip via Apache Jena                                |
-|Statecharts.Provenance     |Journal → PROV-O derivation purity and append-associativity properties         |
-|LinkedData.Core            |RDF format round-trips                                                         |
-|Frank.Statecharts          |Sample-based integration; projection consistency; live-vs-replay provenance    |
-|Frank.Statecharts.Analyzers|Per-rule positive/negative fixtures                                            |
+|Layer                       |Test suite                                                                     |
+|----------------------------|-------------------------------------------------------------------------------|
+|Frank.Statecharts.Core      |FsCheck properties on AST round-trip, predicate evaluation, guard evaluation   |
+|Frank.Statecharts.Runtime   |W3C SCXML IRP subset; restart-recovery property; scheduler under simulated kill|
+|Frank.Statecharts.Parsers   |Round-trip on sample corpora; cross-tool load tests                            |
+|Frank.Statecharts.Generators|Schema validation; cross-tool load tests                                       |
+|Frank.Statecharts.Multiparty|MPST projection rule conformance; well-formedness check corpus                 |
+|Frank.Validation.Core       |W3C SHACL test suite (Frank-supported shapes)                                  |
+|Frank.Provenance.Core       |PROV-O serialization round-trip via Apache Jena                                |
+|Frank.Statecharts.Provenance|Journal → PROV-O derivation purity and append-associativity properties         |
+|Frank.LinkedData.Core       |RDF format round-trips                                                         |
+|Frank.Statecharts           |Sample-based integration; projection consistency; live-vs-replay provenance    |
+|Frank.Statecharts.Analyzers |Per-rule positive/negative fixtures                                            |
 
 ### 12.2 Falsifiable Acceptance Criteria
 
 Every deliverable has a falsifiable acceptance criterion. Examples:
 
-- **Statecharts.Runtime AC-1:** Given any sequence of N events fired against a fresh agent, then snapshotting at position k and replaying events k+1..N from the journal produces identical `AgentState`. Falsifiable by any divergence.
-- **Statecharts.Multiparty AC-1:** Given a global protocol with N roles, projecting each role and re-composing as parallel regions produces a statechart bisimilar to the original. Falsifiable by any role × configuration where the projection cannot reproduce an enabled transition of the original.
-- **Statecharts.Provenance AC-1:** For any split point k in a journal of length N, `derive(entries[0..k]) ∪ derive(entries[k+1..N]) ≡ derive(entries[0..N])` as RDF graphs. Falsifiable by any structural inequivalence.
+- **Frank.Statecharts.Runtime AC-1:** Given any sequence of N events fired against a fresh agent, then snapshotting at position k and replaying events k+1..N from the journal produces identical `AgentState`. Falsifiable by any divergence.
+- **Frank.Statecharts.Multiparty AC-1:** Given a global protocol with N roles, projecting each role and re-composing as parallel regions produces a statechart bisimilar to the original. Falsifiable by any role × configuration where the projection cannot reproduce an enabled transition of the original.
+- **Frank.Statecharts.Provenance AC-1:** For any split point k in a journal of length N, `derive(entries[0..k]) ∪ derive(entries[k+1..N]) ≡ derive(entries[0..N])` as RDF graphs. Falsifiable by any structural inequivalence.
 - **Frank.Statecharts AC-1:** For all role × configuration combinations on the order workflow sample, the set of affordances in `ProjectedView.Affordances` equals the set computed by manually intersecting binding predicates with role triggerable transitions. Falsifiable by any divergence.
 - **Frank.Statecharts AC-2:** For any completed workflow run, the PROV-O graph accumulated through live `deriveAndAppend` calls equals the graph produced by `Derivation.replay` over the final journal. Falsifiable by any graph-isomorphism failure.
 
@@ -2337,20 +2791,20 @@ The full criteria list lives in each phase’s GitHub milestone.
 
 ### Appendix B: Decision Log
 
-|Date   |Decision                              |Rationale                                                                   |
-|-------|--------------------------------------|----------------------------------------------------------------------------|
-|2026-04|Separate types per concern            |Orthogonal concerns, independent utility                                    |
-|2026-04|Three algebras with disjoint carriers |Single algebra conflated structure/behavior/queries                         |
-|2026-04|Journal-sourced runtime               |Durability, provenance derivation, snapshot consistency                     |
-|2026-04|AST + algebra bridge per algebra      |Parsing produces AST; interpretation uses algebra                           |
-|2026-04|Predicate-keyed bindings              |Single-state keys silently dropped parallel-region cases                    |
-|2026-04|Derived role projections              |Hand-authored projections were unsound and didn’t scale                     |
-|2026-04|Independent statecharts package       |Reusability outside HTTP contexts                                           |
-|2026-04|Closed guard language                 |Open-string guards required embedded evaluator                              |
-|2026-04|Scheduled events first-class          |Half of HTTP workflows have timeouts; can’t defer                           |
-|2026-04|Macrostep matches SCXML exactly       |Almost-SCXML is worse than either SCXML or explicit divergence              |
-|2026-04|Statecharts.Provenance as seam package|Keeps Frank.Provenance statechart-unaware; journal → PROV-O reusable offline|
-|2026-04|Depth-first build plan                |Breadth-first accumulates inherited constraints across layers               |
+|Date   |Decision                                    |Rationale                                                                   |
+|-------|--------------------------------------------|----------------------------------------------------------------------------|
+|2026-04|Separate types per concern                  |Orthogonal concerns, independent utility                                    |
+|2026-04|Three algebras with disjoint carriers       |Single algebra conflated structure/behavior/queries                         |
+|2026-04|Journal-sourced runtime                     |Durability, provenance derivation, snapshot consistency                     |
+|2026-04|AST + algebra bridge per algebra            |Parsing produces AST; interpretation uses algebra                           |
+|2026-04|Predicate-keyed bindings                    |Single-state keys silently dropped parallel-region cases                    |
+|2026-04|Derived role projections                    |Hand-authored projections were unsound and didn’t scale                     |
+|2026-04|Independent statecharts package             |Reusability outside HTTP contexts                                           |
+|2026-04|Closed guard language                       |Open-string guards required embedded evaluator                              |
+|2026-04|Scheduled events first-class                |Half of HTTP workflows have timeouts; can’t defer                           |
+|2026-04|Macrostep matches SCXML exactly             |Almost-SCXML is worse than either SCXML or explicit divergence              |
+|2026-04|Frank.Statecharts.Provenance as seam package|Keeps Frank.Provenance statechart-unaware; journal → PROV-O reusable offline|
+|2026-04|Depth-first build plan                      |Breadth-first accumulates inherited constraints across layers               |
 
 ### Appendix C: Open Questions
 
