@@ -4,6 +4,23 @@ How well can agents (LLM-based and rule-based) correctly use a Frank application
 
 This assessment uses Tic-Tac-Toe as the reference scenario. "Success" means the agent discovers the API, plays only legal moves, respects turn-taking, and recognizes game-over — all without prior knowledge of the API beyond an entry-point URL.
 
+## Two agent roles: runtime and authoring
+
+This document's probability tables and demos concern the **runtime agent** — an LLM or rule-based client that consumes a running Frank application, reads its discovery surface, and drives it to correct completion. That is the load-bearing empirical claim the thesis has to defend, and its confidence level is the one the Five-Level Demo measures.
+
+The same LLM capabilities show up in a second role during development: the **authoring agent** works alongside the developer, reads design-time artifacts (vocabulary CE declarations, sketches in mermaid or smcat, generated ALPS/SHACL/PROV-O), and produces proposed mappings, lifts, and refinements that land in committed lock files after human review. The two roles share the same underlying capabilities but answer to different bars:
+
+| Concern | Runtime agent | Authoring agent |
+| --- | --- | --- |
+| Correctness gate | Probabilistic; measured in the Five-Level Demo | Human-reviewed before any artifact is committed |
+| Failure mode | Illegal action, stuck state, abandoned session | Proposed mapping the developer rejects |
+| Determinism | Must hold across sessions and model versions | Not required — output is reviewed once and locked |
+| Load-bearing artifact | The server's discovery surface | The committed lock file |
+
+Separating the roles matters because critics who push back on the runtime probability numbers are pushing on the harder of the two claims. The authoring-time value is defensible independent of how well runtime agents navigate a live API: a developer using Frank's CLI to iterate on a design, with LLM assistance at authoring time and deterministic codegen at build time, gets correctness guarantees that do not depend on any runtime inference by an agent. The runtime demos establish the ceiling; the authoring workflow establishes the floor. Both matter, but conflating them makes the argument weaker than it needs to be.
+
+The feedback loop sketched in `AUTHORING_WORKFLOW.md` operates entirely in the authoring-agent role: the LLM reads generated artifacts, exercises the running app through dry runs, inspects journal traces, and proposes refinements to the source sketch or rigorous format. Whether a runtime agent in production hits 80% or 40% on the Five-Level Demo, the authoring loop delivers value by closing the gap between the author's intent and the generated system's behavior, with human review at every commit point.
+
 ## Probability Assessment
 
 | # | Features Available | LLM Agent | Rule-Based Agent | Notes |
@@ -209,7 +226,9 @@ The strongest demonstration shows the **same agent, same game, with progressivel
 
 Example system prompt for Level 3:
 
-> "You are an HTTP client. Start at the root URL. Read response headers — follow `Link` relations, respect `Allow` methods, fetch `rel="profile"` for semantics. Never guess URLs."
+> "You are an HTTP client. Start at the root URL. Read response headers — follow `Link` relations, respect `Allow` methods, fetch `rel="profile"` for semantics. Never guess URLs.
+
+Every level above Level 0 is simultaneously a runtime success rate and an authoring-time diagnostic channel. If an LLM at Level 1 can read `<link rel="profile">` in the HTML to drive the game, it can read the same HTML during authoring to tell the developer what a runtime agent would see. The Five Levels are not just a gradient of runtime capability; they are a gradient of how richly the authoring agent can inspect and critique the generated system. A Level 0 app offers the authoring loop nothing to work with; a Level 2 app lets the authoring agent explain what the reference client will and will not find. The runtime bet and the authoring loop are served by the same investment.
 
 ### HTML as the Discovery On-Ramp
 
