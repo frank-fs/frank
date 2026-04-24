@@ -2,7 +2,7 @@
 
 How a Frank application gets built end-to-end, in the target state the v7.3.2 / v7.4.0 / Track C work is reaching toward.
 
-This document describes the developer-facing loop rather than the architecture underneath it. For the architecture, see the [protocol-types ADR](./frank-protocol-types-adr.md) (algebra, projection, codegen, verification) and the [v7.3.2 semantic-discovery spec](./superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) (vocabulary, lock file, MSBuild codegen). For the thesis the workflow is designed to prove, see [AGENT_HYPOTHESIS.md](./AGENT_HYPOTHESIS.md).
+This document describes the developer-facing loop rather than the architecture underneath it. For the architecture, see the [protocol-types ADR](./superpowers/specs/2026-04-21-v740-protocol-types-design.md) (algebra, projection, codegen, verification) and the [v7.3.2 semantic-discovery spec](./superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) (vocabulary, lock file, MSBuild codegen). For the thesis the workflow is designed to prove, see [AGENT_HYPOTHESIS.md](./AGENT_HYPOTHESIS.md).
 
 -----
 
