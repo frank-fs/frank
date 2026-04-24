@@ -306,6 +306,10 @@ Read/write `.frank/semantic-mappings.lock.json`. Schema in Section 3.
 
 LLM writes a resolved JSON file in the lock file entry shape. `frank semantic accept --input resolved.json` merges it in.
 
+The JSON output is a first-class interface, not a convenience format. It is the protocol between the authoring LLM and the developer's CLI session, and it is the contract the LLM's prompt discipline is written against. Schema discipline applies: the top-level shape (`unresolved`, `proposed`, and the nested `candidates` / `fields` / `alternates` fields) is versioned; changes are additive-only within a major version; breaking changes require a major-version bump and a migration note for any LLM prompt templates that consume it. The schema version is carried as a top-level `"schemaVersion"` field in every emission. A schema version the LLM's prompt template does not recognize produces a clean failure with remediation guidance rather than a silent misinterpretation.
+
+The same discipline applies to `resolved.json` on the inbound side: `accept` validates the schema version and the structural shape before merging, failing closed on mismatches.
+
 ---
 
 ## Section 3: Lock file format
