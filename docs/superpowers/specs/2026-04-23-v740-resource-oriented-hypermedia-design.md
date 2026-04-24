@@ -1,4 +1,4 @@
-# Track C — Resource-Oriented Hypermedia with Role Projections
+# Resource-Oriented Hypermedia with Role Projections
 
 **Date:** 2026-04-23
 **Status:** Design proposed, awaiting review. Implementation begins after Track A (v7.4.0) lands.
