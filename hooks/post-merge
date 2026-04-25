@@ -1,0 +1,40 @@
+#!/bin/sh
+# Git post-merge hook: verify Frank.sln still builds after a merge into master/main.
+# Loud advisory only — does not auto-revert. Suggests `git reset --hard ORIG_HEAD` on failure.
+# Setup: git config core.hooksPath hooks
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$branch" in
+    master|main) ;;
+    *) exit 0 ;;
+esac
+
+# Skip if no F# / project / solution files changed in the merge.
+changed=$(git diff --name-only ORIG_HEAD..HEAD 2>/dev/null \
+    | grep -E '\.(fs|fsi|fsproj|fsx)$|Frank\.sln|Directory\.Build\.props' || true)
+if [ -z "$changed" ]; then
+    exit 0
+fi
+
+# Drop --no-restore if .fsproj or solution changed (restore graph may be stale).
+restore_flag="--no-restore"
+if echo "$changed" | grep -q '\.fsproj$\|Frank\.sln'; then
+    restore_flag=""
+fi
+
+echo "[post-merge] Building Frank.sln to verify merge..."
+if DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build Frank.sln $restore_flag --nologo -v q; then
+    echo "[post-merge] Build OK."
+    exit 0
+fi
+
+cat >&2 <<'EOF'
+
+================================================================
+  POST-MERGE BUILD FAILED — local master is broken.
+  Undo the merge with:
+    git reset --hard ORIG_HEAD
+  Or fix forward and amend before pushing.
+================================================================
+EOF
+exit 0
