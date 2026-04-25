@@ -56,6 +56,8 @@ EOF
     fi
 done
 
-# Existing Entire CLI integration.
-entire hooks git pre-push "$remote_name" || true
+# Existing Entire CLI integration. Skip silently on machines without Entire installed.
+if command -v entire >/dev/null 2>&1; then
+    entire hooks git pre-push "$remote_name" || true
+fi
 exit 0
