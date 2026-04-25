@@ -44,13 +44,13 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 
 ## Packages
 
-| Package | Description | NuGet |
-|---------|-------------|-------|
-| **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0) |
-| **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Auth/7.2.0) |
-| **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.OpenApi/7.2.0) |
-| **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Datastar/7.2.0) |
-| **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Analyzers/7.2.0) |
+| Package             | Description                                             | NuGet                                                                                                            |
+| ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Frank**           | Core computation expressions for WebHost and routing    | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0)           |
+| **Frank.Auth**      | Resource-level authorization extensions                 | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Auth/7.2.0)      |
+| **Frank.OpenApi**   | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.OpenApi/7.2.0)   |
+| **Frank.Datastar**  | Datastar SSE integration for reactive hypermedia        | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Datastar/7.2.0)  |
+| **Frank.Analyzers** | F# Analyzers for compile-time error detection           | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Analyzers/7.2.0) |
 
 ### Package Dependency Graph
 
@@ -64,7 +64,7 @@ Frank (core)
 │
 ├── Frank.Datastar ────────────── Frank
 │
-└── Frank.Analyzers ──────────── (Roslyn analyzer, no runtime dependency)
+└── Frank.Analyzers ──────────── (FSharp.Analyzers.SDK analyzer, no runtime dependency)
 ```
 
 ---
@@ -288,15 +288,15 @@ let main args =
 
 ### Authorization Patterns
 
-| Pattern | Operation | Behavior |
-|---------|-----------|----------|
-| Authenticated user | `requireAuth` | 401 if unauthenticated, 200 if authenticated |
-| Claim (single value) | `requireClaim "type" "value"` | 403 if claim missing or wrong value |
-| Claim (multiple values) | `requireClaim "type" ["a"; "b"]` | 200 if user has any listed value (OR) |
-| Role | `requireRole "Admin"` | 403 if user not in role |
-| Named policy | `requirePolicy "PolicyName"` | Delegates to registered policy |
-| Multiple requirements | Stack multiple `require*` | AND semantics — all must pass |
-| No requirements | (default) | Publicly accessible, zero overhead |
+| Pattern                 | Operation                        | Behavior                                     |
+| ----------------------- | -------------------------------- | -------------------------------------------- |
+| Authenticated user      | `requireAuth`                    | 401 if unauthenticated, 200 if authenticated |
+| Claim (single value)    | `requireClaim "type" "value"`    | 403 if claim missing or wrong value          |
+| Claim (multiple values) | `requireClaim "type" ["a"; "b"]` | 200 if user has any listed value (OR)        |
+| Role                    | `requireRole "Admin"`            | 403 if user not in role                      |
+| Named policy            | `requirePolicy "PolicyName"`     | Delegates to registered policy               |
+| Multiple requirements   | Stack multiple `require*`        | AND semantics — all must pass                |
+| No requirements         | (default)                        | Publicly accessible, zero overhead           |
 
 ---
 
@@ -346,18 +346,18 @@ let productsResource =
 
 ### HandlerBuilder Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `name "operationId"` | Sets the OpenAPI operationId |
-| `summary "text"` | Brief summary of the operation |
-| `description "text"` | Detailed description |
-| `tags [ "Tag1"; "Tag2" ]` | Categorize endpoints |
-| `produces typeof<T> statusCode` | Define response type and status code |
-| `produces typeof<T> statusCode ["content/type"]` | Response with content negotiation |
-| `producesEmpty statusCode` | Empty responses (204, 404, etc.) |
-| `accepts typeof<T>` | Define request body type |
-| `accepts typeof<T> ["content/type"]` | Request with content negotiation |
-| `handle (fun ctx -> ...)` | Handler function (supports Task, Task<'a>, Async<unit>, Async<'a>) |
+| Operation                                        | Description                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------ |
+| `name "operationId"`                             | Sets the OpenAPI operationId                                       |
+| `summary "text"`                                 | Brief summary of the operation                                     |
+| `description "text"`                             | Detailed description                                               |
+| `tags [ "Tag1"; "Tag2" ]`                        | Categorize endpoints                                               |
+| `produces typeof<T> statusCode`                  | Define response type and status code                               |
+| `produces typeof<T> statusCode ["content/type"]` | Response with content negotiation                                  |
+| `producesEmpty statusCode`                       | Empty responses (204, 404, etc.)                                   |
+| `accepts typeof<T>`                              | Define request body type                                           |
+| `accepts typeof<T> ["content/type"]`             | Request with content negotiation                                   |
+| `handle (fun ctx -> ...)`                        | Handler function (supports Task, Task<'a>, Async<unit>, Async<'a>) |
 
 ### F# Type Schema Generation
 
@@ -418,6 +418,7 @@ handler {
 ### Backward Compatibility
 
 Frank.OpenApi is fully backward compatible with existing Frank applications. You can:
+
 - Mix `HandlerDefinition` and plain `RequestDelegate` handlers in the same resource
 - Add OpenAPI metadata incrementally without changing existing code
 - Use the library only where you need API documentation
@@ -510,6 +511,7 @@ resource "/example" {
 ### IDE Integration
 
 Frank.Analyzers works with:
+
 - **Ionide** (VS Code)
 - **Visual Studio** with F# support
 - **JetBrains Rider**
@@ -549,16 +551,16 @@ git diff --cached --name-only --diff-filter=ACM | grep '\.fs$' | xargs dotnet fa
 
 The `sample/` directory contains several example applications:
 
-| Sample | Description |
-|--------|-------------|
-| `Sample` | Basic Frank application |
-| `Frank.OpenApi.Sample` | Product Catalog API demonstrating OpenAPI document generation |
-| `Frank.Datastar.Basic` | Datastar integration with minimal HTML |
-| `Frank.Datastar.Hox` | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine |
+| Sample                    | Description                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `Sample`                  | Basic Frank application                                                                         |
+| `Frank.OpenApi.Sample`    | Product Catalog API demonstrating OpenAPI document generation                                   |
+| `Frank.Datastar.Basic`    | Datastar integration with minimal HTML                                                          |
+| `Frank.Datastar.Hox`      | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine                              |
 | `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
-| `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
-| `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
-| `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
+| `Frank.Falco`             | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup)                          |
+| `Frank.Giraffe`           | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine)           |
+| `Frank.Oxpecker`          | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/)    |
 
 ---
 
