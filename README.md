@@ -10,7 +10,7 @@ Frank is built on four ideas:
 
 **Resources, not routes.** HTTP resources are the unit of design. You define what a resource is and what it can do — the framework handles routing, method dispatch, and metadata. This is REST as Fielding described it, not the "REST" that became a synonym for JSON-over-HTTP.
 
-**Make invalid states impossible.** Statechart-enforced state machines govern resource behavior at the framework level. If a transition isn't legal, it isn't available — in the response headers, in the HTML controls, in the API surface. No defensive coding required.
+**Make invalid states unrepresentable.** Statechart-enforced state machines govern resource behavior at the framework level. If a transition isn't legal, it isn't available — in the response headers, in the HTML controls, in the API surface. No defensive coding required.
 
 **Built for the age of agents.** Frank provides CLI tooling and extension libraries that layer semantic metadata onto your application — ALPS profiles, Link headers, JSON Home documents, OWL ontologies. Developers and agents can reflect on a running application, understand its capabilities, and refine it continuously.
 
