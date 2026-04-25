@@ -1,6 +1,6 @@
 # Frank
 
-[![NuGet Version](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/)
+[![NuGet Version](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0)
 ![GitHub Release Date](https://img.shields.io/github/release-date/frank-fs/frank)
 ![Build status](https://github.com/frank-fs/frank/workflows/CI/badge.svg)
 
@@ -36,40 +36,6 @@ let main args =
 
 ---
 
-## What This Looks Like in Practice
-
-When you combine statecharts, affordances, and discovery, a Frank application tells clients exactly what's possible at every point in a protocol. Here's a TicTacToe game wired with affordance middleware:
-
-```fsharp
-webHost args {
-    useDefaults
-    plug resolveStateKey           // 1. Resolve current state from store
-    useAffordances gameAffordanceMap  // 2. Inject Link + Allow headers per state
-    useStatecharts                 // 3. Dispatch to state-specific handlers
-
-    resource gameResource          // GET /games/{gameId}, POST /games/{gameId}
-    resource sseResource           // GET /games/{gameId}/sse (Datastar SSE)
-}
-```
-
-When an agent hits `/games/42` during X's turn, it gets back:
-```
-Allow: GET, POST
-Link: </games/42>; rel="self", </games/42>; rel="makeMove"; method="POST"
-Link: </alps/games>; rel="profile"
-```
-
-When the game is won, the response changes:
-```
-Allow: GET
-Link: </games/42>; rel="self"
-Link: </alps/games>; rel="profile"
-```
-
-No special client library. No out-of-band documentation. The API tells you what's possible right now, and the framework guarantees the response is correct.
-
----
-
 ## Getting Started
 
 Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (without MVC)](https://www.strathweb.com/2017/01/building-microservices-with-asp-net-core-without-mvc/).
@@ -80,19 +46,11 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 
 | Package | Description | NuGet |
 |---------|-------------|-------|
-| **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/) |
-| **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
-| **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/nuget/v/Frank.OpenApi)](https://www.nuget.org/packages/Frank.OpenApi/) |
-| **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
-| **Frank.LinkedData** | Semantic RDF/Linked Data content negotiation middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.LinkedData)](https://www.nuget.org/packages/Frank.LinkedData/) |
-| **Frank.Cli.MSBuild** | MSBuild integration for auto-embedding semantic artifacts | [![NuGet](https://img.shields.io/nuget/v/Frank.Cli.MSBuild)](https://www.nuget.org/packages/Frank.Cli.MSBuild/) |
-| **Frank.Resources.Model** | Pure resource model types: type analysis, capabilities, affordances, and runtime projections (zero dependencies) | [![NuGet](https://img.shields.io/nuget/v/Frank.Resources.Model)](https://www.nuget.org/packages/Frank.Resources.Model/) |
-| **Frank.Statecharts.Core** | Shared statechart AST types for format parsers and generators (zero dependencies) | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts.Core)](https://www.nuget.org/packages/Frank.Statecharts.Core/) |
-| **Frank.Statecharts** | Stateful resources with state machines, guards, affordance middleware (Link + Allow headers), multi-format parsers/generators (WSD, ALPS, SCXML, smcat, XState), and cross-format validation | [![NuGet](https://img.shields.io/nuget/v/Frank.Statecharts)](https://www.nuget.org/packages/Frank.Statecharts/) |
-| **Frank.Discovery** | OPTIONS-based link discovery and Link header middleware | [![NuGet](https://img.shields.io/nuget/v/Frank.Discovery)](https://www.nuget.org/packages/Frank.Discovery/) |
-| **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
-| **Frank.Validation** | SHACL shape validation derived from F# types | [![NuGet](https://img.shields.io/nuget/v/Frank.Validation)](https://www.nuget.org/packages/Frank.Validation/) |
-| **Frank.Provenance** | PROV-O provenance tracking for resource state changes | [![NuGet](https://img.shields.io/nuget/v/Frank.Provenance)](https://www.nuget.org/packages/Frank.Provenance/) |
+| **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0) |
+| **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Auth/7.2.0) |
+| **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.OpenApi/7.2.0) |
+| **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Datastar/7.2.0) |
+| **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Analyzers/7.2.0) |
 
 ### Package Dependency Graph
 
@@ -100,34 +58,13 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 Frank (core)
 │   ETag / conditional request middleware
 │
-├── Frank.Resources.Model ────── (zero dependencies)
-│   └── Resource types, affordance map, runtime projections
-│
-├── Frank.Auth
-│
-├── Frank.LinkedData ──────────── Frank
+├── Frank.Auth ────────────────── Frank
 │
 ├── Frank.OpenApi ─────────────── Frank
 │
 ├── Frank.Datastar ────────────── Frank
 │
-├── Frank.Statecharts.Core ────── (zero dependencies)
-│   └── Shared statechart AST (StatechartDocument, StateNode, TransitionEdge, Annotation, ParseResult)
-│
-├── Frank.Statecharts ─────────── Frank + Frank.Resources.Model + Frank.Statecharts.Core
-│   └── WSD, ALPS, SCXML, smcat, XState parsers/generators
-│   └── Cross-format validation pipeline
-│   └── Affordance middleware (Link + Allow headers per state)
-│   └── Profile discovery (/.well-known/frank-profiles, ALPS/OWL/SHACL/JSON Schema endpoints)
-│
-├── Frank.Discovery ───────────── Frank
-│   └── HTTP-level discovery: OPTIONS/Allow headers, RFC 8288 Link headers
-│
-├── Frank.Validation ──────────── Frank.LinkedData + Frank.Auth
-│
-├── Frank.Provenance ──────────── Frank.LinkedData + Frank.Statecharts
-│
-└── Frank.Sparql (planned) ────── Frank.LinkedData + Frank.Provenance
+└── Frank.Analyzers ──────────── (Roslyn analyzer, no runtime dependency)
 ```
 
 ---
@@ -487,85 +424,6 @@ Frank.OpenApi is fully backward compatible with existing Frank applications. You
 
 ---
 
-## Frank.LinkedData
-
-Frank.LinkedData provides automatic RDF content negotiation for Frank applications. Endpoints marked with `linkedData` can serve JSON-LD, Turtle, and RDF/XML representations alongside standard JSON — driven by an OWL ontology extracted from your F# domain types.
-
-### Installation
-
-```bash
-dotnet add package Frank.LinkedData
-dotnet add package Frank.Cli.MSBuild
-```
-
-The `Frank.Cli.MSBuild` package auto-embeds semantic artifacts (ontology, SHACL shapes, manifest) into your assembly at build time.
-
-### Marking Resources
-
-Add `linkedData` to any resource to enable RDF content negotiation:
-
-```fsharp
-open Frank.Builder
-open Frank.LinkedData
-
-let products =
-    resource "/products" {
-        name "Products"
-        linkedData
-        get (fun ctx -> ctx.Response.WriteAsJsonAsync(getAllProducts()))
-    }
-```
-
-### Application Wiring
-
-```fsharp
-[<EntryPoint>]
-let main args =
-    webHost args {
-        useDefaults
-        useLinkedData  // Loads embedded ontology and enables content negotiation
-
-        resource products
-    }
-    0
-```
-
-### Content Negotiation
-
-Clients request RDF formats via the `Accept` header:
-
-| Accept Header | Response Format |
-|---------------|----------------|
-| `application/ld+json` | JSON-LD |
-| `text/turtle` | Turtle |
-| `application/rdf+xml` | RDF/XML |
-| `application/json` (or any other) | Original JSON (pass-through) |
-
-### Semantic Toolchain
-
-Use `frank` to extract an ontology from your F# types:
-
-```bash
-dotnet tool install --global frank
-frank semantic extract --project MyApp.fsproj --base-uri https://example.org/api
-frank semantic validate --project MyApp.fsproj
-frank semantic compile --project MyApp.fsproj
-```
-
-The compiled artifacts are automatically embedded by `Frank.Cli.MSBuild` and loaded at startup by `useLinkedData`.
-
-The CLI also provides unified commands for the full pipeline (semantic + statechart extraction):
-
-```bash
-frank extract --project MyApp.fsproj --base-uri https://example.org/api
-frank generate --project MyApp.fsproj --format all --output ./specs
-frank status --project MyApp.fsproj
-```
-
-See [Spec Pipeline](docs/SPEC-PIPELINE.md) for the full CLI reference.
-
----
-
 ## Frank.Datastar
 
 Frank.Datastar provides seamless integration with [Datastar](https://data-star.dev/), enabling reactive hypermedia applications using Server-Sent Events (SSE).
@@ -701,8 +559,6 @@ The `sample/` directory contains several example applications:
 | `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
 | `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
 | `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
-| `Frank.LinkedData.Sample` | Linked Data content negotiation with semantic RDF responses |
-| `Frank.TicTacToe.Sample` | Stateful resource with affordance middleware, guards, and Datastar SSE |
 
 ---
 
