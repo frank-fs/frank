@@ -67,40 +67,22 @@ Adapted from Gerard Holzmann's "Power of Ten" (NASA/JPL). These apply to all cod
 
 ## F# Patterns
 
+Cross-cutting F# patterns that apply repo-wide. **Subdirectory-specific gotchas live in nested CLAUDE.md files** — they load only when working in that area:
+
+- `src/Frank.Statecharts/CLAUDE.md` — round-trip lossiness, `CompositeKind` shadowing, smcat collection, `Result` over `Option` for diagnostics, `writePresent`/`writeOptional`, FS3511 in Release, `Option.orElse` merge, JSON escaping, `evaluateEventGuards`, MPST projection.
+- `src/Frank.Discovery/CLAUDE.md` — RFC 8288 URI Link headers + `HasTemplateLinks`, `StringValues` on `Headers.Append`, `TemplateMatcher` thread-safety, `GetMetadata<T>` `class` constraint, `Response.OnStarting`, `AddSingleton` vs `TryAddSingleton`, `Allow` content header, CE delegation, `useX`/`useXWith`.
+- `src/Frank.Cli.MSBuild/CLAUDE.md` — `.props` vs `.targets` evaluation timing, `dotnet fsi` resource verification, NuGet tool cache stale binaries.
+- `test/CLAUDE.md` — Expecto + TestHost, `let!` type annotations, `ResourceEndpointDataSource` internal, manual `WebHostSpec` construction, `use` vs `let` in task CEs, reflection-based DU sync tests, handler overload disambiguation, `IWebHostBuilder.Configure` extension.
+- `sample/CLAUDE.md` — sample server lifecycle and Datastar test environment variables.
+
+Repo-wide:
+
 - **CE builders**: `ResourceBuilder`, `WebHostBuilder` — the CE ceremony IS the pit of success. Never suggest simplifying it.
-- **Extensions**: `[<AutoOpen>] module` + `type X with [<CustomOperation>]`
-- **Tests**: Expecto + ASP.NET TestHost. Use `testTask` for async, `testCase` for pure.
-- **Type annotations needed**: `let! (resp: HttpResponseMessage) = client.SendAsync(req)` — F# needs explicit types on `let!` bindings in task CEs.
-- **Handler overloads**: Wrap lambdas in `RequestDelegate(fun ctx -> ...)` to resolve `ResourceBuilder.Get` overload ambiguity.
-- **`use` in task CEs**: Requires `IAsyncDisposable`. `IHost`/`IDisposable` types need `let` not `use` in `task { }`.
-- **`ResourceEndpointDataSource` is internal**: Tests create their own `EndpointDataSource` subclass.
-- **`IWebHostBuilder.Configure`**: Requires `open Microsoft.AspNetCore.Hosting` — it's an extension method, not on the interface directly.
-- **Testing `WebHostSpec`**: `WebHostBuilder.Run()` blocks (starts the app). To test, build the spec manually: `ceBuilder.Yield() |> fun s -> ceBuilder.UseJsonHome(s) |> fun s -> ceBuilder.Resource(s, res)`.
+- **Extensions**: `[<AutoOpen>] module` + `type X with [<CustomOperation>]`.
 - **fsproj compile order matters**: Types must be defined before use. Add new files in dependency order.
-- **`Allow` is a content header**: Use `resp.Content.Headers.Allow` not `resp.Headers.Contains("Allow")`. The latter throws `Misused header name` at runtime.
-- **CE delegation for bundles**: `spec |> this.UseJsonHome |> this.UseDiscoveryHeaders` — compose CE operations via member calls without inline duplication. Each writes to a different `WebHostSpec` field. Precedent: `Frank.Provenance`.
-- **`useX`/`useXWith` naming convention**: Zero-arg auto-load operations use `useX`; explicit-arg overloads use `useXWith`. Established by: `useValidation`/`useValidationWith`, `useLinkedData`/`useLinkedDataWith`, `useAffordances`/`useAffordancesWith`. Do not attempt same-name CE overloading at different arities.
 - **Integer division in threshold checks**: `count / 2` truncates (3/2=1), making thresholds more permissive than intended. Use multiplication instead: `overlap * 2 >= total` gives honest "at least half" semantics without rounding issues.
-- **Result over Option for diagnostics**: When a `None` return would discard useful error context (parse failures, file not found, unsupported format), return `Result<'T, string>` instead. Lets callers aggregate and surface warnings rather than silently dropping them.
-- **Transition state collection**: When extracting state names from `TransitionElement`, collect both `edge.Source` and `edge.Target`. Transition-only formats (smcat) don't create `StateDecl` for target-only states — they'd be invisible if you only collect sources.
-- **`StringValues` overload on `Headers.Append`**: `sprintf` returns `string`, but `IHeaderDictionary.Append` expects `StringValues`. Use an intermediate `let` binding: `let linkValue = sprintf "..." in ctx.Response.Headers.Append("Link", linkValue)`.
-- **`TemplateMatcher` is not thread-safe**: Cache immutable `RouteTemplate` objects (via `TemplateParser.Parse`); create `TemplateMatcher` per-request. Sharing cached matchers across concurrent requests causes subtle data races.
-- **`AddSingleton` vs `TryAddSingleton`**: `AddSingleton` always registers (last-wins for same type). `TryAddSingleton` is first-wins (no-op if already registered). Use `TryAddSingleton` for auto-load defaults, `AddSingleton` for explicit overrides.
-- **Link headers must be URIs per RFC 8288**: Pre-computed Link headers with route template params (`{gameId}`) need runtime resolution against `ctx.Request.RouteValues`. Use a `HasTemplateLinks` flag to skip resolution for non-parameterized resources (zero-alloc fast path).
 - **`_.Member` shorthand can break type inference with `Set.ofList`**: `List.map _.AbsoluteUri |> Set.ofList` may fail with "Uri does not support comparison" because the compiler doesn't resolve the intermediate `string` type. Use explicit lambdas: `List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList`.
-- **`GetMetadata<T>()` requires reference types**: `EndpointMetadataCollection.GetMetadata<T>()` has a `class` constraint. Endpoint metadata marker types must be records, not `[<Struct>]` types.
-- **NuGet tool cache serves stale binaries**: When reinstalling local dotnet tools from `nupkg/`, clear the global cache first: `rm -rf ~/.nuget/packages/<tool-name>` before `dotnet tool install`. `dotnet clean` + `dotnet pack` alone don't invalidate the cache.
 - **Parallel worktree agents cause OOM on 16GB machines**: Limit to 3 concurrent agents spawning `dotnet build`. Each build + NuGet restore can consume 2-4GB. Stagger builds or use `--no-restore` after the first successful build.
-- **MSBuild .props vs .targets evaluation timing**: Properties in `.props` that reference SDK-computed values (`IntermediateOutputPath`, `TargetFramework`) resolve to empty because `.props` is imported before the SDK sets them. Even static `PropertyGroup` in `.targets` can be too early when consuming projects import targets inline. Use a `Target` with inner `PropertyGroup` for true late-binding of SDK-dependent defaults.
-- **DLL resource verification via `dotnet fsi`**: Quick embedded resource check without external tools: `dotnet fsi -e "let a = System.Reflection.Assembly.LoadFrom(\"path.dll\") in a.GetManifestResourceNames() |> Array.iter (printfn \"%s\")"`
-- **FS3511 in Release builds**: `task { }` with complex match expressions inside fails static state machine compilation. CI builds Release; local builds Debug — so this surfaces only in CI. Fix by extracting pure logic into private static members, keeping only async operations (`let!`, `do!`) in the task body.
-- **`Response.OnStarting` for deferred header injection**: When middleware needs data set by later middleware (e.g., AffordanceMiddleware needs state/roles from StateMachineMiddleware), register an `OnStarting` callback. The callback fires just before the response is sent — after all middleware has completed. Pattern: `ctx.Response.OnStarting(Func<Task>(fun () -> ... Task.CompletedTask))`. Gate on `RouteEndpoint` check to avoid closure allocation on every request.
-- **`evaluateEventGuards` timing for post-handler enforcement**: Post-handler constraint enforcement works when handlers set `StatusCode` without calling `WriteAsync` — `HasStarted` remains false, so middleware can override to 403. Pre-handler guards (`evaluateGuards`) can't distinguish HTTP methods. Use `evaluateEventGuards` for role constraint checks that need to know the specific event.
-- **JSON string escaping in `sprintf`-based construction**: `sprintf "%s"` doesn't escape quotes, backslashes, or newlines. When interpolating user-supplied strings into JSON templates, use a `jsonEscape` helper: `s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n")`. Caught by expert review on `BlockReasonMapping.writeProblemResponse`.
-- **`Option.orElse` for "fill None from enriching" merge patterns**: `base'.Field |> Option.orElse enriching.Field` replaces the verbose `match base'.Field with Some _ -> base'.Field | None -> enriching.Field`. Established in `Wsd/Parser.fs:154`. Use as the default pattern for option-field merging. Note: `Option.orElse` is strict (evaluates both sides) — use `Option.orElseWith` if the fallback is a computation.
-- **`writePresent` (omit-on-absent) vs `writeOptional` (null-on-absent) JSON semantics**: New fields that most documents won't populate should use `writePresent` (omits key entirely when None). Existing fields that consumers expect should use `writeOptional` (emits null). Both helpers in `StatechartDocumentJson.fs`.
-- **Reflection-based DU sync tests for intentionally-duplicated types**: When a DU is duplicated across zero-dep assemblies (e.g., `CompositeKind`), add a test using `FSharpType.GetUnionCases` to assert case count equality. Catches divergence at test time since there's no compile-time coupling between the two definitions.
-- **`CompositeKind` shadowing across assemblies**: Files that `open Frank.Resources.Model` and use `Frank.Statecharts.CompositeKind` hit shadowing. Use fully-qualified `Frank.Statecharts.CompositeKind.XOR` explicitly. Discovered in `Dual.fs` and `StatefulResourceBuilder.fs`.
 - **Precondition assertions**: Use `invalidArg` for argument validation, `invalidOp` for state violations, `failwith` for logic errors. At module boundaries, check before proceeding — don't rely on downstream code to fail with a cryptic message. Types encode what they can; assertions cover value ranges, non-empty collections, and valid state transitions.
 
 ## Workflow Rules
