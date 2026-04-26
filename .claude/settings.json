@@ -79,6 +79,10 @@
           {
             "type": "command",
             "command": "file=\"$TOOL_INPUT_FILE_PATH\"; if echo \"$file\" | grep -q '\\.fs$'; then dotnet fantomas \"$file\" 2>/dev/null || true; fi"
+          },
+          {
+            "type": "command",
+            "command": "bash hooks/check-fs-discipline.sh"
           }
         ]
       }
