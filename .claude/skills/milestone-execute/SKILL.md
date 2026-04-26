@@ -71,15 +71,21 @@ Before any implementation:
 
 ### Phase 3: Wave Planning
 
-Group issues into dependency waves:
+Group issues into dependency waves. Query the Project board for current Status + Track in one call (preferred):
 
 ```bash
-gh issue list --milestone "<name>" --state open --json number,title,labels
+gh project item-list 1 --owner frank-fs --format json --limit 200 \
+  | jq '.items[] | select(.content.milestone.title == "<name>") | {num: .content.number, title: .content.title, status: .status, track: .track}'
 ```
+
+Fall back to `gh issue list --milestone "<name>" --state open --json number,title,labels` only if the project query is unavailable.
+
+For umbrella-driven milestones, `gh api graphql` on the umbrella's `subIssues { nodes { number, title, state } }` gives the full child set with current state.
 
 - Wave N+1 depends on Wave N
 - Issues within a wave have zero shared files
 - Merge order: fewest shared-file changes first
+- Set Project Status to `In Progress` on the wave's items as you start each one (`gh project item-edit`); the auto-workflow flips them to `Done` on close.
 
 **Next step:** Present wave plan for user approval.
 
@@ -228,7 +234,8 @@ After E2E passes, run `/expert-review` on the completed work.
 2. **In-scope follow-up** — real gap but separable from this issue
    - Create a new issue using the Issue Template below
    - Add to the current milestone
-   - Add dependency on the current issue (merges first)
+   - Add as a **native sub-issue** of the relevant umbrella (`addSubIssue` mutation — see CLAUDE.md "Project board")
+   - Add a **native dependency** on the current issue with `addIssueDependency` (replaces "Depends on: #X" body convention; surfaces in the UI and is queryable)
    - Include the expert finding as the "Current problem" section
 
 3. **Out-of-scope** — valid concern but belongs to a future milestone
@@ -270,11 +277,11 @@ For each completed issue:
 
 After all waves merge:
 
-1. Verify `gh issue list --milestone "<name>" --state open` returns only
-   follow-up issues (not original issues)
+1. Verify `gh project item-list 1 --owner frank-fs --format json --limit 200 | jq '.items[] | select(.content.milestone.title == "<name>" and .status != "Done")'` returns only follow-up issues (not original issues). The umbrella's sub-issue progress bar should also show all original children at 100%.
 2. Run the FULL E2E test suite against merged master
 3. Run `/retrospective` to capture session learnings
 4. Update memory with milestone completion status
+5. Close the umbrella issue once all sub-issues are closed — the "track shipped" event.
 
 **Next step:** Present completion status and any open follow-up issues
 to the user.

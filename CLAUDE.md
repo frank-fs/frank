@@ -141,6 +141,15 @@ Frank operates in two modes depending on contributor type. Default is trunk-base
 - **Never close issues with unfulfilled-dependency requirements.** If an issue depends on open issues, leave it open. Either split it (done-now vs blocked) or add a comment listing what's blocked. The user decides when to close.
 - **Never create issues, PRs, or take external actions while discussing.** Wait for explicit go-ahead ("yes", "create it", "go ahead"). Presenting a draft is not permission to act on it. Applies to issues, comments, releases, ruleset changes, anything visible to others.
 
+### Project board
+
+The Project board (`https://github.com/orgs/frank-fs/projects/1`, "Frank Roadmap") is the canonical "what's in flight" surface. Two custom fields drive it: **Status** (Ready / In Progress / Blocked / Done) and **Track** (A - Protocol Types / B - Semantic Discovery / C - HTTP Affordances / V - v7.5 Completeness / Other).
+
+- **Query the board first.** When investigating current state ("what's next", "what's blocked", "what's in flight for Track A"), prefer `gh project item-list 1 --owner frank-fs --format json` over scraping milestones+labels+umbrella bodies. One call returns every item with Status, Track, milestone, and assignee.
+- **Keep Status in sync.** When you start work on an issue, set its Status to `In Progress`. When you discover it's blocked on another open issue, set `Blocked` and add a native dependency (`gh api graphql ... addIssueDependency`). When the issue closes, the "Item closed" workflow auto-flips Status to `Done` (manual fallback if the workflow is off: `gh project item-edit`).
+- **Umbrella structure is via native sub-issues, not task lists.** The three track umbrellas (#349 A0, #336 B0, #367 V1) carry their children as native sub-issues. When filing a new issue that belongs to a track, attach it as a sub-issue of the umbrella with `gh api graphql -f query='mutation { addSubIssue(input: {issueId: "<parent>", subIssueId: "<child>"}) { subIssue { number } } }'`. Do not add `- [ ] #NNN` to the umbrella body.
+- **Track field is derivable from title prefix.** `[A*]/[B*]/[C*]/[V*]` map to the corresponding Track value; everything else is `Other`. Set on first add, no manual maintenance after.
+
 ### Planning and communication
 - **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
 - **Report autonomous decisions.** Maintain a running decisions table (Decision, Rationale, Impact) when making choices without explicit user confirmation.

@@ -80,6 +80,8 @@ For approved items:
 - **P2**: File new GitHub issues for items needing separate work, fix quick wins now
 - **P3**: Fix in a single cleanup commit
 
+**Project board:** Newly filed P2 issues should land on the Frank Roadmap project (`https://github.com/orgs/frank-fs/projects/1`). If the "Auto-add to project" workflow is enabled in the project's Workflows tab, this happens automatically; otherwise add manually with `gh project item-add 1 --owner frank-fs --url <issue-url>`. Set Track to `Other` (or the matching track if the debt is scoped to one) and Status to `Ready`.
+
 ## What NOT to do
 
 - Don't refactor working code just because it's "not ideal"

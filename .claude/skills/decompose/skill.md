@@ -116,6 +116,8 @@ For each task:
 If a task fails: the task spec has a gap. Return to Phase 3 and
 refine THAT task. Do not retry with the same spec.
 
+**If a decomposed task warrants its own GitHub issue** (separable scope, deferred to a later wave, or assigned to a different contributor), file it as a **native sub-issue** of the parent — not as a `- [ ] #NNN` line in the parent body. See the "Project board" section of CLAUDE.md for the `addSubIssue` mutation and Track-field convention.
+
 ## Readiness Checklist
 
 Before claiming a decomposition is ready, every item must be true:
