@@ -1,8 +1,32 @@
 # Agent Hypothesis: Feature Combinations for Agentic API Consumption
 
-How well can agents (LLM-based and rule-based) correctly use a Frank application, given different combinations of discovery and protocol features?
+How well can agents (LLM-based and rule-based) correctly use a Frank application, given different combinations of discovery and protocol features — and at what iteration cost?
 
-This assessment uses Tic-Tac-Toe as the reference scenario. "Success" means the agent discovers the API, plays only legal moves, respects turn-taking, and recognizes game-over — all without prior knowledge of the API beyond an entry-point URL.
+This assessment uses Tic-Tac-Toe as the reference scenario. The runtime measure of "success" is not binary: an agent with no discovery surface may eventually complete a game by retrying, the question is *how many retries, how much context, and how often a session abandons*. Discovery and formalism reduce that cost; they do not (and need not) make completion uniquely possible.
+
+## Three load-bearing questions
+
+The thesis lives or dies on three iteration-cost questions, not on a single binary "agent navigates / agent fails" claim. Earlier framings of this document conflated capability with cost; the three questions below are testable independently and cleanly.
+
+### Q1 — Runtime iteration cost
+
+*Does discovery reduce first-try failure rate, retry count, and per-session context consumption for a runtime agent driving the API?*
+
+A naive client without `Allow`/`Link`/ALPS still completes simple tic-tac-toe given enough retries. The question is whether discovery turns a 12-retry-with-context-bloat session into a 2-retry-with-tight-context session. Measured via the Five-Level Demo with **retry count, abandoned-session rate, and context tokens per game** alongside the binary success rate.
+
+### Q2 — Authoring iteration cost
+
+*Does formalism + tooling reduce the authoring iteration count required to produce a correct first-try implementation?*
+
+A developer can hand-author ALPS profiles, JSON Home roots, and SHACL shapes. The question is whether `vocabulary { } + lock-file + codegen` reduces the authoring iteration count compared to hand-authoring against the same statechart fixture. Measured by **time-to-correct-first-try** and **rework count** on the same target artifact, with and without the tooling.
+
+### Q3 — Continuous-improvement feedback loop
+
+*Do discovery + formalism together produce diagnostics rich enough to drive an authoring agent's next iteration without human re-explanation?*
+
+The runtime artifacts (ALPS, SHACL violations, OPTIONS responses, journal traces) are also authoring-agent inputs. The question is whether an authoring agent re-running on those diagnostics improves the source sketch or rigorous format more than a baseline that only sees the original spec. Measured by **iteration-over-iteration improvement rate** on a fixed authoring task with diagnostic feedback vs. without.
+
+These three are independent: Q1 can succeed while Q2 fails (LLMs are smart enough at runtime, but tooling adds little authoring value), Q2 can succeed while Q1 fails (codegen wins on the developer side but agents still struggle at runtime), and Q3 requires both Q1 and Q2 mechanisms to be in place to test at all.
 
 ## Two agent roles: runtime and authoring
 
@@ -21,7 +45,9 @@ Separating the roles matters because critics who push back on the runtime probab
 
 The feedback loop sketched in `AUTHORING_WORKFLOW.md` operates entirely in the authoring-agent role: the LLM reads generated artifacts, exercises the running app through dry runs, inspects journal traces, and proposes refinements to the source sketch or rigorous format. Whether a runtime agent in production hits 80% or 40% on the Five-Level Demo, the authoring loop delivers value by closing the gap between the author's intent and the generated system's behavior, with human review at every commit point.
 
-## Probability Assessment
+## Initial qualitative estimates (pending Five-Level Demo measurement)
+
+The percentages below are *predictions to be replaced with measurements*, not forecasts. They were authored before any empirical run of the Five-Level Demo and reflect intuition about where each feature should move the needle on Q1 (runtime iteration cost). The Five-Level Demo replaces each row's qualitative success rate with measured retry counts, abandoned-session rates, and context-token consumption. Treat the table below as a *starting hypothesis grid*: features with surprising-on-measurement low impact are candidates for scope reduction; features with surprising-on-measurement high impact are candidates for earlier delivery.
 
 | # | Features Available | LLM Agent | Rule-Based Agent | Notes |
 |---|---|---|---|---|
@@ -212,23 +238,29 @@ LLMs are trained overwhelmingly on OpenAPI/Swagger patterns: `GET /api/v1/things
 
 However, LLMs *can* use these standards effectively when told to. The RFCs are well-documented in training data. The question isn't capability — it's default behavior.
 
-### The Five-Level Demo
+### The Five-Level Demo — instrument for Q1, gradient for Q2 and Q3
 
-The strongest demonstration shows the **same agent, same game, with progressively less hand-holding**:
+The Five-Level Demo answers Q1 (runtime iteration cost) directly. The same demo also instruments Q2 and Q3 because each level supplies a different richness of feedback to an authoring agent.
 
-| Level | Agent Setup | Discovery Mechanism | Expected Success |
-|---|---|---|---|
-| **0** | URL only, API headers only | LLM must find `Link`/`Allow` in HTTP headers | ~30-40% |
-| **1** | URL only, HTML discovery page | `<link>` tags, semantic HTML, human-readable instructions | ~60-70% |
-| **2** | URL only, HTML + agent welcome | The page explicitly teaches the agent how to use the API | ~80% |
-| **3** | 3-sentence system prompt | External instruction to follow HTTP standards | ~80-85% |
-| **4** | MCP tool-augmented | `fetch_and_parse_links` tool for mechanical header parsing | ~95% |
+| Level | Agent Setup | Discovery Mechanism | Expected Success | Q2/Q3 instrument |
+|---|---|---|---|---|
+| **0** | URL only, API headers only | LLM must find `Link`/`Allow` in HTTP headers | ~30-40% | Authoring agent sees only HTTP — sparse diagnostic surface |
+| **1** | URL only, HTML discovery page | `<link>` tags, semantic HTML, human-readable instructions | ~60-70% | Authoring agent reads same HTML the runtime agent does |
+| **2** | URL only, HTML + agent welcome | The page explicitly teaches the agent how to use the API | ~80% | Application self-explains — authoring loop reads the welcome page as a contract |
+| **3** | 3-sentence system prompt | External instruction to follow HTTP standards | ~80-85% | Same as L2 plus baseline-vs-instructed comparison data |
+| **4** | MCP tool-augmented | `fetch_and_parse_links` tool for mechanical header parsing | ~95% | Authoring loop has full structured access to journal/discovery state |
 
 Example system prompt for Level 3:
 
 > "You are an HTTP client. Start at the root URL. Read response headers — follow `Link` relations, respect `Allow` methods, fetch `rel="profile"` for semantics. Never guess URLs.
 
-Every level above Level 0 is simultaneously a runtime success rate and an authoring-time diagnostic channel. If an LLM at Level 1 can read `<link rel="profile">` in the HTML to drive the game, it can read the same HTML during authoring to tell the developer what a runtime agent would see. The Five Levels are not just a gradient of runtime capability; they are a gradient of how richly the authoring agent can inspect and critique the generated system. A Level 0 app offers the authoring loop nothing to work with; a Level 2 app lets the authoring agent explain what the reference client will and will not find. The runtime bet and the authoring loop are served by the same investment.
+**Q1 measurement:** for each level, record retry count per game, abandoned-session rate, context-token consumption per completed game, and binary success rate. The success column above is the predicted starting point; the demo replaces it with measurements.
+
+**Q2 measurement:** hand-author the L2 artifacts (HTML welcome, ALPS profile, JSON Home root) and time-to-correct-first-try; then run codegen against the same statechart fixture and time-to-correct-first-try; compare. Q2 confirmed if codegen reduces authoring iteration count materially without regression in runtime success at L2.
+
+**Q3 measurement:** run the authoring agent in two configurations on the same iteration task — one with full diagnostic feedback (ALPS, SHACL violations, journal traces from a failed run), one with only the original spec. Q3 confirmed if the diagnostic-fed configuration converges on a correct artifact in fewer iterations than the spec-only configuration.
+
+A Level 0 app offers the authoring loop nothing to work with; a Level 2 app lets the authoring agent explain what the reference client will and will not find. The runtime bet and the authoring loop are served by the same investment.
 
 ### HTML as the Discovery On-Ramp
 
@@ -297,7 +329,7 @@ The demo must answer this question empirically.
 
 ## Methodology
 
-These probabilities are qualitative estimates based on:
+These probabilities are *initial qualitative estimates* — predictions to be replaced with measurements from the Five-Level Demo. They are based on:
 
 - What information each feature provides to the agent
 - How much ambiguity remains at each level
@@ -305,6 +337,8 @@ These probabilities are qualitative estimates based on:
 - The Tic-Tac-Toe game's relative simplicity (5 states, 2 roles, linear protocol)
 
 For complex protocols (more states, more roles, branching paths), the gap between feature levels widens — particularly the dual derivation becomes more valuable as protocol complexity increases.
+
+Going forward the input quantities (per-feature success rate, retry count, abandoned-session rate, context-token consumption) come from runs of the Five-Level Demo, not from a-priori estimates. The methodology section is preserved as the analytical structure that consumes those measured inputs; the predictions stay only to record what we expected before measurement.
 
 ### Implementation probability methodology
 
@@ -329,21 +363,21 @@ These are deliberately conservative. The v7.3.0/v7.3.1 experience showed that cl
 
 ### Layered architecture (opt-in)
 
-Each layer works independently. The thesis can be proven at Layer 3. Higher layers strengthen guarantees.
+Each layer works independently. Higher layers strengthen guarantees.
 
 ```
 Layer 0: ASP.NET Core          (endpoints, middleware, DI)
 Layer 1: resource/statefulResource CE   (existing, working)
 Layer 2: Discovery middleware   (useJsonHome, useOptionsDiscovery — existing, needs wiring)
 Layer 3: Affordance middleware  (useAffordances from generated types — existing, needs wiring)
-─────────────── thesis provable above this line ───────────────
+─────────────── Q1 sufficiency line is hypothesised here; Five-Level Demo will measure where it actually falls ───────────────
 Layer 4: Interpreter algebra    (opt-in formalization of HierarchicalRuntime)
 Layer 5: Typed codegen          (opt-in DX, replaces string-based model.bin)
 Layer 6: Analyzers              (opt-in compile-time validation)
 Layer 7: Transition CE          (opt-in hand-authoring path)
 ```
 
-Layers 0-3 are the thesis. Layers 4-7 exist because v7.3.0/v7.3.1 showed that without formal semantics (Layer 4), compile-time checks (Layer 6), and correct codegen (Layer 5), the lower layers silently produce wrong output that passes tests but fails agents.
+Layer 3 is the *predicted* sufficiency line for Q1 (runtime iteration cost) — we expect that an L2 application running on Layer 3 hits the iteration-cost target the Five-Level Demo will measure. The actual line may sit lower (LLMs are smarter than the 2026 estimates suggested) or higher (formal semantics are load-bearing in ways the predictions missed). Layers 4–7 exist because Q2 and Q3 (authoring iteration cost, feedback-loop convergence) plausibly require formal semantics, compile-time checks, and correct codegen — independent of where the Q1 line falls. The v7.3.0/v7.3.1 failure showed that without those upper layers, the lower layers silently produce wrong output that passes tests but fails agents; that risk applies to Q2/Q3 even if Q1 is met without them.
 
 ## Related Documents
 

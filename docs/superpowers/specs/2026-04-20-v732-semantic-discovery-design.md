@@ -45,12 +45,11 @@ Seven packages. All other packages removed from v7.3.x milestones and deferred t
 | `Frank.LinkedData` | Rewritten | JSON-LD content negotiation consuming generated graph |
 | `Frank.Provenance` | Rewritten | Standalone request-level PROV-O consuming generated class mappings |
 | `Frank.Discovery` | Rewritten | ALPS/Link/OPTIONS/JSON Home — generators moved from Statecharts |
-| `Frank.Cli` / `Frank.Cli.Core` / `Frank.Cli.MSBuild` | Extended | Semantic subcommands, MSBuild source generation |
+| `Frank.Cli` / `Frank.Cli.Core` / `Frank.Cli.MSBuild` | **Rewritten** | Existing CLI was deleted in `4d85df54`; existing `extract`/`clarify` commands reshape per §2 plus net-new `accept`/`refresh`/`status`. MSBuild source generation. |
 
 ### Out of scope for v7.3.2
 
 - `Frank.Statecharts`, `Frank.Statecharts.Core`, and all other Statecharts-adjacent packages — **removed from v7.3.x milestones**, deferred to v7.4.0 (Track A)
-- `Frank.Resources.Model` — assess during Phase 2 audit. It is zero-dep and holds `ResourceSpec`/affordance types that Frank.Discovery will consume at runtime. Keep if it is clean of Statecharts entanglement; otherwise fold the minimum needed types into `Frank` core.
 - Myriad codegen plugins — not needed, CLI-generated F# source via MSBuild is sufficient
 - Statechart-augmented provenance / journal overlay — Track A/C
 - Actor + SQLite persistence
@@ -178,7 +177,7 @@ let registry = vocabulary {
 - `fieldSeeAlso type fieldName iri` — field-level rdfs:seeAlso
 - `provClass type provOClass` — PROV-O domain typing
 - `constrainPattern type fieldName regex` — constraint the F# type system can't express
-- `include registry` — compose registries from shared libraries
+- `include registry` — compose registries from shared libraries. Performs a deep union across all `VocabularyRegistry` fields. `Prefixes` and `Using` raise on duplicate-key conflict (per B2 AT3). `EquivalentClasses`, `SeeAlso`, `FieldSeeAlso`, `ProvClasses`, `ConstraintPatterns` raise on conflicting *values* for the same key — silent last-wins would corrupt outbound semantic alignments. Identical-value duplicates are silently absorbed.
 
 **Operations explicitly excluded from v7.3.2:**
 - `typeIri` and `fieldIri` — mappings live in lock file, not CE
@@ -504,22 +503,13 @@ Falsifiable HTTP request/response pairs per V732 decisions. Not unit tests.
 
 Outside-in per V732 decisions. CLI and developer experience first, then libraries wired in behind it.
 
-### Phase 1 — Milestone reshaping (before any code)
+### Phase 1 — Milestone reshaping (complete)
 
-- Close or defer all open v7.4.0 issues related to Track A (35 issues)
-- Remove `Frank.Statecharts` and adjacent packages from v7.3.x milestones
-- Create v7.3.2 milestone
-- File Track B issues from this spec: one per section roughly, decomposed by `/decompose`
+Procedurally done. v7.4.0 Track A umbrella (#349) and Track C umbrella (#252) carry their children as native sub-issues; v7.5.0 umbrella (#367) carries V-track. v7.3.2 milestone exists with B-track umbrella (#336) and 22 children (#314–#335). No further milestone reshaping required for v7.3.2 to begin.
 
-### Phase 2 — Audit
+### Phase 2 — Audit (superseded)
 
-Before any library rewrites, verify what actually works today end-to-end:
-- Frank.Validation — does SHACL validation actually run on HTTP requests?
-- Frank.LinkedData — does content negotiation actually serve JSON-LD?
-- Frank.Provenance — does PROV-O actually serialize?
-- Current Frank.Discovery pieces in Frank.Statecharts — which generators work?
-
-Output: list of working code to salvage vs code to rewrite.
+Phase 2 was superseded by the `4d85df54` cleanup landed 2026-04-25/26: rewrite-target packages (`Frank.Validation`, `Frank.LinkedData`, `Frank.Provenance`, `Frank.Discovery`) were deleted entirely along with their test projects. The salvage-vs-rewrite decision was made directly: rewrite all four from spec, distrusting the v7.3.0/v7.3.1 baseline. B1 (#313) is closed with this rationale.
 
 ### Phase 3 — Frank.Semantic (new package)
 
