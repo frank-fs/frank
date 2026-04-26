@@ -12,7 +12,7 @@ DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build Frank.sln
 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"
 
 # Test single project
-DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test test/Frank.Discovery.Tests/
+DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test test/Frank.OpenApi.Tests/
 
 # Format check (Fantomas 7.0.5)
 dotnet fantomas --check src/
@@ -29,16 +29,18 @@ Always run `dotnet build Frank.sln` and `dotnet test` before claiming work is co
 
 - `src/` — Library projects, multi-target net8.0/net9.0/net10.0
 - `test/` — Test projects, target net10.0 only
-- `sample/` — Sample apps (TicTacToe, Datastar variants)
+- `sample/` — Sample apps (Sample, Falco/Giraffe/Oxpecker view-engine variants, OpenApi sample, Datastar variants)
 - `.claude/worktrees/` — Git worktrees for feature branches (gitignored)
 - `hooks/` — Git hooks (Fantomas pre-commit, Entire CLI)
 
-16 projects. Key assemblies:
-- `Frank` — Core CE builders (`resource`, `webHost`), metadata types
-- `Frank.Discovery` — OPTIONS, Link headers, JSON Home middlewares
-- `Frank.Statecharts` — Parser/generator suite, runtime, affordances
-- `Frank.Statecharts.Core` — Zero-dep AST types (`Frank.Statecharts.Ast`)
-- `Frank.Resources.Model` — Zero-dep resource model, affordance map
+Five shipping packages survive the v7.3.2 reset:
+- `Frank` — Core CE builders (`resource`, `webHost`), ETag/conditional-request middleware, content negotiation
+- `Frank.Auth` — Resource-level authorization extensions
+- `Frank.OpenApi` — OpenAPI document generation with F# type schemas
+- `Frank.Datastar` — Datastar SSE integration
+- `Frank.Analyzers` — F# Analyzers for compile-time error detection
+
+The v7.3.2 in-scope packages (`Frank.Semantic` new, `Frank.Validation`/`Frank.LinkedData`/`Frank.Provenance`/`Frank.Discovery` rewrites, `Frank.Cli` trio rewrite) do not yet exist in this worktree — they will be created fresh per the v7.3.2 spec.
 
 ## Constitution (non-negotiable)
 
@@ -67,15 +69,14 @@ Adapted from Gerard Holzmann's "Power of Ten" (NASA/JPL). These apply to all cod
 
 ## F# Patterns
 
-Cross-cutting F# patterns that apply repo-wide. **Subdirectory-specific gotchas live in nested CLAUDE.md files** — they load only when working in that area:
+Cross-cutting patterns that apply repo-wide. **Subdirectory-specific gotchas live in nested CLAUDE.md files** — they load only when working in that area:
 
-- `src/Frank.Statecharts/CLAUDE.md` — round-trip lossiness, `CompositeKind` shadowing, smcat collection, `Result` over `Option` for diagnostics, `writePresent`/`writeOptional`, FS3511 in Release, `Option.orElse` merge, JSON escaping, `evaluateEventGuards`, MPST projection.
-- `src/Frank.Discovery/CLAUDE.md` — RFC 8288 URI Link headers + `HasTemplateLinks`, `StringValues` on `Headers.Append`, `TemplateMatcher` thread-safety, `GetMetadata<T>` `class` constraint, `Response.OnStarting`, `AddSingleton` vs `TryAddSingleton`, `Allow` content header, CE delegation, `useX`/`useXWith`.
-- `src/Frank.Cli.MSBuild/CLAUDE.md` — `.props` vs `.targets` evaluation timing, `dotnet fsi` resource verification, NuGet tool cache stale binaries.
-- `test/CLAUDE.md` — Expecto + TestHost, `let!` type annotations, `ResourceEndpointDataSource` internal, manual `WebHostSpec` construction, `use` vs `let` in task CEs, reflection-based DU sync tests, handler overload disambiguation, `IWebHostBuilder.Configure` extension.
+- `test/CLAUDE.md` — Expecto + TestHost, `let!` type annotations, `ResourceEndpointDataSource` internal, manual `WebHostSpec` construction, `use` vs `let` in task CEs, handler overload disambiguation, `IWebHostBuilder.Configure` extension.
 - `sample/CLAUDE.md` — sample server lifecycle and Datastar test environment variables.
 
-Repo-wide:
+(The previous nested CLAUDE.md files for `Frank.Statecharts`, `Frank.Discovery`, and `Frank.Cli.MSBuild` were removed alongside the v7.3.2 cleanup of those packages. Transferable items moved here; implementation-specific scar tissue dropped. New nested files appear when the rewritten packages re-introduce gotchas worth indexing.)
+
+### Repo-wide F# patterns
 
 - **CE builders**: `ResourceBuilder`, `WebHostBuilder` — the CE ceremony IS the pit of success. Never suggest simplifying it.
 - **Extensions**: `[<AutoOpen>] module` + `type X with [<CustomOperation>]`.
@@ -84,6 +85,24 @@ Repo-wide:
 - **`_.Member` shorthand can break type inference with `Set.ofList`**: `List.map _.AbsoluteUri |> Set.ofList` may fail with "Uri does not support comparison" because the compiler doesn't resolve the intermediate `string` type. Use explicit lambdas: `List.map (fun (u: Uri) -> u.AbsoluteUri) |> Set.ofList`.
 - **Parallel worktree agents cause OOM on 16GB machines**: Limit to 3 concurrent agents spawning `dotnet build`. Each build + NuGet restore can consume 2-4GB. Stagger builds or use `--no-restore` after the first successful build.
 - **Precondition assertions**: Use `invalidArg` for argument validation, `invalidOp` for state violations, `failwith` for logic errors. At module boundaries, check before proceeding — don't rely on downstream code to fail with a cryptic message. Types encode what they can; assertions cover value ranges, non-empty collections, and valid state transitions.
+- **`Result` over `Option` for diagnostics**: When a `None` return would discard useful error context (parse failures, file not found, unsupported format), return `Result<'T, string>` instead. Lets callers aggregate and surface warnings rather than silently dropping them.
+- **`Option.orElse` for fill-from-enriching merges**: `base.Field |> Option.orElse enriching.Field` replaces the verbose `match base.Field with Some _ -> base.Field | None -> enriching.Field`. `Option.orElse` is strict (evaluates both sides) — use `Option.orElseWith` if the fallback is a computation.
+- **FS3511 in Release builds**: `task { }` with complex match expressions inside fails static state machine compilation. CI builds Release; local builds Debug — so this surfaces only in CI. Fix by extracting pure logic into private static members, keeping only async operations (`let!`, `do!`) in the task body.
+
+### ASP.NET Core gotchas
+
+- **`Allow` is a content header**: Use `resp.Content.Headers.Allow` not `resp.Headers.Contains("Allow")`. The latter throws `Misused header name` at runtime.
+- **`StringValues` overload on `Headers.Append`**: `sprintf` returns `string`, but `IHeaderDictionary.Append` expects `StringValues`. Use an intermediate `let` binding: `let v = sprintf "..." in ctx.Response.Headers.Append("Link", v)`.
+- **`TemplateMatcher` is not thread-safe**: Cache immutable `RouteTemplate` objects (via `TemplateParser.Parse`); create `TemplateMatcher` per-request. Sharing cached matchers across concurrent requests causes subtle data races.
+- **`GetMetadata<T>()` requires reference types**: `EndpointMetadataCollection.GetMetadata<T>()` has a `class` constraint. Endpoint metadata marker types must be records, not `[<Struct>]` types.
+- **`AddSingleton` vs `TryAddSingleton`**: `AddSingleton` always registers (last-wins for same type). `TryAddSingleton` is first-wins (no-op if already registered). Use `TryAddSingleton` for auto-load defaults, `AddSingleton` for explicit overrides.
+- **`Response.OnStarting` for deferred header injection**: When middleware needs data set by later middleware, register an `OnStarting` callback. The callback fires just before the response is sent — after all middleware has completed. Pattern: `ctx.Response.OnStarting(Func<Task>(fun () -> ... Task.CompletedTask))`. Gate on `RouteEndpoint` check to avoid closure allocation on every request.
+- **Link headers must be URIs per RFC 8288, not URI templates**: Pre-computed Link headers carrying route template params (`{id}`) need runtime resolution against `ctx.Request.RouteValues` before emission.
+
+### MSBuild and tooling
+
+- **`.props` vs `.targets` evaluation timing**: Properties in `.props` that reference SDK-computed values (`IntermediateOutputPath`, `TargetFramework`) resolve to empty because `.props` is imported before the SDK sets them. Even static `PropertyGroup` in `.targets` can be too early when consuming projects import targets inline. Use a `Target` with inner `PropertyGroup` for true late-binding of SDK-dependent defaults.
+- **NuGet tool cache serves stale binaries**: When reinstalling local dotnet tools from `nupkg/`, clear the global cache first: `rm -rf ~/.nuget/packages/<tool-name>` before `dotnet tool install`. `dotnet clean` + `dotnet pack` alone don't invalidate the cache.
 
 ## Workflow Rules
 
@@ -130,12 +149,12 @@ Frank operates in two modes depending on contributor type. Default is trunk-base
 - **Never triage expert findings without consent.** When presenting expert review results, all findings are potentially blocking until the user says otherwise. Do not sort into "fix now" vs "follow-up" or "framework bug" vs "sample issue" — present them and let the user decide.
 
 ### Implementation
-- **Never hide AST round-trip lossiness.** If a format parser encounters a field that has no home in `TransitionEdge`/`StateNode`/`StatechartDocument`, that is a gap in the AST — report it, don't silently drop data. Format-specific visual styling (smcat colors) goes in annotations. Semantic information (roles, payload types, composite kinds) must be first-class AST fields. Round-trip tests (parse → AST → generate same format) are required for every format; any information loss is a failing test.
+- **Never hide AST round-trip lossiness.** If a format parser encounters a field that has no home in the AST, that is a gap in the AST — report it, don't silently drop data. Visual/format-specific styling goes in annotations; semantic information (roles, payload types, composite kinds) must be first-class AST fields. Round-trip tests (parse → AST → generate same format) are required for every format; any information loss is a failing test. (Applies to v7.4.0 Track A protocol parsers when those land.)
 - **Never blame pre-existing issues.** Surface, investigate, and file issues. Never dismiss problems as "not my change."
-- **Portable concept filter.** When scoping work, ask: "Is this a portable concept or an F#-specific detail?" Portable concepts (statechart semantics, ALPS discovery, affordance projection) get full investment. F#-specific details (CE syntax, DU encoding, .NET middleware) are implemented but not over-invested.
+- **Portable concept filter.** When scoping work, ask: "Is this a portable concept or an F#-specific detail?" Portable concepts (resource modeling, ALPS discovery, affordance projection, MPST projection) get full investment. F#-specific details (CE syntax, DU encoding, .NET middleware) are implemented but not over-invested.
 - **No lightweight API.** Never suggest a simplified `frank.get "/path" handler` alternative. The CE is the design. On-ramp is solved by docs/examples.
 - **Prefer skills over commands.** Use `.claude/skills/` (portable across repos via plugins) rather than `.claude/commands/` (repo-local only). Skills support YAML frontmatter, model selection, and isolation modes.
-- **MPST transitions are projected, not flat FSM.** Transition declarations in the CE reflect per-role agency from the MPST projection, not the flat FSM's transition function. A role only has transitions from states where it is the active participant. Example: `CancelOrder` from Authorize exists in the FSM but is NOT declared for Customer because Authorize is a PaymentService state. The flat FSM is the implementation; the projections are the protocol contract.
+- **MPST transitions are projected, not flat FSM.** When the protocol algebra lands in v7.4.0 Track A, transition declarations reflect per-role agency from the MPST projection, not the flat FSM's transition function. A role only has transitions from states where it is the active participant. The flat FSM is the implementation; the projections are the protocol contract. (See `docs/superpowers/specs/2026-04-21-v740-protocol-types-design.md` once that spec is finalized.)
 
 ### Strategy (Phase 1: demonstrate the thesis)
 - Prove the ideas work: naive-client demo, generated-artifact reference app, blog series
