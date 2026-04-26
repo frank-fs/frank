@@ -96,14 +96,14 @@ Frank operates in two modes depending on contributor type. Default is trunk-base
 - **Worktrees → fast-forward merge into master → push.** Feature work happens in `.claude/worktrees/<name>` on a feature branch. Merge fast-forward only into local master, then push. Small targeted changes (config, docs, single-file fixes, rule updates) go straight to master in a worktree.
 - **Setup required:** `git config core.hooksPath hooks` so pre-commit, pre-push, post-merge, and other hooks fire. Without this, the protections below are inactive.
 - **Master is protected.** Two layers:
-  - **Server (`.github/rulesets/master-protection.json`):** blocks deletion, requires linear history, requires "Build and pack" CI status check to pass on the SHA before push lands.
-  - **Local (`hooks/pre-push`):** blocks deletes and non-fast-forward pushes whose local tracking ref is stale (replicates `--force-with-lease` semantics). Feature branches unrestricted.
+  - **Server (`.github/rulesets/master-protection.json`):** blocks deletion, requires linear history, requires "Build and pack" CI status check. **Admin role bypasses all rules** (`bypass_actors` includes `RepositoryRole 5` with `bypass_mode: always`) — this is what enables direct push to master without staging on a feature branch. Non-admin contributors (PRs from forks) still hit the status check.
+  - **Local (`hooks/pre-push`):** blocks deletes and non-fast-forward pushes whose local tracking ref is stale (replicates `--force-with-lease` semantics). This is the practical force-push guard now that the server bypass exists. Feature branches unrestricted.
 - **Push policy is graduated.** Normal `git push origin master` does not require user approval. Destructive pushes (`--force` without lease, branch deletion, history rewrite from stale state) DO require approval. Background/scheduled-agent pushes always require approval. Escape hatch: `FRANK_ALLOW_DESTRUCTIVE_PUSH=1 git push ...`.
-- **Standard merge sequence:**
-  1. Push feature branch (CI runs on `**` per `ci.yml`)
-  2. Wait for "Build and pack" status to pass on the feature SHA
-  3. `git fetch origin && git merge --ff-only <feature-branch>` (in main worktree on master)
-  4. `git push origin master` (server sees passing status, allows)
+- **Standard merge sequence (direct):**
+  1. Local verification sequence in worktree (build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review` as appropriate for the change).
+  2. `git fetch origin && git merge --ff-only <feature-branch>` (in main worktree on master).
+  3. `git push origin master` — admin bypass lets this through without waiting for CI; CI runs after the push as a backstop.
+- **Optional CI staging** (for risky changes where you want CI confirmation pre-merge): push the feature branch first, wait for "Build and pack" green on the SHA, then ff-merge that exact SHA into master and push.
 - **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first.
 - **Always use `isolation: "worktree"` for implementation/fix agents.** Non-isolated agents lack Bash/Read permissions even when pointed at accessible paths. For fix agents on existing branches, include `git fetch origin <branch> && git checkout <branch>` in the prompt.
 - **Worktree agent Bash commands must be standalone.** Compound commands (`cd /path && dotnet build`) don't match pre-approved `Bash(dotnet:*)` patterns. Instruct agents to run `cd /path/to/worktree` as a separate Bash call first (working directory persists), then run standalone commands. Also `mkdir -p nupkg` in each worktree before building.
