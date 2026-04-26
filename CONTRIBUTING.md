@@ -137,8 +137,10 @@ Don't close issues that have unfulfilled dependencies. Either split the issue or
 
 The `docs/` directory has background on the project's ideas and decisions:
 
-- [DECISIONS.md](docs/DECISIONS.md) — ~400 design decisions with rationale
-- [STATECHARTS.md](docs/STATECHARTS.md) — Hierarchical statechart support, guards, test coverage
-- [SEMANTIC-RESOURCES.md](docs/SEMANTIC-RESOURCES.md) — Agent-legible applications and self-describing app architecture
+- [docs/README.md](docs/README.md) — Index pointing at the architectural source-of-truth specs and the rest of the design surface
+- [AGENT_HYPOTHESIS.md](docs/AGENT_HYPOTHESIS.md) — Thesis: feature combinations for agentic API consumption
+- [AUTHORING_WORKFLOW.md](docs/AUTHORING_WORKFLOW.md) — The author + agent workflow loop (digest of the v7.3.2 / v7.4.0 specs)
+- [STATECHARTS.md](docs/STATECHARTS.md) — Application-level statechart concepts (package pending v7.4.0 rewrite)
+- [SEMANTIC-RESOURCES.md](docs/SEMANTIC-RESOURCES.md) — Agent-legible applications and the reflection/refinement feedback loop
 - [SPEC-PIPELINE.md](docs/SPEC-PIPELINE.md) — Bidirectional design spec pipeline (WSD, SCXML, ALPS)
-- [COMPARISON.md](docs/COMPARISON.md) — How Frank.Statecharts compares to Webmachine and Freya
+- [COMPARISON.md](docs/COMPARISON.md) — Application-level vs. protocol-level state machines (Webmachine, Freya)

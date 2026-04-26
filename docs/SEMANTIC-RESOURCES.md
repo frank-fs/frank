@@ -1,5 +1,7 @@
 # Semantic Resources: Agent-Legible Applications
 
+> **Status (v7.3.2, April 2026):** This is a vision document. The earlier package layering (`Frank.LinkedData`, `Frank.Validation`, `Frank.Provenance`, plus `Frank.Statecharts`) was removed in the v7.3.2 reset. The v7.3.2 [semantic-discovery design spec](superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) is the authoritative description of which surfaces actually ship and how they're packaged. Read this file for the why; read the spec for the what.
+
 Frank's semantic resource layer makes applications self-describing — not just "here are my routes" but a machine-interpretable model of what the application is, what it does, how it's structured, and how its state changes over time. An agent (LLM or otherwise) with access to this model has enough context to use the application, evaluate it, and propose changes to it.
 
 ## The Core Idea
@@ -12,17 +14,17 @@ This is inspired by a proven pattern: extraction of structured data into an RDF 
 
 An agent interacting with a Frank application over standard HTTP can:
 
-1. **Discover capabilities** — `OPTIONS /` returns supported media types; `Link` headers on any response point to the discovery endpoint
-2. **Retrieve the semantic model** — content negotiation on `GET /` yields RDF representations (`application/ld+json`, `text/turtle`, `application/rdf+xml`) describing the full resource graph
-3. **Inspect affordances** — `Accept: application/alps+json` on `GET /` returns the ALPS profile: semantic descriptors, transition types (`safe`/`unsafe`/`idempotent`), return types, and parameter schemas
-4. **Inspect statecharts** — `Accept: application/scxml+xml` or `Accept: application/vnd.xstate+json` returns the state machine definition for stateful resources
-5. **Query the graph** — the RDF model is structured for use with external SPARQL tools or any graph query mechanism
+1. **Discover capabilities** — `OPTIONS /` returns supported media types; `Link` headers on any response point to the discovery endpoint.
+2. **Retrieve the semantic model** — content negotiation on `GET /` yields RDF representations (`application/ld+json`, `text/turtle`, `application/rdf+xml`) describing the full resource graph.
+3. **Inspect affordances** — `Accept: application/alps+json` on `GET /` returns the ALPS profile: semantic descriptors, transition types (`safe`/`unsafe`/`idempotent`), return types, and parameter schemas.
+4. **Inspect statecharts** — `Accept: application/scxml+xml` or `Accept: application/vnd.xstate+json` returns the state machine definition for stateful resources.
+5. **Query the graph** — the RDF model is structured for use with external SPARQL tools or any graph query mechanism.
 
 No custom agent protocol is required. The interface is HTTP with content negotiation — durable standards that predate and will outlast any specific agent framework.
 
 ## The Feedback Loop
 
-The semantic layer enables a cycle that operates at two levels:
+The semantic layer enables a cycle that operates at two levels.
 
 ### Application-Level Reflection
 
@@ -52,51 +54,14 @@ Design spec (WSD, SCXML, ALPS)
 
 The extracted specs from a running application become verification artifacts for the design intent. See [SPEC-PIPELINE.md](SPEC-PIPELINE.md) for details on the bidirectional pipeline.
 
-## Architecture
+## Capability Surfaces
 
-The semantic layer comprises four extensions built in dependency order:
+The semantic layer is composed of four capability surfaces. The exact package boundaries are settled in the [v7.3.2 semantic-discovery spec](superpowers/specs/2026-04-20-v732-semantic-discovery-design.md); the conceptual layering below is stable and survives any repackaging:
 
-```
-Frank.LinkedData (#75)  ──────┬──────────────────┐
-  RDF model, content neg,     │                   │
-  OPTIONS + Link discovery    │                   │
-                              │                   │
-Frank.Statecharts (#87)  ─────┤                   │
-  Runtime state machines      │                   │
-  (see STATECHARTS.md)        │                   │
-                              │                   │
-          Frank.Validation (#76)                  │
-            SHACL constraints                     │
-                              │                   │
-          Frank.Provenance (#77) ─────────────────┤
-            PROV-O state change annotations       │
-                                                  │
-                    (External SPARQL tools) ───────┘
-```
-
-### Frank.LinkedData (#75) — Foundation
-
-Extends Frank resources with an RDF model and content negotiation for semantic media types. This is the foundation everything else builds on. Includes:
-
-- RDF model per resource derived from Frank's existing resource graph
-- Content negotiation for `application/ld+json`, `text/turtle`, `application/rdf+xml`
-- Spec media types via `useAppSpec`: ALPS, SCXML, XState, smcat, Mermaid, PlantUML
-- `OPTIONS` support returning available media types for discovery
-- `Link` headers pointing to the discovery endpoint
-
-### Frank.Validation (#76) — Constraints
-
-SHACL shapes as semantic request/response constraints. Complements F#'s structural type validation with business rule preconditions and cross-resource constraints. Does not need to be exhaustive — even partial SHACL coverage adds value for agent-driven analysis.
-
-### Frank.Provenance (#77) — State Change History
-
-> **Status:** The provenance `IHostedService` registers for `IObservable<TransitionEvent>` from DI, but `Frank.Statecharts` never publishes one — the bridge was never wired. Additionally, `Frank.Provenance.TransitionEvent` (non-generic, singular `PreviousState`/`NewState`) and `Frank.Statecharts.TransitionEvent<'S,'E,'C>` (generic, flat `ExitedStates`/`EnteredStates` lists) are incompatible types. See [AUDIT.md](AUDIT.md) Suspect 1.
-
-PROV-O annotations for resource state changes, built on `Frank.Statecharts`' `onTransition` observable. Enables agents to reason about *how* the application reached its current state, not just what the state is.
-
-### External SPARQL
-
-Frank does not embed a SPARQL engine. The RDF model is structured so that external SPARQL tools can query it. This keeps Frank lightweight while enabling powerful graph queries for those who need them.
+- **Linked-Data surface.** RDF model per resource (derived from Frank's resource graph), content negotiation for `application/ld+json` / `text/turtle` / `application/rdf+xml`, spec media types via discovery (ALPS, SCXML, XState, smcat, Mermaid, PlantUML), `OPTIONS` returning available media types, and `Link` headers pointing to the discovery endpoint. This is the foundation everything else builds on.
+- **Validation surface.** SHACL shapes as semantic request/response constraints. Complements F#'s structural type validation with business-rule preconditions and cross-resource constraints. Need not be exhaustive — partial SHACL coverage already adds value for agent-driven analysis.
+- **Provenance surface.** PROV-O annotations for resource state changes, sourced from the same transition stream the stateful-resource layer uses to drive HTTP affordance changes. Enables agents to reason about *how* the application reached its current state, not just what the state is. The bridge between transitions and provenance events is the load-bearing integration point and is specified in the v7.3.2 design.
+- **External SPARQL.** Frank does not embed a SPARQL engine. The RDF model is structured so external SPARQL tools can query it. This keeps Frank lightweight while enabling powerful graph queries for those who need them.
 
 ## Design Principles
 
@@ -104,7 +69,7 @@ Frank does not embed a SPARQL engine. The RDF model is structured so that extern
 
 **The semantic surface is the interface.** No custom agent protocol, no framework-specific discovery mechanism. An agent that speaks HTTP can understand the application.
 
-**Opt-in, incremental.** A Frank application with zero semantic configuration works exactly as before. Each extension (`useLinkedData`, `useAppSpec`, `useValidation`, `useProvenance`) adds capability without requiring the others.
+**Opt-in, incremental.** A Frank application with zero semantic configuration works exactly as before. Each surface adds capability without requiring the others.
 
 **Let tooling evolve independently.** Frank provides the semantic model; how agents consume it is not Frank's concern. Today that might be an LLM with HTTP tool use; tomorrow it might be something else entirely.
 
@@ -119,6 +84,6 @@ This work draws on ideas from the early Semantic Web vision — a worldwide data
 - [SHACL](https://www.w3.org/TR/shacl/) — Shapes Constraint Language
 - [PROV-O](https://www.w3.org/TR/prov-o/) — Provenance Ontology
 - [JSON-LD](https://www.w3.org/TR/json-ld11/) — JSON for Linking Data
-- [Frank.Statecharts](STATECHARTS.md) — Application-level state machines
-- [Spec Pipeline](SPEC-PIPELINE.md) — Bidirectional design spec pipeline
-- [Comparison with Webmachine and Freya](COMPARISON.md) — How Frank.Statecharts differs from protocol-level state machines
+- [STATECHARTS.md](STATECHARTS.md) — Application-level state machines (background reading; package pending rewrite)
+- [SPEC-PIPELINE.md](SPEC-PIPELINE.md) — Bidirectional design spec pipeline
+- [COMPARISON.md](COMPARISON.md) — Application-level vs. protocol-level state machines

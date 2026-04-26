@@ -4,56 +4,53 @@
 
 Frank is a lightweight F# library for building hypermedia web applications on ASP.NET Core. Its core principles:
 
-- **Resource-oriented** — HTTP resources are first-class citizens, defined as computation expressions with typed route patterns, method handlers, and metadata
-- **Library, not framework** — Frank wraps ASP.NET Core; it doesn't replace it. Authentication, routing, DI, and middleware are ASP.NET Core's responsibility. Frank adds the resource abstraction layer on top
-- **Idiomatic F#** — computation expressions, discriminated unions, pattern matching, and pure functions as the primary modeling tools
-- **Opt-in extensibility** — each extension (`Frank.Auth`, `Frank.OpenApi`, `Frank.Statecharts`, `Frank.Affordances`, `Frank.LinkedData`, `Frank.Datastar`, `Frank.Discovery`) is a separate package that adds capability without requiring the others
+- **Resource-oriented** — HTTP resources are first-class citizens, defined as computation expressions with typed route patterns, method handlers, and metadata.
+- **Library, not framework** — Frank wraps ASP.NET Core; it doesn't replace it. Authentication, routing, DI, and middleware are ASP.NET Core's responsibility. Frank adds the resource abstraction layer on top.
+- **Idiomatic F#** — computation expressions, discriminated unions, pattern matching, and pure functions as the primary modeling tools.
+- **Opt-in extensibility** — each extension is a separate package that adds capability without requiring the others.
 
 ## Where Frank Is Heading
 
-Frank's extensions are converging toward a broader goal: **applications that are legible to both humans and machines**. This is driven by three tracks of work:
+Frank's extensions are converging toward a broader goal: **applications that are legible to both humans and machines**. The architectural source of truth for the next two minor releases lives in `superpowers/specs/`:
 
-### Stateful Hypermedia
+| Spec | Scope |
+|------|-------|
+| [2026-04-20 — v7.3.2 Semantic Discovery](superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) | The semantic / discovery surface for v7.3.2 (Track B). |
+| [2026-04-21 — v7.4.0 Protocol Types](superpowers/specs/2026-04-21-v740-protocol-types-design.md) | Protocol types and MPST projection for v7.4.0 (Track A). |
+| [2026-04-23 — v7.4.0 Resource-Oriented Hypermedia](superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md) | Resource model, affordances, and HTTP surface for v7.4.0 (Track C). |
 
-[Frank.Statecharts](STATECHARTS.md) makes resources whose HTTP surface changes based on domain state — available methods, status codes, and representations all depend on where the resource is in its lifecycle. This is HATEOAS enforced at the framework level, not by convention.
+Everything else in this directory either supports those specs (theory, reference material) or is preserved as the as-built record of the five v7.3.2 shipping packages.
 
-### Semantic Self-Description
+## Shipping Packages (v7.3.2)
 
-The [Semantic Resources](SEMANTIC-RESOURCES.md) initiative (tracked in [#80](https://github.com/frank-fs/frank/issues/80)) makes applications serve machine-interpretable models of themselves — RDF graphs, ALPS profiles, SHACL constraints, provenance annotations. An agent that speaks HTTP can discover what the application does, what constraints it enforces, and how its state has changed over time.
+- `Frank` — Core CE builders (`resource`, `webHost`), ETag/conditional-request middleware, content negotiation.
+- `Frank.Auth` — Resource-level authorization extensions.
+- `Frank.OpenApi` — OpenAPI document generation with F# type schemas.
+- `Frank.Datastar` — Datastar SSE integration.
+- `Frank.Analyzers` — F# Analyzers for compile-time error detection.
 
-### Design-First Development
+Planned for v7.3.2 / v7.4.0 (do not exist in source yet — will be created per the specs above): `Frank.Semantic`, `Frank.Validation`, `Frank.LinkedData`, `Frank.Provenance`, `Frank.Discovery`, `Frank.Cli`.
 
-The [Spec Pipeline](SPEC-PIPELINE.md) (tracked in [#57](https://github.com/frank-fs/frank/issues/57)) enables a bidirectional workflow: start from design documents (WSD, SCXML, ALPS), generate implementations, then extract specs from running applications to verify and refine the design. The pipeline creates a continuous feedback loop between design intent and running code.
+## Top-level Documents
 
-Together, these tracks make Frank applications into **reflective artifacts** — systems that participate in their own evolution by exposing enough structure for agents to understand, evaluate, and propose changes.
+| Document | Description |
+|----------|-------------|
+| [AGENT_HYPOTHESIS.md](AGENT_HYPOTHESIS.md) | Thesis: feature-combination probability assessment for agentic API consumption; runtime-agent vs. authoring-agent roles. |
+| [AUTHORING_WORKFLOW.md](AUTHORING_WORKFLOW.md) | The author + agent workflow loop, derived from the three architectural specs. |
+| [SEMANTIC-RESOURCES.md](SEMANTIC-RESOURCES.md) | Vision: agent-legible applications via RDF/ALPS/SHACL/PROV-O and the reflection/refinement feedback loop. |
+| [SPEC-PIPELINE.md](SPEC-PIPELINE.md) | Bidirectional design-spec pipeline: WSD/SCXML/ALPS as input/output, cross-validation, codegen philosophy. |
+| [STATECHARTS.md](STATECHARTS.md) | User-facing introduction to stateful resources and statecharts. |
+| [MULTI-PARTY_SESSIONS.md](MULTI-PARTY_SESSIONS.md) | Runtime enforcement of multi-party protocol discipline; mapping MPST onto Frank's layers. |
+| [COMPARISON.md](COMPARISON.md) | Frank's stateful-resource layer vs. Webmachine and Freya — application-level vs. protocol-level state machines. |
+| [VIEW_ENGINE_COMPARISON.md](VIEW_ENGINE_COMPARISON.md) | HTML rendering options for Frank.Datastar (F# strings, Oxpecker.ViewEngine, Hox). |
+| [REFERENCES.md](REFERENCES.md) | Bibliography. |
 
 ## Directory Guide
 
 | Path | Contents |
 |------|----------|
-| `superpowers/specs/` | All feature specifications — from Spec Kit (001-016), Kitty Specs (ks-*), GitHub issues (gh-*), and Superpowers (date-prefixed) |
-| `superpowers/plans/` | All implementation plans — paired with specs |
-| [DECISIONS.md](DECISIONS.md) | Complete decision catalog (~400 decisions organized by era) |
-| [AUDIT.md](AUDIT.md) | Contradictions, evolution timeline, suspect findings, dropped designs, and [reset plan](AUDIT.md#reset-plan-types-first-inside-out) with per-component salvageability analysis |
+| `superpowers/specs/2026-04-*-design.md` | The three architectural specs that drive v7.3.2 and v7.4.0 work. |
+| `superpowers/specs/shipped/` | As-built design specs for the five v7.3.2 shipping packages (001–016). |
+| `superpowers/plans/shipped/` | Implementation plans paired with `specs/shipped/`. |
 
-## Design Documents
-
-| Document | Description |
-|----------|-------------|
-| [SEMANTIC-RESOURCES.md](SEMANTIC-RESOURCES.md) | Agent-legible applications: the vision for self-describing apps, the reflection/refinement feedback loop, and how the semantic layer connects to the spec pipeline |
-| [SPEC-PIPELINE.md](SPEC-PIPELINE.md) | Bidirectional design spec pipeline: WSD + SCXML + ALPS as the core trio, verification loop, LLM-assisted codegen philosophy, and CLI integration |
-| [STATECHARTS.md](STATECHARTS.md) | Application-level state machines: the `statefulResource` CE, guards, transitions, hierarchical statecharts, and the `IStateMachineStore` abstraction |
-| [COMPARISON.md](COMPARISON.md) | How Frank.Statecharts differs from Webmachine and Freya — application-level vs. protocol-level state machines |
-| [AGENT_HYPOTHESIS.md](AGENT_HYPOTHESIS.md) | Feature combination probability assessment for agentic API consumption |
-| [MULTI-PARTY_SESSIONS.md](MULTI-PARTY_SESSIONS.md) | Runtime enforcement of multi-party protocol discipline |
-| [REFERENCES.md](REFERENCES.md) | Cited works organized by category |
-| [VIEW_ENGINE_COMPARISON.md](VIEW_ENGINE_COMPARISON.md) | Comparison of HTML rendering approaches for Frank.Datastar |
-
-## Spec Naming Conventions
-
-| Prefix | Source | Era |
-|--------|--------|-----|
-| `001-016` | Spec Kit | v7.0–v7.2 (sound, released) |
-| `ks-001` through `ks-033` | Kitty Specs | v7.3.0 (sound subset migrated; suspect specs archived separately) |
-| `gh-NNN` | GitHub issues | v7.4.0 design specs extracted from issue bodies |
-| `YYYY-MM-DD-*` | Superpowers | v7.3.1+ design documents |
+History — earlier design eras (v7.3.0 Kitty Specs, v7.3.1 GitHub-issue specs, the consolidated `DECISIONS.md` / `AUDIT.md` / `STATECHARTS_ARCHITECTURE_DECISIONS.md` documents, and superseded date-prefixed specs) — is preserved in git history. Recover any of those with `git log -- <path>` followed by `git show <sha>:<path>`.

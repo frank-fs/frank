@@ -1,16 +1,13 @@
 ### v7.3.0–v7.4.0: Status and Errata
 
-> **These release notes were written during development and describe intended features. An [April 2026 audit](docs/AUDIT.md) found significant gaps between what was described and what was implemented. The audit is the authoritative source for current state. Key findings:**
+> **These release notes were written during v7.3.0/v7.3.1 development and describe intended features.** An April 2026 audit found significant gaps between what was described and what was implemented; the audit drove the v7.3.2 reset, which removed `Frank.Statecharts`, `Frank.Discovery`, `Frank.LinkedData`, `Frank.Validation`, `Frank.Provenance`, and `Frank.Cli` from source. v7.3.2 ships only `Frank`, `Frank.Auth`, `Frank.OpenApi`, `Frank.Datastar`, and `Frank.Analyzers`.
 >
-> - **Hierarchy is internal only.** The runtime computes LCA-based exit/entry paths correctly, but results are flat `string list` fields. The tree type (`TransitionStep`) specified in gh-286 was never created. Fork is a no-op. Hierarchy is invisible to every external consumer.
-> - **Provenance bridge never connected.** `Frank.Provenance` registers for `IObservable<TransitionEvent>` from DI. Nobody publishes it. The system silently does nothing. Additionally, two incompatible `TransitionEvent` types exist (generic vs. non-generic).
-> - **Dual derivation is flat.** `Dual.fs` (740 lines) has zero `TransitionAlgebra` references. AND-state parallel composition is explicitly not handled. The `DualAlgebra` interpreter designed to replace it was never built.
-> - **SHACL shapes are undiscoverable.** Shapes are served at `/shapes/{slug}` but no Link header points to them. The affordance middleware has no awareness of SHACL.
-> - **CLI pipeline is flat.** `frank extract` → `frank compile` → `model.bin` operates on flat `StateMachineMetadata`. All generated artifacts are flat regardless of source format capabilities.
-> - **`onTransition` is the only observer.** Scheduled for removal (D-006) but no replacement (TraceAlgebra) exists.
-> - **v7.3.0 had 5 of 54 issues closed with silently dropped requirements.** v7.3.1 was clean (0/13). v7.4.0 closed issues are mostly clean (5/30 with documented concerns, none silent).
+> The authoritative description of what's coming next lives in three design specs:
+> - [v7.3.2 semantic-discovery design](docs/superpowers/specs/2026-04-20-v732-semantic-discovery-design.md)
+> - [v7.4.0 protocol-types design](docs/superpowers/specs/2026-04-21-v740-protocol-types-design.md)
+> - [v7.4.0 resource-oriented hypermedia design](docs/superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md)
 >
-> **See [docs/AUDIT.md](docs/AUDIT.md) for the full forensic analysis and reset plan.**
+> Everything below this banner — the v7.3.0/v7.4.0 feature lists — describes the pre-reset implementation and is retained for historical context. Treat the specs above as the current contract.
 
 ---
 

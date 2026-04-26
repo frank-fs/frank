@@ -1,6 +1,6 @@
 # Spec Pipeline: Bidirectional Design Specifications
 
-> **Status (April 2026):** The input direction (spec → code) is sound — all parsers correctly capture hierarchy from source formats into the shared AST. The output direction (code → spec) operates on flat `StateMachineMetadata` / `ExtractedStatechart` types that have no hierarchy field. Generated artifacts are flat regardless of the source format's capabilities. The pipeline is asymmetrically bidirectional: hierarchy goes in, flat comes out. See [AUDIT.md](AUDIT.md) Act III and contradiction C-3/C-4 for the full analysis.
+> **Status (v7.3.2, April 2026):** `Frank.Cli` and the parser/generator suite were removed in the v7.3.2 reset and do not currently ship. The pipeline described below is the *target* design; it will be rebuilt per the [v7.4.0 protocol-types spec](superpowers/specs/2026-04-21-v740-protocol-types-design.md) (input direction) and the [v7.3.2 semantic-discovery spec](superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) (output direction). Treat this document as the conceptual contract the rebuild must satisfy.
 
 The spec pipeline enables a design-first development workflow for Frank applications. Start from a design document in any supported format, use LLM-assisted tooling to generate a working implementation, then extract specifications from the running application to verify and refine the design. The pipeline is bidirectional — every format works as both input and output.
 

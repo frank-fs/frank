@@ -1,4 +1,6 @@
-# How is Frank.Statecharts different from Webmachine or Freya?
+# How is Frank's stateful-resource layer different from Webmachine or Freya?
+
+> **Status (v7.3.2, April 2026):** This comparison was originally written about the v7.3.x `Frank.Statecharts` package, which was removed in the v7.3.2 reset. The conceptual contrast — application-level state vs. protocol-level state — is unchanged and continues to drive the v7.4.0 rewrite (see [2026-04-21](superpowers/specs/2026-04-21-v740-protocol-types-design.md), [2026-04-23](superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md)). Read "Frank.Statecharts" below as "Frank's stateful-resource layer."
 
 ## Executive Summary
 

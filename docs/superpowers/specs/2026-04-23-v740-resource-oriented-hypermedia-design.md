@@ -408,7 +408,7 @@ Track C builds in this order. Each step is independently testable against falsif
 - Track B — `docs/superpowers/specs/2026-04-20-v732-semantic-discovery-design.md`. Vocabulary registry, semantic codegen, lock file.
 - Authoring loop — `docs/AUTHORING_WORKFLOW.md`. Sketch → lift → generate → inspect → iterate.
 - Agent thesis — `docs/AGENT_HYPOTHESIS.md`. Feature combinations and probability ladder.
-- Archived statecharts ADR — `docs/STATECHARTS_ARCHITECTURE_DECISIONS.md`. The HTTP-binding layer Track C salvages.
+- Predecessor statecharts ADR — recoverable from git history (`git log -- docs/STATECHARTS_ARCHITECTURE_DECISIONS.md`). The HTTP-binding layer Track C salvages.
 - Oliveira, Turine, Masiero (2001). *A Statechart-Based Model for Hypermedia Applications*. ACM TOIS 19(1), 28–52. The HMBS formal anchor.
 - Li, Stutz, Wies, Zufferey (2023). *Complete Multiparty Session Type Projection with Automata*. CAV 2023. The projection algorithm Track A uses; consumed by Track C as the source of role-projected local types.
 - Fielding (2000). *Architectural Styles and the Design of Network-based Software Architectures*. The REST formulation Frank implements.

@@ -86,7 +86,7 @@ All v7.4.0 issues exist to fix these failures. Current feature status:
 
 ## Closing the Gap
 
-> **Status (April 2026):** All three thesis tracks depend on issue #286 (TransitionAlgebra types) as the critical path item. Implementation of #286 has been attempted multiple times — each attempt reintroduced flat-list patterns that the existing codebase gravitates toward. The per-issue probability estimates below assume #286 is complete and do not account for this repeated-failure pattern. The [April 2026 audit](AUDIT.md) documents 8 contradictions, 5 dropped designs, and a flat-data blast radius of ~15 functions in ~10 files that all need updating. The probability estimates should be read as conditional on resolving the flat-type bottleneck, not as unconditional forecasts.
+> **Status (v7.3.2, April 2026):** All three thesis tracks depend on the protocol algebra (`TransitionAlgebra`) being implemented correctly as a tree-shaped, hierarchy-preserving type rather than a flat-list approximation. Earlier attempts repeatedly collapsed to flat-list patterns; the v7.3.2 reset cleared that scar tissue and the algebra is being rebuilt per the [v7.4.0 protocol-types spec](superpowers/specs/2026-04-21-v740-protocol-types-design.md). The per-issue probability estimates below assume that rebuild lands cleanly. Read them as conditional on resolving the flat-type bottleneck, not as unconditional forecasts.
 
 ### Three thesis proof tracks
 
@@ -100,7 +100,7 @@ A naive client navigates the order fulfillment lifecycle using only Link headers
 |---|---|---|
 | [#286](https://github.com/frank-fs/frank/issues/286) | TransitionAlgebra + Abstractions package | ~88% |
 | [#283](https://github.com/frank-fs/frank/issues/283) | frank-cli extract --format fsharp | ~78% |
-| [#284](https://github.com/frank-fs/frank/issues/284) | Frank.Statecharts.Tools (MSBuild) | ~88% |
+| [#284](https://github.com/frank-fs/frank/issues/284) | MSBuild codegen integration | ~88% |
 | [#298](https://github.com/frank-fs/frank/issues/298) | Generated types + Link/Allow headers | ~80% |
 | [#299](https://github.com/frank-fs/frank/issues/299) | JSON Home entry point | ~90% |
 | [#272](https://github.com/frank-fs/frank/issues/272) | ALPS profile endpoint | ~90% |
@@ -160,7 +160,7 @@ Track A at **~87%** is high confidence — 8 issues, all refined, with the e2e t
 
 Track A+B+C at **~70%** is achievable — proving the complete thesis (REST + reactive + concurrent agents, all role-projected, all hierarchical) within v7.4.0 is realistic with well-defined plans. Each track is independently valuable; even if only Track A ships initially, Tracks B and C follow with their infrastructure already in place.
 
-**Remaining risk**: Design decisions now resolved and consolidated in [DECISIONS.md](DECISIONS.md). Contradictions between design and implementation documented in [AUDIT.md](AUDIT.md).
+**Remaining risk**: The design decisions and prior contradictions that drove the v7.3.2 reset are now consolidated in the three architectural specs ([2026-04-20](superpowers/specs/2026-04-20-v732-semantic-discovery-design.md), [2026-04-21](superpowers/specs/2026-04-21-v740-protocol-types-design.md), [2026-04-23](superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md)). The earlier `DECISIONS.md` and `AUDIT.md` analyses are recoverable from git history if the historical investigation is needed.
 
 ### Improving thesis probability
 

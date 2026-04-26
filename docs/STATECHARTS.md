@@ -1,6 +1,6 @@
 # Frank.Statecharts
 
-> **Status (April 2026):** The flat FSM features described in "Core Concepts" below work correctly — state-dependent method filtering, guards, transitions, stores, and the `statefulResource` CE. The "Hierarchical Statecharts" section describes hierarchy via nested DUs, which works for *modeling* but does not provide true Harel hierarchical semantics (AND-state parallelism, Fork, tree-structured transition results). The runtime internally computes hierarchy (LCA, exit/entry paths) but results are flat lists. See [AUDIT.md](AUDIT.md) for the full analysis and reset plan.
+> **Status (v7.3.2, April 2026):** `Frank.Statecharts` does **not** ship in v7.3.2. The package was removed during the v7.3.2 reset and will be rewritten per the v7.4.0 protocol-types and resource-oriented-hypermedia specs ([2026-04-21](superpowers/specs/2026-04-21-v740-protocol-types-design.md), [2026-04-23](superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md)). The code samples below describe the previous (v7.3.x) API surface and are retained as a conceptual primer; they will not compile against the current source tree. Treat this document as background reading until the rewrite lands.
 
 Frank.Statecharts adds application-level state machines to Frank, enabling resources whose HTTP surface changes based on persisted domain state. Each resource instance has its own state, and the framework enforces which HTTP methods are available, evaluates guards, and manages transitions automatically.
 
@@ -133,7 +133,7 @@ services.AddStateMachineStore<GameState, int>()
 
 ## Hierarchical Statecharts
 
-> **Status:** This section describes modeling hierarchy via nested DUs, which is a valid F# pattern for representing compound states. However, this is not the same as Harel hierarchical statechart semantics — AND-state parallelism, Fork operations, history pseudo-states as first-class constructs, and tree-structured transition results. The runtime has a `StateHierarchy` type that computes LCA-based exit/entry paths (PR #221, #259), but its output is flat `string list` fields. The `TransitionStep` tree type specified in [gh-286](https://github.com/frank-fs/frank/issues/286) was never created. `onTransition` below is the only observer mechanism and is scheduled for replacement by a TraceAlgebra interpreter that does not yet exist. See [AUDIT.md](AUDIT.md) for the full timeline.
+> **Status:** This section describes modeling hierarchy via nested DUs — a valid F# pattern for representing compound states, but not the same as Harel hierarchical statechart semantics (AND-state parallelism, Fork, history pseudo-states as first-class constructs, tree-structured transition results). True Harel semantics are specified in the [v7.4.0 protocol-types design](superpowers/specs/2026-04-21-v740-protocol-types-design.md) (`TransitionAlgebra`, projection, dual derivation) and will land when that work ships.
 
 Frank.Statecharts supports hierarchical (nested) state machines through F#'s discriminated unions -- no special framework support required.
 

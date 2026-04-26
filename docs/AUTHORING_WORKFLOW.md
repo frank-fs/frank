@@ -363,4 +363,5 @@ Every stage has its own failure modes, documented in context above. Cross-cuttin
 
 - [protocol-types ADR](./superpowers/specs/2026-04-21-v740-protocol-types-design.md) — algebra, projection, codegen, verification, build order. Appendix R documents the intake pipeline this workflow consumes.
 - [v7.3.2 semantic-discovery spec](./superpowers/specs/2026-04-20-v732-semantic-discovery-design.md) — vocabulary CE, convention engine, lock file, MSBuild codegen. The semantic half of Stage 3.
+- [v7.4.0 resource-oriented hypermedia spec](./superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md) — resource model, affordances, and HTTP surface. The HTTP half of Stage 3 and the inspection target for Stage 4.
 - [AGENT_HYPOTHESIS.md](./AGENT_HYPOTHESIS.md) — the runtime-agent thesis this workflow’s authoring agents run in parallel to. See the “Two agent roles” section for the runtime/authoring split. The design principles in this document (deterministic tool surface, self-description, state coordination) are the authoring-time mirror of the runtime-agent architecture described there.
