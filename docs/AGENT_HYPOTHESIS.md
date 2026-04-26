@@ -28,6 +28,22 @@ The runtime artifacts (ALPS, SHACL violations, OPTIONS responses, journal traces
 
 These three are independent: Q1 can succeed while Q2 fails (LLMs are smart enough at runtime, but tooling adds little authoring value), Q2 can succeed while Q1 fails (codegen wins on the developer side but agents still struggle at runtime), and Q3 requires both Q1 and Q2 mechanisms to be in place to test at all.
 
+### The goal is the seam, not the ceiling
+
+The thesis is not "all features matter." It is "find the *minimum sufficient combination* of features that drives correct agent behavior." Not all agent capabilities are always available — a session may lack tools, prior authoring context, or feedback-loop memory — and the framework must work across that variance. The diminishing-returns analysis of the Five-Level Demo is the experiment's primary output: at which feature layer does adding more discovery / formalism / structure stop reducing iteration cost? That layer is the seam, and it tells us where to stop investing.
+
+### Smallest-sufficient-model is the cost-efficiency win
+
+A successful framework lets cheaper models do agent work that previously required expensive ones. The deeper goal is: route most agent work to Haiku, Sonnet for harder problems, Opus for genuinely hard cases only. The Five-Level Demo therefore measures across three model sizes (Haiku / Sonnet / Opus) and reports, per F-layer, the *smallest model that achieves the iteration-cost floor*. If Haiku reaches near-instant success at F4, that is where the cost-efficiency goal lands.
+
+### What depends on v7.3.2+ and what doesn't
+
+Q1 (runtime / agent hypothesis) is provable on the foundational state machine alone, via hand-authored discovery. The tic-tac-toe experiment does exactly this — no v7.3.2+ machinery required.
+
+Q2 (authoring pit of success) and Q3 (continuous-improvement feedback loop) genuinely require the v7.3.2+ infrastructure: the codegen pipeline, vocabulary lock, analyzers, Li-et-al implementability check, MSBuild integration. Statecharts and MPST as design patterns stay foundational and agent-facing — the state machine that drives projection at richer F-layers is part of the design from the beginning. The *additional formal verification structure of v7.3.2+* is what's developer-facing and what Q2/Q3 measure.
+
+This split lets us prove Q1 first via measurement, then decide whether v7.3.2+'s authoring-side investment is justified by the Q1 results plus the predicted Q2/Q3 wins.
+
 ## Two agent roles: runtime and authoring
 
 This document's probability tables and demos concern the **runtime agent** — an LLM or rule-based client that consumes a running Frank application, reads its discovery surface, and drives it to correct completion. That is the load-bearing empirical claim the thesis has to defend, and its confidence level is the one the Five-Level Demo measures.
@@ -242,13 +258,15 @@ However, LLMs *can* use these standards effectively when told to. The RFCs are w
 
 The Five-Level Demo answers Q1 (runtime iteration cost) directly. The same demo also instruments Q2 and Q3 because each level supplies a different richness of feedback to an authoring agent.
 
+**Baseline note:** the v7.2.0 baseline ships `Frank.OpenApi` (route-table → OpenAPI doc), so any reference application at Level 0 already serves an OpenAPI document at a standard path. The agent at Level 0 has *that* doc plus HTTP headers — it does not have a no-discovery surface. The Five-Level gradient measures HATEOAS additions *over* the OpenAPI baseline, which is the realistic comparison against schema-first APIs.
+
 | Level | Agent Setup | Discovery Mechanism | Expected Success | Q2/Q3 instrument |
 |---|---|---|---|---|
-| **0** | URL only, API headers only | LLM must find `Link`/`Allow` in HTTP headers | ~30-40% | Authoring agent sees only HTTP — sparse diagnostic surface |
+| **0** | URL only; OpenAPI doc + HTTP headers available | LLM may read OpenAPI doc; must find `Link`/`Allow` in HTTP headers | ~30-40% | Authoring agent sees OpenAPI + HTTP — moderate diagnostic surface |
 | **1** | URL only, HTML discovery page | `<link>` tags, semantic HTML, human-readable instructions | ~60-70% | Authoring agent reads same HTML the runtime agent does |
 | **2** | URL only, HTML + agent welcome | The page explicitly teaches the agent how to use the API | ~80% | Application self-explains — authoring loop reads the welcome page as a contract |
 | **3** | 3-sentence system prompt | External instruction to follow HTTP standards | ~80-85% | Same as L2 plus baseline-vs-instructed comparison data |
-| **4** | MCP tool-augmented | `fetch_and_parse_links` tool for mechanical header parsing | ~95% | Authoring loop has full structured access to journal/discovery state |
+| **4** | RPC-tool-call MCP (the OpenAPI-style alternative) | App exposed as MCP tool calls (`new_game`, `get_board`, `make_move`, ...) — no HTTP discovery surface | ~95% | The *null hypothesis* Frank's HATEOAS thesis competes against, not a discovery aid. If F4–F5 + E1 matches or beats this ceiling, the thesis holds: discovery reaches RPC parity with one-time framework investment vs per-API tool authoring. The earlier "MCP tool that parses discovery headers" framing was retired — it tested server-metadata completeness, which the rest of the experiment already assumes (circular). The replacement RPC MCP is built as part of the tic-tac-toe layered experiment. |
 
 Example system prompt for Level 3:
 
