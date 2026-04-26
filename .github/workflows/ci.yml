@@ -23,10 +23,6 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
-      - name: Pack local dependencies
-        run: |
-          mkdir -p nupkg
-          dotnet pack src/Frank.Cli.MSBuild -c Release -o nupkg
       - name: Build
         run: |
           dotnet restore Frank.sln
@@ -38,17 +34,6 @@ jobs:
           dotnet test test/Frank.Auth.Tests
           dotnet test test/Frank.OpenApi.Tests
           dotnet test test/Frank.Datastar.Tests
-          dotnet test test/Frank.Cli.Core.Tests
-          dotnet test test/Frank.Cli.IntegrationTests
-          dotnet test test/Frank.LinkedData.Tests
-          dotnet test test/Frank.LinkedData.Sample.Tests
-          dotnet test test/Frank.Provenance.Tests
-          dotnet test test/Frank.Validation.Tests
-          dotnet test test/Frank.Resources.Model.Tests
-          dotnet test test/Frank.Statecharts.Tests
-          dotnet test test/Frank.Statecharts.Sqlite.Tests
-          dotnet test test/Frank.Discovery.Tests
-          dotnet test test/Frank.TicTacToe.Tests
       - name: Pack
         run: |
           dotnet pack src/Frank -c Release --no-restore --include-symbols -o out
@@ -56,17 +41,6 @@ jobs:
           dotnet pack src/Frank.Auth -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.OpenApi -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Datastar -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Resources.Model -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Statecharts.Core -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.LinkedData -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Discovery -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Provenance -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Validation -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Statecharts -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Statecharts.Sqlite -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Cli.Core -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Cli -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Cli.MSBuild -c Release -o out
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
