@@ -3,8 +3,6 @@ module Frank.Tests.ConditionalRequestIntegrationTests
 open System
 open System.Net
 open System.Net.Http
-open System.Security.Cryptography
-open System.Text
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -16,18 +14,6 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging.Abstractions
 open Expecto
 open Frank
-
-// -- Statechart types for StatechartETagProvider tests --
-
-type ItemState =
-    | Active
-    | Completed
-
-type ItemContext = { Name: string; UpdateCount: int }
-
-let contextSerializer (ctx: ItemContext) : byte[] =
-    let json = sprintf """{"name":"%s","updateCount":%d}""" ctx.Name ctx.UpdateCount
-    Encoding.UTF8.GetBytes(json)
 
 /// Disposable wrapper for test server resources.
 type TestServer<'P>(app: WebApplication, client: HttpClient, provider: 'P, cache: ETagCache) =
@@ -41,7 +27,7 @@ type TestServer<'P>(app: WebApplication, client: HttpClient, provider: 'P, cache
             (cache :> IDisposable).Dispose()
             app.DisposeAsync()
 
-// -- Dictionary-backed IETagProvider for non-statechart integration tests --
+// -- Dictionary-backed IETagProvider for integration tests --
 
 /// Mutable ETag provider wrapping an in-memory dictionary of instance ID -> raw ETag value.
 /// Raw values are unquoted; the middleware quotes them via ETagFormat.quote.
@@ -131,68 +117,6 @@ let createIntegrationTestServer () =
 
     app.Start()
     new TestServer<_>(app, app.GetTestClient(), provider, cache)
-
-/// Creates a test server backed by StatechartETagProvider using MailboxProcessorStore.
-let createStatechartTestServer () =
-    let store =
-        new Frank.Statecharts.MailboxProcessorStore<ItemState, ItemContext>(
-            NullLogger<Frank.Statecharts.MailboxProcessorStore<ItemState, ItemContext>>.Instance
-        )
-
-    let etagProvider =
-        Frank.Statecharts.StatechartETagProvider<ItemState, ItemContext>(store, contextSerializer)
-
-    let factory = DictionaryETagProviderFactory(etagProvider)
-    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
-    let builder = WebApplication.CreateBuilder([||])
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddRouting() |> ignore
-    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-
-    builder.Services.AddSingleton<IETagProviderFactory>(factory :> IETagProviderFactory)
-    |> ignore
-
-    builder.Services.AddLogging() |> ignore
-    let app = builder.Build()
-
-    (app :> IApplicationBuilder).UseRouting() |> ignore
-
-    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-    |> ignore
-
-    let etagMetadata =
-        ETagMetadata("items", fun ctx -> ctx.Request.RouteValues.["id"] :?> string)
-
-    app
-        .MapMethods(
-            "/items/{id}",
-            [| "GET"; "HEAD" |],
-            Func<HttpContext, Task>(fun ctx ->
-                task {
-                    let id = ctx.Request.RouteValues.["id"] :?> string
-                    do! ctx.Response.WriteAsync(sprintf "Statechart item %s" id)
-                }
-                :> Task)
-        )
-        .WithMetadata(etagMetadata)
-    |> ignore
-
-    app
-        .MapMethods(
-            "/items/{id}",
-            [| "POST" |],
-            Func<HttpContext, Task>(fun ctx ->
-                task {
-                    let id = ctx.Request.RouteValues.["id"] :?> string
-                    do! ctx.Response.WriteAsync(sprintf "Statechart mutated %s" id)
-                }
-                :> Task)
-        )
-        .WithMetadata(etagMetadata)
-    |> ignore
-
-    app.Start()
-    new TestServer<_>(app, app.GetTestClient(), store, cache)
 
 [<Tests>]
 let conditionalRequestIntegrationTests =
@@ -375,66 +299,4 @@ let conditionalRequestIntegrationTests =
               Expect.isTrue (etag.StartsWith("\"")) "ETag should start with quote"
               Expect.isTrue (etag.EndsWith("\"")) "ETag should end with quote"
               Expect.equal etag "\"0a1b2c3d4e5f6789\"" "ETag should be quoted raw hex value"
-          }
-
-          // -- StatechartETagProvider integration: ETag from statechart state --
-          testTask "StatechartETagProvider computes ETag from state and context" {
-              use s = createStatechartTestServer ()
-
-              // Set initial state
-              do!
-                  (s.Provider :> Frank.Statecharts.IStatechartsStore<ItemState, ItemContext>).Save
-                      "item1"
-                      { State = Active
-                        Context = { Name = "Widget"; UpdateCount = 0 }
-                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
-                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
-
-              let! (response: HttpResponseMessage) = s.Client.GetAsync("/items/item1")
-              Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
-              Expect.isTrue (response.Headers.ETag <> null) "Should have ETag from statechart provider"
-              let etag1 = response.Headers.ETag.ToString()
-              // ETag should be quoted hex (32 lowercase hex chars inside quotes)
-              Expect.isTrue (etag1.StartsWith("\"")) "Statechart ETag should be quoted"
-              Expect.isTrue (etag1.EndsWith("\"")) "Statechart ETag should be quoted"
-              let innerEtag1 = etag1.Trim('"')
-              Expect.equal innerEtag1.Length 32 "Statechart ETag inner value should be 32 hex chars"
-
-              Expect.isTrue
-                  (innerEtag1 |> Seq.forall (fun c -> "0123456789abcdef".Contains(string c)))
-                  "Statechart ETag should be lowercase hex"
-          }
-
-          // -- StatechartETagProvider: ETag changes when state changes --
-          testTask "StatechartETagProvider produces different ETag after state change" {
-              use s = createStatechartTestServer ()
-              let storeI = s.Provider :> Frank.Statecharts.IStatechartsStore<ItemState, ItemContext>
-
-              // Set initial state
-              do!
-                  storeI.Save
-                      "item2"
-                      { State = Active
-                        Context = { Name = "Gadget"; UpdateCount = 0 }
-                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
-                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
-
-              let! (r1: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
-              let etag1 = r1.Headers.ETag.ToString()
-
-              // Invalidate cache and change state
-              s.Cache.Invalidate("/items/item2")
-
-              do!
-                  storeI.Save
-                      "item2"
-                      { State = Completed
-                        Context = { Name = "Gadget"; UpdateCount = 1 }
-                        HierarchyConfig = Frank.Statecharts.ActiveStateConfiguration.empty
-                        HistoryRecord = Frank.Statecharts.HistoryRecord.empty }
-
-              let! (r2: HttpResponseMessage) = s.Client.GetAsync("/items/item2")
-              let etag2 = r2.Headers.ETag.ToString()
-
-              Expect.notEqual etag1 etag2 "ETag should change after state transition"
           } ]

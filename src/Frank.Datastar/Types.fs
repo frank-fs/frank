@@ -16,6 +16,7 @@ type PatchElementsOptions =
       Namespace: PatchElementNamespace
       EventId: string voption
       Retry: TimeSpan }
+
     static member Defaults =
         { Selector = ValueNone
           PatchMode = Consts.DefaultElementPatchMode
@@ -29,6 +30,7 @@ type RemoveElementOptions =
     { UseViewTransition: bool
       EventId: string voption
       Retry: TimeSpan }
+
     static member Defaults =
         { UseViewTransition = Consts.DefaultElementsUseViewTransitions
           EventId = ValueNone
@@ -39,6 +41,7 @@ type PatchSignalsOptions =
     { OnlyIfMissing: bool
       EventId: string voption
       Retry: TimeSpan }
+
     static member Defaults =
         { OnlyIfMissing = Consts.DefaultPatchSignalsOnlyIfMissing
           EventId = ValueNone
@@ -46,11 +49,14 @@ type PatchSignalsOptions =
 
 [<Struct>]
 type ExecuteScriptOptions =
-    { EventId: string voption
-      Retry: TimeSpan
-      AutoRemove: bool
-      /// Pre-formed attribute strings written verbatim to the &lt;script&gt; tag
-      Attributes: string[] }
+    {
+        EventId: string voption
+        Retry: TimeSpan
+        AutoRemove: bool
+        /// Pre-formed attribute strings written verbatim to the &lt;script&gt; tag
+        Attributes: string[]
+    }
+
     static member Defaults =
         { EventId = ValueNone
           Retry = Consts.DefaultSseRetryDuration

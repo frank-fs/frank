@@ -53,8 +53,7 @@ let private permissiveDefault: AffordanceResult =
 
 /// Convert an AffordanceMapEntry to an AffordanceResult with computed booleans.
 let private entryToResult (entry: AffordanceMapEntry) : AffordanceResult =
-    let methods =
-        entry.AllowedMethods |> List.map (fun m -> m.ToUpperInvariant())
+    let methods = entry.AllowedMethods |> List.map (fun m -> m.ToUpperInvariant())
 
     { AllowedMethods = entry.AllowedMethods
       LinkRelations = entry.LinkRelations
@@ -65,17 +64,12 @@ let private entryToResult (entry: AffordanceMapEntry) : AffordanceResult =
       CanPatch = List.contains "PATCH" methods }
 
 /// Build the composite key used to look up entries in the affordance map.
-let private compositeKey (routeTemplate: string) (stateKey: string) : string =
-    $"{routeTemplate}|{stateKey}"
+let private compositeKey (routeTemplate: string) (stateKey: string) : string = $"{routeTemplate}|{stateKey}"
 
 /// Look up the available affordances for a given route template and state key.
 /// Returns AffordanceResult with available methods and convenience booleans.
 /// If the map is None or the key is not found, returns a permissive default.
-let affordancesFor
-    (routeTemplate: string)
-    (stateKey: string)
-    (map: AffordanceMap option)
-    : AffordanceResult =
+let affordancesFor (routeTemplate: string) (stateKey: string) (map: AffordanceMap option) : AffordanceResult =
     match map with
     | None -> permissiveDefault
     | Some m ->

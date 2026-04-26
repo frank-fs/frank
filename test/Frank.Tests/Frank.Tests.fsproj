@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
-    <ProjectReference Include="../../src/Frank.Statecharts/Frank.Statecharts.fsproj" />
   </ItemGroup>
 
 </Project>

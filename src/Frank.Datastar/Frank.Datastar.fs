@@ -148,7 +148,10 @@ module Datastar =
     /// let jsonOpts = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     /// let! signals = Datastar.tryReadSignalsWithOptions&lt;MySignals&gt; jsonOpts ctx
     /// </example>
-    let inline tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
+    let inline tryReadSignalsWithOptions<'T>
+        (jsonOptions: JsonSerializerOptions)
+        (ctx: HttpContext)
+        : Task<voption<'T>> =
         ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)
 
     // --- Stream-based variants ---
@@ -158,25 +161,41 @@ module Datastar =
     let inline streamPatchElements (writer: TextWriter -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer)
 
-    let inline streamPatchElementsWithOptions (options: PatchElementsOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+    let inline streamPatchElementsWithOptions
+        (options: PatchElementsOptions)
+        (writer: TextWriter -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer, options)
 
     let inline streamRemoveElement (writer: TextWriter -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer)
 
-    let inline streamRemoveElementWithOptions (options: RemoveElementOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+    let inline streamRemoveElementWithOptions
+        (options: RemoveElementOptions)
+        (writer: TextWriter -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer, options)
 
     let inline streamPatchSignals (writer: TextWriter -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer)
 
-    let inline streamPatchSignalsWithOptions (options: PatchSignalsOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+    let inline streamPatchSignalsWithOptions
+        (options: PatchSignalsOptions)
+        (writer: TextWriter -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer, options)
 
     let inline streamExecuteScript (writer: TextWriter -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer)
 
-    let inline streamExecuteScriptWithOptions (options: ExecuteScriptOptions) (writer: TextWriter -> Task) (ctx: HttpContext) =
+    let inline streamExecuteScriptWithOptions
+        (options: ExecuteScriptOptions)
+        (writer: TextWriter -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer, options)
 
     // --- Stream-based variants (Stream -> Task) ---
@@ -186,23 +205,39 @@ module Datastar =
     let inline streamPatchElementsToStream (writer: Stream -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer)
 
-    let inline streamPatchElementsToStreamWithOptions (options: PatchElementsOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+    let inline streamPatchElementsToStreamWithOptions
+        (options: PatchElementsOptions)
+        (writer: Stream -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.PatchElementsAsync(ctx.Response, writer, options)
 
     let inline streamRemoveElementToStream (writer: Stream -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer)
 
-    let inline streamRemoveElementToStreamWithOptions (options: RemoveElementOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+    let inline streamRemoveElementToStreamWithOptions
+        (options: RemoveElementOptions)
+        (writer: Stream -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.RemoveElementAsync(ctx.Response, writer, options)
 
     let inline streamPatchSignalsToStream (writer: Stream -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer)
 
-    let inline streamPatchSignalsToStreamWithOptions (options: PatchSignalsOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+    let inline streamPatchSignalsToStreamWithOptions
+        (options: PatchSignalsOptions)
+        (writer: Stream -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.PatchSignalsAsync(ctx.Response, writer, options)
 
     let inline streamExecuteScriptToStream (writer: Stream -> Task) (ctx: HttpContext) =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer)
 
-    let inline streamExecuteScriptToStreamWithOptions (options: ExecuteScriptOptions) (writer: Stream -> Task) (ctx: HttpContext) =
+    let inline streamExecuteScriptToStreamWithOptions
+        (options: ExecuteScriptOptions)
+        (writer: Stream -> Task)
+        (ctx: HttpContext)
+        =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, writer, options)

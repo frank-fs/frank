@@ -11,31 +11,31 @@ module internal ServerSentEvent =
     let private retryPrefix = "retry: "B
     let dataPrefix = "data: "B
 
-    let inline private writeUtf8String (str:string) (writer:IBufferWriter<byte>) =
+    let inline private writeUtf8String (str: string) (writer: IBufferWriter<byte>) =
         let span = writer.GetSpan(Encoding.UTF8.GetByteCount(str))
         let bytesWritten = Encoding.UTF8.GetBytes(str.AsSpan(), span)
         writer.Advance(bytesWritten)
         writer
 
-    let inline writeUtf8Literal (bytes:byte[]) (writer:IBufferWriter<byte>) =
+    let inline writeUtf8Literal (bytes: byte[]) (writer: IBufferWriter<byte>) =
         let span = writer.GetSpan(bytes.Length)
         bytes.AsSpan().CopyTo(span)
         writer.Advance(bytes.Length)
         writer
 
-    let inline private writeUtf8Segment (segment:StringSegment) (writer:IBufferWriter<byte>) =
+    let inline private writeUtf8Segment (segment: StringSegment) (writer: IBufferWriter<byte>) =
         let span = writer.GetSpan(Encoding.UTF8.GetByteCount(segment))
         let bytesWritten = Encoding.UTF8.GetBytes(segment.AsSpan(), span)
         writer.Advance(bytesWritten)
         writer
 
-    let inline writeSpace (writer:IBufferWriter<byte>) =
+    let inline writeSpace (writer: IBufferWriter<byte>) =
         let span = writer.GetSpan(1)
         span[0] <- 32uy // ' '
         writer.Advance(1)
         writer
 
-    let inline writeNewline (writer:IBufferWriter<byte>) =
+    let inline writeNewline (writer: IBufferWriter<byte>) =
         let span = writer.GetSpan(1)
         span[0] <- 10uy // '\n'
         writer.Advance(1)
@@ -49,7 +49,7 @@ module internal ServerSentEvent =
     let inline sendEventId eventId writer =
         writer |> writeUtf8Literal idPrefix |> writeUtf8String eventId |> writeNewline
 
-    let inline sendRetry (retry:TimeSpan) writer =
+    let inline sendRetry (retry: TimeSpan) writer =
         writer
         |> writeUtf8Literal retryPrefix
         |> writeUtf8String (retry.TotalMilliseconds.ToString())
@@ -71,6 +71,7 @@ module internal ServerSentEvent =
         |> (fun writer ->
             strings
             |> Seq.iter (fun string -> writer |> writeUtf8String string |> writeSpace |> ignore)
+
             writer)
         |> writeNewline
 

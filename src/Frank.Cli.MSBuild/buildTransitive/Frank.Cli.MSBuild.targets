@@ -1,3 +1,0 @@
-<Project>
-  <Import Project="../build/Frank.Cli.MSBuild.targets" />
-</Project>

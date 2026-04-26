@@ -10,11 +10,11 @@ Frank is built on four ideas:
 
 **Resources, not routes.** HTTP resources are the unit of design. You define what a resource is and what it can do — the framework handles routing, method dispatch, and metadata. This is REST as Fielding described it, not the "REST" that became a synonym for JSON-over-HTTP.
 
-**Make invalid states unrepresentable.** Statechart-enforced state machines govern resource behavior at the framework level. If a transition isn't legal, it isn't available — in the response headers, in the HTML controls, in the API surface. No defensive coding required.
+**Make invalid states unrepresentable.** Resource behavior is constrained at the framework level so illegal interactions never appear in the response surface — not in headers, not in advertised affordances, not in rendered controls. The work shifts from defensive runtime checks to structural impossibility.
 
-**Built for the age of agents.** Frank provides CLI tooling and extension libraries that layer semantic metadata onto your application — ALPS profiles, Link headers, JSON Home documents, OWL ontologies. Developers and agents can reflect on a running application, understand its capabilities, and refine it continuously.
+**Built for the age of agents.** Frank treats LLM-based and rule-based clients as first-class consumers. Semantic vocabularies, ALPS profiles, JSON Home directories, and Link relations describe what an application is and what it can do, so an agent that understands HTTP can navigate without an SDK or hand-written tool definitions.
 
-**Discovery is a first-class concern.** A Frank application is understandable from a cold start. JSON Home documents advertise available resources. `Link` headers connect them. `Allow` headers declare what's possible in the current state. ALPS profiles define what things mean. Semantic web vocabularies give structure a shared language. No SDK, no out-of-band documentation — the application explains itself through standard HTTP, content negotiation, and open standards that clients (human or machine) can navigate without prior knowledge.
+**Discovery is a first-class concern.** A Frank application is understandable from a cold start. JSON Home documents advertise available resources, `Link` headers connect them, `Allow` headers declare what's possible in the current state, and ALPS profiles define what things mean. No SDK, no out-of-band documentation — the application explains itself through standard HTTP, content negotiation, and open standards that clients (human or machine) can navigate without prior knowledge.
 
 ```fsharp
 let home =
@@ -556,10 +556,8 @@ The `sample/` directory contains several example applications:
 ## References
 
 - [Design Documents](docs/) — Design philosophy, vision, and architecture documents
-- [Frank.Statecharts Guide](docs/STATECHARTS.md) — Core concepts, hierarchical statechart support, guards, and test coverage overview
 - [Semantic Resources Vision](docs/SEMANTIC-RESOURCES.md) — Agent-legible applications and the self-describing app architecture
 - [Spec Pipeline](docs/SPEC-PIPELINE.md) — Bidirectional design spec pipeline (WSD, SCXML, ALPS)
-- [How is this different from Webmachine or Freya?](docs/COMPARISON.md) — Detailed comparison of Frank.Statecharts with Webmachine and Freya's approach to HTTP resource state machines
 
 ---
 
