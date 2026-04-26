@@ -17,10 +17,7 @@ Architectural pivot from split-concern model (statecharts and session types as s
 
 Track B ships before Track A. Track B proves the semantic discovery hypothesis: a naive client with no hardcoded knowledge can discover, understand, and navigate an API using standard HTTP mechanisms (JSON Home, ALPS, Link headers, OPTIONS, SHACL shapes, JSON-LD contexts).
 
-Reference documents:
-- `docs/brainstorms/V732_DECISIONS.md` — decisions log, open questions entering this design
-- `docs/brainstorms/session_handoff_2026-04-20.md` — architectural pivot context
-- `docs/STATECHARTS_ARCHITECTURE_DECISIONS.archive.md` — archived, contains salvageable AD-13/AD-14/AD-16
+This spec synthesises a v7.3.2 decisions log, the architectural pivot that produced the Track A/B/C split, and the load-bearing decisions (AD-13, AD-14, AD-16) from the predecessor statecharts architecture document. None of those source artifacts ship in the repository — they were drafting notes, captured here in normative form. The predecessor statecharts ADR is recoverable from git history: `git log -- docs/STATECHARTS_ARCHITECTURE_DECISIONS.md` then `git show <sha>:docs/STATECHARTS_ARCHITECTURE_DECISIONS.md`.
 
 ---
 
@@ -568,7 +565,7 @@ Output: list of working code to salvage vs code to rewrite.
 
 ## Section 8: Open questions resolved in this design
 
-From V732_DECISIONS.md:
+From the v7.3.2 decisions log this spec consolidates:
 
 | Question | Resolution |
 |----------|-----------|
@@ -597,7 +594,7 @@ Explicitly not addressed in v7.3.2:
 
 ## Relationship to other documents
 
-- `docs/brainstorms/V732_DECISIONS.md` — decisions log; this spec resolves the open questions
-- `docs/brainstorms/session_handoff_2026-04-20.md` — architectural pivot context, Track A/B/C rationale
-- `docs/STATECHARTS_ARCHITECTURE_DECISIONS.archive.md` — AD-13, AD-14, AD-16 contain the load-bearing design this spec operationalizes for Track B
-- Track A + Track C designs — separate, v7.4.0
+- The v7.3.2 decisions log and the 2026-04-20 architectural-pivot session that established the Track A/B/C split — drafting notes consolidated into this spec; not in the repository.
+- The predecessor statecharts ADR (AD-13, AD-14, AD-16 contain the load-bearing design this spec operationalises for Track B) — recoverable from git history at `docs/STATECHARTS_ARCHITECTURE_DECISIONS.md` (deleted in the v7.3.2 docs cleanup).
+- Track A protocol-types design — `docs/superpowers/specs/2026-04-21-v740-protocol-types-design.md`. v7.4.0.
+- Track C resource-oriented hypermedia design — `docs/superpowers/specs/2026-04-23-v740-resource-oriented-hypermedia-design.md`. v7.4.0.
