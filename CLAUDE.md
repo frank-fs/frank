@@ -106,18 +106,39 @@ Adapted from Gerard Holzmann's "Power of Ten" (NASA/JPL). These apply to all cod
 ## Workflow Rules
 
 ### Git workflow
-- **Trunk-based development.** Commit directly to master. Use worktrees for multi-commit features or work that benefits from isolation (parallel agents, risky experiments). Small, targeted changes — config, docs, single-file fixes, rule updates — go straight to master without a branch or PR.
-- **PRs must include `Closes #XX`** in the body to auto-close related issues (when applicable).
-- **Never push without explicit approval.** Pushing to remote master is a destructive op — always ask first.
-- **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first. The branch with the most shared-file changes merges last to minimize rebase churn.
-- **Always use `isolation: "worktree"` for implementation/fix agents.** Non-isolated agents lack Bash/Read permissions even when pointed at accessible paths. For fix agents on existing branches, include `git fetch origin <branch> && git checkout <branch>` in the prompt. The agent's `EnterWorktree` tool handles worktree creation.
-- **Worktree agent Bash commands must be standalone.** Compound commands (`cd /path && dotnet build`) don't match pre-approved `Bash(dotnet:*)` patterns. Instruct agents to run `cd /path/to/worktree` as a separate Bash call first (working directory persists), then run standalone commands (`dotnet build Frank.sln`). Also `mkdir -p nupkg` in each worktree before building.
-- **Verify fix agent output before pushing.** Always build+test fix agent output in a clean worktree before pushing. Agent output may be partial due to rate limits or permission failures — never assume it's complete.
-- **Verification sequence before PRs.** Before creating a PR, run the full verification sequence: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review`. Address findings before opening the PR.
-- **Section-by-section audit before closing.** When an issue has multiple sections (e.g., "Operational MPST" + "Wadler/dual"), verify every requirement in every section before closing. Don't close an issue because one section is done.
-- **PRs must enumerate all issue requirements with status.** For each requirement in the linked issue, the PR body must state: implemented, blocked by #X, or deferred with rationale. "Closes #X" without per-requirement accounting is insufficient.
-- **Never close issues with unfulfilled-dependency requirements.** If an issue has requirements that depend on open issues (#124, #125, etc.), leave the issue open. Either split it (done-now vs blocked) or add a comment listing what's blocked. The user decides when to close.
-- **Never create issues, PRs, or take external actions while discussing.** Wait for explicit go-ahead ("yes", "create it", "go ahead"). Presenting a draft is not permission to act on it.
+
+Frank operates in two modes depending on contributor type. Default is trunk-based; PRs are a fallback.
+
+**Default — trunk-based (sole maintainer).** Used when working in this session as the maintainer.
+
+- **Worktrees → fast-forward merge into master → push.** Feature work happens in `.claude/worktrees/<name>` on a feature branch. Merge fast-forward only into local master, then push. Small targeted changes (config, docs, single-file fixes, rule updates) go straight to master in a worktree.
+- **Setup required:** `git config core.hooksPath hooks` so pre-commit, pre-push, post-merge, and other hooks fire. Without this, the protections below are inactive.
+- **Master is protected.** Two layers:
+  - **Server (`.github/rulesets/master-protection.json`):** blocks deletion, requires linear history, requires "Build and pack" CI status check to pass on the SHA before push lands.
+  - **Local (`hooks/pre-push`):** blocks deletes and non-fast-forward pushes whose local tracking ref is stale (replicates `--force-with-lease` semantics). Feature branches unrestricted.
+- **Push policy is graduated.** Normal `git push origin master` does not require user approval. Destructive pushes (`--force` without lease, branch deletion, history rewrite from stale state) DO require approval. Background/scheduled-agent pushes always require approval. Escape hatch: `FRANK_ALLOW_DESTRUCTIVE_PUSH=1 git push ...`.
+- **Standard merge sequence:**
+  1. Push feature branch (CI runs on `**` per `ci.yml`)
+  2. Wait for "Build and pack" status to pass on the feature SHA
+  3. `git fetch origin && git merge --ff-only <feature-branch>` (in main worktree on master)
+  4. `git push origin master` (server sees passing status, allows)
+- **Parallel worktree merge ordering.** When parallel worktrees touch the same file in different regions, merge the branch with the fewest changes to shared files first.
+- **Always use `isolation: "worktree"` for implementation/fix agents.** Non-isolated agents lack Bash/Read permissions even when pointed at accessible paths. For fix agents on existing branches, include `git fetch origin <branch> && git checkout <branch>` in the prompt.
+- **Worktree agent Bash commands must be standalone.** Compound commands (`cd /path && dotnet build`) don't match pre-approved `Bash(dotnet:*)` patterns. Instruct agents to run `cd /path/to/worktree` as a separate Bash call first (working directory persists), then run standalone commands. Also `mkdir -p nupkg` in each worktree before building.
+- **Verify fix agent output before merging.** Always build+test fix agent output in a clean worktree before fast-forwarding master. Agent output may be partial due to rate limits or permission failures — never assume it's complete.
+- **Verification sequence before merging master.** Before fast-forwarding into local master: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review`. Address findings before merging. The post-merge hook re-runs build as a backstop.
+
+**Fallback — PR mode (external contributors, occasional release PRs).** Used when an external contributor opens a PR or when the maintainer explicitly opts into PR review. Authoritative rules live in `.github/PULL_REQUEST_TEMPLATE.md` and `CONTRIBUTING.md`. In summary:
+
+- Fill out the PR template fully — Summary, Requirements table (per-requirement status: implemented / deferred / blocked), Test evidence, Reviewer checklist.
+- Include `Closes #XX` in the body to auto-close related issues.
+- Run the full verification sequence before requesting review.
+
+**Issue and external-action discipline (both modes):**
+
+- **Section-by-section audit before closing issues.** When an issue has multiple sections (e.g., "Operational MPST" + "Wadler/dual"), verify every requirement in every section before closing.
+- **Never close issues with unfulfilled-dependency requirements.** If an issue depends on open issues, leave it open. Either split it (done-now vs blocked) or add a comment listing what's blocked. The user decides when to close.
+- **Never create issues, PRs, or take external actions while discussing.** Wait for explicit go-ahead ("yes", "create it", "go ahead"). Presenting a draft is not permission to act on it. Applies to issues, comments, releases, ruleset changes, anything visible to others.
 
 ### Planning and communication
 - **Always surface questions.** Never auto-answer planning/discovery questions from subagents. Present to user with recommendation.
@@ -157,7 +178,7 @@ Run these at the suggested cadence to maintain quality and capture learning.
 | `/retrospective` | End of every session or major task | Mines session for CLAUDE.md rules, skill candidates, agent candidates |
 | `/simplify` | After completing a feature (post-commit, pre-PR) | Parallel agents review changed code for reuse, quality, efficiency |
 | `/techdebt` | Weekly or before cleanup sprints | Scans code + GitHub for tech debt, categorizes by priority, proposes fixes |
-| `/expert-review` | Before merging any PR or "what do my experts think?" | Dispatches 2-4 expert agents in parallel for multi-perspective review |
+| `/expert-review` | Before merging master, before requesting PR review, or "what do my experts think?" | Dispatches 2-4 expert agents in parallel for multi-perspective review |
 
 **Not recurring but important to remember:**
 - `superpowers:brainstorming` — before any creative/design work
