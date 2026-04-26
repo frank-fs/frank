@@ -153,7 +153,7 @@ Note: #286 → #283 → #284 → #298 is a sequential chain (algebra → codegen
 
 **Track B — Reactive streaming agent (Datastar/CQRS + SSE)**
 
-Server receives async events (webhooks, background jobs), defers events the current state can't handle, and pushes state changes to clients via Server-Sent Events. Proven via TicTacToe (existing Datastar SSE pattern) extended with deferred events.
+Server receives async events (webhooks, background jobs), defers events the current state can't handle, and pushes state changes to clients via Server-Sent Events. Demonstrable in `frank-fs/tic-tac-toe` directly: real async sources are already present in the multi-game-with-auth surface (session expiry mid-move, second player joining while first player's move is in flight, SSE reconnect after disconnect). These are not contrived; they are what happens when you put auth + concurrency + streaming on a non-trivial app.
 
 | Issue | What | Prob (session) |
 |---|---|---|
@@ -165,13 +165,15 @@ In classic HTTP, the client IS the event queue (retry on 400/405). In Datastar/C
 
 Multiple agents (different MPST roles) connected simultaneously via SSE. When one role advances a region in an AND-state composite, inter-region broadcast fires, and each connected agent receives their role-projected affordance update in real time.
 
+The simplest possible Track C demonstration is also already in `frank-fs/tic-tac-toe`: Player A wins → Game Play region transitions to Won → reset becomes available to both assigned players but not to spectators — a single broadcast firing role-different SSE patches across three connection types (X, O, Spectator). Order fulfillment remains the paper-realism existence proof; tic-tac-toe is the working proof.
+
 | Issue | What | Prob (session) |
 |---|---|---|
 | [#304](https://github.com/frank-fs/frank/issues/304) | AND-state event broadcast | ~75% |
 | [#305](https://github.com/frank-fs/frank/issues/305) | Datastar multi-region SSE push | ~82% |
 | [#306](https://github.com/frank-fs/frank/issues/306) | Role-projected concurrent SSE | ~68% |
 
-This is the strongest thesis proof: Warehouse completes pick, Pack region auto-advances, Customer sees fulfillment progress, ShippingProvider sees nothing (their region is unchanged) — all via role-projected SSE streams, all from a single state change.
+The strongest thesis proof in the order-fulfillment context: Warehouse completes pick, Pack region auto-advances, Customer sees fulfillment progress, ShippingProvider sees nothing (their region is unchanged) — all via role-projected SSE streams, all from a single state change.
 
 ### Probability metrics
 
@@ -352,9 +354,57 @@ These probabilities are *initial qualitative estimates* — predictions to be re
 - What information each feature provides to the agent
 - How much ambiguity remains at each level
 - The difference between "can guess from context" (LLM) and "needs formal structure" (rule-based)
-- The Tic-Tac-Toe game's relative simplicity (5 states, 2 roles, linear protocol)
+- The actual discovery surface of the reference application
 
-For complex protocols (more states, more roles, branching paths), the gap between feature levels widens — particularly the dual derivation becomes more valuable as protocol complexity increases.
+### Simplicity is the argument, not a hedge
+
+The reference scenario `frank-fs/tic-tac-toe` is deliberately a simple game. Earlier framings of this document characterised that as "5 states, 2 roles, linear protocol" — implicitly apologetic, as though the simplicity weakened the result. **That framing has it backwards.** Picking the simplest possible useful protocol is the *strongest* test bed for a discovery framework's value:
+
+- Guessing works on simple protocols. An LLM with no prior exposure to this exact API can produce a partially-correct request set just by being a competent HTTP client. That makes the *zero-discovery baseline* genuinely competitive.
+- Hand-coding works on simple protocols. A human can write the entire client in an afternoon. That makes the *no-framework alternative* genuinely competitive.
+- If the framework demonstrably helps an agent navigate the simplest case where guessing and hand-coding are both maximally viable, **complex protocols can only benefit more** — this document's own observation that "the gap between feature levels widens" with complexity makes this an a fortiori argument. The simple case is a lower bound on framework value, not a weak demonstration.
+
+There is also precedent the F# community already accepts. The reference app cites Wlaschin's *Enterprise Tic-Tac-Toe*, and there is a decade-plus F# tradition of using tic-tac-toe as the canonical pedagogical surface for non-trivial architectural claims — domain-driven design, type-driven design, railway-oriented programming. Picking it for a discovery-framework claim slots into that tradition cleanly; reviewers grok the move without needing the simplicity defended.
+
+### What the agent actually has to discover
+
+The "5 states, 2 roles, linear protocol" line undercounts the actual surface. At Levels 1–5 the agent has to discover all of:
+
+- A collection resource at `/` with N concurrent games (join-vs-create choice)
+- A child auth state machine that must complete before any `/games` operation (a sequencing constraint)
+- Implicit role assignment: first POST to `/games/{id}` both moves and assigns X; second joiner is assigned O; subsequent users are spectators with neither role's affordances — a three-role asymmetry emerging from a single endpoint
+- Two orthogonal regions in the statechart (Game Play × Player Identity), an AND-state composite — the same structure Track C is built to demonstrate
+- Role-gated lifecycle (reset/delete require assignment) — a clean affordance-discrimination check
+- MoveError recovery via history — tests whether the agent uses returned affordances to retry or spirals into 4xx loops
+
+The LLM's tic-tac-toe priors only carry weight inside the game itself ("play X to win"). They do not cover any of the bullets above. The Five-Level Demo measures whether the agent discovers *protocol structure*, not whether it can compute a winning move; the familiar inner game is useful as a clean victory condition without having to teach the rules.
+
+### Two complementary demos, two rhetorical jobs
+
+Tic-tac-toe and order fulfillment serve different purposes; neither replaces the other:
+
+| Demo | Rhetorical job |
+|---|---|
+| **Tic-tac-toe** (this document's headline matrix) | Proves the framework *adds value against the strongest possible alternative*. Guessing works; hand-coding is trivial; if HATEOAS still wins, the value is real. Lower bound on framework value. |
+| **Order fulfillment** (Track A/C #301 e2e) | Proves the framework *doesn't break down under realistic protocol shape*. Multi-role choreography, AND-states, complex affordance projection. Existence proof of generalisation. |
+
+Reading the headline matrix as tic-tac-toe and the capstone e2e as order fulfillment is *not* inconsistent — it's complementary. The doc should say this explicitly, and going forward the two demos should be cited side-by-side as discharging the two rhetorical jobs.
+
+### The killer baseline: V_swagger
+
+The matrix as currently structured varies feature combinations *within* Frank. The result tells you what each Frank feature contributes to the Frank-internal curve. It does not directly answer the architectural question — *is HATEOAS better than the dominant industry alternative (OpenAPI + tool-calling)?*
+
+Closing that loop requires a horizontal comparison at fixed simplicity: same simple game, three implementations:
+
+| Implementation | What the agent sees |
+|---|---|
+| **V_swagger** — hand-coded ASP.NET Core controllers with Swagger; no Frank `resource` CE, no Allow projection, no Link headers, no ALPS, no JSON Home | OpenAPI doc (the industry alternative) |
+| **Frank F0 / V_proto** | OpenAPI doc (Frank.OpenApi) + HTML/Datastar surface; no HATEOAS additions yet |
+| **Frank F5+ / V_proto** | Full state-dependent HATEOAS surface |
+
+If V_swagger lands at ~30–40% (LLM guesses paths, stumbles on state-dependent invariants, retries through 4xx) and Frank F5+ lands at ~85%, that is the headline number — framework value vs dominant alternative, not within-framework feature value. As a bonus this **dissolves the path-name contamination concern**: V_swagger uses the same paths Frank does (`/games`, `/games/{id}`, etc.), so the LLM's path-guessing prior gets the same free hit on both. The gap between V_swagger and F5+ is pure discovery signal, not vocabulary luck.
+
+For complex protocols beyond what tic-tac-toe exposes (more states, more roles, branching paths), the gap between feature levels widens further — particularly dual derivation becomes more valuable as protocol complexity increases.
 
 Going forward the input quantities (per-feature success rate, retry count, abandoned-session rate, context-token consumption) come from runs of the Five-Level Demo, not from a-priori estimates. The methodology section is preserved as the analytical structure that consumes those measured inputs; the predictions stay only to record what we expected before measurement.
 
