@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '=== Verification Sequence ==='; echo 'Before claiming work is complete:'; echo '1. dotnet build Frank.sln'; echo '2. dotnet test Frank.sln --filter FullyQualifiedName!~Sample'; echo '3. dotnet test test/Frank.Tests/'; echo '4. find sample/ -name test-e2e.sh -exec echo Run: {} \\;'; echo '5. /verification-before-completion'; echo '6. /simplify'; echo '7. /expert-review'; echo 'Address all findings before opening a PR.'"
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); fs_changed=$(git diff --name-only HEAD 2>/dev/null | grep -E \"\\.(fs|fsi|fsx|fsproj|sln)$\" | head -1); echo '=== Verification Sequence ==='; if [ -n \"$fs_changed\" ] && [ \"$branch\" != \"master\" ] && [ \"$branch\" != \"main\" ]; then echo \"!! Uncommitted F# changes on $branch - run build BEFORE claiming complete:\"; echo \"!! DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build Frank.sln\"; echo \"\"; fi; echo 'Before claiming work is complete:'; echo '1. dotnet build Frank.sln'; echo '2. dotnet test Frank.sln --filter FullyQualifiedName!~Sample'; echo '3. dotnet test test/Frank.Tests/'; echo '4. find sample/ -name test-e2e.sh -exec echo Run: {} \\;'; echo '5. /verification-before-completion'; echo '6. /simplify'; echo '7. /expert-review'; echo 'Address all findings before opening a PR.'"
           }
         ]
       }
