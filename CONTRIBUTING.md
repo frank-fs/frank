@@ -119,7 +119,7 @@ When a feature request depends on other open issues, list them explicitly. Don't
 
 ## Git Workflow
 
-Frank uses trunk-based development. Small, targeted changes (config, docs, single-file fixes) go directly to master. Multi-commit features or risky experiments use short-lived branches.
+Frank uses trunk-based development. Small, targeted changes (config, docs, single-file fixes) go directly to master. Multi-commit features or risky experiments use short-lived branches — by convention these live in `.claude/worktrees/<name>` (gitignored) and are merged fast-forward into master once the verification sequence passes.
 
 PRs should include `Closes #XX` in the body to auto-close related issues.
 
