@@ -268,7 +268,7 @@ The Five-Level Demo answers Q1 (runtime iteration cost) directly. The same demo 
 | **1** | URL only, HTML discovery page | `<link>` tags, semantic HTML, human-readable instructions | ~60-70% | Authoring agent reads same HTML the runtime agent does |
 | **2** | URL only, HTML + agent welcome | The page explicitly teaches the agent how to use the API | ~80% | Application self-explains — authoring loop reads the welcome page as a contract |
 | **3** | 3-sentence system prompt | External instruction to follow HTTP standards | ~80-85% | Same as L2 plus baseline-vs-instructed comparison data |
-| **4** | RPC-tool-call MCP (the OpenAPI-style alternative) | App exposed as MCP tool calls (`new_game`, `get_board`, `make_move`, ...) — no HTTP discovery surface | ~95% | The *null hypothesis* Frank's HATEOAS thesis competes against, not a discovery aid. If F4–F5 + E1 matches or beats this ceiling, the thesis holds: discovery reaches RPC parity with one-time framework investment vs per-API tool authoring. The earlier "MCP tool that parses discovery headers" framing was retired — it tested server-metadata completeness, which the rest of the experiment already assumes (circular). The replacement RPC MCP is built as part of the tic-tac-toe layered experiment. |
+| **4** | RPC-tool-call MCP (the OpenAPI-style alternative) | App exposed as MCP tool calls (`new_game`, `get_board`, `make_move`, ...) — no HTTP discovery surface | ~95% | The *null hypothesis* Frank's HATEOAS thesis competes against, not a discovery aid. If V_proto's full F-curve (F1–F4 discovery + F6–F8 semantic) at E1 matches or beats this ceiling, the thesis holds: discovery reaches RPC parity with one-time framework investment vs per-API tool authoring. The earlier "MCP tool that parses discovery headers" framing was retired — it tested server-metadata completeness, which the rest of the experiment already assumes (circular). The replacement RPC MCP is built as part of the tic-tac-toe layered experiment. |
 
 Example system prompt for Level 3:
 
@@ -398,11 +398,13 @@ Closing that loop requires a horizontal comparison at fixed simplicity: same sim
 
 | Implementation | What the agent sees |
 |---|---|
-| **V_swagger** — hand-coded ASP.NET Core controllers with Swagger; no Frank `resource` CE, no Allow projection, no Link headers, no ALPS, no JSON Home | OpenAPI doc (the industry alternative) |
-| **Frank F0 / V_proto** | OpenAPI doc (Frank.OpenApi) + HTML/Datastar surface; no HATEOAS additions yet |
-| **Frank F5+ / V_proto** | Full state-dependent HATEOAS surface |
+| **V_swagger** — same paths as V_proto, OpenAPI mounted, plain JSON/HTML, no role projection, no state-dependent affordances. Participates in F1–F4 discovery + F6–F8 semantic with role-uniform implementations; never role-projects. | OpenAPI doc + (as F-layers land) role-uniform Allow / Link / ALPS / JSON Home / JSON-LD / PROV-O / SHACL |
+| **Frank F0 / V_proto** | OpenAPI doc (Frank.OpenApi) + role-projected HTML/Datastar surface; no HATEOAS additions in headers yet |
+| **Frank full F-curve / V_proto** | Role-projected discovery (F1–F4) + role-projected semantic layer (F6–F8): state-dependent + role-projected Allow / Link / ALPS / JSON Home / JSON-LD / PROV-O / SHACL |
 
-If V_swagger lands at ~30–40% (LLM guesses paths, stumbles on state-dependent invariants, retries through 4xx) and Frank F5+ lands at ~85%, that is the headline number — framework value vs dominant alternative, not within-framework feature value. As a bonus this **dissolves the path-name contamination concern**: V_swagger uses the same paths Frank does (`/games`, `/games/{id}`, etc.), so the LLM's path-guessing prior gets the same free hit on both. The gap between V_swagger and F5+ is pure discovery signal, not vocabulary luck.
+If V_swagger lands at ~30–40% (LLM stumbles on state-dependent invariants, retries through 4xx) and Frank's full F-curve lands at ~85%, that is the headline number — framework value vs dominant alternative, not within-framework feature value. As a bonus this **dissolves the path-name contamination concern**: V_swagger uses the same paths V_proto does, so the LLM's path-guessing prior gets the same free hit on both. The gap between V_swagger and the full F-curve is pure discovery + role-projection signal, not vocabulary luck.
+
+The F-axis has two phases: **F1–F4 (discovery)** = Allow, Link rel=profile, ALPS, JSON Home; **F6–F8 (semantic)** = JSON-LD content negotiation, PROV-O provenance, SHACL validation. F5 and the original F7-as-role-projection are skipped — state-dependence and role-projection are V_proto's per-layer design properties carried throughout, not separate layers to add.
 
 For complex protocols beyond what tic-tac-toe exposes (more states, more roles, branching paths), the gap between feature levels widens further — particularly dual derivation becomes more valuable as protocol complexity increases.
 
