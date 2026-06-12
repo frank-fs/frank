@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Description>MSBuild task package for Frank semantic lock file validation and conditional code generation</Description>
+    <PackageTags>fsharp;frank;msbuild;semantic;code-generation</PackageTags>
+    <!-- MSBuild tasks must not be copied to the output alongside the consuming project -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Suppress the default Build/BuildMultiTargeting targets inclusion for task packages -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SemanticGeneratorTask.fs" />
+    <Compile Include="ValidateLockFileTask.fs" />
+    <Compile Include="GeneratorStubs.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.28" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="build/Frank.Cli.MSBuild.targets">
+      <PackagePath>build/Frank.Cli.MSBuild.targets</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

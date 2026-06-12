@@ -1,0 +1,58 @@
+<Project>
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.ValidateLockFileTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)../lib/net8.0/Frank.Cli.MSBuild.dll" />
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateValidationTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)../lib/net8.0/Frank.Cli.MSBuild.dll" />
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateLinkedDataTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)../lib/net8.0/Frank.Cli.MSBuild.dll" />
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateProvenanceTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)../lib/net8.0/Frank.Cli.MSBuild.dll" />
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateDiscoveryTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)../lib/net8.0/Frank.Cli.MSBuild.dll" />
+
+  <PropertyGroup>
+    <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+    <FrankSemanticOutputDirectory Condition="'$(FrankSemanticOutputDirectory)' == ''">$(IntermediateOutputPath)frank-semantic/</FrankSemanticOutputDirectory>
+  </PropertyGroup>
+
+  <Target Name="FrankValidateLockFile"
+          BeforeTargets="CoreCompile"
+          Condition="Exists('$(FrankLockFilePath)')">
+
+    <ValidateLockFileTask LockFilePath="$(FrankLockFilePath)" />
+
+    <MakeDir Directories="$(FrankSemanticOutputDirectory)" />
+
+    <GenerateValidationTask
+      Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Validation')) == 'true'"
+      LockFilePath="$(FrankLockFilePath)"
+      OutputDirectory="$(FrankSemanticOutputDirectory)" />
+
+    <GenerateLinkedDataTask
+      Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.LinkedData')) == 'true'"
+      LockFilePath="$(FrankLockFilePath)"
+      OutputDirectory="$(FrankSemanticOutputDirectory)" />
+
+    <GenerateProvenanceTask
+      Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Provenance')) == 'true'"
+      LockFilePath="$(FrankLockFilePath)"
+      OutputDirectory="$(FrankSemanticOutputDirectory)" />
+
+    <GenerateDiscoveryTask
+      Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Discovery')) == 'true'"
+      LockFilePath="$(FrankLockFilePath)"
+      OutputDirectory="$(FrankSemanticOutputDirectory)" />
+
+  </Target>
+
+</Project>
