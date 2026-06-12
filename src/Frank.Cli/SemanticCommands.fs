@@ -365,6 +365,95 @@ let private clarifyMarkdown (unresolved: TypeMapping list) (proposed: TypeMappin
 
     sb.ToString()
 
+// ── Accept ────────────────────────────────────────────────────────────────────
+
+/// Merge LLM-resolved or hand-edited mappings from resolvedJson into the lock file.
+/// Returns Ok summaryMessage on success, or Error errorMessage on schema-version mismatch or parse failure.
+/// Unknown F# types in resolvedJson are skipped with a warning but do not cause failure.
+let accept (lockFilePath: string) (resolvedJson: string) (source: MappingSource) : Result<string, string> =
+    use doc =
+        try
+            JsonDocument.Parse(resolvedJson)
+        with ex ->
+            raise (invalidArg "resolvedJson" $"Invalid JSON: {ex.Message}")
+
+    let root = doc.RootElement
+    let schemaVersion = root.GetProperty("schemaVersion").GetInt32()
+
+    if schemaVersion <> 1 then
+        Error $"schema version {schemaVersion} not supported"
+    else
+
+        match LockFile.read lockFilePath with
+        | Error msg -> Error $"Cannot read lock file: {msg}"
+        | Ok lockFile ->
+
+            let existingByType = lockFile.Mappings |> List.map (fun m -> m.FsharpType, m) |> Map.ofList
+
+            let mutable merged = 0
+            let mutable rejected = 0
+            let mutable unchanged = 0
+
+            let resolved =
+                root.GetProperty("resolved").EnumerateArray()
+                |> Seq.choose (fun entry ->
+                    let fsharpType = entry.GetProperty("fsharpType").GetString()
+                    let iri = entry.GetProperty("iri").GetString()
+
+                    match existingByType |> Map.tryFind fsharpType with
+                    | None ->
+                        eprintfn $"{fsharpType} not in lock file; ignored"
+                        rejected <- rejected + 1
+                        None
+                    | Some existing ->
+                        if existing.Status = Confirmed && existing.Iri = iri && existing.Source = source then
+                            unchanged <- unchanged + 1
+                            None
+                        else
+                            merged <- merged + 1
+
+                            Some
+                                { existing with
+                                    Status = Confirmed
+                                    Source = source
+                                    Iri = iri })
+                |> List.ofSeq
+
+            let resolvedByType = resolved |> List.map (fun m -> m.FsharpType, m) |> Map.ofList
+
+            let updatedMappings =
+                lockFile.Mappings
+                |> List.map (fun m ->
+                    resolvedByType |> Map.tryFind m.FsharpType |> Option.defaultValue m)
+
+            let updatedLock =
+                { lockFile with
+                    Generated = DateTimeOffset.UtcNow
+                    Mappings = updatedMappings }
+
+            LockFile.write lockFilePath updatedLock
+            Ok $"Merged {merged} mapping; {rejected} rejected; {unchanged} unchanged"
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+
+/// Re-fetch vocabularies and report drift. Returns list of (prefix, oldHash, newHash).
+/// Does not mutate the lock file.
+let refresh (lockFilePath: string) (cacheDir: string) : (string * string * string) list =
+    match LockFile.read lockFilePath with
+    | Error _ -> []
+    | Ok lockFile -> VocabFetcher.detectDrift cacheDir lockFile
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
+/// Summarize lock-file mapping counts by status.
+let status (lockFilePath: string) : string =
+    match LockFile.read lockFilePath with
+    | Error msg -> invalidArg "lockFilePath" $"Cannot read lock file: {msg}"
+    | Ok lockFile ->
+        let s = summarizeMappings lockFile.Mappings
+
+        $"Confirmed: {s.Confirmed,3}\nProposed: {s.Proposed,4}\nUnresolved: {s.Unresolved,2}"
+
 /// Emit unresolved and proposed entries from a lock file as structured output.
 let clarify (lockFilePath: string) (format: ClarifyFormat) : string =
     let lockFile =
