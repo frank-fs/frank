@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <Compile Include="SemanticGeneratorTask.fs" />
+    <Compile Include="GenerateLinkedDataTask.fs" />
     <Compile Include="ValidateLockFileTask.fs" />
     <Compile Include="GeneratorStubs.fs" />
   </ItemGroup>

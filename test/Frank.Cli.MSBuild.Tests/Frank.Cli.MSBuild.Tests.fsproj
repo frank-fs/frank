@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="BuildGateTests.fs" />
+    <Compile Include="LinkedDataGeneratorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -16,6 +17,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.28" />
   </ItemGroup>
 
   <ItemGroup>

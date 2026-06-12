@@ -7,11 +7,6 @@ type GenerateValidationTask() =
     inherit SemanticGeneratorTask()
     override _.GenerateFiles(_lockFile: LockFile) = ()
 
-/// Stub generator for Frank.LinkedData (B12). No-op until B12 is implemented.
-type GenerateLinkedDataTask() =
-    inherit SemanticGeneratorTask()
-    override _.GenerateFiles(_lockFile: LockFile) = ()
-
 /// Stub generator for Frank.Provenance (B13). No-op until B13 is implemented.
 type GenerateProvenanceTask() =
     inherit SemanticGeneratorTask()
