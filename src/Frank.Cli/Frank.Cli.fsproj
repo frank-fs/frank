@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>CLI command library for Frank — frank semantic extract and related commands</Description>
+    <PackageTags>fsharp;cli;frank;semantic</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SemanticCommands.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../Frank.Cli.Core/Frank.Cli.Core.fsproj" />
+  </ItemGroup>
+
+</Project>
