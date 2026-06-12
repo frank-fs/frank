@@ -9,10 +9,15 @@
     <Compile Include="VocabularyBuilder.fs" />
     <Compile Include="LockFile.fs" />
     <Compile Include="VocabFetcher.fs" />
+    <Compile Include="ConventionEngine.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="dotNetRDF.Core" Version="3.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Cli.Core/Frank.Cli.Core.fsproj" />
   </ItemGroup>
 
 </Project>
