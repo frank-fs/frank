@@ -2,11 +2,6 @@ namespace Frank.Cli.MSBuild
 
 open Frank.Semantic
 
-/// Stub generator for Frank.Validation (B11). No-op until B11 is implemented.
-type GenerateValidationTask() =
-    inherit SemanticGeneratorTask()
-    override _.GenerateFiles(_lockFile: LockFile) = ()
-
 /// Stub generator for Frank.Provenance (B13). No-op until B13 is implemented.
 type GenerateProvenanceTask() =
     inherit SemanticGeneratorTask()

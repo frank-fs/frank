@@ -27,12 +27,14 @@ let sampleLockFile () =
                   Iri = "schema:totalPaymentDue"
                   Confidence = 0.78
                   Source = Llm
-                  Status = Confirmed }
+                  Status = Confirmed
+                  Pattern = None }
                 { Name = "LineItems"
                   Iri = "schema:orderedItem"
                   Confidence = 0.65
                   Source = Convention
-                  Status = Proposed } ] } ] }
+                  Status = Proposed
+                  Pattern = None } ] } ] }
 
 [<Tests>]
 let at1 =

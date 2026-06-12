@@ -27,7 +27,9 @@ type FieldMapping =
       [<JsonPropertyName("source")>]
       Source: MappingSource
       [<JsonPropertyName("status")>]
-      Status: MappingStatus }
+      Status: MappingStatus
+      [<JsonPropertyName("pattern")>]
+      Pattern: string option }
 
 type TypeMapping =
     { [<JsonPropertyName("fsharpType")>]
@@ -103,6 +105,7 @@ module private Serialization =
         writer.WriteNumber("confidence", f.Confidence)
         writer.WriteString("source", sourceToJson f.Source)
         writer.WriteString("status", statusToJson f.Status)
+        writeOptionalString writer "pattern" f.Pattern
         writer.WriteEndObject()
 
     let private writeTypeMapping (writer: Utf8JsonWriter) (m: TypeMapping) =
@@ -152,11 +155,20 @@ module private Serialization =
         System.Text.Encoding.UTF8.GetString(ms.ToArray())
 
     let private readFieldMapping (el: JsonElement) : FieldMapping =
+        let tryStr (name: string) =
+            let mutable prop = Unchecked.defaultof<JsonElement>
+
+            if el.TryGetProperty(name, &prop) && prop.ValueKind <> JsonValueKind.Null then
+                Some(prop.GetString())
+            else
+                None
+
         { Name = el.GetProperty("name").GetString()
           Iri = el.GetProperty("iri").GetString()
           Confidence = el.GetProperty("confidence").GetDouble()
           Source = el.GetProperty("source").GetString() |> sourceFromJson
-          Status = el.GetProperty("status").GetString() |> statusFromJson }
+          Status = el.GetProperty("status").GetString() |> statusFromJson
+          Pattern = tryStr "pattern" }
 
     let private readTypeMapping (el: JsonElement) : TypeMapping =
         let fields =
