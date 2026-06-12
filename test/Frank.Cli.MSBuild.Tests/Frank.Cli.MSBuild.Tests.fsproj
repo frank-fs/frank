@@ -12,6 +12,7 @@
     <Compile Include="LinkedDataGeneratorTests.fs" />
     <Compile Include="ValidationGeneratorTests.fs" />
     <Compile Include="ProvenanceGeneratorTests.fs" />
+    <Compile Include="DiscoveryGeneratorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

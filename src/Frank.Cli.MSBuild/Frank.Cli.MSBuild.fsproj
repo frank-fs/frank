@@ -15,6 +15,7 @@
     <Compile Include="GenerateLinkedDataTask.fs" />
     <Compile Include="GenerateValidationTask.fs" />
     <Compile Include="GenerateProvenanceTask.fs" />
+    <Compile Include="GenerateDiscoveryTask.fs" />
     <Compile Include="ValidateLockFileTask.fs" />
     <Compile Include="GeneratorStubs.fs" />
   </ItemGroup>
