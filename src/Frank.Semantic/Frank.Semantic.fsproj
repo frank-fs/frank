@@ -8,6 +8,7 @@
     <Compile Include="VocabularyRegistry.fs" />
     <Compile Include="VocabularyBuilder.fs" />
     <Compile Include="LockFile.fs" />
+    <Compile Include="VocabFetcher.fs" />
   </ItemGroup>
 
   <ItemGroup>
