@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="SemanticExtractTests.fs" />
+    <Compile Include="SemanticClarifyTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

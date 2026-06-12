@@ -2,6 +2,8 @@ module Frank.Cli.SemanticCommands
 
 open System
 open System.IO
+open System.Text
+open System.Text.Json
 open System.Collections.Generic
 open System.Collections.ObjectModel
 open FSharp.Compiler.CodeAnalysis
@@ -295,3 +297,84 @@ let extract (opts: ExtractOptions) : Result<ExtractResult, string> =
                 Ok
                     { LockPath = lockPath
                       Summary = summary }
+
+// ── Clarify ───────────────────────────────────────────────────────────────────
+
+type ClarifyFormat =
+    | Json
+    | Markdown
+
+/// Render clarify output as indented JSON.
+let private clarifyJson (unresolved: TypeMapping list) (proposed: TypeMapping list) : string =
+    let opts = JsonWriterOptions(Indented = true)
+    use ms = new MemoryStream()
+    use writer = new Utf8JsonWriter(ms, opts)
+    writer.WriteStartObject()
+    writer.WriteNumber("schemaVersion", 1)
+    writer.WriteStartArray("unresolved")
+
+    for m in unresolved do
+        writer.WriteStartObject()
+        writer.WriteString("fsharpType", m.FsharpType)
+        writer.WriteStartArray("fields")
+
+        for f in m.Fields do
+            writer.WriteStartObject()
+            writer.WriteString("name", f.Name)
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+
+    writer.WriteEndArray()
+    writer.WriteStartArray("proposed")
+
+    for m in proposed do
+        writer.WriteStartObject()
+        writer.WriteString("fsharpType", m.FsharpType)
+        writer.WriteString("currentCandidate", m.Iri)
+        writer.WriteNumber("confidence", m.Confidence)
+        writer.WriteEndObject()
+
+    writer.WriteEndArray()
+    writer.WriteEndObject()
+    writer.Flush()
+    Text.Encoding.UTF8.GetString(ms.ToArray())
+
+/// Render clarify output as Markdown.
+let private clarifyMarkdown (unresolved: TypeMapping list) (proposed: TypeMapping list) : string =
+    let sb = StringBuilder()
+
+    if unresolved <> [] then
+        sb.AppendLine("## Unresolved Types") |> ignore
+
+        for m in unresolved do
+            sb.AppendLine($"\n### {m.FsharpType}") |> ignore
+            sb.AppendLine("\n| Field | Type |") |> ignore
+            sb.AppendLine("|-------|------|") |> ignore
+
+            for f in m.Fields do
+                sb.AppendLine($"| {f.Name} | {f.Iri} |") |> ignore
+
+    if proposed <> [] then
+        sb.AppendLine("\n## Proposed Types") |> ignore
+
+        for m in proposed do
+            sb.AppendLine($"\n### {m.FsharpType}") |> ignore
+            sb.AppendLine($"\n**Current candidate:** {m.Iri} (confidence: {m.Confidence:F2})") |> ignore
+
+    sb.ToString()
+
+/// Emit unresolved and proposed entries from a lock file as structured output.
+let clarify (lockFilePath: string) (format: ClarifyFormat) : string =
+    let lockFile =
+        match LockFile.read lockFilePath with
+        | Ok lf -> lf
+        | Error msg -> invalidArg "lockFilePath" $"Cannot read lock file: {msg}"
+
+    let unresolved = lockFile.Mappings |> List.filter (fun m -> m.Status = Unresolved)
+    let proposed = lockFile.Mappings |> List.filter (fun m -> m.Status = Proposed)
+
+    match format with
+    | Json -> clarifyJson unresolved proposed
+    | Markdown -> clarifyMarkdown unresolved proposed
