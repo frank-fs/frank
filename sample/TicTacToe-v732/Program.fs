@@ -6,6 +6,7 @@ open System.Text.Json.Nodes
 open Microsoft.AspNetCore.Http
 open Frank
 open Frank.Builder
+open Frank.Discovery
 open TicTacToe.Model
 open TicTacToe.GameStore
 
@@ -135,6 +136,7 @@ let private movesResource =
 [<EntryPoint>]
 let main args =
     webHost args {
+        useDiscoveryWith GeneratedDiscovery.discoveryConfig
         resource homeResource
         resource gameResource
         resource movesResource

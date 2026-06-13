@@ -23,8 +23,12 @@ the deepest layer is real and every layer is green.
 
 ## Active stubs
 
-(none — off-spec Frank.Discovery reverted; rebuilding spec-true per
-docs/superpowers/specs/2026-04-20-v732-semantic-discovery-design.md)
+| Marker | File | Layer | Serves | Replace with | Status |
+|--------|------|-------|--------|--------------|--------|
+| FRANK-STUB(AT-S1,S2,S3) | sample/TicTacToe-v732/GeneratedDiscovery.fs | artifact | Discovery | `frank semantic` + MSBuild emitting GeneratedDiscovery into obj/ (B2–B14, B10/B14) | active |
+
+The `Frank.Discovery` middleware (OPTIONS/Allow/Link describedby, ALPS, JSON Home)
+is REAL. Only the artifact it consumes is hand-authored.
 
 ## Removed stubs
 
@@ -32,5 +36,8 @@ docs/superpowers/specs/2026-04-20-v732-semantic-discovery-design.md)
 
 ## Property-test candidates (check thesis/AC each step; implement against real code)
 
-(to be populated per AT against spec §6 contracts)
+| AT | Invariant | Test target |
+|----|-----------|-------------|
+| Discovery | ∀ DiscoveryConfig → no served ALPS/JSON Home descriptor IRI is `urn:frank:*` | Frank.Discovery serializers (lib unit/property) |
+| Discovery | OPTIONS on any matched resource path → Allow non-empty + a `rel="describedby"` Link | Frank.Discovery middleware (TestServer) |
 

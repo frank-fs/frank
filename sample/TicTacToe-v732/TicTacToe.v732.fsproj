@@ -10,11 +10,13 @@
     <Compile Include="Model.fsi" />
     <Compile Include="Model.fs" />
     <Compile Include="GameStore.fs" />
+    <Compile Include="GeneratedDiscovery.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
   </ItemGroup>
 
 </Project>
