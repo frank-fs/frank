@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="GameStore.fs" />
+    <Compile Include="Vocabulary.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
+    <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
+  </ItemGroup>
+</Project>

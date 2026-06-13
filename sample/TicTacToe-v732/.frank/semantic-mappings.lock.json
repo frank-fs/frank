@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-06-13T00:00:00+00:00",
+  "vocabularies": {
+    "schema": {
+      "uri": "https://schema.org/",
+      "fetchedAt": null,
+      "hash": null
+    }
+  },
+  "mappings": [
+    {
+      "fsharpType": "TicTacToe.Game",
+      "iri": "schema:Game",
+      "confidence": 0.95,
+      "source": "manual",
+      "status": "confirmed",
+      "fields": [
+        { "name": "Id", "iri": "schema:identifier", "confidence": 0.99, "source": "convention", "status": "confirmed", "pattern": null }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.MoveRequest",
+      "iri": "schema:MoveAction",
+      "confidence": 0.88,
+      "source": "manual",
+      "status": "confirmed",
+      "fields": [
+        { "name": "Row", "iri": "schema:rowIndex", "confidence": 0.85, "source": "manual", "status": "confirmed", "pattern": null },
+        { "name": "Col", "iri": "schema:columnIndex", "confidence": 0.82, "source": "manual", "status": "confirmed", "pattern": null },
+        { "name": "Player", "iri": "schema:agent", "confidence": 0.90, "source": "manual", "status": "confirmed", "pattern": null }
+      ]
+    }
+  ]
+}
