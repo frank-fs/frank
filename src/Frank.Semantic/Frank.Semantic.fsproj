@@ -10,6 +10,8 @@
     <Compile Include="ProvOClass.fs" />
     <Compile Include="VocabularyRegistry.fs" />
     <Compile Include="VocabularyBuilder.fs" />
+    <Compile Include="Mapping.fs" />
+    <Compile Include="ConventionEngine.fs" />
     <Compile Include="VocabFetcher.fs" />
   </ItemGroup>
 

@@ -221,7 +221,10 @@ Algorithm:
 - For candidate vocabulary classes: score field name overlap against vocabulary property set
 - `JsonPropertyName` attribute values used as alternate name sources
 - Weighted score combines type name similarity + field overlap ratio
-- Threshold: ≥0.85 = `confirmed`, <0.85 with best candidate = `proposed`, no viable candidate = `unresolved`
+- **Viable candidate** = a vocabulary class where at least one normalized type token scores JW ≥ 0.85 against that class's local name. Classes with no token hit are excluded before scoring. This replaces any score-floor check: a class that scores well on the combined metric but has no real lexical token match is not a viable candidate.
+- **Type-name similarity** is computed as the per-token average JW (token list vs class local name). Whole-string JW must not be used: it inverts the ranking, scoring unrelated compound names (e.g. "widgetforge") above partial-match names (e.g. "customerorderrecord") against a target class.
+- **Confidence decimal** (0.6 · type-name-score + 0.4 · field-overlap-ratio) is advisory and drives the confirmed/proposed split. The bucket (`confirmed`/`proposed`/`unresolved`) is the contract; the decimal is cosmetic.
+- Threshold: ≥0.85 = `confirmed`, <0.85 with at least one viable candidate = `proposed`, no viable candidate = `unresolved`
 
 ### Vocabulary fetching and caching
 
