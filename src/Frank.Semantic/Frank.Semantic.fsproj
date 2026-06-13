@@ -11,6 +11,7 @@
     <Compile Include="VocabularyRegistry.fs" />
     <Compile Include="VocabularyBuilder.fs" />
     <Compile Include="Mapping.fs" />
+    <Compile Include="LockFile.fs" />
     <Compile Include="ConventionEngine.fs" />
     <Compile Include="VocabFetcher.fs" />
   </ItemGroup>

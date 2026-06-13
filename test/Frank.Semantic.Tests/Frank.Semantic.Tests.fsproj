@@ -11,6 +11,7 @@
     <Compile Include="VocabularyRegistryTests.fs" />
     <Compile Include="VocabFetcherTests.fs" />
     <Compile Include="ConventionEngineTests.fs" />
+    <Compile Include="LockFileTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
