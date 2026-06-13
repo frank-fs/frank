@@ -6,7 +6,9 @@
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="GeneratedProvenance.fs" />
     <Compile Include="ProvenanceTests.fs" />
+    <Compile Include="ProvenanceReflectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

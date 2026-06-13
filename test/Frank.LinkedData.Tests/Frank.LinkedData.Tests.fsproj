@@ -6,7 +6,9 @@
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="GeneratedLinkedData.fs" />
     <Compile Include="LinkedDataTests.fs" />
+    <Compile Include="LinkedDataReflectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

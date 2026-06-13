@@ -8,7 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="GeneratedValidation.fs" />
     <Compile Include="ValidationTests.fs" />
+    <Compile Include="ValidationReflectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
