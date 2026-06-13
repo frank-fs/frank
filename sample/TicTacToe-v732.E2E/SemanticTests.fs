@@ -8,11 +8,15 @@ open Microsoft.Playwright
 open Microsoft.Playwright.NUnit
 open NUnit.Framework
 
-/// The v7.3.2 target: a naive client navigates entirely via HTTP discovery.
-/// The ONLY hardcoded value is the base URL. Game URL comes from JSON Home,
-/// the ALPS profile from Link rel=profile, field IRIs from the ALPS document,
-/// and the move URL from Link rel=makeMove. No path or IRI is constructed by
-/// the client. These fail until the semantic layer is built — that is the point.
+/// v7.3.2 Track B acceptance criteria (spec §6), expressed as falsifiable HTTP
+/// pairs against the live TicTacToe server. The naive client navigates via
+/// JSON Home + ALPS + content negotiation + SHACL validation — no hardcoded API
+/// knowledge beyond the base URL. State-dependent affordances are Track A and
+/// out of scope here. These fail until the semantic layer is built.
+///
+/// Scope: this file is the CAPSTONE (spec §6#6, issue #333). Provenance (§6#3),
+/// composition (§6#5), and negative tests (vocab swap / build gate / hash drift)
+/// live in separate units (issues #331/#332/#334), not here.
 [<TestFixture>]
 type SemanticTests() =
     inherit PlaywrightTest()
@@ -20,7 +24,7 @@ type SemanticTests() =
     member this.NewContext() : Task<IAPIRequestContext> =
         this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = Server.Url()))
 
-    /// Collect Link header values (Playwright may split or combine them).
+    /// rel -> url from one or more Link headers (RFC 8288).
     static member private LinkRels(resp: IAPIResponse) : IDictionary<string, string> =
         let rels = Dictionary<string, string>()
 
@@ -35,66 +39,69 @@ type SemanticTests() =
 
             if seg.Contains "<" && seg.Contains ">" && seg.Contains "rel=" then
                 let url = seg.Substring(seg.IndexOf '<' + 1, seg.IndexOf '>' - seg.IndexOf '<' - 1)
-
-                let relRaw = seg.Substring(seg.IndexOf "rel=" + 4).Trim().Trim('"', '\'', ';', ' ')
-
-                let rel = relRaw.Split(';').[0].Trim().Trim('"', '\'')
+                let rel = seg.Substring(seg.IndexOf "rel=" + 4).Trim().Split(';').[0].Trim().Trim('"', '\'')
                 rels.[rel] <- url
 
         rels
 
+    member private this.Options(ctx: IAPIRequestContext, url: string) =
+        ctx.FetchAsync(url, APIRequestContextOptions(Method = "OPTIONS"))
+
+    // ── AT-S1: JSON Home is a resource directory ────────────────────────────────
     [<Test>]
-    member this.``AT-S1 JSON Home advertises a game resource``() =
+    member this.``AT-S1 JSON Home lists resources with vocabulary-mapped rels``() =
         task {
             use! ctx = this.NewContext()
             let! resp = ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
             Assert.That(resp.Status, Is.EqualTo 200)
             let! json = resp.JsonAsync()
             let resources = json.Value.GetProperty("resources")
-
-            let hasTemplate =
+            Assert.That(resources.EnumerateObject() |> Seq.isEmpty |> not, "JSON Home has no resources")
+            // rels ARE vocabulary terms (absolute IRIs), never urn:frank:
+            let relsAreVocab =
                 resources.EnumerateObject()
-                |> Seq.exists (fun r ->
-                    let v = r.Value
-                    let mutable t = Unchecked.defaultof<JsonElement>
-                    v.TryGetProperty("href-template", &t) || v.TryGetProperty("href", &t))
+                |> Seq.exists (fun r -> r.Name.StartsWith "http")
 
-            Assert.That(hasTemplate, Is.True, "JSON Home has no game resource href/href-template")
+            Assert.That(relsAreVocab, Is.True, "JSON Home rels are not vocabulary IRIs")
+            let! body = resp.TextAsync()
+            Assert.That(body.Contains "urn:frank:", Is.False, "JSON Home leaks urn:frank: rels")
         }
 
+    // ── AT-S2: OPTIONS yields Allow + Link rel=describedby → ALPS ────────────────
     [<Test>]
-    member this.``AT-S2 game response carries Link rel=profile to ALPS``() =
+    member this.``AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS``() =
         task {
             use! ctx = this.NewContext()
-            let! resp = ctx.GetAsync("/games/at-s2")
+            let! resp = this.Options(ctx, "/games/at-s2")
+            Assert.That(resp.Headers.ContainsKey "allow", Is.True, "OPTIONS missing Allow header")
             let rels = SemanticTests.LinkRels resp
-            Assert.That(rels.ContainsKey "profile", Is.True, "no Link rel=profile on game response")
+            Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
         }
 
+    // ── AT-S3: ALPS descriptors cite vocabulary IRIs, never urn:frank: ───────────
     [<Test>]
-    member this.``AT-S3 ALPS profile describes position and agent fields``() =
+    member this.``AT-S3 ALPS profile descriptors reference schema.org IRIs``() =
         task {
             use! ctx = this.NewContext()
-            let! game = ctx.GetAsync("/games/at-s3")
-            let alpsUrl = (SemanticTests.LinkRels game).["profile"]
+            let! opts = this.Options(ctx, "/games/at-s3")
+            let alpsUrl = (SemanticTests.LinkRels opts).["describedby"]
             let! alps = ctx.GetAsync(alpsUrl)
             Assert.That(alps.Status, Is.EqualTo 200)
             let! body = alps.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "ALPS leaks urn:frank: IRIs")
-            // descriptors should reference the move's position + agent fields
-            Assert.That(body.ToLowerInvariant().Contains "position", Is.True, "ALPS missing position descriptor")
-            Assert.That(body.ToLowerInvariant().Contains "agent", Is.True, "ALPS missing agent descriptor")
+            Assert.That(body.Contains "schema.org", Is.True, "ALPS descriptors cite no schema.org IRIs")
         }
 
+    // ── AT-S4: invalid move → 422 ValidationReport citing vocabulary IRIs ────────
     [<Test>]
-    member this.``AT-S4 invalid move is rejected 422 with vocabulary IRIs and no urn:frank``() =
+    member this.``AT-S4 invalid move returns 422 ValidationReport with vocabulary IRIs``() =
         task {
             use! ctx = this.NewContext()
 
             let badMove =
                 {| ``@type`` = "https://schema.org/Action"
-                   position = "NotASquare"
-                   agent = "X" |}
+                   ``https://schema.org/agent`` = "X"
+                   ``https://schema.org/position`` = "NotASquare" |}
 
             let! resp =
                 ctx.PostAsync(
@@ -108,61 +115,72 @@ type SemanticTests() =
             Assert.That(resp.Status, Is.EqualTo 422)
             let! body = resp.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "422 body leaks urn:frank: IRIs")
-            Assert.That(body.Contains "schema.org", Is.True, "422 body lacks vocabulary IRIs")
+            Assert.That(body.Contains "ValidationReport", Is.True, "422 body is not a W3C SHACL ValidationReport")
+            Assert.That(body.Contains "schema.org", Is.True, "422 ValidationReport cites no vocabulary IRIs")
+        // valid-move → 200 is covered by the capstone (AT-S6) using discovered IRIs.
         }
 
+    // ── AT-S5: JSON-LD content negotiation with external @context ────────────────
     [<Test>]
-    member this.``AT-S5 game state negotiates JSON-LD and Turtle``() =
+    member this.``AT-S5 game negotiates JSON-LD with external schema.org @context``() =
         task {
             use! ctx = this.NewContext()
-
-            let contentType (resp: IAPIResponse) =
-                match resp.Headers.TryGetValue "content-type" with
-                | true, v -> v
-                | _ -> ""
 
             let! ld =
                 ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
 
             Assert.That(ld.Status, Is.EqualTo 200, "ld+json not negotiated")
-            Assert.That(contentType(ld).Contains "ld+json", Is.True, "ld+json Accept did not yield ld+json")
-
-            let! ttl =
-                ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
-
-            Assert.That(ttl.Status, Is.EqualTo 200, "turtle not negotiated")
-            Assert.That(contentType(ttl).Contains "turtle", Is.True, "turtle Accept did not yield turtle")
+            let contentType = match ld.Headers.TryGetValue "content-type" with | true, v -> v | _ -> ""
+            Assert.That(contentType.Contains "ld+json", Is.True, "ld+json Accept did not yield ld+json")
+            let! body = ld.TextAsync()
+            Assert.That(body.Contains "@context", Is.True, "JSON-LD body lacks @context")
+            Assert.That(body.Contains "schema.org", Is.True, "@context does not reference external schema.org")
+            // declared outbound link (vocabulary CE: seeAlso wikidata:Q11907)
+            Assert.That(body.Contains "seeAlso" || body.Contains "wikidata", Is.True, "JSON-LD lacks rdfs:seeAlso outbound link")
         }
 
-    /// Discover the game URL (from JSON Home) and the position/agent field IRIs
-    /// (from the ALPS profile) using nothing but HTTP responses.
-    member private this.Discover(ctx: IAPIRequestContext, gameId: string) =
+    // ── AT-S6: capstone — naive client plays a full game via discovery only ──────
+    [<Test>]
+    member this.``AT-S6 naive client plays a full game via discovery only``() =
         task {
+            use! ctx = this.NewContext()
+            let gameId = "at-s6"
+
+            // 1. JSON Home → game resource (GET) and moves resource (POST) templates
             let! home = ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
             let! homeJson = home.JsonAsync()
             let resources = homeJson.Value.GetProperty("resources")
 
-            let template =
+            let templateWith (verb: string) =
                 resources.EnumerateObject()
-                |> Seq.pick (fun r ->
+                |> Seq.tryPick (fun r ->
                     let v = r.Value
-                    let mutable t = Unchecked.defaultof<JsonElement>
+                    let mutable hints = Unchecked.defaultof<JsonElement>
+                    let mutable tmpl = Unchecked.defaultof<JsonElement>
 
-                    if v.TryGetProperty("href-template", &t) then Some(t.GetString())
-                    elif v.TryGetProperty("href", &t) then Some(t.GetString())
-                    else None)
+                    let allowsVerb =
+                        v.TryGetProperty("hints", &hints)
+                        && (let mutable allow = Unchecked.defaultof<JsonElement>
 
-            let gameUrl =
-                let openIdx = template.IndexOf '{'
+                            hints.TryGetProperty("allow", &allow)
+                            && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb))
 
-                if openIdx < 0 then
-                    template
-                else
-                    let close = template.IndexOf '}'
-                    template.Substring(0, openIdx) + Uri.EscapeDataString gameId + template.Substring(close + 1)
+                    if allowsVerb && v.TryGetProperty("href-template", &tmpl) then
+                        Some(tmpl.GetString())
+                    else
+                        None)
 
-            let! game0 = ctx.GetAsync(gameUrl)
-            let alpsUrl = (SemanticTests.LinkRels game0).["profile"]
+            let expand (template: string) =
+                let o = template.IndexOf '{'
+                if o < 0 then template
+                else template.Substring(0, o) + Uri.EscapeDataString gameId + template.Substring(template.IndexOf '}' + 1)
+
+            let gameUrl = templateWith "GET" |> Option.map expand |> Option.defaultWith (fun () -> failwith "JSON Home: no GET game resource")
+            let moveUrl = templateWith "POST" |> Option.map expand |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves resource")
+
+            // 2. OPTIONS game → ALPS profile → field IRIs (schema.org)
+            let! opts = this.Options(ctx, gameUrl)
+            let alpsUrl = (SemanticTests.LinkRels opts).["describedby"]
             let! alps = ctx.GetAsync(alpsUrl)
             let! alpsBody = alps.TextAsync()
             use alpsDoc = JsonDocument.Parse alpsBody
@@ -176,11 +194,7 @@ type SemanticTests() =
                         let mutable idEl = Unchecked.defaultof<JsonElement>
                         let mutable hrefEl = Unchecked.defaultof<JsonElement>
 
-                        if
-                            el.TryGetProperty("id", &idEl)
-                            && idEl.GetString() = name
-                            && el.TryGetProperty("href", &hrefEl)
-                        then
+                        if el.TryGetProperty("id", &idEl) && idEl.GetString() = name && el.TryGetProperty("href", &hrefEl) then
                             found <- Some(hrefEl.GetString())
 
                         for p in el.EnumerateObject() do
@@ -193,62 +207,62 @@ type SemanticTests() =
 
             let positionIri = fieldIri "position" |> Option.defaultWith (fun () -> failwith "ALPS missing position IRI")
             let agentIri = fieldIri "agent" |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI")
-            return gameUrl, positionIri, agentIri
-        }
 
-    /// One naive client posts a single move for its role, using the move URL
-    /// discovered from the live game response (never constructed).
-    member private _.PlayTurn(ctx: IAPIRequestContext, gameUrl, positionIri, agentIri, role) =
-        task {
-            let! state = ctx.GetAsync(gameUrl)
-            let! sJson = state.JsonAsync()
-            let root = sJson.Value
-            let moveUrl = (SemanticTests.LinkRels state).["makeMove"]
+            // 3. capstone also reads JSON-LD responses (external @context) ...
+            let! ldState = ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+            let! ldBody = ldState.TextAsync()
+            Assert.That(ldBody.Contains "@context" && ldBody.Contains "schema.org", Is.True, "capstone: game not available as external-context JSON-LD")
 
-            let emptyPos =
-                root.GetProperty("squares").EnumerateObject()
-                |> Seq.find (fun p -> p.Value.ValueKind = JsonValueKind.Null)
+            // ... and an illegal move is rejected by SHACL with a schema.org IRI in the report
+            let invalid = Dictionary<string, obj>()
+            invalid.["@type"] <- "https://schema.org/Action"
+            invalid.[positionIri] <- "NotASquare"
+            invalid.[agentIri] <- "X"
 
-            let body = Dictionary<string, obj>()
-            body.["@type"] <- "https://schema.org/Action"
-            body.[positionIri] <- emptyPos.Name
-            body.[agentIri] <- role
-
-            let! _ =
+            let! bad =
                 ctx.PostAsync(
                     moveUrl,
-                    APIRequestContextOptions(Headers = dict [ "Content-Type", "application/ld+json" ], DataObject = body)
+                    APIRequestContextOptions(Headers = dict [ "Content-Type", "application/ld+json" ], DataObject = invalid)
                 )
 
-            return ()
-        }
+            Assert.That(bad.Status, Is.EqualTo 422, "capstone: SHACL did not reject an illegal move")
+            let! badBody = bad.TextAsync()
+            Assert.That(badBody.Contains "schema.org", Is.True, "capstone: SHACL error does not cite a schema.org IRI")
 
-    [<Test>]
-    member this.``AT-S6 two naive clients complete a full game via discovery only``() =
-        task {
-            let gameId = "at-s6"
-            // two independent, firewalled clients — one per role
-            use! ctxX = this.NewContext()
-            use! ctxO = this.NewContext()
-
-            let! (gameUrl, positionIri, agentIri) = this.Discover(ctxX, gameId)
-            let! _ = this.Discover(ctxO, gameId) // O discovers independently too
-
+            // 4. play until the game ends, reading state, posting discovered IRIs
             let mutable finished = false
             let mutable turn = 0
 
             while not finished && turn < 9 do
-                let! state = ctxX.GetAsync(gameUrl)
+                let! state = ctx.GetAsync(gameUrl)
                 let! sJson = state.JsonAsync()
-                let status = sJson.Value.GetProperty("status").GetString()
+                let root = sJson.Value
+                let status = root.GetProperty("status").GetString()
 
                 if status = "Won" || status = "Draw" then
                     finished <- true
                 else
-                    let player = sJson.Value.GetProperty("currentPlayer").GetString()
-                    let activeCtx = if player = "X" then ctxX else ctxO
-                    do! this.PlayTurn(activeCtx, gameUrl, positionIri, agentIri, player)
+                    let player = root.GetProperty("currentPlayer").GetString()
+
+                    let emptyPos =
+                        root.GetProperty("squares").EnumerateObject()
+                        |> Seq.find (fun p -> p.Value.ValueKind = JsonValueKind.Null)
+
+                    let body = Dictionary<string, obj>()
+                    body.["@type"] <- "https://schema.org/Action"
+                    body.[positionIri] <- emptyPos.Name
+                    body.[agentIri] <- player
+
+                    let! _ =
+                        ctx.PostAsync(
+                            moveUrl,
+                            APIRequestContextOptions(
+                                Headers = dict [ "Content-Type", "application/ld+json" ],
+                                DataObject = body
+                            )
+                        )
+
                     turn <- turn + 1
 
-            Assert.That(finished, Is.True, "two naive clients could not finish the game via discovery")
+            Assert.That(finished, Is.True, "naive client could not finish the game via discovery")
         }
