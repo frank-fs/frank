@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="VocabularyRegistryTests.fs" />
+    <Compile Include="VocabFetcherTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
