@@ -51,26 +51,31 @@ module ProvenanceExtensions =
 
         [<CustomOperation("useProvenance")>]
         member this.UseProvenance(spec: WebHostSpec) : WebHostSpec =
-            let asm = System.Reflection.Assembly.GetEntryAssembly()
+            let generatedType =
+                System.AppDomain.CurrentDomain.GetAssemblies()
+                |> Array.tryPick (fun asm ->
+                    if asm.IsDynamic then
+                        None
+                    else
+                        match asm.GetType("GeneratedProvenance") with
+                        | null -> None
+                        | t -> Some t)
 
             let provClasses, typeIris =
-                if isNull asm then
-                    Map.empty, Map.empty
-                else
-                    match asm.GetType("GeneratedProvenance") with
-                    | null -> Map.empty, Map.empty
-                    | t ->
-                        let provClassMap =
-                            match t.GetProperty("provClasses") with
-                            | null -> Map.empty
-                            | p -> p.GetValue(null) :?> Map<string, Frank.Semantic.ProvOClass>
+                match generatedType with
+                | None -> Map.empty, Map.empty
+                | Some t ->
+                    let provClassMap =
+                        match t.GetProperty("provClasses") with
+                        | null -> Map.empty
+                        | p -> p.GetValue(null) :?> Map<string, Frank.Semantic.ProvOClass>
 
-                        let typeIriMap =
-                            match t.GetProperty("typeIris") with
-                            | null -> Map.empty
-                            | p -> p.GetValue(null) :?> Map<string, string>
+                    let typeIriMap =
+                        match t.GetProperty("typeIris") with
+                        | null -> Map.empty
+                        | p -> p.GetValue(null) :?> Map<string, string>
 
-                        provClassMap, typeIriMap
+                    provClassMap, typeIriMap
 
             let config =
                 { ProvenanceConfig.Default with

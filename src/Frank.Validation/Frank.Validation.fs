@@ -27,20 +27,22 @@ module ValidationExtensions =
 
         [<CustomOperation("useValidation")>]
         member this.UseValidation(spec: WebHostSpec) : WebHostSpec =
-            let asm = System.Reflection.Assembly.GetEntryAssembly()
+            let generatedType =
+                System.AppDomain.CurrentDomain.GetAssemblies()
+                |> Array.tryPick (fun asm ->
+                    if asm.IsDynamic then
+                        None
+                    else
+                        match asm.GetType("GeneratedValidation") with
+                        | null -> None
+                        | t -> Some t)
 
             let shapesGraph =
-                if isNull asm then
-                    new ShapesGraph(new VDS.RDF.Graph())
-                else
-                    match asm.GetType("GeneratedValidation") with
+                match generatedType with
+                | None -> new ShapesGraph(new VDS.RDF.Graph())
+                | Some t ->
+                    match t.GetProperty("shapesGraph") with
                     | null -> new ShapesGraph(new VDS.RDF.Graph())
-                    | t ->
-                        let prop = t.GetProperty("shapesGraph")
-
-                        if isNull prop then
-                            new ShapesGraph(new VDS.RDF.Graph())
-                        else
-                            prop.GetValue(null) :?> ShapesGraph
+                    | prop -> prop.GetValue(null) :?> ShapesGraph
 
             this.UseValidationWith(spec, shapesGraph)

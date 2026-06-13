@@ -35,25 +35,30 @@ module LinkedDataExtensions =
         /// Falls back to an empty graph if the module is not present.
         [<CustomOperation("useLinkedData")>]
         member this.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
-            let asm = System.Reflection.Assembly.GetEntryAssembly()
+            let generatedType =
+                System.AppDomain.CurrentDomain.GetAssemblies()
+                |> Array.tryPick (fun asm ->
+                    if asm.IsDynamic then
+                        None
+                    else
+                        match asm.GetType("GeneratedLinkedData") with
+                        | null -> None
+                        | t -> Some t)
 
             let graph, context =
-                if isNull asm then
-                    new Graph() :> IGraph, "{}"
-                else
-                    match asm.GetType("GeneratedLinkedData") with
-                    | null -> new Graph() :> IGraph, "{}"
-                    | t ->
-                        let g =
-                            match t.GetProperty("graph") with
-                            | null -> new Graph() :> IGraph
-                            | p -> p.GetValue(null) :?> IGraph
+                match generatedType with
+                | None -> new Graph() :> IGraph, "{}"
+                | Some t ->
+                    let g =
+                        match t.GetProperty("graph") with
+                        | null -> new Graph() :> IGraph
+                        | p -> p.GetValue(null) :?> IGraph
 
-                        let c =
-                            match t.GetProperty("jsonLdContext") with
-                            | null -> "{}"
-                            | p -> p.GetValue(null) :?> string
+                    let c =
+                        match t.GetProperty("jsonLdContext") with
+                        | null -> "{}"
+                        | p -> p.GetValue(null) :?> string
 
-                        g, c
+                    g, c
 
             this.UseLinkedDataWith(spec, graph, context)

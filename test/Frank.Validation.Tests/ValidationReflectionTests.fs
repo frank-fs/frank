@@ -11,45 +11,43 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Expecto
 open VDS.RDF.Shacl
+open Frank.Builder
+open Frank.Validation
 open Frank.Validation.ValidationMiddleware
 
 [<Tests>]
 let validationReflectionTests =
     testList
-        "ValidationReflection: useValidation zero-arg reflection path"
+        "ValidationReflection: useValidation zero-arg CE loads GeneratedValidation"
         [ test "executing assembly contains GeneratedValidation type" {
-              let asm = Assembly.GetExecutingAssembly()
-              Expect.isNotNull asm "executing assembly should not be null"
-              let t = asm.GetType("GeneratedValidation")
-              Expect.isNotNull t "GeneratedValidation type should be found in entry assembly"
+              let t = Assembly.GetExecutingAssembly().GetType("GeneratedValidation")
+              Expect.isNotNull t "GeneratedValidation type should be found in executing assembly"
           }
 
-          test "GeneratedValidation.shapesGraph property loads a non-empty ShapesGraph" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedValidation")
-              Expect.isNotNull t "GeneratedValidation type should be found"
-              let prop = t.GetProperty("shapesGraph")
-              Expect.isNotNull prop "shapesGraph property should exist on GeneratedValidation"
-              let shapesGraph = prop.GetValue(null) :?> ShapesGraph
-              Expect.isNotNull shapesGraph "shapesGraph should not be null"
+          test "useValidation CE: registers non-empty ShapesGraph (AppDomain scan finds GeneratedValidation)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseValidation(WebHostSpec.Empty)
+              let services = new ServiceCollection()
+              configuredSpec.Services(services) |> ignore
+              use provider = services.BuildServiceProvider()
+              let shapesGraph = provider.GetRequiredService<ShapesGraph>()
 
               Expect.isTrue
                   (shapesGraph.Triples.Count > 0)
-                  "shapesGraph should have SHACL triples — not the empty fallback"
+                  "useValidation CE should register the generated ShapesGraph with real SHACL triples — not the empty fallback"
           }
 
-          testTask "useValidation zero-arg: valid body passes (generated ShapesGraph, not empty fallback)" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedValidation")
-              let shapesGraph = t.GetProperty("shapesGraph").GetValue(null) :?> ShapesGraph
+          testTask "useValidation CE: valid body passes (generated ShapesGraph, not empty fallback)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseValidation(WebHostSpec.Empty)
 
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<ShapesGraph>(shapesGraph) |> ignore
+              configuredSpec.Services(builder.Services) |> ignore
               let app = builder.Build()
               (app :> IApplicationBuilder).UseRouting() |> ignore
-              app.UseMiddleware<ValidationMiddleware>() |> ignore
+              configuredSpec.Middleware(app :> IApplicationBuilder) |> ignore
 
               app.MapPost(
                   "/orders",
@@ -65,29 +63,26 @@ let validationReflectionTests =
               let body =
                   """{"@type": "https://schema.org/Order", "https://schema.org/totalPaymentDue": 100}"""
 
-              let content =
-                  new StringContent(body, System.Text.Encoding.UTF8, "application/ld+json")
-
+              let content = new StringContent(body, Encoding.UTF8, "application/ld+json")
               let! (response: HttpResponseMessage) = client.PostAsync("/orders", content)
 
               Expect.equal
                   response.StatusCode
                   HttpStatusCode.OK
-                  "valid Order body should pass with generated ShapesGraph"
+                  "valid Order body should pass — useValidation loaded real ShapesGraph"
           }
 
-          testTask "useValidation zero-arg: missing required field returns 422 (ShapesGraph has real SHACL constraints)" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedValidation")
-              let shapesGraph = t.GetProperty("shapesGraph").GetValue(null) :?> ShapesGraph
+          testTask "useValidation CE: missing required field returns 422 (real SHACL constraints, not empty fallback)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseValidation(WebHostSpec.Empty)
 
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<ShapesGraph>(shapesGraph) |> ignore
+              configuredSpec.Services(builder.Services) |> ignore
               let app = builder.Build()
               (app :> IApplicationBuilder).UseRouting() |> ignore
-              app.UseMiddleware<ValidationMiddleware>() |> ignore
+              configuredSpec.Middleware(app :> IApplicationBuilder) |> ignore
 
               app.MapPost(
                   "/orders",
@@ -101,14 +96,11 @@ let validationReflectionTests =
               let client = app.GetTestClient()
 
               let body = """{"@type": "https://schema.org/Order"}"""
-
-              let content =
-                  new StringContent(body, System.Text.Encoding.UTF8, "application/ld+json")
-
+              let content = new StringContent(body, Encoding.UTF8, "application/ld+json")
               let! (response: HttpResponseMessage) = client.PostAsync("/orders", content)
 
               Expect.equal
                   response.StatusCode
                   HttpStatusCode.UnprocessableEntity
-                  "missing totalPaymentDue must return 422 — proves loaded ShapesGraph has real minCount constraint, not empty fallback"
+                  "missing totalPaymentDue returns 422 — useValidation loaded real minCount=1 constraint, not empty fallback"
           } ]

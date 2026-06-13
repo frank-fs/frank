@@ -9,64 +9,52 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Expecto
 open VDS.RDF
+open Frank.Builder
+open Frank.LinkedData
 open Frank.LinkedData.LinkedDataMiddleware
 
 [<Tests>]
 let linkedDataReflectionTests =
     testList
-        "LinkedDataReflection: useLinkedData zero-arg reflection path"
+        "LinkedDataReflection: useLinkedData zero-arg CE loads GeneratedLinkedData"
         [ test "executing assembly contains GeneratedLinkedData type" {
-              let asm = Assembly.GetExecutingAssembly()
-              Expect.isNotNull asm "executing assembly should not be null"
-              let t = asm.GetType("GeneratedLinkedData")
-              Expect.isNotNull t "GeneratedLinkedData type should be found in entry assembly"
+              let t = Assembly.GetExecutingAssembly().GetType("GeneratedLinkedData")
+              Expect.isNotNull t "GeneratedLinkedData type should be found in executing assembly"
           }
 
-          test "GeneratedLinkedData.graph has triples (not empty fallback)" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedLinkedData")
-              Expect.isNotNull t "GeneratedLinkedData type should be found"
-              let prop = t.GetProperty("graph")
-              Expect.isNotNull prop "graph property should exist on GeneratedLinkedData"
-              let graph = prop.GetValue(null) :?> IGraph
-              Expect.isNotNull graph "graph should not be null"
+          test "useLinkedData CE: registers non-empty graph (AppDomain scan finds GeneratedLinkedData)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseLinkedData(WebHostSpec.Empty)
+              let services = new ServiceCollection()
+              configuredSpec.Services(services) |> ignore
+              use provider = services.BuildServiceProvider()
+              let config = provider.GetRequiredService<LinkedDataConfig>()
 
               Expect.isTrue
-                  (graph.Triples.Count > 0)
-                  "graph should have owl:equivalentClass triples — not empty fallback"
-          }
+                  (config.Graph.Triples.Count > 0)
+                  "useLinkedData CE should register a graph with owl:equivalentClass triples — not the empty fallback"
 
-          test "GeneratedLinkedData.jsonLdContext references schema.org" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedLinkedData")
-              let prop = t.GetProperty("jsonLdContext")
-              Expect.isNotNull prop "jsonLdContext property should exist on GeneratedLinkedData"
-              let ctx = prop.GetValue(null) :?> string
-              Expect.stringContains ctx "schema.org" "jsonLdContext should reference schema.org vocabulary"
+              Expect.stringContains
+                  config.JsonLdContext
+                  "schema.org"
+                  "useLinkedData CE should register a jsonLdContext referencing schema.org — not the empty fallback"
           }
 
           testTask
-              "useLinkedData zero-arg: GET ld+json returns 200 with schema.org reference (loaded graph, not empty fallback)" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedLinkedData")
-              let graph = t.GetProperty("graph").GetValue(null) :?> IGraph
-              let jsonLdContext = t.GetProperty("jsonLdContext").GetValue(null) :?> string
+              "useLinkedData CE: GET ld+json returns 200 with schema.org reference (loaded graph, not empty fallback)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseLinkedData(WebHostSpec.Empty)
 
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
-
-              builder.Services.AddSingleton<LinkedDataConfig>(
-                  { Graph = graph
-                    JsonLdContext = jsonLdContext }
-              )
-              |> ignore
-
+              configuredSpec.Services(builder.Services) |> ignore
               let app = builder.Build()
               (app :> IApplicationBuilder).UseRouting() |> ignore
-              app.UseMiddleware<LinkedDataMiddleware>() |> ignore
+              configuredSpec.Middleware(app :> IApplicationBuilder) |> ignore
 
               app.MapGet(
                   "/orders/{id}",
@@ -91,5 +79,5 @@ let linkedDataReflectionTests =
               Expect.stringContains
                   body
                   "schema.org"
-                  "body should reference schema.org from loaded graph — proves graph has real equivalentClass triples, not empty fallback"
+                  "body must reference schema.org from loaded graph — useLinkedData found GeneratedLinkedData, not empty fallback"
           } ]

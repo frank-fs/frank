@@ -12,62 +12,48 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Semantic
+open Frank.Builder
+open Frank.Provenance
 open Frank.Provenance.ProvenanceStore
 open Frank.Provenance.ProvenanceMiddleware
 
 [<Tests>]
 let provenanceReflectionTests =
     testList
-        "ProvenanceReflection: useProvenance zero-arg reflection path"
+        "ProvenanceReflection: useProvenance zero-arg CE loads GeneratedProvenance"
         [ test "executing assembly contains GeneratedProvenance type" {
-              let asm = Assembly.GetExecutingAssembly()
-              Expect.isNotNull asm "executing assembly should not be null"
-              let t = asm.GetType("GeneratedProvenance")
-              Expect.isNotNull t "GeneratedProvenance type should be found in entry assembly"
+              let t = Assembly.GetExecutingAssembly().GetType("GeneratedProvenance")
+              Expect.isNotNull t "GeneratedProvenance type should be found in executing assembly"
           }
 
-          test "GeneratedProvenance.provClasses property returns Map.empty" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedProvenance")
-              let prop = t.GetProperty("provClasses")
-              Expect.isNotNull prop "provClasses property should exist on GeneratedProvenance"
-              let provClasses = prop.GetValue(null) :?> Map<string, ProvOClass>
+          test "useProvenance CE: loads provClasses and typeIris from GeneratedProvenance (AppDomain scan)" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseProvenance(WebHostSpec.Empty)
+              let services = new ServiceCollection()
+              configuredSpec.Services(services) |> ignore
+              use provider = services.BuildServiceProvider()
+              let config = provider.GetRequiredService<ProvenanceConfig>()
 
               Expect.isEmpty
-                  provClasses
-                  "provClasses is Map.empty — generator emits empty map when no provClass annotations are present"
-          }
-
-          test "GeneratedProvenance.typeIris property returns Map.empty" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedProvenance")
-              let prop = t.GetProperty("typeIris")
-              Expect.isNotNull prop "typeIris property should exist on GeneratedProvenance"
-              let typeIris = prop.GetValue(null) :?> Map<string, string>
+                  config.ProvClasses
+                  "provClasses should be Map.empty — GeneratedProvenance found via AppDomain scan, not null fallback"
 
               Expect.isEmpty
-                  typeIris
-                  "typeIris is Map.empty — generator emits empty map when no provClass annotations are present"
+                  config.TypeIris
+                  "typeIris should be Map.empty — GeneratedProvenance found via AppDomain scan, not null fallback"
           }
 
-          testTask
-              "useProvenance zero-arg: GeneratedProvenance found, middleware still emits prov:wasGeneratedBy Link header" {
-              let asm = Assembly.GetExecutingAssembly()
-              let t = asm.GetType("GeneratedProvenance")
+          testTask "useProvenance CE: GeneratedProvenance found, middleware still emits prov:wasGeneratedBy Link header" {
+              let wh = WebHostBuilder([||])
+              let configuredSpec = wh.UseProvenance(WebHostSpec.Empty)
 
-              Expect.isNotNull
-                  t
-                  "GeneratedProvenance must be found — this test exercises the reflection path, not the null fallback"
-
-              let config = ProvenanceConfig.Default
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<ProvenanceConfig>(config) |> ignore
-              builder.Services.AddSingleton<ProvenanceStore>(config.Store) |> ignore
+              configuredSpec.Services(builder.Services) |> ignore
               let app = builder.Build()
               (app :> IApplicationBuilder).UseRouting() |> ignore
-              app.UseMiddleware<ProvenanceMiddleware>() |> ignore
+              configuredSpec.Middleware(app :> IApplicationBuilder) |> ignore
 
               app.MapGet(
                   "/resource",
@@ -88,5 +74,5 @@ let provenanceReflectionTests =
 
               Expect.isTrue
                   hasProvLink
-                  "prov:wasGeneratedBy Link header must be emitted even when GeneratedProvenance is found in assembly"
+                  "prov:wasGeneratedBy Link header must be emitted — useProvenance found GeneratedProvenance via AppDomain scan"
           } ]
