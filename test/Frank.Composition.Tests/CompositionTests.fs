@@ -174,9 +174,7 @@ let compositionTests =
             let! (ldResponse: HttpResponseMessage) = client.SendAsync(ldReq)
             Expect.equal ldResponse.StatusCode HttpStatusCode.OK "LinkedData: should return 200"
             let! (ldBody: string) = ldResponse.Content.ReadAsStringAsync()
-            Expect.isTrue
-                (ldBody.Contains("schema.org") || ldBody.Contains("equivalentClass"))
-                "LinkedData: body should reference vocabulary"
+            Expect.stringContains ldBody "schema.org" "LinkedData: body should reference vocabulary IRI"
 
             // 3. Discovery: GET /alps/orders → ALPS has fieldIri in href (no Accept header — avoid LinkedData 406)
             let! (alpsResponse: HttpResponseMessage) = client.GetAsync("/alps/orders")

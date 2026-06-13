@@ -116,23 +116,32 @@ let linkedDataTests =
               let! (response: HttpResponseMessage) = client.SendAsync(req)
               let! (body: string) = response.Content.ReadAsStringAsync()
 
-              Expect.isTrue (body.Contains("schema.org") || body.Length > 0) "turtle body should reference vocabulary"
+              Expect.stringContains body "schema.org" "turtle body should reference vocabulary"
           }
 
-          testTask "AT5: useLinkedDataWith compiles and registers correctly" {
-              let config = makeTestConfig ()
+          testTask "AT5: useLinkedData fallback — empty graph returns 200 with ld+json Accept" {
+              // useLinkedData with no GeneratedLinkedData present falls back to empty IGraph
+              let emptyConfig = { Graph = new Graph() :> IGraph; JsonLdContext = "{}" }
               let builder = WebApplication.CreateBuilder([||])
               builder.WebHost.UseTestServer() |> ignore
               builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<LinkedDataConfig>(config) |> ignore
+              builder.Services.AddSingleton<LinkedDataConfig>(emptyConfig) |> ignore
               let app = builder.Build()
-              (app :> IApplicationBuilder).UseMiddleware<LinkedDataMiddleware>() |> ignore
+              (app :> IApplicationBuilder).UseRouting() |> ignore
+              app.UseMiddleware<LinkedDataMiddleware>() |> ignore
 
-              app.MapGet("/test", Func<HttpContext, Task>(fun ctx -> (task { ctx.Response.StatusCode <- 200 }) :> Task))
+              app.MapGet(
+                  "/resource",
+                  Func<HttpContext, Task>(fun ctx ->
+                      task { do! ctx.Response.WriteAsync("ok") } :> Task)
+              )
               |> ignore
 
               app.Start()
               let client = app.GetTestClient()
-              let! (response: HttpResponseMessage) = client.GetAsync("/test")
-              Expect.equal response.StatusCode HttpStatusCode.OK "server should start and respond"
+              let req = new HttpRequestMessage(HttpMethod.Get, "/resource")
+              req.Headers.Add("Accept", "application/ld+json")
+              let! (response: HttpResponseMessage) = client.SendAsync(req)
+              Expect.equal response.StatusCode HttpStatusCode.OK "empty graph returns 200 for ld+json Accept"
+              Expect.equal response.Content.Headers.ContentType.MediaType "application/ld+json" "content type should be application/ld+json even with empty graph"
           } ]

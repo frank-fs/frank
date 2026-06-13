@@ -84,7 +84,7 @@ let provenanceTests =
               let! (traceResponse: HttpResponseMessage) = client.GetAsync(uri)
               Expect.equal traceResponse.StatusCode HttpStatusCode.OK "trace endpoint should return 200"
               let! (body: string) = traceResponse.Content.ReadAsStringAsync()
-              Expect.isTrue (body.Contains("prov") || body.Contains("Activity")) "body should reference PROV-O"
+              Expect.stringContains body "prov" "body should reference PROV-O"
           }
 
           testTask "AT2: Empty provClasses doesn't crash middleware" {
@@ -124,8 +124,34 @@ let provenanceTests =
                       Expect.isFalse (content.Contains("Statecharts")) $"{f} must not reference Statecharts"
           }
 
-          testTask "AT5: useProvenance falls back gracefully without GeneratedProvenance" {
+          testTask "AT5: useProvenance fallback — empty provClasses still emits prov:wasGeneratedBy Link header" {
+              // useProvenance with no GeneratedProvenance present falls back to ProvenanceConfig.Default (empty maps)
+              // Middleware should still add Link header for every request regardless of provClass mappings
               let config = ProvenanceConfig.Default
-              Expect.equal config.ProvClasses Map.empty "default config should have empty provClasses"
-              Expect.equal config.TypeIris Map.empty "default config should have empty typeIris"
+              let builder = WebApplication.CreateBuilder([||])
+              builder.WebHost.UseTestServer() |> ignore
+              builder.Services.AddRouting() |> ignore
+              builder.Services.AddSingleton<ProvenanceConfig>(config) |> ignore
+              builder.Services.AddSingleton<ProvenanceStore>(config.Store) |> ignore
+              let app = builder.Build()
+              (app :> IApplicationBuilder).UseRouting() |> ignore
+              app.UseMiddleware<ProvenanceMiddleware>() |> ignore
+
+              app.MapGet(
+                  "/resource",
+                  Func<HttpContext, Task>(fun ctx ->
+                      task { do! ctx.Response.WriteAsync("ok") } :> Task)
+              )
+              |> ignore
+
+              app.Start()
+              let client = app.GetTestClient()
+              let! (response: HttpResponseMessage) = client.GetAsync("/resource")
+              Expect.equal response.StatusCode HttpStatusCode.OK "empty provClasses should not crash middleware"
+              let hasProvLink =
+                  response.Headers.Contains("Link")
+                  && (response.Headers.GetValues("Link")
+                      |> Seq.exists (fun v ->
+                          v.Contains("prov#wasGeneratedBy") || v.Contains("prov:wasGeneratedBy")))
+              Expect.isTrue hasProvLink "Link header should include prov:wasGeneratedBy even with empty provClasses"
           } ]

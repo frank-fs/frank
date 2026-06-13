@@ -109,22 +109,32 @@ let validationTests =
             Expect.equal response.StatusCode HttpStatusCode.OK "text/plain should pass through"
         }
 
-        testTask "AT5: src/Frank.Validation has no urn:frank: URIs" {
-            let srcDir =
-                System.IO.Path.Combine(
-                    __SOURCE_DIRECTORY__,
-                    "..",
-                    "..",
-                    "src",
-                    "Frank.Validation"
-                )
+        testTask "AT5: empty ShapesGraph passes all JSON-LD (useValidation fallback behavior)" {
+            // useValidation with no GeneratedValidation present falls back to empty ShapesGraph
+            // Empty ShapesGraph has no constraints → report.Conforms = true → all inputs pass
+            let shapesGraph = new ShapesGraph(new VDS.RDF.Graph())
+            let builder = WebApplication.CreateBuilder([||])
+            builder.WebHost.UseTestServer() |> ignore
+            builder.Services.AddRouting() |> ignore
+            builder.Services.AddSingleton<ShapesGraph>(shapesGraph) |> ignore
+            let app = builder.Build()
+            (app :> IApplicationBuilder).UseRouting() |> ignore
+            app.UseMiddleware<ValidationMiddleware>() |> ignore
 
-            if System.IO.Directory.Exists(srcDir) then
-                let files =
-                    System.IO.Directory.GetFiles(srcDir, "*.fs", System.IO.SearchOption.AllDirectories)
+            app.UseEndpoints(fun endpoints ->
+                endpoints.MapPost(
+                    "/orders",
+                    RequestDelegate(fun ctx ->
+                        ctx.Response.StatusCode <- 200
+                        ctx.Response.WriteAsync("ok")))
+                |> ignore)
+            |> ignore
 
-                for f in files do
-                    let content = System.IO.File.ReadAllText(f)
-                    Expect.isFalse (content.Contains("urn:frank:")) $"{f} must not contain urn:frank:"
+            app.Start()
+            let client = app.GetTestClient()
+            let body = """{"@type": "https://schema.org/AnyType", "https://schema.org/anyProp": "anyValue"}"""
+            let content = new StringContent(body, Encoding.UTF8, "application/ld+json")
+            let! (response: HttpResponseMessage) = client.PostAsync("/orders", content)
+            Expect.equal response.StatusCode HttpStatusCode.OK "empty ShapesGraph should pass all JSON-LD (useValidation fallback)"
         }
     ]
