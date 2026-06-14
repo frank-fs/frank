@@ -1,11 +1,11 @@
-module Frank.Cli.Tests.VocabularyEvaluatorTests
+module Frank.Cli.Core.Tests.VocabularyEvaluatorTests
 
 open System
 open System.IO
 open System.Reflection
 open Expecto
 open Frank.Semantic
-open Frank.Cli
+open Frank.Cli.Core
 
 // ── Assembly path helper ──────────────────────────────────────────────────────
 

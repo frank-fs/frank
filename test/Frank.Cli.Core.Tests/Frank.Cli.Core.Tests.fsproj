@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <Compile Include="ExtractorTests.fs" />
+    <Compile Include="VocabularyEvaluatorTests.fs" />
+    <Compile Include="PipelineTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

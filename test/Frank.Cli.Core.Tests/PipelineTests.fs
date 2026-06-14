@@ -1,4 +1,4 @@
-module Frank.Cli.Tests.ExtractPipelineTests
+module Frank.Cli.Core.Tests.PipelineTests
 
 open System
 open System.IO
@@ -6,7 +6,7 @@ open System.Reflection
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
-open Frank.Cli
+open Frank.Cli.Core
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,11 +78,11 @@ let at1PipelineTests =
                   let projectFile, lockFilePath = writeFixtureProject tmpDir
 
                   let result =
-                      ExtractPipeline.run
+                      Pipeline.run
                           { ProjectFile = projectFile
                             VocabularyFile = None
                             AssemblyRefs = dllRefs ()
-                            OutputFormat = ExtractPipeline.Text }
+                            OutputFormat = Pipeline.Text }
 
                   Expect.isOk result "pipeline should succeed"
                   Expect.isTrue (File.Exists lockFilePath) "lock file must be written"
@@ -97,11 +97,11 @@ let at1PipelineTests =
               try
                   let projectFile, lockFilePath = writeFixtureProject tmpDir
 
-                  ExtractPipeline.run
+                  Pipeline.run
                       { ProjectFile = projectFile
                         VocabularyFile = None
                         AssemblyRefs = dllRefs ()
-                        OutputFormat = ExtractPipeline.Text }
+                        OutputFormat = Pipeline.Text }
                   |> ignore
 
                   let lockResult = LockFile.read lockFilePath
@@ -119,11 +119,11 @@ let at1PipelineTests =
                   let projectFile, _ = writeFixtureProject tmpDir
 
                   let result =
-                      ExtractPipeline.run
+                      Pipeline.run
                           { ProjectFile = projectFile
                             VocabularyFile = None
                             AssemblyRefs = dllRefs ()
-                            OutputFormat = ExtractPipeline.Text }
+                            OutputFormat = Pipeline.Text }
 
                   let summary = Expect.wantOk result "pipeline should succeed"
                   Expect.isTrue (summary.Confirmed >= 0) "Confirmed >= 0"
@@ -140,11 +140,11 @@ let at1PipelineTests =
               try
                   let projectFile, lockFilePath = writeFixtureProject tmpDir
 
-                  ExtractPipeline.run
+                  Pipeline.run
                       { ProjectFile = projectFile
                         VocabularyFile = None
                         AssemblyRefs = dllRefs ()
-                        OutputFormat = ExtractPipeline.Text }
+                        OutputFormat = Pipeline.Text }
                   |> ignore
 
                   let lf = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
@@ -193,11 +193,11 @@ let at2MergeTests =
 
                   LockFile.write lockFilePath existingLock
 
-                  ExtractPipeline.run
+                  Pipeline.run
                       { ProjectFile = projectFile
                         VocabularyFile = None
                         AssemblyRefs = dllRefs ()
-                        OutputFormat = ExtractPipeline.Text }
+                        OutputFormat = Pipeline.Text }
                   |> ignore
 
                   let updated = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
@@ -227,11 +227,11 @@ let at4DeterminismTests =
                   let projectFile, lockFilePath = writeFixtureProject tmpDir
 
                   let runOnce () =
-                      ExtractPipeline.run
+                      Pipeline.run
                           { ProjectFile = projectFile
                             VocabularyFile = None
                             AssemblyRefs = dllRefs ()
-                            OutputFormat = ExtractPipeline.Text }
+                            OutputFormat = Pipeline.Text }
                       |> ignore
 
                       LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)

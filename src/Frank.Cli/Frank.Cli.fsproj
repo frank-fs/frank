@@ -12,8 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="VocabularyEvaluator.fs" />
-    <Compile Include="ExtractPipeline.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

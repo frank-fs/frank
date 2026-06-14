@@ -1,4 +1,4 @@
-module Frank.Cli.VocabularyEvaluator
+module Frank.Cli.Core.VocabularyEvaluator
 
 open System
 open System.IO

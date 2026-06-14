@@ -4,7 +4,7 @@ open System
 open System.IO
 open System.Reflection
 open Argu
-open Frank.Cli
+open Frank.Cli.Core
 
 // ── CLI argument definitions ──────────────────────────────────────────────────
 
@@ -60,18 +60,17 @@ let private runtimeAssemblyRefs () : string list =
       Assembly.GetAssembly(typeof<int list>).Location ]
 
 /// Parse the output format string.
-let private parseOutputFormat (s: string) : Result<ExtractPipeline.OutputFormat, string> =
+let private parseOutputFormat (s: string) : Result<Pipeline.OutputFormat, string> =
     match s.ToLowerInvariant() with
-    | "text" -> Ok ExtractPipeline.Text
-    | "json" -> Ok ExtractPipeline.Json
+    | "text" -> Ok Pipeline.Text
+    | "json" -> Ok Pipeline.Json
     | other -> Error $"unknown output format '{other}'; expected 'text' or 'json'"
 
 /// Format and print the summary line to stdout.
-let private printSummary (fmt: ExtractPipeline.OutputFormat) (s: ExtractPipeline.ExtractSummary) : unit =
+let private printSummary (fmt: Pipeline.OutputFormat) (s: Pipeline.ExtractSummary) : unit =
     match fmt with
-    | ExtractPipeline.Text -> printfn "Confirmed: %d, Proposed: %d, Unresolved: %d" s.Confirmed s.Proposed s.Unresolved
-    | ExtractPipeline.Json ->
-        printfn """{"confirmed":%d,"proposed":%d,"unresolved":%d}""" s.Confirmed s.Proposed s.Unresolved
+    | Pipeline.Text -> printfn "Confirmed: %d, Proposed: %d, Unresolved: %d" s.Confirmed s.Proposed s.Unresolved
+    | Pipeline.Json -> printfn """{"confirmed":%d,"proposed":%d,"unresolved":%d}""" s.Confirmed s.Proposed s.Unresolved
 
 // ── Command handlers ──────────────────────────────────────────────────────────
 
@@ -79,7 +78,7 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
     let formatResult =
         args.TryGetResult(ExtractArgs.Output_Format)
         |> Option.map parseOutputFormat
-        |> Option.defaultValue (Ok ExtractPipeline.Text)
+        |> Option.defaultValue (Ok Pipeline.Text)
 
     match formatResult with
     | Error e ->
@@ -98,13 +97,13 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
             1
         | Ok projectFile ->
 
-            let opts: ExtractPipeline.ExtractOptions =
+            let opts: Pipeline.ExtractOptions =
                 { ProjectFile = projectFile
                   VocabularyFile = args.TryGetResult(ExtractArgs.Vocabulary_File)
                   AssemblyRefs = runtimeAssemblyRefs ()
                   OutputFormat = fmt }
 
-            match ExtractPipeline.run opts with
+            match Pipeline.run opts with
             | Error e ->
                 eprintfn "error: %s" e
                 1

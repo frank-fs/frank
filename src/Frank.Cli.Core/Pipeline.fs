@@ -1,11 +1,10 @@
-module Frank.Cli.ExtractPipeline
+module Frank.Cli.Core.Pipeline
 
 open System
 open System.IO
 open System.Net.Http
 open Frank.Semantic
 open Frank.Semantic.LockFile
-open Frank.Cli.Core
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

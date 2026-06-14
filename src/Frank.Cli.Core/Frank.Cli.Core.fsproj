@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <Compile Include="Extractor.fs" />
+    <Compile Include="VocabularyEvaluator.fs" />
+    <Compile Include="Pipeline.fs" />
   </ItemGroup>
 
   <ItemGroup>
