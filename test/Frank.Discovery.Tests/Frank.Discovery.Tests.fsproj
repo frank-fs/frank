@@ -12,6 +12,7 @@
     <Compile Include="SerializerTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="RelationTests.fs" />
+    <Compile Include="ResolverTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

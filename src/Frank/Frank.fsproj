@@ -9,6 +9,7 @@
     <Compile Include="ETagCache.fs" />
     <Compile Include="ConditionalRequestMiddleware.fs" />
     <Compile Include="ContentNegotiation.fs" />
+    <Compile Include="GeneratedModuleReflection.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>
 
