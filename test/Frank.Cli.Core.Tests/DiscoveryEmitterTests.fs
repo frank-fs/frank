@@ -297,12 +297,17 @@ let descriptorCountTests =
 let describedByTests =
     testList
         "DiscoveryEmitter — DescribedBy links"
-        [ test "TicTacToe: describedby links contain 'describedby' in source" {
+        [ test "TicTacToe: vocabulary links use rel=type (not describedby)" {
               let src =
                   DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "describedby" "describedby keyword present"
+              // Emitted F# source contains escaped quotes: rel=\"type\"
+              Expect.stringContains (unwrapOk src) "rel=\\\"type\\\"" "vocabulary links carry rel=type"
+
+              Expect.isFalse
+                  ((unwrapOk src).Contains("rel=\\\"describedby\\\""))
+                  "vocabulary links do not use describedby"
           }
 
           test "no urn:frank in describedby links" {

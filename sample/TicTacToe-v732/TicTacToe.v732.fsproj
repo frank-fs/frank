@@ -4,19 +4,30 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <!-- Module name must match the open/reference in Program.fs -->
+    <FrankDiscoveryModuleName>TicTacToe.GeneratedDiscovery</FrankDiscoveryModuleName>
+    <!-- Lock file path is the default; listed explicitly for clarity -->
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="Model.fsi" />
     <Compile Include="Model.fs" />
     <Compile Include="GameStore.fs" />
-    <Compile Include="GeneratedDiscovery.fs" />
+    <!-- GeneratedDiscovery.fs is injected by FrankGenerateSemantic before Program.fs -->
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
+    <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType=""
+                      PrivateAssets="all" />
   </ItemGroup>
+
+  <Import Project="../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
 
 </Project>

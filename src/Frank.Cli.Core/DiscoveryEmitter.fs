@@ -92,7 +92,9 @@ let private collectDescriptors
 
     loop mappings []
 
-/// Collect unique describedby link values for types that have an Iri.
+/// Collect unique `rel="type"` link values for types that have an Iri.
+/// Uses rel="type" (RFC 6903) rather than rel="describedby" so the local
+/// ALPS profile retains the canonical describedby slot on OPTIONS responses.
 let private collectDescribedByLinks
     (prefixes: Map<string, Uri>)
     (mappings: Mapping list)
@@ -102,13 +104,13 @@ let private collectDescribedByLinks
         | [] -> Ok(List.rev acc)
         | m :: rest ->
             match resolveOptional prefixes m.Iri with
-            | Error e -> Error $"describedby for '{m.FSharpType}': {e}"
+            | Error e -> Error $"type link for '{m.FSharpType}': {e}"
             | Ok None -> loop rest seen acc
             | Ok(Some fullIri) ->
                 if Set.contains fullIri seen then
                     loop rest seen acc
                 else
-                    let link = $"<{fullIri}>; rel=\"describedby\""
+                    let link = $"<{fullIri}>; rel=\"type\""
                     loop rest (Set.add fullIri seen) (link :: acc)
 
     loop mappings Set.empty []

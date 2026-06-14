@@ -1,22 +1,32 @@
 <Project>
 
+  <!--
+    Assembly resolution: when imported directly (not via NuGet pack), the dll
+    lives at bin/<Configuration>/net8.0/ relative to the .targets file's parent.
+    When imported from a NuGet pack the dll lives at lib/net8.0/ in the pack
+    layout. The property FrankMSBuildAssemblyFile can be set by the caller to
+    override both defaults.
+  -->
+  <PropertyGroup>
+    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == '' and Exists('$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
+    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == ''">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\net8.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
+  </PropertyGroup>
+
   <UsingTask
     TaskName="Frank.Cli.MSBuild.ValidateLockFileTask"
-    AssemblyFile="$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll" />
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
   <UsingTask
     TaskName="Frank.Cli.MSBuild.GenerateDiscoveryTask"
-    AssemblyFile="$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll" />
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
   <!--
-    FrankGenerateSemantic: runs before compilation.
-    1. Always validates the lock file (gate).
-    2. Conditionally generates GeneratedDiscovery.fs when Frank.Discovery is referenced.
-
-    Incremental: target is skipped when lock file is unchanged and output already exists.
+    FrankGenerateSemantic: validate lock file and generate GeneratedDiscovery.fs.
+    Incremental: skipped when lock file is unchanged and output already exists.
+    Always validates (gate); generates only when Frank.Discovery is referenced.
   -->
   <Target Name="FrankGenerateSemantic"
-          BeforeTargets="BeforeCompile;CoreCompile"
+          BeforeTargets="FrankInjectGeneratedFile"
           Inputs="$(FrankLockFilePath)"
           Outputs="$(IntermediateOutputPath)GeneratedDiscovery.fs"
           Condition="Exists('$(FrankLockFilePath)')">
@@ -27,20 +37,18 @@
       <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
       <FrankDiscoveryModuleName Condition="'$(FrankDiscoveryModuleName)' == ''">$(RootNamespace).GeneratedDiscovery</FrankDiscoveryModuleName>
       <FrankProfileUri Condition="'$(FrankProfileUri)' == ''">/alps/$(MSBuildProjectName.ToLower())</FrankProfileUri>
-      <_FrankDiscoveryOutput>$(IntermediateOutputPath)GeneratedDiscovery.fs</_FrankDiscoveryOutput>
     </PropertyGroup>
 
     <!-- Step 1: validate the lock file (always). Build fails here if any mapping is non-Confirmed. -->
     <ValidateLockFileTask LockFilePath="$(FrankLockFilePath)" />
 
-    <!-- Step 2: generate only when Frank.Discovery is referenced (package or project). -->
+    <!-- Step 2: detect Frank.Discovery reference (package or project). -->
     <PropertyGroup>
-      <_FrankDiscoveryPackageCount>@(PackageReference->Count()->AnyHaveMetadataValue('Identity', 'Frank.Discovery'))</_FrankDiscoveryPackageCount>
-      <_FrankDiscoveryProjectCount>@(ProjectReference->Count()->AnyHaveMetadataValue('Identity', 'Frank.Discovery'))</_FrankDiscoveryProjectCount>
       <_FrankHasDiscovery Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Discovery')) == 'True'">true</_FrankHasDiscovery>
       <_FrankHasDiscovery Condition="@(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Discovery')) == 'True'">true</_FrankHasDiscovery>
     </PropertyGroup>
 
+    <!-- Step 3: generate the F# module. -->
     <GenerateDiscoveryTask
       Condition="'$(_FrankHasDiscovery)' == 'true'"
       LockFilePath="$(FrankLockFilePath)"
@@ -50,10 +58,40 @@
       <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedDiscoveryFile" />
     </GenerateDiscoveryTask>
 
-    <!-- Add generated file to Compile and FileWrites; guard against double-add on incremental. -->
-    <ItemGroup Condition="'$(_FrankHasDiscovery)' == 'true' and '$(_FrankGeneratedDiscoveryFile)' != '' and !@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedDiscoveryFile)'))">
-      <Compile Include="$(_FrankGeneratedDiscoveryFile)" />
+    <ItemGroup Condition="'$(_FrankHasDiscovery)' == 'true' and '$(_FrankGeneratedDiscoveryFile)' != ''">
       <FileWrites Include="$(_FrankGeneratedDiscoveryFile)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankInjectGeneratedFile: always runs before CoreCompile (not incremental).
+    Injects the already-generated file into @(Compile) before Program.fs.
+
+    Separation of concerns:
+    - FrankGenerateSemantic writes the file (incremental, skippable).
+    - FrankInjectGeneratedFile wires the file into the compile list (always).
+
+    F# compile-order: source files must be listed in dependency order.
+    GeneratedDiscovery defines the module that Program.fs opens, so it must
+    precede Program.fs in @(Compile). A plain Include appends to the end;
+    instead we Remove Program.fs, Include the generated file, then re-Include
+    Program.fs to restore the correct order.
+  -->
+  <Target Name="FrankInjectGeneratedFile"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Condition="Exists('$(IntermediateOutputPath)GeneratedDiscovery.fs')">
+
+    <PropertyGroup>
+      <_FrankGeneratedFile>$(IntermediateOutputPath)GeneratedDiscovery.fs</_FrankGeneratedFile>
+    </PropertyGroup>
+
+    <!-- Only reorder when the file is not already in the compile list. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)'))">
+      <_FrankProgramFs Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <Compile Remove="@(_FrankProgramFs)" />
+      <Compile Include="$(_FrankGeneratedFile)" />
+      <Compile Include="@(_FrankProgramFs)" />
     </ItemGroup>
 
   </Target>

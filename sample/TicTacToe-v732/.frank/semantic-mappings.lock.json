@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-06-13T00:00:00+00:00",
+  "vocabularies": {
+    "schema": {
+      "uri": "https://schema.org/",
+      "fetchedAt": "2026-06-13T00:00:00+00:00",
+      "hash": "sha256:abc"
+    }
+  },
+  "mappings": [
+    {
+      "fsharpType": "TicTacToe.Game",
+      "iri": "schema:Game",
+      "confidence": 1.0,
+      "source": "convention",
+      "status": "confirmed",
+      "fields": [
+        {
+          "name": "identifier",
+          "iri": "schema:identifier",
+          "confidence": 1.0,
+          "source": "convention",
+          "status": "confirmed"
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Move",
+      "iri": "schema:MoveAction",
+      "confidence": 0.9,
+      "source": "convention",
+      "status": "confirmed",
+      "fields": [
+        {
+          "name": "position",
+          "iri": "schema:position",
+          "confidence": 0.9,
+          "source": "convention",
+          "status": "confirmed"
+        },
+        {
+          "name": "agent",
+          "iri": "schema:agent",
+          "confidence": 0.9,
+          "source": "convention",
+          "status": "confirmed"
+        }
+      ]
+    }
+  ]
+}

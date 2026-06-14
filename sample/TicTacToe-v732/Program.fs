@@ -41,8 +41,10 @@ let private squaresJson (gameState: GameState) : JsonObject =
 
 let private positionsJson (positions: SquarePosition seq) : JsonArray =
     let arr = JsonArray()
+
     for pos in positions do
         arr.Add(JsonValue.Create(pos.ToString()))
+
     arr
 
 let private getGameState (result: MoveResult) : GameState =
@@ -69,8 +71,17 @@ let private wireJson (id: string) (result: MoveResult) : JsonObject =
         | Error _ -> "Error", None, None, [||]
 
     obj.["status"] <- JsonValue.Create status
-    obj.["currentPlayer"] <- (match current with Some c -> JsonValue.Create c :> JsonNode | None -> null)
-    obj.["winner"] <- (match winner with Some w -> JsonValue.Create w :> JsonNode | None -> null)
+
+    obj.["currentPlayer"] <-
+        (match current with
+         | Some c -> JsonValue.Create c :> JsonNode
+         | None -> null)
+
+    obj.["winner"] <-
+        (match winner with
+         | Some w -> JsonValue.Create w :> JsonNode
+         | None -> null)
+
     obj.["validMoves"] <- positionsJson valid
     obj
 
@@ -78,7 +89,8 @@ let private writeJson (ctx: HttpContext) (node: JsonNode) =
     ctx.Response.ContentType <- "application/json"
     ctx.Response.WriteAsync(node.ToJsonString())
 
-let private routeId (ctx: HttpContext) = ctx.Request.RouteValues.["id"] :?> string
+let private routeId (ctx: HttpContext) =
+    ctx.Request.RouteValues.["id"] :?> string
 
 let private homeHandler (ctx: HttpContext) =
     task { do! ctx.Response.WriteAsync("Frank TicTacToe v7.3.2") }
@@ -99,8 +111,11 @@ let private moveHandler (ctx: HttpContext) =
         let! body = reader.ReadToEndAsync()
         let doc = JsonNode.Parse body
 
-        let position = doc.["position"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
-        let player = doc.["player"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+        let position =
+            doc.["position"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+
+        let player =
+            doc.["player"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
 
         match position, player with
         | Some pos, Some plr ->
@@ -110,8 +125,7 @@ let private moveHandler (ctx: HttpContext) =
                 do! ctx.Response.WriteAsync("""{"title":"Unparseable move"}""")
             | Some move ->
                 match store.Update(id, move) with
-                | None ->
-                    ctx.Response.StatusCode <- 404
+                | None -> ctx.Response.StatusCode <- 404
                 | Some(Error(_, msg)) ->
                     ctx.Response.StatusCode <- 409
                     do! writeJson ctx (JsonObject(dict [ "title", (JsonValue.Create msg :> JsonNode) ]))
@@ -121,17 +135,26 @@ let private moveHandler (ctx: HttpContext) =
             do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
     }
 
-let private homeResource = resource "/" { name "Home"; get homeHandler }
+let private homeResource =
+    resource "/" {
+        name "Home"
+        get homeHandler
+    }
 
 let private gameResource =
     resource "/games/{id}" {
         name "Game"
         entryPoint
+        relation "https://schema.org/Game"
         get gameHandler
     }
 
 let private movesResource =
-    resource "/games/{id}/moves" { name "GameMoves"; post moveHandler }
+    resource "/games/{id}/moves" {
+        name "GameMoves"
+        relation "https://schema.org/MoveAction"
+        post moveHandler
+    }
 
 [<EntryPoint>]
 let main args =
