@@ -7,7 +7,7 @@ open Frank.Builder
 
 /// Extensions adding static semantic discovery (JSON Home, ALPS, OPTIONS/Allow,
 /// Link rel=describedby) to the Frank WebHostBuilder CE. Consumes a DiscoveryConfig
-/// (hand-authored now; generated from GeneratedDiscovery later) plus endpoint metadata.
+/// (the MSBuild-generated GeneratedDiscovery module) plus endpoint metadata.
 [<AutoOpen>]
 module DiscoveryExtensions =
 

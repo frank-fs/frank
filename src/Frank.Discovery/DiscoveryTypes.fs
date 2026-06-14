@@ -21,9 +21,8 @@ type JsonHomeResource =
 /// EndpointMetadataCollection.GetMetadata<T> has a `class` constraint.
 type ResourceRelationMetadata = { Relation: string }
 
-/// Discovery configuration the middleware consumes. In the finished system this
-/// is derived from the generated `GeneratedDiscovery` module (issue #326); until
-/// then it is hand-authored in the application.
+/// Discovery configuration the middleware consumes. Derived from the generated
+/// `GeneratedDiscovery` module (MSBuild codegen, issue #326) in the application.
 type DiscoveryConfig =
     {
         /// Route serving the ALPS profile, e.g. "/alps/tictactoe".
