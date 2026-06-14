@@ -172,8 +172,7 @@ let private assembleModule
           "      AlpsDescriptors ="
           descriptorLines
           "      DescribedByLinks ="
-          linkLines
-          "      HomeResources = [] }"
+          linkLines + " }"
           "" ]
 
 // ── Public API ────────────────────────────────────────────────────────────────

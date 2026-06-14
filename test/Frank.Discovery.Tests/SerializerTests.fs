@@ -23,8 +23,14 @@ let alpsTests =
         [ testCase "emits a valid ALPS document with vocabulary IRIs and no urn:frank:"
           <| fun _ ->
               let descriptors =
-                  [ { Id = "Game"; Type = "semantic"; Doc = Some "doc"; Href = Some "https://schema.org/Game" }
-                    { Id = "makeMove"; Type = "unsafe"; Doc = None; Href = None } ]
+                  [ { Id = "Game"
+                      Type = "semantic"
+                      Doc = Some "doc"
+                      Href = Some "https://schema.org/Game" }
+                    { Id = "makeMove"
+                      Type = "unsafe"
+                      Doc = None
+                      Href = None } ]
 
               let json = AlpsSerializer.serialize descriptors
               use doc = JsonDocument.Parse json // throws if invalid
@@ -36,7 +42,12 @@ let alpsTests =
           <| fun () ->
               Prop.forAll (Arb.fromGen (Gen.listOf (Gen.zip safeToken iriGen))) (fun pairs ->
                   let descriptors =
-                      pairs |> List.map (fun (id, iri) -> { Id = id; Type = "semantic"; Doc = None; Href = Some iri })
+                      pairs
+                      |> List.map (fun (id, iri) ->
+                          { Id = id
+                            Type = "semantic"
+                            Doc = None
+                            Href = Some iri })
 
                   let json = AlpsSerializer.serialize descriptors
                   use _ = JsonDocument.Parse json
@@ -49,8 +60,12 @@ let jsonHomeTests =
         [ testCase "templated href uses href-template, fixed uses href"
           <| fun _ ->
               let resources =
-                  [ { Relation = "https://schema.org/Game"; Href = "/games/{id}"; Allow = [ "GET" ] }
-                    { Relation = "https://schema.org/About"; Href = "/about"; Allow = [ "GET" ] } ]
+                  [ { Relation = "https://schema.org/Game"
+                      Href = "/games/{id}"
+                      Allow = [ "GET" ] }
+                    { Relation = "https://schema.org/About"
+                      Href = "/about"
+                      Allow = [ "GET" ] } ]
 
               let json = JsonHomeSerializer.serialize resources
               use _ = JsonDocument.Parse json
@@ -63,7 +78,9 @@ let jsonHomeTests =
                   let resources =
                       pairs
                       |> List.mapi (fun i (rel, seg) ->
-                          { Relation = rel + string i; Href = "/" + seg; Allow = [ "GET" ] })
+                          { Relation = rel + string i
+                            Href = "/" + seg
+                            Allow = [ "GET" ] })
 
                   let json = JsonHomeSerializer.serialize resources
                   use _ = JsonDocument.Parse json

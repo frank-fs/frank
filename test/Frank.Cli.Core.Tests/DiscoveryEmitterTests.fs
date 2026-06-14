@@ -389,3 +389,35 @@ let determinismTests =
                   let r1 = DiscoveryEmitter.emit "Test.Generated" "/alps" schemaRegistry lock
                   let r2 = DiscoveryEmitter.emit "Test.Generated" "/alps" schemaRegistry lock
                   r1 = r2)) ]
+
+[<Tests>]
+let homeResourcesAbsentTests =
+    testList
+        "DiscoveryEmitter — HomeResources absent from generated source"
+        [ test "generated source does not contain HomeResources field" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.isFalse ((unwrapOk src).Contains "HomeResources") "HomeResources absent"
+          }
+
+          test "generated record literal contains ProfileUri, HomeRoute, AlpsDescriptors, DescribedByLinks" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "ProfileUri" "ProfileUri field present"
+              Expect.stringContains source "HomeRoute" "HomeRoute field present"
+              Expect.stringContains source "AlpsDescriptors" "AlpsDescriptors field present"
+              Expect.stringContains source "DescribedByLinks" "DescribedByLinks field present"
+          }
+
+          test "generated source parses as valid F# without HomeResources" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.isTrue (parsesFsSource (unwrapOk src)) "parses as valid F#"
+          } ]

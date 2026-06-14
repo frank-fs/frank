@@ -17,7 +17,11 @@ let tests =
               let resp = client.SendAsync(req).GetAwaiter().GetResult()
               Expect.isNonEmpty (allowValues resp) "Allow header present"
               let links = linkValues resp
-              Expect.isTrue (links |> List.exists (fun l -> l.Contains "rel=\"describedby\"")) "describedby Link present"
+
+              Expect.isTrue
+                  (links |> List.exists (fun l -> l.Contains "rel=\"describedby\""))
+                  "describedby Link present"
+
               Expect.isTrue (links |> List.exists (fun l -> l.Contains "/alps/test")) "profile URI in describedby Link"
 
           testCase "GET profile URI serves ALPS with schema.org IRIs"

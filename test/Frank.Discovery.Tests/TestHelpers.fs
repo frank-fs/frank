@@ -2,14 +2,14 @@ module Frank.Discovery.Tests.TestHelpers
 
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Frank.Discovery
 
 /// Spin a TestServer with the discovery middleware in front of a couple of
-/// routed endpoints (so OPTIONS method-collection has something to enumerate).
+/// routed endpoints. The GET /games/{id} endpoint carries ResourceRelationMetadata
+/// so the middleware can build the JSON Home directory at runtime.
 let startServer (config: DiscoveryConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
@@ -18,8 +18,15 @@ let startServer (config: DiscoveryConfig) =
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
-    app.MapGet("/games/{id}", System.Func<string>(fun () -> "game")) |> ignore
-    app.MapPost("/games/{id}/moves", System.Func<string>(fun () -> "moved")) |> ignore
+
+    app
+        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
+        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+    |> ignore
+
+    app.MapMethods("/games/{id}/moves", [| "POST" |], System.Func<string>(fun () -> "moved"))
+    |> ignore
+
     app.StartAsync().GetAwaiter().GetResult()
     app
 
@@ -33,15 +40,23 @@ let allowValues (resp: HttpResponseMessage) =
     | a when a.Count > 0 -> a |> List.ofSeq
     | _ ->
         match resp.Headers.TryGetValues "Allow" with
-        | true, vs -> vs |> Seq.collect (fun v -> v.Split(',')) |> Seq.map (fun s -> s.Trim()) |> List.ofSeq
+        | true, vs ->
+            vs
+            |> Seq.collect (fun v -> v.Split(','))
+            |> Seq.map (fun s -> s.Trim())
+            |> List.ofSeq
         | _ -> []
 
 let sampleConfig =
     { ProfileUri = "/alps/test"
       HomeRoute = "/"
       AlpsDescriptors =
-        [ { Id = "Game"; Type = "semantic"; Doc = None; Href = Some "https://schema.org/Game" }
-          { Id = "agent"; Type = "semantic"; Doc = None; Href = Some "https://schema.org/agent" } ]
-      DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ]
-      HomeResources =
-        [ { Relation = "https://schema.org/Game"; Href = "/games/{id}"; Allow = [ "GET"; "HEAD" ] } ] }
+        [ { Id = "Game"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/Game" }
+          { Id = "agent"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/agent" } ]
+      DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ] }

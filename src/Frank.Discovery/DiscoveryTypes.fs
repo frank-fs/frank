@@ -15,25 +15,30 @@ type JsonHomeResource =
       Href: string
       Allow: string list }
 
+/// Endpoint metadata stamped by the `relation` CE operation. Carries the
+/// vocabulary IRI for this resource so the middleware can build the JSON Home
+/// directory at runtime. Must be a reference type (record satisfies this) because
+/// EndpointMetadataCollection.GetMetadata<T> has a `class` constraint.
+type ResourceRelationMetadata = { Relation: string }
+
 /// Discovery configuration the middleware consumes. In the finished system this
 /// is derived from the generated `GeneratedDiscovery` module (issue #326); until
 /// then it is hand-authored in the application.
 type DiscoveryConfig =
-    { /// Route serving the ALPS profile, e.g. "/alps/tictactoe".
-      ProfileUri: string
-      /// Route serving the JSON Home document, e.g. "/".
-      HomeRoute: string
-      /// Flat ALPS descriptors (resource + field + action), vocabulary IRIs.
-      AlpsDescriptors: AlpsDescriptor list
-      /// External vocabulary Link header values, e.g.
-      /// `<https://schema.org/Game>; rel="describedby"`.
-      DescribedByLinks: string list
-      /// JSON Home resource directory entries (rel = vocabulary IRI).
-      HomeResources: JsonHomeResource list }
+    {
+        /// Route serving the ALPS profile, e.g. "/alps/tictactoe".
+        ProfileUri: string
+        /// Route serving the JSON Home document, e.g. "/".
+        HomeRoute: string
+        /// Flat ALPS descriptors (resource + field + action), vocabulary IRIs.
+        AlpsDescriptors: AlpsDescriptor list
+        /// External vocabulary Link header values, e.g.
+        /// `<https://schema.org/Game>; rel="describedby"`.
+        DescribedByLinks: string list
+    }
 
     static member Empty =
         { ProfileUri = "/alps"
           HomeRoute = "/"
           AlpsDescriptors = []
-          DescribedByLinks = []
-          HomeResources = [] }
+          DescribedByLinks = [] }
