@@ -121,13 +121,14 @@ let private tryEvalExpr (session: FsiEvaluationSession) (expr: string) : Result<
 /// Try to evaluate `bindingName` as-is; if that fails and it looks like
 /// "Namespace.name", open the namespace and retry just "name".
 /// Also tries opening each loaded source file's derived module path (no-dot fallback).
+/// Returns (resolvedExpr, FsiValue) — resolvedExpr is the name that succeeded in-session.
 let private resolveBinding
     (session: FsiEvaluationSession)
     (bindingName: string)
     (sourceFiles: string list)
-    : Result<FsiValue, string> =
+    : Result<string * FsiValue, string> =
     match tryEvalExpr session bindingName with
-    | Ok v -> Ok v
+    | Ok v -> Ok(bindingName, v)
     | Error firstErr ->
         let lastDot = bindingName.LastIndexOf('.')
 
@@ -135,7 +136,10 @@ let private resolveBinding
             let ns = bindingName.[.. lastDot - 1]
             let localName = bindingName.[lastDot + 1 ..]
             session.EvalInteractionNonThrowing($"open {ns}") |> ignore
-            tryEvalExpr session localName
+
+            match tryEvalExpr session localName with
+            | Ok v -> Ok(localName, v)
+            | Error e -> Error e
         else
             // No dot in binding name — try opening each source file's derived module name.
             // Derive candidates from file base names: "Vocabulary.fs" → try open "Vocabulary", etc.
@@ -152,7 +156,7 @@ let private resolveBinding
                     session.EvalInteractionNonThrowing($"open {modName}") |> ignore
 
                     match tryEvalExpr session bindingName with
-                    | Ok v -> Ok v
+                    | Ok v -> Ok(bindingName, v)
                     | Error _ -> tryNext rest
 
             tryNext candidates
@@ -197,8 +201,15 @@ let evalRegistry
         | Ok() ->
             match resolveBinding session bindingName sourceFiles with
             | Error e -> Error e
-            | Ok fsiValue ->
-                try
-                    Ok(fsiValue.ReflectionValue :?> VocabularyRegistry)
-                with ex ->
-                    Error $"type mismatch unboxing VocabularyRegistry: {ex.Message}"
+            | Ok(resolvedExpr, _) ->
+                // Serialize INSIDE FSI where the registry's VocabularyRegistry type is
+                // in the same ALC as Frank.Semantic.VocabularyRegistry.serialize.
+                // Strings cross ALC boundaries; typed values do not — this avoids the cast.
+                let serializedExpr = $"Frank.Semantic.VocabularyRegistry.serialize ({resolvedExpr})"
+
+                match tryEvalExpr session serializedExpr with
+                | Error e -> Error $"serialize inside FSI failed: {e}"
+                | Ok sv ->
+                    match sv.ReflectionValue with
+                    | :? string as json -> VocabularyRegistry.deserialize json
+                    | other -> Error $"expected string from serialize, got {other.GetType().Name}"

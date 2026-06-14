@@ -8,6 +8,9 @@
     <FrankDiscoveryModuleName>TicTacToe.GeneratedDiscovery</FrankDiscoveryModuleName>
     <!-- Lock file path is the default; listed explicitly for clarity -->
     <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+    <!-- LinkedData codegen: module name + the vocabulary CE binding to evaluate -->
+    <FrankLinkedDataModuleName>TicTacToe.GeneratedLinkedData</FrankLinkedDataModuleName>
+    <FrankVocabularyBinding>TicTacToe.Vocabulary.registry</FrankVocabularyBinding>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,8 +18,7 @@
     <Compile Include="Model.fs" />
     <Compile Include="GameStore.fs" />
     <Compile Include="Vocabulary.fs" />
-    <Compile Include="GeneratedLinkedData.fs" />
-    <!-- GeneratedDiscovery.fs is injected by FrankGenerateSemantic before Program.fs -->
+    <!-- GeneratedDiscovery.fs + GeneratedLinkedData.fs are injected (generated into obj/) before Program.fs -->
     <Compile Include="Program.fs" />
   </ItemGroup>
 

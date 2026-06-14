@@ -124,11 +124,23 @@
       <FrankVocabularyBinding Condition="'$(FrankVocabularyBinding)' == ''">registry</FrankVocabularyBinding>
     </PropertyGroup>
 
+    <!--
+      Source files for the in-process FSI eval = the vocabulary CE's dependency closure.
+      Exclude: .fsi (FSI cannot #load a standalone signature file), the entry point
+      Program.fs (it references the not-yet-generated modules), and any Generated*.fs.
+      An explicit $(FrankVocabularySourceFiles) overrides this default when set.
+    -->
+    <ItemGroup>
+      <_FrankVocabSource Include="$(FrankVocabularySourceFiles)" Condition="'$(FrankVocabularySourceFiles)' != ''" />
+      <_FrankVocabSource Include="@(Compile->'%(FullPath)')"
+                         Condition="'$(FrankVocabularySourceFiles)' == '' And '%(Extension)' != '.fsi' And '%(Filename)%(Extension)' != 'Program.fs' And !$([System.String]::Copy('%(Filename)').StartsWith('Generated'))" />
+    </ItemGroup>
+
     <GenerateLinkedDataTask
       LockFilePath="$(FrankLockFilePath)"
       OutputPath="$(IntermediateOutputPath)"
       ModuleName="$(FrankLinkedDataModuleName)"
-      SourceFiles="@(Compile)"
+      SourceFiles="@(_FrankVocabSource)"
       AssemblyRefs="@(ReferencePath)"
       VocabularyBinding="$(FrankVocabularyBinding)">
       <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedLinkedDataFile" />

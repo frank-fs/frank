@@ -26,7 +26,7 @@
       ]
     },
     {
-      "fsharpType": "TicTacToe.Move",
+      "fsharpType": "TicTacToe.Model.Move",
       "iri": "schema:MoveAction",
       "confidence": 0.9,
       "source": "convention",
