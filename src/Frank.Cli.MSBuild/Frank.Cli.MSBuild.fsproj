@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net8.0: MSBuild task assemblies must match the lowest SDK TFM supported.
+         MSBuild/.NET SDK loads task assemblies in-process; net8.0 covers net8/9/10 hosts. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Description>MSBuild task package for Frank semantic lock file validation and Discovery code generation</Description>
+    <PackageTags>fsharp;frank;msbuild;semantic;code-generation</PackageTags>
+    <!-- Task packages use CopyLocalLockFileAssemblies so deps land next to the dll -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Suppress NU5128: no lib/tfm folder is expected for task-only packages -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ValidateLockFileTask.fs" />
+    <Compile Include="GenerateDiscoveryTask.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Cli.Core/Frank.Cli.Core.fsproj" />
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ExcludeAssets=runtime + PrivateAssets=all: MSBuild provides these at runtime;
+         they must not be copied to the consuming project's output. -->
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.28" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="build/Frank.Cli.MSBuild.targets">
+      <PackagePath>build/Frank.Cli.MSBuild.targets</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

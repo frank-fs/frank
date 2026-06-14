@@ -1,0 +1,61 @@
+<Project>
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.ValidateLockFileTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll" />
+
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateDiscoveryTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll" />
+
+  <!--
+    FrankGenerateSemantic: runs before compilation.
+    1. Always validates the lock file (gate).
+    2. Conditionally generates GeneratedDiscovery.fs when Frank.Discovery is referenced.
+
+    Incremental: target is skipped when lock file is unchanged and output already exists.
+  -->
+  <Target Name="FrankGenerateSemantic"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Inputs="$(FrankLockFilePath)"
+          Outputs="$(IntermediateOutputPath)GeneratedDiscovery.fs"
+          Condition="Exists('$(FrankLockFilePath)')">
+
+    <!-- Late-bind SDK-computed properties inside the target.
+         IntermediateOutputPath is not set at .props import time. -->
+    <PropertyGroup>
+      <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+      <FrankDiscoveryModuleName Condition="'$(FrankDiscoveryModuleName)' == ''">$(RootNamespace).GeneratedDiscovery</FrankDiscoveryModuleName>
+      <FrankProfileUri Condition="'$(FrankProfileUri)' == ''">/alps/$(MSBuildProjectName.ToLower())</FrankProfileUri>
+      <_FrankDiscoveryOutput>$(IntermediateOutputPath)GeneratedDiscovery.fs</_FrankDiscoveryOutput>
+    </PropertyGroup>
+
+    <!-- Step 1: validate the lock file (always). Build fails here if any mapping is non-Confirmed. -->
+    <ValidateLockFileTask LockFilePath="$(FrankLockFilePath)" />
+
+    <!-- Step 2: generate only when Frank.Discovery is referenced (package or project). -->
+    <PropertyGroup>
+      <_FrankDiscoveryPackageCount>@(PackageReference->Count()->AnyHaveMetadataValue('Identity', 'Frank.Discovery'))</_FrankDiscoveryPackageCount>
+      <_FrankDiscoveryProjectCount>@(ProjectReference->Count()->AnyHaveMetadataValue('Identity', 'Frank.Discovery'))</_FrankDiscoveryProjectCount>
+      <_FrankHasDiscovery Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Discovery')) == 'True'">true</_FrankHasDiscovery>
+      <_FrankHasDiscovery Condition="@(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Discovery')) == 'True'">true</_FrankHasDiscovery>
+    </PropertyGroup>
+
+    <GenerateDiscoveryTask
+      Condition="'$(_FrankHasDiscovery)' == 'true'"
+      LockFilePath="$(FrankLockFilePath)"
+      OutputPath="$(IntermediateOutputPath)"
+      ModuleName="$(FrankDiscoveryModuleName)"
+      ProfileUri="$(FrankProfileUri)">
+      <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedDiscoveryFile" />
+    </GenerateDiscoveryTask>
+
+    <!-- Add generated file to Compile and FileWrites; guard against double-add on incremental. -->
+    <ItemGroup Condition="'$(_FrankHasDiscovery)' == 'true' and '$(_FrankGeneratedDiscoveryFile)' != '' and !@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedDiscoveryFile)'))">
+      <Compile Include="$(_FrankGeneratedDiscoveryFile)" />
+      <FileWrites Include="$(_FrankGeneratedDiscoveryFile)" />
+    </ItemGroup>
+
+  </Target>
+
+</Project>
