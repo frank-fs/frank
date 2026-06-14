@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>frank CLI — semantic discovery tooling for Frank projects</Description>
+    <PackageTags>frank;cli;semantic;vocabulary</PackageTags>
+    <!-- CLI executables are net10.0 only; not published as a library multi-target -->
+    <IsPackable>false</IsPackable>
+    <!-- Suppress doc XML generation for executables -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="VocabularyEvaluator.fs" />
+    <Compile Include="ExtractPipeline.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Argu: idiomatic F# CLI argument parser; DU-based, no reflection magic at runtime -->
+    <PackageReference Include="Argu" Version="6.2.5" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Cli.Core/Frank.Cli.Core.fsproj" />
+  </ItemGroup>
+
+</Project>
