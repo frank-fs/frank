@@ -60,6 +60,8 @@ type Move =
 
     static member TryParse: player: string * position: string -> Move option
 
+type Game = { Id: string; Result: MoveResult }
+
 type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult

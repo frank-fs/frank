@@ -8,5 +8,5 @@ let registry =
         prefix "schema" "https://schema.org/"
         prefix "wikidata" "https://www.wikidata.org/wiki/"
         using "schema"
-        seeAlso typeof<Move> "wikidata:Q11907"
+        seeAlso typeof<Game> "wikidata:Q11907"
     }

@@ -96,6 +96,8 @@ type Move =
         | Some O, Some pos -> Some(OMove pos)
         | _ -> None
 
+type Game = { Id: string; Result: MoveResult }
+
 type XMove = MoveResult * XPosition -> MoveResult
 
 type OMove = MoveResult * OPosition -> MoveResult
