@@ -25,14 +25,9 @@ module LinkedDataExtensions =
                 Middleware = addMiddleware }
 
         [<CustomOperation("useLinkedData")>]
-        member _.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
-            let addServices (services: IServiceCollection) = spec.Services services
+        member this.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
+            let assemblies = System.AppDomain.CurrentDomain.GetAssemblies()
 
-            let addMiddleware (app: IApplicationBuilder) =
-                let configured = spec.Middleware app
-                configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
-                configured
-
-            { spec with
-                Services = addServices
-                Middleware = addMiddleware }
+            match GeneratedLinkedDataResolver.resolveGeneratedConfig assemblies with
+            | Ok config -> this.UseLinkedDataWith(spec, config)
+            | Error msg -> invalidOp msg

@@ -163,13 +163,9 @@ let private movesResource =
 
 [<EntryPoint>]
 let main args =
-    let linkedDataConfig =
-        { Graph = GeneratedLinkedData.graph
-          JsonLdContext = GeneratedLinkedData.jsonLdContext }
-
     webHost args {
         useDiscoveryWith GeneratedDiscovery.discoveryConfig
-        useLinkedDataWith linkedDataConfig
+        useLinkedData
         resource homeResource
         resource gameResource
         resource movesResource

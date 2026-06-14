@@ -11,6 +11,7 @@
     <Compile Include="TestHelpers.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="PropertyTests.fs" />
+    <Compile Include="ResolverTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
