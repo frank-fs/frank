@@ -99,8 +99,8 @@ Trunk-based (sole maintainer). PRs fallback for external contributors.
 - Normal `git push origin master` OK. Destructive pushes (force without lease, branch deletion, history rewrite) require approval.
 - **Merge sequence**: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review` → ff-merge → push.
 - Always `isolation: "worktree"` for implementation agents.
-- Worktree Bash: standalone commands only; run `cd` first, then command (no `cd && command`).
-- Never push without verifying agent output — may be partial.
+- **Worktree Bash cwd resets to the main repo (master) between calls.** A bare `cd` does NOT persist to the next Bash call — it silently returns to the main checkout. Use ABSOLUTE worktree paths for every command (reads, greps, `dotnet test <abs-path>`), or `cd <abs>` as the first statement *and* verify `git branch --show-current` before trusting output. Prefer the Read tool (absolute path) over `cat`. If a file looks wrong (unexpected type shape / test count), suspect cwd contamination first and re-check with an absolute path before concluding the work is wrong.
+- Never push without verifying agent output — may be partial. **Re-run test suites yourself (absolute paths); don't trust agent-reported counts or pasted artifacts** — agents miscount and paste from cwd-contaminated reads. Verify quantitative claims by running the code (e.g. `dotnet fsi` to compute real values), not by reading the report.
 
 External contributors: fill PR template fully with `Closes #XX`. See `.github/PULL_REQUEST_TEMPLATE.md`.
 
