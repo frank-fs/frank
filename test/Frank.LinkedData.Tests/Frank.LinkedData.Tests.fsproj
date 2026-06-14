@@ -8,12 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="ExtractorTests.fs" />
-    <Compile Include="VocabularyEvaluatorTests.fs" />
-    <Compile Include="PipelineTests.fs" />
-    <Compile Include="DiscoveryEmitterTests.fs" />
-    <Compile Include="LinkedDataEmitterTests.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="TestHelpers.fs" />
+    <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="PropertyTests.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,11 +19,15 @@
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="Expecto.FsCheck" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
-    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Frank.Cli.Core/Frank.Cli.Core.fsproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
   </ItemGroup>
 
 </Project>
