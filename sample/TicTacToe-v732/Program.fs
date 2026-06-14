@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.Http
 open Frank
 open Frank.Builder
 open Frank.Discovery
+open Frank.LinkedData
 open TicTacToe.Model
 open TicTacToe.GameStore
 
@@ -158,8 +159,13 @@ let private movesResource =
 
 [<EntryPoint>]
 let main args =
+    let linkedDataConfig =
+        { Graph = GeneratedLinkedData.graph
+          JsonLdContext = GeneratedLinkedData.jsonLdContext }
+
     webHost args {
         useDiscoveryWith GeneratedDiscovery.discoveryConfig
+        useLinkedDataWith linkedDataConfig
         resource homeResource
         resource gameResource
         resource movesResource

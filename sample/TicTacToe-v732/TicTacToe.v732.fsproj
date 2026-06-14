@@ -14,6 +14,8 @@
     <Compile Include="Model.fsi" />
     <Compile Include="Model.fs" />
     <Compile Include="GameStore.fs" />
+    <Compile Include="Vocabulary.fs" />
+    <Compile Include="GeneratedLinkedData.fs" />
     <!-- GeneratedDiscovery.fs is injected by FrankGenerateSemantic before Program.fs -->
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -21,6 +23,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
     <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
                       ReferenceOutputAssembly="false"
