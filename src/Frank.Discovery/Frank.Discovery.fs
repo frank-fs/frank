@@ -28,6 +28,14 @@ module DiscoveryExtensions =
                 Services = addServices
                 Middleware = addMiddleware }
 
+        [<CustomOperation("useDiscovery")>]
+        member this.UseDiscovery(spec: WebHostSpec) : WebHostSpec =
+            let assemblies = System.AppDomain.CurrentDomain.GetAssemblies()
+
+            match GeneratedDiscoveryResolver.resolveGeneratedConfig assemblies with
+            | Ok config -> this.UseDiscoveryWith(spec, config)
+            | Error msg -> invalidOp msg
+
 /// Extends ResourceBuilder with a `relation` operation that stamps
 /// ResourceRelationMetadata onto every endpoint built by the resource CE block.
 /// Frank.Discovery adds this operation; Frank core is unchanged.

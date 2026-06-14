@@ -9,6 +9,7 @@
     <Compile Include="AlpsSerializer.fs" />
     <Compile Include="JsonHomeSerializer.fs" />
     <Compile Include="DiscoveryMiddleware.fs" />
+    <Compile Include="GeneratedDiscoveryResolver.fs" />
     <Compile Include="Frank.Discovery.fs" />
   </ItemGroup>
 

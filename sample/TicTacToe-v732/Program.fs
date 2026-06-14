@@ -164,7 +164,7 @@ let private movesResource =
 [<EntryPoint>]
 let main args =
     webHost args {
-        useDiscoveryWith GeneratedDiscovery.discoveryConfig
+        useDiscovery
         useLinkedData
         resource homeResource
         resource gameResource
