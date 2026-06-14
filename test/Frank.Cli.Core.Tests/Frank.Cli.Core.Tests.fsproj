@@ -12,6 +12,7 @@
     <Compile Include="VocabularyEvaluatorTests.fs" />
     <Compile Include="PipelineTests.fs" />
     <Compile Include="DiscoveryEmitterTests.fs" />
+    <Compile Include="LinkedDataEmitterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
