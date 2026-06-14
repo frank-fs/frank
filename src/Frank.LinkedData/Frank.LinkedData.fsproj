@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="LinkedDataTypes.fs" />
     <Compile Include="LinkedDataMiddleware.fs" />
+    <Compile Include="GeneratedLinkedDataResolver.fs" />
     <Compile Include="Frank.LinkedData.fs" />
   </ItemGroup>
 
