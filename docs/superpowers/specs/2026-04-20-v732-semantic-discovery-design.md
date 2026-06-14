@@ -381,7 +381,7 @@ Extends existing `Frank.Cli.MSBuild` targets.
 | `GeneratedLinkedData.fs` | JSON-LD `@context` (including external context refs), `IGraph` with type/property triples, `owl:equivalentClass` and `rdfs:seeAlso` triples for outbound links |
 | `GeneratedValidation.fs` | `ShapesGraph` construction with SHACL shapes derived from F# types + mapped IRIs |
 | `GeneratedProvenance.fs` | PROV-O class mappings for `provClass` entries |
-| `GeneratedDiscovery.fs` | Link header values with `rel="describedby"`, ALPS semantic descriptor entries |
+| `GeneratedDiscovery.fs` | Link header values: `rel="describedby"` → ALPS profile, `rel="type"` (RFC 6903) → external vocabulary class IRIs; ALPS semantic descriptor entries |
 
 ### Conditional generation
 
@@ -454,7 +454,7 @@ No fallbacks, no migration paths. v7.3.0/v7.3.1 implementations were never succe
 
 **Produces:**
 - OPTIONS responses with `Allow` header from endpoint metadata
-- Link headers with `rel="describedby"` pointing to ALPS profile and external vocabulary URIs
+- Link headers: `rel="describedby"` → the ALPS profile (machine-readable interface description); `rel="type"` (RFC 6903) → external vocabulary class IRIs (the resource's semantic type, e.g. `schema:Game`). Distinct relations keep a single unambiguous `describedby` target and let a client separate "what interface describes this" from "what kind of thing this is."
 - ALPS profiles: resource-and-property descriptors with vocabulary-aligned IRIs, **without state/transition nesting** (state-projection descriptors are Track A). Each resource emits `descriptor` entries for its fields plus `safe`/`unsafe`/`idempotent` action descriptors for its HTTP methods.
 - JSON Home: resource directory with relation types mapped to vocabulary terms
 
