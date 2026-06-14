@@ -20,6 +20,10 @@
     TaskName="Frank.Cli.MSBuild.GenerateDiscoveryTask"
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateLinkedDataTask"
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
+
   <!--
     FrankGenerateSemantic: validate lock file and generate GeneratedDiscovery.fs.
     Incremental: skipped when lock file is unchanged and output already exists.
@@ -92,6 +96,68 @@
       <Compile Remove="@(_FrankProgramFs)" />
       <Compile Include="$(_FrankGeneratedFile)" />
       <Compile Include="@(_FrankProgramFs)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankGenerateLinkedData: evaluate the vocabulary CE in-process via FSI and emit
+    GeneratedLinkedData.fs. Only runs when Frank.LinkedData is referenced.
+
+    Incremental: Inputs = lock file + all project compile items (vocab CE source).
+                 Outputs = $(IntermediateOutputPath)GeneratedLinkedData.fs.
+
+    Separation of concerns mirrors the Discovery pair:
+    - FrankGenerateLinkedData writes the file (incremental, skippable when inputs unchanged).
+    - FrankInjectGeneratedLinkedDataFile wires the file into @(Compile) (always).
+  -->
+  <Target Name="FrankGenerateLinkedData"
+          BeforeTargets="FrankInjectGeneratedLinkedDataFile"
+          Inputs="$(FrankLockFilePath);@(Compile)"
+          Outputs="$(IntermediateOutputPath)GeneratedLinkedData.fs"
+          Condition="Exists('$(FrankLockFilePath)') and (@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.LinkedData')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.LinkedData')) == 'True')">
+
+    <!-- Late-bind SDK-computed properties inside the target. -->
+    <PropertyGroup>
+      <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+      <FrankLinkedDataModuleName Condition="'$(FrankLinkedDataModuleName)' == ''">$(RootNamespace).GeneratedLinkedData</FrankLinkedDataModuleName>
+      <FrankVocabularyBinding Condition="'$(FrankVocabularyBinding)' == ''">registry</FrankVocabularyBinding>
+    </PropertyGroup>
+
+    <GenerateLinkedDataTask
+      LockFilePath="$(FrankLockFilePath)"
+      OutputPath="$(IntermediateOutputPath)"
+      ModuleName="$(FrankLinkedDataModuleName)"
+      SourceFiles="@(Compile)"
+      AssemblyRefs="@(ReferencePath)"
+      VocabularyBinding="$(FrankVocabularyBinding)">
+      <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedLinkedDataFile" />
+    </GenerateLinkedDataTask>
+
+    <ItemGroup Condition="'$(_FrankGeneratedLinkedDataFile)' != ''">
+      <FileWrites Include="$(_FrankGeneratedLinkedDataFile)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankInjectGeneratedLinkedDataFile: always runs before CoreCompile (not incremental).
+    Injects the already-generated GeneratedLinkedData.fs before Program.fs in @(Compile).
+    Guards against double-add.
+  -->
+  <Target Name="FrankInjectGeneratedLinkedDataFile"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Condition="Exists('$(IntermediateOutputPath)GeneratedLinkedData.fs')">
+
+    <PropertyGroup>
+      <_FrankGeneratedLDFile>$(IntermediateOutputPath)GeneratedLinkedData.fs</_FrankGeneratedLDFile>
+    </PropertyGroup>
+
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)'))">
+      <_FrankProgramFsLD Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <Compile Remove="@(_FrankProgramFsLD)" />
+      <Compile Include="$(_FrankGeneratedLDFile)" />
+      <Compile Include="@(_FrankProgramFsLD)" />
     </ItemGroup>
 
   </Target>
