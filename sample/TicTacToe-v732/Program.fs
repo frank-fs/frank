@@ -99,8 +99,12 @@ let private homeHandler (ctx: HttpContext) =
 let private gameHandler (ctx: HttpContext) =
     task {
         let id = routeId ctx
-        let result = store.GetOrCreate id
-        do! writeJson ctx (wireJson id result)
+
+        let game: Game =
+            { Id = id
+              Result = store.GetOrCreate id }
+
+        do! writeJson ctx (wireJson game.Id game.Result)
     }
 
 /// Pre-semantic move shape: plain JSON { "position": "TopLeft", "player": "X" }.

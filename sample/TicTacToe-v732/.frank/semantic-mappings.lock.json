@@ -10,7 +10,7 @@
   },
   "mappings": [
     {
-      "fsharpType": "TicTacToe.Game",
+      "fsharpType": "TicTacToe.Model.Game",
       "iri": "schema:Game",
       "confidence": 1.0,
       "source": "convention",
