@@ -11,13 +11,16 @@
     <Compile Include="ExtractorTests.fs" />
     <Compile Include="VocabularyEvaluatorTests.fs" />
     <Compile Include="PipelineTests.fs" />
+    <Compile Include="DiscoveryEmitterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
+    <PackageReference Include="Expecto.FsCheck" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
   </ItemGroup>
 
   <ItemGroup>

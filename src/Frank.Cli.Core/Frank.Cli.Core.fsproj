@@ -10,6 +10,7 @@
     <Compile Include="Extractor.fs" />
     <Compile Include="VocabularyEvaluator.fs" />
     <Compile Include="Pipeline.fs" />
+    <Compile Include="DiscoveryEmitter.fs" />
   </ItemGroup>
 
   <ItemGroup>
