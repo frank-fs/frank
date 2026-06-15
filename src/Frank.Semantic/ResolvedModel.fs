@@ -26,6 +26,83 @@ type ResolvedModel =
 
 module ResolvedModel =
 
+    // F# reserved keywords that cannot be bare DU case names without backticks.
+    let private fsharpKeywords =
+        Set.ofList
+            [ "abstract"
+              "and"
+              "as"
+              "assert"
+              "base"
+              "begin"
+              "class"
+              "default"
+              "delegate"
+              "do"
+              "done"
+              "downcast"
+              "downto"
+              "elif"
+              "else"
+              "end"
+              "exception"
+              "extern"
+              "false"
+              "finally"
+              "fixed"
+              "for"
+              "fun"
+              "function"
+              "global"
+              "if"
+              "in"
+              "inherit"
+              "inline"
+              "interface"
+              "internal"
+              "lazy"
+              "let"
+              "match"
+              "member"
+              "module"
+              "mutable"
+              "namespace"
+              "new"
+              "not"
+              "null"
+              "of"
+              "open"
+              "or"
+              "override"
+              "private"
+              "public"
+              "rec"
+              "return"
+              "select"
+              "static"
+              "struct"
+              "then"
+              "to"
+              "true"
+              "try"
+              "type"
+              "upcast"
+              "use"
+              "val"
+              "void"
+              "when"
+              "while"
+              "with"
+              "yield" ]
+
+    let private isValidIdentifier (name: string) : bool =
+        if String.IsNullOrEmpty name then
+            false
+        elif not (Char.IsLetter(name.[0]) || name.[0] = '_') then
+            false
+        else
+            name |> Seq.forall (fun c -> Char.IsLetterOrDigit c || c = '_')
+
     let private parseLocalName (fsharpType: string) : string * int =
         let segment =
             match fsharpType.LastIndexOf('.') with
@@ -42,18 +119,19 @@ module ResolvedModel =
             | true, n -> name, n
             | false, _ -> segment, 0
 
-    let private resolveOptionalIri
-        (prefixes: Map<string, Uri>)
-        (context: string)
-        (iri: string option)
-        : Result<Uri option, string> =
-        match iri with
-        | None -> Ok None
-        | Some s ->
-            try
-                Ok(Some(VocabularyRegistry.resolveIri prefixes s))
-            with :? InvalidOperationException as ex ->
-                Error $"type '{context}': {ex.Message}"
+    // Fix 8: one total traversal combinator, O(n) via cons + List.rev.
+    let private traverseResult (f: 'a -> Result<'b, 'e>) (xs: 'a list) : Result<'b list, 'e> =
+        let folder acc x =
+            match acc with
+            | Error e -> Error e
+            | Ok ys ->
+                match f x with
+                | Error e -> Error e
+                | Ok y -> Ok(y :: ys)
+
+        match List.fold folder (Ok []) xs with
+        | Error e -> Error e
+        | Ok ys -> Ok(List.rev ys)
 
     let private buildField
         (prefixes: Map<string, Uri>)
@@ -61,8 +139,8 @@ module ResolvedModel =
         (fsharpType: string)
         (f: FieldMapping)
         : Result<ResolvedField, string> =
-        match resolveOptionalIri prefixes fsharpType f.Iri with
-        | Error e -> Error e
+        match VocabularyRegistry.tryResolveIri prefixes f.Iri with
+        | Error e -> Error $"type '{fsharpType}': {e}"
         | Ok iri ->
             let seeAlso =
                 registry.FieldSeeAlso
@@ -83,15 +161,7 @@ module ResolvedModel =
         (fsharpType: string)
         (fields: FieldMapping list)
         : Result<ResolvedField list, string> =
-        let folder acc f =
-            match acc with
-            | Error e -> Error e
-            | Ok xs ->
-                match buildField prefixes registry fsharpType f with
-                | Error e -> Error e
-                | Ok rf -> Ok(xs @ [ rf ])
-
-        List.fold folder (Ok []) fields
+        traverseResult (buildField prefixes registry fsharpType) fields
 
     let private buildResource
         (prefixes: Map<string, Uri>)
@@ -100,16 +170,14 @@ module ResolvedModel =
         : Result<ResolvedResource, string> =
         let localName, genericArity = parseLocalName m.FSharpType
 
-        match resolveOptionalIri prefixes m.FSharpType m.Iri with
-        | Error e -> Error e
+        match VocabularyRegistry.tryResolveIri prefixes m.Iri with
+        | Error e -> Error $"type '{m.FSharpType}': {e}"
         | Ok classIri ->
             match buildFields prefixes registry m.FSharpType m.Fields with
             | Error e -> Error e
             | Ok fields ->
                 let equivalentClass = registry.EquivalentClasses |> Map.tryFind m.FSharpType
-
                 let seeAlso = registry.SeeAlso |> Map.tryFind m.FSharpType |> Option.defaultValue []
-
                 let provClass = registry.ProvClasses |> Map.tryFind m.FSharpType
 
                 Ok
@@ -127,15 +195,7 @@ module ResolvedModel =
         (registry: VocabularyRegistry)
         (mappings: Mapping list)
         : Result<ResolvedResource list, string> =
-        let folder acc m =
-            match acc with
-            | Error e -> Error e
-            | Ok xs ->
-                match buildResource prefixes registry m with
-                | Error e -> Error e
-                | Ok r -> Ok(xs @ [ r ])
-
-        List.fold folder (Ok []) mappings
+        traverseResult (buildResource prefixes registry) mappings
 
     let private checkLocalNameCollisions (resources: ResolvedResource list) : Result<unit, string> =
         let withClassIri = resources |> List.filter (fun r -> r.ClassIri.IsSome)
@@ -160,6 +220,27 @@ module ResolvedModel =
 
         result |> Result.map (fun _ -> ())
 
+    // Fix 4: reject reserved keywords and non-identifier local names for class-mapped resources.
+    let private checkReservedKeywords (resources: ResolvedResource list) : Result<unit, string> =
+        let withClassIri = resources |> List.filter (fun r -> r.ClassIri.IsSome)
+
+        let check (r: ResolvedResource) =
+            if Set.contains (r.LocalName.ToLowerInvariant()) fsharpKeywords then
+                Error
+                    $"resource '{r.FSharpType}' has local name '{r.LocalName}' which is an F# reserved keyword; rename the type or use a backtick alias in your vocabulary"
+            elif not (isValidIdentifier r.LocalName) then
+                Error
+                    $"resource '{r.FSharpType}' has local name '{r.LocalName}' which is not a valid F# identifier; rename the type"
+            else
+                Ok()
+
+        let folder acc r =
+            match acc with
+            | Error e -> Error e
+            | Ok() -> check r
+
+        List.fold folder (Ok()) withClassIri
+
     let build (registry: VocabularyRegistry) (lock: LockFile) : Result<ResolvedModel, string> =
         let prefixes = registry.Prefixes
 
@@ -169,7 +250,10 @@ module ResolvedModel =
             match checkLocalNameCollisions resources with
             | Error e -> Error e
             | Ok() ->
-                Ok
-                    { Prefixes = prefixes
-                      Using = registry.Using
-                      Resources = resources }
+                match checkReservedKeywords resources with
+                | Error e -> Error e
+                | Ok() ->
+                    Ok
+                        { Prefixes = prefixes
+                          Using = registry.Using
+                          Resources = resources }

@@ -211,6 +211,50 @@ let at_rm7 =
             Expect.equal names [ "A.One"; "B.Two"; "C.Three" ] "order preserved"
     }
 
+// ── AT-RM-KW: reserved keyword local name returns Error ──────────────────────
+
+[<Tests>]
+let at_rm_kw =
+    testList
+        "AT-RM-KW: reserved keyword local names rejected for class-mapped resources"
+        [ test "type named 'Type' (F# reserved) with ClassIri returns Error" {
+              let mapping = mkMapping "Ns.Type" (Some "schema:Thing") []
+
+              let lock =
+                  { emptyLock with
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build baseRegistry lock with
+              | Ok _ -> failwith "Expected Error for reserved keyword local name"
+              | Error msg ->
+                  Expect.stringContains msg "Type" "error names the type"
+                  Expect.stringContains msg "reserved keyword" "error mentions reserved keyword"
+          }
+
+          test "type named 'End' (F# reserved) with ClassIri returns Error" {
+              let mapping = mkMapping "Ns.End" (Some "schema:End") []
+
+              let lock =
+                  { emptyLock with
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build baseRegistry lock with
+              | Ok _ -> failwith "Expected Error for reserved keyword local name 'End'"
+              | Error msg -> Expect.stringContains msg "reserved keyword" "error mentions reserved keyword"
+          }
+
+          test "type with reserved keyword LocalName but no ClassIri is allowed (not emitted)" {
+              let mapping = mkMapping "Ns.Type" None []
+
+              let lock =
+                  { emptyLock with
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build baseRegistry lock with
+              | Error e -> failwith $"Expected Ok for unmapped reserved-keyword type, got Error: {e}"
+              | Ok model -> Expect.hasLength model.Resources 1 "resource present but not class-mapped"
+          } ]
+
 // ── AT-RM8: property — every Uri in model IsAbsoluteUri ──────────────────────
 
 [<Tests>]

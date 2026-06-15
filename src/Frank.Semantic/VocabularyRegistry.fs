@@ -94,6 +94,23 @@ module VocabularyRegistry =
           ProvClasses = mergeMap "ProvClasses" base'.ProvClasses other.ProvClasses
           ConstraintPatterns = mergeMap "ConstraintPatterns" base'.ConstraintPatterns other.ConstraintPatterns }
 
+    /// Total version of resolveIri: returns Ok(Some uri) for prefixed/absolute IRIs,
+    /// Ok None for None, Error for unknown prefix.
+    let tryResolveIri (prefixes: Map<string, Uri>) (iri: string option) : Result<Uri option, string> =
+        match iri with
+        | None -> Ok None
+        | Some s ->
+            match s.IndexOf(':') with
+            | -1 -> Ok(Some(Uri s))
+            | idx ->
+                let prefix = s.[.. idx - 1]
+                let local = s.[idx + 1 ..]
+
+                match Map.tryFind prefix prefixes with
+                | None ->
+                    Error $"Unknown prefix '{prefix}' in IRI '{s}'. Declare it with: prefix \"{prefix}\" \"<uri>\""
+                | Some baseUri -> Ok(Some(Uri(baseUri.AbsoluteUri + local)))
+
     /// Look up EquivalentClass by Type.
     let tryFindEquivalentClass (t: Type) (r: VocabularyRegistry) =
         Map.tryFind (typeKey t) r.EquivalentClasses

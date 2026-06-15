@@ -88,11 +88,16 @@ let private resolveTypeArg (isTypeDefOf: bool) (t: FSharpType) : Result<string, 
 
 // ── Argument extraction helpers ───────────────────────────────────────────────
 
-/// Extract a string literal from a Const expression, or return Error.
+/// Extract a string literal from a Const expression, or return an actionable Error.
 let private requireConst (expr: FSharpExpr) : Result<string, string> =
     match expr with
     | FSharpExprPatterns.Const(:? string as s, _) -> Ok s
-    | other -> Error $"expected string literal, got {other.GetType().Name}"
+    | FSharpExprPatterns.Const _ -> Error "vocabulary argument must be a string literal, not a non-string constant"
+    | FSharpExprPatterns.Value _ ->
+        Error "vocabulary argument must be a string literal, not a binding or computed expression"
+    | FSharpExprPatterns.Call _ ->
+        Error "vocabulary argument must be a string literal, not a binding or computed expression"
+    | _ -> Error "vocabulary argument must be a string literal, not a binding or computed expression"
 
 /// Extract a ProvOClass from a NewUnionCase expression, or return Error.
 let private requireProvOClass (expr: FSharpExpr) : Result<ProvOClass, string> =
@@ -119,12 +124,13 @@ let private requireTypeKey (expr: FSharpExpr) : Result<string, string> =
 
 // ── IRI resolution ────────────────────────────────────────────────────────────
 
-/// Resolve a prefixed IRI, converting InvalidOperationException (undeclared prefix) to Error.
-let private tryResolveIri (prefixes: Map<string, Uri>) (iri: string) : Result<Uri, string> =
-    try
-        Ok(VocabularyRegistry.resolveIri prefixes iri)
-    with :? InvalidOperationException as ex ->
-        Error ex.Message
+/// Resolve a prefixed IRI string to a Uri using the total VocabularyRegistry.tryResolveIri.
+/// The string iri is always present at this call site (extracted from a Const); wraps as Some.
+let private tryResolveIriStr (prefixes: Map<string, Uri>) (iri: string) : Result<Uri, string> =
+    match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
+    | Error e -> Error e
+    | Ok None -> Error "unexpected: tryResolveIri returned None for a present string"
+    | Ok(Some uri) -> Ok uri
 
 // ── Per-operation helpers (Task C) ────────────────────────────────────────────
 
@@ -157,7 +163,7 @@ let private applyTypeIriOp<'K when 'K: comparison>
     | Error e, _
     | _, Error e -> Error e
     | Ok typeName, Ok iri ->
-        match tryResolveIri prefixes iri with
+        match tryResolveIriStr prefixes iri with
         | Error e -> Error e
         | Ok resolved -> insertSingleton label (makeKey typeName) resolved getMap setMap state
 
@@ -211,7 +217,7 @@ let private resolveAndAppend<'K when 'K: comparison>
     (setMap: VocabularyRegistry -> Map<'K, Uri list> -> VocabularyRegistry)
     (state: VocabularyRegistry)
     : Result<VocabularyRegistry, string> =
-    match tryResolveIri prefixes iri with
+    match tryResolveIriStr prefixes iri with
     | Error e -> Error e
     | Ok resolved ->
         let existing = getMap state |> Map.tryFind key |> Option.defaultValue []
@@ -299,6 +305,9 @@ let private tryMerge (state: VocabularyRegistry) (other: VocabularyRegistry) : R
 
 // ── Binding search ────────────────────────────────────────────────────────────
 
+[<Literal>]
+let private MaxSearchDepth = 4096
+
 /// Find the CE body expression of the named binding across all implementation files.
 /// Supports qualified names (e.g. "CliTestVocab.registry") and simple names ("registry").
 let private findBindingBody
@@ -311,17 +320,21 @@ let private findBindingBody
 
     let found = ResizeArray<FSharpExpr>()
 
-    let rec search (decls: FSharpImplementationFileDeclaration list) : unit =
-        for decl in decls do
-            match decl with
-            | FSharpImplementationFileDeclaration.Entity(_, ds) -> search ds
-            | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
-                if mfv.CompiledName = simpleName then
-                    found.Add(body)
-            | FSharpImplementationFileDeclaration.InitAction _ -> ()
+    // Fix 11: bound the entity-decl search to prevent unbounded recursion.
+    let rec search (depth: int) (decls: FSharpImplementationFileDeclaration list) : unit =
+        if depth >= MaxSearchDepth then
+            ()
+        else
+            for decl in decls do
+                match decl with
+                | FSharpImplementationFileDeclaration.Entity(_, ds) -> search (depth + 1) ds
+                | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
+                    if mfv.CompiledName = simpleName then
+                        found.Add(body)
+                | FSharpImplementationFileDeclaration.InitAction _ -> ()
 
     for f in implFiles do
-        search f.Declarations
+        search 0 f.Declarations
 
     match found.Count with
     | 0 -> Error $"binding '{bindingName}' not found in source files"
@@ -339,6 +352,9 @@ let private findBindingBody
 [<Literal>]
 let private MaxIncludeDepth = 16
 
+[<Literal>]
+let private MaxWalkDepth = 4096
+
 /// Resolve the included registry from an include arg expression.
 /// Module-level zero-arg bindings appear as Call(mfv, args=[]) in the typed tree
 /// (property getter calls). Value mfv is a fallback for local bindings.
@@ -353,7 +369,8 @@ let rec private resolveIncludedRegistry
         if Set.contains name visited then
             Error $"include cycle detected: '{name}' is already being resolved"
         elif depth >= MaxIncludeDepth then
-            Error "include cycle or depth exceeded"
+            Error
+                $"include nesting exceeded {MaxIncludeDepth} levels (not a cycle — cycles are detected separately); increase the cap if intentional"
         else
             match findBindingBody implFiles name with
             | Error e -> Error e
@@ -380,6 +397,7 @@ and private applyInclude
     | _ -> Error "Include: wrong argument count"
 
 /// Walk the vocabulary CE typed-tree body, recursively applying operations bottom-up.
+/// Fix 11: explicit walkDepth cap prevents unbounded structural recursion.
 /// The CE desugars to Application(func=Lambda(body), typeArgs, args=[builder]).
 /// The Lambda body is the nested Call chain; args[0] is the previous state expression.
 /// Recursion terminates at Yield (returns empty) or unrecognized nodes (returns empty).
@@ -389,18 +407,30 @@ and private walkCEBody
     (visited: Set<string>)
     (expr: FSharpExpr)
     : Result<VocabularyRegistry, string> =
-    match expr with
-    | FSharpExprPatterns.Application(func, _, _) -> walkCEBody implFiles depth visited func
-    | FSharpExprPatterns.Lambda(_, body) -> walkCEBody implFiles depth visited body
-    | FSharpExprPatterns.Call(_, mfv, _, _, _) when mfv.CompiledName = "Yield" -> Ok VocabularyRegistry.empty
-    | FSharpExprPatterns.Call(_, mfv, _, _, args) ->
-        match args with
-        | prevStateExpr :: _ ->
-            match walkCEBody implFiles depth visited prevStateExpr with
-            | Error e -> Error e
-            | Ok state -> applyOperation implFiles depth visited mfv.CompiledName args state
-        | [] -> Ok VocabularyRegistry.empty
-    | _ -> Ok VocabularyRegistry.empty
+    walkCEBodyAt implFiles depth visited 0 expr
+
+and private walkCEBodyAt
+    (implFiles: FSharpImplementationFileContents list)
+    (depth: int)
+    (visited: Set<string>)
+    (walkDepth: int)
+    (expr: FSharpExpr)
+    : Result<VocabularyRegistry, string> =
+    if walkDepth >= MaxWalkDepth then
+        Error $"vocabulary CE/declaration nesting exceeded {MaxWalkDepth} levels"
+    else
+        match expr with
+        | FSharpExprPatterns.Application(func, _, _) -> walkCEBodyAt implFiles depth visited (walkDepth + 1) func
+        | FSharpExprPatterns.Lambda(_, body) -> walkCEBodyAt implFiles depth visited (walkDepth + 1) body
+        | FSharpExprPatterns.Call(_, mfv, _, _, _) when mfv.CompiledName = "Yield" -> Ok VocabularyRegistry.empty
+        | FSharpExprPatterns.Call(_, mfv, _, _, args) ->
+            match args with
+            | prevStateExpr :: _ ->
+                match walkCEBodyAt implFiles depth visited (walkDepth + 1) prevStateExpr with
+                | Error e -> Error e
+                | Ok state -> applyOperation implFiles depth visited mfv.CompiledName args state
+            | [] -> Ok VocabularyRegistry.empty
+        | _ -> Ok VocabularyRegistry.empty
 
 /// Dispatch a single CE operation by CompiledName to its per-op handler.
 and private applyOperation
