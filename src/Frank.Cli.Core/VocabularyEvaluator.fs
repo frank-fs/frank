@@ -168,15 +168,7 @@ let private applyPrefix (args: FSharpExpr list) (state: VocabularyRegistry) : Re
         | Error e, _
         | _, Error e -> Error e
         | Ok name, Ok uri ->
-            let baseUri = Uri(uri)
-
-            match Map.tryFind name state.Prefixes with
-            | Some existing when existing = baseUri -> Ok state
-            | Some _ -> Error $"prefix '{name}' declared with conflicting URIs"
-            | None ->
-                Ok
-                    { state with
-                        Prefixes = Map.add name baseUri state.Prefixes }
+            insertSingleton "prefix" name (Uri(uri)) (fun s -> s.Prefixes) (fun s m -> { s with Prefixes = m }) state
     | _ -> Error "Prefix: wrong argument count"
 
 let private applyUsing (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
