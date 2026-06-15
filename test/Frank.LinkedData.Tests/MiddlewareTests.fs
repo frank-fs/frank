@@ -181,34 +181,27 @@ let qvalueTests =
                   "text/turtle"
                   "turtle served; ld+json excluded by q=0"
 
-          testCase "*/* → Serve application/ld+json (first entry in supportedTypes)"
+          testCase "*/* alone → PassThrough (wildcard does not serve RDF)"
           <| fun _ ->
               use app = startServer sampleConfig
               use client = app.GetTestClient()
               use req = new HttpRequestMessage(HttpMethod.Get, "/data")
               req.Headers.Add("Accept", "*/*")
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
-              Expect.equal (int resp.StatusCode) 200 "status 200"
+              Expect.equal (int resp.StatusCode) 200 "downstream 200"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "downstream" "*/* passes through to downstream handler"
 
-              Expect.equal
-                  resp.Content.Headers.ContentType.MediaType
-                  "application/ld+json"
-                  "*/* serves first supportedType (ld+json)"
-
-          testCase "application/* → Serve an application/* supported type (not text/turtle)"
+          testCase "application/* alone → PassThrough (wildcard subtype does not serve RDF)"
           <| fun _ ->
               use app = startServer sampleConfig
               use client = app.GetTestClient()
               use req = new HttpRequestMessage(HttpMethod.Get, "/data")
               req.Headers.Add("Accept", "application/*")
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
-              Expect.equal (int resp.StatusCode) 200 "status 200"
-
-              let ct = resp.Content.Headers.ContentType.MediaType
-
-              Expect.isTrue
-                  (ct = "application/ld+json" || ct = "application/rdf+xml")
-                  "application/* matches ld+json or rdf+xml, not turtle"
+              Expect.equal (int resp.StatusCode) 200 "downstream 200"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "downstream" "application/* passes through to downstream handler"
 
           testCase "application/*;q=0 + turtle → Serve text/turtle (wildcard exclusion)"
           <| fun _ ->

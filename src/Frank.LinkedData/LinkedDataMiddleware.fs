@@ -37,6 +37,10 @@ module private AcceptNegotiation =
         | NotAcceptable
         | PassThrough
 
+    /// Returns true if the Accept entry is a concrete (non-wildcard) type/subtype.
+    let private isConcrete (entry: MediaTypeHeaderValue) =
+        entry.Type.Value <> "*" && entry.SubType.Value <> "*"
+
     /// Returns true if the Accept entry (which may be a wildcard) matches the candidate media type.
     let private matchesType (entry: MediaTypeHeaderValue) (candidate: string) =
         let slash = candidate.IndexOf('/')
@@ -74,10 +78,10 @@ module private AcceptNegotiation =
             PassThrough
         else
             let entries = parseAcceptWithQ acceptHeader
-            let nonZero = entries |> List.filter (fun (_, q) -> q > 0.0)
+            let concreteNonZero = entries |> List.filter (fun (e, q) -> q > 0.0 && isConcrete e)
 
             let bestSupported =
-                nonZero
+                concreteNonZero
                 |> List.tryPick (fun (entry, _) ->
                     supportedTypes
                     |> Array.tryFind (fun candidate ->
@@ -86,12 +90,16 @@ module private AcceptNegotiation =
             match bestSupported with
             | Some t -> Serve t
             | None ->
-                let anyRdfMentioned =
+                let anyConcreteRdfMentioned =
                     entries
                     |> List.exists (fun (entry, _) ->
-                        rdfScopeTypes |> Set.exists (fun candidate -> matchesType entry candidate))
+                        isConcrete entry
+                        && rdfScopeTypes |> Set.exists (fun candidate -> matchesType entry candidate))
 
-                if anyRdfMentioned then NotAcceptable else PassThrough
+                if anyConcreteRdfMentioned then
+                    NotAcceptable
+                else
+                    PassThrough
 
 module private Serializers =
 
