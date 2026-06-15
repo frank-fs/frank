@@ -7,6 +7,7 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging
+open Microsoft.Net.Http.Headers
 open VDS.RDF
 open VDS.RDF.Writing
 
@@ -31,37 +32,66 @@ module private AcceptNegotiation =
                "application/trig"
                "application/xml" |]
 
-    let parseAccept (acceptHeader: string) : string list =
-        acceptHeader.Split(',')
-        |> Array.map (fun part ->
-            let semicolon = part.IndexOf(';')
-
-            if semicolon >= 0 then
-                part.[.. semicolon - 1].Trim()
-            else
-                part.Trim())
-        |> Array.filter (fun s -> not (String.IsNullOrEmpty s))
-        |> Array.toList
-
     type NegotiationResult =
         | Serve of mediaType: string
         | NotAcceptable
         | PassThrough
 
+    /// Returns true if the Accept entry (which may be a wildcard) matches the candidate media type.
+    let private matchesType (entry: MediaTypeHeaderValue) (candidate: string) =
+        let slash = candidate.IndexOf('/')
+        let mainType = candidate.[.. slash - 1]
+        let subType = candidate.[slash + 1 ..]
+        let eMain = entry.Type.Value
+        let eSub = entry.SubType.Value
+
+        (eMain = "*" && eSub = "*")
+        || (eMain = mainType && eSub = "*")
+        || (eMain = mainType && eSub = subType)
+
+    /// Parse Accept header into (mediaType, q) pairs sorted by q descending (then by header order for ties).
+    /// q=0 entries are retained so callers can apply exclusions.
+    let private parseAcceptWithQ (acceptHeader: string) : (MediaTypeHeaderValue * double) list =
+        let entries =
+            MediaTypeHeaderValue.ParseList(Collections.Generic.List([ acceptHeader ]))
+
+        entries
+        |> Seq.mapi (fun i e ->
+            let q = if e.Quality.HasValue then e.Quality.Value else 1.0
+            (e, q, i))
+        |> Seq.sortWith (fun (_, q1, i1) (_, q2, i2) ->
+            let cq = compare q2 q1
+            if cq <> 0 then cq else compare i1 i2)
+        |> Seq.map (fun (e, q, _) -> (e, q))
+        |> Seq.toList
+
+    /// Returns true if the candidate is excluded by any q=0 entry in the list.
+    let private isExcluded (entries: (MediaTypeHeaderValue * double) list) (candidate: string) =
+        entries |> List.exists (fun (e, q) -> q = 0.0 && matchesType e candidate)
+
     let negotiate (acceptHeader: string) : NegotiationResult =
         if String.IsNullOrEmpty acceptHeader then
             PassThrough
         else
-            let types = parseAccept acceptHeader
+            let entries = parseAcceptWithQ acceptHeader
+            let nonZero = entries |> List.filter (fun (_, q) -> q > 0.0)
 
-            let firstSupported =
-                types |> List.tryFind (fun t -> Array.contains t supportedTypes)
+            let bestSupported =
+                nonZero
+                |> List.tryPick (fun (entry, _) ->
+                    supportedTypes
+                    |> Array.tryFind (fun candidate ->
+                        matchesType entry candidate && not (isExcluded entries candidate)))
 
-            match firstSupported with
+            match bestSupported with
             | Some t -> Serve t
             | None ->
-                let anyRdf = types |> List.exists (fun t -> Set.contains t rdfScopeTypes)
-                if anyRdf then NotAcceptable else PassThrough
+                let anyRdfMentioned =
+                    entries
+                    |> List.exists (fun (entry, _) ->
+                        rdfScopeTypes |> Set.exists (fun candidate -> matchesType entry candidate))
+
+                if anyRdfMentioned then NotAcceptable else PassThrough
 
 module private Serializers =
 

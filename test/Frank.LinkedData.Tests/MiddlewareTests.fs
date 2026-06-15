@@ -129,3 +129,97 @@ let tests =
               use client = app.GetTestClient()
               let (resp: HttpResponseMessage) = client.GetAsync("/data").GetAwaiter().GetResult()
               Expect.equal (int resp.StatusCode) 200 "200 from downstream" ]
+
+[<Tests>]
+let qvalueTests =
+    testList
+        "LinkedDataMiddleware q-value content negotiation"
+        [ testCase "turtle;q=0.9 + ld+json;q=0.3 (turtle first) → Serve text/turtle (higher q wins)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "text/turtle;q=0.9, application/ld+json;q=0.3")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              Expect.equal resp.Content.Headers.ContentType.MediaType "text/turtle" "turtle wins by q"
+
+          testCase "ld+json;q=0.3 + turtle;q=0.9 (ld+json first) → Serve text/turtle (higher q wins)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json;q=0.3, text/turtle;q=0.9")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "text/turtle"
+                  "turtle wins by q regardless of header order"
+
+          testCase "ld+json;q=0 alone → 406 (q=0 excludes; only RDF-scope type → NotAcceptable)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json;q=0")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 406 "q=0 means not acceptable; RDF-scope with no match → 406"
+
+          testCase "ld+json;q=0 + turtle → Serve text/turtle (q=0 excludes ld+json; turtle has implicit q=1)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json;q=0, text/turtle")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "text/turtle"
+                  "turtle served; ld+json excluded by q=0"
+
+          testCase "*/* → Serve application/ld+json (first entry in supportedTypes)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "*/*")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/ld+json"
+                  "*/* serves first supportedType (ld+json)"
+
+          testCase "application/* → Serve an application/* supported type (not text/turtle)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/*")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              let ct = resp.Content.Headers.ContentType.MediaType
+
+              Expect.isTrue
+                  (ct = "application/ld+json" || ct = "application/rdf+xml")
+                  "application/* matches ld+json or rdf+xml, not turtle"
+
+          testCase "application/*;q=0 + turtle → Serve text/turtle (wildcard exclusion)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/*;q=0, text/turtle")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "text/turtle"
+                  "application/* q=0 excludes ld+json and rdf+xml; turtle served" ]

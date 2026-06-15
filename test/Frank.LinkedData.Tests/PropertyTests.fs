@@ -131,4 +131,24 @@ let tests =
                   int resp.StatusCode = 406
 
               supportedTypes |> List.forall checkSupported
-              && unsupportedRdfTypes |> List.forall checkUnsupported ]
+              && unsupportedRdfTypes |> List.forall checkUnsupported
+
+          testProperty "a supported type present with q=0 is never Served"
+          <| fun () ->
+              let supportedTypesWithQZero =
+                  [ "application/ld+json"; "text/turtle"; "application/rdf+xml" ]
+
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+
+              let neverServedWhenQZero (ct: string) =
+                  use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+                  req.Headers.Add("Accept", $"{ct};q=0")
+                  let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+
+                  let notServed =
+                      int resp.StatusCode <> 200 || resp.Content.Headers.ContentType.MediaType <> ct
+
+                  notServed
+
+              supportedTypesWithQZero |> List.forall neverServedWhenQZero ]
