@@ -333,3 +333,101 @@ let groupCLoudFailTests =
               withTempVocab bclTypeSrc "ProbeVocab.registry" (fun result ->
                   Expect.isError result "BCL constructed generic must return Error — no declared source type to match")
           } ]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group D: include support through evalRegistry (Task A)
+// ─────────────────────────────────────────────────────────────────────────────
+
+let private includeTwoBindingsSrc =
+    """
+module IncludeVocab
+
+open Frank.Semantic
+
+type Order = { Id: int; Total: decimal }
+type Product = { Name: string }
+
+let base' =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        equivalentClass typeof<Order> "schema:Order"
+    }
+
+let registry =
+    vocabulary {
+        prefix "ex" "http://example.com/vocab#"
+        equivalentClass typeof<Product> "ex:Product"
+        ``include`` base'
+    }
+"""
+
+let private includeConflictSrc =
+    """
+module IncludeConflict
+
+open Frank.Semantic
+
+type Order = { Id: int }
+
+let base' =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        equivalentClass typeof<Order> "schema:Order"
+    }
+
+let registry =
+    vocabulary {
+        prefix "ex" "http://example.com/vocab#"
+        equivalentClass typeof<Order> "ex:DifferentThing"
+        ``include`` base'
+    }
+"""
+
+let private includeInlineSrc =
+    """
+module IncludeInline
+
+open Frank.Semantic
+
+type Order = { Id: int }
+type Product = { Name: string }
+
+let extra =
+    vocabulary {
+        prefix "ex" "http://example.com/"
+        equivalentClass typeof<Product> "ex:Product"
+    }
+
+let registry =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        equivalentClass typeof<Order> "schema:Order"
+        ``include`` extra
+    }
+"""
+
+[<Tests>]
+let groupDIncludeTests =
+    testList
+        "TypeIdentity - D: include through evalRegistry"
+        [ test "D1: include of another binding merges both registries" {
+              withTempVocab includeTwoBindingsSrc "IncludeVocab.registry" (fun result ->
+                  let reg = Expect.wantOk result "evalRegistry with include should succeed"
+                  Expect.isTrue (reg.Prefixes.ContainsKey "schema") "schema prefix from included binding"
+                  Expect.isTrue (reg.Prefixes.ContainsKey "ex") "ex prefix from outer registry"
+                  let keys = reg.EquivalentClasses |> Map.toList |> List.map fst
+                  Expect.equal keys.Length 2 "two EquivalentClass entries (Order + Product)")
+          }
+
+          test "D2: include conflict → evalRegistry returns Error" {
+              withTempVocab includeConflictSrc "IncludeConflict.registry" (fun result ->
+                  Expect.isError result "conflicting EquivalentClass via include must return Error")
+          }
+
+          test "D3: include of sibling binding in same module merges prefixes and equivalentClasses" {
+              withTempVocab includeInlineSrc "IncludeInline.registry" (fun result ->
+                  let reg = Expect.wantOk result "sibling include should succeed"
+                  Expect.isTrue (reg.Prefixes.ContainsKey "schema") "schema present"
+                  Expect.isTrue (reg.Prefixes.ContainsKey "ex") "ex present from sibling include"
+                  Expect.equal reg.EquivalentClasses.Count 2 "both types mapped")
+          } ]
