@@ -47,6 +47,14 @@
           "status": "confirmed"
         }
       ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveLog`1",
+      "iri": "schema:ItemList",
+      "confidence": 1.0,
+      "source": "manual",
+      "status": "confirmed",
+      "fields": []
     }
   ]
 }

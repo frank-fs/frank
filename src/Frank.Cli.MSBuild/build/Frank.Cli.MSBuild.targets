@@ -24,6 +24,10 @@
     TaskName="Frank.Cli.MSBuild.GenerateLinkedDataTask"
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateSemanticsTask"
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
+
   <!--
     FrankGenerateSemantic: validate lock file and generate GeneratedDiscovery.fs.
     Incremental: skipped when lock file is unchanged and output already exists.
@@ -170,6 +174,83 @@
       <Compile Remove="@(_FrankProgramFsLD)" />
       <Compile Include="$(_FrankGeneratedLDFile)" />
       <Compile Include="@(_FrankProgramFsLD)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankGenerateSemanticModel: evaluate the vocabulary CE in-process via FCS and emit
+    GeneratedSemantics.fs. Gate: Exists(lock file) only — no package condition, because
+    GeneratedSemantics references only domain types + System.Type (no Frank runtime package).
+
+    Incremental: Inputs = lock file + all project compile items (vocab CE source).
+                 Outputs = $(IntermediateOutputPath)GeneratedSemantics.fs.
+
+    Separation of concerns mirrors the LinkedData pair:
+    - FrankGenerateSemanticModel writes the file (incremental, skippable when inputs unchanged).
+    - FrankInjectGeneratedSemanticModelFile wires the file into @(Compile) (always).
+  -->
+  <Target Name="FrankGenerateSemanticModel"
+          BeforeTargets="FrankInjectGeneratedSemanticModelFile"
+          Inputs="$(FrankLockFilePath);@(Compile)"
+          Outputs="$(IntermediateOutputPath)GeneratedSemantics.fs"
+          Condition="Exists('$(FrankLockFilePath)')">
+
+    <!-- Late-bind SDK-computed properties inside the target. -->
+    <PropertyGroup>
+      <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+      <FrankSemanticsModuleName Condition="'$(FrankSemanticsModuleName)' == ''">$(RootNamespace).GeneratedSemantics</FrankSemanticsModuleName>
+      <FrankVocabularyBinding Condition="'$(FrankVocabularyBinding)' == ''">registry</FrankVocabularyBinding>
+    </PropertyGroup>
+
+    <!--
+      Source files for the in-process FCS eval = the vocabulary CE's dependency closure.
+      Exclude: .fsi (FCS cannot #load a standalone signature file), the entry point
+      Program.fs (it references the not-yet-generated modules), and any Generated*.fs.
+      An explicit $(FrankVocabularySourceFiles) overrides this default when set.
+    -->
+    <ItemGroup>
+      <_FrankSemVocabSource Include="$(FrankVocabularySourceFiles)" Condition="'$(FrankVocabularySourceFiles)' != ''" />
+      <_FrankSemVocabSource Include="@(Compile->'%(FullPath)')"
+                            Condition="'$(FrankVocabularySourceFiles)' == '' And '%(Extension)' != '.fsi' And '%(Filename)%(Extension)' != 'Program.fs' And !$([System.String]::Copy('%(Filename)').StartsWith('Generated'))" />
+    </ItemGroup>
+
+    <GenerateSemanticsTask
+      LockFilePath="$(FrankLockFilePath)"
+      OutputPath="$(IntermediateOutputPath)"
+      ModuleName="$(FrankSemanticsModuleName)"
+      SourceFiles="@(_FrankSemVocabSource)"
+      AssemblyRefs="@(ReferencePath)"
+      VocabularyBinding="$(FrankVocabularyBinding)">
+      <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedSemanticsFile" />
+    </GenerateSemanticsTask>
+
+    <ItemGroup Condition="'$(_FrankGeneratedSemanticsFile)' != ''">
+      <FileWrites Include="$(_FrankGeneratedSemanticsFile)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankInjectGeneratedSemanticModelFile: always runs before CoreCompile (not incremental).
+    Injects the already-generated GeneratedSemantics.fs before Program.fs in @(Compile).
+    GeneratedSemantics references domain types by fully-qualified name, so it only needs
+    to compile after the domain (e.g. Model.fs) — placing it just before Program.fs satisfies that.
+    Guards against double-add.
+  -->
+  <Target Name="FrankInjectGeneratedSemanticModelFile"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Condition="Exists('$(IntermediateOutputPath)GeneratedSemantics.fs')">
+
+    <PropertyGroup>
+      <_FrankGeneratedSemFile>$(IntermediateOutputPath)GeneratedSemantics.fs</_FrankGeneratedSemFile>
+    </PropertyGroup>
+
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)'))">
+      <_FrankProgramFsSem Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <Compile Remove="@(_FrankProgramFsSem)" />
+      <Compile Include="$(_FrankGeneratedSemFile)" />
+      <Compile Include="@(_FrankProgramFsSem)" />
     </ItemGroup>
 
   </Target>

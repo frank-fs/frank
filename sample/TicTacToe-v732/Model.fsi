@@ -62,6 +62,8 @@ type Move =
 
 type Game = { Id: string; Result: MoveResult }
 
+type MoveLog<'T> = { Items: 'T list; Count: int }
+
 type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult

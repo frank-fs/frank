@@ -11,6 +11,8 @@
     <!-- LinkedData codegen: module name + the vocabulary CE binding to evaluate -->
     <FrankLinkedDataModuleName>TicTacToe.GeneratedLinkedData</FrankLinkedDataModuleName>
     <FrankVocabularyBinding>TicTacToe.Vocabulary.registry</FrankVocabularyBinding>
+    <!-- SemanticModel codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
+    <FrankSemanticsModuleName>TicTacToe.GeneratedSemantics</FrankSemanticsModuleName>
   </PropertyGroup>
 
   <ItemGroup>
