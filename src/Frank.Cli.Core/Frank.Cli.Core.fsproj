@@ -12,6 +12,7 @@
     <Compile Include="Pipeline.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
+    <Compile Include="SemanticModelEmitter.fs" />
   </ItemGroup>
 
   <ItemGroup>

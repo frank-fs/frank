@@ -4,41 +4,23 @@ open System
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
-// ── IRI resolution ─────────────────────────────────────────────────────────
-
-/// Resolve an optional prefixed IRI to its full string.
-/// Error if prefixed and prefix unknown. Ok None if iriOpt is None.
-let private resolveOptional (prefixes: Map<string, Uri>) (iriOpt: string option) : Result<string option, string> =
-    match iriOpt with
-    | None -> Ok None
-    | Some iri ->
-        match iri.IndexOf(':') with
-        | -1 -> Ok(Some iri)
-        | idx ->
-            let prefix = iri.[.. idx - 1]
-            let local = iri.[idx + 1 ..]
-
-            match Map.tryFind prefix prefixes with
-            | None -> Error $"Unknown prefix '{prefix}' in IRI '{iri}'"
-            | Some baseUri -> Ok(Some(baseUri.AbsoluteUri + local))
-
 // ── @context rendering ──────────────────────────────────────────────────────
 
-/// Build the JSON-LD @context string from the Using set and Prefixes map.
+/// Build the JSON-LD @context string from the model's Using set and Prefixes map.
 /// For each `using` prefix, include the external base URI (trimmed of trailing slash).
 /// Returns Error if any using prefix is not in Prefixes.
-let private buildContext (registry: VocabularyRegistry) : Result<string, string> =
+let private buildContext (model: ResolvedModel) : Result<string, string> =
     let rec loop (remaining: string list) (acc: string list) =
         match remaining with
         | [] -> Ok(List.rev acc)
         | prefix :: rest ->
-            match Map.tryFind prefix registry.Prefixes with
+            match Map.tryFind prefix model.Prefixes with
             | None -> Error $"using prefix '{prefix}' not found in Prefixes"
             | Some baseUri ->
                 let uri = baseUri.AbsoluteUri.TrimEnd('/')
                 loop rest (uri :: acc)
 
-    match loop (Set.toList registry.Using) [] with
+    match loop (Set.toList model.Using) [] with
     | Error e -> Error e
     | Ok uris ->
         let items = uris |> List.map (fun u -> "\"" + u + "\"") |> String.concat ","
@@ -72,89 +54,48 @@ let private uriNode (iri: string) : string =
 let private qnameNode (qname: string) : string =
     "g.CreateUriNode(g.ResolveQName(\"" + esc qname + "\"))"
 
-/// Render all triples for one type mapping. Returns Error on unknown prefix.
-let private typeTriples
-    (prefixes: Map<string, Uri>)
-    (seeAlso: Map<string, Uri list>)
-    (equivClasses: Map<string, Uri>)
-    (m: Mapping)
-    : Result<string list, string> =
-    match resolveOptional prefixes m.Iri with
-    | Error e -> Error $"type '{m.FSharpType}': {e}"
-    | Ok None -> Ok []
-    | Ok(Some subjIri) ->
+/// Render all triples for one resolved resource. Returns [] if no ClassIri.
+let private typeTriples (r: ResolvedResource) : string list =
+    match r.ClassIri with
+    | None -> []
+    | Some classUri ->
+        let subjIri = classUri.AbsoluteUri
         let typeTriple = assertTriple subjIri "rdf" "type" (qnameNode "owl:Class")
 
         let equivTriple =
-            match Map.tryFind m.FSharpType equivClasses with
+            match r.EquivalentClass with
             | None -> []
             | Some equivUri -> [ assertTriple subjIri "owl" "equivalentClass" (uriNode equivUri.AbsoluteUri) ]
 
         let seeAlsoTriples =
-            match Map.tryFind m.FSharpType seeAlso with
-            | None -> []
-            | Some uris ->
-                uris
-                |> List.map (fun u -> assertTriple subjIri "rdfs" "seeAlso" (uriNode u.AbsoluteUri))
+            r.SeeAlso
+            |> List.map (fun u -> assertTriple subjIri "rdfs" "seeAlso" (uriNode u.AbsoluteUri))
 
-        Ok(typeTriple :: equivTriple @ seeAlsoTriples)
+        typeTriple :: equivTriple @ seeAlsoTriples
 
-/// Render all triples for one field mapping. Returns Error on unknown prefix.
-let private fieldTriples
-    (prefixes: Map<string, Uri>)
-    (typeFSharpName: string)
-    (subjIri: string)
-    (f: FieldMapping)
-    : Result<string list, string> =
-    match resolveOptional prefixes f.Iri with
-    | Error e -> Error $"field '{typeFSharpName}.{f.Name}': {e}"
-    | Ok None -> Ok []
-    | Ok(Some fieldIri) ->
+/// Render all triples for one resolved field. Returns [] if no field Iri.
+let private fieldTriples (subjIri: string) (f: ResolvedField) : string list =
+    match f.Iri with
+    | None -> []
+    | Some fieldUri ->
+        let fieldIri = fieldUri.AbsoluteUri
         let propTriple = assertTriple fieldIri "rdf" "type" (qnameNode "rdf:Property")
-
         let domainTriple = assertTriple fieldIri "rdfs" "domain" (uriNode subjIri)
+        [ propTriple; domainTriple ]
 
-        Ok [ propTriple; domainTriple ]
+/// Collect all triple lines for all resources in the model. Returns Error on first failure.
+let private collectTriples (resources: ResolvedResource list) : string list =
+    let resourceLines (r: ResolvedResource) =
+        let tLines = typeTriples r
 
-/// Collect all triple lines for all mappings in the lock. Returns Error on first failure.
-let private collectTriples
-    (prefixes: Map<string, Uri>)
-    (seeAlso: Map<string, Uri list>)
-    (equivClasses: Map<string, Uri>)
-    (mappings: Mapping list)
-    : Result<string list, string> =
-    let rec loop (remaining: Mapping list) (acc: string list) =
-        match remaining with
-        | [] -> Ok(List.rev acc)
-        | m :: rest ->
-            match typeTriples prefixes seeAlso equivClasses m with
-            | Error e -> Error e
-            | Ok tLines ->
-                match resolveOptional prefixes m.Iri with
-                | Error e -> Error $"type '{m.FSharpType}': {e}"
-                | Ok subjOpt ->
-                    let subjIri = defaultArg subjOpt ""
+        let fLines =
+            match r.ClassIri with
+            | None -> []
+            | Some classUri -> r.Fields |> List.collect (fieldTriples classUri.AbsoluteUri)
 
-                    match collectFieldTriples prefixes m.FSharpType subjIri m.Fields [] with
-                    | Error e -> Error e
-                    | Ok fLines -> loop rest (List.rev (fLines @ tLines) @ acc)
+        tLines @ fLines
 
-    and collectFieldTriples
-        (prefixes: Map<string, Uri>)
-        (fsType: string)
-        (subjIri: string)
-        (fields: FieldMapping list)
-        (acc: string list)
-        : Result<string list, string> =
-        match fields with
-        | [] -> Ok(List.rev acc)
-        | _ when String.IsNullOrEmpty subjIri -> Ok(List.rev acc)
-        | f :: rest ->
-            match fieldTriples prefixes fsType subjIri f with
-            | Error e -> Error e
-            | Ok lines -> collectFieldTriples prefixes fsType subjIri rest (List.rev lines @ acc)
-
-    loop mappings []
+    resources |> List.collect resourceLines
 
 // ── Namespace setup rendering ───────────────────────────────────────────────
 
@@ -203,9 +144,11 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
     if String.IsNullOrWhiteSpace moduleName then
         invalidArg (nameof moduleName) "moduleName must not be empty"
 
-    match buildContext registry with
+    match ResolvedModel.build registry lock with
     | Error e -> Error e
-    | Ok contextJson ->
-        match collectTriples registry.Prefixes registry.SeeAlso registry.EquivalentClasses lock.Mappings with
+    | Ok model ->
+        match buildContext model with
         | Error e -> Error e
-        | Ok tripleLines -> Ok(assembleModule moduleName contextJson tripleLines)
+        | Ok contextJson ->
+            let tripleLines = collectTriples model.Resources
+            Ok(assembleModule moduleName contextJson tripleLines)

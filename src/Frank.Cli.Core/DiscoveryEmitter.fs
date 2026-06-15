@@ -4,24 +4,7 @@ open System
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
-// ── IRI resolution ────────────────────────────────────────────────────────────
-
-/// Resolve an optional prefixed IRI to its full string form.
-/// Returns Error if the IRI is prefixed and the prefix is not in the registry.
-/// Returns Ok None if iriOpt is None.
-let private resolveOptional (prefixes: Map<string, Uri>) (iriOpt: string option) : Result<string option, string> =
-    match iriOpt with
-    | None -> Ok None
-    | Some iri ->
-        match iri.IndexOf(':') with
-        | -1 -> Ok(Some iri)
-        | idx ->
-            let prefix = iri.[.. idx - 1]
-            let local = iri.[idx + 1 ..]
-
-            match Map.tryFind prefix prefixes with
-            | None -> Error $"Unknown prefix '{prefix}' in IRI '{iri}'"
-            | Some baseUri -> Ok(Some(baseUri.AbsoluteUri + local))
+// ── IRI local-name helper ─────────────────────────────────────────────────────
 
 /// Extract the local name from a full IRI (part after last '#' or '/').
 let private localName (iri: string) : string =
@@ -38,82 +21,48 @@ let private localName (iri: string) : string =
 
 type private ResolvedDescriptor = { Id: string; Href: string }
 
-/// Resolve the type-level descriptor for one Mapping. Returns None if Iri is absent.
-let private typeDescriptor (prefixes: Map<string, Uri>) (m: Mapping) : Result<ResolvedDescriptor option, string> =
-    match resolveOptional prefixes m.Iri with
-    | Error e -> Error $"type '{m.FSharpType}': {e}"
-    | Ok None -> Ok None
-    | Ok(Some fullIri) ->
-        Ok(
-            Some
-                { Id = localName fullIri
-                  Href = fullIri }
-        )
+/// Resolve the type-level descriptor for one ResolvedResource. Returns None if ClassIri is absent.
+let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
+    r.ClassIri
+    |> Option.map (fun uri ->
+        let href = uri.AbsoluteUri
 
-/// Resolve field descriptors for one Mapping; skip fields with no Iri.
-let private fieldDescriptors
-    (prefixes: Map<string, Uri>)
-    (typeName: string)
-    (fields: FieldMapping list)
-    : Result<ResolvedDescriptor list, string> =
-    let rec loop (remaining: FieldMapping list) (acc: ResolvedDescriptor list) =
-        match remaining with
-        | [] -> Ok(List.rev acc)
-        | f :: rest ->
-            match resolveOptional prefixes f.Iri with
-            | Error e -> Error $"field '{typeName}.{f.Name}': {e}"
-            | Ok None -> loop rest acc
-            | Ok(Some fullIri) ->
-                let d =
-                    { Id = localName fullIri
-                      Href = fullIri }
+        { Id = localName href; Href = href })
 
-                loop rest (d :: acc)
+/// Resolve field descriptors for one resource; skip fields with no Iri.
+let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor list =
+    fields
+    |> List.choose (fun f ->
+        f.Iri
+        |> Option.map (fun uri ->
+            let href = uri.AbsoluteUri
 
-    loop fields []
+            { Id = localName href; Href = href }))
 
-/// Collect all descriptors from all mappings in dependency order: each type then its fields.
-let private collectDescriptors
-    (prefixes: Map<string, Uri>)
-    (mappings: Mapping list)
-    : Result<ResolvedDescriptor list, string> =
-    let rec loop (remaining: Mapping list) (acc: ResolvedDescriptor list) =
-        match remaining with
-        | [] -> Ok(List.rev acc)
-        | m :: rest ->
-            match typeDescriptor prefixes m with
-            | Error e -> Error e
-            | Ok typeDOpt ->
-                match fieldDescriptors prefixes m.FSharpType m.Fields with
-                | Error e -> Error e
-                | Ok fieldDs ->
-                    let typeDs = typeDOpt |> Option.toList
-                    loop rest (List.rev (fieldDs @ typeDs) @ acc)
+/// Collect all descriptors from all resources in dependency order: each type then its fields.
+let private collectDescriptors (resources: ResolvedResource list) : ResolvedDescriptor list =
+    resources
+    |> List.collect (fun r ->
+        let typeDs = typeDescriptor r |> Option.toList
+        let fieldDs = fieldDescriptors r.Fields
+        typeDs @ fieldDs)
 
-    loop mappings []
+/// Collect unique `rel="type"` link values for resources that have a ClassIri.
+let private collectDescribedByLinks (resources: ResolvedResource list) : string list =
+    let folder (seen: Set<string>, acc: string list) (r: ResolvedResource) =
+        match r.ClassIri with
+        | None -> seen, acc
+        | Some uri ->
+            let fullIri = uri.AbsoluteUri
 
-/// Collect unique `rel="type"` link values for types that have an Iri.
-/// Uses rel="type" (RFC 6903) rather than rel="describedby" so the local
-/// ALPS profile retains the canonical describedby slot on OPTIONS responses.
-let private collectDescribedByLinks
-    (prefixes: Map<string, Uri>)
-    (mappings: Mapping list)
-    : Result<string list, string> =
-    let rec loop (remaining: Mapping list) (seen: Set<string>) (acc: string list) =
-        match remaining with
-        | [] -> Ok(List.rev acc)
-        | m :: rest ->
-            match resolveOptional prefixes m.Iri with
-            | Error e -> Error $"type link for '{m.FSharpType}': {e}"
-            | Ok None -> loop rest seen acc
-            | Ok(Some fullIri) ->
-                if Set.contains fullIri seen then
-                    loop rest seen acc
-                else
-                    let link = $"<{fullIri}>; rel=\"type\""
-                    loop rest (Set.add fullIri seen) (link :: acc)
+            if Set.contains fullIri seen then
+                seen, acc
+            else
+                let link = $"<{fullIri}>; rel=\"type\""
+                Set.add fullIri seen, link :: acc
 
-    loop mappings Set.empty []
+    let _, revLinks = List.fold folder (Set.empty, []) resources
+    List.rev revLinks
 
 // ── Source rendering ──────────────────────────────────────────────────────────
 
@@ -200,11 +149,9 @@ let emit
     if String.IsNullOrWhiteSpace profileUri then
         invalidArg (nameof profileUri) "profileUri must not be empty"
 
-    let prefixes = registry.Prefixes
-
-    match collectDescriptors prefixes lock.Mappings with
+    match ResolvedModel.build registry lock with
     | Error e -> Error e
-    | Ok descriptors ->
-        match collectDescribedByLinks prefixes lock.Mappings with
-        | Error e -> Error e
-        | Ok links -> Ok(assembleModule moduleName profileUri descriptors links)
+    | Ok model ->
+        let descriptors = collectDescriptors model.Resources
+        let links = collectDescribedByLinks model.Resources
+        Ok(assembleModule moduleName profileUri descriptors links)
