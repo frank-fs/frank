@@ -50,12 +50,12 @@ module LockFile =
 
     // ── JSON deserialization (pure) ───────────────────────────────────────────
 
-    let private parseIso8601 (s: string) : Result<DateTimeOffset, string> =
+    let parseIso8601 (s: string) : Result<DateTimeOffset, string> =
         match DateTimeOffset.TryParse(s) with
         | true, dto -> Ok dto
         | false, _ -> Error $"invalid ISO 8601 timestamp: '{s}'"
 
-    let private requireString (node: JsonNode) (key: string) : Result<string, string> =
+    let requireString (node: JsonNode) (key: string) : Result<string, string> =
         match node.[key] with
         | null -> Error $"missing field '{key}'"
         | n ->
@@ -64,7 +64,7 @@ module LockFile =
             with _ ->
                 Error $"field '{key}' is not a string"
 
-    let private optionalString (node: JsonNode) (key: string) : string option =
+    let optionalString (node: JsonNode) (key: string) : string option =
         match node.[key] with
         | null -> None
         | n ->
@@ -74,7 +74,7 @@ module LockFile =
             with _ ->
                 None
 
-    let private requireFloat (node: JsonNode) (key: string) : Result<float, string> =
+    let requireFloat (node: JsonNode) (key: string) : Result<float, string> =
         match node.[key] with
         | null -> Error $"missing field '{key}'"
         | n ->
@@ -83,141 +83,131 @@ module LockFile =
             with _ ->
                 Error $"field '{key}' is not a number"
 
+    let private parseAlternates (node: JsonNode) : Result<string list, string> =
+        match node with
+        | null -> Ok []
+        | :? JsonArray as arr ->
+            arr
+            |> Seq.mapi (fun i x ->
+                if isNull x then
+                    Error $"alternates[{i}]: not a string"
+                else
+                    try
+                        Ok(x.GetValue<string>())
+                    with _ ->
+                        Error $"alternates[{i}]: not a string")
+            |> Seq.fold
+                (fun acc r ->
+                    match acc, r with
+                    | Error e, _ -> Error e
+                    | _, Error e -> Error e
+                    | Ok xs, Ok x -> Ok(x :: xs))
+                (Ok [])
+            |> Result.map List.rev
+        | _ -> Error "field 'alternates' must be an array"
+
     let private parseFieldMapping (node: JsonNode) : Result<FieldMapping, string> =
-        match requireString node "name" with
-        | Error e -> Error e
-        | Ok name ->
+        requireString node "name"
+        |> Result.bind (fun name ->
             let iri = optionalString node "iri"
 
-            match requireFloat node "confidence" with
-            | Error e -> Error e
-            | Ok confidence ->
-                match requireString node "source" with
-                | Error e -> Error e
-                | Ok sourceStr ->
-                    match mappingSourceFromString sourceStr with
-                    | Error e -> Error e
-                    | Ok source ->
-                        match requireString node "status" with
-                        | Error e -> Error e
-                        | Ok statusStr ->
-                            match mappingStatusFromString statusStr with
-                            | Error e -> Error e
-                            | Ok status ->
-                                Ok
-                                    { Name = name
-                                      Iri = iri
-                                      Confidence = confidence
-                                      Source = source
-                                      Status = status }
+            requireFloat node "confidence"
+            |> Result.bind (fun confidence ->
+                requireString node "source"
+                |> Result.bind mappingSourceFromString
+                |> Result.bind (fun source ->
+                    requireString node "status"
+                    |> Result.bind mappingStatusFromString
+                    |> Result.map (fun status ->
+                        { Name = name
+                          Iri = iri
+                          Confidence = confidence
+                          Source = source
+                          Status = status }))))
 
     let private parseFieldMappings (node: JsonNode) : Result<FieldMapping list, string> =
-        if node = null then
-            Ok []
-        else
-            let elements = node.AsArray()
-            let mutable acc: Result<FieldMapping list, string> = Ok []
-            let mutable i = 0
-
-            while i < elements.Count && Result.isOk acc do
-                match parseFieldMapping elements.[i] with
-                | Error e -> acc <- Error $"fields[{i}]: {e}"
-                | Ok f ->
-                    acc <- acc |> Result.map (fun xs -> xs @ [ f ])
-                    i <- i + 1
-
-            acc
+        match node with
+        | null -> Ok []
+        | :? JsonArray as elements ->
+            elements
+            |> Seq.mapi (fun i el -> parseFieldMapping el |> Result.mapError (fun e -> $"fields[{i}]: {e}"))
+            |> Seq.fold
+                (fun acc r ->
+                    match acc, r with
+                    | Error e, _ -> Error e
+                    | _, Error e -> Error e
+                    | Ok xs, Ok x -> Ok(x :: xs))
+                (Ok [])
+            |> Result.map List.rev
+        | _ -> Error "field 'fields' must be an array"
 
     let private parseMapping (node: JsonNode) : Result<Mapping, string> =
-        match requireString node "fsharpType" with
-        | Error e -> Error e
-        | Ok fsType ->
+        requireString node "fsharpType"
+        |> Result.bind (fun fsType ->
             let iri = optionalString node "iri"
 
-            match requireFloat node "confidence" with
-            | Error e -> Error e
-            | Ok confidence ->
-                match requireString node "source" with
-                | Error e -> Error e
-                | Ok sourceStr ->
-                    match mappingSourceFromString sourceStr with
-                    | Error e -> Error e
-                    | Ok source ->
-                        match requireString node "status" with
-                        | Error e -> Error e
-                        | Ok statusStr ->
-                            match mappingStatusFromString statusStr with
-                            | Error e -> Error e
-                            | Ok status ->
-                                match parseFieldMappings node.["fields"] with
-                                | Error e -> Error e
-                                | Ok fields ->
-                                    let alternates =
-                                        match node.["alternates"] with
-                                        | null -> []
-                                        | n ->
-                                            n.AsArray()
-                                            |> Seq.choose (fun x ->
-                                                if isNull x then None else Some(x.GetValue<string>()))
-                                            |> Seq.toList
-
-                                    Ok
-                                        { FSharpType = fsType
-                                          Iri = iri
-                                          Confidence = confidence
-                                          Source = source
-                                          Status = status
-                                          Alternates = alternates
-                                          Fields = fields }
+            requireFloat node "confidence"
+            |> Result.bind (fun confidence ->
+                requireString node "source"
+                |> Result.bind mappingSourceFromString
+                |> Result.bind (fun source ->
+                    requireString node "status"
+                    |> Result.bind mappingStatusFromString
+                    |> Result.bind (fun status ->
+                        parseFieldMappings node.["fields"]
+                        |> Result.bind (fun fields ->
+                            parseAlternates node.["alternates"]
+                            |> Result.map (fun alternates ->
+                                { FSharpType = fsType
+                                  Iri = iri
+                                  Confidence = confidence
+                                  Source = source
+                                  Status = status
+                                  Alternates = alternates
+                                  Fields = fields }))))))
 
     let private parseMappingList (node: JsonNode) : Result<Mapping list, string> =
-        let elements = node.AsArray()
-        let mutable acc: Result<Mapping list, string> = Ok []
-        let mutable i = 0
-
-        while i < elements.Count && Result.isOk acc do
-            match parseMapping elements.[i] with
-            | Error e -> acc <- Error $"mappings[{i}]: {e}"
-            | Ok m ->
-                acc <- acc |> Result.map (fun xs -> xs @ [ m ])
-                i <- i + 1
-
-        acc
+        match node with
+        | :? JsonArray as elements ->
+            elements
+            |> Seq.mapi (fun i el -> parseMapping el |> Result.mapError (fun e -> $"mappings[{i}]: {e}"))
+            |> Seq.fold
+                (fun acc r ->
+                    match acc, r with
+                    | Error e, _ -> Error e
+                    | _, Error e -> Error e
+                    | Ok xs, Ok x -> Ok(x :: xs))
+                (Ok [])
+            |> Result.map List.rev
+        | _ -> Error "field 'mappings' must be an array"
 
     let private parseVocabEntry (node: JsonNode) : Result<VocabularyEntry, string> =
-        match requireString node "uri" with
-        | Error e -> Error e
-        | Ok uri ->
-            match requireString node "fetchedAt" with
-            | Error e -> Error e
-            | Ok fetchedAtStr ->
-                match parseIso8601 fetchedAtStr with
-                | Error e -> Error e
-                | Ok fetchedAt ->
-                    match requireString node "hash" with
-                    | Error e -> Error e
-                    | Ok hash ->
-                        Ok
-                            { Uri = uri
-                              FetchedAt = fetchedAt
-                              Hash = hash }
+        requireString node "uri"
+        |> Result.bind (fun uri ->
+            requireString node "fetchedAt"
+            |> Result.bind parseIso8601
+            |> Result.bind (fun fetchedAt ->
+                requireString node "hash"
+                |> Result.map (fun hash ->
+                    { Uri = uri
+                      FetchedAt = fetchedAt
+                      Hash = hash })))
 
     let private parseVocabularies (node: JsonNode) : Result<Map<string, VocabularyEntry>, string> =
-        if node = null then
-            Ok Map.empty
-        else
-            let kvps = node.AsObject() |> Seq.toList
-            let mutable acc: Result<Map<string, VocabularyEntry>, string> = Ok Map.empty
-
-            for kvp in kvps do
-                match acc with
-                | Error _ -> ()
-                | Ok m ->
-                    match parseVocabEntry kvp.Value with
-                    | Error e -> acc <- Error $"vocabularies['{kvp.Key}']: {e}"
-                    | Ok v -> acc <- Ok(Map.add kvp.Key v m)
-
-            acc
+        match node with
+        | null -> Ok Map.empty
+        | :? JsonObject as obj ->
+            obj
+            |> Seq.fold
+                (fun acc kvp ->
+                    match acc with
+                    | Error e -> Error e
+                    | Ok m ->
+                        match parseVocabEntry kvp.Value with
+                        | Error e -> Error $"vocabularies['{kvp.Key}']: {e}"
+                        | Ok v -> Ok(Map.add kvp.Key v m))
+                (Ok Map.empty)
+        | _ -> Error "field 'vocabularies' must be an object"
 
     let private supportedVersions = Set.ofList [ 1 ]
 
@@ -228,36 +218,38 @@ module LockFile =
             with ex ->
                 Error $"JSON parse error: {ex.Message}"
 
-        match rootResult with
-        | Error e -> Error e
-        | Ok node ->
-            let version =
-                try
-                    node.["schemaVersion"].GetValue<int>()
-                with _ ->
-                    -1
+        rootResult
+        |> Result.bind (fun node ->
+            match node with
+            | :? JsonObject ->
+                let schemaVersionNode = node.["schemaVersion"]
 
-            if not (Set.contains version supportedVersions) then
-                Error $"lock file schema version {version} not supported by this CLI"
-            else
+                if schemaVersionNode = null then
+                    Error "lock file: schemaVersion is required"
+                else
+                    let versionResult =
+                        try
+                            Ok(schemaVersionNode.GetValue<int>())
+                        with _ ->
+                            Error "lock file: schemaVersion must be an integer"
 
-                match requireString node "generated" with
-                | Error e -> Error e
-                | Ok generatedStr ->
-                    match parseIso8601 generatedStr with
-                    | Error e -> Error e
-                    | Ok generated ->
-                        match parseVocabularies node.["vocabularies"] with
-                        | Error e -> Error e
-                        | Ok vocabularies ->
-                            match parseMappingList node.["mappings"] with
-                            | Error e -> Error e
-                            | Ok mappings ->
-                                Ok
-                                    { SchemaVersion = version
-                                      Generated = generated
-                                      Vocabularies = vocabularies
-                                      Mappings = mappings }
+                    versionResult
+                    |> Result.bind (fun version ->
+                        if not (Set.contains version supportedVersions) then
+                            Error $"lock file schema version {version} not supported by this CLI"
+                        else
+                            requireString node "generated"
+                            |> Result.bind parseIso8601
+                            |> Result.bind (fun generated ->
+                                parseVocabularies node.["vocabularies"]
+                                |> Result.bind (fun vocabularies ->
+                                    parseMappingList node.["mappings"]
+                                    |> Result.map (fun mappings ->
+                                        { SchemaVersion = version
+                                          Generated = generated
+                                          Vocabularies = vocabularies
+                                          Mappings = mappings }))))
+            | _ -> Error "lock file: root must be a JSON object")
 
     // ── JSON serialization (pure, deterministic) ──────────────────────────────
 
@@ -362,9 +354,22 @@ module LockFile =
           Unresolved: int }
 
     let countByStatus (mappings: Mapping list) : StatusCounts =
-        { Confirmed = mappings |> List.filter (fun m -> m.Status = Confirmed) |> List.length
-          Proposed = mappings |> List.filter (fun m -> m.Status = Proposed) |> List.length
-          Unresolved = mappings |> List.filter (fun m -> m.Status = Unresolved) |> List.length }
+        let tally (acc: StatusCounts) (m: Mapping) =
+            match m.Status with
+            | Confirmed ->
+                { acc with
+                    Confirmed = acc.Confirmed + 1 }
+            | Proposed -> { acc with Proposed = acc.Proposed + 1 }
+            | Unresolved ->
+                { acc with
+                    Unresolved = acc.Unresolved + 1 }
+
+        List.fold
+            tally
+            { Confirmed = 0
+              Proposed = 0
+              Unresolved = 0 }
+            mappings
 
     // ── Pure merge ────────────────────────────────────────────────────────────
 

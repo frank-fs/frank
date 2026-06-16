@@ -574,6 +574,150 @@ let mergeTests =
               Expect.isNone lf.Mappings.[0].Iri "original lf.Mappings unchanged"
           } ]
 
+// ── hardening: malformed-shape guards ────────────────────────────────────────
+
+[<Tests>]
+let malformedShapeTests =
+    testList
+        "LockFile.read: malformed root / field shapes"
+        [ test "root is JSON array → Error mentioning 'root must be a JSON object'" {
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, "[]")
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for array root"
+                  | Error msg -> Expect.stringContains msg "root must be a JSON object" "error message"
+              finally
+                  File.Delete path
+          }
+
+          test "schemaVersion absent → Error mentioning 'schemaVersion is required'" {
+              let json =
+                  """{
+  "generated": "2026-04-20T12:00:00Z",
+  "vocabularies": {},
+  "mappings": []
+}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for missing schemaVersion"
+                  | Error msg -> Expect.stringContains msg "schemaVersion is required" "error message"
+              finally
+                  File.Delete path
+          }
+
+          test "'mappings' is object not array → Error, not exception" {
+              let json =
+                  """{
+  "schemaVersion": 1,
+  "generated": "2026-04-20T12:00:00Z",
+  "vocabularies": {},
+  "mappings": {}
+}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+                  let result = LockFile.read path
+                  Expect.isError result "object mappings must return Error"
+              finally
+                  File.Delete path
+          }
+
+          test "mapping with 'fields' as string → Error, not exception" {
+              let json =
+                  """{
+  "schemaVersion": 1,
+  "generated": "2026-04-20T12:00:00Z",
+  "vocabularies": {},
+  "mappings": [
+    {
+      "fsharpType": "MyApp.Foo",
+      "confidence": 0.5,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "fields": "x"
+    }
+  ]
+}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+                  let result = LockFile.read path
+                  Expect.isError result "string fields must return Error"
+              finally
+                  File.Delete path
+          }
+
+          test "mapping with non-string alternates element → Error mentioning alternates" {
+              let json =
+                  """{
+  "schemaVersion": 1,
+  "generated": "2026-04-20T12:00:00Z",
+  "vocabularies": {},
+  "mappings": [
+    {
+      "fsharpType": "MyApp.Foo",
+      "confidence": 0.5,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": ["ok", 7],
+      "fields": []
+    }
+  ]
+}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for non-string alternate"
+                  | Error msg -> Expect.stringContains msg "alternates" "error mentions alternates"
+              finally
+                  File.Delete path
+          } ]
+
+// ── countByStatus ─────────────────────────────────────────────────────────────
+
+[<Tests>]
+let countByStatusTests =
+    test "countByStatus: 2 Confirmed + 1 Proposed + 3 Unresolved" {
+        let make status : Mapping =
+            { FSharpType = "T"
+              Iri = None
+              Confidence = 0.0
+              Source = MappingSource.Convention
+              Status = status
+              Alternates = []
+              Fields = [] }
+
+        let mappings =
+            [ make MappingStatus.Confirmed
+              make MappingStatus.Confirmed
+              make MappingStatus.Proposed
+              make MappingStatus.Unresolved
+              make MappingStatus.Unresolved
+              make MappingStatus.Unresolved ]
+
+        let counts = LockFile.countByStatus mappings
+        Expect.equal counts.Confirmed 2 "Confirmed"
+        Expect.equal counts.Proposed 1 "Proposed"
+        Expect.equal counts.Unresolved 3 "Unresolved"
+    }
+
 // ── vocab key sort ────────────────────────────────────────────────────────────
 
 [<Tests>]
