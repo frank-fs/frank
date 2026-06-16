@@ -18,10 +18,7 @@ type ExtractOptions =
       AssemblyRefs: string list
       OutputFormat: OutputFormat }
 
-type ExtractSummary =
-    { Confirmed: int
-      Proposed: int
-      Unresolved: int }
+type ExtractSummary = LockFile.StatusCounts
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -114,13 +111,7 @@ let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list)
 
     updatedExisting @ newEntries
 
-/// Compute counts per status bucket.
-let private summarize (mappings: Mapping list) : ExtractSummary =
-    let c = LockFile.countByStatus mappings
-
-    { Confirmed = c.Confirmed
-      Proposed = c.Proposed
-      Unresolved = c.Unresolved }
+let private summarize (mappings: Mapping list) : ExtractSummary = LockFile.countByStatus mappings
 
 // ── Effectful steps ───────────────────────────────────────────────────────────
 

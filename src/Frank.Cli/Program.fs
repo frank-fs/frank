@@ -119,19 +119,21 @@ let private findProjectFile (dir: string) : Result<string, string> =
     | [| f |] -> Ok f
     | _ -> Error $"multiple .fsproj files in '{dir}'; use --project to specify one"
 
-/// Assembly references needed by the FSI evaluator:
-///   - Frank.Semantic.dll loaded by THIS process (same assembly → same type identity)
-///   - FSharp.Core.dll loaded by THIS process
 let private runtimeAssemblyRefs () : string list =
     [ Assembly.GetAssembly(typeof<Frank.Semantic.VocabularyRegistry>).Location
-      Assembly.GetAssembly(typeof<int list>).Location ]
+      Assembly.GetAssembly(typeof<unit>).Location ]
 
-/// Parse the output format string.
-let private parseOutputFormat (s: string) : Result<Pipeline.OutputFormat, string> =
-    match s.ToLowerInvariant() with
-    | "text" -> Ok Pipeline.Text
-    | "json" -> Ok Pipeline.Json
-    | other -> Error $"unknown output format '{other}'; expected 'text' or 'json'"
+let private parseChoice (label: string) (choices: (string * 'a) list) (s: string) : Result<'a, string> =
+    let key = s.ToLowerInvariant()
+
+    match choices |> List.tryFind (fun (k, _) -> k = key) with
+    | Some(_, v) -> Ok v
+    | None ->
+        let valid = choices |> List.map fst |> String.concat "', '"
+        Error $"unknown {label} '{s}'; expected '{valid}'"
+
+let private parseOutputFormat: string -> Result<Pipeline.OutputFormat, string> =
+    parseChoice "output format" [ "text", Pipeline.Text; "json", Pipeline.Json ]
 
 /// Format and print the summary line to stdout.
 let private printSummary (fmt: Pipeline.OutputFormat) (s: Pipeline.ExtractSummary) : unit =
@@ -193,22 +195,20 @@ let private lockPathFrom (lockFile: string option) (project: string option) : Re
             let dir = Path.GetDirectoryName(Path.GetFullPath projectFile)
             Ok(Path.Combine(dir, ".frank", "semantic-mappings.lock.json"))
 
+let private clarifyFormats =
+    [ "json", Clarify.toJson
+      "markdown", Clarify.toMarkdown
+      "resolved-template", Clarify.toResolvedTemplate ]
+
 let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
     let formatStr =
         args.TryGetResult(ClarifyArgs.Output_Format) |> Option.defaultValue "json"
 
-    let emit =
-        match formatStr.ToLowerInvariant() with
-        | "json" -> Some Clarify.toJson
-        | "markdown" -> Some Clarify.toMarkdown
-        | "resolved-template" -> Some Clarify.toResolvedTemplate
-        | other ->
-            eprintfn "error: unknown output format '%s'; expected 'json', 'markdown', or 'resolved-template'" other
-            None
-
-    match emit with
-    | None -> 1
-    | Some render ->
+    match parseChoice "output format" clarifyFormats formatStr with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok render ->
         match lockPathFrom (args.TryGetResult ClarifyArgs.Lock_File) (args.TryGetResult ClarifyArgs.Project) with
         | Error e ->
             eprintfn "error: %s" e
@@ -222,22 +222,18 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
                 printfn "%s" (render lf)
                 0
 
-let private parseSource (s: string) : Result<MappingSource, string> =
-    match s.ToLowerInvariant() with
-    | "llm" -> Ok Llm
-    | "manual" -> Ok Manual
-    | other -> Error $"unknown source '{other}'; expected 'llm' or 'manual'"
+let private parseSource: string -> Result<MappingSource, string> =
+    parseChoice "source" [ "llm", Llm; "manual", Manual ]
 
 let private handleAccept (args: ParseResults<AcceptArgs>) : int =
     let formatStr =
         args.TryGetResult(AcceptArgs.Output_Format) |> Option.defaultValue "text"
 
-    let fmt = formatStr.ToLowerInvariant()
-
-    if fmt <> "text" && fmt <> "json" then
-        eprintfn "error: unknown output format '%s'; expected 'text' or 'json'" formatStr
+    match parseOutputFormat formatStr with
+    | Error e ->
+        eprintfn "error: %s" e
         1
-    else
+    | Ok fmt ->
 
         let inputPath = args.GetResult(AcceptArgs.Input)
 
@@ -292,8 +288,8 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
                                 eprintfn "%s: %s" r.FSharpType r.Reason
 
                             match fmt with
-                            | "json" -> printfn "%s" (Accept.summaryToJson summary)
-                            | _ ->
+                            | Pipeline.Json -> printfn "%s" (Accept.summaryToJson summary)
+                            | Pipeline.Text ->
                                 printfn
                                     "Merged %d mapping(s); %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
                                     summary.Merged
@@ -341,7 +337,7 @@ let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
                     printfn "%s vocabulary hash drift: %s → %s" d.Prefix d.Recorded d.Current
 
                 if report.Drifted <> [] then
-                    1
+                    2
                 else
                     printfn "%d vocabulary(ies) checked; no drift" report.Checked
                     0
