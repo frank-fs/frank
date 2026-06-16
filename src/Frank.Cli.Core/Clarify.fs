@@ -33,16 +33,18 @@ let private fieldsArray (fields: FieldMapping list) : JsonArray =
 
     arr
 
+let private candidatesArray (alternates: string list) : JsonArray =
+    let arr = JsonArray()
+
+    for a in alternates do
+        arr.Add(JsonValue.Create a)
+
+    arr
+
 let private unresolvedNode (m: Mapping) : JsonObject =
     let obj = JsonObject()
     obj.Add("fsharpType", JsonValue.Create m.FSharpType)
-
-    let candidates = JsonArray()
-
-    for a in m.Alternates do
-        candidates.Add(JsonValue.Create a)
-
-    obj.Add("candidates", candidates)
+    obj.Add("candidates", candidatesArray m.Alternates)
     obj.Add("fields", fieldsArray m.Fields)
     obj
 
@@ -51,37 +53,76 @@ let private proposedNode (m: Mapping) : JsonObject =
     obj.Add("fsharpType", JsonValue.Create m.FSharpType)
     obj.Add("currentCandidate", iriNode m.Iri)
     obj.Add("confidence", JsonValue.Create m.Confidence)
-
-    let alternates = JsonArray()
-
-    for a in m.Alternates do
-        alternates.Add(JsonValue.Create a)
-
-    obj.Add("alternates", alternates)
+    obj.Add("candidates", candidatesArray m.Alternates)
     obj.Add("fields", fieldsArray m.Fields)
     obj
+
+let private partitionMappings (mappings: Mapping list) : Mapping list * Mapping list =
+    mappings
+    |> List.fold
+        (fun (unresolved, proposed) m ->
+            match m.Status with
+            | Unresolved -> (m :: unresolved, proposed)
+            | Proposed -> (unresolved, m :: proposed)
+            | Confirmed -> (unresolved, proposed))
+        ([], [])
+    |> fun (u, p) -> (List.rev u, List.rev p)
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 let toJson (lf: LockFile) : string =
+    let unresolved, proposed = partitionMappings lf.Mappings
     let root = JsonObject()
     root.Add("schemaVersion", JsonValue.Create 1)
 
-    let unresolved = JsonArray()
+    let unresolvedArr = JsonArray()
 
-    for m in lf.Mappings do
-        if m.Status = Unresolved then
-            unresolved.Add(unresolvedNode m)
+    for m in unresolved do
+        unresolvedArr.Add(unresolvedNode m)
 
-    root.Add("unresolved", unresolved)
+    root.Add("unresolved", unresolvedArr)
 
-    let proposed = JsonArray()
+    let proposedArr = JsonArray()
 
-    for m in lf.Mappings do
-        if m.Status = Proposed then
-            proposed.Add(proposedNode m)
+    for m in proposed do
+        proposedArr.Add(proposedNode m)
 
-    root.Add("proposed", proposed)
+    root.Add("proposed", proposedArr)
+    root.ToJsonString writeOptions
+
+let private templateFieldNode (f: FieldMapping) : JsonObject =
+    let obj = JsonObject()
+    obj.Add("name", JsonValue.Create f.Name)
+    obj.Add("iri", iriNode f.Iri)
+    obj
+
+let private templateResolvedNode (m: Mapping) : JsonObject =
+    let obj = JsonObject()
+    obj.Add("fsharpType", JsonValue.Create m.FSharpType)
+    obj.Add("iri", iriNode m.Iri)
+
+    let fields = JsonArray()
+
+    for f in m.Fields do
+        fields.Add(templateFieldNode f)
+
+    obj.Add("fields", fields)
+    obj
+
+let toResolvedTemplate (lf: LockFile) : string =
+    let unresolved, proposed = partitionMappings lf.Mappings
+    let root = JsonObject()
+    root.Add("schemaVersion", JsonValue.Create 1)
+
+    let resolvedArr = JsonArray()
+
+    for m in proposed do
+        resolvedArr.Add(templateResolvedNode m)
+
+    for m in unresolved do
+        resolvedArr.Add(templateResolvedNode m)
+
+    root.Add("resolved", resolvedArr)
     root.ToJsonString writeOptions
 
 // ── Markdown helpers ──────────────────────────────────────────────────────────
@@ -138,8 +179,7 @@ let private proposedSection (mappings: Mapping list) : string =
     sb.ToString()
 
 let toMarkdown (lf: LockFile) : string =
-    let unresolved = lf.Mappings |> List.filter (fun m -> m.Status = Unresolved)
-    let proposed = lf.Mappings |> List.filter (fun m -> m.Status = Proposed)
+    let unresolved, proposed = partitionMappings lf.Mappings
 
     let sb = StringBuilder()
     sb.AppendLine("# Semantic clarify") |> ignore

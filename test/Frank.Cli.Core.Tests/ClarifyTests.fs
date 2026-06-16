@@ -120,6 +120,16 @@ let clarifyTests =
                   "schema:Order"
                   "currentCandidate"
 
+              let proposedCandidates : JsonArray = proposedEntry.["candidates"].AsArray()
+              Expect.equal proposedCandidates.Count 1 "proposed entry has one candidate"
+
+              Expect.equal
+                  (proposedCandidates.[0].GetValue<string>())
+                  "schema:OrderAction"
+                  "proposed candidate is schema:OrderAction"
+
+              Expect.isTrue (isNull (proposedEntry.["alternates"])) "alternates key must not exist on proposed entry"
+
           testCase "AT4: toJson all-confirmed lock — unresolved and proposed are empty arrays"
           <| fun () ->
               let json : string = Clarify.toJson allConfirmedLock
@@ -155,4 +165,59 @@ let clarifyTests =
               let iriIsNull =
                   isNull iriNode
                   || (iriNode :? JsonValue && (iriNode.AsValue().GetValue<obj>() |> isNull))
-              Expect.isTrue iriIsNull "iri must be null for None" ]
+              Expect.isTrue iriIsNull "iri must be null for None"
+
+          testCase "toResolvedTemplate — proposed and unresolved included, confirmed excluded, iris pre-filled"
+          <| fun () ->
+              let json : string = Clarify.toResolvedTemplate mixedLock
+              let root : JsonNode = JsonNode.Parse json
+
+              Expect.equal (root.["schemaVersion"].GetValue<int>()) 1 "schemaVersion must be 1"
+
+              let resolved : JsonArray = root.["resolved"].AsArray()
+              Expect.equal resolved.Count 2 "proposed + unresolved = 2 entries"
+
+              let types =
+                  [ for i in 0 .. resolved.Count - 1 do
+                        yield resolved.[i].["fsharpType"].GetValue<string>() ]
+
+              Expect.isFalse (List.contains "MyApp.Customer" types) "confirmed must not appear"
+              Expect.isTrue (List.contains "MyApp.Order" types) "proposed must appear"
+              Expect.isTrue (List.contains "MyApp.Mystery" types) "unresolved must appear"
+
+              let orderEntry =
+                  resolved
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun n -> n.["fsharpType"].GetValue<string>() = "MyApp.Order")
+
+              Expect.equal (orderEntry.["iri"].GetValue<string>()) "schema:Order" "proposed iri pre-filled"
+
+              let orderFields : JsonArray = orderEntry.["fields"].AsArray()
+              Expect.equal orderFields.Count 1 "one field on Order"
+              Expect.equal (orderFields.[0].["name"].GetValue<string>()) "Amount" "field name"
+              Expect.equal (orderFields.[0].["iri"].GetValue<string>()) "schema:price" "field iri pre-filled"
+
+              let mysteryEntry =
+                  resolved
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun n -> n.["fsharpType"].GetValue<string>() = "MyApp.Mystery")
+
+              let mysteryIriNode : JsonNode = mysteryEntry.["iri"]
+
+              let mysteryIriIsNull =
+                  isNull mysteryIriNode
+                  || (mysteryIriNode :? JsonValue && (mysteryIriNode.AsValue().GetValue<obj>() |> isNull))
+
+              Expect.isTrue mysteryIriIsNull "unresolved iri is null"
+
+              let mysteryFields : JsonArray = mysteryEntry.["fields"].AsArray()
+              Expect.equal mysteryFields.Count 1 "one field on Mystery"
+              Expect.equal (mysteryFields.[0].["name"].GetValue<string>()) "Blah" "field name"
+
+              let blahIriNode : JsonNode = mysteryFields.[0].["iri"]
+
+              let blahIriIsNull =
+                  isNull blahIriNode
+                  || (blahIriNode :? JsonValue && (blahIriNode.AsValue().GetValue<obj>() |> isNull))
+
+              Expect.isTrue blahIriIsNull "unresolved field iri is null" ]

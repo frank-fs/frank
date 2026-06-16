@@ -24,7 +24,7 @@ type ClarifyArgs =
             match a with
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
-            | Output_Format _ -> "output format: 'json' (default) or 'markdown'"
+            | Output_Format _ -> "output format: 'json' (default) | 'markdown' | 'resolved-template'"
 
 /// Arguments for the `frank semantic extract` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -199,8 +199,9 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
         match formatStr.ToLowerInvariant() with
         | "json" -> Some Clarify.toJson
         | "markdown" -> Some Clarify.toMarkdown
+        | "resolved-template" -> Some Clarify.toResolvedTemplate
         | other ->
-            eprintfn "error: unknown output format '%s'; expected 'json' or 'markdown'" other
+            eprintfn "error: unknown output format '%s'; expected 'json', 'markdown', or 'resolved-template'" other
             None
 
     match emit with
