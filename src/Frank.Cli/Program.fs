@@ -47,6 +47,7 @@ type AcceptArgs =
     | Source of source: string
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
+    | Output_Format of format: string
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -55,6 +56,7 @@ type AcceptArgs =
             | Source _ -> "mapping source: 'llm' (default) or 'manual'"
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+            | Output_Format _ -> "output format: 'text' (default) or 'json'"
 
 /// Arguments for the `frank semantic status` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -227,63 +229,80 @@ let private parseSource (s: string) : Result<MappingSource, string> =
     | other -> Error $"unknown source '{other}'; expected 'llm' or 'manual'"
 
 let private handleAccept (args: ParseResults<AcceptArgs>) : int =
-    let inputPath = args.GetResult(AcceptArgs.Input)
+    let formatStr =
+        args.TryGetResult(AcceptArgs.Output_Format) |> Option.defaultValue "text"
 
-    let jsonResult =
-        try
-            Ok(File.ReadAllText inputPath)
-        with ex ->
-            Error $"could not read '{inputPath}': {ex.Message}"
+    let fmt = formatStr.ToLowerInvariant()
 
-    match jsonResult with
-    | Error e ->
-        eprintfn "error: %s" e
+    if fmt <> "text" && fmt <> "json" then
+        eprintfn "error: unknown output format '%s'; expected 'text' or 'json'" formatStr
         1
-    | Ok json ->
+    else
 
-        match Accept.parseResolved json with
+        let inputPath = args.GetResult(AcceptArgs.Input)
+
+        let jsonResult =
+            try
+                Ok(File.ReadAllText inputPath)
+            with ex ->
+                Error $"could not read '{inputPath}': {ex.Message}"
+
+        match jsonResult with
         | Error e ->
             eprintfn "error: %s" e
             1
-        | Ok doc ->
+        | Ok json ->
 
-            let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
-
-            match parseSource sourceStr with
+            match Accept.parseResolved json with
             | Error e ->
                 eprintfn "error: %s" e
                 1
-            | Ok source ->
+            | Ok doc ->
 
-                match lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project) with
+                let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
+
+                match parseSource sourceStr with
                 | Error e ->
                     eprintfn "error: %s" e
                     1
-                | Ok lockPath ->
+                | Ok source ->
 
-                    match read lockPath with
+                    match
+                        lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project)
+                    with
                     | Error e ->
                         eprintfn "error: %s" e
                         1
-                    | Ok lf ->
+                    | Ok lockPath ->
 
-                        let updated, summary = Accept.apply lf doc source
+                        match read lockPath with
+                        | Error e ->
+                            eprintfn "error: %s" e
+                            1
+                        | Ok lf ->
 
-                        write
-                            lockPath
-                            { updated with
-                                Generated = DateTimeOffset.UtcNow }
+                            let updated, summary = Accept.apply lf doc source
 
-                        for t in summary.Rejected do
-                            eprintfn "%s not in lock file; ignored" t
+                            write
+                                lockPath
+                                { updated with
+                                    Generated = DateTimeOffset.UtcNow }
 
-                        printfn
-                            "Merged %d mapping(s); %d rejected; %d unchanged"
-                            summary.Merged
-                            summary.Rejected.Length
-                            summary.Unchanged
+                            for r in summary.Rejected do
+                                eprintfn "%s: %s" r.FSharpType r.Reason
 
-                        0
+                            match fmt with
+                            | "json" -> printfn "%s" (Accept.summaryToJson summary)
+                            | _ ->
+                                printfn
+                                    "Merged %d mapping(s); %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
+                                    summary.Merged
+                                    summary.Rejected.Length
+                                    summary.Unchanged
+                                    summary.AlreadyConfirmed
+                                    summary.FieldsUnresolved
+
+                            0
 
 let private handleStatus (args: ParseResults<StatusArgs>) : int =
     match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with

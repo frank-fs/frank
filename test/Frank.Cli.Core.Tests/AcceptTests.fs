@@ -31,7 +31,12 @@ let private unresolvedOrder : Mapping =
       Source = Convention
       Status = Unresolved
       Alternates = []
-      Fields = [] }
+      Fields =
+        [ { Name = "Total"
+            Iri = None
+            Confidence = 0.0
+            Source = Convention
+            Status = Unresolved } ] }
 
 let private at1Json =
     """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.OrderLine","iri":"schema:OrderItem","fields":[]}]}"""
@@ -41,9 +46,6 @@ let private at3Json =
 
 let private versionMismatchJson =
     """{"schemaVersion":99,"resolved":[]}"""
-
-let private missingIriJson =
-    """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.OrderLine","fields":[]}]}"""
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -83,7 +85,10 @@ let acceptTests =
               | Ok doc ->
                   let updated, summary = Accept.apply lock doc Llm
                   Expect.equal summary.Merged 1 "Merged count"
-                  Expect.equal summary.Rejected [ "MyApp.Nonexistent" ] "rejected types"
+                  let rejectedTypes = summary.Rejected |> List.map (fun r -> r.FSharpType)
+                  Expect.equal rejectedTypes [ "MyApp.Nonexistent" ] "rejected types"
+                  let rejectedReasons = summary.Rejected |> List.map (fun r -> r.Reason)
+                  Expect.equal rejectedReasons [ "not in lock file" ] "rejected reasons"
 
                   let hasNonexistent =
                       updated.Mappings |> List.exists (fun m -> m.FSharpType = "MyApp.Nonexistent")
@@ -101,8 +106,120 @@ let acceptTests =
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
                   Expect.equal m.Source Manual "source must be Manual"
 
-          testCase "structural: entry missing iri — Error"
+          testCase "null-iri: known type with iri:null in resolved — rejected, lock unchanged"
           <| fun () ->
-              match Accept.parseResolved missingIriJson with
-              | Ok _ -> failtest "expected Error for missing iri"
-              | Error msg -> Expect.stringContains msg "iri" "error message must mention iri" ]
+              let nullIriJson =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":null,"fields":[]}]}"""
+
+              let lock = mkLock [ unresolvedOrder ]
+
+              match Accept.parseResolved nullIriJson with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let updated, summary = Accept.apply lock doc Llm
+                  Expect.equal summary.Merged 0 "nothing merged"
+                  Expect.equal (summary.Rejected |> List.length) 1 "one rejection"
+                  let rej = summary.Rejected |> List.head
+                  Expect.equal rej.FSharpType "MyApp.Order" "rejected type"
+                  Expect.stringContains rej.Reason "iri is required" "reason mentions iri"
+                  let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
+                  Expect.equal m.Status Unresolved "lock entry unchanged"
+
+          testCase "field null-iri: type iri present, field iri null — field stays Unresolved"
+          <| fun () ->
+              let fieldNullIriJson =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":"schema:Order","fields":[{"name":"Total","iri":null}]}]}"""
+
+              let lock = mkLock [ unresolvedOrder ]
+
+              match Accept.parseResolved fieldNullIriJson with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let updated, summary = Accept.apply lock doc Llm
+                  Expect.equal summary.Merged 1 "one merged"
+                  Expect.isTrue (summary.FieldsUnresolved >= 1) "at least one field unresolved"
+                  let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
+                  Expect.equal m.Status Confirmed "type is Confirmed"
+
+                  let totalField = m.Fields |> List.tryFind (fun f -> f.Name = "Total")
+
+                  match totalField with
+                  | None -> failtest "Total field missing"
+                  | Some f -> Expect.equal f.Status Unresolved "Total field stays Unresolved"
+
+          testCase "alreadyConfirmed: re-confirming an already-Confirmed entry"
+          <| fun () ->
+              let alreadyConfirmed : Mapping =
+                  { FSharpType = "MyApp.OrderLine"
+                    Iri = Some "schema:OrderItem"
+                    Confidence = 1.0
+                    Source = Llm
+                    Status = Confirmed
+                    Alternates = []
+                    Fields = [] }
+
+              let lock = mkLock [ alreadyConfirmed ]
+
+              match Accept.parseResolved at1Json with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let _updated, summary = Accept.apply lock doc Llm
+                  Expect.equal summary.Merged 1 "Merged=1"
+                  Expect.equal summary.AlreadyConfirmed 1 "AlreadyConfirmed=1"
+
+          testCase "robustness: no schemaVersion — Error schemaVersion is required"
+          <| fun () ->
+              let json = """{"resolved":[]}"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failtest "expected Error"
+              | Error msg -> Expect.stringContains msg "schemaVersion is required" "error message"
+
+          testCase "robustness: root array — Error root must be a JSON object"
+          <| fun () ->
+              let json = """[]"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failtest "expected Error"
+              | Error msg -> Expect.stringContains msg "root must be a JSON object" "error message"
+
+          testCase "robustness: resolved is object not array — Error not exception"
+          <| fun () ->
+              let json = """{"schemaVersion":1,"resolved":{}}"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failtest "expected Error"
+              | Error _ -> ()
+
+          testCase "robustness: entry fields is string not array — Error not exception"
+          <| fun () ->
+              let json =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.X","iri":"schema:X","fields":"x"}]}"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failtest "expected Error"
+              | Error _ -> ()
+
+          testCase "json output: summaryToJson produces valid JSON with expected fields"
+          <| fun () ->
+              let summary : Accept.AcceptSummary =
+                  { Merged = 2
+                    Rejected =
+                      [ { FSharpType = "MyApp.Ghost"
+                          Reason = "not in lock file" } ]
+                    Unchanged = 1
+                    AlreadyConfirmed = 0
+                    FieldsUnresolved = 3 }
+
+              let json = Accept.summaryToJson summary
+              let doc = System.Text.Json.JsonDocument.Parse(json)
+              let root = doc.RootElement
+              Expect.equal (root.GetProperty("merged").GetInt32()) 2 "merged"
+              Expect.equal (root.GetProperty("unchanged").GetInt32()) 1 "unchanged"
+              Expect.equal (root.GetProperty("alreadyConfirmed").GetInt32()) 0 "alreadyConfirmed"
+              Expect.equal (root.GetProperty("fieldsUnresolved").GetInt32()) 3 "fieldsUnresolved"
+              let rejected = root.GetProperty("rejected")
+              Expect.equal (rejected.GetArrayLength()) 1 "rejected length"
+              let r0 = rejected.[0]
+              Expect.equal (r0.GetProperty("fsharpType").GetString()) "MyApp.Ghost" "fsharpType"
+              Expect.equal (r0.GetProperty("reason").GetString()) "not in lock file" "reason" ]
