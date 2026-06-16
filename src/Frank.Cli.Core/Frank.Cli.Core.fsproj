@@ -10,6 +10,7 @@
     <Compile Include="Extractor.fs" />
     <Compile Include="VocabularyEvaluator.fs" />
     <Compile Include="Pipeline.fs" />
+    <Compile Include="Clarify.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
     <Compile Include="SemanticModelEmitter.fs" />

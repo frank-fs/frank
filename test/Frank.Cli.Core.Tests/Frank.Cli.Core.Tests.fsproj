@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ClarifyTests.fs" />
     <Compile Include="ExtractorTests.fs" />
     <Compile Include="VocabularyEvaluatorTests.fs" />
     <Compile Include="PipelineTests.fs" />

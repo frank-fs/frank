@@ -4,12 +4,26 @@ open System
 open System.IO
 open System.Reflection
 open Argu
+open Frank.Semantic.LockFile
 open Frank.Cli.Core
 
 // ── CLI argument definitions ──────────────────────────────────────────────────
 
+/// Arguments for the `frank semantic clarify` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type ClarifyArgs =
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
+    | Output_Format of format: string
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+            | Output_Format _ -> "output format: 'json' (default) or 'markdown'"
+
 /// Arguments for the `frank semantic extract` subcommand.
-/// B8/B9 will add `clarify`, `accept`, `refresh`, `status` as siblings under SemanticArgs.
 [<CliPrefix(CliPrefix.DoubleDash)>]
 type ExtractArgs =
     | [<AltCommandLine("-p")>] Project of path: string
@@ -26,11 +40,13 @@ type ExtractArgs =
 [<CliPrefix(CliPrefix.None)>]
 type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Extract of ParseResults<ExtractArgs>
+    | [<CliPrefix(CliPrefix.None)>] Clarify of ParseResults<ClarifyArgs>
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Extract _ -> "extract semantic mappings from a Frank project"
+            | Clarify _ -> "emit unresolved/proposed mappings as an LLM contract"
 
 [<CliPrefix(CliPrefix.None)>]
 type FrankArgs =
@@ -111,9 +127,53 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
                 printSummary fmt summary
                 0
 
+let private resolveLockPath (args: ParseResults<ClarifyArgs>) : Result<string, string> =
+    match args.TryGetResult(ClarifyArgs.Lock_File) with
+    | Some p -> Ok p
+    | None ->
+        let projectResult =
+            match args.TryGetResult(ClarifyArgs.Project) with
+            | Some p -> Ok p
+            | None -> findProjectFile (Directory.GetCurrentDirectory())
+
+        match projectResult with
+        | Error e -> Error e
+        | Ok projectFile ->
+            let dir = Path.GetDirectoryName(Path.GetFullPath projectFile)
+            Ok(Path.Combine(dir, ".frank", "semantic-mappings.lock.json"))
+
+let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
+    let formatStr =
+        args.TryGetResult(ClarifyArgs.Output_Format) |> Option.defaultValue "json"
+
+    let emit =
+        match formatStr.ToLowerInvariant() with
+        | "json" -> Some Clarify.toJson
+        | "markdown" -> Some Clarify.toMarkdown
+        | other ->
+            eprintfn "error: unknown output format '%s'; expected 'json' or 'markdown'" other
+            None
+
+    match emit with
+    | None -> 1
+    | Some render ->
+        match resolveLockPath args with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok lockPath ->
+            match read lockPath with
+            | Error e ->
+                eprintfn "error: %s" e
+                1
+            | Ok lf ->
+                printfn "%s" (render lf)
+                0
+
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with
     | SemanticArgs.Extract extractArgs -> handleExtract extractArgs
+    | SemanticArgs.Clarify clarifyArgs -> handleClarify clarifyArgs
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
