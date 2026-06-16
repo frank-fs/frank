@@ -8,6 +8,7 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
 open Frank.Cli.Core.Refresh
+open Frank.Cli.Core.Status
 
 // ── CLI argument definitions ──────────────────────────────────────────────────
 
@@ -55,6 +56,18 @@ type AcceptArgs =
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
 
+/// Arguments for the `frank semantic status` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type StatusArgs =
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+
 /// Arguments for the `frank semantic refresh` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
 type RefreshArgs =
@@ -73,6 +86,7 @@ type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Clarify of ParseResults<ClarifyArgs>
     | [<CliPrefix(CliPrefix.None)>] Accept of ParseResults<AcceptArgs>
     | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshArgs>
+    | [<CliPrefix(CliPrefix.None)>] Status of ParseResults<StatusArgs>
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -81,6 +95,7 @@ type SemanticArgs =
             | Clarify _ -> "emit unresolved/proposed mappings as an LLM contract"
             | Accept _ -> "merge LLM/hand-resolved mappings into the lock file"
             | Refresh _ -> "re-fetch vocabularies and report hash drift"
+            | Status _ -> "summarize lock-file mapping counts"
 
 [<CliPrefix(CliPrefix.None)>]
 type FrankArgs =
@@ -260,6 +275,20 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
     printfn "Merged %d mapping(s); %d rejected; %d unchanged" summary.Merged summary.Rejected.Length summary.Unchanged
     0
 
+let private handleStatus (args: ParseResults<StatusArgs>) : int =
+    match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lockPath ->
+        match read lockPath with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok lf ->
+            printfn "%s" (format lf)
+            0
+
 let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
     match lockPathFrom (args.TryGetResult RefreshArgs.Lock_File) (args.TryGetResult RefreshArgs.Project) with
     | Error e ->
@@ -294,6 +323,7 @@ let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     | SemanticArgs.Clarify clarifyArgs -> handleClarify clarifyArgs
     | SemanticArgs.Accept acceptArgs -> handleAccept acceptArgs
     | SemanticArgs.Refresh refreshArgs -> handleRefresh refreshArgs
+    | SemanticArgs.Status statusArgs -> handleStatus statusArgs
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 

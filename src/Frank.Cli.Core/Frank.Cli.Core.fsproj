@@ -13,6 +13,7 @@
     <Compile Include="Clarify.fs" />
     <Compile Include="Accept.fs" />
     <Compile Include="Refresh.fs" />
+    <Compile Include="Status.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
     <Compile Include="SemanticModelEmitter.fs" />

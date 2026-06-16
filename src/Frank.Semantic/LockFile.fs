@@ -353,6 +353,15 @@ module LockFile =
         let json = root.ToJsonString writeOptions
         File.WriteAllText(path, json)
 
+    // ── Status counts ─────────────────────────────────────────────────────────
+
+    type StatusCounts = { Confirmed: int; Proposed: int; Unresolved: int }
+
+    let countByStatus (mappings: Mapping list) : StatusCounts =
+        { Confirmed = mappings |> List.filter (fun m -> m.Status = Confirmed) |> List.length
+          Proposed = mappings |> List.filter (fun m -> m.Status = Proposed) |> List.length
+          Unresolved = mappings |> List.filter (fun m -> m.Status = Unresolved) |> List.length }
+
     // ── Pure merge ────────────────────────────────────────────────────────────
 
     let private mergeFields (existing: FieldMapping list) (resolved: FieldMapping list) : FieldMapping list =
