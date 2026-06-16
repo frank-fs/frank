@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Reflection
 open Argu
+open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
 
@@ -37,16 +38,34 @@ type ExtractArgs =
             | Vocabulary_File _ -> "path to the vocabulary CE file (defaults to Vocabulary.fs)"
             | Output_Format _ -> "output format: 'text' (default) or 'json'"
 
+/// Arguments for the `frank semantic accept` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type AcceptArgs =
+    | [<Mandatory; AltCommandLine("-i")>] Input of path: string
+    | Source of source: string
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Input _ -> "path to resolved.json"
+            | Source _ -> "mapping source: 'llm' (default) or 'manual'"
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+
 [<CliPrefix(CliPrefix.None)>]
 type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Extract of ParseResults<ExtractArgs>
     | [<CliPrefix(CliPrefix.None)>] Clarify of ParseResults<ClarifyArgs>
+    | [<CliPrefix(CliPrefix.None)>] Accept of ParseResults<AcceptArgs>
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Extract _ -> "extract semantic mappings from a Frank project"
             | Clarify _ -> "emit unresolved/proposed mappings as an LLM contract"
+            | Accept _ -> "merge LLM/hand-resolved mappings into the lock file"
 
 [<CliPrefix(CliPrefix.None)>]
 type FrankArgs =
@@ -170,10 +189,82 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
                 printfn "%s" (render lf)
                 0
 
+let private resolveAcceptLockPath (args: ParseResults<AcceptArgs>) : Result<string, string> =
+    match args.TryGetResult(AcceptArgs.Lock_File) with
+    | Some p -> Ok p
+    | None ->
+        let projectResult =
+            match args.TryGetResult(AcceptArgs.Project) with
+            | Some p -> Ok p
+            | None -> findProjectFile (Directory.GetCurrentDirectory())
+
+        match projectResult with
+        | Error e -> Error e
+        | Ok projectFile ->
+            let dir = Path.GetDirectoryName(Path.GetFullPath projectFile)
+            Ok(Path.Combine(dir, ".frank", "semantic-mappings.lock.json"))
+
+let private parseSource (s: string) : Result<MappingSource, string> =
+    match s.ToLowerInvariant() with
+    | "llm" -> Ok Llm
+    | "manual" -> Ok Manual
+    | other -> Error $"unknown source '{other}'; expected 'llm' or 'manual'"
+
+let private handleAccept (args: ParseResults<AcceptArgs>) : int =
+    let inputPath = args.GetResult(AcceptArgs.Input)
+
+    let jsonResult =
+        try
+            Ok(File.ReadAllText inputPath)
+        with ex ->
+            Error $"could not read '{inputPath}': {ex.Message}"
+
+    match jsonResult with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok json ->
+
+    match Accept.parseResolved json with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok doc ->
+
+    let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
+
+    match parseSource sourceStr with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok source ->
+
+    match resolveAcceptLockPath args with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lockPath ->
+
+    match read lockPath with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lf ->
+
+    let updated, summary = Accept.apply lf doc source
+    write lockPath { updated with Generated = DateTimeOffset.UtcNow }
+
+    for t in summary.Rejected do
+        eprintfn "%s not in lock file; ignored" t
+
+    printfn "Merged %d mapping(s); %d rejected; %d unchanged" summary.Merged summary.Rejected.Length summary.Unchanged
+    0
+
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with
     | SemanticArgs.Extract extractArgs -> handleExtract extractArgs
     | SemanticArgs.Clarify clarifyArgs -> handleClarify clarifyArgs
+    | SemanticArgs.Accept acceptArgs -> handleAccept acceptArgs
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
