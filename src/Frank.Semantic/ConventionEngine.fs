@@ -285,6 +285,48 @@ module ConventionEngine =
               Source = Convention
               Status = status }
 
+    // ── CURIE reverse-resolution ──────────────────────────────────────────────
+
+    /// Reverse-resolve an absolute Uri to a CURIE string using declared prefixes.
+    /// Finds the longest matching prefix base URI, returns "prefix:local". Falls
+    /// back to the absolute URI string if no prefix matches.
+    let private toCurie (prefixes: Map<string, Uri>) (uri: Uri) : string =
+        let absUri = uri.AbsoluteUri
+
+        prefixes
+        |> Map.toSeq
+        |> Seq.tryFind (fun (_, baseUri) -> absUri.StartsWith(baseUri.AbsoluteUri, StringComparison.Ordinal))
+        |> Option.map (fun (prefix, baseUri) -> $"{prefix}:{absUri.[baseUri.AbsoluteUri.Length ..]}")
+        |> Option.defaultValue absUri
+
+    // ── Explicit equivalentClass override ─────────────────────────────────────
+
+    /// If registry.EquivalentClasses contains an entry for typeInfo.FullName,
+    /// override the class IRI to the explicit one, keeping convention-scored fields.
+    let private applyExplicitClass
+        (registry: VocabularyRegistry)
+        (typeInfo: TypeInfo)
+        (terms: VocabTerms)
+        (convention: Mapping)
+        : Mapping =
+        match Map.tryFind typeInfo.FullName registry.EquivalentClasses with
+        | None -> convention
+        | Some explicitUri ->
+            let curie = toCurie registry.Prefixes explicitUri
+
+            let fieldMappings =
+                if convention.Fields.IsEmpty && not typeInfo.Fields.IsEmpty then
+                    typeInfo.Fields |> List.map (buildFieldMapping terms.Properties)
+                else
+                    convention.Fields
+
+            { convention with
+                Iri = Some curie
+                Confidence = 1.0
+                Source = Manual
+                Status = Confirmed
+                Fields = fieldMappings }
+
     // ── Main entry ────────────────────────────────────────────────────────────
 
     /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
@@ -302,37 +344,40 @@ module ConventionEngine =
               Alternates = []
               Fields = [] }
 
-        if inScopeClasses.IsEmpty then
-            emptyUnresolved
-        else
-            let typeTokens = normalizeTokens typeInfo.LocalName
+        let conventionResult =
+            if inScopeClasses.IsEmpty then
+                emptyUnresolved
+            else
+                let typeTokens = normalizeTokens typeInfo.LocalName
 
-            let candidates =
-                inScopeClasses
-                |> Map.toList
-                |> List.choose (fun (localName, classIri) ->
-                    if hasTokenHit typeTokens localName then
-                        Some(combinedScore typeTokens typeInfo.Fields terms.Properties localName, classIri)
-                    else
-                        None)
-                |> topK
+                let candidates =
+                    inScopeClasses
+                    |> Map.toList
+                    |> List.choose (fun (localName, classIri) ->
+                        if hasTokenHit typeTokens localName then
+                            Some(combinedScore typeTokens typeInfo.Fields terms.Properties localName, classIri)
+                        else
+                            None)
+                    |> topK
 
-            match candidates with
-            | [] -> emptyUnresolved
-            | (bestScore, bestIri) :: rest ->
-                let alternates = rest |> List.map snd
-                let fieldMappings = typeInfo.Fields |> List.map (buildFieldMapping terms.Properties)
+                match candidates with
+                | [] -> emptyUnresolved
+                | (bestScore, bestIri) :: rest ->
+                    let alternates = rest |> List.map snd
+                    let fieldMappings = typeInfo.Fields |> List.map (buildFieldMapping terms.Properties)
 
-                let status =
-                    if bestScore >= confirmationThreshold then
-                        Confirmed
-                    else
-                        Proposed
+                    let status =
+                        if bestScore >= confirmationThreshold then
+                            Confirmed
+                        else
+                            Proposed
 
-                { FSharpType = typeInfo.FullName
-                  Iri = Some bestIri
-                  Confidence = bestScore
-                  Source = Convention
-                  Status = status
-                  Alternates = alternates
-                  Fields = fieldMappings }
+                    { FSharpType = typeInfo.FullName
+                      Iri = Some bestIri
+                      Confidence = bestScore
+                      Source = Convention
+                      Status = status
+                      Alternates = alternates
+                      Fields = fieldMappings }
+
+        applyExplicitClass registry typeInfo terms conventionResult

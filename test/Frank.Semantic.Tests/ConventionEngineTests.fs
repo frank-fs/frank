@@ -428,3 +428,178 @@ let scopeFilteringTests =
 
         Expect.equal mapping.Status MappingStatus.Unresolved "unresolved when prefix not in Using"
     }
+
+// ── Explicit equivalentClass override ────────────────────────────────────────
+
+[<Tests>]
+let explicitEquivalentClassTests =
+    testList
+        "explicit equivalentClass override"
+        [ test "type with equivalentClass entry gets Manual/Confirmed/1.0 and CURIE IRI" {
+              // MoveLog<_> doesn't convention-match "itemlist" (tokens: move, log vs itemlist)
+              // but the vocabulary declares equivalentClass typedefof<MoveLog<_>> "schema:ItemList"
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "TicTacToe.Model.MoveLog`1"
+                    Namespace = "TicTacToe.Model"
+                    LocalName = "MoveLog"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                      equivalentClass typedefof<System.Collections.Generic.List<_>> "schema:ItemList"
+                  }
+
+              // Patch: use a registry with MoveLog`1 key directly via a helper
+              let registryWithMoveLog =
+                  { registry with
+                      EquivalentClasses =
+                          Map.add
+                              "TicTacToe.Model.MoveLog`1"
+                              (Uri("https://schema.org/ItemList"))
+                              registry.EquivalentClasses }
+
+              let mapping = ConventionEngine.score terms registryWithMoveLog typeInfo
+
+              Expect.equal mapping.Source MappingSource.Manual "source is Manual"
+              Expect.equal mapping.Status MappingStatus.Confirmed "status is Confirmed"
+              Expect.floatClose Accuracy.high mapping.Confidence 1.0 "confidence is 1.0"
+              Expect.equal mapping.Iri (Some "schema:ItemList") "iri is schema:ItemList CURIE"
+          }
+
+          test "type WITHOUT equivalentClass entry keeps convention scoring" {
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Order"
+                    Namespace = "MyApp"
+                    LocalName = "Order"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                  }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Source MappingSource.Convention "source stays Convention"
+          }
+
+          test "generic-definition type (FullName ends `1) correctly matched in EquivalentClasses" {
+              // Verifies Map.tryFind works on the `1 suffix form used by generic type defs
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Container`1"
+                    Namespace = "MyApp"
+                    LocalName = "Container"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                      Using = Set.ofList [ "schema" ]
+                      EquivalentClasses = Map.ofList [ "MyApp.Container`1", Uri("https://schema.org/ItemList") ] }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Source MappingSource.Manual "source is Manual for generic def"
+              Expect.equal mapping.Iri (Some "schema:ItemList") "iri is schema:ItemList"
+          }
+
+          test "CURIE reverse-resolution: absolute Uri -> prefix:local when prefix matches" {
+              // Verify toCurie logic via score: absolute https://schema.org/ItemList
+              // with prefix schema -> https://schema.org/ produces "schema:ItemList"
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Thing`1"
+                    Namespace = "MyApp"
+                    LocalName = "Thing"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                      Using = Set.ofList [ "schema" ]
+                      EquivalentClasses = Map.ofList [ "MyApp.Thing`1", Uri("https://schema.org/ItemList") ] }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Iri (Some "schema:ItemList") "reverse-resolved to CURIE"
+          }
+
+          test "no matching prefix falls back to absolute URI string" {
+              let terms: VocabTerms =
+                  { Classes = Map.empty
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Foo"
+                    Namespace = "MyApp"
+                    LocalName = "Foo"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              // registry has no prefixes at all → toCurie must fall back to absolute URI
+              let registry =
+                  { VocabularyRegistry.empty with
+                      EquivalentClasses = Map.ofList [ "MyApp.Foo", Uri("https://example.com/Bar") ] }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Iri (Some "https://example.com/Bar") "fallback to absolute URI"
+          }
+
+          test "explicit equivalentClass keeps convention-scored fields" {
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
+                    Properties =
+                      Map.ofList [ "name", "https://schema.org/name"; "position", "https://schema.org/position" ] }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Log`1"
+                    Namespace = "MyApp"
+                    LocalName = "Log"
+                    Fields =
+                      [ { Name = "Position"
+                          TypeName = "int"
+                          Attributes = Map.empty
+                          DocComment = None } ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                      Using = Set.ofList [ "schema" ]
+                      EquivalentClasses = Map.ofList [ "MyApp.Log`1", Uri("https://schema.org/ItemList") ] }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI overridden"
+              Expect.isNonEmpty mapping.Fields "fields convention-scored"
+              Expect.equal mapping.Fields.[0].Name "Position" "field name preserved"
+          } ]

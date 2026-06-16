@@ -213,6 +213,54 @@ let at2MergeTests =
                   Directory.Delete(tmpDir, true)
           } ]
 
+// ── AT3: curation ─────────────────────────────────────────────────────────────
+
+[<Tests>]
+let at3CurationTests =
+    testList
+        "AT3 - curateSourceFiles excludes Program.fs / Generated*.fs / .fsi"
+        [ test "Program.fs is excluded" {
+              let files = [ "/app/Domain.fs"; "/app/Program.fs"; "/app/Vocabulary.fs" ]
+              let curated = Pipeline.curateSourceFiles files
+              Expect.isFalse (List.contains "/app/Program.fs" curated) "Program.fs must be excluded"
+              Expect.isTrue (List.contains "/app/Domain.fs" curated) "Domain.fs must be kept"
+          }
+
+          test "Generated*.fs is excluded" {
+              let files =
+                  [ "/app/Model.fs"
+                    "/app/GeneratedDiscovery.fs"
+                    "/app/GeneratedLinkedData.fs"
+                    "/app/GeneratedSemantics.fs" ]
+
+              let curated = Pipeline.curateSourceFiles files
+              Expect.equal curated [ "/app/Model.fs" ] "only non-Generated files kept"
+          }
+
+          test ".fsi files are excluded" {
+              let files = [ "/app/Model.fsi"; "/app/Model.fs"; "/app/Vocabulary.fs" ]
+              let curated = Pipeline.curateSourceFiles files
+              Expect.isFalse (List.contains "/app/Model.fsi" curated) ".fsi must be excluded"
+              Expect.isTrue (List.contains "/app/Model.fs" curated) ".fs kept"
+          }
+
+          test "all three exclusions apply together" {
+              let files =
+                  [ "/app/Model.fsi"
+                    "/app/Model.fs"
+                    "/app/GameStore.fs"
+                    "/app/Vocabulary.fs"
+                    "/app/GeneratedDiscovery.fs"
+                    "/app/Program.fs" ]
+
+              let curated = Pipeline.curateSourceFiles files
+
+              Expect.equal
+                  curated
+                  [ "/app/Model.fs"; "/app/GameStore.fs"; "/app/Vocabulary.fs" ]
+                  "only domain+vocab files remain"
+          } ]
+
 // ── AT4: determinism ─────────────────────────────────────────────────────────
 
 [<Tests>]

@@ -46,6 +46,20 @@ let private resolveVocabFile (projectFile: string) (explicit: string option) : R
         else
             Error "no Vocabulary.fs found in project directory; use --vocabulary-file to specify one"
 
+/// Exclude files that FCS cannot typecheck in the pipeline's reduced assembly context.
+/// Mirrors the MSBuild _FrankVocabSource item exclusion in Frank.Cli.MSBuild.targets:
+///   Extension != '.fsi'  AND  Filename+Extension != 'Program.fs'  AND  NOT StartsWith('Generated').
+/// Cross-boundary duplication (XML vs F#) is unavoidable; keep rules in sync.
+let internal curateSourceFiles (files: string list) : string list =
+    files
+    |> List.filter (fun f ->
+        let name = System.IO.Path.GetFileName f
+        let ext = System.IO.Path.GetExtension f
+
+        ext <> ".fsi"
+        && name <> "Program.fs"
+        && not (System.IO.Path.GetFileNameWithoutExtension(f).StartsWith("Generated")))
+
 /// Read all <Compile> source file paths from the .fsproj in declaration order.
 let private sourceFilesFromFsproj (projectFile: string) : Result<string list, string> =
     let dir = Path.GetDirectoryName(Path.GetFullPath projectFile)
@@ -198,9 +212,10 @@ let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
             | Error e -> Error e
             | Ok allSourceFiles ->
 
-                let domainFiles = allSourceFiles |> List.filter (fun f -> f <> vocabFile)
+                let curatedFiles = curateSourceFiles allSourceFiles
+                let domainFiles = curatedFiles |> List.filter (fun f -> f <> vocabFile)
 
-                match tryEvalRegistry opts.AssemblyRefs allSourceFiles with
+                match tryEvalRegistry opts.AssemblyRefs curatedFiles with
                 | Error e -> Error $"registry eval failed: {e}"
                 | Ok registry ->
 
