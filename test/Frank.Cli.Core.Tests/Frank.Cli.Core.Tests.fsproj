@@ -17,6 +17,7 @@
     <Compile Include="LinkedDataEmitterTests.fs" />
     <Compile Include="SemanticModelEmitterTests.fs" />
     <Compile Include="TypeIdentityTests.fs" />
+    <Compile Include="RefreshTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

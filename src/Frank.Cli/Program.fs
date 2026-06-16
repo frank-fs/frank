@@ -7,6 +7,7 @@ open Argu
 open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
+open Frank.Cli.Core.Refresh
 
 // ── CLI argument definitions ──────────────────────────────────────────────────
 
@@ -54,11 +55,24 @@ type AcceptArgs =
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
 
+/// Arguments for the `frank semantic refresh` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type RefreshArgs =
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+
 [<CliPrefix(CliPrefix.None)>]
 type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Extract of ParseResults<ExtractArgs>
     | [<CliPrefix(CliPrefix.None)>] Clarify of ParseResults<ClarifyArgs>
     | [<CliPrefix(CliPrefix.None)>] Accept of ParseResults<AcceptArgs>
+    | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshArgs>
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -66,6 +80,7 @@ type SemanticArgs =
             | Extract _ -> "extract semantic mappings from a Frank project"
             | Clarify _ -> "emit unresolved/proposed mappings as an LLM contract"
             | Accept _ -> "merge LLM/hand-resolved mappings into the lock file"
+            | Refresh _ -> "re-fetch vocabularies and report hash drift"
 
 [<CliPrefix(CliPrefix.None)>]
 type FrankArgs =
@@ -146,12 +161,12 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
                 printSummary fmt summary
                 0
 
-let private resolveLockPath (args: ParseResults<ClarifyArgs>) : Result<string, string> =
-    match args.TryGetResult(ClarifyArgs.Lock_File) with
+let private lockPathFrom (lockFile: string option) (project: string option) : Result<string, string> =
+    match lockFile with
     | Some p -> Ok p
     | None ->
         let projectResult =
-            match args.TryGetResult(ClarifyArgs.Project) with
+            match project with
             | Some p -> Ok p
             | None -> findProjectFile (Directory.GetCurrentDirectory())
 
@@ -176,7 +191,7 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
     match emit with
     | None -> 1
     | Some render ->
-        match resolveLockPath args with
+        match lockPathFrom (args.TryGetResult ClarifyArgs.Lock_File) (args.TryGetResult ClarifyArgs.Project) with
         | Error e ->
             eprintfn "error: %s" e
             1
@@ -188,21 +203,6 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
             | Ok lf ->
                 printfn "%s" (render lf)
                 0
-
-let private resolveAcceptLockPath (args: ParseResults<AcceptArgs>) : Result<string, string> =
-    match args.TryGetResult(AcceptArgs.Lock_File) with
-    | Some p -> Ok p
-    | None ->
-        let projectResult =
-            match args.TryGetResult(AcceptArgs.Project) with
-            | Some p -> Ok p
-            | None -> findProjectFile (Directory.GetCurrentDirectory())
-
-        match projectResult with
-        | Error e -> Error e
-        | Ok projectFile ->
-            let dir = Path.GetDirectoryName(Path.GetFullPath projectFile)
-            Ok(Path.Combine(dir, ".frank", "semantic-mappings.lock.json"))
 
 let private parseSource (s: string) : Result<MappingSource, string> =
     match s.ToLowerInvariant() with
@@ -239,7 +239,7 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
         1
     | Ok source ->
 
-    match resolveAcceptLockPath args with
+    match lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project) with
     | Error e ->
         eprintfn "error: %s" e
         1
@@ -260,11 +260,40 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
     printfn "Merged %d mapping(s); %d rejected; %d unchanged" summary.Merged summary.Rejected.Length summary.Unchanged
     0
 
+let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
+    match lockPathFrom (args.TryGetResult RefreshArgs.Lock_File) (args.TryGetResult RefreshArgs.Project) with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lockPath ->
+        match read lockPath with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok lf ->
+            use client = new System.Net.Http.HttpClient()
+            let fetch = VocabFetcher.httpFetch client
+
+            match refresh fetch lf |> Async.RunSynchronously with
+            | Error e ->
+                eprintfn "error: %s" e
+                1
+            | Ok report ->
+                for d in report.Drifted do
+                    printfn "%s vocabulary hash drift: %s → %s" d.Prefix d.Recorded d.Current
+
+                if report.Drifted <> [] then
+                    1
+                else
+                    printfn "%d vocabulary(ies) checked; no drift" report.Checked
+                    0
+
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with
     | SemanticArgs.Extract extractArgs -> handleExtract extractArgs
     | SemanticArgs.Clarify clarifyArgs -> handleClarify clarifyArgs
     | SemanticArgs.Accept acceptArgs -> handleAccept acceptArgs
+    | SemanticArgs.Refresh refreshArgs -> handleRefresh refreshArgs
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
