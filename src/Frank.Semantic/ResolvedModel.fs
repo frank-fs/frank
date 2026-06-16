@@ -133,6 +133,11 @@ module ResolvedModel =
         | Error e -> Error e
         | Ok ys -> Ok(List.rev ys)
 
+    /// Build a prefix map from the lock's vocabularies block.
+    /// Each key is the vocabulary prefix (e.g. "schema"); each value is its base Uri.
+    let private lockPrefixes (vocabularies: Map<string, VocabularyEntry>) : Map<string, Uri> =
+        vocabularies |> Map.map (fun _ entry -> Uri(entry.Uri))
+
     let private buildField
         (prefixes: Map<string, Uri>)
         (registry: VocabularyRegistry)
@@ -140,7 +145,7 @@ module ResolvedModel =
         (f: FieldMapping)
         : Result<ResolvedField, string> =
         match VocabularyRegistry.tryResolveIri prefixes f.Iri with
-        | Error e -> Error $"type '{fsharpType}': {e}"
+        | Error e -> Error $"type '{fsharpType}', field '{f.Name}': {e}"
         | Ok iri ->
             let seeAlso =
                 registry.FieldSeeAlso
@@ -242,9 +247,9 @@ module ResolvedModel =
         List.fold folder (Ok()) withClassIri
 
     let build (registry: VocabularyRegistry) (lock: LockFile) : Result<ResolvedModel, string> =
-        let prefixes = registry.Prefixes
+        let lockIriPrefixes = lockPrefixes lock.Vocabularies
 
-        match buildResources prefixes registry lock.Mappings with
+        match buildResources lockIriPrefixes registry lock.Mappings with
         | Error e -> Error e
         | Ok resources ->
             match checkLocalNameCollisions resources with
@@ -254,6 +259,6 @@ module ResolvedModel =
                 | Error e -> Error e
                 | Ok() ->
                     Ok
-                        { Prefixes = prefixes
+                        { Prefixes = registry.Prefixes
                           Using = registry.Using
                           Resources = resources }

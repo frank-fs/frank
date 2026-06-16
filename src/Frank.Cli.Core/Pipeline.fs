@@ -123,11 +123,11 @@ let private summarize (mappings: Mapping list) : ExtractSummary =
 // ── Effectful steps ───────────────────────────────────────────────────────────
 
 /// Fetch all in-scope vocabularies and return merged VocabTerms.
-let private fetchVocabTerms (registry: VocabularyRegistry) : Async<Result<VocabTerms, string>> =
+let private fetchVocabTerms (projectDir: string) (registry: VocabularyRegistry) : Async<Result<VocabTerms, string>> =
     async {
         use client = new HttpClient()
         let fetch = VocabFetcher.httpFetch client
-        let cacheDir = Path.Combine(Path.GetTempPath(), "frank-vocab-cache")
+        let cacheDir = Path.Combine(projectDir, ".frank", "vocab")
         Directory.CreateDirectory cacheDir |> ignore
 
         let inScopePrefixes =
@@ -223,7 +223,9 @@ let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
                     | Error e -> Error $"type extraction failed: {e}"
                     | Ok typeInfos ->
 
-                        match fetchVocabTerms registry |> Async.RunSynchronously with
+                        let projectDir = Path.GetDirectoryName projectFile
+
+                        match fetchVocabTerms projectDir registry |> Async.RunSynchronously with
                         | Error e -> Error $"vocab fetch failed: {e}"
                         | Ok terms ->
 

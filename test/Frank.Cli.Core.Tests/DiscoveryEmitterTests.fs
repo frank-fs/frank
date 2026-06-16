@@ -65,10 +65,15 @@ let private ticTacToeLock: LockFile =
                   Source = Convention
                   Status = Confirmed } ] } ] }
 
+let private schemaVocabEntry: VocabularyEntry =
+    { Uri = "https://schema.org/"
+      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Hash = "test" }
+
 let private minimalLock (mapping: Mapping) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
-      Vocabularies = Map.empty
+      Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
       Mappings = [ mapping ] }
 
 let private singleTypeLock: LockFile =
@@ -170,7 +175,7 @@ let private genLockWithSchemaIris =
         return
             { SchemaVersion = 1
               Generated = DateTimeOffset.UtcNow
-              Vocabularies = Map.empty
+              Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
               Mappings = mappings }
     }
 

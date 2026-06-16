@@ -12,11 +12,29 @@ let private exPrefix = Uri "http://example.com/vocab#"
 
 let private prefixes = Map.ofList [ "schema", schemaPrefix; "ex", exPrefix ]
 
+let private mkVocabEntry (uri: string) : VocabularyEntry =
+    { Uri = uri
+      FetchedAt = DateTimeOffset.UtcNow
+      Hash = "test" }
+
 let private emptyLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
       Vocabularies = Map.empty
       Mappings = [] }
+
+/// Lock pre-loaded with the schema: prefix — used by tests that resolve schema:* IRIs.
+let private lockWithSchema: LockFile =
+    { emptyLock with
+        Vocabularies = Map.ofList [ "schema", mkVocabEntry "https://schema.org/" ] }
+
+/// Lock pre-loaded with schema: and ex: prefixes.
+let private lockWithSchemaAndEx: LockFile =
+    { emptyLock with
+        Vocabularies =
+            Map.ofList
+                [ "schema", mkVocabEntry "https://schema.org/"
+                  "ex", mkVocabEntry "http://example.com/vocab#" ] }
 
 let private mkMapping fsharpType iri fields : Mapping =
     { FSharpType = fsharpType
@@ -57,7 +75,7 @@ let at_rm1 =
         let mapping = mkMapping gameType (Some "schema:Game") [ boardField ]
 
         let lock =
-            { emptyLock with
+            { lockWithSchema with
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build registry lock with
@@ -152,7 +170,10 @@ let at_rm4 =
     test "AT-RM4: LocalName collision among resources with ClassIri returns Error" {
         let m1 = mkMapping "Ns.A.Game" (Some "schema:Game") []
         let m2 = mkMapping "Ns.B.Game" (Some "ex:Game") []
-        let lock = { emptyLock with Mappings = [ m1; m2 ] }
+
+        let lock =
+            { lockWithSchemaAndEx with
+                Mappings = [ m1; m2 ] }
 
         match ResolvedModel.build baseRegistry lock with
         | Ok _ -> failwith "Expected Error for LocalName collision"
@@ -221,7 +242,7 @@ let at_rm_kw =
               let mapping = mkMapping "Ns.Type" (Some "schema:Thing") []
 
               let lock =
-                  { emptyLock with
+                  { lockWithSchema with
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -235,7 +256,7 @@ let at_rm_kw =
               let mapping = mkMapping "Ns.End" (Some "schema:End") []
 
               let lock =
-                  { emptyLock with
+                  { lockWithSchema with
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -272,7 +293,7 @@ let at_rm8 =
         let mapping = mkMapping gameType (Some "schema:Game") [ idField ]
 
         let lock =
-            { emptyLock with
+            { lockWithSchema with
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build registry lock with
@@ -295,3 +316,43 @@ let at_rm8 =
             for uri in allUris do
                 Expect.isTrue uri.IsAbsoluteUri $"URI must be absolute: {uri}"
     }
+
+// ── AT-RM9: lock IRI self-contained resolution ────────────────────────────────
+
+[<Tests>]
+let at_rm9 =
+    testList
+        "AT-RM9: lock IRI resolution is self-contained from lock.Vocabularies"
+        [ test "lock IRI resolves from lock.Vocabularies — not registry.Prefixes" {
+              let mapping = mkMapping "Ns.Thing" (Some "schema:Thing") []
+
+              // Lock carries schema: but registry has NO prefixes at all.
+              let lock =
+                  { lockWithSchema with
+                      Mappings = [ mapping ] }
+
+              let registryNoPrefixes = VocabularyRegistry.empty
+
+              match ResolvedModel.build registryNoPrefixes lock with
+              | Error e -> failwith $"Expected Ok when schema: is in lock.Vocabularies: {e}"
+              | Ok model ->
+                  let res = model.Resources |> List.head
+                  Expect.equal res.ClassIri (Some(Uri "https://schema.org/Thing")) "IRI resolved from lock vocab"
+          }
+
+          test "lock IRI with prefix absent from lock.Vocabularies returns Error (not silent)" {
+              let mapping = mkMapping "Ns.Widget" (Some "myns:Widget") []
+
+              // myns: is absent from lock.Vocabularies — even if registry carries it, still Error.
+              let lock =
+                  { emptyLock with
+                      Mappings = [ mapping ] }
+
+              let registryWithMyns =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "myns", Uri "http://my.ns/" ] }
+
+              match ResolvedModel.build registryWithMyns lock with
+              | Ok _ -> failwith "Expected Error: prefix 'myns' not in lock.Vocabularies"
+              | Error msg -> Expect.stringContains msg "myns" "error names the unresolvable prefix"
+          } ]
