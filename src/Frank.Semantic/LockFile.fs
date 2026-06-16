@@ -152,13 +152,21 @@ module LockFile =
                                 match parseFieldMappings node.["fields"] with
                                 | Error e -> Error e
                                 | Ok fields ->
+                                    let alternates =
+                                        match node.["alternates"] with
+                                        | null -> []
+                                        | n ->
+                                            n.AsArray()
+                                            |> Seq.choose (fun x -> if isNull x then None else Some(x.GetValue<string>()))
+                                            |> Seq.toList
+
                                     Ok
                                         { FSharpType = fsType
                                           Iri = iri
                                           Confidence = confidence
                                           Source = source
                                           Status = status
-                                          Alternates = []
+                                          Alternates = alternates
                                           Fields = fields }
 
     let private parseMappingList (node: JsonNode) : Result<Mapping list, string> =
@@ -278,6 +286,13 @@ module LockFile =
         obj.Add("confidence", JsonValue.Create m.Confidence)
         obj.Add("source", JsonValue.Create(mappingSourceToString m.Source))
         obj.Add("status", JsonValue.Create(mappingStatusToString m.Status))
+
+        let alternates = JsonArray()
+
+        for a in m.Alternates do
+            alternates.Add(JsonValue.Create a)
+
+        obj.Add("alternates", alternates)
 
         let fields = JsonArray()
 

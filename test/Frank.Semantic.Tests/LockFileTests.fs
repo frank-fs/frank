@@ -38,6 +38,7 @@ let private genMapping =
         let! source = genMappingSource
         let! status = genMappingStatus
         let! fields = Gen.listOfLength 2 genFieldMapping
+        let! alternates = Gen.listOf (Arb.generate<NonEmptyString> |> Gen.map (fun (NonEmptyString s) -> s))
 
         return
             { FSharpType = fsType
@@ -45,7 +46,7 @@ let private genMapping =
               Confidence = confidence
               Source = source
               Status = status
-              Alternates = []
+              Alternates = alternates
               Fields = fields }
     }
 
@@ -231,7 +232,7 @@ let schemaVersionTests =
 let roundTripTests =
     testList
         "AT1/AT3: round-trip and determinism"
-        [ test "read(write(lf)) reconstructs fields (modulo Alternates and Generated)" {
+        [ test "read(write(lf)) reconstructs fields (modulo Generated)" {
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
@@ -271,7 +272,7 @@ let roundTripTests =
                       Expect.equal m.Iri (Some "schema:Order") "iri"
                       Expect.equal m.Source MappingSource.Convention "source"
                       Expect.equal m.Status MappingStatus.Confirmed "status"
-                      Expect.equal m.Alternates [] "alternates empty after round-trip (deliberately dropped)"
+                      Expect.equal m.Alternates [ "schema:OrderAction" ] "alternates preserved through round-trip"
                       let f = m.Fields.[0]
                       Expect.equal f.Name "Total" "field name"
                       Expect.equal f.Iri (Some "schema:totalPaymentDue") "field iri"
@@ -346,7 +347,7 @@ let roundTripTests =
           }
 
           testProperty
-              "FsCheck: read(write(lf)) reconstructs all fields except Alternates"
+              "FsCheck: read(write(lf)) reconstructs all fields"
               (Prop.forAll (Arb.fromGen genLockFile) (fun lf ->
                   let path = Path.GetTempFileName()
 
@@ -366,7 +367,7 @@ let roundTripTests =
                                  && abs (r.Confidence - orig.Confidence) < 1e-9
                                  && r.Source = orig.Source
                                  && r.Status = orig.Status
-                                 && r.Alternates = []
+                                 && r.Alternates = orig.Alternates
                                  && r.Fields.Length = orig.Fields.Length
                                  && List.zip r.Fields orig.Fields
                                     |> List.forall (fun (rf, of_) ->
