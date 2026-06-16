@@ -10,10 +10,7 @@ open Frank.Semantic.LockFile
 // ── JSON helpers ──────────────────────────────────────────────────────────────
 
 let private writeOptions =
-    JsonSerializerOptions(
-        WriteIndented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    )
+    JsonSerializerOptions(WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping)
 
 let private iriNode (iri: string option) : JsonNode =
     match iri with
@@ -89,8 +86,7 @@ let toJson (lf: LockFile) : string =
 
 // ── Markdown helpers ──────────────────────────────────────────────────────────
 
-let private iriText (iri: string option) : string =
-    iri |> Option.defaultValue "null"
+let private iriText (iri: string option) : string = iri |> Option.defaultValue "null"
 
 let private fieldTable (fields: FieldMapping list) : string =
     let sb = StringBuilder()
@@ -99,7 +95,12 @@ let private fieldTable (fields: FieldMapping list) : string =
 
     for f in fields do
         let row =
-            sprintf "| %s | %s | %.2f | %s |" f.Name (iriText f.Iri) f.Confidence (LockFile.mappingStatusToString f.Status)
+            sprintf
+                "| %s | %s | %.2f | %s |"
+                f.Name
+                (iriText f.Iri)
+                f.Confidence
+                (LockFile.mappingStatusToString f.Status)
 
         sb.AppendLine(row) |> ignore
 
@@ -128,7 +129,10 @@ let private proposedSection (mappings: Mapping list) : string =
 
     for m in mappings do
         sb.AppendLine(sprintf "### %s" m.FSharpType) |> ignore
-        sb.AppendLine(sprintf "Current: %s (confidence %.2f)" (iriText m.Iri) m.Confidence) |> ignore
+
+        sb.AppendLine(sprintf "Current: %s (confidence %.2f)" (iriText m.Iri) m.Confidence)
+        |> ignore
+
         sb.AppendLine(fieldTable m.Fields) |> ignore
 
     sb.ToString()

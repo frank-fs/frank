@@ -117,7 +117,10 @@ let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list)
 /// Compute counts per status bucket.
 let private summarize (mappings: Mapping list) : ExtractSummary =
     let c = LockFile.countByStatus mappings
-    { Confirmed = c.Confirmed; Proposed = c.Proposed; Unresolved = c.Unresolved }
+
+    { Confirmed = c.Confirmed
+      Proposed = c.Proposed
+      Unresolved = c.Unresolved }
 
 // ── Effectful steps ───────────────────────────────────────────────────────────
 

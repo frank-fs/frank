@@ -5,10 +5,20 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Semantic.VocabFetcher
 
-type DriftEntry = { Prefix: string; Recorded: string; Current: string }
-type RefreshReport = { Checked: int; Drifted: DriftEntry list }
+type DriftEntry =
+    { Prefix: string
+      Recorded: string
+      Current: string }
 
-let private checkOne (fetch: Fetch) (prefix: string) (entry: VocabularyEntry) : Async<Result<DriftEntry option, string>> =
+type RefreshReport =
+    { Checked: int
+      Drifted: DriftEntry list }
+
+let private checkOne
+    (fetch: Fetch)
+    (prefix: string)
+    (entry: VocabularyEntry)
+    : Async<Result<DriftEntry option, string>> =
     async {
         let! r = fetch (Uri entry.Uri)
 
@@ -20,7 +30,13 @@ let private checkOne (fetch: Fetch) (prefix: string) (entry: VocabularyEntry) : 
             match detectDrift entry.Hash h with
             | NoDrift -> return Ok None
             | Drift(recorded, current) ->
-                return Ok(Some { Prefix = prefix; Recorded = recorded; Current = current })
+                return
+                    Ok(
+                        Some
+                            { Prefix = prefix
+                              Recorded = recorded
+                              Current = current }
+                    )
     }
 
 let refresh (fetch: Fetch) (lf: LockFile) : Async<Result<RefreshReport, string>> =
@@ -44,5 +60,8 @@ let refresh (fetch: Fetch) (lf: LockFile) : Async<Result<RefreshReport, string>>
         return
             match errorResult with
             | Some e -> Error e
-            | None -> Ok { Checked = Map.count lf.Vocabularies; Drifted = drifted }
+            | None ->
+                Ok
+                    { Checked = Map.count lf.Vocabularies
+                      Drifted = drifted }
     }

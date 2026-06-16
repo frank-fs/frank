@@ -157,7 +157,8 @@ module LockFile =
                                         | null -> []
                                         | n ->
                                             n.AsArray()
-                                            |> Seq.choose (fun x -> if isNull x then None else Some(x.GetValue<string>()))
+                                            |> Seq.choose (fun x ->
+                                                if isNull x then None else Some(x.GetValue<string>()))
                                             |> Seq.toList
 
                                     Ok
@@ -355,7 +356,10 @@ module LockFile =
 
     // ── Status counts ─────────────────────────────────────────────────────────
 
-    type StatusCounts = { Confirmed: int; Proposed: int; Unresolved: int }
+    type StatusCounts =
+        { Confirmed: int
+          Proposed: int
+          Unresolved: int }
 
     let countByStatus (mappings: Mapping list) : StatusCounts =
         { Confirmed = mappings |> List.filter (fun m -> m.Status = Confirmed) |> List.length

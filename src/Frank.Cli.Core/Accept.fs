@@ -11,7 +11,9 @@ type ResolvedEntry =
       Iri: string option
       Fields: ResolvedField list }
 
-type ResolvedDoc = { SchemaVersion: int; Resolved: ResolvedEntry list }
+type ResolvedDoc =
+    { SchemaVersion: int
+      Resolved: ResolvedEntry list }
 
 type AcceptSummary =
     { Merged: int
@@ -47,33 +49,37 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
     let fsType =
         match node.["fsharpType"] with
         | null -> ""
-        | n -> try n.GetValue<string>() with _ -> ""
+        | n ->
+            try
+                n.GetValue<string>()
+            with _ ->
+                ""
 
     if System.String.IsNullOrEmpty fsType then
         Error $"resolved[{i}]: fsharpType is required"
     else
 
-    let iri =
-        match node.["iri"] with
-        | null -> None
-        | n ->
-            try
-                let s = n.GetValue<string>()
-                if s = null then None else Some s
-            with _ ->
-                None
+        let iri =
+            match node.["iri"] with
+            | null -> None
+            | n ->
+                try
+                    let s = n.GetValue<string>()
+                    if s = null then None else Some s
+                with _ ->
+                    None
 
-    if iri.IsNone && isNull node.["iri"] then
-        Error $"resolved[{i}]: iri is required"
-    else
+        if iri.IsNone && isNull node.["iri"] then
+            Error $"resolved[{i}]: iri is required"
+        else
 
-    Ok
-        { FSharpType = fsType
-          Iri = iri
-          Fields = parseFields node.["fields"] }
+            Ok
+                { FSharpType = fsType
+                  Iri = iri
+                  Fields = parseFields node.["fields"] }
 
 let private parseEntries (arr: JsonArray) : Result<ResolvedEntry list, string> =
-    let mutable acc : Result<ResolvedEntry list, string> = Ok []
+    let mutable acc: Result<ResolvedEntry list, string> = Ok []
     let mutable i = 0
 
     while i < arr.Count && Result.isOk acc do
@@ -98,25 +104,30 @@ let parseResolved (json: string) : Result<ResolvedDoc, string> =
     | Error e -> Error e
     | Ok node ->
 
-    let version =
-        try
-            node.["schemaVersion"].GetValue<int>()
-        with _ ->
-            -1
+        let version =
+            try
+                node.["schemaVersion"].GetValue<int>()
+            with _ ->
+                -1
 
-    if version <> supportedVersion then
-        Error $"schema version {version} not supported"
-    else
+        if version <> supportedVersion then
+            Error $"schema version {version} not supported"
+        else
 
-    let resolvedNode = node.["resolved"]
+            let resolvedNode = node.["resolved"]
 
-    if resolvedNode = null then
-        Ok { SchemaVersion = version; Resolved = [] }
-    else
+            if resolvedNode = null then
+                Ok
+                    { SchemaVersion = version
+                      Resolved = [] }
+            else
 
-    match parseEntries (resolvedNode.AsArray()) with
-    | Error e -> Error e
-    | Ok entries -> Ok { SchemaVersion = version; Resolved = entries }
+                match parseEntries (resolvedNode.AsArray()) with
+                | Error e -> Error e
+                | Ok entries ->
+                    Ok
+                        { SchemaVersion = version
+                          Resolved = entries }
 
 // ── Apply helpers ─────────────────────────────────────────────────────────────
 
@@ -140,10 +151,17 @@ let private buildMapping (source: MappingSource) (entry: ResolvedEntry) : Mappin
 
 let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
-    let known, unknown = doc.Resolved |> List.partition (fun e -> Set.contains e.FSharpType lockTypes)
+
+    let known, unknown =
+        doc.Resolved |> List.partition (fun e -> Set.contains e.FSharpType lockTypes)
+
     let knownMappings = known |> List.map (buildMapping source)
     let knownTypes = known |> List.map (fun e -> e.FSharpType) |> Set.ofList
-    let unchanged = lf.Mappings |> List.filter (fun m -> not (Set.contains m.FSharpType knownTypes)) |> List.length
+
+    let unchanged =
+        lf.Mappings
+        |> List.filter (fun m -> not (Set.contains m.FSharpType knownTypes))
+        |> List.length
 
     let updated = LockFile.merge lf knownMappings
 

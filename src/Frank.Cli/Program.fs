@@ -240,40 +240,49 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
         1
     | Ok json ->
 
-    match Accept.parseResolved json with
-    | Error e ->
-        eprintfn "error: %s" e
-        1
-    | Ok doc ->
+        match Accept.parseResolved json with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok doc ->
 
-    let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
+            let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
 
-    match parseSource sourceStr with
-    | Error e ->
-        eprintfn "error: %s" e
-        1
-    | Ok source ->
+            match parseSource sourceStr with
+            | Error e ->
+                eprintfn "error: %s" e
+                1
+            | Ok source ->
 
-    match lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project) with
-    | Error e ->
-        eprintfn "error: %s" e
-        1
-    | Ok lockPath ->
+                match lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project) with
+                | Error e ->
+                    eprintfn "error: %s" e
+                    1
+                | Ok lockPath ->
 
-    match read lockPath with
-    | Error e ->
-        eprintfn "error: %s" e
-        1
-    | Ok lf ->
+                    match read lockPath with
+                    | Error e ->
+                        eprintfn "error: %s" e
+                        1
+                    | Ok lf ->
 
-    let updated, summary = Accept.apply lf doc source
-    write lockPath { updated with Generated = DateTimeOffset.UtcNow }
+                        let updated, summary = Accept.apply lf doc source
 
-    for t in summary.Rejected do
-        eprintfn "%s not in lock file; ignored" t
+                        write
+                            lockPath
+                            { updated with
+                                Generated = DateTimeOffset.UtcNow }
 
-    printfn "Merged %d mapping(s); %d rejected; %d unchanged" summary.Merged summary.Rejected.Length summary.Unchanged
-    0
+                        for t in summary.Rejected do
+                            eprintfn "%s not in lock file; ignored" t
+
+                        printfn
+                            "Merged %d mapping(s); %d rejected; %d unchanged"
+                            summary.Merged
+                            summary.Rejected.Length
+                            summary.Unchanged
+
+                        0
 
 let private handleStatus (args: ParseResults<StatusArgs>) : int =
     match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with
