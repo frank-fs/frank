@@ -10,7 +10,6 @@ open Frank.Discovery
 open Frank.LinkedData
 open TicTacToe.Model
 open TicTacToe.GameStore
-open TicTacToe.GeneratedSemantics
 
 /// Single in-memory store for this sample app.
 let private store = GameStore()
@@ -151,14 +150,14 @@ let private gameResource =
     resource "/games/{id}" {
         name "Game"
         entryPoint
-        relation ((iri SemanticResource.Game).AbsoluteUri)
+        relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Game).AbsoluteUri)
         get gameHandler
     }
 
 let private movesResource =
     resource "/games/{id}/moves" {
         name "GameMoves"
-        relation ((iri SemanticResource.Move).AbsoluteUri)
+        relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Move).AbsoluteUri)
         post moveHandler
     }
 

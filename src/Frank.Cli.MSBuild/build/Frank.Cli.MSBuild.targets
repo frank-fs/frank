@@ -74,17 +74,17 @@
 
   <!--
     FrankInjectGeneratedFile: always runs before CoreCompile (not incremental).
-    Injects the already-generated file into @(Compile) before Program.fs.
+    Injects the already-generated GeneratedDiscovery.fs into @(Compile).
 
-    Separation of concerns:
-    - FrankGenerateSemantic writes the file (incremental, skippable).
-    - FrankInjectGeneratedFile wires the file into the compile list (always).
-
-    F# compile-order: source files must be listed in dependency order.
-    GeneratedDiscovery defines the module that Program.fs opens, so it must
-    precede Program.fs in @(Compile). A plain Include appends to the end;
-    instead we Remove Program.fs, Include the generated file, then re-Include
-    Program.fs to restore the correct order.
+    Ordering strategy (explicit-item-first, best-effort default):
+    - If the project already lists the generated file in @(Compile), skip — the
+      author controls position.
+    - Else if Program.fs is in @(Compile), insert immediately before it.
+    - Else insert before the last @(Compile) item (best-effort: at minimum the
+      generated file precedes the final consumer).
+    Limitation: "before the resource-definition file" is impractical in pure
+    MSBuild without a file-content probe; Program.fs-or-last is the defensible
+    default for library projects that omit Program.fs.
   -->
   <Target Name="FrankInjectGeneratedFile"
           BeforeTargets="BeforeCompile;CoreCompile"
@@ -94,12 +94,26 @@
       <_FrankGeneratedFile>$(IntermediateOutputPath)GeneratedDiscovery.fs</_FrankGeneratedFile>
     </PropertyGroup>
 
-    <!-- Only reorder when the file is not already in the compile list. -->
+    <!-- Step 1: capture anchor candidates (before any reordering). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)'))">
+      <!-- Case A anchor: Program.fs if present. -->
       <_FrankProgramFs Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <!-- Case B anchor: last compile item (used only when Program.fs absent). -->
+      <_FrankLastCompile Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFs)' == ''" />
+    </ItemGroup>
+
+    <!-- Step 2 Case A: Program.fs present — remove it, insert generated file, re-add. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)')) and '@(_FrankProgramFs)' != ''">
       <Compile Remove="@(_FrankProgramFs)" />
       <Compile Include="$(_FrankGeneratedFile)" />
       <Compile Include="@(_FrankProgramFs)" />
+    </ItemGroup>
+
+    <!-- Step 2 Case B: no Program.fs — insert generated file before the last item. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)')) and '@(_FrankProgramFs)' == '' and '@(_FrankLastCompile)' != ''">
+      <Compile Remove="@(_FrankLastCompile)" />
+      <Compile Include="$(_FrankGeneratedFile)" />
+      <Compile Include="@(_FrankLastCompile)" />
     </ItemGroup>
 
   </Target>
@@ -158,8 +172,10 @@
 
   <!--
     FrankInjectGeneratedLinkedDataFile: always runs before CoreCompile (not incremental).
-    Injects the already-generated GeneratedLinkedData.fs before Program.fs in @(Compile).
-    Guards against double-add.
+    Injects the already-generated GeneratedLinkedData.fs into @(Compile).
+
+    Same ordering strategy as FrankInjectGeneratedFile: explicit-item-first,
+    Program.fs-or-last-item best-effort default.
   -->
   <Target Name="FrankInjectGeneratedLinkedDataFile"
           BeforeTargets="BeforeCompile;CoreCompile"
@@ -169,11 +185,24 @@
       <_FrankGeneratedLDFile>$(IntermediateOutputPath)GeneratedLinkedData.fs</_FrankGeneratedLDFile>
     </PropertyGroup>
 
+    <!-- Step 1: capture anchor candidates. -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)'))">
       <_FrankProgramFsLD Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <_FrankLastCompileLD Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsLD)' == ''" />
+    </ItemGroup>
+
+    <!-- Step 2 Case A: Program.fs present. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)')) and '@(_FrankProgramFsLD)' != ''">
       <Compile Remove="@(_FrankProgramFsLD)" />
       <Compile Include="$(_FrankGeneratedLDFile)" />
       <Compile Include="@(_FrankProgramFsLD)" />
+    </ItemGroup>
+
+    <!-- Step 2 Case B: no Program.fs — insert before last item. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)')) and '@(_FrankProgramFsLD)' == '' and '@(_FrankLastCompileLD)' != ''">
+      <Compile Remove="@(_FrankLastCompileLD)" />
+      <Compile Include="$(_FrankGeneratedLDFile)" />
+      <Compile Include="@(_FrankLastCompileLD)" />
     </ItemGroup>
 
   </Target>
@@ -233,10 +262,11 @@
 
   <!--
     FrankInjectGeneratedSemanticModelFile: always runs before CoreCompile (not incremental).
-    Injects the already-generated GeneratedSemantics.fs before Program.fs in @(Compile).
+    Injects the already-generated GeneratedSemantics.fs into @(Compile).
+
     GeneratedSemantics references domain types by fully-qualified name, so it only needs
-    to compile after the domain (e.g. Model.fs) — placing it just before Program.fs satisfies that.
-    Guards against double-add.
+    to compile after the domain (e.g. Model.fs). Same ordering strategy as the other
+    inject targets: explicit-item-first, Program.fs-or-last-item best-effort default.
   -->
   <Target Name="FrankInjectGeneratedSemanticModelFile"
           BeforeTargets="BeforeCompile;CoreCompile"
@@ -246,11 +276,24 @@
       <_FrankGeneratedSemFile>$(IntermediateOutputPath)GeneratedSemantics.fs</_FrankGeneratedSemFile>
     </PropertyGroup>
 
+    <!-- Step 1: capture anchor candidates. -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)'))">
       <_FrankProgramFsSem Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <_FrankLastCompileSem Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsSem)' == ''" />
+    </ItemGroup>
+
+    <!-- Step 2 Case A: Program.fs present. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)')) and '@(_FrankProgramFsSem)' != ''">
       <Compile Remove="@(_FrankProgramFsSem)" />
       <Compile Include="$(_FrankGeneratedSemFile)" />
       <Compile Include="@(_FrankProgramFsSem)" />
+    </ItemGroup>
+
+    <!-- Step 2 Case B: no Program.fs — insert before last item. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)')) and '@(_FrankProgramFsSem)' == '' and '@(_FrankLastCompileSem)' != ''">
+      <Compile Remove="@(_FrankLastCompileSem)" />
+      <Compile Include="$(_FrankGeneratedSemFile)" />
+      <Compile Include="@(_FrankLastCompileSem)" />
     </ItemGroup>
 
   </Target>
