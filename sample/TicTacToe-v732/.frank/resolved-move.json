@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "resolved": [
+    {
+      "fsharpType": "TicTacToe.Model.Move",
+      "iri": "schema:MoveAction",
+      "fields": [
+        { "name": "position", "iri": "schema:position" },
+        { "name": "agent", "iri": "schema:agent" }
+      ]
+    }
+  ]
+}

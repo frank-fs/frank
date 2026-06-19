@@ -1,25 +1,26 @@
 {
   "schemaVersion": 1,
-  "generated": "2026-06-13T00:00:00+00:00",
+  "generated": "2026-06-18T18:36:27+00:00",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
       "fetchedAt": "2026-06-13T00:00:00+00:00",
-      "hash": "sha256:abc"
+      "hash": "0f0c97a4f666b2f8563573fe48453782fd51b87a504523cf0c9aff6a71c3eec4"
     }
   },
   "mappings": [
     {
       "fsharpType": "TicTacToe.Model.Game",
       "iri": "schema:Game",
-      "confidence": 1.0,
+      "confidence": 1,
       "source": "convention",
       "status": "confirmed",
+      "alternates": [],
       "fields": [
         {
           "name": "identifier",
           "iri": "schema:identifier",
-          "confidence": 1.0,
+          "confidence": 1,
           "source": "convention",
           "status": "confirmed"
         }
@@ -28,22 +29,23 @@
     {
       "fsharpType": "TicTacToe.Model.Move",
       "iri": "schema:MoveAction",
-      "confidence": 0.9,
-      "source": "convention",
+      "confidence": 1,
+      "source": "llm",
       "status": "confirmed",
+      "alternates": [],
       "fields": [
         {
           "name": "position",
           "iri": "schema:position",
-          "confidence": 0.9,
-          "source": "convention",
+          "confidence": 1,
+          "source": "llm",
           "status": "confirmed"
         },
         {
           "name": "agent",
           "iri": "schema:agent",
-          "confidence": 0.9,
-          "source": "convention",
+          "confidence": 1,
+          "source": "llm",
           "status": "confirmed"
         }
       ]
@@ -51,9 +53,10 @@
     {
       "fsharpType": "TicTacToe.Model.MoveLog`1",
       "iri": "schema:ItemList",
-      "confidence": 1.0,
+      "confidence": 1,
       "source": "manual",
       "status": "confirmed",
+      "alternates": [],
       "fields": []
     }
   ]
