@@ -6,6 +6,7 @@ open System.Reflection
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
+open Frank.Semantic.VocabFetcher
 open Frank.Cli.Core
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -294,6 +295,223 @@ let at4DeterminismTests =
                   let mappingsEqual = normalize lf1 = normalize lf2
 
                   Expect.isTrue mappingsEqual "Two extracts must produce identical mappings"
+              finally
+                  Directory.Delete(tmpDir, true)
+          } ]
+
+// ── AT5: merge preserves excluded manual decisions ────────────────────────────
+
+[<Tests>]
+let at5ExcludedPreservationTests =
+    testList
+        "AT5 - merge preserves Excluded Manual decisions across re-extract"
+        [ test "Excluded+Manual entry survives re-extract unchanged" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProject tmpDir
+                  Directory.CreateDirectory(Path.GetDirectoryName lockFilePath) |> ignore
+
+                  let existingLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.UtcNow
+                        Vocabularies = Map.empty
+                        Mappings =
+                          [ { FSharpType = "FixtureApp.Order"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = Manual
+                              Status = Excluded
+                              Alternates = []
+                              Fields = [] } ] }
+
+                  LockFile.write lockFilePath existingLock
+
+                  Pipeline.run
+                      { ProjectFile = projectFile
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+                  |> ignore
+
+                  let updated = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+
+                  let order =
+                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Order")
+
+                  Expect.isSome order "Order mapping must be present after re-extract"
+                  let m = order.Value
+                  Expect.equal m.Status Excluded "Status must remain Excluded (decision must not be overwritten)"
+                  Expect.equal m.Source Manual "Source must remain Manual"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Excluded+Convention entry survives re-extract unchanged" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProject tmpDir
+                  Directory.CreateDirectory(Path.GetDirectoryName lockFilePath) |> ignore
+
+                  let existingLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.UtcNow
+                        Vocabularies = Map.empty
+                        Mappings =
+                          [ { FSharpType = "FixtureApp.Order"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = Convention
+                              Status = Excluded
+                              Alternates = []
+                              Fields = [] } ] }
+
+                  LockFile.write lockFilePath existingLock
+
+                  Pipeline.run
+                      { ProjectFile = projectFile
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+                  |> ignore
+
+                  let updated = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+
+                  let order =
+                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Order")
+
+                  Expect.isSome order "Order mapping must be present after re-extract"
+                  let m = order.Value
+                  Expect.equal m.Status Excluded "Excluded status preserved regardless of Source"
+                  Expect.equal m.Source Convention "Source=Convention preserved on Excluded entry"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Confirmed+Convention entry IS overwritten by fresh convention proposal" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProject tmpDir
+                  Directory.CreateDirectory(Path.GetDirectoryName lockFilePath) |> ignore
+
+                  let existingLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.UtcNow
+                        Vocabularies = Map.empty
+                        Mappings =
+                          [ { FSharpType = "FixtureApp.Order"
+                              Iri = Some "https://schema.org/Order"
+                              Confidence = 0.9
+                              Source = Convention
+                              Status = Confirmed
+                              Alternates = []
+                              Fields = [] } ] }
+
+                  LockFile.write lockFilePath existingLock
+
+                  Pipeline.run
+                      { ProjectFile = projectFile
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+                  |> ignore
+
+                  let updated = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+
+                  let order =
+                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Order")
+
+                  Expect.isSome order "Order mapping must be present"
+                  let m = order.Value
+                  Expect.notEqual m.Status Confirmed "Confirmed+Convention must NOT be preserved (re-scored)"
+              finally
+                  Directory.Delete(tmpDir, true)
+          } ]
+
+// ── AT6 fixture (with `using`) ────────────────────────────────────────────────
+
+/// Minimal valid Turtle bytes — empty graph with a base prefix declaration.
+let private minimalTurtleBytes () : byte[] =
+    System.Text.Encoding.UTF8.GetBytes "@prefix schema: <https://schema.org/> .\n"
+
+/// Stub fetch: returns minimal Turtle bytes for any URI (no network).
+let private stubFetch: Fetch =
+    fun _uri ->
+        async { return Ok {| ContentType = Some "text/turtle"; Body = minimalTurtleBytes () |} }
+
+/// Writes a fixture with `using "schema"` so the pipeline puts schema in inScopePrefixes.
+let private writeFixtureProjectWithUsing (tmpDir: string) : string * string =
+    let domainSource =
+        """namespace FixtureApp
+
+type Game = { Id: int; Title: string }
+"""
+
+    let vocabSource =
+        """module Vocabulary
+open Frank.Semantic
+
+let registry =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        using "schema"
+    }
+"""
+
+    File.WriteAllText(Path.Combine(tmpDir, "Domain.fs"), domainSource)
+    File.WriteAllText(Path.Combine(tmpDir, "Vocabulary.fs"), vocabSource)
+
+    let fsprojContent =
+        """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Vocabulary.fs" />
+  </ItemGroup>
+</Project>
+"""
+
+    let projectFile = Path.Combine(tmpDir, "FixtureApp.fsproj")
+    File.WriteAllText(projectFile, fsprojContent)
+    let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
+    projectFile, lockFilePath
+
+// ── AT6: vocabularies block populated ────────────────────────────────────────
+
+[<Tests>]
+let at6VocabulariesTests =
+    testList
+        "AT6 - extract populates lock vocabularies block"
+        [ test "lock vocabularies contains schema prefix with uri and non-empty hash after extract" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProjectWithUsing tmpDir
+
+                  let result =
+                      Pipeline.runWithFetch
+                          stubFetch
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  Expect.isOk result "pipeline should succeed"
+                  let lf = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+                  let entry = Map.tryFind "schema" lf.Vocabularies
+                  Expect.isSome entry "Vocabularies must contain 'schema' prefix"
+                  let v = entry.Value
+                  Expect.equal v.Uri "https://schema.org/" "Uri must match registry prefix"
+                  Expect.isNotEmpty v.Hash "Hash must be non-empty"
               finally
                   Directory.Delete(tmpDir, true)
           } ]

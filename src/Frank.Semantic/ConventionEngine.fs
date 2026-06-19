@@ -130,6 +130,10 @@ module ConventionEngine =
     let canonicalName (name: string) : string =
         normalizeTokens name |> String.concat " "
 
+    /// Normalized-token key with no separator (for exact-identity comparison).
+    let private normKey (name: string) : string =
+        normalizeTokens name |> String.concat ""
+
     // ── Type name similarity ──────────────────────────────────────────────────
 
     /// Average JW of each type token against a class local name.
@@ -198,7 +202,7 @@ module ConventionEngine =
     // Explicit bound K=3: the algorithm considers at most 3 top candidates.
     let private topKCandidatesBound = 3
 
-    let private topK (candidates: (float * string) list) : (float * string) list =
+    let private topK (candidates: (float * 'a) list) : (float * 'a) list =
         candidates |> List.sortByDescending fst |> List.truncate topKCandidatesBound
 
     let private confirmationThreshold = 0.85
@@ -254,37 +258,6 @@ module ConventionEngine =
         { Classes = mergeTermMaps rdfsClasses schemaClasses
           Properties = mergeTermMaps rdfProperties schemaProperties }
 
-    // ── Field mapping construction ────────────────────────────────────────────
-
-    let private buildFieldMapping (properties: Map<string, string>) (field: FieldInfo) : FieldMapping =
-        if properties.IsEmpty then
-            { Name = field.Name
-              Iri = None
-              Confidence = 0.0
-              Source = Convention
-              Status = Unresolved }
-        else
-            let name = bestFieldName field
-
-            let best =
-                properties
-                |> Map.toSeq
-                |> Seq.map (fun (k, iri) -> jaroWinkler name k, iri)
-                |> Seq.maxBy fst
-
-            let conf, iri = best
-
-            let status =
-                if conf >= confirmationThreshold then Confirmed
-                elif conf > 0.0 then Proposed
-                else Unresolved
-
-            { Name = field.Name
-              Iri = Some iri
-              Confidence = conf
-              Source = Convention
-              Status = status }
-
     // ── CURIE reverse-resolution ──────────────────────────────────────────────
 
     /// Reverse-resolve an absolute Uri to a CURIE string using declared prefixes.
@@ -298,6 +271,45 @@ module ConventionEngine =
         |> Seq.tryFind (fun (_, baseUri) -> absUri.StartsWith(baseUri.AbsoluteUri, StringComparison.Ordinal))
         |> Option.map (fun (prefix, baseUri) -> $"{prefix}:{absUri.[baseUri.AbsoluteUri.Length ..]}")
         |> Option.defaultValue absUri
+
+    // ── Field mapping construction ────────────────────────────────────────────
+
+    let private buildFieldMapping
+        (prefixes: Map<string, Uri>)
+        (properties: Map<string, string>)
+        (field: FieldInfo)
+        : FieldMapping =
+        if properties.IsEmpty then
+            { Name = field.Name
+              Iri = None
+              Confidence = 0.0
+              Source = Convention
+              Status = Unresolved }
+        else
+            let name = bestFieldName field
+
+            let fieldKey =
+                field.Attributes
+                |> Map.tryFind "JsonPropertyName"
+                |> Option.defaultValue field.Name
+                |> normKey
+
+            let bestK, bestIri, conf =
+                properties
+                |> Map.toSeq
+                |> Seq.map (fun (k, iri) -> k, iri, jaroWinkler name k)
+                |> Seq.maxBy (fun (_, _, c) -> c)
+
+            let status =
+                if fieldKey = bestK then Confirmed
+                elif conf > 0.0 then Proposed
+                else Unresolved
+
+            { Name = field.Name
+              Iri = Some(toCurie prefixes (Uri bestIri))
+              Confidence = conf
+              Source = Convention
+              Status = status }
 
     // ── Explicit equivalentClass override ─────────────────────────────────────
 
@@ -316,7 +328,8 @@ module ConventionEngine =
 
             let fieldMappings =
                 if convention.Fields.IsEmpty && not typeInfo.Fields.IsEmpty then
-                    typeInfo.Fields |> List.map (buildFieldMapping terms.Properties)
+                    typeInfo.Fields
+                    |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
                 else
                     convention.Fields
 
@@ -349,31 +362,34 @@ module ConventionEngine =
                 emptyUnresolved
             else
                 let typeTokens = normalizeTokens typeInfo.LocalName
+                let typeKey = normKey typeInfo.LocalName
 
                 let candidates =
                     inScopeClasses
                     |> Map.toList
                     |> List.choose (fun (localName, classIri) ->
                         if hasTokenHit typeTokens localName then
-                            Some(combinedScore typeTokens typeInfo.Fields terms.Properties localName, classIri)
+                            Some(
+                                combinedScore typeTokens typeInfo.Fields terms.Properties localName,
+                                (localName, classIri)
+                            )
                         else
                             None)
                     |> topK
 
                 match candidates with
                 | [] -> emptyUnresolved
-                | (bestScore, bestIri) :: rest ->
-                    let alternates = rest |> List.map snd
-                    let fieldMappings = typeInfo.Fields |> List.map (buildFieldMapping terms.Properties)
+                | (bestScore, (bestLocal, bestIri)) :: rest ->
+                    let alternates = rest |> List.map (snd >> snd)
 
-                    let status =
-                        if bestScore >= confirmationThreshold then
-                            Confirmed
-                        else
-                            Proposed
+                    let fieldMappings =
+                        typeInfo.Fields
+                        |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
+
+                    let status = if typeKey = bestLocal then Confirmed else Proposed
 
                     { FSharpType = typeInfo.FullName
-                      Iri = Some bestIri
+                      Iri = Some(toCurie registry.Prefixes (Uri bestIri))
                       Confidence = bestScore
                       Source = Convention
                       Status = status

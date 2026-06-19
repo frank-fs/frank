@@ -215,6 +215,43 @@ let zeroResourcesTests =
           } ]
 
 [<Tests>]
+let excludedMappingTests =
+    testList
+        "SemanticModelEmitter — Excluded mappings generate nothing"
+        [ test "excluded mapping DU case absent; confirmed mapping DU case present" {
+              let twoMappingLock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.UtcNow
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = DateTimeOffset.UtcNow
+                              Hash = "sha256:test" } ]
+                    Mappings =
+                      [ { FSharpType = "MyApp.Game"
+                          Iri = Some "schema:Game"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Fields = [] }
+                        { FSharpType = "MyApp.Player"
+                          Iri = Some "schema:Player"
+                          Confidence = 0.9
+                          Source = Convention
+                          Status = Excluded
+                          Alternates = []
+                          Fields = [] } ] }
+
+              let result = SemanticModelEmitter.emit "MyApp.Generated" probeRegistry twoMappingLock
+              Expect.isOk result "emit should succeed with at least one confirmed class-mapped resource"
+              let source = unwrapOk result
+              Expect.stringContains source "| Game" "confirmed Game DU case present"
+              Expect.isFalse (source.Contains("| Player")) "excluded Player DU case absent"
+          } ]
+
+[<Tests>]
 let antiDriftHeaderTests =
     testList
         "SemanticModelEmitter — anti-drift guard header"

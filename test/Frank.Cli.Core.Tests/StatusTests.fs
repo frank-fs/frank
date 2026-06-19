@@ -28,7 +28,7 @@ let private lockWith (mappings: Mapping list) : LockFile.LockFile =
 let at5StatusTests =
     testList
         "AT5 - Status.format"
-        [ test "3 confirmed + 2 proposed + 1 unresolved produces correct counts" {
+        [ test "3 confirmed + 2 proposed + 1 unresolved + 2 excluded produces correct counts" {
               let lf =
                   lockWith
                       [ mapping "A" Confirmed
@@ -36,12 +36,15 @@ let at5StatusTests =
                         mapping "C" Confirmed
                         mapping "D" Proposed
                         mapping "E" Proposed
-                        mapping "F" Unresolved ]
+                        mapping "F" Unresolved
+                        mapping "G" Excluded
+                        mapping "H" Excluded ]
 
               let output = Status.format lf
               Expect.stringContains output "Confirmed:  3" "confirmed count"
               Expect.stringContains output "Proposed:   2" "proposed count"
               Expect.stringContains output "Unresolved: 1" "unresolved count"
+              Expect.stringContains output "Excluded:   2" "excluded count"
           }
 
           test "empty lock produces all-zero counts" {
@@ -50,4 +53,5 @@ let at5StatusTests =
               Expect.stringContains output "Confirmed:  0" "confirmed zero"
               Expect.stringContains output "Proposed:   0" "proposed zero"
               Expect.stringContains output "Unresolved: 0" "unresolved zero"
+              Expect.stringContains output "Excluded:   0" "excluded zero"
           } ]

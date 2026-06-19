@@ -401,6 +401,38 @@ let determinismTests =
                   r1 = r2)) ]
 
 [<Tests>]
+let excludedMappingTests =
+    testList
+        "DiscoveryEmitter — Excluded mappings generate nothing"
+        [ test "excluded mapping IRI absent; confirmed mapping IRI present" {
+              let twoMappingLock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.UtcNow
+                    Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    Mappings =
+                      [ { FSharpType = "MyApp.Game"
+                          Iri = Some "schema:Game"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Fields = [] }
+                        { FSharpType = "MyApp.Player"
+                          Iri = Some "schema:Player"
+                          Confidence = 0.9
+                          Source = Convention
+                          Status = Excluded
+                          Alternates = []
+                          Fields = [] } ] }
+
+              let result = DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry twoMappingLock
+              Expect.isOk result "emit should succeed"
+              let source = unwrapOk result
+              Expect.stringContains source "https://schema.org/Game" "confirmed Game IRI present"
+              Expect.isFalse (source.Contains("https://schema.org/Player")) "excluded Player IRI absent"
+          } ]
+
+[<Tests>]
 let homeResourcesAbsentTests =
     testList
         "DiscoveryEmitter — HomeResources absent from generated source"

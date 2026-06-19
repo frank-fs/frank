@@ -29,10 +29,18 @@ module LockFile =
         Map.ofList [ "convention", Convention; "llm", Llm; "manual", Manual ]
 
     let private statusToString =
-        Map.ofList [ Confirmed, "confirmed"; Proposed, "proposed"; Unresolved, "unresolved" ]
+        Map.ofList
+            [ Confirmed, "confirmed"
+              Proposed, "proposed"
+              Unresolved, "unresolved"
+              Excluded, "excluded" ]
 
     let private stringToStatus =
-        Map.ofList [ "confirmed", Confirmed; "proposed", Proposed; "unresolved", Unresolved ]
+        Map.ofList
+            [ "confirmed", Confirmed
+              "proposed", Proposed
+              "unresolved", Unresolved
+              "excluded", Excluded ]
 
     let mappingSourceToString (s: MappingSource) : string = Map.find s sourceToString
 
@@ -47,6 +55,8 @@ module LockFile =
         match Map.tryFind s stringToStatus with
         | Some v -> Ok v
         | None -> Error $"unknown mapping status '{s}'"
+
+    let isDecided (status: MappingStatus) : bool = status = Confirmed || status = Excluded
 
     // ── JSON deserialization (pure) ───────────────────────────────────────────
 
@@ -351,7 +361,8 @@ module LockFile =
     type StatusCounts =
         { Confirmed: int
           Proposed: int
-          Unresolved: int }
+          Unresolved: int
+          Excluded: int }
 
     let countByStatus (mappings: Mapping list) : StatusCounts =
         let tally (acc: StatusCounts) (m: Mapping) =
@@ -363,12 +374,14 @@ module LockFile =
             | Unresolved ->
                 { acc with
                     Unresolved = acc.Unresolved + 1 }
+            | Excluded -> { acc with Excluded = acc.Excluded + 1 }
 
         List.fold
             tally
             { Confirmed = 0
               Proposed = 0
-              Unresolved = 0 }
+              Unresolved = 0
+              Excluded = 0 }
             mappings
 
     // ── Pure merge ────────────────────────────────────────────────────────────

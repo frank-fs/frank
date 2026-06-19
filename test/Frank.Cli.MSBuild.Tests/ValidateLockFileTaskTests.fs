@@ -1,10 +1,13 @@
 module Frank.Cli.MSBuild.Tests.ValidateLockFileTaskTests
 
+open System
 open System.IO
 open Expecto
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
+open Frank.Semantic
+open Frank.Semantic.LockFile
 
 let private withTempDir (f: string -> unit) =
     let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
@@ -57,7 +60,129 @@ let validateTests =
                   let result = task.Execute()
                   Expect.isFalse result "Execute should return false"
                   let msg = engine.Errors |> List.map (fun e -> e.Message) |> String.concat ""
-                  Expect.stringContains msg "2 proposed/unresolved" "count includes mapping + field")
+                  Expect.stringContains msg "2 undecided" "count includes mapping + field")
+          }
+
+          test "AT5 excluded mapping passes: Execute returns true, no MS001" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+
+                  let excludedLock: LockFile =
+                      { confirmedLock with
+                          Mappings =
+                              confirmedLock.Mappings
+                              @ [ { FSharpType = "TicTacToe.Internal"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Excluded
+                                    Alternates = []
+                                    Fields = [] } ] }
+
+                  let lockPath = writeLockFile dir excludedLock
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true"
+                  Expect.isEmpty engine.Errors "no errors should be logged")
+          }
+
+          test "AT5b excluded mapping with proposed field passes: Execute returns true" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+
+                  let excludedWithProposedField: LockFile =
+                      { confirmedLock with
+                          Mappings =
+                              confirmedLock.Mappings
+                              @ [ { FSharpType = "TicTacToe.Internal"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Excluded
+                                    Alternates = []
+                                    Fields =
+                                      [ { Name = "privateField"
+                                          Iri = None
+                                          Confidence = 0.3
+                                          Source = Llm
+                                          Status = Proposed } ] } ] }
+
+                  let lockPath = writeLockFile dir excludedWithProposedField
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true"
+                  Expect.isEmpty engine.Errors "fields of excluded mappings are ignored")
+          }
+
+          test "AT4 proposed mapping fails: Execute returns false, MS001 logged" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+
+                  let proposedMappingLock: LockFile =
+                      { confirmedLock with
+                          Mappings =
+                              [ { FSharpType = "TicTacToe.Draft"
+                                  Iri = Some "schema:Thing"
+                                  Confidence = 0.6
+                                  Source = Llm
+                                  Status = Proposed
+                                  Alternates = []
+                                  Fields = [] } ] }
+
+                  let lockPath = writeLockFile dir proposedMappingLock
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isFalse result "Execute should return false"
+                  Expect.contains engine.ErrorCodes "MS001" "MS001 error code present")
+          }
+
+          test "AT4b unresolved mapping fails: Execute returns false, MS001 logged" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+
+                  let unresolvedMappingLock: LockFile =
+                      { confirmedLock with
+                          Mappings =
+                              [ { FSharpType = "TicTacToe.Ambiguous"
+                                  Iri = None
+                                  Confidence = 0.0
+                                  Source = Convention
+                                  Status = Unresolved
+                                  Alternates = []
+                                  Fields = [] } ] }
+
+                  let lockPath = writeLockFile dir unresolvedMappingLock
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isFalse result "Execute should return false"
+                  Expect.contains engine.ErrorCodes "MS001" "MS001 error code present")
+          }
+
+          test "confirmed mapping with proposed field fails: Execute returns false, MS001 logged" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+
+                  let confirmedWithProposedField: LockFile =
+                      { confirmedLock with
+                          Mappings =
+                              [ { FSharpType = "TicTacToe.Game"
+                                  Iri = Some "schema:Game"
+                                  Confidence = 1.0
+                                  Source = Convention
+                                  Status = Confirmed
+                                  Alternates = []
+                                  Fields =
+                                    [ { Name = "pendingField"
+                                        Iri = None
+                                        Confidence = 0.4
+                                        Source = Llm
+                                        Status = Proposed } ] } ] }
+
+                  let lockPath = writeLockFile dir confirmedWithProposedField
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isFalse result "Execute should return false"
+                  Expect.contains engine.ErrorCodes "MS001" "MS001 error code present")
           }
 
           test "missing lock file: Execute returns false, error logged" {

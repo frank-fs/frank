@@ -70,6 +70,18 @@ type StatusArgs =
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
 
+/// Arguments for the `frank semantic finalize` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type FinalizeArgs =
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+
 /// Arguments for the `frank semantic refresh` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
 type RefreshArgs =
@@ -89,6 +101,7 @@ type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Accept of ParseResults<AcceptArgs>
     | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshArgs>
     | [<CliPrefix(CliPrefix.None)>] Status of ParseResults<StatusArgs>
+    | [<CliPrefix(CliPrefix.None)>] Finalize of ParseResults<FinalizeArgs>
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -98,6 +111,7 @@ type SemanticArgs =
             | Accept _ -> "merge LLM/hand-resolved mappings into the lock file"
             | Refresh _ -> "re-fetch vocabularies and report hash drift"
             | Status _ -> "summarize lock-file mapping counts"
+            | Finalize _ -> "decide a draft lock: confirm exact matches, exclude the rest (zero LLM)"
 
 [<CliPrefix(CliPrefix.None)>]
 type FrankArgs =
@@ -300,6 +314,28 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
 
                             0
 
+let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
+    match lockPathFrom (args.TryGetResult FinalizeArgs.Lock_File) (args.TryGetResult FinalizeArgs.Project) with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lockPath ->
+        match read lockPath with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok lf ->
+            let updated, summary = Finalize.run lf
+            write lockPath updated
+
+            printfn
+                "Finalized: %d confirmed, %d excluded (%d already decided)"
+                summary.Confirmed
+                summary.Excluded
+                summary.AlreadyDecided
+
+            0
+
 let private handleStatus (args: ParseResults<StatusArgs>) : int =
     match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with
     | Error e ->
@@ -349,6 +385,7 @@ let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     | SemanticArgs.Accept acceptArgs -> handleAccept acceptArgs
     | SemanticArgs.Refresh refreshArgs -> handleRefresh refreshArgs
     | SemanticArgs.Status statusArgs -> handleStatus statusArgs
+    | SemanticArgs.Finalize finalizeArgs -> handleFinalize finalizeArgs
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 

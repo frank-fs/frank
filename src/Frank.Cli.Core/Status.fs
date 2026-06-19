@@ -4,4 +4,4 @@ open Frank.Semantic.LockFile
 
 let format (lf: LockFile) : string =
     let c = countByStatus lf.Mappings
-    $"Confirmed:  {c.Confirmed}\nProposed:   {c.Proposed}\nUnresolved: {c.Unresolved}"
+    $"Confirmed:  {c.Confirmed}\nProposed:   {c.Proposed}\nUnresolved: {c.Unresolved}\nExcluded:   {c.Excluded}"

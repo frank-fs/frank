@@ -240,6 +240,36 @@ let at6 =
         Expect.equal (VocabularyRegistry.tryFindProvClass typeof<Address> r) (Some ProvOClass.Agent) "Agent"
     }
 
+// AT-TRI: tryResolveIri edge cases.
+[<Tests>]
+let at_tri =
+    testList
+        "AT-TRI: tryResolveIri guards"
+        [ test "valid schema:Game expands to Ok(Some https://schema.org/Game)" {
+              let prefixes = Map.ofList [ "schema", Uri "https://schema.org/" ]
+
+              match VocabularyRegistry.tryResolveIri prefixes (Some "schema:Game") with
+              | Ok(Some uri) -> Expect.equal (uri.AbsoluteUri) "https://schema.org/Game" "expanded IRI"
+              | other -> failwith $"Expected Ok(Some uri), got {other}"
+          }
+
+          test "None input resolves to Ok None" {
+              let prefixes = Map.ofList [ "schema", Uri "https://schema.org/" ]
+
+              match VocabularyRegistry.tryResolveIri prefixes None with
+              | Ok None -> ()
+              | other -> failwith $"Expected Ok None, got {other}"
+          }
+
+          test "malformed expansion (local part with space) returns Error, not a bad Uri" {
+              // A local part containing a space produces an IRI that Uri.IsWellFormedUriString rejects.
+              let prefixes = Map.ofList [ "schema", Uri "https://schema.org/" ]
+
+              match VocabularyRegistry.tryResolveIri prefixes (Some "schema:bad local name") with
+              | Error msg -> Expect.stringContains msg "not a well-formed" "error must cite malformed IRI"
+              | Ok _ -> failwith "Expected Error for malformed expansion"
+          } ]
+
 // FsCheck property tests for include union laws.
 [<Tests>]
 let propertyTests =

@@ -694,29 +694,110 @@ let malformedShapeTests =
 
 [<Tests>]
 let countByStatusTests =
-    test "countByStatus: 2 Confirmed + 1 Proposed + 3 Unresolved" {
-        let make status : Mapping =
-            { FSharpType = "T"
-              Iri = None
-              Confidence = 0.0
-              Source = MappingSource.Convention
-              Status = status
-              Alternates = []
-              Fields = [] }
+    testList
+        "countByStatus"
+        [ test "2 Confirmed + 1 Proposed + 3 Unresolved" {
+              let make status : Mapping =
+                  { FSharpType = "T"
+                    Iri = None
+                    Confidence = 0.0
+                    Source = MappingSource.Convention
+                    Status = status
+                    Alternates = []
+                    Fields = [] }
 
-        let mappings =
-            [ make MappingStatus.Confirmed
-              make MappingStatus.Confirmed
-              make MappingStatus.Proposed
-              make MappingStatus.Unresolved
-              make MappingStatus.Unresolved
-              make MappingStatus.Unresolved ]
+              let mappings =
+                  [ make MappingStatus.Confirmed
+                    make MappingStatus.Confirmed
+                    make MappingStatus.Proposed
+                    make MappingStatus.Unresolved
+                    make MappingStatus.Unresolved
+                    make MappingStatus.Unresolved ]
 
-        let counts = LockFile.countByStatus mappings
-        Expect.equal counts.Confirmed 2 "Confirmed"
-        Expect.equal counts.Proposed 1 "Proposed"
-        Expect.equal counts.Unresolved 3 "Unresolved"
-    }
+              let counts = LockFile.countByStatus mappings
+              Expect.equal counts.Confirmed 2 "Confirmed"
+              Expect.equal counts.Proposed 1 "Proposed"
+              Expect.equal counts.Unresolved 3 "Unresolved"
+          }
+
+          test "Excluded count is tallied separately from other statuses" {
+              let make status : Mapping =
+                  { FSharpType = "T"
+                    Iri = None
+                    Confidence = 0.0
+                    Source = MappingSource.Convention
+                    Status = status
+                    Alternates = []
+                    Fields = [] }
+
+              let mappings =
+                  [ make MappingStatus.Confirmed
+                    make MappingStatus.Confirmed
+                    make MappingStatus.Proposed
+                    make MappingStatus.Unresolved
+                    make MappingStatus.Excluded
+                    make MappingStatus.Excluded ]
+
+              let counts = LockFile.countByStatus mappings
+              Expect.equal counts.Confirmed 2 "Confirmed"
+              Expect.equal counts.Proposed 1 "Proposed"
+              Expect.equal counts.Unresolved 1 "Unresolved"
+              Expect.equal counts.Excluded 2 "Excluded"
+          } ]
+
+// ── MappingStatus.Excluded ────────────────────────────────────────────────────
+
+[<Tests>]
+let excludedStatusTests =
+    testList
+        "MappingStatus.Excluded"
+        [ test "mappingStatusFromString 'excluded' → Ok Excluded" {
+              Expect.equal
+                  (LockFile.mappingStatusFromString "excluded")
+                  (Ok MappingStatus.Excluded)
+                  "excluded"
+          }
+
+          test "mappingStatusToString Excluded → 'excluded'" {
+              Expect.equal (LockFile.mappingStatusToString MappingStatus.Excluded) "excluded" "excluded"
+          }
+
+          test "Excluded round-trips through write/read with 'excluded' in JSON" {
+              let lf: LockFile.LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+                    Vocabularies = Map.empty
+                    Mappings =
+                      [ { FSharpType = "MyApp.Legacy"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = MappingSource.Manual
+                          Status = MappingStatus.Excluded
+                          Alternates = []
+                          Fields =
+                            [ { Name = "OldField"
+                                Iri = None
+                                Confidence = 0.0
+                                Source = MappingSource.Manual
+                                Status = MappingStatus.Excluded } ] } ] }
+
+              let path = Path.GetTempFileName()
+
+              try
+                  LockFile.write path lf
+                  let json = File.ReadAllText path
+                  Expect.stringContains json "\"status\": \"excluded\"" "JSON contains excluded status"
+
+                  match LockFile.read path with
+                  | Error e -> failtest $"read failed: {e}"
+                  | Ok result ->
+                      let m = result.Mappings.[0]
+                      Expect.equal m.Status MappingStatus.Excluded "mapping status is Excluded"
+                      let f = m.Fields.[0]
+                      Expect.equal f.Status MappingStatus.Excluded "field status is Excluded"
+              finally
+                  File.Delete path
+          } ]
 
 // ── vocab key sort ────────────────────────────────────────────────────────────
 

@@ -109,7 +109,14 @@ module VocabularyRegistry =
                 match Map.tryFind prefix prefixes with
                 | None ->
                     Error $"Unknown prefix '{prefix}' in IRI '{s}'. Declare it with: prefix \"{prefix}\" \"<uri>\""
-                | Some baseUri -> Ok(Some(Uri(baseUri.AbsoluteUri + local)))
+                | Some baseUri ->
+                    let expanded = baseUri.AbsoluteUri + local
+
+                    if Uri.IsWellFormedUriString(expanded, UriKind.Absolute) then
+                        Ok(Some(Uri expanded))
+                    else
+                        Error
+                            $"Expanded IRI '{expanded}' is not a well-formed absolute URI. Check that prefix '{prefix}' base has a trailing '/' or '#'."
 
     /// Look up EquivalentClass by Type.
     let tryFindEquivalentClass (t: Type) (r: VocabularyRegistry) =

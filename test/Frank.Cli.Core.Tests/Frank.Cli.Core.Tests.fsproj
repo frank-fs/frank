@@ -19,6 +19,7 @@
     <Compile Include="TypeIdentityTests.fs" />
     <Compile Include="RefreshTests.fs" />
     <Compile Include="StatusTests.fs" />
+    <Compile Include="FinalizeTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

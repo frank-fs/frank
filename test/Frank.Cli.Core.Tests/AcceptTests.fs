@@ -9,10 +9,23 @@ open Frank.Cli.Core
 
 let private emptyVocabs : Map<string, VocabularyEntry> = Map.empty
 
+let private schemaVocabs : Map<string, VocabularyEntry> =
+    Map.ofList
+        [ "schema",
+          { Uri = "https://schema.org/"
+            FetchedAt = System.DateTimeOffset.UnixEpoch
+            Hash = "stub" } ]
+
 let private mkLock (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
+      Mappings = mappings }
+
+let private mkLockWithVocabs (mappings: Mapping list) : LockFile =
+    { SchemaVersion = 1
+      Generated = System.DateTimeOffset.UnixEpoch
+      Vocabularies = schemaVocabs
       Mappings = mappings }
 
 let private unresolvedOrderLine : Mapping =
@@ -55,7 +68,7 @@ let acceptTests =
         "Accept"
         [ testCase "AT1: known type resolved — status Confirmed, source Llm, iri set"
           <| fun () ->
-              let lock = mkLock [ unresolvedOrderLine ]
+              let lock = mkLockWithVocabs [ unresolvedOrderLine ]
 
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
@@ -78,7 +91,7 @@ let acceptTests =
 
           testCase "AT3: unknown type rejected, not appended"
           <| fun () ->
-              let lock = mkLock [ unresolvedOrder ]
+              let lock = mkLockWithVocabs [ unresolvedOrder ]
 
               match Accept.parseResolved at3Json with
               | Error e -> failtest $"parseResolved failed: {e}"
@@ -97,7 +110,7 @@ let acceptTests =
 
           testCase "source manual — merged entry has Source=Manual"
           <| fun () ->
-              let lock = mkLock [ unresolvedOrderLine ]
+              let lock = mkLockWithVocabs [ unresolvedOrderLine ]
 
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
@@ -130,7 +143,7 @@ let acceptTests =
               let fieldNullIriJson =
                   """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":"schema:Order","fields":[{"name":"Total","iri":null}]}]}"""
 
-              let lock = mkLock [ unresolvedOrder ]
+              let lock = mkLockWithVocabs [ unresolvedOrder ]
 
               match Accept.parseResolved fieldNullIriJson with
               | Error e -> failtest $"parseResolved failed: {e}"
@@ -158,7 +171,7 @@ let acceptTests =
                     Alternates = []
                     Fields = [] }
 
-              let lock = mkLock [ alreadyConfirmed ]
+              let lock = mkLockWithVocabs [ alreadyConfirmed ]
 
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
@@ -199,6 +212,48 @@ let acceptTests =
               match Accept.parseResolved json with
               | Ok _ -> failtest "expected Error"
               | Error _ -> ()
+
+          testCase "FIX2: absolute iri rejected at accept time — not silently merged"
+          <| fun () ->
+              let absoluteIriJson =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.OrderLine","iri":"https://schema.org/MoveAction","fields":[]}]}"""
+
+              let lock = mkLockWithVocabs [ unresolvedOrderLine ]
+
+              match Accept.parseResolved absoluteIriJson with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let updated, summary = Accept.apply lock doc Llm
+                  Expect.equal summary.Merged 0 "absolute iri must not be merged"
+
+                  let rej =
+                      summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "MyApp.OrderLine")
+
+                  Expect.isSome rej "OrderLine must appear in Rejected"
+                  Expect.stringContains rej.Value.Reason "https://schema.org/MoveAction" "reason mentions the iri"
+
+                  let m =
+                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "MyApp.OrderLine")
+
+                  Expect.isSome m "lock entry must still exist"
+                  Expect.equal m.Value.Status Unresolved "lock entry unchanged (not merged)"
+
+          testCase "FIX2: valid CURIE iri merged correctly — not rejected"
+          <| fun () ->
+              let curieIriJson =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.OrderLine","iri":"schema:MoveAction","fields":[]}]}"""
+
+              let lock = mkLockWithVocabs [ unresolvedOrderLine ]
+
+              match Accept.parseResolved curieIriJson with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let updated, summary = Accept.apply lock doc Llm
+                  Expect.equal summary.Merged 1 "valid CURIE must be merged"
+                  Expect.equal summary.Rejected [] "no rejections for valid CURIE"
+                  let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
+                  Expect.equal m.Status Confirmed "merged entry is Confirmed"
+                  Expect.equal m.Iri (Some "schema:MoveAction") "iri stored as-is"
 
           testCase "json output: summaryToJson produces valid JSON with expected fields"
           <| fun () ->

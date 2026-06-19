@@ -145,6 +145,27 @@ let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) 
 
 // ── Public: apply ─────────────────────────────────────────────────────────────
 
+let private firstIriError (prefixes: Map<string, System.Uri>) (e: ResolvedEntry) : string option =
+    let classCheck =
+        match e.Iri with
+        | None -> None
+        | Some iri ->
+            match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
+            | Error msg -> Some $"unresolvable iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
+            | Ok _ -> None
+
+    match classCheck with
+    | Some _ -> classCheck
+    | None ->
+        e.Fields
+        |> List.tryPick (fun f ->
+            match f.Iri with
+            | None -> None
+            | Some iri ->
+                match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
+                | Error msg -> Some $"unresolvable field iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
+                | Ok _ -> None)
+
 let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
 
@@ -165,7 +186,19 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile *
             { FSharpType = e.FSharpType
               Reason = "iri is required for a confirmed mapping" })
 
-    let toMerge = inLock |> List.filter (fun e -> e.Iri.IsSome)
+    let withIri = inLock |> List.filter (fun e -> e.Iri.IsSome)
+
+    let prefixes =
+        lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
+
+    let unresolvableRejected, toMerge =
+        withIri |> List.partition (fun e -> firstIriError prefixes e |> Option.isSome)
+
+    let iriRejected =
+        unresolvableRejected
+        |> List.map (fun e ->
+            { FSharpType = e.FSharpType
+              Reason = firstIriError prefixes e |> Option.defaultValue "unresolvable iri" })
 
     let alreadyConfirmed =
         toMerge
@@ -189,7 +222,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile *
 
     let summary =
         { Merged = toMerge.Length
-          Rejected = notInLock @ nullIriRejected
+          Rejected = notInLock @ nullIriRejected @ iriRejected
           Unchanged = unchanged
           AlreadyConfirmed = alreadyConfirmed
           FieldsUnresolved = fieldsUnresolved }

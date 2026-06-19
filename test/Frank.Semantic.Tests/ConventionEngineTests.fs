@@ -250,7 +250,7 @@ let at2ProposedMapping =
         let mapping = ConventionEngine.score terms registry typeInfo
 
         Expect.equal mapping.Status MappingStatus.Proposed "status proposed"
-        Expect.equal mapping.Iri (Some "https://schema.org/Order") "best candidate is schema:Order"
+        Expect.equal mapping.Iri (Some "schema:Order") "best candidate is schema:Order"
 
         Expect.isTrue
             (mapping.Confidence >= 0.6 && mapping.Confidence < 0.85)
@@ -602,4 +602,136 @@ let explicitEquivalentClassTests =
               Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI overridden"
               Expect.isNonEmpty mapping.Fields "fields convention-scored"
               Expect.equal mapping.Fields.[0].Name "Position" "field name preserved"
+          } ]
+
+// ── Exact-identity confirm rule ───────────────────────────────────────────────
+
+[<Tests>]
+let exactIdentityConfirmTests =
+    testList
+        "Exact-identity confirm rule"
+        [ test "type fuzzy demote: Player vs play (JW=0.93) must be Proposed not Confirmed" {
+              // jaroWinkler "player" "play" = 0.933 clears the 0.85 token-hit gate.
+              // Field "Name" vs property "name" gives 100% field overlap so
+              // combined = 0.6*0.933 + 0.4*1.0 = 0.96 >= 0.85 — old code Confirms.
+              // New rule: "player" != "play" (token-concat != class local name) -> Proposed.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "play", "https://schema.org/Play" ]
+                    Properties = Map.ofList [ "name", "https://schema.org/name" ] }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Player"
+                    Namespace = "MyApp"
+                    LocalName = "Player"
+                    Fields =
+                      [ { Name = "Name"
+                          TypeName = "string"
+                          Attributes = Map.empty
+                          DocComment = None } ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                  }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Status MappingStatus.Proposed "fuzzy type match must be Proposed not Confirmed"
+              Expect.isSome mapping.Iri "IRI still surfaced as suggestion"
+              Expect.equal mapping.Iri (Some "schema:Play") "correct IRI"
+          }
+
+          test "field fuzzy demote: Total vs totalpaymentdue (JW=0.87) must be Proposed not Confirmed" {
+              // Type name Order exact-matches class "order" so the type is Confirmed.
+              // Field "Total": normKey("Total") = "total" != "totalpaymentdue"
+              // so the field must be Proposed. Old code confirmed it at JW 0.867 >= 0.85.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
+                    Properties = Map.ofList [ "totalpaymentdue", "https://schema.org/totalPaymentDue" ] }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Order"
+                    Namespace = "MyApp"
+                    LocalName = "Order"
+                    Fields =
+                      [ { Name = "Total"
+                          TypeName = "decimal"
+                          Attributes = Map.empty
+                          DocComment = None } ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                  }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Status MappingStatus.Confirmed "type is exact-match so Confirmed"
+              let fieldMapping = mapping.Fields |> List.head
+              Expect.equal fieldMapping.Status MappingStatus.Proposed "field fuzzy match must be Proposed not Confirmed"
+              Expect.isSome fieldMapping.Iri "field IRI surfaced as suggestion"
+              Expect.equal fieldMapping.Iri (Some "schema:totalPaymentDue") "correct field IRI"
+          }
+
+          test "type exact still confirms: Order token-concat equals class local name" {
+              // normalizeTokens "Order" = ["order"], concat = "order" = class key "order"
+              // so exact identity -> Confirmed regardless of combined score.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
+                    Properties = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Order"
+                    Namespace = "MyApp"
+                    LocalName = "Order"
+                    Fields = []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                  }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              Expect.equal mapping.Status MappingStatus.Confirmed "exact token identity -> Confirmed"
+          }
+
+          test "field exact still confirms: Name normKey equals property key" {
+              // normKey("Name") = "name" = property key "name" -> Confirmed.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
+                    Properties = Map.ofList [ "name", "https://schema.org/name" ] }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Order"
+                    Namespace = "MyApp"
+                    LocalName = "Order"
+                    Fields =
+                      [ { Name = "Name"
+                          TypeName = "string"
+                          Attributes = Map.empty
+                          DocComment = None } ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  vocabulary {
+                      prefix "schema" "https://schema.org/"
+                      using "schema"
+                  }
+
+              let mapping = ConventionEngine.score terms registry typeInfo
+
+              let fieldMapping = mapping.Fields |> List.head
+              Expect.equal fieldMapping.Status MappingStatus.Confirmed "exact field key -> Confirmed"
+              Expect.equal fieldMapping.Iri (Some "schema:name") "correct field IRI"
           } ]

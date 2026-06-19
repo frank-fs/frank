@@ -64,7 +64,8 @@ let private partitionMappings (mappings: Mapping list) : Mapping list * Mapping 
             match m.Status with
             | Unresolved -> (m :: unresolved, proposed)
             | Proposed -> (unresolved, m :: proposed)
-            | Confirmed -> (unresolved, proposed))
+            | Confirmed
+            | Excluded -> (unresolved, proposed))
         ([], [])
     |> fun (u, p) -> (List.rev u, List.rev p)
 

@@ -317,6 +317,69 @@ let at_rm8 =
                 Expect.isTrue uri.IsAbsoluteUri $"URI must be absolute: {uri}"
     }
 
+// ── AT-RM10: Excluded mappings are filtered out ──────────────────────────────
+
+[<Tests>]
+let at_rm10 =
+    test "AT-RM10: Excluded mappings are absent from model.Resources" {
+        let confirmed =
+            { mkMapping "MyApp.Game" (Some "schema:Game") [] with
+                Status = Confirmed }
+
+        let excluded =
+            { mkMapping "MyApp.Player" (Some "schema:Person") [] with
+                Status = Excluded }
+
+        let lock =
+            { lockWithSchema with
+                Mappings = [ confirmed; excluded ] }
+
+        match ResolvedModel.build baseRegistry lock with
+        | Error e -> failwith $"Expected Ok but got Error: {e}"
+        | Ok model ->
+            Expect.hasLength model.Resources 1 "only the Confirmed mapping is present"
+            Expect.equal (model.Resources |> List.head).FSharpType "MyApp.Game" "confirmed type present"
+    }
+
+// ── AT-RM-EF: excluded fields do not leak into built resource ────────────────
+
+[<Tests>]
+let at_rm_ef =
+    test "AT-RM-EF: Excluded fields on a Confirmed mapping are absent from built resource.Fields" {
+        let gameType = "MyApp.Game"
+
+        let confirmedField: FieldMapping =
+            { Name = "Name"
+              Iri = Some "schema:name"
+              Confidence = 1.0
+              Source = Convention
+              Status = Confirmed }
+
+        let excludedField: FieldMapping =
+            { Name = "Id"
+              Iri = Some "schema:Play"
+              Confidence = 0.5
+              Source = Convention
+              Status = Excluded }
+
+        let mapping =
+            { mkMapping gameType (Some "schema:Game") [ confirmedField; excludedField ] with
+                Status = Confirmed }
+
+        let lock =
+            { lockWithSchema with
+                Mappings = [ mapping ] }
+
+        match ResolvedModel.build baseRegistry lock with
+        | Error e -> failwith $"Expected Ok but got Error: {e}"
+        | Ok model ->
+            let res = model.Resources |> List.head
+            let fieldIris = res.Fields |> List.choose (fun f -> f.Iri) |> List.map string
+            Expect.hasLength res.Fields 1 "only the Confirmed field present"
+            Expect.equal (res.Fields |> List.head).Name "Name" "confirmed field present"
+            Expect.isFalse (fieldIris |> List.exists (fun s -> s.Contains "Play")) "schema:Play (excluded) must not appear"
+    }
+
 // ── AT-RM9: lock IRI self-contained resolution ────────────────────────────────
 
 [<Tests>]

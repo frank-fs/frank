@@ -178,7 +178,9 @@ module ResolvedModel =
         match VocabularyRegistry.tryResolveIri prefixes m.Iri with
         | Error e -> Error $"type '{m.FSharpType}': {e}"
         | Ok classIri ->
-            match buildFields prefixes registry m.FSharpType m.Fields with
+            let includedFields = m.Fields |> List.filter (fun f -> f.Status <> Excluded)
+
+            match buildFields prefixes registry m.FSharpType includedFields with
             | Error e -> Error e
             | Ok fields ->
                 let equivalentClass = registry.EquivalentClasses |> Map.tryFind m.FSharpType
@@ -248,8 +250,9 @@ module ResolvedModel =
 
     let build (registry: VocabularyRegistry) (lock: LockFile) : Result<ResolvedModel, string> =
         let lockIriPrefixes = lockPrefixes lock.Vocabularies
+        let included = lock.Mappings |> List.filter (fun m -> m.Status <> Excluded)
 
-        match buildResources lockIriPrefixes registry lock.Mappings with
+        match buildResources lockIriPrefixes registry included with
         | Error e -> Error e
         | Ok resources ->
             match checkLocalNameCollisions resources with

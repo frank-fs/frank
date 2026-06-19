@@ -98,7 +98,9 @@ let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list)
     let updatedExisting =
         existing
         |> List.map (fun m ->
-            let isProtected = m.Status = Confirmed && (m.Source = Llm || m.Source = Manual)
+            let isProtected =
+                m.Status = Excluded
+                || (m.Status = Confirmed && (m.Source = Llm || m.Source = Manual))
 
             match Map.tryFind m.FSharpType freshByType with
             | None -> m
@@ -115,11 +117,13 @@ let private summarize (mappings: Mapping list) : ExtractSummary = LockFile.count
 
 // ── Effectful steps ───────────────────────────────────────────────────────────
 
-/// Fetch all in-scope vocabularies and return merged VocabTerms.
-let private fetchVocabTerms (projectDir: string) (registry: VocabularyRegistry) : Async<Result<VocabTerms, string>> =
+/// Fetch all in-scope vocabularies and return merged VocabTerms with per-prefix entries.
+let private fetchVocabTerms
+    (fetch: VocabFetcher.Fetch)
+    (projectDir: string)
+    (registry: VocabularyRegistry)
+    : Async<Result<VocabTerms * Map<string, VocabularyEntry>, string>> =
     async {
-        use client = new HttpClient()
-        let fetch = VocabFetcher.httpFetch client
         let cacheDir = Path.Combine(projectDir, ".frank", "vocab")
         Directory.CreateDirectory cacheDir |> ignore
 
@@ -158,7 +162,21 @@ let private fetchVocabTerms (projectDir: string) (registry: VocabularyRegistry) 
                     { Classes = Map.empty
                       Properties = Map.empty }
 
-            return Ok terms
+            let vocabEntries =
+                List.zip inScopePrefixes (Array.toList results)
+                |> List.choose (fun ((prefix, uri), r) ->
+                    match r with
+                    | Ok cv ->
+                        Some(
+                            prefix,
+                            { Uri = uri.AbsoluteUri
+                              FetchedAt = DateTimeOffset.UtcNow
+                              Hash = cv.Hash }
+                        )
+                    | Error _ -> None)
+                |> Map.ofList
+
+            return Ok(terms, vocabEntries)
     }
 
 /// Evaluate the registry binding. The VocabularyEvaluator handles fallback resolution.
@@ -174,12 +192,18 @@ let private extractFromFiles (sourceFiles: string list) : Result<TypeInfo list, 
     Extractor.extractTypeInfosFromSource combined
 
 /// Write the updated lock file to disk.
-let private writeLock (lockPath: string) (existing: LockFile) (fresh: Mapping list) : ExtractSummary =
+let private writeLock
+    (lockPath: string)
+    (existing: LockFile)
+    (fresh: Mapping list)
+    (vocabularies: Map<string, VocabularyEntry>)
+    : ExtractSummary =
     let merged = mergeWithPreservation existing.Mappings fresh
 
     let updated =
         { existing with
             Generated = DateTimeOffset.UtcNow
+            Vocabularies = vocabularies
             Mappings = merged }
 
     Directory.CreateDirectory(Path.GetDirectoryName lockPath) |> ignore
@@ -188,9 +212,8 @@ let private writeLock (lockPath: string) (existing: LockFile) (fresh: Mapping li
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
-/// Run the extract pipeline.
-/// No child processes; all FCS evaluation is in-process.
-let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
+/// Pipeline core with the vocabulary fetcher injected. `run` wraps this with the production HttpClient-backed fetcher.
+let internal runWithFetch (fetch: VocabFetcher.Fetch) (opts: ExtractOptions) : Result<ExtractSummary, string> =
     let projectFile = Path.GetFullPath opts.ProjectFile
 
     if not (File.Exists projectFile) then
@@ -218,11 +241,17 @@ let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
 
                         let projectDir = Path.GetDirectoryName projectFile
 
-                        match fetchVocabTerms projectDir registry |> Async.RunSynchronously with
+                        match fetchVocabTerms fetch projectDir registry |> Async.RunSynchronously with
                         | Error e -> Error $"vocab fetch failed: {e}"
-                        | Ok terms ->
+                        | Ok(terms, vocabEntries) ->
 
                             let freshMappings = typeInfos |> List.map (ConventionEngine.score terms registry)
                             let lockPath = lockFilePath projectFile
                             let existingLock = readOrEmptyLock lockPath
-                            Ok(writeLock lockPath existingLock freshMappings)
+                            Ok(writeLock lockPath existingLock freshMappings vocabEntries)
+
+/// Run the extract pipeline.
+/// No child processes; all FCS evaluation is in-process.
+let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
+    use client = new HttpClient()
+    runWithFetch (VocabFetcher.httpFetch client) opts

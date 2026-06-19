@@ -25,15 +25,15 @@ type ValidateLockFileTask() =
                 this.Log.LogError($"ValidateLockFileTask: could not read lock file: {msg}")
                 false
             | Ok lock ->
-                let nonConfirmedMappings =
-                    lock.Mappings |> List.filter (fun m -> m.Status <> Confirmed)
+                let draftMappings = lock.Mappings |> List.filter (fun m -> not (isDecided m.Status))
 
-                let nonConfirmedFields =
+                let draftFields =
                     lock.Mappings
+                    |> List.filter (fun m -> m.Status <> Excluded)
                     |> List.collect (fun m -> m.Fields)
-                    |> List.filter (fun f -> f.Status <> Confirmed)
+                    |> List.filter (fun f -> not (isDecided f.Status))
 
-                let total = nonConfirmedMappings.Length + nonConfirmedFields.Length
+                let total = draftMappings.Length + draftFields.Length
 
                 if total > 0 then
                     this.Log.LogError(
@@ -46,7 +46,7 @@ type ValidateLockFileTask() =
                         endLineNumber = 0,
                         endColumnNumber = 0,
                         message =
-                            $"Lock file has {total} proposed/unresolved mapping(s); run 'frank semantic clarify' to resolve.",
+                            $"Lock file has {total} undecided (proposed/unresolved) mapping(s); run 'frank semantic finalize' (zero-LLM) or 'frank semantic clarify' (LLM) to decide.",
                         messageArgs = [||]
                     )
 

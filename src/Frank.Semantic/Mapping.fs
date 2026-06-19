@@ -24,11 +24,13 @@ type MappingSource =
     | Llm
     | Manual
 
-/// Confidence threshold result. B5 serializes these as "confirmed" | "proposed" | "unresolved".
+/// Confidence threshold result. B5 serializes these as "confirmed" | "proposed" | "unresolved" | "excluded".
+/// confirmed = asserted equivalence; proposed = suggestion (not asserted); unresolved = no candidate found; excluded = deliberately no external mapping (decided-absent).
 type MappingStatus =
     | Confirmed
     | Proposed
     | Unresolved
+    | Excluded
 
 /// Resolved mapping for a single field.
 type FieldMapping =
