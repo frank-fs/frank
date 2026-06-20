@@ -156,7 +156,8 @@ let at5ThresholdRule =
                       Map.ofList
                           [ "ordereditem", "https://schema.org/orderedItem"
                             "totalpaymentdue", "https://schema.org/totalPaymentDue"
-                            "orderdate", "https://schema.org/orderDate" ] }
+                            "orderdate", "https://schema.org/orderDate" ]
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "Test.Order"
@@ -193,7 +194,8 @@ let at1ConfirmedMapping =
               Properties =
                 Map.ofList
                     [ "totalpaymentdue", "https://schema.org/totalPaymentDue"
-                      "ordereditem", "https://schema.org/orderedItem" ] }
+                      "ordereditem", "https://schema.org/orderedItem" ]
+              Individuals = Map.empty }
 
         let typeInfo: TypeInfo =
             { FullName = "MyApp.Order"
@@ -243,7 +245,8 @@ let at2ProposedMapping =
               Properties =
                 Map.ofList
                     [ "totalpaymentdue", "https://schema.org/totalPaymentDue"
-                      "ordereditem", "https://schema.org/orderedItem" ] }
+                      "ordereditem", "https://schema.org/orderedItem" ]
+              Individuals = Map.empty }
 
         let typeInfo: TypeInfo =
             { FullName = "MyApp.CustomerOrderRecord"
@@ -297,7 +300,8 @@ let at3UnresolvedMapping =
               Properties =
                 Map.ofList
                     [ "totalpaymentdue", "https://schema.org/totalPaymentDue"
-                      "ordereditem", "https://schema.org/orderedItem" ] }
+                      "ordereditem", "https://schema.org/orderedItem" ]
+              Individuals = Map.empty }
 
         let typeInfo: TypeInfo =
             { FullName = "MyApp.WidgetForge"
@@ -331,7 +335,8 @@ let at4JsonPropertyNameBoost =
     test "AT4: Total with JsonPropertyName(totalPaymentDue) scores higher than without" {
         let terms: VocabTerms =
             { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-              Properties = Map.ofList [ "totalpaymentdue", "https://schema.org/totalPaymentDue" ] }
+              Properties = Map.ofList [ "totalpaymentdue", "https://schema.org/totalPaymentDue" ]
+              Individuals = Map.empty }
 
         let registry =
             vocabulary {
@@ -432,7 +437,8 @@ let scopeFilteringTests =
     test "score ignores classes whose prefix is not in registry.Using" {
         let terms: VocabTerms =
             { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-              Properties = Map.empty }
+              Properties = Map.empty
+              Individuals = Map.empty }
 
         let typeInfo: TypeInfo =
             { FullName = "MyApp.Order"
@@ -460,7 +466,8 @@ let explicitEquivalentClassTests =
               // but the vocabulary declares equivalentClass typedefof<MoveLog<_>> "schema:ItemList"
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "TicTacToe.Model.MoveLog`1"
@@ -497,7 +504,8 @@ let explicitEquivalentClassTests =
           test "type WITHOUT equivalentClass entry keeps convention scoring" {
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Order"
@@ -522,7 +530,8 @@ let explicitEquivalentClassTests =
               // Verifies Map.tryFind works on the `1 suffix form used by generic type defs
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Container`1"
@@ -549,7 +558,8 @@ let explicitEquivalentClassTests =
               // with prefix schema -> https://schema.org/ produces "schema:ItemList"
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Thing`1"
@@ -573,7 +583,8 @@ let explicitEquivalentClassTests =
           test "no matching prefix falls back to absolute URI string" {
               let terms: VocabTerms =
                   { Classes = Map.empty
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Foo"
@@ -597,7 +608,8 @@ let explicitEquivalentClassTests =
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
                     Properties =
-                      Map.ofList [ "name", "https://schema.org/name"; "position", "https://schema.org/position" ] }
+                      Map.ofList [ "name", "https://schema.org/name"; "position", "https://schema.org/position" ]
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Log`1"
@@ -637,7 +649,8 @@ let exactIdentityConfirmTests =
               // New rule: "player" != "play" (token-concat != class local name) -> Proposed.
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "play", "https://schema.org/Play" ]
-                    Properties = Map.ofList [ "name", "https://schema.org/name" ] }
+                    Properties = Map.ofList [ "name", "https://schema.org/name" ]
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Player"
@@ -670,7 +683,8 @@ let exactIdentityConfirmTests =
               // so the field must be Proposed. Old code confirmed it at JW 0.867 >= 0.85.
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-                    Properties = Map.ofList [ "totalpaymentdue", "https://schema.org/totalPaymentDue" ] }
+                    Properties = Map.ofList [ "totalpaymentdue", "https://schema.org/totalPaymentDue" ]
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Order"
@@ -704,7 +718,8 @@ let exactIdentityConfirmTests =
               // so exact identity -> Confirmed regardless of combined score.
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-                    Properties = Map.empty }
+                    Properties = Map.empty
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Order"
@@ -729,7 +744,8 @@ let exactIdentityConfirmTests =
               // normKey("Name") = "name" = property key "name" -> Confirmed.
               let terms: VocabTerms =
                   { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
-                    Properties = Map.ofList [ "name", "https://schema.org/name" ] }
+                    Properties = Map.ofList [ "name", "https://schema.org/name" ]
+                    Individuals = Map.empty }
 
               let typeInfo: TypeInfo =
                   { FullName = "MyApp.Order"
@@ -754,4 +770,29 @@ let exactIdentityConfirmTests =
               let fieldMapping = mapping.Fields |> List.head
               Expect.equal fieldMapping.Status MappingStatus.Confirmed "exact field key -> Confirmed"
               Expect.equal fieldMapping.Iri (Some "schema:name") "correct field IRI"
+          } ]
+
+[<Tests>]
+let individualExtractionTests =
+    testList
+        "VocabTerms.Individuals"
+        [ test "owl:NamedIndividual surfaces as an individual" {
+              let jsonld =
+                  """
+                  { "@context": { "owl": "http://www.w3.org/2002/07/owl#" },
+                    "@graph": [
+                      { "@id": "https://ex.org/X", "@type": "owl:NamedIndividual" },
+                      { "@id": "https://ex.org/O", "@type": "owl:NamedIndividual" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Individuals.ContainsKey "x") "x individual present"
+              Expect.equal terms.Individuals.["x"] "https://ex.org/X" "x IRI"
+              Expect.isTrue (terms.Individuals.ContainsKey "o") "o individual present"
           } ]

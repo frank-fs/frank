@@ -3,11 +3,12 @@ namespace Frank.Semantic
 open System
 open VDS.RDF
 
-/// Extracted class/property local names from a vocabulary IGraph.
+/// Extracted class/property/individual local names from a vocabulary IGraph.
 /// Keys are lowercase local names; values are absolute IRI strings.
 type VocabTerms =
     { Classes: Map<string, string>
-      Properties: Map<string, string> }
+      Properties: Map<string, string>
+      Individuals: Map<string, string> }
 
 module ConventionEngine =
 
@@ -231,6 +232,8 @@ module ConventionEngine =
     let private schemaClassIri = "https://schema.org/Class"
     let private schemaPropertyIri = "https://schema.org/Property"
     let private rdfTypeIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    let private owlNamedIndividualIri = "http://www.w3.org/2002/07/owl#NamedIndividual"
+    let private skosConceptIri = "http://www.w3.org/2004/02/skos/core#Concept"
 
     let private iriLocalName (iri: string) : string =
         let hashIdx = iri.LastIndexOf('#')
@@ -258,17 +261,21 @@ module ConventionEngine =
     let private mergeTermMaps (a: Map<string, string>) (b: Map<string, string>) : Map<string, string> =
         Map.fold (fun acc k v -> Map.add k v acc) a b
 
-    /// Extract class and property local names from a vocabulary IGraph.
-    /// Recognizes rdfs:Class, rdf:Property, schema:Class, schema:Property typings.
+    /// Extract class, property, and individual local names from a vocabulary IGraph.
+    /// Recognizes rdfs:Class, rdf:Property, schema:Class, schema:Property typings,
+    /// plus owl:NamedIndividual and skos:Concept as individuals (enumerated values).
     /// Keys are lowercase local names; values are absolute IRI strings.
     let extractVocabTerms (graph: IGraph) : VocabTerms =
         let rdfsClasses = collectByTypeIri rdfsClassIri graph
         let schemaClasses = collectByTypeIri schemaClassIri graph
         let rdfProperties = collectByTypeIri rdfPropertyIri graph
         let schemaProperties = collectByTypeIri schemaPropertyIri graph
+        let owlIndividuals = collectByTypeIri owlNamedIndividualIri graph
+        let skosConcepts = collectByTypeIri skosConceptIri graph
 
         { Classes = mergeTermMaps rdfsClasses schemaClasses
-          Properties = mergeTermMaps rdfProperties schemaProperties }
+          Properties = mergeTermMaps rdfProperties schemaProperties
+          Individuals = mergeTermMaps owlIndividuals skosConcepts }
 
     // ── CURIE reverse-resolution ──────────────────────────────────────────────
 

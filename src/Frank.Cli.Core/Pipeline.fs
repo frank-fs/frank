@@ -158,9 +158,11 @@ let private fetchVocabTerms
                         let t = ConventionEngine.extractVocabTerms g
 
                         { Classes = Map.fold (fun m k v -> Map.add k v m) acc.Classes t.Classes
-                          Properties = Map.fold (fun m k v -> Map.add k v m) acc.Properties t.Properties })
+                          Properties = Map.fold (fun m k v -> Map.add k v m) acc.Properties t.Properties
+                          Individuals = Map.fold (fun m k v -> Map.add k v m) acc.Individuals t.Individuals })
                     { Classes = Map.empty
-                      Properties = Map.empty }
+                      Properties = Map.empty
+                      Individuals = Map.empty }
 
             let vocabEntries =
                 List.zip inScopePrefixes (Array.toList results)
