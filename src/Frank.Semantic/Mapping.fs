@@ -1,20 +1,31 @@
 namespace Frank.Semantic
 
-/// Input type: FCS-extracted field metadata. Populated by Frank.Cli.Core (B6).
-/// Defined here so Frank.Semantic (convention engine) and Frank.Cli.Core share one definition.
+/// Input type: FCS-extracted field/payload metadata. Populated by Frank.Cli.Core.
 type FieldInfo =
     { Name: string
       TypeName: string
       Attributes: Map<string, string>
       DocComment: string option }
 
-/// Input type: FCS-extracted type metadata. Populated by Frank.Cli.Core (B6).
-/// Defined here so Frank.Semantic (convention engine) and Frank.Cli.Core share one definition.
+/// One case of a discriminated union. Payload is [] for a nullary case.
+type CaseInfo =
+    { Name: string
+      Payload: FieldInfo list
+      Attributes: Map<string, string>
+      DocComment: string option }
+
+/// A type is either a product (record) or a sum (union). Preserves the
+/// type → cases → payload tree; never flattened into one field list.
+type TypeShape =
+    | Record of FieldInfo list
+    | Union of CaseInfo list
+
+/// Input type: FCS-extracted type metadata. Populated by Frank.Cli.Core.
 type TypeInfo =
     { FullName: string
       Namespace: string
       LocalName: string
-      Fields: FieldInfo list
+      Shape: TypeShape
       Attributes: Map<string, string>
       DocComment: string option }
 

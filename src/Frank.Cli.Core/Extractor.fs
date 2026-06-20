@@ -67,17 +67,36 @@ let private fieldToFieldInfo (field: FSharpField) : FieldInfo =
       Attributes = attrs
       DocComment = docCommentOf field.XmlDoc }
 
-let private unionCaseToFieldInfo (uc: FSharpUnionCase) : FieldInfo =
+// Payload field name priority: explicit label > generated name fallback to type name.
+// FCS gives generated names "Item", "Item1", ... for unlabeled payloads; we
+// keep the FCS field name only when the author supplied a label, otherwise we
+// fall back to the payload TYPE name so type-name tokens can drive the join.
+let private payloadFieldInfo (ucField: FSharpField) : FieldInfo =
     let typeName =
+        ucField.FieldType.Format FSharpDisplayContext.Empty |> normalizeTypeName
+
+    let isGenerated =
+        ucField.Name = "Item"
+        || (ucField.Name.StartsWith("Item", StringComparison.Ordinal)
+            && ucField.Name.Length > 4
+            && ucField.Name.[4..] |> Seq.forall Char.IsDigit)
+
+    let name = if isGenerated then typeName else ucField.Name
+
+    { Name = name
+      TypeName = typeName
+      Attributes = buildAttributeMap (Seq.append ucField.FieldAttributes ucField.PropertyAttributes)
+      DocComment = docCommentOf ucField.XmlDoc }
+
+let private unionCaseToCaseInfo (uc: FSharpUnionCase) : CaseInfo =
+    let payload =
         if uc.HasFields then
-            uc.Fields
-            |> Seq.map (fun f -> f.FieldType.Format FSharpDisplayContext.Empty |> normalizeTypeName)
-            |> String.concat " * "
+            uc.Fields |> Seq.map payloadFieldInfo |> Seq.toList
         else
-            "unit"
+            []
 
     { Name = uc.Name
-      TypeName = typeName
+      Payload = payload
       Attributes = buildAttributeMap uc.Attributes
       DocComment = docCommentOf uc.XmlDoc }
 
@@ -89,19 +108,17 @@ let private entityToTypeInfo (entity: FSharpEntity) : TypeInfo option =
     else
         let ns = entity.Namespace |> Option.defaultValue ""
 
-        let fields =
-            if entity.IsFSharpRecord then
-                entity.FSharpFields |> Seq.map fieldToFieldInfo |> Seq.toList
-            elif entity.IsFSharpUnion then
-                entity.UnionCases |> Seq.map unionCaseToFieldInfo |> Seq.toList
+        let shape =
+            if entity.IsFSharpUnion then
+                entity.UnionCases |> Seq.map unionCaseToCaseInfo |> Seq.toList |> Union
             else
-                []
+                entity.FSharpFields |> Seq.map fieldToFieldInfo |> Seq.toList |> Record
 
         Some
             { FullName = entity.TryFullName |> Option.defaultValue entity.LogicalName
               Namespace = ns
               LocalName = entity.LogicalName
-              Fields = fields
+              Shape = shape
               Attributes = buildAttributeMap entity.Attributes
               DocComment = docCommentOf entity.XmlDoc }
 

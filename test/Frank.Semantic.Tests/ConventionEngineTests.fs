@@ -163,11 +163,12 @@ let at5ThresholdRule =
                   { FullName = "Test.Order"
                     Namespace = "Test"
                     LocalName = "Order"
-                    Fields =
-                      [ { Name = "Total"
-                          TypeName = "decimal"
-                          Attributes = Map.empty
-                          DocComment = None } ]
+                    Shape =
+                      Record
+                          [ { Name = "Total"
+                              TypeName = "decimal"
+                              Attributes = Map.empty
+                              DocComment = None } ]
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -201,15 +202,16 @@ let at1ConfirmedMapping =
             { FullName = "MyApp.Order"
               Namespace = "MyApp"
               LocalName = "Order"
-              Fields =
-                [ { Name = "Total"
-                    TypeName = "decimal"
-                    Attributes = Map.empty
-                    DocComment = None }
-                  { Name = "LineItems"
-                    TypeName = "OrderLine list"
-                    Attributes = Map.empty
-                    DocComment = None } ]
+              Shape =
+                Record
+                    [ { Name = "Total"
+                        TypeName = "decimal"
+                        Attributes = Map.empty
+                        DocComment = None }
+                      { Name = "LineItems"
+                        TypeName = "OrderLine list"
+                        Attributes = Map.empty
+                        DocComment = None } ]
               Attributes = Map.empty
               DocComment = None }
 
@@ -252,15 +254,16 @@ let at2ProposedMapping =
             { FullName = "MyApp.CustomerOrderRecord"
               Namespace = "MyApp"
               LocalName = "CustomerOrderRecord"
-              Fields =
-                [ { Name = "Total"
-                    TypeName = "decimal"
-                    Attributes = Map.empty
-                    DocComment = None }
-                  { Name = "LineItems"
-                    TypeName = "OrderLine list"
-                    Attributes = Map.empty
-                    DocComment = None } ]
+              Shape =
+                Record
+                    [ { Name = "Total"
+                        TypeName = "decimal"
+                        Attributes = Map.empty
+                        DocComment = None }
+                      { Name = "LineItems"
+                        TypeName = "OrderLine list"
+                        Attributes = Map.empty
+                        DocComment = None } ]
               Attributes = Map.empty
               DocComment = None }
 
@@ -307,11 +310,12 @@ let at3UnresolvedMapping =
             { FullName = "MyApp.WidgetForge"
               Namespace = "MyApp"
               LocalName = "WidgetForge"
-              Fields =
-                [ { Name = "Sprocket"
-                    TypeName = "int"
-                    Attributes = Map.empty
-                    DocComment = None } ]
+              Shape =
+                Record
+                    [ { Name = "Sprocket"
+                        TypeName = "int"
+                        Attributes = Map.empty
+                        DocComment = None } ]
               Attributes = Map.empty
               DocComment = None }
 
@@ -348,21 +352,23 @@ let at4JsonPropertyNameBoost =
             { FullName = "MyApp.Order"
               Namespace = "MyApp"
               LocalName = "Order"
-              Fields =
-                [ { Name = "Total"
-                    TypeName = "decimal"
-                    Attributes = Map.ofList [ "JsonPropertyName", "totalPaymentDue" ]
-                    DocComment = None } ]
+              Shape =
+                Record
+                    [ { Name = "Total"
+                        TypeName = "decimal"
+                        Attributes = Map.ofList [ "JsonPropertyName", "totalPaymentDue" ]
+                        DocComment = None } ]
               Attributes = Map.empty
               DocComment = None }
 
         let typeWithoutAttr: TypeInfo =
             { typeWithAttr with
-                Fields =
-                    [ { Name = "Total"
-                        TypeName = "decimal"
-                        Attributes = Map.empty
-                        DocComment = None } ] }
+                Shape =
+                    Record
+                        [ { Name = "Total"
+                            TypeName = "decimal"
+                            Attributes = Map.empty
+                            DocComment = None } ] }
 
         let withAttr = ConventionEngine.score terms registry typeWithAttr
         let withoutAttr = ConventionEngine.score terms registry typeWithoutAttr
@@ -444,7 +450,7 @@ let scopeFilteringTests =
             { FullName = "MyApp.Order"
               Namespace = "MyApp"
               LocalName = "Order"
-              Fields = []
+              Shape = Record []
               Attributes = Map.empty
               DocComment = None }
 
@@ -473,7 +479,7 @@ let explicitEquivalentClassTests =
                   { FullName = "TicTacToe.Model.MoveLog`1"
                     Namespace = "TicTacToe.Model"
                     LocalName = "MoveLog"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -511,7 +517,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -537,7 +543,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Container`1"
                     Namespace = "MyApp"
                     LocalName = "Container"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -565,7 +571,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Thing`1"
                     Namespace = "MyApp"
                     LocalName = "Thing"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -590,7 +596,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Foo"
                     Namespace = "MyApp"
                     LocalName = "Foo"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -615,11 +621,12 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Log`1"
                     Namespace = "MyApp"
                     LocalName = "Log"
-                    Fields =
-                      [ { Name = "Position"
-                          TypeName = "int"
-                          Attributes = Map.empty
-                          DocComment = None } ]
+                    Shape =
+                      Record
+                          [ { Name = "Position"
+                              TypeName = "int"
+                              Attributes = Map.empty
+                              DocComment = None } ]
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -656,11 +663,12 @@ let exactIdentityConfirmTests =
                   { FullName = "MyApp.Player"
                     Namespace = "MyApp"
                     LocalName = "Player"
-                    Fields =
-                      [ { Name = "Name"
-                          TypeName = "string"
-                          Attributes = Map.empty
-                          DocComment = None } ]
+                    Shape =
+                      Record
+                          [ { Name = "Name"
+                              TypeName = "string"
+                              Attributes = Map.empty
+                              DocComment = None } ]
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -690,11 +698,12 @@ let exactIdentityConfirmTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Fields =
-                      [ { Name = "Total"
-                          TypeName = "decimal"
-                          Attributes = Map.empty
-                          DocComment = None } ]
+                    Shape =
+                      Record
+                          [ { Name = "Total"
+                              TypeName = "decimal"
+                              Attributes = Map.empty
+                              DocComment = None } ]
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -725,7 +734,7 @@ let exactIdentityConfirmTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Fields = []
+                    Shape = Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -751,11 +760,12 @@ let exactIdentityConfirmTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Fields =
-                      [ { Name = "Name"
-                          TypeName = "string"
-                          Attributes = Map.empty
-                          DocComment = None } ]
+                    Shape =
+                      Record
+                          [ { Name = "Name"
+                              TypeName = "string"
+                              Attributes = Map.empty
+                              DocComment = None } ]
                     Attributes = Map.empty
                     DocComment = None }
 

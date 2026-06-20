@@ -24,6 +24,12 @@ namespace MyApp
 type Status =
     | Pending
     | Shipped of trackingNumber: string
+
+type Move =
+    | XMove of position: SquarePosition
+    | OMove of SquarePosition
+
+and SquarePosition = { Row: int; Col: int }
 """
 
 let attributeSource =
@@ -85,25 +91,37 @@ let at1RecordTests =
               let result = Extractor.extractTypeInfosFromSource recordSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let names = order.Fields |> List.map _.Name
-              Expect.contains names "Total" "Total field"
-              Expect.contains names "LineItems" "LineItems field"
+
+              match order.Shape with
+              | Record fields ->
+                  let names = fields |> List.map (fun f -> f.Name)
+                  Expect.contains names "Total" "Total field"
+                  Expect.contains names "LineItems" "LineItems field"
+              | Union _ -> failwith "Order should be a Record"
           }
 
           test "Total field TypeName contains decimal" {
               let result = Extractor.extractTypeInfosFromSource recordSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let total = order.Fields |> List.find (fun f -> f.Name = "Total")
-              Expect.stringContains total.TypeName "decimal" "Total TypeName"
+
+              match order.Shape with
+              | Record fields ->
+                  let total = fields |> List.find (fun f -> f.Name = "Total")
+                  Expect.stringContains total.TypeName "decimal" "Total TypeName"
+              | Union _ -> failwith "Order should be a Record"
           }
 
           test "LineItems field TypeName mentions OrderLine" {
               let result = Extractor.extractTypeInfosFromSource recordSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let li = order.Fields |> List.find (fun f -> f.Name = "LineItems")
-              Expect.stringContains li.TypeName "OrderLine" "LineItems TypeName mentions OrderLine"
+
+              match order.Shape with
+              | Record fields ->
+                  let li = fields |> List.find (fun f -> f.Name = "LineItems")
+                  Expect.stringContains li.TypeName "OrderLine" "LineItems TypeName mentions OrderLine"
+              | Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT2: discriminated unions ─────────────────────────────────────────────────
@@ -111,44 +129,57 @@ let at1RecordTests =
 [<Tests>]
 let at2DuTests =
     testList
-        "AT2 - DU extraction"
-        [ test "Status is extracted" {
-              let result = Extractor.extractTypeInfosFromSource duSource
-              let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
-              let status = types |> List.tryFind (fun t -> t.LocalName = "Status")
-              Expect.isSome status "Status type present"
+        "AT2 - DU extraction (sum-aware)"
+        [ test "Status is a Union shape" {
+              let types = Expect.wantOk (Extractor.extractTypeInfosFromSource duSource) "extract"
+
+              let status = types |> List.find (fun t -> t.LocalName = "Status")
+
+              match status.Shape with
+              | Union cases ->
+                  let names = cases |> List.map (fun c -> c.Name)
+                  Expect.contains names "Pending" "Pending case"
+                  Expect.contains names "Shipped" "Shipped case"
+              | Record _ -> failwith "Status should be a Union"
           }
 
-          test "Status has Pending case as FieldInfo" {
-              let result = Extractor.extractTypeInfosFromSource duSource
-              let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
+          test "nullary case has empty payload" {
+              let types = Expect.wantOk (Extractor.extractTypeInfosFromSource duSource) "extract"
+
               let status = types |> List.find (fun t -> t.LocalName = "Status")
-              let pending = status.Fields |> List.tryFind (fun f -> f.Name = "Pending")
-              Expect.isSome pending "Pending case present"
+
+              match status.Shape with
+              | Union cases ->
+                  let pending = cases |> List.find (fun c -> c.Name = "Pending")
+                  Expect.isEmpty pending.Payload "Pending has no payload"
+              | Record _ -> failwith "Status should be a Union"
           }
 
-          test "Pending case TypeName is unit" {
-              let result = Extractor.extractTypeInfosFromSource duSource
-              let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
+          test "labeled payload uses the label as field name" {
+              let types = Expect.wantOk (Extractor.extractTypeInfosFromSource duSource) "extract"
+
               let status = types |> List.find (fun t -> t.LocalName = "Status")
-              let pending = status.Fields |> List.find (fun f -> f.Name = "Pending")
-              Expect.equal pending.TypeName "unit" "Pending TypeName is unit"
+
+              match status.Shape with
+              | Union cases ->
+                  let shipped = cases |> List.find (fun c -> c.Name = "Shipped")
+                  let f = shipped.Payload |> List.exactlyOne
+                  Expect.equal f.Name "trackingNumber" "label is the field name"
+                  Expect.stringContains f.TypeName "string" "payload type"
+              | Record _ -> failwith "Status should be a Union"
           }
 
-          test "Status has Shipped case as FieldInfo" {
-              let result = Extractor.extractTypeInfosFromSource duSource
-              let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
-              let status = types |> List.find (fun t -> t.LocalName = "Status")
-              let shipped = status.Fields |> List.tryFind (fun f -> f.Name = "Shipped")
-              Expect.isSome shipped "Shipped case present"
-          }
+          test "record type is a Record shape" {
+              let types = Expect.wantOk (Extractor.extractTypeInfosFromSource duSource) "extract"
 
-          test "Shipped case TypeName contains string" {
-              let result = Extractor.extractTypeInfosFromSource duSource
-              let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
-              let status = types |> List.find (fun t -> t.LocalName = "Status")
-              let shipped = status.Fields |> List.find (fun f -> f.Name = "Shipped")
-              Expect.stringContains shipped.TypeName "string" "Shipped TypeName contains string"
+              let sq = types |> List.find (fun t -> t.LocalName = "SquarePosition")
+
+              match sq.Shape with
+              | Record fields ->
+                  let names = fields |> List.map (fun f -> f.Name)
+                  Expect.contains names "Row" "Row field"
+                  Expect.contains names "Col" "Col field"
+              | Union _ -> failwith "SquarePosition should be a Record"
           } ]
 
 // ── AT3: attributes ───────────────────────────────────────────────────────────
@@ -161,16 +192,24 @@ let at3AttributeTests =
               let result = Extractor.extractTypeInfosFromSource attributeSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let total = order.Fields |> List.find (fun f -> f.Name = "Total")
-              Expect.isTrue (total.Attributes.ContainsKey "JsonPropertyName") "JsonPropertyName key present"
+
+              match order.Shape with
+              | Record fields ->
+                  let total = fields |> List.find (fun f -> f.Name = "Total")
+                  Expect.isTrue (total.Attributes.ContainsKey "JsonPropertyName") "JsonPropertyName key present"
+              | Union _ -> failwith "Order should be a Record"
           }
 
           test "Total JsonPropertyName value is total_paid" {
               let result = Extractor.extractTypeInfosFromSource attributeSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let total = order.Fields |> List.find (fun f -> f.Name = "Total")
-              Expect.equal total.Attributes.["JsonPropertyName"] "total_paid" "JsonPropertyName value"
+
+              match order.Shape with
+              | Record fields ->
+                  let total = fields |> List.find (fun f -> f.Name = "Total")
+                  Expect.equal total.Attributes.["JsonPropertyName"] "total_paid" "JsonPropertyName value"
+              | Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT4: doc comments ─────────────────────────────────────────────────────────
@@ -198,17 +237,25 @@ let at4DocCommentTests =
               let result = Extractor.extractTypeInfosFromSource docCommentSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let customer = order.Fields |> List.find (fun f -> f.Name = "Customer")
-              Expect.isSome customer.DocComment "Customer field DocComment present"
+
+              match order.Shape with
+              | Record fields ->
+                  let customer = fields |> List.find (fun f -> f.Name = "Customer")
+                  Expect.isSome customer.DocComment "Customer field DocComment present"
+              | Union _ -> failwith "Order should be a Record"
           }
 
           test "Customer field DocComment contains expected text" {
               let result = Extractor.extractTypeInfosFromSource docCommentSource
               let types = Expect.wantOk result "extractTypeInfosFromSource should succeed"
               let order = types |> List.find (fun t -> t.LocalName = "Order")
-              let customer = order.Fields |> List.find (fun f -> f.Name = "Customer")
-              let comment = customer.DocComment |> Option.defaultValue ""
-              Expect.stringContains comment "name" "Customer DocComment mentions name"
+
+              match order.Shape with
+              | Record fields ->
+                  let customer = fields |> List.find (fun f -> f.Name = "Customer")
+                  let comment = customer.DocComment |> Option.defaultValue ""
+                  Expect.stringContains comment "name" "Customer DocComment mentions name"
+              | Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT5: source-only filter ───────────────────────────────────────────────────

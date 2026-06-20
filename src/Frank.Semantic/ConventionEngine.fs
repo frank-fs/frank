@@ -147,6 +147,13 @@ module ConventionEngine =
     let private normKey (name: string) : string =
         normalizeTokens name |> String.concat ""
 
+    /// Record fields used for the field-mapping path. A union contributes no
+    /// record fields here (its cases are mapped separately in a later layer).
+    let private recordFields (typeInfo: TypeInfo) : FieldInfo list =
+        match typeInfo.Shape with
+        | Record fields -> fields
+        | Union _ -> []
+
     // ── Type name similarity ──────────────────────────────────────────────────
 
     /// Average JW of each type token against a class local name.
@@ -346,8 +353,8 @@ module ConventionEngine =
             let curie = toCurie registry.Prefixes explicitUri
 
             let fieldMappings =
-                if convention.Fields.IsEmpty && not typeInfo.Fields.IsEmpty then
-                    typeInfo.Fields
+                if convention.Fields.IsEmpty && not (recordFields typeInfo).IsEmpty then
+                    recordFields typeInfo
                     |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
                 else
                     convention.Fields
@@ -389,7 +396,7 @@ module ConventionEngine =
                     |> List.choose (fun (localName, classIri) ->
                         if hasTokenHit typeTokens localName then
                             Some(
-                                combinedScore typeTokens typeInfo.Fields terms.Properties localName,
+                                combinedScore typeTokens (recordFields typeInfo) terms.Properties localName,
                                 (localName, classIri)
                             )
                         else
@@ -402,7 +409,7 @@ module ConventionEngine =
                     let alternates = rest |> List.map (snd >> snd)
 
                     let fieldMappings =
-                        typeInfo.Fields
+                        recordFields typeInfo
                         |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
 
                     let status = if typeKey = bestLocal then Confirmed else Proposed
