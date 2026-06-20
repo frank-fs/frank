@@ -39,6 +39,17 @@ module private ServerSentEventGeneratorHelpers =
                    })
 
 type ServerSentEventGenerator =
+    /// <summary>
+    /// Initializes the SSE response stream: sets <c>Content-Type: text/event-stream</c>,
+    /// <c>Cache-Control: no-cache</c>, and (HTTP/1.1 only) <c>Connection: keep-alive</c>,
+    /// then flushes to the client. Idempotent per request — only the first call takes effect.
+    /// </summary>
+    /// <remarks>
+    /// Thread safety: <see cref="System.IO.Pipelines.PipeWriter"/> is not thread-safe.
+    /// Do not write to the same SSE stream from parallel tasks. The <c>datastar</c> CE
+    /// operation and <c>Datastar.*</c> helpers enforce sequential writes implicitly via
+    /// <c>task { }</c> linearization.
+    /// </remarks>
     static member StartServerEventStreamAsync(httpResponse: HttpResponse, cancellationToken: CancellationToken) =
         let task =
             backgroundTask {
@@ -96,6 +107,12 @@ type ServerSentEventGenerator =
                  else
                      Bytes.bFalse)
 
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                writer
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             writer
             |> ServerSentEvent.sendDataBytesLine
@@ -143,6 +160,12 @@ type ServerSentEventGenerator =
                      Bytes.bTrue
                  else
                      Bytes.bFalse)
+
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                bufWriter
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
 
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter
@@ -406,6 +429,12 @@ type ServerSentEventGenerator =
                  else
                      Bytes.bFalse)
 
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                bufWriter
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter
             |> ServerSentEvent.sendDataBytesLine
@@ -535,7 +564,10 @@ type ServerSentEventGenerator =
 
     static member ReadSignalsAsync(httpRequest: HttpRequest, cancellationToken: CancellationToken) =
         backgroundTask {
-            if HttpMethods.IsGet(httpRequest.Method) then
+            if
+                HttpMethods.IsGet(httpRequest.Method)
+                || HttpMethods.IsDelete(httpRequest.Method)
+            then
                 match httpRequest.Query.TryGetValue(Consts.DatastarKey) with
                 | true, stringValues when stringValues.Count > 0 -> return stringValues[0]
                 | _ -> return ""
@@ -543,9 +575,8 @@ type ServerSentEventGenerator =
                 try
                     use readResult = new StreamReader(httpRequest.Body)
                     return! readResult.ReadToEndAsync(cancellationToken)
-                with
-                | :? IOException -> return ""
-                | :? JsonException -> return ""
+                with :? IOException ->
+                    return ""
         }
 
     static member ReadSignalsAsync<'T>
@@ -553,7 +584,10 @@ type ServerSentEventGenerator =
         =
         task {
             try
-                if HttpMethods.IsGet(httpRequest.Method) then
+                if
+                    HttpMethods.IsGet(httpRequest.Method)
+                    || HttpMethods.IsDelete(httpRequest.Method)
+                then
                     match httpRequest.Query.TryGetValue(Consts.DatastarKey) with
                     | true, stringValues when stringValues.Count > 0 ->
                         return ValueSome(JsonSerializer.Deserialize<'T>(stringValues[0], jsonSerializerOptions))
@@ -563,9 +597,8 @@ type ServerSentEventGenerator =
                         JsonSerializer.DeserializeAsync<'T>(httpRequest.Body, jsonSerializerOptions, cancellationToken)
 
                     return (ValueSome t)
-            with
-            | :? IOException -> return ValueNone
-            | :? JsonException -> return ValueNone
+            with :? IOException ->
+                return ValueNone
         }
 
     //

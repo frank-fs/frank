@@ -928,3 +928,109 @@ let datastarTests =
             Expect.stringContains responseBody "event: datastar-patch-signals" "Should have patch-signals event"
             Expect.stringContains responseBody "data: signals {\"count\": 42}" "Should contain signals JSON"
     ]
+
+[<Tests>]
+let adrComplianceTests =
+    testList "ADR Compliance" [
+
+        testCase "ADR-Gap1: PatchElementsAsync emits viewTransitionSelector when UseViewTransition is true" <| fun () ->
+            let context = createMockContext()
+            let html = "<div id='target'>Content</div>"
+            let opts = { PatchElementsOptions.Defaults with UseViewTransition = true; ViewTransitionSelector = ValueSome "#main" }
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! ServerSentEventGenerator.PatchElementsAsync(context.Response, html, opts)
+            } |> (fun t -> t.Wait())
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: useViewTransition true" "Should emit useViewTransition"
+            Expect.stringContains responseBody "data: viewTransitionSelector #main" "Should emit viewTransitionSelector"
+
+        testCase "ADR-Gap1: PatchElementsAsync omits viewTransitionSelector when UseViewTransition is false" <| fun () ->
+            let context = createMockContext()
+            let opts = { PatchElementsOptions.Defaults with UseViewTransition = false; ViewTransitionSelector = ValueSome "#main" }
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! ServerSentEventGenerator.PatchElementsAsync(context.Response, "<div>x</div>", opts)
+            } |> (fun t -> t.Wait())
+            let responseBody = getResponseBody context
+            Expect.isFalse (responseBody.Contains("viewTransitionSelector")) "Should NOT emit viewTransitionSelector when UseViewTransition is false"
+
+        testCase "ADR-Gap1: streamPatchElementsWithOptions emits viewTransitionSelector" <| fun () ->
+            let context = createMockContext()
+            let opts = { PatchElementsOptions.Defaults with UseViewTransition = true; ViewTransitionSelector = ValueSome "#hero" }
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElementsWithOptions opts (fun tw ->
+                    tw.Write("<div id='target'>Content</div>")
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: viewTransitionSelector #hero" "TextWriter overload should emit viewTransitionSelector"
+
+        testCase "ADR-Gap1: streamPatchElementsToStreamWithOptions emits viewTransitionSelector" <| fun () ->
+            let context = createMockContext()
+            let opts = { PatchElementsOptions.Defaults with UseViewTransition = true; ViewTransitionSelector = ValueSome "#hero" }
+            let htmlBytes = System.Text.Encoding.UTF8.GetBytes("<div id='target'>Content</div>")
+            task {
+                do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
+                do! Datastar.streamPatchElementsToStreamWithOptions opts (fun stream ->
+                    stream.Write(htmlBytes, 0, htmlBytes.Length)
+                    Task.CompletedTask) context
+            } |> (fun t -> t.Wait())
+            let responseBody = getResponseBody context
+            Expect.stringContains responseBody "data: viewTransitionSelector #hero" "Stream overload should emit viewTransitionSelector"
+
+        testCase "ADR-Gap2: ReadSignalsAsync with DELETE reads from query parameter" <| fun () ->
+            let context = createMockContext()
+            context.Request.Method <- HttpMethods.Delete
+            let signals = """{"id":42}"""
+            context.Request.QueryString <- QueryString($"?datastar={Uri.EscapeDataString(signals)}")
+            let result =
+                ServerSentEventGenerator.ReadSignalsAsync(context.Request)
+                    .GetAwaiter().GetResult()
+            Expect.equal result signals "DELETE should read 'datastar' query param, not body"
+
+        testCase "ADR-Gap2: ReadSignalsAsync<T> with DELETE reads from query parameter" <| fun () ->
+            let context = createMockContext()
+            context.Request.Method <- HttpMethods.Delete
+            let signals = """{"id":42}"""
+            context.Request.QueryString <- QueryString($"?datastar={Uri.EscapeDataString(signals)}")
+            let result =
+                ServerSentEventGenerator.ReadSignalsAsync<{| id: int |}>(context.Request)
+                    .GetAwaiter().GetResult()
+            Expect.isTrue result.IsSome "DELETE with query param should parse signals"
+            Expect.equal result.Value.id 42 "Should correctly parse 'id' field"
+
+        testCase "ADR-Gap3: ReadSignalsAsync<T> propagates JsonException for invalid POST body" <| fun () ->
+            let context = createMockContext()
+            setRequestBody context """{"unclosed": """
+            context.Request.Method <- HttpMethods.Post
+
+            let mutable propagated = false
+            try
+                ServerSentEventGenerator.ReadSignalsAsync<{| id: int |}>(context.Request).Wait()
+            with
+            | :? AggregateException as ae when (ae.InnerException :? JsonException) ->
+                propagated <- true
+
+            Expect.isTrue propagated "ReadSignalsAsync<T> must propagate JsonException for invalid JSON (ADR §ReadSignals)"
+
+        testCase "ADR-Gap3: tryReadSignals returns ValueNone for POST with invalid JSON" <| fun () ->
+            let context = createMockContext()
+            setRequestBody context """{"unclosed": """
+            context.Request.Method <- HttpMethods.Post
+
+            let mutable result: voption<{| id: int |}> = ValueSome {| id = -1 |}
+            let resource =
+                ResourceBuilder("/test") {
+                    datastar HttpMethods.Post (fun ctx -> task {
+                        let! signals = Datastar.tryReadSignals<{| id: int |}> ctx
+                        result <- signals
+                    })
+                }
+            let endpoint = resource.Endpoints.[0] :?> Microsoft.AspNetCore.Routing.RouteEndpoint
+            endpoint.RequestDelegate.Invoke(context).Wait()
+
+            Expect.isTrue result.IsNone "tryReadSignals should return ValueNone for invalid JSON (try-semantics)"
+
+    ]
