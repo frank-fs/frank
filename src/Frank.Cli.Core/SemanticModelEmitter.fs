@@ -4,8 +4,6 @@ open System
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
-let private unmappedCaseIri = "urn:frank:unmapped"
-
 // ── Mapped resource tuple ─────────────────────────────────────────────────────
 
 /// A class-mapped resource with its ClassIri already unwrapped.
@@ -78,11 +76,11 @@ let private camel (s: string) : string =
     else
         string (Char.ToLowerInvariant s.[0]) + s.[1..]
 
-/// Render `let <type>CaseIri (x: FSharpType) : System.Uri = match x with ...`
+/// Render `let <type>CaseIri (x: FSharpType) : System.Uri option = match x with ...`
 /// over the REAL F# case constructors. Exhaustive → renaming a case breaks the build.
 /// When all cases are confirmed-with-IRI (exhaustive), no wildcard is emitted.
-/// When coverage is partial, a final `| _ -> System.Uri("urn:frank:unmapped")` arm
-/// is appended so the match compiles while still catching renames of the mapped cases.
+/// When coverage is partial, a final `| _ -> None` arm is appended so the match
+/// compiles while still catching renames of the mapped cases.
 let private renderCaseMatch (r: MappedResource) : string option =
     if r.Cases.IsEmpty then
         None
@@ -93,20 +91,20 @@ let private renderCaseMatch (r: MappedResource) : string option =
             r.Cases
             |> List.map (fun c ->
                 let ctor = if c.IsNullary then c.CaseName else c.CaseName + " _"
-                "    | " + ctor + " -> System.Uri(\"" + c.Iri.AbsoluteUri + "\")")
+                "    | " + ctor + " -> Some(System.Uri(\"" + c.Iri.AbsoluteUri + "\"))")
 
         let arms =
             if r.Cases.Length = r.UnionCaseCount then
                 mappedArms
             else
-                mappedArms @ [ "    | _ -> System.Uri(\"" + unmappedCaseIri + "\")" ]
+                mappedArms @ [ "    | _ -> None" ]
 
         Some(
             "let "
             + fnName
             + " (x: "
             + r.FSharpType
-            + ") : System.Uri =\n    match x with\n"
+            + ") : System.Uri option =\n    match x with\n"
             + String.concat "\n" arms
         )
 

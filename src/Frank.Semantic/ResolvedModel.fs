@@ -175,34 +175,50 @@ module ResolvedModel =
         : Result<ResolvedField list, string> =
         traverseResult (buildField prefixes registry fsharpType) fields
 
-    let private buildCases (prefixes: Map<string, Uri>) (cs: CaseMapping list) : ResolvedCase list =
-        cs
-        |> List.filter (fun c -> c.Status = Confirmed)
-        // Confirmed cases whose IRI fails to resolve are dropped (not errored):
-        // `accept` already validates Confirmed IRIs against declared prefixes, so
-        // this is defense-in-depth — such a case degrades to the generated `| _ ->`
-        // wildcard rather than aborting codegen for the whole module.
-        |> List.choose (fun c ->
-            match VocabularyRegistry.tryResolveIri prefixes c.Iri with
-            | Ok(Some iri) ->
+    let private buildCase
+        (prefixes: Map<string, Uri>)
+        (fsharpType: string)
+        (c: CaseMapping)
+        : Result<ResolvedCase option, string> =
+        match VocabularyRegistry.tryResolveIri prefixes c.Iri with
+        | Ok(Some iri) ->
+            Ok(
                 Some
                     { CaseName = c.Name
                       Iri = iri
                       IsNullary = c.Payload.IsEmpty }
-            | _ -> None)
+            )
+        | Ok None ->
+            // Confirmed but Iri=None: the lock is internally inconsistent (e.g. hand-edited).
+            // `accept` would have rejected this — surface as hard Error, not a silent drop.
+            Error $"type '{fsharpType}', case '{c.Name}': status is confirmed but no IRI is set (lock inconsistency)"
+        | Error _ ->
+            // IRI present but prefix unresolvable: defense-in-depth drop.
+            // `accept` already validates Confirmed IRIs against declared prefixes, so
+            // this is a last-resort guard — degrade to the generated `| _ ->` wildcard
+            // rather than aborting codegen for the whole module.
+            Ok None
 
-    let private buildResource
+    let private buildCases
+        (prefixes: Map<string, Uri>)
+        (fsharpType: string)
+        (cs: CaseMapping list)
+        : Result<ResolvedCase list, string> =
+        let confirmed = cs |> List.filter (fun c -> c.Status = Confirmed)
+
+        confirmed
+        |> traverseResult (buildCase prefixes fsharpType)
+        |> Result.map (List.choose id)
+
+    let private buildResolvedResource
         (prefixes: Map<string, Uri>)
         (registry: VocabularyRegistry)
         (m: Mapping)
+        (localName: string)
+        (genericArity: int)
+        (unionCaseCount: int)
+        (cases: ResolvedCase list)
         : Result<ResolvedResource, string> =
-        let localName, genericArity = parseLocalName m.FSharpType
-
-        let cases, unionCaseCount =
-            match m.Shape with
-            | MappingShape.Union cs -> buildCases prefixes cs, cs.Length
-            | MappingShape.Record _ -> [], 0
-
         match VocabularyRegistry.tryResolveIri prefixes m.Iri with
         | Error e -> Error $"type '{m.FSharpType}': {e}"
         | Ok classIri ->
@@ -228,6 +244,27 @@ module ResolvedModel =
                       Fields = fields
                       Cases = cases
                       UnionCaseCount = unionCaseCount }
+
+    let private buildResource
+        (prefixes: Map<string, Uri>)
+        (registry: VocabularyRegistry)
+        (m: Mapping)
+        : Result<ResolvedResource, string> =
+        let localName, genericArity = parseLocalName m.FSharpType
+
+        let unionCaseCount =
+            match m.Shape with
+            | MappingShape.Union cs -> cs.Length
+            | MappingShape.Record _ -> 0
+
+        let casesResult =
+            match m.Shape with
+            | MappingShape.Union cs -> buildCases prefixes m.FSharpType cs
+            | MappingShape.Record _ -> Ok []
+
+        match casesResult with
+        | Error e -> Error e
+        | Ok cases -> buildResolvedResource prefixes registry m localName genericArity unionCaseCount cases
 
     let private buildResources
         (prefixes: Map<string, Uri>)

@@ -323,9 +323,17 @@ let unionCaseEmissionTests =
 
               Expect.stringContains src "moveCaseIri" "case function name"
 
-              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "XMove arm over constructor"
+              Expect.stringContains
+                  src
+                  "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))"
+                  "XMove arm over constructor"
 
-              Expect.stringContains src "| OMove _ -> System.Uri(\"https://ex.org/OMove\")" "OMove arm over constructor"
+              Expect.stringContains
+                  src
+                  "| OMove _ -> Some(System.Uri(\"https://ex.org/OMove\"))"
+                  "OMove arm over constructor"
+
+              Expect.stringContains src ": System.Uri option" "return type is Uri option"
           }
 
           test "nullary union cases render without underscore" {
@@ -370,11 +378,14 @@ let unionCaseEmissionTests =
               let src =
                   Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
 
-              Expect.stringContains src "| Red -> System.Uri(\"https://ex.org/Red\")" "nullary Red arm, no underscore"
+              Expect.stringContains
+                  src
+                  "| Red -> Some(System.Uri(\"https://ex.org/Red\"))"
+                  "nullary Red arm, no underscore"
 
               Expect.stringContains
                   src
-                  "| Green -> System.Uri(\"https://ex.org/Green\")"
+                  "| Green -> Some(System.Uri(\"https://ex.org/Green\"))"
                   "nullary Green arm, no underscore"
 
               Expect.isFalse (src.Contains "| Red _ ->") "nullary case must NOT have a wildcard payload binding"
@@ -432,12 +443,10 @@ let unionCaseEmissionTests =
               let src =
                   Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
 
-              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "confirmed XMove arm"
+              Expect.stringContains src "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))" "confirmed XMove arm"
 
-              Expect.stringContains
-                  src
-                  "| _ -> System.Uri(\"urn:frank:unmapped\")"
-                  "trailing wildcard for the unconfirmed case"
+              Expect.stringContains src "| _ -> None" "trailing wildcard returns None for unconfirmed case"
+              Expect.isFalse (src.Contains "urn:frank:unmapped") "no dead-end urn:frank:unmapped in output"
 
               Expect.isFalse (src.Contains "OMove") "unconfirmed OMove must NOT appear in the match"
           } ]
@@ -535,8 +544,10 @@ let at4UnionCaseIriTests =
                   Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" exRegistry moveLock) "emit"
 
               Expect.stringContains src "moveCaseIri" "moveCaseIri function emitted"
-              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "XMove arm present"
-              Expect.stringContains src "| OMove _ -> System.Uri(\"https://ex.org/OMove\")" "OMove arm present"
+
+              Expect.stringContains src "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))" "XMove arm present"
+
+              Expect.stringContains src "| OMove _ -> Some(System.Uri(\"https://ex.org/OMove\"))" "OMove arm present"
 
               let errors = typecheckTwoSources moveDomainSrc src
               Expect.isEmpty errors $"generated union match must compile against real DU; diagnostics: {errors}"

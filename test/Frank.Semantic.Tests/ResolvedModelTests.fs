@@ -383,6 +383,47 @@ let at_rm_ef =
                 "schema:Play (excluded) must not appear"
     }
 
+// ── AT-RM-CI: confirmed case with Iri=None is a lock inconsistency → Error ────
+
+[<Tests>]
+let at_rm_ci =
+    test "AT-RM-CI: confirmed union case with Iri=None returns Error naming the case" {
+        let lock: LockFile =
+            { SchemaVersion = 1
+              Generated = DateTimeOffset.UtcNow
+              Vocabularies =
+                Map.ofList
+                    [ "ex",
+                      { Uri = "http://example.com/vocab#"
+                        FetchedAt = DateTimeOffset.UtcNow
+                        Hash = "test" } ]
+              Mappings =
+                [ { FSharpType = "MyApp.Color"
+                    Iri = Some "ex:Color"
+                    Confidence = 1.0
+                    Source = Convention
+                    Status = Confirmed
+                    Alternates = []
+                    Shape =
+                      MappingShape.Union
+                          [ { Name = "Red"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = Convention
+                              Status = Confirmed
+                              Payload = [] } ] } ] }
+
+        let registry =
+            { baseRegistry with
+                Prefixes = Map.ofList [ "ex", Uri "http://example.com/vocab#" ] }
+
+        match ResolvedModel.build registry lock with
+        | Ok _ -> failwith "Expected Error for confirmed case with Iri=None (lock inconsistency)"
+        | Error msg ->
+            Expect.stringContains msg "Red" "error mentions the case name"
+            Expect.stringContains msg "confirmed" "error mentions confirmed status"
+    }
+
 // ── AT-RM9: lock IRI self-contained resolution ────────────────────────────────
 
 [<Tests>]
