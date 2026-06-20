@@ -180,6 +180,20 @@ let at2DuTests =
                   Expect.contains names "Row" "Row field"
                   Expect.contains names "Col" "Col field"
               | Union _ -> failwith "SquarePosition should be a Record"
+          }
+
+          test "unlabeled payload falls back to the payload type name" {
+              let types = Expect.wantOk (Extractor.extractTypeInfosFromSource duSource) "extract"
+
+              let move = types |> List.find (fun t -> t.LocalName = "Move")
+
+              match move.Shape with
+              | Union cases ->
+                  let omove = cases |> List.find (fun c -> c.Name = "OMove")
+                  let f = omove.Payload |> List.exactlyOne
+                  Expect.equal f.Name "SquarePosition" "unlabeled payload → type name, not 'Item'"
+                  Expect.stringContains f.TypeName "SquarePosition" "payload TypeName"
+              | Record _ -> failwith "Move should be a Union"
           } ]
 
 // ── AT3: attributes ───────────────────────────────────────────────────────────

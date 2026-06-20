@@ -67,6 +67,16 @@ let private fieldToFieldInfo (field: FSharpField) : FieldInfo =
       Attributes = attrs
       DocComment = docCommentOf field.XmlDoc }
 
+let private localTypeName (t: string) : string =
+    let baseName =
+        match t.IndexOf('<') with
+        | -1 -> t
+        | i -> t.[.. i - 1]
+
+    match baseName.LastIndexOf('.') with
+    | -1 -> baseName
+    | i -> baseName.[i + 1 ..]
+
 // Payload field name priority: explicit label > generated name fallback to type name.
 // FCS gives generated names "Item", "Item1", ... for unlabeled payloads; we
 // keep the FCS field name only when the author supplied a label, otherwise we
@@ -81,7 +91,7 @@ let private payloadFieldInfo (ucField: FSharpField) : FieldInfo =
             && ucField.Name.Length > 4
             && ucField.Name.[4..] |> Seq.forall Char.IsDigit)
 
-    let name = if isGenerated then typeName else ucField.Name
+    let name = if isGenerated then localTypeName typeName else ucField.Name
 
     { Name = name
       TypeName = typeName
