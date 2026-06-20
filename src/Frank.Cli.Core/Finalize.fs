@@ -15,17 +15,34 @@ let private decideField (f: FieldMapping) : FieldMapping =
     | Proposed
     | Unresolved -> { f with Status = Excluded }
 
+let private decideCase (c: CaseMapping) : CaseMapping =
+    let payload = c.Payload |> List.map decideField
+
+    match c.Status with
+    | Confirmed
+    | Excluded -> { c with Payload = payload }
+    | Proposed
+    | Unresolved ->
+        { c with
+            Status = Excluded
+            Payload = payload }
+
+let private decideShape (shape: MappingShape) : MappingShape =
+    match shape with
+    | MappingShape.Record fs -> MappingShape.Record(List.map decideField fs)
+    | MappingShape.Union cases -> MappingShape.Union(List.map decideCase cases)
+
 let private decideMapping (m: Mapping) : Mapping =
-    let fields = m.Fields |> List.map decideField
+    let shape = decideShape m.Shape
 
     match m.Status with
     | Confirmed
-    | Excluded -> { m with Fields = fields }
+    | Excluded -> { m with Shape = shape }
     | Proposed
     | Unresolved ->
         { m with
             Status = Excluded
-            Fields = fields }
+            Shape = shape }
 
 /// Resolve a draft lock to all-decided: Confirmed stays; everything else Excluded.
 /// Deterministic, zero tokens. Pure.

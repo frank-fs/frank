@@ -71,7 +71,7 @@ let private stringLock: Frank.Semantic.LockFile.LockFile =
                 Source = Convention
                 Status = Confirmed
                 Alternates = []
-                Fields = [] } ] }
+                Shape = MappingShape.Record [] } ] }
 
 let private makeTaskItem (path: string) : ITaskItem =
     let mutable spec = path

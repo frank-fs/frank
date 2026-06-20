@@ -31,39 +31,41 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "identifier"
-                  Iri = Some "schema:identifier"
-                  Confidence = 1.0
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "status"
-                  Iri = None
-                  Confidence = 0.0
-                  Source = Convention
-                  Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "identifier"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "status"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "TicTacToe.Move"
             Iri = Some "schema:MoveAction"
             Confidence = 0.9
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "rowIndex"
-                  Iri = Some "schema:rowIndex"
-                  Confidence = 0.8
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "columnIndex"
-                  Iri = Some "schema:columnIndex"
-                  Confidence = 0.8
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "agent"
-                  Iri = Some "schema:agent"
-                  Confidence = 1.0
-                  Source = Convention
-                  Status = Confirmed } ] } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "rowIndex"
+                      Iri = Some "schema:rowIndex"
+                      Confidence = 0.8
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "columnIndex"
+                      Iri = Some "schema:columnIndex"
+                      Confidence = 0.8
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "agent"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
 
 let private schemaVocabEntry: VocabularyEntry =
     { Uri = "https://schema.org/"
@@ -84,12 +86,13 @@ let private singleTypeLock: LockFile =
           Source = Convention
           Status = Confirmed
           Alternates = []
-          Fields =
-            [ { Name = "bar"
-                Iri = Some "schema:bar"
-                Confidence = 1.0
-                Source = Convention
-                Status = Confirmed } ] }
+          Shape =
+            MappingShape.Record
+                [ { Name = "bar"
+                    Iri = Some "schema:bar"
+                    Confidence = 1.0
+                    Source = Convention
+                    Status = Confirmed } ] }
 
 // ── Result helpers ────────────────────────────────────────────────────────────
 
@@ -164,7 +167,7 @@ let private genMappingWithSchemaIri =
               Source = source
               Status = status
               Alternates = []
-              Fields = fields }
+              Shape = MappingShape.Record fields }
     }
 
 let private genLockWithSchemaIris =
@@ -280,7 +283,7 @@ let descriptorCountTests =
 
               let allFields =
                   ticTacToeLock.Mappings
-                  |> List.collect (fun m -> m.Fields)
+                  |> List.collect (fun m -> MappingShape.payloadFields m.Shape)
                   |> List.filter (fun f -> f.Iri.IsSome)
                   |> List.length
 
@@ -338,7 +341,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
-                        Fields = [] }
+                        Shape = MappingShape.Record [] }
 
               let result = DiscoveryEmitter.emit "My.Generated" "/alps" noRegistry lockWithUnknown
               Expect.isError result "unknown prefix must return Error"
@@ -359,7 +362,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Unresolved
                         Alternates = []
-                        Fields = [] }
+                        Shape = MappingShape.Record [] }
 
               let result =
                   DiscoveryEmitter.emit "My.Generated" "/alps" schemaRegistry lockWithNoneIri
@@ -416,16 +419,18 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
-                          Fields = [] }
+                          Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
                           Confidence = 0.9
                           Source = Convention
                           Status = Excluded
                           Alternates = []
-                          Fields = [] } ] }
+                          Shape = MappingShape.Record [] } ] }
 
-              let result = DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry twoMappingLock
+              let result =
+                  DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry twoMappingLock
+
               Expect.isOk result "emit should succeed"
               let source = unwrapOk result
               Expect.stringContains source "https://schema.org/Game" "confirmed Game IRI present"

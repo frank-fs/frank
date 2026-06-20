@@ -178,7 +178,9 @@ module ResolvedModel =
         match VocabularyRegistry.tryResolveIri prefixes m.Iri with
         | Error e -> Error $"type '{m.FSharpType}': {e}"
         | Ok classIri ->
-            let includedFields = m.Fields |> List.filter (fun f -> f.Status <> Excluded)
+            let includedFields =
+                MappingShape.activePayloadFields m.Shape
+                |> List.filter (fun f -> f.Status <> Excluded)
 
             match buildFields prefixes registry m.FSharpType includedFields with
             | Error e -> Error e

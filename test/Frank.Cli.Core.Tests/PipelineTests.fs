@@ -190,7 +190,7 @@ let at2MergeTests =
                               Source = Llm
                               Status = Confirmed
                               Alternates = []
-                              Fields = [] } ] }
+                              Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
 
@@ -324,7 +324,7 @@ let at5ExcludedPreservationTests =
                               Source = Manual
                               Status = Excluded
                               Alternates = []
-                              Fields = [] } ] }
+                              Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
 
@@ -367,7 +367,7 @@ let at5ExcludedPreservationTests =
                               Source = Convention
                               Status = Excluded
                               Alternates = []
-                              Fields = [] } ] }
+                              Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
 
@@ -410,7 +410,7 @@ let at5ExcludedPreservationTests =
                               Source = Convention
                               Status = Confirmed
                               Alternates = []
-                              Fields = [] } ] }
+                              Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
 
@@ -442,7 +442,12 @@ let private minimalTurtleBytes () : byte[] =
 /// Stub fetch: returns minimal Turtle bytes for any URI (no network).
 let private stubFetch: Fetch =
     fun _uri ->
-        async { return Ok {| ContentType = Some "text/turtle"; Body = minimalTurtleBytes () |} }
+        async {
+            return
+                Ok
+                    {| ContentType = Some "text/turtle"
+                       Body = minimalTurtleBytes () |}
+        }
 
 /// Writes a fixture with `using "schema"` so the pipeline puts schema in inScopePrefixes.
 let private writeFixtureProjectWithUsing (tmpDir: string) : string * string =

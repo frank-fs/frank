@@ -8,56 +8,56 @@ open Frank.Cli.Core
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-let private unresolvedField : FieldMapping =
+let private unresolvedField: FieldMapping =
     { Name = "Blah"
       Iri = None
       Confidence = 0.0
       Source = Convention
       Status = Unresolved }
 
-let private proposedField : FieldMapping =
+let private proposedField: FieldMapping =
     { Name = "Amount"
       Iri = Some "schema:price"
       Confidence = 0.72
       Source = Convention
       Status = Proposed }
 
-let private unresolvedMapping : Mapping =
+let private unresolvedMapping: Mapping =
     { FSharpType = "MyApp.Mystery"
       Iri = None
       Confidence = 0.0
       Source = Convention
       Status = Unresolved
       Alternates = [ "schema:Thing"; "schema:Event" ]
-      Fields = [ unresolvedField ] }
+      Shape = MappingShape.Record [ unresolvedField ] }
 
-let private proposedMapping : Mapping =
+let private proposedMapping: Mapping =
     { FSharpType = "MyApp.Order"
       Iri = Some "schema:Order"
       Confidence = 0.65
       Source = Convention
       Status = Proposed
       Alternates = [ "schema:OrderAction" ]
-      Fields = [ proposedField ] }
+      Shape = MappingShape.Record [ proposedField ] }
 
-let private confirmedMapping : Mapping =
+let private confirmedMapping: Mapping =
     { FSharpType = "MyApp.Customer"
       Iri = Some "schema:Person"
       Confidence = 0.91
       Source = Llm
       Status = Confirmed
       Alternates = []
-      Fields = [] }
+      Shape = MappingShape.Record [] }
 
-let private emptyVocabs : Map<string, VocabularyEntry> = Map.empty
+let private emptyVocabs: Map<string, VocabularyEntry> = Map.empty
 
-let private mixedLock : LockFile =
+let private mixedLock: LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
       Mappings = [ unresolvedMapping; proposedMapping; confirmedMapping ] }
 
-let private allConfirmedLock : LockFile =
+let private allConfirmedLock: LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
@@ -71,13 +71,13 @@ let clarifyTests =
         "Clarify"
         [ testCase "AT1: toJson mixed lock — schemaVersion 1, unresolved and proposed present, confirmed excluded"
           <| fun () ->
-              let json : string = Clarify.toJson mixedLock
-              let root : JsonNode = JsonNode.Parse json
+              let json: string = Clarify.toJson mixedLock
+              let root: JsonNode = JsonNode.Parse json
 
               Expect.equal (root.["schemaVersion"].GetValue<int>()) 1 "schemaVersion must be 1"
 
-              let unresolved : JsonArray = root.["unresolved"].AsArray()
-              let proposed : JsonArray = root.["proposed"].AsArray()
+              let unresolved: JsonArray = root.["unresolved"].AsArray()
+              let proposed: JsonArray = root.["proposed"].AsArray()
 
               Expect.equal unresolved.Count 1 "one unresolved entry"
               Expect.equal proposed.Count 1 "one proposed entry"
@@ -93,34 +93,22 @@ let clarifyTests =
               let allTypes = unresolvedTypes @ proposedTypes
               Expect.isFalse (List.contains "MyApp.Customer" allTypes) "confirmed type must not appear"
 
-              let unresolvedEntry : JsonNode = unresolved.[0]
+              let unresolvedEntry: JsonNode = unresolved.[0]
 
-              Expect.equal
-                  (unresolvedEntry.["fsharpType"].GetValue<string>())
-                  "MyApp.Mystery"
-                  "unresolved fsharpType"
+              Expect.equal (unresolvedEntry.["fsharpType"].GetValue<string>()) "MyApp.Mystery" "unresolved fsharpType"
 
-              let candidates : JsonArray = unresolvedEntry.["candidates"].AsArray()
+              let candidates: JsonArray = unresolvedEntry.["candidates"].AsArray()
               Expect.equal candidates.Count 2 "two candidates"
 
-              Expect.equal
-                  (candidates.[0].GetValue<string>())
-                  "schema:Thing"
-                  "first candidate"
+              Expect.equal (candidates.[0].GetValue<string>()) "schema:Thing" "first candidate"
 
-              let proposedEntry : JsonNode = proposed.[0]
+              let proposedEntry: JsonNode = proposed.[0]
 
-              Expect.equal
-                  (proposedEntry.["fsharpType"].GetValue<string>())
-                  "MyApp.Order"
-                  "proposed fsharpType"
+              Expect.equal (proposedEntry.["fsharpType"].GetValue<string>()) "MyApp.Order" "proposed fsharpType"
 
-              Expect.equal
-                  (proposedEntry.["currentCandidate"].GetValue<string>())
-                  "schema:Order"
-                  "currentCandidate"
+              Expect.equal (proposedEntry.["currentCandidate"].GetValue<string>()) "schema:Order" "currentCandidate"
 
-              let proposedCandidates : JsonArray = proposedEntry.["candidates"].AsArray()
+              let proposedCandidates: JsonArray = proposedEntry.["candidates"].AsArray()
               Expect.equal proposedCandidates.Count 1 "proposed entry has one candidate"
 
               Expect.equal
@@ -132,18 +120,18 @@ let clarifyTests =
 
           testCase "AT4: toJson all-confirmed lock — unresolved and proposed are empty arrays"
           <| fun () ->
-              let json : string = Clarify.toJson allConfirmedLock
-              let root : JsonNode = JsonNode.Parse json
+              let json: string = Clarify.toJson allConfirmedLock
+              let root: JsonNode = JsonNode.Parse json
 
-              let unresolved : JsonArray = root.["unresolved"].AsArray()
-              let proposed : JsonArray = root.["proposed"].AsArray()
+              let unresolved: JsonArray = root.["unresolved"].AsArray()
+              let proposed: JsonArray = root.["proposed"].AsArray()
 
               Expect.equal unresolved.Count 0 "unresolved must be empty"
               Expect.equal proposed.Count 0 "proposed must be empty"
 
           testCase "AT3: toMarkdown mixed lock — contains type names and table header"
           <| fun () ->
-              let md : string = Clarify.toMarkdown mixedLock
+              let md: string = Clarify.toMarkdown mixedLock
 
               Expect.stringContains md "MyApp.Mystery" "unresolved type name"
               Expect.stringContains md "MyApp.Order" "proposed type name"
@@ -152,29 +140,31 @@ let clarifyTests =
 
           testCase "field with Iri = None serializes iri as null"
           <| fun () ->
-              let lock : LockFile =
+              let lock: LockFile =
                   { mixedLock with
                       Mappings = [ unresolvedMapping ] }
 
-              let json : string = Clarify.toJson lock
-              let root : JsonNode = JsonNode.Parse json
-              let unresolved : JsonArray = root.["unresolved"].AsArray()
-              let fields : JsonArray = unresolved.[0].["fields"].AsArray()
+              let json: string = Clarify.toJson lock
+              let root: JsonNode = JsonNode.Parse json
+              let unresolved: JsonArray = root.["unresolved"].AsArray()
+              let fields: JsonArray = unresolved.[0].["fields"].AsArray()
               Expect.equal fields.Count 1 "one field"
-              let iriNode : JsonNode = fields.[0].["iri"]
+              let iriNode: JsonNode = fields.[0].["iri"]
+
               let iriIsNull =
                   isNull iriNode
                   || (iriNode :? JsonValue && (iriNode.AsValue().GetValue<obj>() |> isNull))
+
               Expect.isTrue iriIsNull "iri must be null for None"
 
           testCase "toResolvedTemplate — proposed and unresolved included, confirmed excluded, iris pre-filled"
           <| fun () ->
-              let json : string = Clarify.toResolvedTemplate mixedLock
-              let root : JsonNode = JsonNode.Parse json
+              let json: string = Clarify.toResolvedTemplate mixedLock
+              let root: JsonNode = JsonNode.Parse json
 
               Expect.equal (root.["schemaVersion"].GetValue<int>()) 1 "schemaVersion must be 1"
 
-              let resolved : JsonArray = root.["resolved"].AsArray()
+              let resolved: JsonArray = root.["resolved"].AsArray()
               Expect.equal resolved.Count 2 "proposed + unresolved = 2 entries"
 
               let types =
@@ -192,7 +182,7 @@ let clarifyTests =
 
               Expect.equal (orderEntry.["iri"].GetValue<string>()) "schema:Order" "proposed iri pre-filled"
 
-              let orderFields : JsonArray = orderEntry.["fields"].AsArray()
+              let orderFields: JsonArray = orderEntry.["fields"].AsArray()
               Expect.equal orderFields.Count 1 "one field on Order"
               Expect.equal (orderFields.[0].["name"].GetValue<string>()) "Amount" "field name"
               Expect.equal (orderFields.[0].["iri"].GetValue<string>()) "schema:price" "field iri pre-filled"
@@ -202,19 +192,20 @@ let clarifyTests =
                   |> Seq.cast<JsonNode>
                   |> Seq.find (fun n -> n.["fsharpType"].GetValue<string>() = "MyApp.Mystery")
 
-              let mysteryIriNode : JsonNode = mysteryEntry.["iri"]
+              let mysteryIriNode: JsonNode = mysteryEntry.["iri"]
 
               let mysteryIriIsNull =
                   isNull mysteryIriNode
-                  || (mysteryIriNode :? JsonValue && (mysteryIriNode.AsValue().GetValue<obj>() |> isNull))
+                  || (mysteryIriNode :? JsonValue
+                      && (mysteryIriNode.AsValue().GetValue<obj>() |> isNull))
 
               Expect.isTrue mysteryIriIsNull "unresolved iri is null"
 
-              let mysteryFields : JsonArray = mysteryEntry.["fields"].AsArray()
+              let mysteryFields: JsonArray = mysteryEntry.["fields"].AsArray()
               Expect.equal mysteryFields.Count 1 "one field on Mystery"
               Expect.equal (mysteryFields.[0].["name"].GetValue<string>()) "Blah" "field name"
 
-              let blahIriNode : JsonNode = mysteryFields.[0].["iri"]
+              let blahIriNode: JsonNode = mysteryFields.[0].["iri"]
 
               let blahIriIsNull =
                   isNull blahIriNode

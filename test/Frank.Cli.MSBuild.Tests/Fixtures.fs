@@ -20,24 +20,26 @@ let confirmedLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "identifier"
-                  Iri = Some "schema:identifier"
-                  Confidence = 1.0
-                  Source = Convention
-                  Status = Confirmed } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "identifier"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] }
           { FSharpType = "TicTacToe.Move"
             Iri = Some "schema:MoveAction"
             Confidence = 0.9
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "rowIndex"
-                  Iri = Some "schema:rowIndex"
-                  Confidence = 0.8
-                  Source = Convention
-                  Status = Confirmed } ] } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "rowIndex"
+                      Iri = Some "schema:rowIndex"
+                      Confidence = 0.8
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
 
 let proposedLock: LockFile =
     { confirmedLock with
@@ -48,12 +50,13 @@ let proposedLock: LockFile =
                 Source = Llm
                 Status = Proposed
                 Alternates = []
-                Fields =
-                  [ { Name = "identifier"
-                      Iri = Some "schema:identifier"
-                      Confidence = 0.5
-                      Source = Convention
-                      Status = Unresolved } ] } ] }
+                Shape =
+                  MappingShape.Record
+                      [ { Name = "identifier"
+                          Iri = Some "schema:identifier"
+                          Confidence = 0.5
+                          Source = Convention
+                          Status = Unresolved } ] } ] }
 
 let writeLockFile (dir: string) (lock: LockFile) : string =
     let path = System.IO.Path.Combine(dir, "semantic-mappings.lock.json")

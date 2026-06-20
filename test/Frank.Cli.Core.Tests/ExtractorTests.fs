@@ -93,11 +93,11 @@ let at1RecordTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let names = fields |> List.map (fun f -> f.Name)
                   Expect.contains names "Total" "Total field"
                   Expect.contains names "LineItems" "LineItems field"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           }
 
           test "Total field TypeName contains decimal" {
@@ -106,10 +106,10 @@ let at1RecordTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let total = fields |> List.find (fun f -> f.Name = "Total")
                   Expect.stringContains total.TypeName "decimal" "Total TypeName"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           }
 
           test "LineItems field TypeName mentions OrderLine" {
@@ -118,10 +118,10 @@ let at1RecordTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let li = fields |> List.find (fun f -> f.Name = "LineItems")
                   Expect.stringContains li.TypeName "OrderLine" "LineItems TypeName mentions OrderLine"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT2: discriminated unions ─────────────────────────────────────────────────
@@ -136,11 +136,11 @@ let at2DuTests =
               let status = types |> List.find (fun t -> t.LocalName = "Status")
 
               match status.Shape with
-              | Union cases ->
+              | TypeShape.Union cases ->
                   let names = cases |> List.map (fun c -> c.Name)
                   Expect.contains names "Pending" "Pending case"
                   Expect.contains names "Shipped" "Shipped case"
-              | Record _ -> failwith "Status should be a Union"
+              | TypeShape.Record _ -> failwith "Status should be a Union"
           }
 
           test "nullary case has empty payload" {
@@ -149,10 +149,10 @@ let at2DuTests =
               let status = types |> List.find (fun t -> t.LocalName = "Status")
 
               match status.Shape with
-              | Union cases ->
+              | TypeShape.Union cases ->
                   let pending = cases |> List.find (fun c -> c.Name = "Pending")
                   Expect.isEmpty pending.Payload "Pending has no payload"
-              | Record _ -> failwith "Status should be a Union"
+              | TypeShape.Record _ -> failwith "Status should be a Union"
           }
 
           test "labeled payload uses the label as field name" {
@@ -161,12 +161,12 @@ let at2DuTests =
               let status = types |> List.find (fun t -> t.LocalName = "Status")
 
               match status.Shape with
-              | Union cases ->
+              | TypeShape.Union cases ->
                   let shipped = cases |> List.find (fun c -> c.Name = "Shipped")
                   let f = shipped.Payload |> List.exactlyOne
                   Expect.equal f.Name "trackingNumber" "label is the field name"
                   Expect.stringContains f.TypeName "string" "payload type"
-              | Record _ -> failwith "Status should be a Union"
+              | TypeShape.Record _ -> failwith "Status should be a Union"
           }
 
           test "record type is a Record shape" {
@@ -175,11 +175,11 @@ let at2DuTests =
               let sq = types |> List.find (fun t -> t.LocalName = "SquarePosition")
 
               match sq.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let names = fields |> List.map (fun f -> f.Name)
                   Expect.contains names "Row" "Row field"
                   Expect.contains names "Col" "Col field"
-              | Union _ -> failwith "SquarePosition should be a Record"
+              | TypeShape.Union _ -> failwith "SquarePosition should be a Record"
           }
 
           test "unlabeled payload falls back to the payload type name" {
@@ -188,12 +188,12 @@ let at2DuTests =
               let move = types |> List.find (fun t -> t.LocalName = "Move")
 
               match move.Shape with
-              | Union cases ->
+              | TypeShape.Union cases ->
                   let omove = cases |> List.find (fun c -> c.Name = "OMove")
                   let f = omove.Payload |> List.exactlyOne
                   Expect.equal f.Name "SquarePosition" "unlabeled payload → type name, not 'Item'"
                   Expect.stringContains f.TypeName "SquarePosition" "payload TypeName"
-              | Record _ -> failwith "Move should be a Union"
+              | TypeShape.Record _ -> failwith "Move should be a Union"
           } ]
 
 // ── AT3: attributes ───────────────────────────────────────────────────────────
@@ -208,10 +208,10 @@ let at3AttributeTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let total = fields |> List.find (fun f -> f.Name = "Total")
                   Expect.isTrue (total.Attributes.ContainsKey "JsonPropertyName") "JsonPropertyName key present"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           }
 
           test "Total JsonPropertyName value is total_paid" {
@@ -220,10 +220,10 @@ let at3AttributeTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let total = fields |> List.find (fun f -> f.Name = "Total")
                   Expect.equal total.Attributes.["JsonPropertyName"] "total_paid" "JsonPropertyName value"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT4: doc comments ─────────────────────────────────────────────────────────
@@ -253,10 +253,10 @@ let at4DocCommentTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let customer = fields |> List.find (fun f -> f.Name = "Customer")
                   Expect.isSome customer.DocComment "Customer field DocComment present"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           }
 
           test "Customer field DocComment contains expected text" {
@@ -265,11 +265,11 @@ let at4DocCommentTests =
               let order = types |> List.find (fun t -> t.LocalName = "Order")
 
               match order.Shape with
-              | Record fields ->
+              | TypeShape.Record fields ->
                   let customer = fields |> List.find (fun f -> f.Name = "Customer")
                   let comment = customer.DocComment |> Option.defaultValue ""
                   Expect.stringContains comment "name" "Customer DocComment mentions name"
-              | Union _ -> failwith "Order should be a Record"
+              | TypeShape.Union _ -> failwith "Order should be a Record"
           } ]
 
 // ── AT5: source-only filter ───────────────────────────────────────────────────

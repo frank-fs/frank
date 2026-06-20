@@ -151,6 +151,51 @@ module LockFile =
             |> Result.map List.rev
         | _ -> Error "field 'fields' must be an array"
 
+    let private parseCaseMapping (node: JsonNode) : Result<CaseMapping, string> =
+        requireString node "name"
+        |> Result.bind (fun name ->
+            let iri = optionalString node "iri"
+
+            requireFloat node "confidence"
+            |> Result.bind (fun confidence ->
+                requireString node "source"
+                |> Result.bind mappingSourceFromString
+                |> Result.bind (fun source ->
+                    requireString node "status"
+                    |> Result.bind mappingStatusFromString
+                    |> Result.bind (fun status ->
+                        parseFieldMappings node.["payload"]
+                        |> Result.map (fun payload ->
+                            { Name = name
+                              Iri = iri
+                              Confidence = confidence
+                              Source = source
+                              Status = status
+                              Payload = payload })))))
+
+    let private parseCaseMappings (node: JsonNode) : Result<CaseMapping list, string> =
+        match node with
+        | null -> Ok []
+        | :? JsonArray as elements ->
+            elements
+            |> Seq.mapi (fun i el -> parseCaseMapping el |> Result.mapError (fun e -> $"cases[{i}]: {e}"))
+            |> Seq.fold
+                (fun acc r ->
+                    match acc, r with
+                    | Error e, _ -> Error e
+                    | _, Error e -> Error e
+                    | Ok xs, Ok x -> Ok(x :: xs))
+                (Ok [])
+            |> Result.map List.rev
+        | _ -> Error "field 'cases' must be an array"
+
+    let private parseShape (node: JsonNode) : Result<MappingShape, string> =
+        match optionalString node "shape" with
+        | Some "union" -> parseCaseMappings node.["cases"] |> Result.map MappingShape.Union
+        | Some "record"
+        | None -> parseFieldMappings node.["fields"] |> Result.map MappingShape.Record
+        | Some other -> Error $"unknown shape '{other}'"
+
     let private parseMapping (node: JsonNode) : Result<Mapping, string> =
         requireString node "fsharpType"
         |> Result.bind (fun fsType ->
@@ -164,8 +209,8 @@ module LockFile =
                     requireString node "status"
                     |> Result.bind mappingStatusFromString
                     |> Result.bind (fun status ->
-                        parseFieldMappings node.["fields"]
-                        |> Result.bind (fun fields ->
+                        parseShape node
+                        |> Result.bind (fun shape ->
                             parseAlternates node.["alternates"]
                             |> Result.map (fun alternates ->
                                 { FSharpType = fsType
@@ -174,7 +219,7 @@ module LockFile =
                                   Source = source
                                   Status = status
                                   Alternates = alternates
-                                  Fields = fields }))))))
+                                  Shape = shape }))))))
 
     let private parseMappingList (node: JsonNode) : Result<Mapping list, string> =
         match node with
@@ -282,6 +327,22 @@ module LockFile =
         obj.Add("status", JsonValue.Create(mappingStatusToString f.Status))
         obj
 
+    let private serializeCaseMapping (c: CaseMapping) : JsonObject =
+        let obj = JsonObject()
+        obj.Add("name", JsonValue.Create c.Name)
+        obj.Add("iri", c.Iri |> Option.map JsonValue.Create<string> |> Option.toObj)
+        obj.Add("confidence", JsonValue.Create c.Confidence)
+        obj.Add("source", JsonValue.Create(mappingSourceToString c.Source))
+        obj.Add("status", JsonValue.Create(mappingStatusToString c.Status))
+
+        let payload = JsonArray()
+
+        for f in c.Payload do
+            payload.Add(serializeFieldMapping f)
+
+        obj.Add("payload", payload)
+        obj
+
     let private serializeMapping (m: Mapping) : JsonObject =
         let obj = JsonObject()
         obj.Add("fsharpType", JsonValue.Create m.FSharpType)
@@ -297,12 +358,24 @@ module LockFile =
 
         obj.Add("alternates", alternates)
 
-        let fields = JsonArray()
+        match m.Shape with
+        | MappingShape.Record fs ->
+            obj.Add("shape", JsonValue.Create "record")
+            let fields = JsonArray()
 
-        for f in m.Fields do
-            fields.Add(serializeFieldMapping f)
+            for f in fs do
+                fields.Add(serializeFieldMapping f)
 
-        obj.Add("fields", fields)
+            obj.Add("fields", fields)
+        | MappingShape.Union cases ->
+            obj.Add("shape", JsonValue.Create "union")
+            let arr = JsonArray()
+
+            for c in cases do
+                arr.Add(serializeCaseMapping c)
+
+            obj.Add("cases", arr)
+
         obj
 
     let private serializeVocabEntry (v: VocabularyEntry) : JsonObject =
@@ -395,13 +468,31 @@ module LockFile =
             | Some r -> r
             | None -> f)
 
+    let private mergeShape (existing: MappingShape) (resolved: MappingShape) : MappingShape =
+        match existing, resolved with
+        | MappingShape.Record ef, MappingShape.Record rf -> MappingShape.Record(mergeFields ef rf)
+        | MappingShape.Union ec, MappingShape.Union rc ->
+            let rByName = rc |> List.map (fun c -> c.Name, c) |> Map.ofList
+
+            ec
+            |> List.map (fun c ->
+                match Map.tryFind c.Name rByName with
+                | Some r ->
+                    { r with
+                        Payload = mergeFields c.Payload r.Payload }
+                | None -> c)
+            |> MappingShape.Union
+        // Shape kind changed between lock versions (type went record<->union in source);
+        // no field-level merge is meaningful — take the freshly resolved shape wholesale.
+        | _ -> resolved
+
     let private mergeOneMapping (existing: Mapping) (resolved: Mapping) : Mapping =
         { existing with
             Iri = resolved.Iri
             Confidence = resolved.Confidence
             Source = resolved.Source
             Status = resolved.Status
-            Fields = mergeFields existing.Fields resolved.Fields }
+            Shape = mergeShape existing.Shape resolved.Shape }
 
     /// Merge resolved mappings into an existing lock file.
     /// Matching is by FSharpType. Unmatched existing entries are kept.

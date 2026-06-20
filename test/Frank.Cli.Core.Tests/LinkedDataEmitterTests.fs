@@ -38,39 +38,41 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "identifier"
-                  Iri = Some "schema:identifier"
-                  Confidence = 1.0
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "status"
-                  Iri = None
-                  Confidence = 0.0
-                  Source = Convention
-                  Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "identifier"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "status"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "TicTacToe.Move"
             Iri = Some "schema:MoveAction"
             Confidence = 0.9
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields =
-              [ { Name = "rowIndex"
-                  Iri = Some "schema:rowIndex"
-                  Confidence = 0.8
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "columnIndex"
-                  Iri = Some "schema:columnIndex"
-                  Confidence = 0.8
-                  Source = Convention
-                  Status = Confirmed }
-                { Name = "agent"
-                  Iri = Some "schema:agent"
-                  Confidence = 1.0
-                  Source = Convention
-                  Status = Confirmed } ] } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "rowIndex"
+                      Iri = Some "schema:rowIndex"
+                      Confidence = 0.8
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "columnIndex"
+                      Iri = Some "schema:columnIndex"
+                      Confidence = 0.8
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "agent"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
 
 let private schemaVocabEntry: VocabularyEntry =
     { Uri = "https://schema.org/"
@@ -154,7 +156,7 @@ let private genMappingWithSchemaIri =
               Source = source
               Status = status
               Alternates = []
-              Fields = fields }
+              Shape = MappingShape.Record fields }
     }
 
 let private genLockWithSchemaIris =
@@ -466,12 +468,13 @@ let parsesTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
-                        Fields =
-                          [ { Name = "bar"
-                              Iri = Some "schema:bar"
-                              Confidence = 1.0
-                              Source = Convention
-                              Status = Confirmed } ] }
+                        Shape =
+                          MappingShape.Record
+                              [ { Name = "bar"
+                                  Iri = Some "schema:bar"
+                                  Confidence = 1.0
+                                  Source = Convention
+                                  Status = Confirmed } ] }
 
               let reg =
                   { VocabularyRegistry.empty with
@@ -499,14 +502,14 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
-                          Fields = [] }
+                          Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
                           Confidence = 0.9
                           Source = Convention
                           Status = Excluded
                           Alternates = []
-                          Fields = [] } ] }
+                          Shape = MappingShape.Record [] } ] }
 
               let reg =
                   { VocabularyRegistry.empty with
@@ -535,7 +538,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
-                        Fields = [] }
+                        Shape = MappingShape.Record [] }
 
               let result = LinkedDataEmitter.emit "My.Generated" noRegistry lockWithUnknown
               Expect.isError result "unknown prefix must return Error"
@@ -555,7 +558,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Unresolved
                         Alternates = []
-                        Fields = [] }
+                        Shape = MappingShape.Record [] }
 
               let result = LinkedDataEmitter.emit "My.Generated" reg lockWithNoneIri
               Expect.isOk result "None IRI mapping emits without error"

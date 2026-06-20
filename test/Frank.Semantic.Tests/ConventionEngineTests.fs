@@ -164,7 +164,7 @@ let at5ThresholdRule =
                     Namespace = "Test"
                     LocalName = "Order"
                     Shape =
-                      Record
+                      TypeShape.Record
                           [ { Name = "Total"
                               TypeName = "decimal"
                               Attributes = Map.empty
@@ -203,7 +203,7 @@ let at1ConfirmedMapping =
               Namespace = "MyApp"
               LocalName = "Order"
               Shape =
-                Record
+                TypeShape.Record
                     [ { Name = "Total"
                         TypeName = "decimal"
                         Attributes = Map.empty
@@ -255,7 +255,7 @@ let at2ProposedMapping =
               Namespace = "MyApp"
               LocalName = "CustomerOrderRecord"
               Shape =
-                Record
+                TypeShape.Record
                     [ { Name = "Total"
                         TypeName = "decimal"
                         Attributes = Map.empty
@@ -311,7 +311,7 @@ let at3UnresolvedMapping =
               Namespace = "MyApp"
               LocalName = "WidgetForge"
               Shape =
-                Record
+                TypeShape.Record
                     [ { Name = "Sprocket"
                         TypeName = "int"
                         Attributes = Map.empty
@@ -353,7 +353,7 @@ let at4JsonPropertyNameBoost =
               Namespace = "MyApp"
               LocalName = "Order"
               Shape =
-                Record
+                TypeShape.Record
                     [ { Name = "Total"
                         TypeName = "decimal"
                         Attributes = Map.ofList [ "JsonPropertyName", "totalPaymentDue" ]
@@ -364,7 +364,7 @@ let at4JsonPropertyNameBoost =
         let typeWithoutAttr: TypeInfo =
             { typeWithAttr with
                 Shape =
-                    Record
+                    TypeShape.Record
                         [ { Name = "Total"
                             TypeName = "decimal"
                             Attributes = Map.empty
@@ -450,7 +450,7 @@ let scopeFilteringTests =
             { FullName = "MyApp.Order"
               Namespace = "MyApp"
               LocalName = "Order"
-              Shape = Record []
+              Shape = TypeShape.Record []
               Attributes = Map.empty
               DocComment = None }
 
@@ -479,7 +479,7 @@ let explicitEquivalentClassTests =
                   { FullName = "TicTacToe.Model.MoveLog`1"
                     Namespace = "TicTacToe.Model"
                     LocalName = "MoveLog"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -517,7 +517,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -543,7 +543,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Container`1"
                     Namespace = "MyApp"
                     LocalName = "Container"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -571,7 +571,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Thing`1"
                     Namespace = "MyApp"
                     LocalName = "Thing"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -596,7 +596,7 @@ let explicitEquivalentClassTests =
                   { FullName = "MyApp.Foo"
                     Namespace = "MyApp"
                     LocalName = "Foo"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -622,7 +622,7 @@ let explicitEquivalentClassTests =
                     Namespace = "MyApp"
                     LocalName = "Log"
                     Shape =
-                      Record
+                      TypeShape.Record
                           [ { Name = "Position"
                               TypeName = "int"
                               Attributes = Map.empty
@@ -639,8 +639,9 @@ let explicitEquivalentClassTests =
               let mapping = ConventionEngine.score terms registry typeInfo
 
               Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI overridden"
-              Expect.isNonEmpty mapping.Fields "fields convention-scored"
-              Expect.equal mapping.Fields.[0].Name "Position" "field name preserved"
+              let fields = MappingShape.payloadFields mapping.Shape
+              Expect.isNonEmpty fields "fields convention-scored"
+              Expect.equal fields.[0].Name "Position" "field name preserved"
           } ]
 
 // ── Exact-identity confirm rule ───────────────────────────────────────────────
@@ -664,7 +665,7 @@ let exactIdentityConfirmTests =
                     Namespace = "MyApp"
                     LocalName = "Player"
                     Shape =
-                      Record
+                      TypeShape.Record
                           [ { Name = "Name"
                               TypeName = "string"
                               Attributes = Map.empty
@@ -699,7 +700,7 @@ let exactIdentityConfirmTests =
                     Namespace = "MyApp"
                     LocalName = "Order"
                     Shape =
-                      Record
+                      TypeShape.Record
                           [ { Name = "Total"
                               TypeName = "decimal"
                               Attributes = Map.empty
@@ -716,7 +717,7 @@ let exactIdentityConfirmTests =
               let mapping = ConventionEngine.score terms registry typeInfo
 
               Expect.equal mapping.Status MappingStatus.Confirmed "type is exact-match so Confirmed"
-              let fieldMapping = mapping.Fields |> List.head
+              let fieldMapping = MappingShape.payloadFields mapping.Shape |> List.head
               Expect.equal fieldMapping.Status MappingStatus.Proposed "field fuzzy match must be Proposed not Confirmed"
               Expect.isSome fieldMapping.Iri "field IRI surfaced as suggestion"
               Expect.equal fieldMapping.Iri (Some "schema:totalPaymentDue") "correct field IRI"
@@ -734,7 +735,7 @@ let exactIdentityConfirmTests =
                   { FullName = "MyApp.Order"
                     Namespace = "MyApp"
                     LocalName = "Order"
-                    Shape = Record []
+                    Shape = TypeShape.Record []
                     Attributes = Map.empty
                     DocComment = None }
 
@@ -761,7 +762,7 @@ let exactIdentityConfirmTests =
                     Namespace = "MyApp"
                     LocalName = "Order"
                     Shape =
-                      Record
+                      TypeShape.Record
                           [ { Name = "Name"
                               TypeName = "string"
                               Attributes = Map.empty
@@ -777,7 +778,7 @@ let exactIdentityConfirmTests =
 
               let mapping = ConventionEngine.score terms registry typeInfo
 
-              let fieldMapping = mapping.Fields |> List.head
+              let fieldMapping = MappingShape.payloadFields mapping.Shape |> List.head
               Expect.equal fieldMapping.Status MappingStatus.Confirmed "exact field key -> Confirmed"
               Expect.equal fieldMapping.Iri (Some "schema:name") "correct field IRI"
           } ]

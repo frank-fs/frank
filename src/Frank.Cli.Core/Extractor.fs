@@ -120,9 +120,15 @@ let private entityToTypeInfo (entity: FSharpEntity) : TypeInfo option =
 
         let shape =
             if entity.IsFSharpUnion then
-                entity.UnionCases |> Seq.map unionCaseToCaseInfo |> Seq.toList |> Union
+                entity.UnionCases
+                |> Seq.map unionCaseToCaseInfo
+                |> Seq.toList
+                |> TypeShape.Union
             else
-                entity.FSharpFields |> Seq.map fieldToFieldInfo |> Seq.toList |> Record
+                entity.FSharpFields
+                |> Seq.map fieldToFieldInfo
+                |> Seq.toList
+                |> TypeShape.Record
 
         Some
             { FullName = entity.TryFullName |> Option.defaultValue entity.LogicalName

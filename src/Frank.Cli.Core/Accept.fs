@@ -136,12 +136,15 @@ let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: st
       Source = source
       Status = Confirmed
       Alternates = []
-      Fields = entry.Fields |> List.map (buildFieldMapping source) }
+      Shape = MappingShape.Record(entry.Fields |> List.map (buildFieldMapping source)) }
 
 let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) : int =
     mappings
     |> List.filter (fun m -> Set.contains m.FSharpType types)
-    |> List.sumBy (fun m -> m.Fields |> List.filter (fun f -> f.Status = Unresolved) |> List.length)
+    |> List.sumBy (fun m ->
+        MappingShape.payloadFields m.Shape
+        |> List.filter (fun f -> f.Status = Unresolved)
+        |> List.length)
 
 // ── Public: apply ─────────────────────────────────────────────────────────────
 

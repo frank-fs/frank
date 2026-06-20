@@ -27,13 +27,19 @@ type ValidateLockFileTask() =
             | Ok lock ->
                 let draftMappings = lock.Mappings |> List.filter (fun m -> not (isDecided m.Status))
 
+                let liveMappings = lock.Mappings |> List.filter (fun m -> m.Status <> Excluded)
+
+                let draftCases =
+                    liveMappings
+                    |> List.collect (fun m -> MappingShape.caseMappings m.Shape)
+                    |> List.filter (fun c -> not (isDecided c.Status))
+
                 let draftFields =
-                    lock.Mappings
-                    |> List.filter (fun m -> m.Status <> Excluded)
-                    |> List.collect (fun m -> m.Fields)
+                    liveMappings
+                    |> List.collect (fun m -> MappingShape.activePayloadFields m.Shape)
                     |> List.filter (fun f -> not (isDecided f.Status))
 
-                let total = draftMappings.Length + draftFields.Length
+                let total = draftMappings.Length + draftCases.Length + draftFields.Length
 
                 if total > 0 then
                     this.Log.LogError(

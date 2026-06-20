@@ -43,7 +43,7 @@ let private mkMapping fsharpType iri fields : Mapping =
       Source = Convention
       Status = Confirmed
       Alternates = []
-      Fields = fields }
+      Shape = MappingShape.Record fields }
 
 let private mkField name iri : FieldMapping =
     { Name = name
@@ -377,7 +377,10 @@ let at_rm_ef =
             let fieldIris = res.Fields |> List.choose (fun f -> f.Iri) |> List.map string
             Expect.hasLength res.Fields 1 "only the Confirmed field present"
             Expect.equal (res.Fields |> List.head).Name "Name" "confirmed field present"
-            Expect.isFalse (fieldIris |> List.exists (fun s -> s.Contains "Play")) "schema:Play (excluded) must not appear"
+
+            Expect.isFalse
+                (fieldIris |> List.exists (fun s -> s.Contains "Play"))
+                "schema:Play (excluded) must not appear"
     }
 
 // ── AT-RM9: lock IRI self-contained resolution ────────────────────────────────

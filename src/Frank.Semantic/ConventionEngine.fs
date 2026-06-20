@@ -151,8 +151,8 @@ module ConventionEngine =
     /// record fields here (its cases are mapped separately in a later layer).
     let private recordFields (typeInfo: TypeInfo) : FieldInfo list =
         match typeInfo.Shape with
-        | Record fields -> fields
-        | Union _ -> []
+        | TypeShape.Record fields -> fields
+        | TypeShape.Union _ -> []
 
     // ── Type name similarity ──────────────────────────────────────────────────
 
@@ -355,17 +355,17 @@ module ConventionEngine =
             let fields = recordFields typeInfo
 
             let fieldMappings =
-                if convention.Fields.IsEmpty && not fields.IsEmpty then
+                if (MappingShape.payloadFields convention.Shape).IsEmpty && not fields.IsEmpty then
                     fields |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
                 else
-                    convention.Fields
+                    MappingShape.payloadFields convention.Shape
 
             { convention with
                 Iri = Some curie
                 Confidence = 1.0
                 Source = Manual
                 Status = Confirmed
-                Fields = fieldMappings }
+                Shape = MappingShape.Record fieldMappings }
 
     // ── Main entry ────────────────────────────────────────────────────────────
 
@@ -382,7 +382,7 @@ module ConventionEngine =
               Source = Convention
               Status = Unresolved
               Alternates = []
-              Fields = [] }
+              Shape = MappingShape.Record [] }
 
         let conventionResult =
             if inScopeClasses.IsEmpty then
@@ -413,6 +413,13 @@ module ConventionEngine =
                         recordFields typeInfo
                         |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
 
+                    let shape =
+                        match typeInfo.Shape with
+                        // Union case scoring lands in the next layer; until then a
+                        // union maps only its type, with no cases. (Intentional stub.)
+                        | TypeShape.Union _ -> MappingShape.Union []
+                        | TypeShape.Record _ -> MappingShape.Record fieldMappings
+
                     let status = if typeKey = bestLocal then Confirmed else Proposed
 
                     { FSharpType = typeInfo.FullName
@@ -421,6 +428,6 @@ module ConventionEngine =
                       Source = Convention
                       Status = status
                       Alternates = alternates
-                      Fields = fieldMappings }
+                      Shape = shape }
 
         applyExplicitClass registry typeInfo terms conventionResult

@@ -47,7 +47,7 @@ let private genMapping =
               Source = source
               Status = status
               Alternates = alternates
-              Fields = fields }
+              Shape = MappingShape.Record fields }
     }
 
 let private truncSec (dto: DateTimeOffset) =
@@ -249,12 +249,13 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Confirmed
                           Alternates = [ "schema:OrderAction" ]
-                          Fields =
-                            [ { Name = "Total"
-                                Iri = Some "schema:totalPaymentDue"
-                                Confidence = 0.78
-                                Source = MappingSource.Llm
-                                Status = MappingStatus.Confirmed } ] } ] }
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "Total"
+                                    Iri = Some "schema:totalPaymentDue"
+                                    Confidence = 0.78
+                                    Source = MappingSource.Llm
+                                    Status = MappingStatus.Confirmed } ] } ] }
 
               let path = Path.GetTempFileName()
 
@@ -273,7 +274,7 @@ let roundTripTests =
                       Expect.equal m.Source MappingSource.Convention "source"
                       Expect.equal m.Status MappingStatus.Confirmed "status"
                       Expect.equal m.Alternates [ "schema:OrderAction" ] "alternates preserved through round-trip"
-                      let f = m.Fields.[0]
+                      let f = (MappingShape.payloadFields m.Shape).[0]
                       Expect.equal f.Name "Total" "field name"
                       Expect.equal f.Iri (Some "schema:totalPaymentDue") "field iri"
                       Expect.equal f.Source MappingSource.Llm "field source"
@@ -293,7 +294,7 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Unresolved
                           Alternates = []
-                          Fields = [] } ] }
+                          Shape = MappingShape.Record [] } ] }
 
               let path = Path.GetTempFileName()
 
@@ -330,7 +331,7 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Confirmed
                           Alternates = []
-                          Fields = [] } ] }
+                          Shape = MappingShape.Record [] } ] }
 
               let path1 = Path.GetTempFileName()
               let path2 = Path.GetTempFileName()
@@ -368,14 +369,17 @@ let roundTripTests =
                                  && r.Source = orig.Source
                                  && r.Status = orig.Status
                                  && r.Alternates = orig.Alternates
-                                 && r.Fields.Length = orig.Fields.Length
-                                 && List.zip r.Fields orig.Fields
-                                    |> List.forall (fun (rf, of_) ->
-                                        rf.Name = of_.Name
-                                        && rf.Iri = of_.Iri
-                                        && abs (rf.Confidence - of_.Confidence) < 1e-9
-                                        && rf.Source = of_.Source
-                                        && rf.Status = of_.Status))
+                                 && (let rfs = MappingShape.payloadFields r.Shape
+                                     let ofs = MappingShape.payloadFields orig.Shape
+
+                                     rfs.Length = ofs.Length
+                                     && List.zip rfs ofs
+                                        |> List.forall (fun (rf, of_) ->
+                                            rf.Name = of_.Name
+                                            && rf.Iri = of_.Iri
+                                            && abs (rf.Confidence - of_.Confidence) < 1e-9
+                                            && rf.Source = of_.Source
+                                            && rf.Status = of_.Status)))
                   finally
                       File.Delete path)) ]
 
@@ -396,7 +400,7 @@ let diffFriendlyTests =
               Source = MappingSource.Convention
               Status = MappingStatus.Confirmed
               Alternates = []
-              Fields = [] }
+              Shape = MappingShape.Record [] }
 
         let mapping2: Mapping =
             { FSharpType = "MyApp.Product"
@@ -405,7 +409,7 @@ let diffFriendlyTests =
               Source = MappingSource.Convention
               Status = MappingStatus.Confirmed
               Alternates = []
-              Fields = [] }
+              Shape = MappingShape.Record [] }
 
         let lf1: LockFile.LockFile =
             { SchemaVersion = 1
@@ -455,7 +459,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Unresolved
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let resolved: Mapping =
                   { FSharpType = "MyApp.Order"
@@ -464,7 +468,7 @@ let mergeTests =
                     Source = MappingSource.Manual
                     Status = MappingStatus.Confirmed
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
@@ -488,7 +492,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Confirmed
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let resolved: Mapping =
                   { FSharpType = "MyApp.Product"
@@ -497,7 +501,7 @@ let mergeTests =
                     Source = MappingSource.Llm
                     Status = MappingStatus.Confirmed
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
@@ -519,12 +523,13 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Confirmed
                     Alternates = []
-                    Fields =
-                      [ { Name = "Total"
-                          Iri = None
-                          Confidence = 0.0
-                          Source = MappingSource.Convention
-                          Status = MappingStatus.Unresolved } ] }
+                    Shape =
+                      MappingShape.Record
+                          [ { Name = "Total"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = MappingSource.Convention
+                              Status = MappingStatus.Unresolved } ] }
 
               let resolvedField: FieldMapping =
                   { Name = "Total"
@@ -535,7 +540,7 @@ let mergeTests =
 
               let resolved: Mapping =
                   { existing with
-                      Fields = [ resolvedField ] }
+                      Shape = MappingShape.Record [ resolvedField ] }
 
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
@@ -544,7 +549,7 @@ let mergeTests =
                     Mappings = [ existing ] }
 
               let result = LockFile.merge lf [ resolved ]
-              let field = result.Mappings.[0].Fields.[0]
+              let field = (MappingShape.payloadFields result.Mappings.[0].Shape).[0]
               Expect.equal field.Iri (Some "schema:totalPaymentDue") "field iri updated"
               Expect.equal field.Status MappingStatus.Confirmed "field status updated"
           }
@@ -557,7 +562,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Unresolved
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
@@ -704,7 +709,7 @@ let countByStatusTests =
                     Source = MappingSource.Convention
                     Status = status
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let mappings =
                   [ make MappingStatus.Confirmed
@@ -728,7 +733,7 @@ let countByStatusTests =
                     Source = MappingSource.Convention
                     Status = status
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let mappings =
                   [ make MappingStatus.Confirmed
@@ -752,10 +757,7 @@ let excludedStatusTests =
     testList
         "MappingStatus.Excluded"
         [ test "mappingStatusFromString 'excluded' → Ok Excluded" {
-              Expect.equal
-                  (LockFile.mappingStatusFromString "excluded")
-                  (Ok MappingStatus.Excluded)
-                  "excluded"
+              Expect.equal (LockFile.mappingStatusFromString "excluded") (Ok MappingStatus.Excluded) "excluded"
           }
 
           test "mappingStatusToString Excluded → 'excluded'" {
@@ -774,12 +776,13 @@ let excludedStatusTests =
                           Source = MappingSource.Manual
                           Status = MappingStatus.Excluded
                           Alternates = []
-                          Fields =
-                            [ { Name = "OldField"
-                                Iri = None
-                                Confidence = 0.0
-                                Source = MappingSource.Manual
-                                Status = MappingStatus.Excluded } ] } ] }
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "OldField"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = MappingSource.Manual
+                                    Status = MappingStatus.Excluded } ] } ] }
 
               let path = Path.GetTempFileName()
 
@@ -793,7 +796,7 @@ let excludedStatusTests =
                   | Ok result ->
                       let m = result.Mappings.[0]
                       Expect.equal m.Status MappingStatus.Excluded "mapping status is Excluded"
-                      let f = m.Fields.[0]
+                      let f = (MappingShape.payloadFields m.Shape).[0]
                       Expect.equal f.Status MappingStatus.Excluded "field status is Excluded"
               finally
                   File.Delete path
@@ -835,3 +838,79 @@ let vocabKeySortTests =
         finally
             File.Delete path
     }
+
+// ── Back-compat: no-shape field parses as Record ─────────────────────────────
+
+[<Tests>]
+let backCompatNoShapeTests =
+    testList
+        "back-compat: no shape field"
+        [ test "mapping with no shape field parses as Record (back-compat)" {
+              let json =
+                  """{ "schemaVersion": 1, "generated": "2026-01-01T00:00:00Z", "vocabularies": {},
+                    "mappings": [
+                      { "fsharpType": "Old.Thing", "iri": "ex:Thing", "confidence": 1.0,
+                        "source": "convention", "status": "confirmed", "alternates": [],
+                        "fields": [ { "name": "Id", "iri": "ex:id", "confidence": 1.0, "source": "convention", "status": "confirmed" } ] } ] }"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Error e -> failtest $"expected Ok but got Error: {e}"
+                  | Ok lf ->
+                      match lf.Mappings with
+                      | [ m ] ->
+                          match m.Shape with
+                          | MappingShape.Record [ f ] ->
+                              Expect.equal f.Name "Id" "field name preserved"
+                              Expect.equal f.Iri (Some "ex:id") "field iri preserved"
+                              Expect.equal f.Status MappingStatus.Confirmed "field status preserved"
+                          | MappingShape.Record fs -> failtest $"expected 1 field, got {List.length fs}"
+                          | other -> failtest $"expected Record shape but got: %A{other}"
+                      | ms -> failtest $"expected 1 mapping, got {List.length ms}"
+              finally
+                  File.Delete path
+          } ]
+
+// ── Union shape round-trip ────────────────────────────────────────────────────
+
+[<Tests>]
+let unionShapeRoundTripTests =
+    testList
+        "Union shape round-trip"
+        [ test "a union mapping serializes and parses back with cases" {
+              let mapping =
+                  { FSharpType = "MyApp.Move"
+                    Iri = Some "ex:Move"
+                    Confidence = 1.0
+                    Source = Convention
+                    Status = Confirmed
+                    Alternates = []
+                    Shape =
+                      MappingShape.Union
+                          [ { Name = "XMove"
+                              Iri = Some "ex:XMove"
+                              Confidence = 1.0
+                              Source = Convention
+                              Status = Confirmed
+                              Payload =
+                                [ { Name = "position"
+                                    Iri = Some "ex:position"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed } ] } ] }
+
+              let lf: LockFile.LockFile =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Vocabularies = Map.empty
+                    Mappings = [ mapping ] }
+
+              let path = System.IO.Path.GetTempFileName()
+              LockFile.write path lf
+              let parsed = Expect.wantOk (LockFile.read path) "read back"
+              Expect.equal parsed.Mappings lf.Mappings "round-trips with union shape"
+          } ]

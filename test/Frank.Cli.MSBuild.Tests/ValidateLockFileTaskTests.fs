@@ -77,7 +77,7 @@ let validateTests =
                                     Source = Convention
                                     Status = Excluded
                                     Alternates = []
-                                    Fields = [] } ] }
+                                    Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir excludedLock
                   let task = makeTask engine lockPath
@@ -100,12 +100,13 @@ let validateTests =
                                     Source = Convention
                                     Status = Excluded
                                     Alternates = []
-                                    Fields =
-                                      [ { Name = "privateField"
-                                          Iri = None
-                                          Confidence = 0.3
-                                          Source = Llm
-                                          Status = Proposed } ] } ] }
+                                    Shape =
+                                      MappingShape.Record
+                                          [ { Name = "privateField"
+                                              Iri = None
+                                              Confidence = 0.3
+                                              Source = Llm
+                                              Status = Proposed } ] } ] }
 
                   let lockPath = writeLockFile dir excludedWithProposedField
                   let task = makeTask engine lockPath
@@ -127,7 +128,7 @@ let validateTests =
                                   Source = Llm
                                   Status = Proposed
                                   Alternates = []
-                                  Fields = [] } ] }
+                                  Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir proposedMappingLock
                   let task = makeTask engine lockPath
@@ -149,7 +150,7 @@ let validateTests =
                                   Source = Convention
                                   Status = Unresolved
                                   Alternates = []
-                                  Fields = [] } ] }
+                                  Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir unresolvedMappingLock
                   let task = makeTask engine lockPath
@@ -171,12 +172,13 @@ let validateTests =
                                   Source = Convention
                                   Status = Confirmed
                                   Alternates = []
-                                  Fields =
-                                    [ { Name = "pendingField"
-                                        Iri = None
-                                        Confidence = 0.4
-                                        Source = Llm
-                                        Status = Proposed } ] } ] }
+                                  Shape =
+                                    MappingShape.Record
+                                        [ { Name = "pendingField"
+                                            Iri = None
+                                            Confidence = 0.4
+                                            Source = Llm
+                                            Status = Proposed } ] } ] }
 
                   let lockPath = writeLockFile dir confirmedWithProposedField
                   let task = makeTask engine lockPath

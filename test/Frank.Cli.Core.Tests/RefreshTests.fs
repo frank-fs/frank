@@ -9,9 +9,10 @@ open Frank.Cli.Core.Refresh
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-let private schemaBody : byte[] = Text.Encoding.UTF8.GetBytes "{ \"@context\": \"https://schema.org/\" }"
+let private schemaBody: byte[] =
+    Text.Encoding.UTF8.GetBytes "{ \"@context\": \"https://schema.org/\" }"
 
-let private schemaBodyHash : string = sha256Hex schemaBody
+let private schemaBodyHash: string = sha256Hex schemaBody
 
 let private stubFetch (body: byte[]) : Fetch =
     fun (_: Uri) -> async { return Ok {| ContentType = None; Body = body |} }
@@ -38,8 +39,7 @@ let refreshTests =
         "Refresh"
         [ testCase "AT4: hash drift detected — drifted entry returned with recorded and current hashes"
           <| fun () ->
-              let lock =
-                  mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
+              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
 
               let fetch = stubFetch schemaBody
 
@@ -57,8 +57,7 @@ let refreshTests =
 
           testCase "no drift — drifted list empty, checked = 1"
           <| fun () ->
-              let lock =
-                  mkLock (Map.ofList [ "schema", mkVocabEntry schemaBodyHash ])
+              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry schemaBodyHash ])
 
               let fetch = stubFetch schemaBody
 
@@ -72,8 +71,7 @@ let refreshTests =
 
           testCase "fetch error — refresh returns Error containing prefix and reason"
           <| fun () ->
-              let lock =
-                  mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
+              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
 
               let fetch = errorFetch "boom"
 

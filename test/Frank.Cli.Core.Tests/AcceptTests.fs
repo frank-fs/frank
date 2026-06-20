@@ -7,9 +7,9 @@ open Frank.Cli.Core
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-let private emptyVocabs : Map<string, VocabularyEntry> = Map.empty
+let private emptyVocabs: Map<string, VocabularyEntry> = Map.empty
 
-let private schemaVocabs : Map<string, VocabularyEntry> =
+let private schemaVocabs: Map<string, VocabularyEntry> =
     Map.ofList
         [ "schema",
           { Uri = "https://schema.org/"
@@ -28,28 +28,29 @@ let private mkLockWithVocabs (mappings: Mapping list) : LockFile =
       Vocabularies = schemaVocabs
       Mappings = mappings }
 
-let private unresolvedOrderLine : Mapping =
+let private unresolvedOrderLine: Mapping =
     { FSharpType = "MyApp.OrderLine"
       Iri = None
       Confidence = 0.0
       Source = Convention
       Status = Unresolved
       Alternates = []
-      Fields = [] }
+      Shape = MappingShape.Record [] }
 
-let private unresolvedOrder : Mapping =
+let private unresolvedOrder: Mapping =
     { FSharpType = "MyApp.Order"
       Iri = None
       Confidence = 0.0
       Source = Convention
       Status = Unresolved
       Alternates = []
-      Fields =
-        [ { Name = "Total"
-            Iri = None
-            Confidence = 0.0
-            Source = Convention
-            Status = Unresolved } ] }
+      Shape =
+        MappingShape.Record
+            [ { Name = "Total"
+                Iri = None
+                Confidence = 0.0
+                Source = Convention
+                Status = Unresolved } ] }
 
 let private at1Json =
     """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.OrderLine","iri":"schema:OrderItem","fields":[]}]}"""
@@ -57,8 +58,7 @@ let private at1Json =
 let private at3Json =
     """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":"schema:Order","fields":[]},{"fsharpType":"MyApp.Nonexistent","iri":"schema:Thing","fields":[]}]}"""
 
-let private versionMismatchJson =
-    """{"schemaVersion":99,"resolved":[]}"""
+let private versionMismatchJson = """{"schemaVersion":99,"resolved":[]}"""
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -154,7 +154,8 @@ let acceptTests =
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
                   Expect.equal m.Status Confirmed "type is Confirmed"
 
-                  let totalField = m.Fields |> List.tryFind (fun f -> f.Name = "Total")
+                  let totalField =
+                      MappingShape.payloadFields m.Shape |> List.tryFind (fun f -> f.Name = "Total")
 
                   match totalField with
                   | None -> failtest "Total field missing"
@@ -162,14 +163,14 @@ let acceptTests =
 
           testCase "alreadyConfirmed: re-confirming an already-Confirmed entry"
           <| fun () ->
-              let alreadyConfirmed : Mapping =
+              let alreadyConfirmed: Mapping =
                   { FSharpType = "MyApp.OrderLine"
                     Iri = Some "schema:OrderItem"
                     Confidence = 1.0
                     Source = Llm
                     Status = Confirmed
                     Alternates = []
-                    Fields = [] }
+                    Shape = MappingShape.Record [] }
 
               let lock = mkLockWithVocabs [ alreadyConfirmed ]
 
@@ -232,8 +233,7 @@ let acceptTests =
                   Expect.isSome rej "OrderLine must appear in Rejected"
                   Expect.stringContains rej.Value.Reason "https://schema.org/MoveAction" "reason mentions the iri"
 
-                  let m =
-                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "MyApp.OrderLine")
+                  let m = updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "MyApp.OrderLine")
 
                   Expect.isSome m "lock entry must still exist"
                   Expect.equal m.Value.Status Unresolved "lock entry unchanged (not merged)"
@@ -257,7 +257,7 @@ let acceptTests =
 
           testCase "json output: summaryToJson produces valid JSON with expected fields"
           <| fun () ->
-              let summary : Accept.AcceptSummary =
+              let summary: Accept.AcceptSummary =
                   { Merged = 2
                     Rejected =
                       [ { FSharpType = "MyApp.Ghost"

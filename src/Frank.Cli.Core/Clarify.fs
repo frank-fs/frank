@@ -45,7 +45,7 @@ let private unresolvedNode (m: Mapping) : JsonObject =
     let obj = JsonObject()
     obj.Add("fsharpType", JsonValue.Create m.FSharpType)
     obj.Add("candidates", candidatesArray m.Alternates)
-    obj.Add("fields", fieldsArray m.Fields)
+    obj.Add("fields", fieldsArray (MappingShape.payloadFields m.Shape))
     obj
 
 let private proposedNode (m: Mapping) : JsonObject =
@@ -54,7 +54,7 @@ let private proposedNode (m: Mapping) : JsonObject =
     obj.Add("currentCandidate", iriNode m.Iri)
     obj.Add("confidence", JsonValue.Create m.Confidence)
     obj.Add("candidates", candidatesArray m.Alternates)
-    obj.Add("fields", fieldsArray m.Fields)
+    obj.Add("fields", fieldsArray (MappingShape.payloadFields m.Shape))
     obj
 
 let private partitionMappings (mappings: Mapping list) : Mapping list * Mapping list =
@@ -104,7 +104,7 @@ let private templateResolvedNode (m: Mapping) : JsonObject =
 
     let fields = JsonArray()
 
-    for f in m.Fields do
+    for f in MappingShape.payloadFields m.Shape do
         fields.Add(templateFieldNode f)
 
     obj.Add("fields", fields)
@@ -161,7 +161,7 @@ let private unresolvedSection (mappings: Mapping list) : string =
             let joined = m.Alternates |> String.concat ", "
             sb.AppendLine(sprintf "Candidates: %s" joined) |> ignore
 
-        sb.AppendLine(fieldTable m.Fields) |> ignore
+        sb.AppendLine(fieldTable (MappingShape.payloadFields m.Shape)) |> ignore
 
     sb.ToString()
 
@@ -175,7 +175,7 @@ let private proposedSection (mappings: Mapping list) : string =
         sb.AppendLine(sprintf "Current: %s (confidence %.2f)" (iriText m.Iri) m.Confidence)
         |> ignore
 
-        sb.AppendLine(fieldTable m.Fields) |> ignore
+        sb.AppendLine(fieldTable (MappingShape.payloadFields m.Shape)) |> ignore
 
     sb.ToString()
 

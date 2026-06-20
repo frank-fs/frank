@@ -14,7 +14,7 @@ let private mapping fsType status : Mapping =
       Source = Convention
       Status = status
       Alternates = []
-      Fields = [] }
+      Shape = MappingShape.Record [] }
 
 let private mappingWithFields fsType status (fields: FieldMapping list) : Mapping =
     { FSharpType = fsType
@@ -23,7 +23,7 @@ let private mappingWithFields fsType status (fields: FieldMapping list) : Mappin
       Source = Convention
       Status = status
       Alternates = []
-      Fields = fields }
+      Shape = MappingShape.Record fields }
 
 let private field name status : FieldMapping =
     { Name = name
@@ -46,10 +46,7 @@ let finalizeTests =
         "Finalize.run"
         [ test "all-decided: no Proposed or Unresolved remain after finalize" {
               let lf =
-                  lockWith
-                      [ mapping "A" Confirmed
-                        mapping "B" Proposed
-                        mapping "C" Unresolved ]
+                  lockWith [ mapping "A" Confirmed; mapping "B" Proposed; mapping "C" Unresolved ]
 
               let result, _ = Finalize.run lf
 
@@ -62,28 +59,44 @@ let finalizeTests =
               let c = result.Mappings |> List.find (fun m -> m.FSharpType = "C")
               Expect.equal a.Status Confirmed "Confirmed mapping stays Confirmed"
               Expect.equal b.Status Excluded "Proposed becomes Excluded"
-              Expect.equal b.Source Convention "Proposed source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
+              Expect.equal
+                  b.Source
+                  Convention
+                  "Proposed source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
               Expect.equal c.Status Excluded "Unresolved becomes Excluded"
-              Expect.equal c.Source Convention "Unresolved source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
+              Expect.equal
+                  c.Source
+                  Convention
+                  "Unresolved source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
           }
 
           test "field decided: Proposed and Unresolved fields on a Confirmed mapping become Excluded" {
-              let fields =
-                  [ field "x" Confirmed
-                    field "y" Proposed
-                    field "z" Unresolved ]
+              let fields = [ field "x" Confirmed; field "y" Proposed; field "z" Unresolved ]
 
               let lf = lockWith [ mappingWithFields "T" Confirmed fields ]
               let result, _ = Finalize.run lf
               let m = result.Mappings |> List.head
-              let x = m.Fields |> List.find (fun f -> f.Name = "x")
-              let y = m.Fields |> List.find (fun f -> f.Name = "y")
-              let z = m.Fields |> List.find (fun f -> f.Name = "z")
+              let fs = MappingShape.payloadFields m.Shape
+              let x = fs |> List.find (fun f -> f.Name = "x")
+              let y = fs |> List.find (fun f -> f.Name = "y")
+              let z = fs |> List.find (fun f -> f.Name = "z")
               Expect.equal x.Status Confirmed "Confirmed field stays Confirmed"
               Expect.equal y.Status Excluded "Proposed field becomes Excluded"
-              Expect.equal y.Source Convention "Proposed field source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
+              Expect.equal
+                  y.Source
+                  Convention
+                  "Proposed field source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
               Expect.equal z.Status Excluded "Unresolved field becomes Excluded"
-              Expect.equal z.Source Convention "Unresolved field source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
+
+              Expect.equal
+                  z.Source
+                  Convention
+                  "Unresolved field source preserved (finalize is zero-judgment; behavior-correction from Source=Manual)"
           }
 
           test "summary counts match result state and input already-decided count" {
@@ -95,34 +108,45 @@ let finalizeTests =
                         mapping "D" Unresolved ]
 
               let result, summary = Finalize.run lf
-              let expectedConfirmed = result.Mappings |> List.filter (fun m -> m.Status = Confirmed) |> List.length
-              let expectedExcluded = result.Mappings |> List.filter (fun m -> m.Status = Excluded) |> List.length
+
+              let expectedConfirmed =
+                  result.Mappings |> List.filter (fun m -> m.Status = Confirmed) |> List.length
+
+              let expectedExcluded =
+                  result.Mappings |> List.filter (fun m -> m.Status = Excluded) |> List.length
+
               Expect.equal summary.Confirmed expectedConfirmed "Confirmed count matches result"
               Expect.equal summary.Excluded expectedExcluded "Excluded count matches result"
               Expect.equal summary.AlreadyDecided 2 "AlreadyDecided = Confirmed + Excluded in input (A + B)"
           }
 
           test "provenance honesty: Proposed+Convention mapping demoted to Excluded with Source=Convention (not Manual)" {
-              let conventionProposed : Mapping =
+              let conventionProposed: Mapping =
                   { FSharpType = "MyApp.Product"
                     Iri = None
                     Confidence = 0.5
                     Source = Convention
                     Status = Proposed
                     Alternates = []
-                    Fields =
-                      [ { Name = "Price"
-                          Iri = None
-                          Confidence = 0.5
-                          Source = Convention
-                          Status = Proposed } ] }
+                    Shape =
+                      MappingShape.Record
+                          [ { Name = "Price"
+                              Iri = None
+                              Confidence = 0.5
+                              Source = Convention
+                              Status = Proposed } ] }
 
               let lf = lockWith [ conventionProposed ]
               let result, _ = Finalize.run lf
               let m = result.Mappings |> List.head
               Expect.equal m.Status Excluded "Proposed mapping becomes Excluded"
-              Expect.equal m.Source Convention "Source must remain Convention (finalize does not claim Manual authorship)"
-              let f = m.Fields |> List.head
+
+              Expect.equal
+                  m.Source
+                  Convention
+                  "Source must remain Convention (finalize does not claim Manual authorship)"
+
+              let f = MappingShape.payloadFields m.Shape |> List.head
               Expect.equal f.Status Excluded "Proposed field becomes Excluded"
               Expect.equal f.Source Convention "Field source must remain Convention"
           }

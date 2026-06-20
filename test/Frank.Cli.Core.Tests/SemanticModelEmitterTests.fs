@@ -31,21 +31,21 @@ let private probeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields = [] }
+            Shape = MappingShape.Record [] }
           { FSharpType = "Probe.Holder`1"
             Iri = Some "schema:Holder"
             Confidence = 0.9
             Source = Convention
             Status = Confirmed
             Alternates = []
-            Fields = [] }
+            Shape = MappingShape.Record [] }
           { FSharpType = "Probe.Unmapped"
             Iri = None
             Confidence = 0.0
             Source = Convention
             Status = Unresolved
             Alternates = []
-            Fields = [] } ] }
+            Shape = MappingShape.Record [] } ] }
 
 let private noClassLock: LockFile =
     { SchemaVersion = 1
@@ -58,7 +58,7 @@ let private noClassLock: LockFile =
             Source = Convention
             Status = Unresolved
             Alternates = []
-            Fields = [] } ] }
+            Shape = MappingShape.Record [] } ] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -235,16 +235,18 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
-                          Fields = [] }
+                          Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
                           Confidence = 0.9
                           Source = Convention
                           Status = Excluded
                           Alternates = []
-                          Fields = [] } ] }
+                          Shape = MappingShape.Record [] } ] }
 
-              let result = SemanticModelEmitter.emit "MyApp.Generated" probeRegistry twoMappingLock
+              let result =
+                  SemanticModelEmitter.emit "MyApp.Generated" probeRegistry twoMappingLock
+
               Expect.isOk result "emit should succeed with at least one confirmed class-mapped resource"
               let source = unwrapOk result
               Expect.stringContains source "| Game" "confirmed Game DU case present"
