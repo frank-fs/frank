@@ -92,6 +92,26 @@ let normalizationTests =
           test "normalized tokens joined as canonical name" {
               let name = ConventionEngine.canonicalName "CustomerOrderRecord"
               Expect.equal name "customer order" "joined with space"
+          }
+
+          test "single-capital prefix is its own token" {
+              let tokens = ConventionEngine.normalizeTokens "XMove"
+              Expect.equal tokens [ "x"; "move" ] "XMove → x, move"
+          }
+
+          test "multipart payload type splits" {
+              let tokens = ConventionEngine.normalizeTokens "SquarePosition"
+              Expect.equal tokens [ "square"; "position" ] "SquarePosition → square, position"
+          }
+
+          test "acronym run then word splits before trailing word" {
+              let tokens = ConventionEngine.normalizeTokens "HTTPSConfig"
+              Expect.equal tokens [ "https"; "config" ] "HTTPSConfig → https, config"
+          }
+
+          test "trailing single capital stays attached" {
+              let tokens = ConventionEngine.normalizeTokens "PointX"
+              Expect.equal tokens [ "point"; "x" ] "PointX → point, x"
           } ]
 
 // ── AT5: multiplication threshold rule ───────────────────────────────────────

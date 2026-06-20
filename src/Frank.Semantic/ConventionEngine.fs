@@ -112,7 +112,19 @@ module ConventionEngine =
         let mutable start = 0
 
         for i in 1 .. name.Length - 1 do
-            if Char.IsUpper(name.[i]) && Char.IsLower(name.[i - 1]) then
+            let prev = name.[i - 1]
+            let cur = name.[i]
+            // boundary A: lower/digit → upper   (squareP|osition, point|X)
+            let lowerToUpper = Char.IsUpper cur && not (Char.IsUpper prev)
+            // boundary B: end of an acronym run → start of a capitalized word
+            // (HTTPS|Config): cur is upper, prev is upper, and the char AFTER cur is lower
+            let acronymToWord =
+                Char.IsUpper cur
+                && Char.IsUpper prev
+                && i + 1 < name.Length
+                && Char.IsLower name.[i + 1]
+
+            if lowerToUpper || acronymToWord then
                 tokens <- name.[start .. i - 1].ToLowerInvariant() :: tokens
                 start <- i
 
