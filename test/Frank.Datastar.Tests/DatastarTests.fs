@@ -1275,4 +1275,21 @@ let adrComplianceTests =
 
               Expect.isTrue result.IsNone "tryReadSignals should return ValueNone for invalid JSON (try-semantics)"
 
+          testCase "ADR-Gap3: ReadSignalsAsync<T> propagates JsonException for malformed GET query param"
+          <| fun () ->
+              let context = createMockContext ()
+              context.Request.Method <- HttpMethods.Get
+              context.Request.QueryString <- QueryString("?datastar={not-valid-json")
+
+              let mutable propagated = false
+
+              try
+                  ServerSentEventGenerator.ReadSignalsAsync<{| id: int |}>(context.Request).Wait()
+              with :? AggregateException as ae when (ae.InnerException :? JsonException) ->
+                  propagated <- true
+
+              Expect.isTrue
+                  propagated
+                  "ReadSignalsAsync<T> must propagate JsonException for malformed query param (ADR §ReadSignals)"
+
           ]
