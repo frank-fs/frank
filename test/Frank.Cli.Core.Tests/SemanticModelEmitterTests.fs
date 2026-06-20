@@ -266,6 +266,183 @@ let antiDriftHeaderTests =
           } ]
 
 [<Tests>]
+let unionCaseEmissionTests =
+    testList
+        "Union case emission"
+        [ test "a confirmed union emits a CaseIri match over constructors" {
+              let exDateOffset = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+
+              let lock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = exDateOffset
+                    Vocabularies =
+                      Map.ofList
+                          [ "ex",
+                            { Uri = "https://ex.org/"
+                              FetchedAt = exDateOffset
+                              Hash = "sha256:t" } ]
+                    Mappings =
+                      [ { FSharpType = "Probe.Move"
+                          Iri = Some "ex:Move"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "XMove"
+                                    Iri = Some "ex:XMove"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload =
+                                      [ { Name = "position"
+                                          Iri = None
+                                          Confidence = 0.0
+                                          Source = Convention
+                                          Status = Unresolved } ] }
+                                  { Name = "OMove"
+                                    Iri = Some "ex:OMove"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload =
+                                      [ { Name = "position"
+                                          Iri = None
+                                          Confidence = 0.0
+                                          Source = Convention
+                                          Status = Unresolved } ] } ] } ] }
+
+              let registry: VocabularyRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "ex", Uri "https://ex.org/" ]
+                      Using = Set.ofList [ "ex" ] }
+
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
+
+              Expect.stringContains src "moveCaseIri" "case function name"
+
+              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "XMove arm over constructor"
+
+              Expect.stringContains src "| OMove _ -> System.Uri(\"https://ex.org/OMove\")" "OMove arm over constructor"
+          }
+
+          test "nullary union cases render without underscore" {
+              let exDateOffset = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+
+              let lock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = exDateOffset
+                    Vocabularies =
+                      Map.ofList
+                          [ "ex",
+                            { Uri = "https://ex.org/"
+                              FetchedAt = exDateOffset
+                              Hash = "sha256:t" } ]
+                    Mappings =
+                      [ { FSharpType = "Probe.Light"
+                          Iri = Some "ex:Light"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "Red"
+                                    Iri = Some "ex:Red"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload = [] }
+                                  { Name = "Green"
+                                    Iri = Some "ex:Green"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload = [] } ] } ] }
+
+              let registry: VocabularyRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "ex", Uri "https://ex.org/" ]
+                      Using = Set.ofList [ "ex" ] }
+
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
+
+              Expect.stringContains src "| Red -> System.Uri(\"https://ex.org/Red\")" "nullary Red arm, no underscore"
+
+              Expect.stringContains
+                  src
+                  "| Green -> System.Uri(\"https://ex.org/Green\")"
+                  "nullary Green arm, no underscore"
+
+              Expect.isFalse (src.Contains "| Red _ ->") "nullary case must NOT have a wildcard payload binding"
+          }
+
+          test "partially-confirmed union appends a wildcard arm" {
+              let exDateOffset = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+
+              let lock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = exDateOffset
+                    Vocabularies =
+                      Map.ofList
+                          [ "ex",
+                            { Uri = "https://ex.org/"
+                              FetchedAt = exDateOffset
+                              Hash = "sha256:t" } ]
+                    Mappings =
+                      [ { FSharpType = "Probe.Move"
+                          Iri = Some "ex:Move"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "XMove"
+                                    Iri = Some "ex:XMove"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload =
+                                      [ { Name = "position"
+                                          Iri = None
+                                          Confidence = 0.0
+                                          Source = Convention
+                                          Status = Unresolved } ] }
+                                  { Name = "OMove"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Proposed
+                                    Payload =
+                                      [ { Name = "position"
+                                          Iri = None
+                                          Confidence = 0.0
+                                          Source = Convention
+                                          Status = Unresolved } ] } ] } ] }
+
+              let registry: VocabularyRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "ex", Uri "https://ex.org/" ]
+                      Using = Set.ofList [ "ex" ] }
+
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
+
+              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "confirmed XMove arm"
+
+              Expect.stringContains
+                  src
+                  "| _ -> System.Uri(\"urn:frank:unmapped\")"
+                  "trailing wildcard for the unconfirmed case"
+
+              Expect.isFalse (src.Contains "OMove") "unconfirmed OMove must NOT appear in the match"
+          } ]
+
+[<Tests>]
 let antiDriftTests =
     testList
         "SemanticModelEmitter — anti-drift (FCS typecheck)"

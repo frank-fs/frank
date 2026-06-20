@@ -9,6 +9,11 @@ type ResolvedField =
       SeeAlso: Uri list
       ConstraintPattern: string option }
 
+type ResolvedCase =
+    { CaseName: string
+      Iri: Uri
+      IsNullary: bool }
+
 type ResolvedResource =
     { FSharpType: string
       LocalName: string
@@ -17,7 +22,9 @@ type ResolvedResource =
       EquivalentClass: Uri option
       SeeAlso: Uri list
       ProvClass: ProvOClass option
-      Fields: ResolvedField list }
+      Fields: ResolvedField list
+      Cases: ResolvedCase list
+      UnionCaseCount: int }
 
 type ResolvedModel =
     { Prefixes: Map<string, Uri>
@@ -168,12 +175,33 @@ module ResolvedModel =
         : Result<ResolvedField list, string> =
         traverseResult (buildField prefixes registry fsharpType) fields
 
+    let private buildCases (prefixes: Map<string, Uri>) (cs: CaseMapping list) : ResolvedCase list =
+        cs
+        |> List.filter (fun c -> c.Status = Confirmed)
+        // Confirmed cases whose IRI fails to resolve are dropped (not errored):
+        // `accept` already validates Confirmed IRIs against declared prefixes, so
+        // this is defense-in-depth — such a case degrades to the generated `| _ ->`
+        // wildcard rather than aborting codegen for the whole module.
+        |> List.choose (fun c ->
+            match VocabularyRegistry.tryResolveIri prefixes c.Iri with
+            | Ok(Some iri) ->
+                Some
+                    { CaseName = c.Name
+                      Iri = iri
+                      IsNullary = c.Payload.IsEmpty }
+            | _ -> None)
+
     let private buildResource
         (prefixes: Map<string, Uri>)
         (registry: VocabularyRegistry)
         (m: Mapping)
         : Result<ResolvedResource, string> =
         let localName, genericArity = parseLocalName m.FSharpType
+
+        let cases, unionCaseCount =
+            match m.Shape with
+            | MappingShape.Union cs -> buildCases prefixes cs, cs.Length
+            | MappingShape.Record _ -> [], 0
 
         match VocabularyRegistry.tryResolveIri prefixes m.Iri with
         | Error e -> Error $"type '{m.FSharpType}': {e}"
@@ -197,7 +225,9 @@ module ResolvedModel =
                       EquivalentClass = equivalentClass
                       SeeAlso = seeAlso
                       ProvClass = provClass
-                      Fields = fields }
+                      Fields = fields
+                      Cases = cases
+                      UnionCaseCount = unionCaseCount }
 
     let private buildResources
         (prefixes: Map<string, Uri>)
