@@ -86,10 +86,18 @@ module Datastar =
     let inline executeScript (script: string) (ctx: HttpContext) =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, script)
 
+    let private catchJsonExn<'T> (t: Task<voption<'T>>) : Task<voption<'T>> =
+        task {
+            try
+                return! t
+            with :? JsonException ->
+                return ValueNone
+        }
+
     /// Read and deserialize signals from the request body.
     /// Returns ValueNone for invalid/missing JSON.
-    let inline tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
-        ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request)
+    let tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
+        catchJsonExn (ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request))
 
     // --- WithOptions variants ---
     // These allow specifying full options records from StarFederation.Datastar.FSharp.
@@ -148,8 +156,8 @@ module Datastar =
     /// let jsonOpts = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     /// let! signals = Datastar.tryReadSignalsWithOptions&lt;MySignals&gt; jsonOpts ctx
     /// </example>
-    let inline tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
-        ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)
+    let tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
+        catchJsonExn (ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions))
 
     // --- Stream-based variants ---
     // These accept a TextWriter -> Task callback for direct-to-buffer output.
