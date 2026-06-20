@@ -157,13 +157,13 @@ Prove thesis: naive-client demo, generated-artifact reference app, blog series. 
 
 ## Expert Panel
 
-10 reviewers in `~/.claude/agents/expert-*.md`. Dispatch 2-4 via `/expert-review`.
+11 reviewers in `~/.claude/agents/expert-*.md`. Dispatch 2-4 via `/expert-review`.
 
 | Tier | Experts | Focus |
 |------|---------|-------|
-| 1 (highest gap) | Fielding, Darrel Miller | HATEOAS, API discovery, HTTP standards |
+| 1 (highest gap) | Tim Berners-Lee, Fielding, Darrel Miller | Linked Data / dereferenceable IRIs, HATEOAS, API discovery, HTTP standards |
 | 2 (active) | Fowler, @7sharp9 | ASP.NET Core, F# performance |
 | 3 (long-term) | Harel, Seemann, Don Syme | Statecharts, purity, F# API design |
 | 4 (domain) | Amundsen, Wlaschin, Claude-agent | ALPS, F# DX, agentic consumption |
 
-Dispatch 2-4 per review based on change type. Don't dispatch all 10.
+Tim Berners-Lee is a near-default — include his Linked Data lens in nearly every review unless the change is purely non-data (e.g. build tooling). Otherwise dispatch 2-4 per review based on change type; don't dispatch all 11.
