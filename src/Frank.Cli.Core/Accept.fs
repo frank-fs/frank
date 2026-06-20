@@ -58,8 +58,9 @@ let private parseJsonArray
                 match acc, r with
                 | Error e, _ -> Error e
                 | _, Error e -> Error e
-                | Ok xs, Ok x -> Ok(xs @ [ x ]))
+                | Ok xs, Ok x -> Ok(x :: xs))
             (Ok [])
+        |> Result.map List.rev
     | _ -> Error $"{label} must be an array"
 
 let private parseFieldsArray (node: JsonNode) : Result<ResolvedField list, string> =
@@ -103,8 +104,9 @@ let private parseEntries (arr: JsonArray) : Result<ResolvedEntry list, string> =
             match acc, r with
             | Error e, _ -> Error e
             | _, Error e -> Error e
-            | Ok xs, Ok x -> Ok(xs @ [ x ]))
+            | Ok xs, Ok x -> Ok(x :: xs))
         (Ok [])
+    |> Result.map List.rev
 
 // ── Public: parseResolved ─────────────────────────────────────────────────────
 

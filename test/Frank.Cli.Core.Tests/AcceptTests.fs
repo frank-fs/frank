@@ -381,6 +381,26 @@ let acceptTests =
               | _ -> failwith "expected Record from a fields-based (no cases) resolved entry"
           }
 
+          test "parseResolved preserves field order positionally" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                        { "fsharpType": "App.T", "iri": "schema:Thing",
+                          "fields": [ {"name":"alpha","iri":"schema:a"},
+                                      {"name":"beta","iri":"schema:b"},
+                                      {"name":"gamma","iri":"schema:c"} ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.RecordShape fields ->
+                  Expect.equal
+                      (fields |> List.map (fun f -> f.Name))
+                      [ "alpha"; "beta"; "gamma" ]
+                      "field order preserved"
+              | Accept.UnionShape _ -> failwith "expected RecordShape"
+          }
+
           test "a union case with an unresolvable iri is rejected" {
               let lock =
                   { SchemaVersion = 1
