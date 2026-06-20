@@ -52,6 +52,7 @@ module internal Bytes =
     let DatalineMode = "mode"B
     let DatalineElements = "elements"B
     let DatalineUseViewTransition = "useViewTransition"B
+    let DatalineViewTransitionSelector = "viewTransitionSelector"B
     let DatalineNamespace = "namespace"B
     let DatalineSignals = "signals"B
     let DatalineOnlyIfMissing = "onlyIfMissing"B

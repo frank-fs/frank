@@ -13,6 +13,7 @@ type PatchElementsOptions =
     { Selector: Selector voption
       PatchMode: ElementPatchMode
       UseViewTransition: bool
+      ViewTransitionSelector: string voption
       Namespace: PatchElementNamespace
       EventId: string voption
       Retry: TimeSpan }
@@ -20,6 +21,7 @@ type PatchElementsOptions =
         { Selector = ValueNone
           PatchMode = Consts.DefaultElementPatchMode
           UseViewTransition = Consts.DefaultElementsUseViewTransitions
+          ViewTransitionSelector = ValueNone
           Namespace = Consts.DefaultPatchElementNamespace
           EventId = ValueNone
           Retry = Consts.DefaultSseRetryDuration }

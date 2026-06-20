@@ -8,11 +8,23 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
 type ServerSentEventGenerator =
-    static member StartServerEventStreamAsync(httpResponse:HttpResponse, cancellationToken:CancellationToken) =
-        let task = backgroundTask {
-            // Ensure initialization occurs exactly once per request (FR-010/SC-006)
-            let initKey = "Frank.Datastar.SseStreamInitialized"
-            let isInitialized = httpResponse.HttpContext.Items.ContainsKey(initKey)
+    /// <summary>
+    /// Initializes the SSE response stream: sets <c>Content-Type: text/event-stream</c>,
+    /// <c>Cache-Control: no-cache</c>, and (HTTP/1.1 only) <c>Connection: keep-alive</c>,
+    /// then flushes to the client. Idempotent per request — only the first call takes effect.
+    /// </summary>
+    /// <remarks>
+    /// Thread safety: <see cref="System.IO.Pipelines.PipeWriter"/> is not thread-safe.
+    /// Do not write to the same SSE stream from parallel tasks. The <c>datastar</c> CE
+    /// operation and <c>Datastar.*</c> helpers enforce sequential writes implicitly via
+    /// <c>task { }</c> linearization.
+    /// </remarks>
+    static member StartServerEventStreamAsync(httpResponse: HttpResponse, cancellationToken: CancellationToken) =
+        let task =
+            backgroundTask {
+                // Ensure initialization occurs exactly once per request (FR-010/SC-006)
+                let initKey = "Frank.Datastar.SseStreamInitialized"
+                let isInitialized = httpResponse.HttpContext.Items.ContainsKey(initKey)
 
             if not isInitialized then
                 httpResponse.HttpContext.Items.[initKey] <- true
@@ -42,6 +54,12 @@ type ServerSentEventGenerator =
         if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
             writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
 
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                writer
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
 
@@ -65,6 +83,12 @@ type ServerSentEventGenerator =
 
         if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
+
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                bufWriter
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
 
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
@@ -230,6 +254,12 @@ type ServerSentEventGenerator =
         if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
 
+        if options.UseViewTransition then
+            options.ViewTransitionSelector
+            |> ValueOption.iter (fun sel ->
+                bufWriter
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
 
@@ -312,8 +342,10 @@ type ServerSentEventGenerator =
 
     static member ReadSignalsAsync(httpRequest:HttpRequest, cancellationToken:CancellationToken) =
         backgroundTask {
-            match httpRequest.Method with
-            | "GET" ->
+            if
+                HttpMethods.IsGet(httpRequest.Method)
+                || HttpMethods.IsDelete(httpRequest.Method)
+            then
                 match httpRequest.Query.TryGetValue(Consts.DatastarKey) with
                 | true, stringValues when stringValues.Count > 0 -> return stringValues[0]
                 | _ -> return ""
@@ -321,15 +353,17 @@ type ServerSentEventGenerator =
                 try
                     use readResult = new StreamReader(httpRequest.Body)
                     return! readResult.ReadToEndAsync(cancellationToken)
-                with _ ->
+                with :? IOException ->
                     return ""
         }
 
     static member ReadSignalsAsync<'T>(httpRequest:HttpRequest, jsonSerializerOptions:JsonSerializerOptions, cancellationToken:CancellationToken) =
         task {
             try
-                match httpRequest.Method with
-                | "GET" ->
+                if
+                    HttpMethods.IsGet(httpRequest.Method)
+                    || HttpMethods.IsDelete(httpRequest.Method)
+                then
                     match httpRequest.Query.TryGetValue(Consts.DatastarKey) with
                     | true, stringValues when stringValues.Count > 0 ->
                         return ValueSome (JsonSerializer.Deserialize<'T>(stringValues[0], jsonSerializerOptions))
@@ -338,7 +372,8 @@ type ServerSentEventGenerator =
                 | _ ->
                     let! t = JsonSerializer.DeserializeAsync<'T>(httpRequest.Body, jsonSerializerOptions, cancellationToken)
                     return (ValueSome t)
-            with _ -> return ValueNone
+            with :? IOException ->
+                return ValueNone
         }
 
     //
