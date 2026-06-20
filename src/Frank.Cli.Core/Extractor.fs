@@ -135,17 +135,22 @@ let private entityToTypeInfo (entity: FSharpEntity) : TypeInfo option =
 // ── symbol walk ───────────────────────────────────────────────────────────────
 
 let private collectFromEntity (inProject: FSharpEntity -> bool) (entity: FSharpEntity) : TypeInfo list =
-    let rec walk (e: FSharpEntity) : TypeInfo list =
-        let nested = e.NestedEntities |> Seq.collect walk |> Seq.toList
+    let maxDepth = 20
 
-        if inProject e then
-            match entityToTypeInfo e with
-            | Some ti -> ti :: nested
-            | None -> nested
+    let rec walk depth (e: FSharpEntity) : TypeInfo list =
+        if depth > maxDepth then
+            []
         else
-            nested
+            let nested = e.NestedEntities |> Seq.collect (walk (depth + 1)) |> Seq.toList
 
-    walk entity
+            if inProject e then
+                match entityToTypeInfo e with
+                | Some ti -> ti :: nested
+                | None -> nested
+            else
+                nested
+
+    walk 0 entity
 
 // ── in-memory source extraction ───────────────────────────────────────────────
 
@@ -159,40 +164,44 @@ let private inMemoryOptions (checker: FSharpChecker) (source: ISourceText) =
 /// Types from referenced assemblies are excluded; only types whose declaration
 /// location resolves to the virtual source file are returned.
 let extractTypeInfosFromSource (sourceCode: string) : Result<TypeInfo list, string> =
-    let checker = FSharpChecker.Create(keepAssemblyContents = true)
-    let source = SourceText.ofString sourceCode
-
-    let options, diagnostics = inMemoryOptions checker source
-
-    if
-        diagnostics
-        |> List.exists (fun (d: FSharp.Compiler.Diagnostics.FSharpDiagnostic) ->
-            d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
-    then
-        let msgs = diagnostics |> List.map (fun d -> d.Message) |> String.concat "; "
-        Error $"Script options error: {msgs}"
+    if String.IsNullOrWhiteSpace sourceCode then
+        Error "sourceCode must not be empty"
     else
 
-        let _, checkResult =
-            checker.ParseAndCheckFileInProject(virtualFileName, 0, source, options)
-            |> Async.RunSynchronously
+        let checker = FSharpChecker.Create(keepAssemblyContents = true)
+        let source = SourceText.ofString sourceCode
 
-        match checkResult with
-        | FSharpCheckFileAnswer.Aborted -> Error "FCS check aborted"
-        | FSharpCheckFileAnswer.Succeeded fileResults ->
-            let virtualPath = Path.GetFullPath(virtualFileName)
+        let options, diagnostics = inMemoryOptions checker source
 
-            let inProject (entity: FSharpEntity) =
-                let loc = entity.DeclarationLocation.FileName
+        if
+            diagnostics
+            |> List.exists (fun (d: FSharp.Compiler.Diagnostics.FSharpDiagnostic) ->
+                d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
+        then
+            let msgs = diagnostics |> List.map (fun d -> d.Message) |> String.concat "; "
+            Error $"Script options error: {msgs}"
+        else
 
-                Path.GetFullPath(loc) = virtualPath
+            let _, checkResult =
+                checker.ParseAndCheckFileInProject(virtualFileName, 0, source, options)
+                |> Async.RunSynchronously
 
-            let types =
-                fileResults.PartialAssemblySignature.Entities
-                |> Seq.collect (collectFromEntity inProject)
-                |> Seq.toList
+            match checkResult with
+            | FSharpCheckFileAnswer.Aborted -> Error "FCS check aborted"
+            | FSharpCheckFileAnswer.Succeeded fileResults ->
+                let virtualPath = Path.GetFullPath(virtualFileName)
 
-            Ok types
+                let inProject (entity: FSharpEntity) =
+                    let loc = entity.DeclarationLocation.FileName
+
+                    Path.GetFullPath(loc) = virtualPath
+
+                let types =
+                    fileResults.PartialAssemblySignature.Entities
+                    |> Seq.collect (collectFromEntity inProject)
+                    |> Seq.toList
+
+                Ok types
 
 // ── .fsproj cracking helpers ──────────────────────────────────────────────────
 

@@ -352,10 +352,11 @@ module ConventionEngine =
         | Some explicitUri ->
             let curie = toCurie registry.Prefixes explicitUri
 
+            let fields = recordFields typeInfo
+
             let fieldMappings =
-                if convention.Fields.IsEmpty && not (recordFields typeInfo).IsEmpty then
-                    recordFields typeInfo
-                    |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
+                if convention.Fields.IsEmpty && not fields.IsEmpty then
+                    fields |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
                 else
                     convention.Fields
 
