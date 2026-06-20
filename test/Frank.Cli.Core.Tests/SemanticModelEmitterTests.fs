@@ -461,3 +461,98 @@ let antiDriftTests =
               let errors = typecheckTwoSources domainSrcRenamed src
               Expect.isNonEmpty errors "renaming Game→GameX must break the emitted typeof<Probe.Game>"
           } ]
+
+// ── AT4 fixtures ──────────────────────────────────────────────────────────────
+
+let private exDateOffset = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+
+let private exRegistry: VocabularyRegistry =
+    { VocabularyRegistry.empty with
+        Prefixes = Map.ofList [ "ex", Uri "https://ex.org/" ]
+        Using = Set.ofList [ "ex" ] }
+
+let private moveLock: LockFile =
+    { SchemaVersion = 1
+      Generated = exDateOffset
+      Vocabularies =
+        Map.ofList
+            [ "ex",
+              { Uri = "https://ex.org/"
+                FetchedAt = exDateOffset
+                Hash = "sha256:t" } ]
+      Mappings =
+        [ { FSharpType = "Probe.Move"
+            Iri = Some "ex:Move"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Union
+                  [ { Name = "XMove"
+                      Iri = Some "ex:XMove"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed
+                      Payload =
+                        [ { Name = "position"
+                            Iri = None
+                            Confidence = 0.0
+                            Source = Convention
+                            Status = Unresolved } ] }
+                    { Name = "OMove"
+                      Iri = Some "ex:OMove"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed
+                      Payload =
+                        [ { Name = "position"
+                            Iri = None
+                            Confidence = 0.0
+                            Source = Convention
+                            Status = Unresolved } ] } ] } ] }
+
+let private moveDomainSrc =
+    """
+namespace Probe
+
+type Move = | XMove of int | OMove of int
+"""
+
+let private moveDomainSrcRenamed =
+    """
+namespace Probe
+
+type Move = | XPlay of int | OMove of int
+"""
+
+[<Tests>]
+let at4UnionCaseIriTests =
+    testList
+        "AT4 — generated union CaseIri compiles against real DU (FCS anti-drift)"
+        [ test "generated moveCaseIri compiles against matching domain (positive)" {
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" exRegistry moveLock) "emit"
+
+              Expect.stringContains src "moveCaseIri" "moveCaseIri function emitted"
+              Expect.stringContains src "| XMove _ -> System.Uri(\"https://ex.org/XMove\")" "XMove arm present"
+              Expect.stringContains src "| OMove _ -> System.Uri(\"https://ex.org/OMove\")" "OMove arm present"
+
+              let errors = typecheckTwoSources moveDomainSrc src
+              Expect.isEmpty errors $"generated union match must compile against real DU; diagnostics: {errors}"
+          }
+
+          test "generated moveCaseIri fails to compile when XMove renamed to XPlay (negative / AT4)" {
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" exRegistry moveLock) "emit"
+
+              let errors = typecheckTwoSources moveDomainSrcRenamed src
+
+              Expect.isNonEmpty
+                  errors
+                  "renaming XMove→XPlay must produce a compile error in the generated CaseIri match"
+
+              let mentionsXMove = errors |> List.exists (fun e -> e.Contains "XMove")
+
+              Expect.isTrue mentionsXMove $"at least one diagnostic must reference XMove; got: {errors}"
+          } ]
