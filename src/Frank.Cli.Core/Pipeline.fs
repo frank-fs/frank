@@ -115,6 +115,13 @@ let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list)
 
 let private summarize (mappings: Mapping list) : ExtractSummary = LockFile.countByStatus mappings
 
+let private accumulateTerms (acc: VocabTerms) g : VocabTerms =
+    let t = ConventionEngine.extractVocabTerms g
+
+    { Classes = Map.fold (fun m k v -> Map.add k v m) acc.Classes t.Classes
+      Properties = Map.fold (fun m k v -> Map.add k v m) acc.Properties t.Properties
+      Individuals = Map.fold (fun m k v -> Map.add k v m) acc.Individuals t.Individuals }
+
 // ── Effectful steps ───────────────────────────────────────────────────────────
 
 /// Fetch all in-scope vocabularies and return merged VocabTerms with per-prefix entries.
@@ -147,22 +154,18 @@ let private fetchVocabTerms
         match firstError with
         | Some(Error e) -> return Error e
         | _ ->
+            let emptyTerms =
+                { Classes = Map.empty
+                  Properties = Map.empty
+                  Individuals = Map.empty }
+
             let terms =
                 results
                 |> Array.choose (fun r ->
                     match r with
                     | Ok cv -> Some cv.Graph
                     | Error _ -> None)
-                |> Array.fold
-                    (fun acc g ->
-                        let t = ConventionEngine.extractVocabTerms g
-
-                        { Classes = Map.fold (fun m k v -> Map.add k v m) acc.Classes t.Classes
-                          Properties = Map.fold (fun m k v -> Map.add k v m) acc.Properties t.Properties
-                          Individuals = Map.fold (fun m k v -> Map.add k v m) acc.Individuals t.Individuals })
-                    { Classes = Map.empty
-                      Properties = Map.empty
-                      Individuals = Map.empty }
+                |> Array.fold accumulateTerms emptyTerms
 
             let vocabEntries =
                 List.zip inScopePrefixes (Array.toList results)
