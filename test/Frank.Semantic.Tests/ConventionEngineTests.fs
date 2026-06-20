@@ -940,3 +940,172 @@ let individualExtractionTests =
               Expect.equal terms.Individuals.["x"] "https://ex.org/X" "x IRI"
               Expect.isTrue (terms.Individuals.ContainsKey "o") "o individual present"
           } ]
+
+// ── Fix #3: union-case role dichotomy ────────────────────────────────────────
+
+[<Tests>]
+let roleDichotomyTests =
+    testList
+        "Fix #3: role dichotomy — cases search union of both role maps"
+        [ test "#3 nullary→class: nullary case confirms when ontology declares value as class only" {
+              // Shape only has Classes, no Individuals — old code searched only Individuals → Unresolved.
+              // New code: nullary = Classes overlay Individuals → circle found in Classes.
+              let terms =
+                  { Classes = Map.ofList [ "circle", "https://ex.org/Circle" ]
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Shape"
+                    Namespace = "App"
+                    LocalName = "Shape"
+                    Shape = TypeShape.Union [ mkCase "Circle" [] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let circle = cases |> List.find (fun c -> c.Name = "Circle")
+                  Expect.equal circle.Status Confirmed "#3 nullary→class: Circle must be Confirmed"
+                  Expect.equal circle.Iri (Some "ex:Circle") "Circle → class IRI"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "#3 nullary individual-precedence: individual wins over class on key collision" {
+              // Both Individuals["red"]=RedI and Classes["red"]=RedC declared.
+              // nullary precedence: individual wins → Confirmed to RedI.
+              let terms =
+                  { Classes = Map.ofList [ "red", "https://ex.org/RedC" ]
+                    Properties = Map.empty
+                    Individuals = Map.ofList [ "red", "https://ex.org/RedI" ] }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Color"
+                    Namespace = "App"
+                    LocalName = "Color"
+                    Shape = TypeShape.Union [ mkCase "Red" [] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let red = cases |> List.find (fun c -> c.Name = "Red")
+                  Expect.equal red.Status Confirmed "#3 nullary individual-precedence: Red confirmed"
+                  Expect.equal red.Iri (Some "ex:RedI") "individual wins over class on tie"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "#3 payload→individual fallback: payload case confirms when only individual declared" {
+              // Classes empty, Individuals has xmove → old code searched only Classes → Unresolved.
+              // New code: payload = Individuals overlay Classes → xmove found in Individuals.
+              let terms =
+                  { Classes = Map.empty
+                    Properties = Map.empty
+                    Individuals = Map.ofList [ "xmove", "https://ex.org/XMoveI" ] }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Move"
+                    Namespace = "App"
+                    LocalName = "Move"
+                    Shape = TypeShape.Union [ mkCase "XMove" [ mkFieldInfo "position" "SquarePosition" ] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let x = cases |> List.find (fun c -> c.Name = "XMove")
+                  Expect.equal x.Status Confirmed "#3 payload→individual fallback: XMove confirmed"
+                  Expect.equal x.Iri (Some "ex:XMoveI") "XMove → individual IRI (fallback)"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "#3 payload subclass-precedence: class wins over individual on key collision" {
+              // Both Classes["xmove"]=XMoveC and Individuals["xmove"]=XMoveI declared.
+              // payload precedence: class wins → Confirmed to XMoveC.
+              let terms =
+                  { Classes = Map.ofList [ "xmove", "https://ex.org/XMoveC" ]
+                    Properties = Map.empty
+                    Individuals = Map.ofList [ "xmove", "https://ex.org/XMoveI" ] }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Move"
+                    Namespace = "App"
+                    LocalName = "Move"
+                    Shape = TypeShape.Union [ mkCase "XMove" [ mkFieldInfo "position" "SquarePosition" ] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let x = cases |> List.find (fun c -> c.Name = "XMove")
+                  Expect.equal x.Status Confirmed "#3 payload subclass-precedence: XMove confirmed"
+                  Expect.equal x.Iri (Some "ex:XMoveC") "class wins over individual on tie"
+              | _ -> failwith "expected Union shape"
+          } ]
+
+// ── Fix #10: isInScope path-boundary ─────────────────────────────────────────
+
+[<Tests>]
+let isInScopeBoundaryTests =
+    testList
+        "Fix #10: isInScope path-boundary — sibling slash-namespaces excluded"
+        [ test "#10 isInScope boundary: sibling namespace voc2 excluded, voc#Foo included" {
+              // Base: https://ex.org/voc (no trailing slash).
+              // In-scope:  https://ex.org/voc#Foo   (hash separator after base)
+              // Out-of-scope: https://ex.org/voc2#Bar (next char after base is '2', not '/' or '#')
+              let terms =
+                  { Classes = Map.ofList [ "foo", "https://ex.org/voc#Foo"; "bar", "https://ex.org/voc2#Bar" ]
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              // Registry declares prefix "ex" → https://ex.org/voc (bare, no trailing slash)
+              let registry =
+                  { Prefixes = Map.ofList [ "ex", System.Uri "https://ex.org/voc" ]
+                    Using = Set.ofList [ "ex" ]
+                    EquivalentClasses = Map.empty
+                    SeeAlso = Map.empty
+                    FieldSeeAlso = Map.empty
+                    ProvClasses = Map.empty
+                    ConstraintPatterns = Map.empty }
+
+              // Score a type whose LocalName matches "foo" exactly → Confirmed
+              let typeInfo =
+                  { FullName = "App.Foo"
+                    Namespace = "App"
+                    LocalName = "Foo"
+                    Shape = TypeShape.Record []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let mFoo = ConventionEngine.score terms registry typeInfo
+              Expect.equal mFoo.Status Confirmed "#10: Foo (in voc#Foo) must be Confirmed"
+
+              // Score a type whose LocalName matches "bar" exactly → must NOT confirm (out of scope)
+              let typeInfoBar =
+                  { FullName = "App.Bar"
+                    Namespace = "App"
+                    LocalName = "Bar"
+                    Shape = TypeShape.Record []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let mBar = ConventionEngine.score terms registry typeInfoBar
+              Expect.notEqual mBar.Status Confirmed "#10: Bar (in voc2#Bar) must NOT be Confirmed — sibling namespace"
+              Expect.isNone mBar.Iri "#10: out-of-scope IRI must not surface"
+          } ]

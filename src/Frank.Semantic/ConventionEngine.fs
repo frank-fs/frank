@@ -205,7 +205,14 @@ module ConventionEngine =
         |> Set.exists (fun prefix ->
             match Map.tryFind prefix registry.Prefixes with
             | None -> false
-            | Some baseUri -> iri.StartsWith(baseUri.AbsoluteUri, StringComparison.Ordinal))
+            | Some baseUri ->
+                let b = baseUri.AbsoluteUri
+
+                iri.StartsWith(b, StringComparison.Ordinal)
+                && (b.EndsWith("/")
+                    || b.EndsWith("#")
+                    || iri.Length = b.Length
+                    || (let c = iri.[b.Length] in c = '/' || c = '#')))
 
     // ── Candidate scoring ─────────────────────────────────────────────────────
 
@@ -376,9 +383,9 @@ module ConventionEngine =
     let private buildCaseMapping (registry: VocabularyRegistry) (terms: VocabTerms) (case: CaseInfo) : CaseMapping =
         let role =
             (if case.Payload.IsEmpty then
-                 terms.Individuals
+                 mergeTermMaps terms.Classes terms.Individuals
              else
-                 terms.Classes)
+                 mergeTermMaps terms.Individuals terms.Classes)
             |> Map.filter (fun _ iri -> isInScope registry iri)
 
         let iri, conf, status = matchEntity registry.Prefixes role case.Name
@@ -426,6 +433,20 @@ module ConventionEngine =
                 Status = Confirmed
                 Shape = MappingShape.Record fieldMappings }
 
+    // ── Union fallback ────────────────────────────────────────────────────────
+
+    let private unionFallback
+        (registry: VocabularyRegistry)
+        (terms: VocabTerms)
+        (typeInfo: TypeInfo)
+        (empty: Mapping)
+        : Mapping =
+        match typeInfo.Shape with
+        | TypeShape.Union cases ->
+            { empty with
+                Shape = mapUnionCases registry terms cases }
+        | TypeShape.Record _ -> empty
+
     // ── Main entry ────────────────────────────────────────────────────────────
 
     let private unresolvedMapping (typeInfo: TypeInfo) : Mapping =
@@ -447,11 +468,7 @@ module ConventionEngine =
 
         let conventionResult =
             if inScopeClasses.IsEmpty then
-                match typeInfo.Shape with
-                | TypeShape.Union cases ->
-                    { emptyUnresolved with
-                        Shape = mapUnionCases registry terms cases }
-                | TypeShape.Record _ -> emptyUnresolved
+                unionFallback registry terms typeInfo emptyUnresolved
             else
                 let typeTokens = normalizeTokens typeInfo.LocalName
                 let typeKey = normKey typeInfo.LocalName
@@ -470,7 +487,7 @@ module ConventionEngine =
                     |> topK
 
                 match candidates with
-                | [] -> emptyUnresolved
+                | [] -> unionFallback registry terms typeInfo emptyUnresolved
                 | (bestScore, (bestLocal, bestIri)) :: rest ->
                     let alternates = rest |> List.map (snd >> snd)
 
