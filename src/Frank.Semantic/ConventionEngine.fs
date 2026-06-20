@@ -293,6 +293,9 @@ module ConventionEngine =
     /// Keys are lowercase local names; values are absolute IRI strings.
     /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
     let extractVocabTerms (graph: IGraph) : VocabTerms =
+        if isNull graph then
+            invalidArg (nameof graph) "graph must not be null"
+
         { Classes =
             buildTermMap (Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph))
           Properties =
