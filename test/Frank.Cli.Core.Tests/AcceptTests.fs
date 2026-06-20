@@ -277,4 +277,144 @@ let acceptTests =
               Expect.equal (rejected.GetArrayLength()) 1 "rejected length"
               let r0 = rejected.[0]
               Expect.equal (r0.GetProperty("fsharpType").GetString()) "MyApp.Ghost" "fsharpType"
-              Expect.equal (r0.GetProperty("reason").GetString()) "not in lock file" "reason" ]
+              Expect.equal (r0.GetProperty("reason").GetString()) "not in lock file" "reason"
+
+          test "accept a union investment produces a Union mapping with confirmed cases" {
+              let unresolvedPayload =
+                  [ { Name = "position"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                              Hash = "h" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Move"
+                          Iri = Some "schema:MoveAction"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "XMove"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = unresolvedPayload }
+                                  { Name = "OMove"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = unresolvedPayload } ] } ] }
+
+              let json =
+                  """
+                  { "schemaVersion": 1, "resolved": [
+                    { "fsharpType": "App.Move", "iri": "schema:MoveAction",
+                      "cases": [
+                        { "name": "XMove", "iri": "schema:MoveAction", "payload": [ { "name": "position", "iri": "schema:position" } ] },
+                        { "name": "OMove", "iri": "schema:MoveAction", "payload": [ { "name": "position", "iri": "schema:position" } ] } ] } ] }
+                  """
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let updated, _ = Accept.apply lock doc Manual
+
+              let move = updated.Mappings |> List.find (fun m -> m.FSharpType = "App.Move")
+
+              match move.Shape with
+              | MappingShape.Union cases ->
+                  let x = cases |> List.find (fun c -> c.Name = "XMove")
+                  Expect.equal x.Status Confirmed "XMove confirmed by investment"
+                  Expect.equal x.Iri (Some "schema:MoveAction") "XMove iri"
+                  let pos = x.Payload |> List.exactlyOne
+                  Expect.equal pos.Status Confirmed "payload position confirmed"
+                  Expect.equal pos.Iri (Some "schema:position") "payload iri"
+              | _ -> failwith "expected Move to remain a Union after accept (not downcast to Record)"
+          }
+
+          test "back-compat: a resolved entry with fields (no cases) still builds a Record" {
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                              Hash = "h" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "id"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let updated, _ = Accept.apply lock doc Manual
+
+              let game = updated.Mappings |> List.find (fun m -> m.FSharpType = "App.Game")
+
+              match game.Shape with
+              | MappingShape.Record [ f ] -> Expect.equal f.Name "id" "record field preserved"
+              | _ -> failwith "expected Record from a fields-based (no cases) resolved entry"
+          }
+
+          test "a union case with an unresolvable iri is rejected" {
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                              Hash = "h" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Move"
+                          Iri = Some "schema:MoveAction"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "XMove"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = [] } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Move", "iri": "schema:MoveAction", "cases": [ { "name": "XMove", "iri": "bogus:NotAPrefix", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Manual
+              Expect.isNonEmpty summary.Rejected "unresolvable case iri must be rejected"
+
+              let r = summary.Rejected |> List.find (fun r -> r.FSharpType = "App.Move")
+
+              Expect.stringContains r.Reason "iri" "rejection reason mentions the iri problem"
+          } ]

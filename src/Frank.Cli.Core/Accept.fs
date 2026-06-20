@@ -6,10 +6,19 @@ open Frank.Semantic.LockFile
 
 type ResolvedField = { Name: string; Iri: string option }
 
+type ResolvedCase =
+    { Name: string
+      Iri: string option
+      Payload: ResolvedField list }
+
+type ResolvedShape =
+    | RecordShape of ResolvedField list
+    | UnionShape of ResolvedCase list
+
 type ResolvedEntry =
     { FSharpType: string
       Iri: string option
-      Fields: ResolvedField list }
+      Shape: ResolvedShape }
 
 type ResolvedDoc =
     { SchemaVersion: int
@@ -34,12 +43,16 @@ let private parseField (node: JsonNode) : Result<ResolvedField, string> =
         { Name = name
           Iri = optionalString node "iri" })
 
-let private parseFieldsArray (node: JsonNode) : Result<ResolvedField list, string> =
+let private parseJsonArray
+    (label: string)
+    (parseElement: int -> JsonNode -> Result<'a, string>)
+    (node: JsonNode)
+    : Result<'a list, string> =
     match node with
     | null -> Ok []
     | :? JsonArray as arr ->
         arr
-        |> Seq.mapi (fun i el -> parseField el |> Result.mapError (fun e -> $"fields[{i}]: {e}"))
+        |> Seq.mapi (fun i el -> parseElement i el)
         |> Seq.fold
             (fun acc r ->
                 match acc, r with
@@ -47,18 +60,40 @@ let private parseFieldsArray (node: JsonNode) : Result<ResolvedField list, strin
                 | _, Error e -> Error e
                 | Ok xs, Ok x -> Ok(xs @ [ x ]))
             (Ok [])
-    | _ -> Error "fields must be an array"
+    | _ -> Error $"{label} must be an array"
+
+let private parseFieldsArray (node: JsonNode) : Result<ResolvedField list, string> =
+    parseJsonArray "fields" (fun i el -> parseField el |> Result.mapError (fun e -> $"fields[{i}]: {e}")) node
+
+let private parseCase (node: JsonNode) : Result<ResolvedCase, string> =
+    requireString node "name"
+    |> Result.bind (fun name ->
+        parseFieldsArray node.["payload"]
+        |> Result.map (fun payload ->
+            { Name = name
+              Iri = optionalString node "iri"
+              Payload = payload }))
+
+let private parseCasesArray (node: JsonNode) : Result<ResolvedCase list, string> =
+    parseJsonArray "cases" (fun i el -> parseCase el |> Result.mapError (fun e -> $"cases[{i}]: {e}")) node
 
 let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string> =
     requireString node "fsharpType"
     |> Result.mapError (fun _ -> $"resolved[{i}]: fsharpType is required")
     |> Result.bind (fun fsType ->
-        parseFieldsArray node.["fields"]
+        let iri = optionalString node "iri"
+
+        let shapeResult =
+            match node.["cases"] with
+            | null -> parseFieldsArray node.["fields"] |> Result.map RecordShape
+            | casesNode -> parseCasesArray casesNode |> Result.map UnionShape
+
+        shapeResult
         |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
-        |> Result.map (fun fields ->
+        |> Result.map (fun shape ->
             { FSharpType = fsType
-              Iri = optionalString node "iri"
-              Fields = fields }))
+              Iri = iri
+              Shape = shape }))
 
 let private parseEntries (arr: JsonArray) : Result<ResolvedEntry list, string> =
     arr
@@ -129,6 +164,30 @@ let private buildFieldMapping (source: MappingSource) (rf: ResolvedField) : Fiel
           Source = source
           Status = Confirmed }
 
+let private buildCaseMapping (source: MappingSource) (rc: ResolvedCase) : CaseMapping =
+    let payload = rc.Payload |> List.map (buildFieldMapping source)
+
+    match rc.Iri with
+    | None ->
+        { Name = rc.Name
+          Iri = None
+          Confidence = 0.0
+          Source = source
+          Status = Unresolved
+          Payload = payload }
+    | Some iri ->
+        { Name = rc.Name
+          Iri = Some iri
+          Confidence = 1.0
+          Source = source
+          Status = Confirmed
+          Payload = payload }
+
+let private buildShape (source: MappingSource) (shape: ResolvedShape) : MappingShape =
+    match shape with
+    | RecordShape fs -> MappingShape.Record(fs |> List.map (buildFieldMapping source))
+    | UnionShape cs -> MappingShape.Union(cs |> List.map (buildCaseMapping source))
+
 let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: string) : Mapping =
     { FSharpType = entry.FSharpType
       Iri = Some iri
@@ -136,7 +195,7 @@ let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: st
       Source = source
       Status = Confirmed
       Alternates = []
-      Shape = MappingShape.Record(entry.Fields |> List.map (buildFieldMapping source)) }
+      Shape = buildShape source entry.Shape }
 
 let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) : int =
     mappings
@@ -148,26 +207,45 @@ let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) 
 
 // ── Public: apply ─────────────────────────────────────────────────────────────
 
-let private firstIriError (prefixes: Map<string, System.Uri>) (e: ResolvedEntry) : string option =
-    let classCheck =
-        match e.Iri with
-        | None -> None
-        | Some iri ->
-            match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
-            | Error msg -> Some $"unresolvable iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
-            | Ok _ -> None
+let private checkIri (prefixes: Map<string, System.Uri>) (label: string) (iri: string) : string option =
+    match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
+    | Error msg -> Some $"unresolvable {label} '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
+    | Ok _ -> None
 
-    match classCheck with
-    | Some _ -> classCheck
+let private firstCaseIriError (prefixes: Map<string, System.Uri>) (c: ResolvedCase) : string option =
+    match c.Iri |> Option.bind (checkIri prefixes "case iri") with
+    | Some err -> Some err
     | None ->
-        e.Fields
-        |> List.tryPick (fun f ->
-            match f.Iri with
-            | None -> None
-            | Some iri ->
-                match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
-                | Error msg -> Some $"unresolvable field iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
-                | Ok _ -> None)
+        c.Payload
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes "payload iri"))
+
+let private firstShapeIriError (prefixes: Map<string, System.Uri>) (shape: ResolvedShape) : string option =
+    match shape with
+    | RecordShape fs ->
+        fs
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes "field iri"))
+    | UnionShape cs -> cs |> List.tryPick (firstCaseIriError prefixes)
+
+let private firstIriError (prefixes: Map<string, System.Uri>) (e: ResolvedEntry) : string option =
+    match e.Iri |> Option.bind (checkIri prefixes "iri") with
+    | Some err -> Some err
+    | None -> firstShapeIriError prefixes e.Shape
+
+let private partitionByIri
+    (prefixes: Map<string, System.Uri>)
+    (entries: ResolvedEntry list)
+    : RejectedEntry list * ResolvedEntry list =
+    let folder (rejected, ok) e =
+        match firstIriError prefixes e with
+        | Some reason ->
+            ({ FSharpType = e.FSharpType
+               Reason = reason }
+             :: rejected),
+            ok
+        | None -> rejected, (e :: ok)
+
+    let rejected, ok = List.fold folder ([], []) entries
+    List.rev rejected, List.rev ok
 
 let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
@@ -194,14 +272,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile *
     let prefixes =
         lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
 
-    let unresolvableRejected, toMerge =
-        withIri |> List.partition (fun e -> firstIriError prefixes e |> Option.isSome)
-
-    let iriRejected =
-        unresolvableRejected
-        |> List.map (fun e ->
-            { FSharpType = e.FSharpType
-              Reason = firstIriError prefixes e |> Option.defaultValue "unresolvable iri" })
+    let iriRejected, toMerge = partitionByIri prefixes withIri
 
     let alreadyConfirmed =
         toMerge
