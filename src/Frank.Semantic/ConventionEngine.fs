@@ -259,7 +259,7 @@ module ConventionEngine =
         else
             iri.ToLowerInvariant()
 
-    let private collectByTypeIri (typeIri: string) (graph: IGraph) : Map<string, string> =
+    let private collectByTypeIri (typeIri: string) (graph: IGraph) : (string * string) seq =
         let typeNode = graph.CreateUriNode(Uri(rdfTypeIri))
         let typeValueNode = graph.CreateUriNode(Uri(typeIri))
 
@@ -270,26 +270,37 @@ module ConventionEngine =
                 let iri = subj.Uri.AbsoluteUri
                 Some(iriLocalName iri, iri)
             | _ -> None)
-        |> Map.ofSeq
 
     let private mergeTermMaps (a: Map<string, string>) (b: Map<string, string>) : Map<string, string> =
         Map.fold (fun acc k v -> Map.add k v acc) a b
+
+    /// Build a local-name to IRI map, excluding ambiguous local names (a name that
+    /// maps to more than one distinct IRI). Ambiguous names are dropped so they cannot
+    /// produce a Confirmed mapping to an arbitrary namespace; the affected type degrades
+    /// to Unresolved (surfaced in the lock), never a silent wrong-namespace confirm.
+    let private buildTermMap (pairs: (string * string) seq) : Map<string, string> =
+        pairs
+        |> Seq.groupBy fst
+        |> Seq.choose (fun (key, group) ->
+            match group |> Seq.map snd |> Seq.distinct |> Seq.toList with
+            | [ single ] -> Some(key, single)
+            | _ -> None)
+        |> Map.ofSeq
 
     /// Extract class, property, and individual local names from a vocabulary IGraph.
     /// Recognizes rdfs:Class, rdf:Property, schema:Class, schema:Property typings,
     /// plus owl:NamedIndividual and skos:Concept as individuals (enumerated values).
     /// Keys are lowercase local names; values are absolute IRI strings.
+    /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
     let extractVocabTerms (graph: IGraph) : VocabTerms =
-        let rdfsClasses = collectByTypeIri rdfsClassIri graph
-        let schemaClasses = collectByTypeIri schemaClassIri graph
-        let rdfProperties = collectByTypeIri rdfPropertyIri graph
-        let schemaProperties = collectByTypeIri schemaPropertyIri graph
-        let owlIndividuals = collectByTypeIri owlNamedIndividualIri graph
-        let skosConcepts = collectByTypeIri skosConceptIri graph
-
-        { Classes = mergeTermMaps rdfsClasses schemaClasses
-          Properties = mergeTermMaps rdfProperties schemaProperties
-          Individuals = mergeTermMaps owlIndividuals skosConcepts }
+        { Classes =
+            buildTermMap (Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph))
+          Properties =
+            buildTermMap (Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph))
+          Individuals =
+            buildTermMap (
+                Seq.append (collectByTypeIri owlNamedIndividualIri graph) (collectByTypeIri skosConceptIri graph)
+            ) }
 
     // ── CURIE reverse-resolution ──────────────────────────────────────────────
 

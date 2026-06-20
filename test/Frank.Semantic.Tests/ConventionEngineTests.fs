@@ -1059,6 +1059,83 @@ let roleDichotomyTests =
               | _ -> failwith "expected Union shape"
           } ]
 
+// ── Ambiguous local-name collision (Miller finding) ───────────────────────────
+
+[<Tests>]
+let ambiguousLocalNameTests =
+    testList
+        "ambiguous local-name: cross-namespace collision drops the key"
+        [ test "[ambiguous dropped] two rdfs:Classes with same local name → key absent" {
+              let jsonld =
+                  """
+                  { "@context": {
+                      "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                      "a_ns": "https://a.org/",
+                      "b_ns": "https://b.org/" },
+                    "@graph": [
+                      { "@id": "https://a.org/Order", "@type": "rdfs:Class" },
+                      { "@id": "https://b.org/Order", "@type": "rdfs:Class" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isFalse
+                  (terms.Classes.ContainsKey "order")
+                  $"ambiguous 'order' must be dropped; classes: {terms.Classes}"
+          }
+
+          test "[unambiguous kept] single rdfs:Class → key present with correct IRI" {
+              let jsonld =
+                  """
+                  { "@context": { "rdfs": "http://www.w3.org/2000/01/rdf-schema#" },
+                    "@graph": [
+                      { "@id": "https://a.org/Order", "@type": "rdfs:Class" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue (terms.Classes.ContainsKey "order") "unambiguous 'order' must be kept"
+              Expect.equal terms.Classes.["order"] "https://a.org/Order" "IRI is a.org/Order"
+          }
+
+          test "[same-iri not ambiguous] class typed as both rdfs:Class and schema:Class → kept" {
+              let jsonld =
+                  """
+                  { "@context": {
+                      "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                      "schema": "https://schema.org/" },
+                    "@graph": [
+                      { "@id": "https://a.org/Order",
+                        "@type": [ "rdfs:Class", "schema:Class" ] } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue
+                  (terms.Classes.ContainsKey "order")
+                  $"same-IRI dual-typed class must be kept; classes: {terms.Classes}"
+
+              Expect.equal terms.Classes.["order"] "https://a.org/Order" "IRI preserved"
+          } ]
+
 // ── Fix #10: isInScope path-boundary ─────────────────────────────────────────
 
 [<Tests>]
