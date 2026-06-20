@@ -783,6 +783,139 @@ let exactIdentityConfirmTests =
               Expect.equal fieldMapping.Iri (Some "schema:name") "correct field IRI"
           } ]
 
+// ── Union join test helpers ───────────────────────────────────────────────────
+
+let mkFieldInfo name typeName : FieldInfo =
+    { Name = name
+      TypeName = typeName
+      Attributes = Map.empty
+      DocComment = None }
+
+let mkCase name payload : CaseInfo =
+    { Name = name
+      Payload = payload
+      Attributes = Map.empty
+      DocComment = None }
+
+let mkRegistryUsing (prefixes: (string * string) list) : VocabularyRegistry =
+    { Prefixes = prefixes |> List.map (fun (p, u) -> p, System.Uri u) |> Map.ofList
+      Using = prefixes |> List.map fst |> Set.ofList
+      EquivalentClasses = Map.empty
+      SeeAlso = Map.empty
+      FieldSeeAlso = Map.empty
+      ProvClasses = Map.empty
+      ConstraintPatterns = Map.empty }
+
+// ── Union join tests ──────────────────────────────────────────────────────────
+
+[<Tests>]
+let unionJoinTests =
+    testList
+        "Union join (case scoring)"
+        [ test "AT1: nullary case confirms against a declared individual" {
+              let terms =
+                  { Classes = Map.ofList [ "light", "https://ex.org/Light" ]
+                    Properties = Map.empty
+                    Individuals = Map.ofList [ "red", "https://ex.org/Red"; "green", "https://ex.org/Green" ] }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Light"
+                    Namespace = "App"
+                    LocalName = "Light"
+                    Shape = TypeShape.Union [ mkCase "Red" []; mkCase "Green" [] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let red = cases |> List.find (fun c -> c.Name = "Red")
+                  Expect.equal red.Status Confirmed "Red confirmed"
+                  Expect.equal red.Iri (Some "ex:Red") "Red → individual IRI"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "AT2: payload case against generic vocab does NOT map to a property" {
+              let terms =
+                  { Classes = Map.ofList [ "move", "https://ex.org/Move" ]
+                    Properties = Map.ofList [ "ordereditem", "https://ex.org/orderedItem" ]
+                    Individuals = Map.empty }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Move"
+                    Namespace = "App"
+                    LocalName = "Move"
+                    Shape = TypeShape.Union [ mkCase "XMove" [ mkFieldInfo "position" "SquarePosition" ] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let x = cases |> List.find (fun c -> c.Name = "XMove")
+                  Expect.notEqual x.Iri (Some "ex:orderedItem") "XMove must NOT map to a property"
+                  Expect.notEqual x.Status Confirmed "no exact subclass → not confirmed"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "AT3: payload case confirms against a declared subclass" {
+              let terms =
+                  { Classes = Map.ofList [ "move", "https://ex.org/Move"; "xmove", "https://ex.org/XMove" ]
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let typeInfo =
+                  { FullName = "App.Move"
+                    Namespace = "App"
+                    LocalName = "Move"
+                    Shape = TypeShape.Union [ mkCase "XMove" [ mkFieldInfo "position" "SquarePosition" ] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry typeInfo
+
+              match m.Shape with
+              | MappingShape.Union cases ->
+                  let x = cases |> List.find (fun c -> c.Name = "XMove")
+                  Expect.equal x.Status Confirmed "XMove confirmed against subclass"
+                  Expect.equal x.Iri (Some "ex:XMove") "XMove → subclass IRI"
+              | _ -> failwith "expected Union shape"
+          }
+
+          test "AT5: generic and recursive unions map structurally without crash" {
+              let terms =
+                  { Classes = Map.empty
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              let registry = mkRegistryUsing [ "ex", "https://ex.org/" ]
+
+              let result =
+                  { FullName = "App.Result`2"
+                    Namespace = "App"
+                    LocalName = "Result"
+                    Shape =
+                      TypeShape.Union
+                          [ mkCase "Ok" [ mkFieldInfo "Item" "'T" ]
+                            mkCase "Error" [ mkFieldInfo "Item" "'TError" ] ]
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let m = ConventionEngine.score terms registry result
+
+              match m.Shape with
+              | MappingShape.Union cases -> Expect.equal cases.Length 2 "both cases present, no crash"
+              | _ -> failwith "expected Union"
+          } ]
+
 [<Tests>]
 let individualExtractionTests =
     testList

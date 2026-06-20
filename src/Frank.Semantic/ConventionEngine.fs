@@ -337,6 +337,65 @@ module ConventionEngine =
               Source = Convention
               Status = status }
 
+    // ── Case scoring (union join) ─────────────────────────────────────────────
+
+    // Called only when entities is non-empty, so Seq.maxBy is safe.
+    let private fuzzyEntity
+        (prefixes: Map<string, Uri>)
+        (entities: Map<string, string>)
+        (key: string)
+        : string option * float * MappingStatus =
+        let _, bestIri, conf =
+            entities
+            |> Map.toSeq
+            |> Seq.map (fun (k, iri) -> k, iri, jaroWinkler key k)
+            |> Seq.maxBy (fun (_, _, c) -> c)
+
+        if conf > 0.0 then
+            Some(toCurie prefixes (Uri bestIri)), conf, Proposed
+        else
+            None, 0.0, Unresolved
+
+    /// Resolve a case name against a role map (individuals for nullary, classes
+    /// for payload) by normalized-key identity → Confirmed; fuzzy → Proposed;
+    /// none → Unresolved. Mirrors the type-level confirm rule exactly.
+    let private matchEntity
+        (prefixes: Map<string, Uri>)
+        (entities: Map<string, string>)
+        (name: string)
+        : string option * float * MappingStatus =
+        if entities.IsEmpty then
+            None, 0.0, Unresolved
+        else
+            let key = normKey name
+
+            match Map.tryFind key entities with
+            | Some iri -> Some(toCurie prefixes (Uri iri)), 1.0, Confirmed
+            | None -> fuzzyEntity prefixes entities key
+
+    let private buildCaseMapping (registry: VocabularyRegistry) (terms: VocabTerms) (case: CaseInfo) : CaseMapping =
+        let role =
+            (if case.Payload.IsEmpty then
+                 terms.Individuals
+             else
+                 terms.Classes)
+            |> Map.filter (fun _ iri -> isInScope registry iri)
+
+        let iri, conf, status = matchEntity registry.Prefixes role case.Name
+
+        let payload =
+            case.Payload |> List.map (buildFieldMapping registry.Prefixes terms.Properties)
+
+        { Name = case.Name
+          Iri = iri
+          Confidence = conf
+          Source = Convention
+          Status = status
+          Payload = payload }
+
+    let private mapUnionCases (registry: VocabularyRegistry) (terms: VocabTerms) (cases: CaseInfo list) : MappingShape =
+        MappingShape.Union(cases |> List.map (buildCaseMapping registry terms))
+
     // ── Explicit equivalentClass override ─────────────────────────────────────
 
     /// If registry.EquivalentClasses contains an entry for typeInfo.FullName,
@@ -369,24 +428,30 @@ module ConventionEngine =
 
     // ── Main entry ────────────────────────────────────────────────────────────
 
+    let private unresolvedMapping (typeInfo: TypeInfo) : Mapping =
+        { FSharpType = typeInfo.FullName
+          Iri = None
+          Confidence = 0.0
+          Source = Convention
+          Status = Unresolved
+          Alternates = []
+          Shape = MappingShape.Record [] }
+
     /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
     /// Pure: takes pre-extracted VocabTerms and VocabularyRegistry as data — no I/O.
     let score (terms: VocabTerms) (registry: VocabularyRegistry) (typeInfo: TypeInfo) : Mapping =
         let inScopeClasses =
             terms.Classes |> Map.filter (fun _ iri -> isInScope registry iri)
 
-        let emptyUnresolved =
-            { FSharpType = typeInfo.FullName
-              Iri = None
-              Confidence = 0.0
-              Source = Convention
-              Status = Unresolved
-              Alternates = []
-              Shape = MappingShape.Record [] }
+        let emptyUnresolved = unresolvedMapping typeInfo
 
         let conventionResult =
             if inScopeClasses.IsEmpty then
-                emptyUnresolved
+                match typeInfo.Shape with
+                | TypeShape.Union cases ->
+                    { emptyUnresolved with
+                        Shape = mapUnionCases registry terms cases }
+                | TypeShape.Record _ -> emptyUnresolved
             else
                 let typeTokens = normalizeTokens typeInfo.LocalName
                 let typeKey = normKey typeInfo.LocalName
@@ -415,9 +480,7 @@ module ConventionEngine =
 
                     let shape =
                         match typeInfo.Shape with
-                        // Union case scoring lands in the next layer; until then a
-                        // union maps only its type, with no cases. (Intentional stub.)
-                        | TypeShape.Union _ -> MappingShape.Union []
+                        | TypeShape.Union cases -> mapUnionCases registry terms cases
                         | TypeShape.Record _ -> MappingShape.Record fieldMappings
 
                     let status = if typeKey = bestLocal then Confirmed else Proposed
