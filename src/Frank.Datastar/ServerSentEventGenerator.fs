@@ -46,19 +46,40 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> writer |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then writer |> ServerSentEvent.sendRetry options.Retry
 
-        options.Selector |> ValueOption.iter (fun selector -> writer |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector)
+        match options.EventId with
+        | ValueSome eventId -> writer |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            writer |> ServerSentEvent.sendRetry options.Retry
+
+        match options.Selector with
+        | ValueSome selector ->
+            if selector.Contains('\n') || selector.Contains('\r') then
+                invalidArg "selector" "CSS selector must not contain newline characters — newlines corrupt SSE framing"
+
+            writer |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector
+        | ValueNone -> ()
 
         if options.PatchMode <> Consts.DefaultElementPatchMode then
             writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode (options.PatchMode |> Bytes.ElementPatchMode.toBytes)
 
-        if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
-            writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
+        match options.ViewTransition with
+        | NoViewTransition -> ()
+        | ViewTransition vtSelector ->
+            writer
+            |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition Bytes.bTrue
 
-        if options.UseViewTransition then
-            options.ViewTransitionSelector
-            |> ValueOption.iter (fun sel ->
+            match vtSelector with
+            | ValueSome sel ->
+                if sel.Contains('\n') || sel.Contains('\r') then
+                    invalidArg
+                        "options.ViewTransition"
+                        "View transition selector must not contain newline characters — newlines corrupt SSE framing"
+
                 writer
-                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel
+            | ValueNone -> ()
 
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
@@ -76,19 +97,40 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
 
-        options.Selector |> ValueOption.iter (fun selector -> bufWriter |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector)
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.Selector with
+        | ValueSome selector ->
+            if selector.Contains('\n') || selector.Contains('\r') then
+                invalidArg "selector" "CSS selector must not contain newline characters — newlines corrupt SSE framing"
+
+            bufWriter |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector
+        | ValueNone -> ()
 
         if options.PatchMode <> Consts.DefaultElementPatchMode then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode (options.PatchMode |> Bytes.ElementPatchMode.toBytes)
 
-        if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
-            bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
+        match options.ViewTransition with
+        | NoViewTransition -> ()
+        | ViewTransition vtSelector ->
+            bufWriter
+            |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition Bytes.bTrue
 
-        if options.UseViewTransition then
-            options.ViewTransitionSelector
-            |> ValueOption.iter (fun sel ->
+            match vtSelector with
+            | ValueSome sel ->
+                if sel.Contains('\n') || sel.Contains('\r') then
+                    invalidArg
+                        "options.ViewTransition"
+                        "View transition selector must not contain newline characters — newlines corrupt SSE framing"
+
                 bufWriter
-                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel
+            | ValueNone -> ()
 
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
@@ -107,7 +149,17 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> writer |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then writer |> ServerSentEvent.sendRetry options.Retry
 
-        writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode (ElementPatchMode.Remove |> Bytes.ElementPatchMode.toBytes)
+        match options.EventId with
+        | ValueSome eventId -> writer |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            writer |> ServerSentEvent.sendRetry options.Retry
+
+        writer
+        |> ServerSentEvent.sendDataBytesLine
+            Bytes.DatalineMode
+            (ElementPatchMode.Remove |> Bytes.ElementPatchMode.toBytes)
 
         writer |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector
 
@@ -121,8 +173,13 @@ type ServerSentEventGenerator =
     static member RemoveElementAsync(httpResponse:HttpResponse, writer:System.IO.TextWriter -> Task, options:RemoveElementOptions, cancellationToken:CancellationToken) =
         let bufWriter = httpResponse.BodyWriter
         bufWriter |> ServerSentEvent.sendEventType Bytes.EventTypePatchElements
-        options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
 
         task {
             use sseWriter = new SseDataLineWriter(bufWriter, Bytes.DatalineSelector, cancellationToken)
@@ -141,8 +198,13 @@ type ServerSentEventGenerator =
     static member PatchSignalsAsync(httpResponse:HttpResponse, signals:Signals, options:PatchSignalsOptions, cancellationToken:CancellationToken) =
         let writer = httpResponse.BodyWriter
         writer |> ServerSentEvent.sendEventType Bytes.EventTypePatchSignals
-        options.EventId |> ValueOption.iter (fun eventId -> writer |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then writer |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> writer |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            writer |> ServerSentEvent.sendRetry options.Retry
 
         if options.OnlyIfMissing <> Consts.DefaultPatchSignalsOnlyIfMissing then
             writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineOnlyIfMissing (if options.OnlyIfMissing then Bytes.bTrue else Bytes.bFalse)
@@ -157,8 +219,13 @@ type ServerSentEventGenerator =
     static member PatchSignalsAsync(httpResponse:HttpResponse, writer:System.IO.TextWriter -> Task, options:PatchSignalsOptions, cancellationToken:CancellationToken) =
         let bufWriter = httpResponse.BodyWriter
         bufWriter |> ServerSentEvent.sendEventType Bytes.EventTypePatchSignals
-        options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
 
         if options.OnlyIfMissing <> Consts.DefaultPatchSignalsOnlyIfMissing then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineOnlyIfMissing (if options.OnlyIfMissing then Bytes.bTrue else Bytes.bFalse)
@@ -174,8 +241,13 @@ type ServerSentEventGenerator =
     static member ExecuteScriptAsync(httpResponse:HttpResponse, script:string, options:ExecuteScriptOptions, cancellationToken:CancellationToken) =
         let writer = httpResponse.BodyWriter
         writer |> ServerSentEvent.sendEventType Bytes.EventTypePatchElements
-        options.EventId |> ValueOption.iter (fun eventId -> writer |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then writer |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> writer |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            writer |> ServerSentEvent.sendRetry options.Retry
 
         writer |> ServerSentEvent.sendDataBytesLine Bytes.DatalineSelector Bytes.bBody
 
@@ -210,7 +282,9 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
 
-        bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineSelector Bytes.bBody
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
 
         bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode Bytes.ElementPatchMode.bAppend
 
@@ -246,19 +320,40 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
 
-        options.Selector |> ValueOption.iter (fun selector -> bufWriter |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector)
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.Selector with
+        | ValueSome selector ->
+            if selector.Contains('\n') || selector.Contains('\r') then
+                invalidArg "selector" "CSS selector must not contain newline characters — newlines corrupt SSE framing"
+
+            bufWriter |> ServerSentEvent.sendDataStringLine Bytes.DatalineSelector selector
+        | ValueNone -> ()
 
         if options.PatchMode <> Consts.DefaultElementPatchMode then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode (options.PatchMode |> Bytes.ElementPatchMode.toBytes)
 
-        if options.UseViewTransition <> Consts.DefaultElementsUseViewTransitions then
-            bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition (if options.UseViewTransition then Bytes.bTrue else Bytes.bFalse)
+        match options.ViewTransition with
+        | NoViewTransition -> ()
+        | ViewTransition vtSelector ->
+            bufWriter
+            |> ServerSentEvent.sendDataBytesLine Bytes.DatalineUseViewTransition Bytes.bTrue
 
-        if options.UseViewTransition then
-            options.ViewTransitionSelector
-            |> ValueOption.iter (fun sel ->
+            match vtSelector with
+            | ValueSome sel ->
+                if sel.Contains('\n') || sel.Contains('\r') then
+                    invalidArg
+                        "options.ViewTransition"
+                        "View transition selector must not contain newline characters — newlines corrupt SSE framing"
+
                 bufWriter
-                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel)
+                |> ServerSentEvent.sendDataStringLine Bytes.DatalineViewTransitionSelector sel
+            | ValueNone -> ()
 
         if options.Namespace <> Consts.DefaultPatchElementNamespace then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineNamespace (options.Namespace |> Bytes.PatchElementNamespace.toBytes)
@@ -274,8 +369,13 @@ type ServerSentEventGenerator =
     static member RemoveElementAsync(httpResponse:HttpResponse, writer:System.IO.Stream -> Task, options:RemoveElementOptions, cancellationToken:CancellationToken) =
         let bufWriter = httpResponse.BodyWriter
         bufWriter |> ServerSentEvent.sendEventType Bytes.EventTypePatchElements
-        options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
 
         task {
             use sseStream = new SseDataLineStream(bufWriter, Bytes.DatalineSelector, cancellationToken)
@@ -294,8 +394,13 @@ type ServerSentEventGenerator =
     static member PatchSignalsAsync(httpResponse:HttpResponse, writer:System.IO.Stream -> Task, options:PatchSignalsOptions, cancellationToken:CancellationToken) =
         let bufWriter = httpResponse.BodyWriter
         bufWriter |> ServerSentEvent.sendEventType Bytes.EventTypePatchSignals
-        options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
-        if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
+
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
+
+        if options.Retry <> Consts.DefaultSseRetryDuration then
+            bufWriter |> ServerSentEvent.sendRetry options.Retry
 
         if options.OnlyIfMissing <> Consts.DefaultPatchSignalsOnlyIfMissing then
             bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineOnlyIfMissing (if options.OnlyIfMissing then Bytes.bTrue else Bytes.bFalse)
@@ -314,7 +419,9 @@ type ServerSentEventGenerator =
         options.EventId |> ValueOption.iter (fun eventId -> bufWriter |> ServerSentEvent.sendEventId eventId)
         if options.Retry <> Consts.DefaultSseRetryDuration then bufWriter |> ServerSentEvent.sendRetry options.Retry
 
-        bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineSelector Bytes.bBody
+        match options.EventId with
+        | ValueSome eventId -> bufWriter |> ServerSentEvent.sendEventId eventId
+        | ValueNone -> ()
 
         bufWriter |> ServerSentEvent.sendDataBytesLine Bytes.DatalineMode Bytes.ElementPatchMode.bAppend
 
@@ -340,7 +447,9 @@ type ServerSentEventGenerator =
             return! bufWriter.FlushAsync(cancellationToken).AsTask() :> Task
         }
 
-    static member ReadSignalsAsync(httpRequest:HttpRequest, cancellationToken:CancellationToken) =
+    // backgroundTask vs task: both are equivalent on ASP.NET Core's threadpool sync context.
+    // The asymmetry is intentional: the string overload predates the typed overload.
+    static member ReadSignalsAsync(httpRequest: HttpRequest, cancellationToken: CancellationToken) =
         backgroundTask {
             if
                 HttpMethods.IsGet(httpRequest.Method)
@@ -351,7 +460,8 @@ type ServerSentEventGenerator =
                 | _ -> return ""
             | _ ->
                 try
-                    use readResult = new StreamReader(httpRequest.Body)
+                    // leaveOpen = true: httpRequest.Body is owned by ASP.NET Core, closing it from user code violates the platform contract.
+                    use readResult = new StreamReader(httpRequest.Body, leaveOpen = true)
                     return! readResult.ReadToEndAsync(cancellationToken)
                 with :? IOException ->
                     return ""

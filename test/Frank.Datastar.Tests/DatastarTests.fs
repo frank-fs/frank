@@ -1113,8 +1113,7 @@ let adrComplianceTests =
 
               let opts =
                   { PatchElementsOptions.Defaults with
-                      UseViewTransition = true
-                      ViewTransitionSelector = ValueSome "#main" }
+                      ViewTransition = ViewTransition(ValueSome "#main") }
 
               task {
                   do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
@@ -1130,14 +1129,13 @@ let adrComplianceTests =
                   "data: viewTransitionSelector #main"
                   "Should emit viewTransitionSelector"
 
-          testCase "ADR-Gap1: PatchElementsAsync omits viewTransitionSelector when UseViewTransition is false"
+          testCase "ADR-Gap1: PatchElementsAsync omits viewTransitionSelector when ViewTransition is NoViewTransition"
           <| fun () ->
               let context = createMockContext ()
 
               let opts =
                   { PatchElementsOptions.Defaults with
-                      UseViewTransition = false
-                      ViewTransitionSelector = ValueSome "#main" }
+                      ViewTransition = NoViewTransition }
 
               task {
                   do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
@@ -1149,7 +1147,7 @@ let adrComplianceTests =
 
               Expect.isFalse
                   (responseBody.Contains("viewTransitionSelector"))
-                  "Should NOT emit viewTransitionSelector when UseViewTransition is false"
+                  "Should NOT emit viewTransitionSelector when ViewTransition is NoViewTransition"
 
           testCase "ADR-Gap1: streamPatchElementsWithOptions emits viewTransitionSelector"
           <| fun () ->
@@ -1157,8 +1155,7 @@ let adrComplianceTests =
 
               let opts =
                   { PatchElementsOptions.Defaults with
-                      UseViewTransition = true
-                      ViewTransitionSelector = ValueSome "#hero" }
+                      ViewTransition = ViewTransition(ValueSome "#hero") }
 
               task {
                   do! ServerSentEventGenerator.StartServerEventStreamAsync(context.Response)
@@ -1186,8 +1183,7 @@ let adrComplianceTests =
 
               let opts =
                   { PatchElementsOptions.Defaults with
-                      UseViewTransition = true
-                      ViewTransitionSelector = ValueSome "#hero" }
+                      ViewTransition = ViewTransition(ValueSome "#hero") }
 
               let htmlBytes = System.Text.Encoding.UTF8.GetBytes("<div id='target'>Content</div>")
 
