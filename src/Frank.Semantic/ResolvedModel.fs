@@ -7,7 +7,10 @@ type ResolvedField =
     { Name: string
       Iri: Uri option
       SeeAlso: Uri list
-      ConstraintPattern: string option }
+      ConstraintPattern: string option
+      TypeName: string
+      IsOptional: bool
+      IsCollection: bool }
 
 type ResolvedCase =
     { CaseName: string
@@ -165,7 +168,10 @@ module ResolvedModel =
                 { Name = f.Name
                   Iri = iri
                   SeeAlso = seeAlso
-                  ConstraintPattern = pattern }
+                  ConstraintPattern = pattern
+                  TypeName = ""
+                  IsOptional = false
+                  IsCollection = false }
 
     let private buildFields
         (prefixes: Map<string, Uri>)
@@ -334,3 +340,74 @@ module ResolvedModel =
                         { Prefixes = registry.Prefixes
                           Using = registry.Using
                           Resources = resources }
+
+    // Unwrap " option" (outer) then " list" to determine cardinality.
+    // Returns Error only when typeName is empty or whitespace.
+    let private classifyType (typeName: string) : Result<string * bool * bool, string> =
+        if String.IsNullOrWhiteSpace typeName then
+            Error "TypeName must not be empty"
+        else
+            let isOptional = typeName.EndsWith(" option")
+
+            let afterOption =
+                if isOptional then
+                    typeName.[.. typeName.Length - 8]
+                else
+                    typeName
+
+            let isCollection = afterOption.EndsWith(" list")
+
+            let inner =
+                if isCollection then
+                    afterOption.[.. afterOption.Length - 6]
+                else
+                    afterOption
+
+            Ok(inner, isOptional, isCollection)
+
+    let private enrichField
+        (fieldInfosByName: Map<string, FieldInfo>)
+        (rf: ResolvedField)
+        : Result<ResolvedField, string> =
+        match Map.tryFind rf.Name fieldInfosByName with
+        | None -> Ok rf
+        | Some fi ->
+            match classifyType fi.TypeName with
+            | Error e -> Error $"field '{rf.Name}': {e}"
+            | Ok(inner, isOpt, isColl) ->
+                Ok
+                    { rf with
+                        TypeName = inner
+                        IsOptional = isOpt
+                        IsCollection = isColl }
+
+    let private enrichRecordFields
+        (typeName: string)
+        (fis: FieldInfo list)
+        (rr: ResolvedResource)
+        : Result<ResolvedResource, string> =
+        let byName = fis |> List.map (fun fi -> fi.Name, fi) |> Map.ofList
+
+        match traverseResult (enrichField byName) rr.Fields with
+        | Error e -> Error $"type '{typeName}': {e}"
+        | Ok fields -> Ok { rr with Fields = fields }
+
+    let private enrichResource
+        (typesByName: Map<string, TypeInfo>)
+        (rr: ResolvedResource)
+        : Result<ResolvedResource, string> =
+        match Map.tryFind rr.FSharpType typesByName with
+        | None -> Ok rr
+        | Some ti ->
+            match ti.Shape with
+            | TypeShape.Union _ -> Ok rr
+            | TypeShape.Record fis -> enrichRecordFields rr.FSharpType fis rr
+
+    /// Fills TypeName/IsOptional/IsCollection on each ResolvedField from the FCS-extracted TypeInfo.
+    /// typesByName is keyed by TypeInfo.FullName (= ResolvedResource.FSharpType).
+    /// Fields with no matching TypeInfo are left at defaults.
+    /// Returns Error only when a matched field has an empty TypeName in the TypeInfo.
+    let enrichTypes (typesByName: Map<string, TypeInfo>) (model: ResolvedModel) : Result<ResolvedModel, string> =
+        match traverseResult (enrichResource typesByName) model.Resources with
+        | Error e -> Error e
+        | Ok resources -> Ok { model with Resources = resources }

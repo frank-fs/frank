@@ -424,6 +424,141 @@ let at_rm_ci =
             Expect.stringContains msg "confirmed" "error mentions confirmed status"
     }
 
+// ── AT-RM-ET: enrichTypes fills type/cardinality ────────────────────────────
+
+// Real TypeName strings produced by Extractor.normalizeTypeName (verified by probe):
+//   scalar int         → "int"
+//   string option      → "string option"
+//   int list           → "int list"
+//   int list option    → "int list option"
+
+let private enrichFsharpType = "MyApp.DataRecord"
+
+let private enrichFields =
+    [ mkField "Count" (Some "schema:numberOfItems")
+      mkField "Note" (Some "schema:description")
+      mkField "Scores" (Some "schema:value")
+      mkField "MaybeScores" (Some "schema:value") ]
+
+let private enrichMapping =
+    mkMapping enrichFsharpType (Some "schema:Thing") enrichFields
+
+let private enrichLock =
+    { lockWithSchema with
+        Mappings = [ enrichMapping ] }
+
+let private mkFieldInfo name typeName : FieldInfo =
+    { Name = name
+      TypeName = typeName
+      Attributes = Map.empty
+      DocComment = None }
+
+let private enrichTypeInfo: TypeInfo =
+    { FullName = enrichFsharpType
+      Namespace = "MyApp"
+      LocalName = "DataRecord"
+      Shape =
+        TypeShape.Record
+            [ mkFieldInfo "Count" "int"
+              mkFieldInfo "Note" "string option"
+              mkFieldInfo "Scores" "int list"
+              mkFieldInfo "MaybeScores" "int list option" ]
+      Attributes = Map.empty
+      DocComment = None }
+
+let private typesByName = Map.ofList [ enrichFsharpType, enrichTypeInfo ]
+
+let private okOrFail (r: Result<ResolvedModel, string>) : ResolvedModel =
+    match r with
+    | Ok m -> m
+    | Error e -> failwith $"Expected Ok but got Error: {e}"
+
+let private typesByNameWithEmpty =
+    let tiWithEmpty =
+        { enrichTypeInfo with
+            Shape = TypeShape.Record [ mkFieldInfo "Count" "" ] }
+
+    Map.ofList [ enrichFsharpType, tiWithEmpty ]
+
+[<Tests>]
+let at_rm_et =
+    testList
+        "AT-RM-ET: enrichTypes fills type/cardinality from TypeInfo"
+        [ test "enrichTypes fills unwrapped type + cardinality for a scalar int field" {
+              let enriched =
+                  ResolvedModel.build baseRegistry enrichLock
+                  |> Result.bind (ResolvedModel.enrichTypes typesByName)
+                  |> okOrFail
+
+              let f =
+                  (List.head enriched.Resources).Fields |> List.find (fun f -> f.Name = "Count")
+
+              Expect.equal f.TypeName "int" "unwrapped type"
+              Expect.isFalse f.IsOptional "not optional"
+              Expect.isFalse f.IsCollection "not collection"
+          }
+
+          test "enrichTypes fills option flag for string option field" {
+              let enriched =
+                  ResolvedModel.build baseRegistry enrichLock
+                  |> Result.bind (ResolvedModel.enrichTypes typesByName)
+                  |> okOrFail
+
+              let f =
+                  (List.head enriched.Resources).Fields |> List.find (fun f -> f.Name = "Note")
+
+              Expect.equal f.TypeName "string" "unwrapped inner type"
+              Expect.isTrue f.IsOptional "is optional"
+              Expect.isFalse f.IsCollection "not collection"
+          }
+
+          test "enrichTypes fills collection flag for int list field" {
+              let enriched =
+                  ResolvedModel.build baseRegistry enrichLock
+                  |> Result.bind (ResolvedModel.enrichTypes typesByName)
+                  |> okOrFail
+
+              let f =
+                  (List.head enriched.Resources).Fields |> List.find (fun f -> f.Name = "Scores")
+
+              Expect.equal f.TypeName "int" "unwrapped inner type"
+              Expect.isFalse f.IsOptional "not optional"
+              Expect.isTrue f.IsCollection "is collection"
+          }
+
+          test "enrichTypes fills both flags for int list option field" {
+              let enriched =
+                  ResolvedModel.build baseRegistry enrichLock
+                  |> Result.bind (ResolvedModel.enrichTypes typesByName)
+                  |> okOrFail
+
+              let f =
+                  (List.head enriched.Resources).Fields
+                  |> List.find (fun f -> f.Name = "MaybeScores")
+
+              Expect.equal f.TypeName "int" "unwrapped inner type"
+              Expect.isTrue f.IsOptional "is optional"
+              Expect.isTrue f.IsCollection "is collection"
+          }
+
+          test "enrichTypes Errors on a present-but-empty TypeName" {
+              match
+                  ResolvedModel.build baseRegistry enrichLock
+                  |> Result.bind (ResolvedModel.enrichTypes typesByNameWithEmpty)
+              with
+              | Error _ -> ()
+              | Ok _ -> failtest "expected Error for empty TypeName"
+          }
+
+          test "build alone leaves new fields at defaults" {
+              let m = ResolvedModel.build baseRegistry enrichLock |> okOrFail
+
+              let f = (List.head m.Resources).Fields |> List.head
+              Expect.equal f.TypeName "" "default empty until enriched"
+              Expect.isFalse f.IsOptional "default false until enriched"
+              Expect.isFalse f.IsCollection "default false until enriched"
+          } ]
+
 // ── AT-RM9: lock IRI self-contained resolution ────────────────────────────────
 
 [<Tests>]
