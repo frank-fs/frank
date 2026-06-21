@@ -4,6 +4,8 @@ open System.IO
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Frank.Builder
 
 /// Extensions to Frank's ResourceBuilder for Datastar SSE operations.
@@ -67,7 +69,7 @@ module DatastarExtensions =
 
 /// Helper functions for use inside the `datastar` handler.
 /// These assume the SSE stream has already been started by the `datastar` operation.
-/// All functions are marked `inline` to ensure zero-overhead wrapper calls (Constitution Principle V).
+/// Most functions are marked `inline`. tryReadSignals and tryReadSignalsWithOptions are not inline — they contain try/with which the F# compiler cannot inline.
 module Datastar =
 
     /// Patch HTML elements. Use this as the primary pattern (hypermedia-first).
@@ -87,9 +89,23 @@ module Datastar =
         ServerSentEventGenerator.ExecuteScriptAsync(ctx.Response, script)
 
     /// Read and deserialize signals from the request body.
-    /// Returns ValueNone for invalid/missing JSON.
-    let inline tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
-        ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request)
+    /// Returns ValueNone for invalid/missing JSON and logs the JsonException as a warning.
+    /// Call ServerSentEventGenerator.ReadSignalsAsync<'T> directly to handle parse errors yourself.
+    let tryReadSignals<'T> (ctx: HttpContext) : Task<voption<'T>> =
+        task {
+            try
+                return! ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request)
+            with :? JsonException as exn ->
+                ctx.RequestServices
+                |> Option.ofObj
+                |> Option.bind (fun svc -> svc.GetService<ILoggerFactory>() |> Option.ofObj)
+                |> Option.iter (fun f ->
+                    f
+                        .CreateLogger("Frank.Datastar")
+                        .LogWarning(exn, "Signal deserialization failed; returning ValueNone"))
+
+                return ValueNone
+        }
 
     // --- WithOptions variants ---
     // These allow specifying full options records from StarFederation.Datastar.FSharp.
@@ -148,11 +164,21 @@ module Datastar =
     /// let jsonOpts = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     /// let! signals = Datastar.tryReadSignalsWithOptions&lt;MySignals&gt; jsonOpts ctx
     /// </example>
-    let inline tryReadSignalsWithOptions<'T>
-        (jsonOptions: JsonSerializerOptions)
-        (ctx: HttpContext)
-        : Task<voption<'T>> =
-        ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)
+    let tryReadSignalsWithOptions<'T> (jsonOptions: JsonSerializerOptions) (ctx: HttpContext) : Task<voption<'T>> =
+        task {
+            try
+                return! ServerSentEventGenerator.ReadSignalsAsync<'T>(ctx.Request, jsonOptions)
+            with :? JsonException as exn ->
+                ctx.RequestServices
+                |> Option.ofObj
+                |> Option.bind (fun svc -> svc.GetService<ILoggerFactory>() |> Option.ofObj)
+                |> Option.iter (fun f ->
+                    f
+                        .CreateLogger("Frank.Datastar")
+                        .LogWarning(exn, "Signal deserialization failed; returning ValueNone"))
+
+                return ValueNone
+        }
 
     // --- Stream-based variants ---
     // These accept a TextWriter -> Task callback for direct-to-buffer output.

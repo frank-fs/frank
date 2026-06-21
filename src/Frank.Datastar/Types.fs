@@ -8,11 +8,17 @@ type Signals = string
 /// An HTML selector name
 type Selector = string
 
+/// Controls whether and how the View Transitions API is used when patching elements.
+[<Struct>]
+type ViewTransitionMode =
+    | NoViewTransition
+    | ViewTransition of selector: string voption
+
 [<Struct>]
 type PatchElementsOptions =
     { Selector: Selector voption
       PatchMode: ElementPatchMode
-      UseViewTransition: bool
+      ViewTransition: ViewTransitionMode
       Namespace: PatchElementNamespace
       EventId: string voption
       Retry: TimeSpan }
@@ -20,7 +26,7 @@ type PatchElementsOptions =
     static member Defaults =
         { Selector = ValueNone
           PatchMode = Consts.DefaultElementPatchMode
-          UseViewTransition = Consts.DefaultElementsUseViewTransitions
+          ViewTransition = NoViewTransition
           Namespace = Consts.DefaultPatchElementNamespace
           EventId = ValueNone
           Retry = Consts.DefaultSseRetryDuration }
