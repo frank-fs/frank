@@ -1,3 +1,14 @@
+### New in 7.2.1 (Released 2026-06-21)
+
+**Frank.Datastar - Datastar v1 ADR Compliance**
+
+- **`viewTransitionSelector` support:** `PatchElementsOptions.ViewTransition` is now a discriminated union (`NoViewTransition | ViewTransition of selector: string voption`). Set `ViewTransition(ValueSome "#my-el")` to emit both `useViewTransition true` and `viewTransitionSelector #my-el` in the SSE frame; `ViewTransition(ValueNone)` emits `useViewTransition true` without a selector. Aligned with the StarFederation.Datastar reference SDK.
+- **DELETE signal routing:** `ReadSignalsAsync` and `ReadSignalsAsync<'T>` now read signals from the `datastar` query parameter for DELETE requests, matching the behaviour already in place for GET. Previously DELETE fell through to body parsing, returning empty signals.
+- **`JsonException` surfacing:** `ReadSignalsAsync<'T>` now lets `JsonException` propagate instead of swallowing it. The `tryReadSignals` and `tryReadSignalsWithOptions` convenience wrappers catch `JsonException` and return `ValueNone`, logging a warning via `ILoggerFactory`. Call `ReadSignalsAsync<'T>` directly to handle parse errors yourself.
+- **Thread-safety documentation:** `StartServerEventStreamAsync` now carries an XML doc note that `PipeWriter` is not thread-safe — writes to the same SSE stream must be serialised, which the `datastar` CE operation enforces implicitly via `task { }` linearisation.
+- **Samples updated to Datastar JS v1.0.2:** All three Datastar sample apps (Basic, Hox, Oxpecker) now load the stable `v1.0.2` client script from the CDN (was `v1.0.0-RC.7`).
+
+
 ### New in 7.2.0 (Released 2026-02-10)
 
 **Frank.OpenApi - Native OpenAPI Document Generation Support**
