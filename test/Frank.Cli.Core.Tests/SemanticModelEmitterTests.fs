@@ -1,11 +1,11 @@
 module Frank.Cli.Core.Tests.SemanticModelEmitterTests
 
 open System
-open System.IO
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
+open Frank.Cli.Core.Tests.FcsTypecheck
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -66,48 +66,6 @@ let private unwrapOk (r: Result<string, string>) : string =
     match r with
     | Ok s -> s
     | Error e -> failwith $"Expected Ok but got Error: {e}"
-
-// ── FCS typecheck helper ──────────────────────────────────────────────────────
-
-/// Typecheck two source strings together via FCS ParseAndCheckProject.
-/// domainSrc is compiled first (declares the types), emittedSrc second (uses them).
-/// Returns the error diagnostic messages (empty list means no errors).
-let private typecheckTwoSources (domainSrc: string) (emittedSrc: string) : string list =
-    let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
-    Directory.CreateDirectory(tmpDir) |> ignore
-
-    try
-        let domainFile = Path.Combine(tmpDir, "Domain.fs")
-        let emittedFile = Path.Combine(tmpDir, "GeneratedSemanticModel.fs")
-        File.WriteAllText(domainFile, domainSrc)
-        File.WriteAllText(emittedFile, emittedSrc)
-
-        let checker =
-            FSharp.Compiler.CodeAnalysis.FSharpChecker.Create(keepAssemblyContents = false)
-
-        let primaryText = FSharp.Compiler.Text.SourceText.ofString emittedSrc
-
-        let scriptOpts, _ =
-            checker.GetProjectOptionsFromScript(
-                emittedFile,
-                primaryText,
-                assumeDotNetFramework = false,
-                useSdkRefs = true
-            )
-            |> Async.RunSynchronously
-
-        let opts =
-            { scriptOpts with
-                SourceFiles = [| domainFile; emittedFile |] }
-
-        let results = checker.ParseAndCheckProject(opts) |> Async.RunSynchronously
-
-        results.Diagnostics
-        |> Array.filter (fun d -> d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
-        |> Array.map (fun d -> d.ToString())
-        |> Array.toList
-    finally
-        Directory.Delete(tmpDir, true)
 
 // ── Probe domain sources ──────────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@
     <Compile Include="ExtractorTests.fs" />
     <Compile Include="VocabularyEvaluatorTests.fs" />
     <Compile Include="PipelineTests.fs" />
+    <Compile Include="FcsTypecheck.fs" />
     <Compile Include="DiscoveryEmitterTests.fs" />
     <Compile Include="LinkedDataEmitterTests.fs" />
     <Compile Include="SemanticModelEmitterTests.fs" />
