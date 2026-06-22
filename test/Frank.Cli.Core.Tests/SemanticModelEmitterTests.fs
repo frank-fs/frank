@@ -117,7 +117,7 @@ let iriMatchTests =
 
               Expect.stringContains
                   src
-                  "| Game -> System.Uri(\"https://schema.org/Game\")"
+                  "| Game -> System.Uri \"https://schema.org/Game\""
                   "Game iri arm uses System.Uri"
           }
 
@@ -127,7 +127,7 @@ let iriMatchTests =
 
               Expect.stringContains
                   src
-                  "| Holder -> System.Uri(\"https://schema.org/Holder\")"
+                  "| Holder -> System.Uri \"https://schema.org/Holder\""
                   "Holder iri arm uses System.Uri"
           }
 
@@ -283,12 +283,12 @@ let unionCaseEmissionTests =
 
               Expect.stringContains
                   src
-                  "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))"
+                  "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")"
                   "XMove arm over constructor"
 
               Expect.stringContains
                   src
-                  "| OMove _ -> Some(System.Uri(\"https://ex.org/OMove\"))"
+                  "| OMove _ -> Some (System.Uri \"https://ex.org/OMove\")"
                   "OMove arm over constructor"
 
               Expect.stringContains src ": System.Uri option" "return type is Uri option"
@@ -338,12 +338,12 @@ let unionCaseEmissionTests =
 
               Expect.stringContains
                   src
-                  "| Red -> Some(System.Uri(\"https://ex.org/Red\"))"
+                  "| Red -> Some (System.Uri \"https://ex.org/Red\")"
                   "nullary Red arm, no underscore"
 
               Expect.stringContains
                   src
-                  "| Green -> Some(System.Uri(\"https://ex.org/Green\"))"
+                  "| Green -> Some (System.Uri \"https://ex.org/Green\")"
                   "nullary Green arm, no underscore"
 
               Expect.isFalse (src.Contains "| Red _ ->") "nullary case must NOT have a wildcard payload binding"
@@ -401,7 +401,7 @@ let unionCaseEmissionTests =
               let src =
                   Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
 
-              Expect.stringContains src "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))" "confirmed XMove arm"
+              Expect.stringContains src "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")" "confirmed XMove arm"
 
               Expect.stringContains src "| _ -> None" "trailing wildcard returns None for unconfirmed case"
               Expect.isFalse (src.Contains "urn:frank:unmapped") "no dead-end urn:frank:unmapped in output"
@@ -427,6 +427,24 @@ let antiDriftTests =
 
               let errors = typecheckTwoSources domainSrcRenamed src
               Expect.isNonEmpty errors "renaming Game→GameX must break the emitted typeof<Probe.Game>"
+          } ]
+
+// ── Tier-1 projection test ───────────────────────────────────────────────────
+
+[<Tests>]
+let projectionTests =
+    testList
+        "SemanticModelEmitter — typed projection (tier 1)"
+        [ test "projectMapped yields class-mapped resources with unwrapped ClassIri (tier 1)" {
+              let model =
+                  match ResolvedModel.build probeRegistry probeLock with
+                  | Ok m -> m
+                  | Error e -> failwith $"Expected Ok but got Error: {e}"
+
+              let mapped: SemanticModelEmitter.MappedResource list = SemanticModelEmitter.projectMapped model
+              Expect.isNonEmpty mapped "at least one class-mapped resource"
+              Expect.contains (mapped |> List.map (fun m -> m.LocalName)) "Game" "Game mapped"
+              Expect.contains (mapped |> List.map (fun m -> m.ClassIri.AbsoluteUri)) "https://schema.org/Game" "ClassIri unwrapped"
           } ]
 
 // ── AT4 fixtures ──────────────────────────────────────────────────────────────
@@ -503,9 +521,9 @@ let at4UnionCaseIriTests =
 
               Expect.stringContains src "moveCaseIri" "moveCaseIri function emitted"
 
-              Expect.stringContains src "| XMove _ -> Some(System.Uri(\"https://ex.org/XMove\"))" "XMove arm present"
+              Expect.stringContains src "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")" "XMove arm present"
 
-              Expect.stringContains src "| OMove _ -> Some(System.Uri(\"https://ex.org/OMove\"))" "OMove arm present"
+              Expect.stringContains src "| OMove _ -> Some (System.Uri \"https://ex.org/OMove\")" "OMove arm present"
 
               let errors = typecheckTwoSources moveDomainSrc src
               Expect.isEmpty errors $"generated union match must compile against real DU; diagnostics: {errors}"

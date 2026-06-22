@@ -69,6 +69,9 @@ let rawExpr (s: string) : WidgetBuilder<Expr> = ConstantExpr s
 /// A function application: <func> <arg>, e.g. appExpr "System.Uri" (strExpr "x") → System.Uri "x"
 let appExpr (func: string) (arg: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = AppExpr(func, arg)
 
+/// Wraps an expression in parentheses: (<expr>).
+let parenExpr (e: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = ParenExpr e
+
 /// Wrapper so heterogeneous module declarations can be stored in a single list.
 [<NoComparison; NoEquality>]
 type ModuleDeclItem =
