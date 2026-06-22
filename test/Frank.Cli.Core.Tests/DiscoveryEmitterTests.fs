@@ -438,6 +438,53 @@ let excludedMappingTests =
           } ]
 
 [<Tests>]
+let projectionTests =
+    testList
+        "DiscoveryEmitter — typed projection (tier 1)"
+        [ test "projectDiscovery yields typed descriptors for class + fields (tier 1)" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith $"Expected Ok but got Error: {e}"
+
+              let descriptors, links =
+                  DiscoveryEmitter.projectDiscovery "/alps/tictactoe" model
+
+              Expect.contains
+                  (descriptors |> List.map (fun d -> d.Id))
+                  "MoveAction"
+                  "type descriptor present"
+
+              Expect.contains
+                  (descriptors |> List.map (fun d -> d.Href))
+                  (Some "https://schema.org/MoveAction")
+                  "type href present"
+
+              Expect.isNonEmpty links "describedBy links present"
+          } ]
+
+[<Tests>]
+let compileGateTests =
+    testList
+        "DiscoveryEmitter — compile gate (tier 3)"
+        [ test "emitted GeneratedDiscovery compiles against Frank.Discovery types (tier 3)" {
+              let src =
+                  DiscoveryEmitter.emit "Probe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok s -> s
+                      | Error e -> failwith $"Expected Ok but got Error: {e}"
+
+              let domainSrc =
+                  "namespace Frank.Discovery\n"
+                  + "type AlpsDescriptor = { Id: string; Type: string; Doc: string option; Href: string option }\n"
+                  + "type DiscoveryConfig = { ProfileUri: string; HomeRoute: string; AlpsDescriptors: AlpsDescriptor list; DescribedByLinks: string list }\n"
+
+              let diagnostics = FcsTypecheck.typecheckTwoSources domainSrc src
+              Expect.isEmpty diagnostics "emitted Discovery module compiles cleanly"
+          } ]
+
+[<Tests>]
 let homeResourcesAbsentTests =
     testList
         "DiscoveryEmitter — HomeResources absent from generated source"

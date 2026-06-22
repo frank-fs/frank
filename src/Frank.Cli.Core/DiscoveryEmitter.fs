@@ -19,7 +19,7 @@ let private localName (iri: string) : string =
 
 // ── Descriptor builders ───────────────────────────────────────────────────────
 
-type private ResolvedDescriptor = { Id: string; Href: string }
+type internal ResolvedDescriptor = { Id: string; Href: string option }
 
 /// Resolve the type-level descriptor for one ResolvedResource. Returns None if ClassIri is absent.
 let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
@@ -27,7 +27,8 @@ let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
     |> Option.map (fun uri ->
         let href = uri.AbsoluteUri
 
-        { Id = localName href; Href = href })
+        { Id = localName href
+          Href = Some href })
 
 /// Resolve field descriptors for one resource; skip fields with no Iri.
 let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor list =
@@ -37,7 +38,8 @@ let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor l
         |> Option.map (fun uri ->
             let href = uri.AbsoluteUri
 
-            { Id = localName href; Href = href }))
+            { Id = localName href
+              Href = Some href }))
 
 /// Collect all descriptors from all resources in dependency order: each type then its fields.
 let private collectDescriptors (resources: ResolvedResource list) : ResolvedDescriptor list =
@@ -64,67 +66,30 @@ let private collectDescribedByLinks (resources: ResolvedResource list) : string 
     let _, revLinks = List.fold folder (Set.empty, []) resources
     List.rev revLinks
 
-// ── Source rendering ──────────────────────────────────────────────────────────
+// ── Pure projection ───────────────────────────────────────────────────────────
 
-/// Escape a string for use as an F# string literal.
-let private escapeString (s: string) : string =
-    s.Replace("\\", "\\\\").Replace("\"", "\\\"")
+/// Pure projection: model → (descriptors, describedBy links). Testable typed output.
+let internal projectDiscovery (_profileUri: string) (model: ResolvedModel) : ResolvedDescriptor list * string list =
+    collectDescriptors model.Resources, collectDescribedByLinks model.Resources
 
-/// Render one AlpsDescriptor record literal as a single line.
-let private renderDescriptor (d: ResolvedDescriptor) : string =
-    let href = "Some \"" + escapeString d.Href + "\""
+// ── Source rendering via AstRender (no string concat) ────────────────────────
 
-    "{ Id = \""
-    + escapeString d.Id
-    + "\"; Type = \"semantic\"; Doc = None; Href = "
-    + href
-    + " }"
+let private descriptorExpr (d: ResolvedDescriptor) =
+    AstRender.recordExpr
+        [ "Id", AstRender.strExpr d.Id
+          "Type", AstRender.strExpr "semantic"
+          "Doc", AstRender.noneExpr
+          "Href",
+          match d.Href with
+          | Some h -> AstRender.someStrExpr h
+          | None -> AstRender.noneExpr ]
 
-/// Render the AlpsDescriptors list literal (indented 8 spaces).
-let private renderDescriptorList (descriptors: ResolvedDescriptor list) : string =
-    match descriptors with
-    | [] -> "        []"
-    | d :: rest ->
-        let first = "        [ " + renderDescriptor d
-        let others = rest |> List.map (fun x -> "          " + renderDescriptor x)
-        let all = first :: others
-        (all |> String.concat "\n") + " ]"
-
-/// Render the DescribedByLinks list literal (indented 8 spaces).
-let private renderLinkList (links: string list) : string =
-    match links with
-    | [] -> "        []"
-    | l :: rest ->
-        let first = "        [ \"" + escapeString l + "\""
-        let others = rest |> List.map (fun s -> "          \"" + escapeString s + "\"")
-        let all = first :: others
-        (all |> String.concat "\n") + " ]"
-
-/// Assemble the full F# module source string.
-let private assembleModule
-    (moduleName: string)
-    (profileUri: string)
-    (descriptors: ResolvedDescriptor list)
-    (links: string list)
-    : string =
-    let descriptorLines = renderDescriptorList descriptors
-    let linkLines = renderLinkList links
-    let escapedProfile = escapeString profileUri
-
-    String.concat
-        "\n"
-        [ $"module {moduleName}"
-          ""
-          "open Frank.Discovery"
-          ""
-          "let discoveryConfig: DiscoveryConfig ="
-          "    { ProfileUri = \"" + escapedProfile + "\""
-          "      HomeRoute = \"/\""
-          "      AlpsDescriptors ="
-          descriptorLines
-          "      DescribedByLinks ="
-          linkLines + " }"
-          "" ]
+let private configExpr (profileUri: string) (descriptors: ResolvedDescriptor list) (links: string list) =
+    AstRender.recordExpr
+        [ "ProfileUri", AstRender.strExpr profileUri
+          "HomeRoute", AstRender.strExpr "/"
+          "AlpsDescriptors", AstRender.listExpr (descriptors |> List.map descriptorExpr)
+          "DescribedByLinks", AstRender.listExpr (links |> List.map AstRender.strExpr) ]
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -152,6 +117,6 @@ let emit
     match ResolvedModel.build registry lock with
     | Error e -> Error e
     | Ok model ->
-        let descriptors = collectDescriptors model.Resources
-        let links = collectDescribedByLinks model.Resources
-        Ok(assembleModule moduleName profileUri descriptors links)
+        let descriptors, links = projectDiscovery profileUri model
+        let value = configExpr profileUri descriptors links
+        Ok(AstRender.formatTypedValueModule moduleName [ "Frank.Discovery" ] "discoveryConfig" "DiscoveryConfig" value)
