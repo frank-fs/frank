@@ -108,8 +108,7 @@ let formatModule
     if moduleName.LastIndexOf '.' < 0 then
         invalidArg (nameof moduleName) "moduleName must be namespace-qualified (contain a '.')"
 
-    let i = moduleName.LastIndexOf '.'
-    let nsName, modName = moduleName.[.. i - 1], moduleName.[i + 1 ..]
+    let nsName, modName = splitModuleName moduleName
 
     let oak =
         Oak() {
