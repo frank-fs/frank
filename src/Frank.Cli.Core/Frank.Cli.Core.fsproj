@@ -15,6 +15,7 @@
     <Compile Include="Refresh.fs" />
     <Compile Include="Status.fs" />
     <Compile Include="Finalize.fs" />
+    <Compile Include="AstRender.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
     <Compile Include="SemanticModelEmitter.fs" />
@@ -22,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Compiler.Service" Version="43.10.103" />
+    <PackageReference Include="Fabulous.AST" Version="1.10.0" />
   </ItemGroup>
 
   <ItemGroup>
