@@ -458,7 +458,7 @@ type ServerSentEventGenerator =
                 match httpRequest.Query.TryGetValue(Consts.DatastarKey) with
                 | true, stringValues when stringValues.Count > 0 -> return stringValues[0]
                 | _ -> return ""
-            | _ ->
+            else
                 try
                     // leaveOpen = true: httpRequest.Body is owned by ASP.NET Core, closing it from user code violates the platform contract.
                     use readResult = new StreamReader(httpRequest.Body, leaveOpen = true)
@@ -479,7 +479,7 @@ type ServerSentEventGenerator =
                         return ValueSome (JsonSerializer.Deserialize<'T>(stringValues[0], jsonSerializerOptions))
                     | _ ->
                         return ValueNone
-                | _ ->
+                else
                     let! t = JsonSerializer.DeserializeAsync<'T>(httpRequest.Body, jsonSerializerOptions, cancellationToken)
                     return (ValueSome t)
             with :? IOException ->
