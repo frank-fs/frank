@@ -87,6 +87,10 @@ let unionDecl (name: string) (cases: string list) : ModuleDeclItem =
         }
     )
 
+/// A plain typed value binding as a module declaration: let <name>: <typeName> = <value>
+let valueDecl (name: string) (typeName: string) (value: WidgetBuilder<Expr>) : ModuleDeclItem =
+    BindingDecl(Value(name, value, typeName))
+
 /// let <name> (<paramName>: <paramType>) : <returnType> = match <paramName> with <clauses>
 let matchFunction
     (name: string)
