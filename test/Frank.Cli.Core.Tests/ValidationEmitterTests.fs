@@ -215,6 +215,89 @@ let compileGateTests =
               Expect.isEmpty diagnostics $"emitted Validation module compiles cleanly; errors: {diagnostics}"
           } ]
 
+// ── skip paths ────────────────────────────────────────────────────────────────
+
+[<Tests>]
+let skipPathTests =
+    testList
+        "ValidationEmitter — skip paths"
+        [ test "resource with ClassIri=None produces no shape in emitted output" {
+              let registryNoIri: VocabularyRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", schemaPrefix ]
+                      Using = Set.ofList [ "schema" ] }
+
+              let lockNoIri: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                              Hash = "sha256:test" } ]
+                    Mappings =
+                      [ { FSharpType = "TicTacToe.NoIriType"
+                          Iri = None
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let shapes =
+                  ValidationEmitter.emit "T.GeneratedValidation" registryNoIri lockNoIri Map.empty
+                  |> okOrFail
+
+              Expect.isFalse (shapes.Contains "NoIriType") "resource with ClassIri=None must not appear in shapes"
+              Expect.stringContains shapes "shapes" "shapes binding still emitted (empty list)"
+          }
+
+          test "non-nullary union resource produces no shape in emitted output" {
+              let registryUnion: VocabularyRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", schemaPrefix ]
+                      Using = Set.ofList [ "schema" ] }
+
+              let lockNonNullary: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                              Hash = "sha256:test" } ]
+                    Mappings =
+                      [ { FSharpType = "TicTacToe.PayloadUnion"
+                          Iri = Some "schema:PayloadUnion"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "WithData"
+                                    Iri = Some "schema:WithData"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed
+                                    Payload =
+                                      [ { Name = "value"
+                                          Iri = Some "schema:value"
+                                          Confidence = 1.0
+                                          Source = Convention
+                                          Status = Confirmed } ] } ] } ] }
+
+              let shapes =
+                  ValidationEmitter.emit "T.GeneratedValidation" registryUnion lockNonNullary Map.empty
+                  |> okOrFail
+
+              Expect.isFalse (shapes.Contains "PayloadUnion") "non-nullary union must not appear in shapes"
+              Expect.isFalse (shapes.Contains "EnumShape") "non-nullary union must not produce EnumShape"
+              Expect.isFalse (shapes.Contains "RecordShape") "non-nullary union must not produce RecordShape"
+          } ]
+
 // ── determinism ───────────────────────────────────────────────────────────────
 
 [<Tests>]

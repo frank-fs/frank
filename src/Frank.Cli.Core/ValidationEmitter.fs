@@ -24,28 +24,26 @@ let private xsdOf (typeName: string) : XsdDatatype option =
 
 // ── PropertyShape projection ──────────────────────────────────────────────────
 
-let private projectProperty (rf: ResolvedField) : Result<PropertyShape, string> =
-    match rf.Iri with
-    | None -> Error $"field '{rf.Name}' has no IRI; cannot project to PropertyShape"
-    | Some path ->
-        if String.IsNullOrEmpty rf.TypeName then
-            Error $"field '{rf.Name}' has IRI but TypeName is empty (never enriched); fail-closed"
-        else
-            Ok
-                { Path = path
-                  Datatype = xsdOf rf.TypeName
-                  MinCount = if rf.IsOptional then 0 else 1
-                  MaxCount = if rf.IsCollection then None else Some 1
-                  Pattern = rf.ConstraintPattern }
+let private projectProperty (path: Uri) (rf: ResolvedField) : Result<PropertyShape, string> =
+    if String.IsNullOrEmpty rf.TypeName then
+        Error $"field '{rf.Name}' has IRI but TypeName is empty (never enriched); fail-closed"
+    else
+        Ok
+            { Path = path
+              Datatype = xsdOf rf.TypeName
+              MinCount = if rf.IsOptional then 0 else 1
+              MaxCount = if rf.IsCollection then None else Some 1
+              Pattern = rf.ConstraintPattern }
 
 let private projectProperties (fields: ResolvedField list) : Result<PropertyShape list, string> =
-    let withIri = fields |> List.filter (fun f -> f.Iri.IsSome)
+    let withIri =
+        fields |> List.choose (fun f -> f.Iri |> Option.map (fun iri -> iri, f))
 
-    let folder acc f =
+    let folder acc (path, rf) =
         match acc with
         | Error e -> Error e
         | Ok ps ->
-            match projectProperty f with
+            match projectProperty path rf with
             | Error e -> Error e
             | Ok p -> Ok(p :: ps)
 
@@ -58,22 +56,26 @@ let private projectProperties (fields: ResolvedField list) : Result<PropertyShap
 let private isAllNullary (r: ResolvedResource) : bool =
     r.Cases |> List.forall (fun c -> c.IsNullary)
 
+let private projectClassShape (classIri: Uri) (r: ResolvedResource) : Result<ShapeDecl option, string> =
+    match r.Cases with
+    | _ :: _ when isAllNullary r ->
+        let iris = r.Cases |> List.map (fun c -> c.Iri)
+
+        let nel =
+            { Head = List.head iris
+              Tail = List.tail iris }
+
+        Ok(Some(EnumShape(classIri, nel)))
+    | _ :: _ -> Ok None
+    | [] ->
+        match projectProperties r.Fields with
+        | Error e -> Error e
+        | Ok props -> Ok(Some(RecordShape(classIri, props)))
+
 let private projectResource (r: ResolvedResource) : Result<ShapeDecl option, string> =
     match r.ClassIri with
     | None -> Ok None
-    | Some classIri ->
-        match r.Cases with
-        | _ :: _ when isAllNullary r ->
-            let iris = r.Cases |> List.map (fun c -> c.Iri)
-
-            match NonEmptyList.ofList iris with
-            | None -> Ok None
-            | Some nel -> Ok(Some(EnumShape(classIri, nel)))
-        | _ :: _ -> Ok None
-        | [] ->
-            match projectProperties r.Fields with
-            | Error e -> Error e
-            | Ok props -> Ok(Some(RecordShape(classIri, props)))
+    | Some classIri -> projectClassShape classIri r
 
 let private traverseResult (f: 'a -> Result<'b option, 'e>) (xs: 'a list) : Result<'b list, 'e> =
     let folder acc x =
