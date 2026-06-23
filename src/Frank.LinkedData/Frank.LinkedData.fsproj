@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="LinkedDataTypes.fs" />
+    <Compile Include="Ontology.fs" />
     <Compile Include="LinkedDataMiddleware.fs" />
     <Compile Include="GeneratedLinkedDataResolver.fs" />
     <Compile Include="Frank.LinkedData.fs" />
@@ -19,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
