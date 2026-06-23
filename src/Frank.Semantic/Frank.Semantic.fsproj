@@ -14,6 +14,7 @@
     <Compile Include="LockFile.fs" />
     <Compile Include="ResolvedModel.fs" />
     <Compile Include="OntologyTypes.fs" />
+    <Compile Include="ShapeTypes.fs" />
     <Compile Include="ConventionEngine.fs" />
     <Compile Include="VocabFetcher.fs" />
   </ItemGroup>
