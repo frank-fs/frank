@@ -441,10 +441,16 @@ let projectionTests =
                   | Ok m -> m
                   | Error e -> failwith $"Expected Ok but got Error: {e}"
 
-              let mapped: SemanticModelEmitter.MappedResource list = SemanticModelEmitter.projectMapped model
+              let mapped: SemanticModelEmitter.MappedResource list =
+                  SemanticModelEmitter.projectMapped model
+
               Expect.isNonEmpty mapped "at least one class-mapped resource"
               Expect.contains (mapped |> List.map (fun m -> m.LocalName)) "Game" "Game mapped"
-              Expect.contains (mapped |> List.map (fun m -> m.ClassIri.AbsoluteUri)) "https://schema.org/Game" "ClassIri unwrapped"
+
+              Expect.contains
+                  (mapped |> List.map (fun m -> m.ClassIri.AbsoluteUri))
+                  "https://schema.org/Game"
+                  "ClassIri unwrapped"
           } ]
 
 // ── AT4 fixtures ──────────────────────────────────────────────────────────────
