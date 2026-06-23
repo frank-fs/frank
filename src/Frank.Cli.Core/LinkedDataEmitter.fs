@@ -9,14 +9,16 @@ open Frank.Semantic.LockFile
 /// Resolve the external base IRIs for the @context from the model's Using set and Prefixes map.
 /// Iterates Set.toList (ascending) — identical order to the old buildContext loop.
 /// Returns Error if any using prefix is not in Prefixes.
-let private contextBases (model: ResolvedModel) : Result<Uri list, string> =
+let internal contextBases (model: ResolvedModel) : Result<Uri list, string> =
     let rec loop (remaining: string list) (acc: Uri list) =
         match remaining with
         | [] -> Ok(List.rev acc)
         | prefix :: rest ->
             match Map.tryFind prefix model.Prefixes with
             | None -> Error $"using prefix '{prefix}' not found in Prefixes"
-            | Some baseUri -> loop rest (baseUri :: acc)
+            | Some baseUri ->
+                // stored un-trimmed; Ontology.toJsonLdContext trims trailing '/' at render
+                loop rest (baseUri :: acc)
 
     loop (Set.toList model.Using) []
 

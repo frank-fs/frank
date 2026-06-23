@@ -591,6 +591,16 @@ let projectionTierTests =
           } ]
 
 [<Tests>]
+let contextBasesTypedTests =
+    testList
+        "LinkedDataEmitter — contextBases typed equality"
+        [ test "schemaRegistry with ticTacToeLock resolves to [ Uri(\"https://schema.org/\") ]" {
+              let model = ResolvedModel.build schemaRegistry ticTacToeLock |> okOrFail
+              let result = LinkedDataEmitter.contextBases model |> okOrFail
+              Expect.equal result [ Uri("https://schema.org/") ] "context base resolved"
+          } ]
+
+[<Tests>]
 let compileGateTierTests =
     testList
         "LinkedDataEmitter — tier-3 compile-gate"
