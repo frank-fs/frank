@@ -72,6 +72,16 @@ let appExpr (func: string) (arg: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = Ap
 /// Wraps an expression in parentheses: (<expr>).
 let parenExpr (e: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = ParenExpr e
 
+/// An integer literal expression.
+let intExpr (n: int) : WidgetBuilder<Expr> = ConstantExpr(string n)
+
+/// Some <e>
+let someExpr (e: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = AppExpr("Some", e)
+
+/// A tupled discriminated-union case application: Ctor(a, b, ...)
+let tupleAppExpr (ctor: string) (args: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> =
+    AppExpr(ctor, ParenExpr(TupleExpr args))
+
 /// Wrapper so heterogeneous module declarations can be stored in a single list.
 [<NoComparison; NoEquality>]
 type ModuleDeclItem =

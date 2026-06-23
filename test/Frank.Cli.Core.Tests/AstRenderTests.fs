@@ -112,4 +112,18 @@ let astRenderTests =
                   src
                   "let graph: VDS.RDF.IGraph = Ontology.toGraph ontology"
                   "graph binding calls interpreter"
+          }
+
+          test "tupleAppExpr renders a tupled DU-case application; intExpr/someExpr render" {
+              let e =
+                  AstRender.tupleAppExpr
+                      "RecordShape"
+                      [ AstRender.uriExpr "https://schema.org/MoveAction"
+                        AstRender.listExpr [ AstRender.intExpr 1; AstRender.someExpr (AstRender.rawExpr "XsdInteger") ] ]
+
+              let src =
+                  AstRender.formatModule "T.GeneratedValidation" None [] [ AstRender.valueDecl "x" "ShapeDecl" e ]
+
+              Expect.stringContains src "RecordShape (Uri \"https://schema.org/MoveAction\"," "tupled ctor application"
+              Expect.stringContains src "[ 1; Some XsdInteger ]" "int + Some-enum in list"
           } ]
