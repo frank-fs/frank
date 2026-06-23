@@ -22,6 +22,7 @@
     <Compile Include="StatusTests.fs" />
     <Compile Include="FinalizeTests.fs" />
     <Compile Include="AstRenderTests.fs" />
+    <Compile Include="ValidationEmitterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

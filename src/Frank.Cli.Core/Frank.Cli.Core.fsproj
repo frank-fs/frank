@@ -18,6 +18,7 @@
     <Compile Include="AstRender.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
+    <Compile Include="ValidationEmitter.fs" />
     <Compile Include="SemanticModelEmitter.fs" />
   </ItemGroup>
 
