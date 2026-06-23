@@ -92,6 +92,11 @@ let private unwrapOk (r: Result<string, string>) : string =
     | Ok s -> s
     | Error e -> failwith $"Expected Ok but got Error: {e}"
 
+let private okOrFail (r: Result<'a, string>) : 'a =
+    match r with
+    | Ok v -> v
+    | Error e -> failwith $"Expected Ok but got Error: {e}"
+
 // ── FCS parse helper (in-process, no child processes) ────────────────────────
 
 let private parsesFsSource (source: string) : bool =
@@ -298,12 +303,12 @@ let seeAlsoCompletenessTests =
               Expect.stringContains (unwrapOk src) "https://www.wikidata.org/wiki/Q2140226" "Move seeAlso IRI"
           }
 
-          test "seeAlso uses rdfs:seeAlso predicate" {
+          test "seeAlso is captured in OntologyDecl typed literal (SeeAlso field present)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "rdfs:seeAlso" "rdfs:seeAlso predicate"
+              Expect.stringContains (unwrapOk src) "SeeAlso" "SeeAlso field present in typed literal"
           }
 
           testPropertyWithConfig
@@ -339,12 +344,12 @@ let equivalentClassCompletenessTests =
               Expect.stringContains (unwrapOk src) "https://schema.org/GamePlayMode" "equivalentClass IRI"
           }
 
-          test "owl:equivalentClass predicate present" {
+          test "equivalentClass is captured in OntologyDecl typed literal (EquivalentClass field present)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "owl:equivalentClass" "owl:equivalentClass predicate"
+              Expect.stringContains (unwrapOk src) "EquivalentClass" "EquivalentClass field present in typed literal"
           }
 
           testPropertyWithConfig
@@ -400,28 +405,30 @@ let subjectCorrectnessTests =
               Expect.stringContains text "https://schema.org/rowIndex" "rowIndex field IRI"
           }
 
-          test "rdf:type owl:Class assertion present" {
+          test "class data is captured in OntologyDecl typed literal (Classes field and type annotation present)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "owl:Class" "owl:Class type assertion"
+              let text = unwrapOk src
+              Expect.stringContains text "Classes" "Classes field present in typed literal"
+              Expect.stringContains text "OntologyDecl" "OntologyDecl type annotation present"
           }
 
-          test "rdf:type rdf:Property assertion for fields" {
+          test "field data is captured in OntologyDecl typed literal (Properties field present)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "rdf:Property" "rdf:Property type assertion for fields"
+              Expect.stringContains (unwrapOk src) "Properties" "Properties field present in typed literal"
           }
 
-          test "rdfs:domain assertion links field to class" {
+          test "domain linkage is captured in OntologyDecl typed literal (Domain field present)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "rdfs:domain" "rdfs:domain assertion"
+              Expect.stringContains (unwrapOk src) "Domain" "Domain field present in typed literal"
           } ]
 
 [<Tests>]
@@ -562,4 +569,44 @@ let prefixResolutionTests =
 
               let result = LinkedDataEmitter.emit "My.Generated" reg lockWithNoneIri
               Expect.isOk result "None IRI mapping emits without error"
+          } ]
+
+[<Tests>]
+let projectionTierTests =
+    testList
+        "LinkedDataEmitter — tier-1 projection"
+        [ test "projectOntology yields a typed ClassDecl per class-mapped resource with required domains (tier 1)" {
+              let model = ResolvedModel.build schemaRegistry ticTacToeLock |> okOrFail
+              let onto = LinkedDataEmitter.projectOntology model
+              Expect.isNonEmpty onto.Classes "at least one class"
+
+              let gameClass =
+                  onto.Classes
+                  |> List.find (fun c -> c.Iri.AbsoluteUri = "https://schema.org/Game")
+
+              Expect.all
+                  gameClass.Properties
+                  (fun p -> p.Domain.AbsoluteUri = "https://schema.org/Game")
+                  "every property domain is its class"
+          } ]
+
+[<Tests>]
+let compileGateTierTests =
+    testList
+        "LinkedDataEmitter — tier-3 compile-gate"
+        [ test "emitted GeneratedLinkedData compiles against Frank.Semantic/Frank.LinkedData (tier 3)" {
+              let src =
+                  LinkedDataEmitter.emit "Probe.GeneratedLinkedData" schemaRegistry ticTacToeLock
+                  |> okOrFail
+
+              let domainSrc =
+                  "namespace VDS.RDF\ntype IGraph = interface end\n"
+                  + "namespace Frank.Semantic\nopen System\n"
+                  + "type PropertyDecl = { Iri: Uri; Domain: Uri }\n"
+                  + "type ClassDecl = { Iri: Uri; EquivalentClass: Uri option; SeeAlso: Uri list; Properties: PropertyDecl list }\n"
+                  + "type OntologyDecl = { Classes: ClassDecl list; ContextBases: Uri list }\n"
+                  + "namespace Frank.LinkedData\nmodule Ontology =\n    let toGraph (_: Frank.Semantic.OntologyDecl) : VDS.RDF.IGraph = Unchecked.defaultof<_>\n    let toJsonLdContext (_: Frank.Semantic.OntologyDecl) : string = \"\"\n"
+
+              let diagnostics = FcsTypecheck.typecheckTwoSources domainSrc src
+              Expect.isEmpty diagnostics "emitted LinkedData module compiles cleanly"
           } ]

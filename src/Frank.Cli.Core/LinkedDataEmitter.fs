@@ -4,131 +4,79 @@ open System
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
-// ── @context rendering ──────────────────────────────────────────────────────
+// ── Prefix resolution ────────────────────────────────────────────────────────
 
-/// Build the JSON-LD @context string from the model's Using set and Prefixes map.
-/// For each `using` prefix, include the external base URI (trimmed of trailing slash).
+/// Resolve the external base IRIs for the @context from the model's Using set and Prefixes map.
+/// Iterates Set.toList (ascending) — identical order to the old buildContext loop.
 /// Returns Error if any using prefix is not in Prefixes.
-let private buildContext (model: ResolvedModel) : Result<string, string> =
-    let rec loop (remaining: string list) (acc: string list) =
+let private contextBases (model: ResolvedModel) : Result<Uri list, string> =
+    let rec loop (remaining: string list) (acc: Uri list) =
         match remaining with
         | [] -> Ok(List.rev acc)
         | prefix :: rest ->
             match Map.tryFind prefix model.Prefixes with
             | None -> Error $"using prefix '{prefix}' not found in Prefixes"
-            | Some baseUri ->
-                let uri = baseUri.AbsoluteUri.TrimEnd('/')
-                loop rest (uri :: acc)
+            | Some baseUri -> loop rest (baseUri :: acc)
 
-    match loop (Set.toList model.Using) [] with
-    | Error e -> Error e
-    | Ok uris ->
-        let items = uris |> List.map (fun u -> "\"" + u + "\"") |> String.concat ","
-        Ok("{\"@context\":[" + items + "]}")
+    loop (Set.toList model.Using) []
 
-// ── Triple rendering ─────────────────────────────────────────────────────────
+// ── OntologyDecl projection ──────────────────────────────────────────────────
 
-/// Escape a string for use in an F# string literal (double-quoted).
-let private esc (s: string) : string =
-    s.Replace("\\", "\\\\").Replace("\"", "\\\"")
+let private toClassDecl (r: ResolvedResource) : ClassDecl option =
+    r.ClassIri
+    |> Option.map (fun classUri ->
+        let props =
+            r.Fields
+            |> List.choose (fun f -> f.Iri |> Option.map (fun iri -> { Iri = iri; Domain = classUri }))
 
-/// Render one triple assertion: g.Assert(g.CreateUriNode(UriFactory.Create("S")), pred, obj)
-let private assertTriple (subject: string) (predNs: string) (predLocal: string) (objExpr: string) : string =
-    let s = "UriFactory.Create(\"" + esc subject + "\")"
-    let p = $"{predNs}:{predLocal}"
+        { Iri = classUri
+          EquivalentClass = r.EquivalentClass
+          SeeAlso = r.SeeAlso
+          Properties = props })
 
-    "    g.Assert(Triple(g.CreateUriNode("
-    + s
-    + "), "
-    + "g.CreateUriNode(g.ResolveQName(\""
-    + p
-    + "\")), "
-    + objExpr
-    + "))"
+/// Project a ResolvedModel to an OntologyDecl.
+/// ContextBases is left empty; emit fills it after resolving prefix URIs.
+let internal projectOntology (model: ResolvedModel) : OntologyDecl =
+    { Classes = model.Resources |> List.choose toClassDecl
+      ContextBases = [] }
 
-/// Render a URI node expression.
-let private uriNode (iri: string) : string =
-    "g.CreateUriNode(UriFactory.Create(\"" + esc iri + "\"))"
+// ── AstRender helpers ────────────────────────────────────────────────────────
 
-/// Render a QName node expression (uses g.ResolveQName).
-let private qnameNode (qname: string) : string =
-    "g.CreateUriNode(g.ResolveQName(\"" + esc qname + "\"))"
+let private uriField (name: string) (u: Uri) =
+    name, AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri)
 
-/// Render all triples for one resolved resource. Returns [] if no ClassIri.
-let private typeTriples (r: ResolvedResource) : string list =
-    match r.ClassIri with
-    | None -> []
-    | Some classUri ->
-        let subjIri = classUri.AbsoluteUri
-        let typeTriple = assertTriple subjIri "rdf" "type" (qnameNode "owl:Class")
+let private optUriField (name: string) (u: Uri option) =
+    let expr =
+        match u with
+        | Some v ->
+            AstRender.appExpr
+                "Some"
+                (AstRender.parenExpr (AstRender.appExpr "System.Uri" (AstRender.strExpr v.AbsoluteUri)))
+        | None -> AstRender.noneExpr
 
-        let equivTriple =
-            match r.EquivalentClass with
-            | None -> []
-            | Some equivUri -> [ assertTriple subjIri "owl" "equivalentClass" (uriNode equivUri.AbsoluteUri) ]
+    name, expr
 
-        let seeAlsoTriples =
-            r.SeeAlso
-            |> List.map (fun u -> assertTriple subjIri "rdfs" "seeAlso" (uriNode u.AbsoluteUri))
+let private uriListField (name: string) (us: Uri list) =
+    let items =
+        us
+        |> List.map (fun u -> AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri))
 
-        typeTriple :: equivTriple @ seeAlsoTriples
+    name, AstRender.listExpr items
 
-/// Render all triples for one resolved field. Returns [] if no field Iri.
-let private fieldTriples (subjIri: string) (f: ResolvedField) : string list =
-    match f.Iri with
-    | None -> []
-    | Some fieldUri ->
-        let fieldIri = fieldUri.AbsoluteUri
-        let propTriple = assertTriple fieldIri "rdf" "type" (qnameNode "rdf:Property")
-        let domainTriple = assertTriple fieldIri "rdfs" "domain" (uriNode subjIri)
-        [ propTriple; domainTriple ]
+let private propExpr (p: PropertyDecl) =
+    AstRender.recordExpr [ uriField "Iri" p.Iri; uriField "Domain" p.Domain ]
 
-/// Collect all triple lines for all resources in the model. Returns Error on first failure.
-let private collectTriples (resources: ResolvedResource list) : string list =
-    let resourceLines (r: ResolvedResource) =
-        let tLines = typeTriples r
+let private classExpr (c: ClassDecl) =
+    AstRender.recordExpr
+        [ uriField "Iri" c.Iri
+          optUriField "EquivalentClass" c.EquivalentClass
+          uriListField "SeeAlso" c.SeeAlso
+          "Properties", AstRender.listExpr (c.Properties |> List.map propExpr) ]
 
-        let fLines =
-            match r.ClassIri with
-            | None -> []
-            | Some classUri -> r.Fields |> List.collect (fieldTriples classUri.AbsoluteUri)
-
-        tLines @ fLines
-
-    resources |> List.collect resourceLines
-
-// ── Namespace setup rendering ───────────────────────────────────────────────
-
-/// Render the namespace registration lines for well-known ontology prefixes.
-let private namespaceSetup: string list =
-    [ "    g.NamespaceMap.AddNamespace(\"rdf\", UriFactory.Create(\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"))"
-      "    g.NamespaceMap.AddNamespace(\"rdfs\", UriFactory.Create(\"http://www.w3.org/2000/01/rdf-schema#\"))"
-      "    g.NamespaceMap.AddNamespace(\"owl\", UriFactory.Create(\"http://www.w3.org/2002/07/owl#\"))" ]
-
-// ── Module assembly ──────────────────────────────────────────────────────────
-
-/// Assemble the full F# module source string.
-let private assembleModule (moduleName: string) (contextJson: string) (tripleLines: string list) : string =
-    let graphBody =
-        match tripleLines with
-        | [] -> "    g"
-        | lines -> (String.concat "\n" lines) + "\n    g"
-
-    String.concat
-        "\n"
-        [ $"module {moduleName}"
-          ""
-          "open VDS.RDF"
-          "open VDS.RDF.Parsing"
-          ""
-          "let jsonLdContext : string ="
-          "    \"\"\"" + contextJson + "\"\"\""
-          ""
-          "let graph : IGraph ="
-          "    let g = new Graph()"
-          (String.concat "\n" namespaceSetup)
-          graphBody
-          "" ]
+let private ontologyExpr (onto: OntologyDecl) =
+    AstRender.recordExpr
+        [ "Classes", AstRender.listExpr (onto.Classes |> List.map classExpr)
+          uriListField "ContextBases" onto.ContextBases ]
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -147,8 +95,22 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
     match ResolvedModel.build registry lock with
     | Error e -> Error e
     | Ok model ->
-        match buildContext model with
+        match contextBases model with
         | Error e -> Error e
-        | Ok contextJson ->
-            let tripleLines = collectTriples model.Resources
-            Ok(assembleModule moduleName contextJson tripleLines)
+        | Ok bases ->
+            let onto =
+                { projectOntology model with
+                    ContextBases = bases }
+
+            let decls =
+                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr onto)
+                  AstRender.valueDecl
+                      "graph"
+                      "VDS.RDF.IGraph"
+                      (AstRender.appExpr "Ontology.toGraph" (AstRender.rawExpr "ontology"))
+                  AstRender.valueDecl
+                      "jsonLdContext"
+                      "string"
+                      (AstRender.appExpr "Ontology.toJsonLdContext" (AstRender.rawExpr "ontology")) ]
+
+            Ok(AstRender.formatModule moduleName None [ "Frank.Semantic"; "Frank.LinkedData" ] decls)
