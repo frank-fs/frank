@@ -448,13 +448,9 @@ let projectionTests =
                       | Ok m -> m
                       | Error e -> failwith $"Expected Ok but got Error: {e}"
 
-              let descriptors, links =
-                  DiscoveryEmitter.projectDiscovery "/alps/tictactoe" model
+              let descriptors, links = DiscoveryEmitter.projectDiscovery "/alps/tictactoe" model
 
-              Expect.contains
-                  (descriptors |> List.map (fun d -> d.Id))
-                  "MoveAction"
-                  "type descriptor present"
+              Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "type descriptor present"
 
               Expect.contains
                   (descriptors |> List.map (fun d -> d.Href))
