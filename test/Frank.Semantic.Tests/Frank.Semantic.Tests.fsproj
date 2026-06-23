@@ -13,6 +13,7 @@
     <Compile Include="ConventionEngineTests.fs" />
     <Compile Include="LockFileTests.fs" />
     <Compile Include="ResolvedModelTests.fs" />
+    <Compile Include="OntologyTypesTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
