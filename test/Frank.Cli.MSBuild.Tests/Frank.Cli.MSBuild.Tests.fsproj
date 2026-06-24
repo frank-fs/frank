@@ -13,6 +13,7 @@
     <Compile Include="ValidateLockFileTaskTests.fs" />
     <Compile Include="GenerateDiscoveryTaskTests.fs" />
     <Compile Include="GenerateLinkedDataTaskTests.fs" />
+    <Compile Include="GenerateValidationTaskTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -26,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
   </ItemGroup>
 
 </Project>
