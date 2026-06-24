@@ -294,7 +294,7 @@ git commit -m "test(cli): extract typecheckTwoSources to shared FcsTypecheck mod
 ```fsharp
 test "projectDiscovery yields typed descriptors for class + fields (tier 1)" {
     let model = ResolvedModel.build fixtureRegistry fixtureLock |> okOrFail
-    let descriptors, links = DiscoveryEmitter.projectDiscovery "/alps/tictactoe" model
+    let descriptors, links = DiscoveryEmitter.projectDiscovery model
     Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "type descriptor present"
     Expect.contains (descriptors |> List.map (fun d -> d.Href)) (Some "https://schema.org/MoveAction") "type href present"
     Expect.isNonEmpty links "describedBy links present"
@@ -334,7 +334,7 @@ type internal ResolvedDescriptor = { Id: string; Href: string }   // (keep exist
 // ... keep localName / typeDescriptor / fieldDescriptors / collectDescriptors / collectDescribedByLinks ...
 
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
-let internal projectDiscovery (_profileUri: string) (model: ResolvedModel) : ResolvedDescriptor list * string list =
+let internal projectDiscovery (model: ResolvedModel) : ResolvedDescriptor list * string list =
     collectDescriptors model.Resources, collectDescribedByLinks model.Resources
 
 // ── Source rendering via AstRender (no string concat) ─────────────────────────
@@ -367,7 +367,7 @@ let emit
     match ResolvedModel.build registry lock with
     | Error e -> Error e
     | Ok model ->
-        let descriptors, links = projectDiscovery profileUri model
+        let descriptors, links = projectDiscovery model
         let value = configExpr profileUri descriptors links
         Ok(AstRender.formatTypedValueModule moduleName [ "Frank.Discovery" ] "discoveryConfig" "DiscoveryConfig" value)
 ```
