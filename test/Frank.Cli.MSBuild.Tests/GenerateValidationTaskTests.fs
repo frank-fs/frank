@@ -161,7 +161,8 @@ let validationTests =
                   let source = File.ReadAllText outFile
                   Expect.stringContains source "RecordShape" "RecordShape DU case present"
                   Expect.stringContains source "Shapes.toShapesGraph" "interpreter call present"
-                  Expect.isFalse (source.Contains "urn:frank:") "no urn:frank: in output")
+                  Expect.isFalse (source.Contains "urn:frank:") "no urn:frank: in output"
+                  Expect.stringContains source "Some XsdInteger" "int field produces XsdInteger datatype")
           }
 
           test "GeneratedFile output property set to written path" {
@@ -271,6 +272,65 @@ let validationTests =
                       |> Array.toList
 
                   Expect.isEmpty errors $"emitted GeneratedValidation.fs compiles cleanly; errors: {errors}")
+          }
+
+          test "FCS compile gate is non-vacuous: corrupted source produces errors" {
+              withTempDir (fun dir ->
+                  let outDir = Path.Combine(dir, "obj")
+                  let engine = StubBuildEngine()
+                  let lockPath = writeLockFile dir validationLock
+                  let srcPath = writeVocabAndDomainSource dir
+                  let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
+                  let task = makeTask engine lockPath outDir [ srcPath ] refs
+                  task.VocabularyBinding <- "TicTacToe.CliValidationVocab.registry"
+                  let result = task.Execute()
+                  Expect.isTrue result "task must succeed to have emitted source"
+
+                  let outFile = Path.Combine(outDir, "GeneratedValidation.fs")
+                  let goodSrc = File.ReadAllText outFile
+
+                  let corruptedSrc = goodSrc.Replace("Path =", "PathZZZ =")
+                  Expect.isFalse (corruptedSrc = goodSrc) "corruption must change the source"
+
+                  let checker =
+                      FSharp.Compiler.CodeAnalysis.FSharpChecker.Create(keepAssemblyContents = false)
+
+                  let corruptedText = FSharp.Compiler.Text.SourceText.ofString corruptedSrc
+                  let tmpFile = Path.Combine(outDir, "Corrupted.fs")
+                  File.WriteAllText(tmpFile, corruptedSrc)
+
+                  let scriptOpts, _ =
+                      checker.GetProjectOptionsFromScript(
+                          tmpFile,
+                          corruptedText,
+                          assumeDotNetFramework = false,
+                          useSdkRefs = true
+                      )
+                      |> Async.RunSynchronously
+
+                  let extraRefs =
+                      [ typeof<Frank.Semantic.ShapeDecl>.Assembly
+                        typeof<Frank.Validation.ValidationConfig>.Assembly
+                        typeof<VDS.RDF.Shacl.ShapesGraph>.Assembly
+                        typeof<VDS.RDF.IGraph>.Assembly ]
+                      |> List.filter (fun a -> not (String.IsNullOrEmpty a.Location))
+                      |> List.map (fun a -> $"-r:{a.Location}")
+                      |> Array.ofList
+
+                  let opts =
+                      { scriptOpts with
+                          SourceFiles = [| tmpFile |]
+                          OtherOptions = Array.append scriptOpts.OtherOptions extraRefs }
+
+                  let results = checker.ParseAndCheckProject(opts) |> Async.RunSynchronously
+
+                  let errors =
+                      results.Diagnostics
+                      |> Array.filter (fun d ->
+                          d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
+                      |> Array.toList
+
+                  Expect.isNonEmpty errors "gate must report errors on corrupted source (mutation proof)")
           }
 
           test "determinism: two runs produce byte-identical output" {
