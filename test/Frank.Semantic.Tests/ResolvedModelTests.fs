@@ -541,12 +541,14 @@ let at_rm_et =
               Expect.isTrue f.IsCollection "is collection"
           }
 
-          test "enrichTypes Errors on a present-but-empty TypeName" {
+          test "enrichTypes Errors on a present-but-empty TypeName and names the field" {
               match
                   ResolvedModel.build baseRegistry enrichLock
                   |> Result.bind (ResolvedModel.enrichTypes typesByNameWithEmpty)
               with
-              | Error _ -> ()
+              | Error msg ->
+                  Expect.stringContains msg "Count" "error names the offending field"
+                  Expect.stringContains msg "TypeName must not be empty" "error preserves inner message"
               | Ok _ -> failtest "expected Error for empty TypeName"
           }
 

@@ -27,6 +27,7 @@ let internal contextBases (model: ResolvedModel) : Result<Uri list, string> =
 let private toClassDecl (r: ResolvedResource) : ClassDecl option =
     r.ClassIri
     |> Option.map (fun classUri ->
+        // Invariant: Domain = classUri for every property emitted by this function.
         let props =
             r.Fields
             |> List.choose (fun f -> f.Iri |> Option.map (fun iri -> { Iri = iri; Domain = classUri }))

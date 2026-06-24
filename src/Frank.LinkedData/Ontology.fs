@@ -9,6 +9,15 @@ let private rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 let private owl = "http://www.w3.org/2002/07/owl#"
 
 let private addClass (g: IGraph) (c: ClassDecl) : unit =
+    if
+        not (
+            g.NamespaceMap.HasNamespace "rdf"
+            && g.NamespaceMap.HasNamespace "rdfs"
+            && g.NamespaceMap.HasNamespace "owl"
+        )
+    then
+        invalidOp "addClass requires rdf/rdfs/owl namespaces registered on the graph"
+
     let subj = Triples.uriNode g c.Iri.AbsoluteUri
     Triples.assert3 g subj (Triples.qnameNode g "rdf:type") (Triples.qnameNode g "owl:Class")
 
