@@ -609,14 +609,11 @@ let compileGateTierTests =
                   LinkedDataEmitter.emit "Probe.GeneratedLinkedData" schemaRegistry ticTacToeLock
                   |> okOrFail
 
-              let domainSrc =
-                  "namespace VDS.RDF\ntype IGraph = interface end\n"
-                  + "namespace Frank.Semantic\nopen System\n"
-                  + "type PropertyDecl = { Iri: Uri; Domain: Uri }\n"
-                  + "type ClassDecl = { Iri: Uri; EquivalentClass: Uri option; SeeAlso: Uri list; Properties: PropertyDecl list }\n"
-                  + "type OntologyDecl = { Classes: ClassDecl list; ContextBases: Uri list }\n"
-                  + "namespace Frank.LinkedData\nmodule Ontology =\n    let toGraph (_: Frank.Semantic.OntologyDecl) : VDS.RDF.IGraph = Unchecked.defaultof<_>\n    let toJsonLdContext (_: Frank.Semantic.OntologyDecl) : string = \"\"\n"
+              let assemblies =
+                  [ typeof<Frank.Semantic.OntologyDecl>.Assembly
+                    typeof<Frank.LinkedData.LinkedDataConfig>.Assembly
+                    typeof<VDS.RDF.IGraph>.Assembly ]
 
-              let diagnostics = FcsTypecheck.typecheckTwoSources domainSrc src
+              let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
               Expect.isEmpty diagnostics "emitted LinkedData module compiles cleanly"
           } ]

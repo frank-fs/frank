@@ -471,12 +471,9 @@ let compileGateTests =
                       | Ok s -> s
                       | Error e -> failwith $"Expected Ok but got Error: {e}"
 
-              let domainSrc =
-                  "namespace Frank.Discovery\n"
-                  + "type AlpsDescriptor = { Id: string; Type: string; Doc: string option; Href: string option }\n"
-                  + "type DiscoveryConfig = { ProfileUri: string; HomeRoute: string; AlpsDescriptors: AlpsDescriptor list; DescribedByLinks: string list }\n"
+              let assemblies = [ typeof<Frank.Discovery.DiscoveryConfig>.Assembly ]
 
-              let diagnostics = FcsTypecheck.typecheckTwoSources domainSrc src
+              let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
               Expect.isEmpty diagnostics "emitted Discovery module compiles cleanly"
           } ]
 

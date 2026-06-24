@@ -202,16 +202,13 @@ let compileGateTests =
                   ValidationEmitter.emit "T.GeneratedValidation" registry lock typesByName
                   |> okOrFail
 
-              let domainSrc =
-                  "namespace VDS.RDF.Shacl\ntype ShapesGraph = class end\n"
-                  + "namespace Frank.Semantic\nopen System\n"
-                  + "type NonEmptyList<'T> = { Head: 'T; Tail: 'T list }\n"
-                  + "type XsdDatatype = XsdInteger | XsdLong | XsdDecimal | XsdDouble | XsdBoolean | XsdString | XsdDateTime\n"
-                  + "type PropertyShape = { Path: Uri; Datatype: XsdDatatype option; MinCount: int; MaxCount: int option; Pattern: string option }\n"
-                  + "type ShapeDecl = RecordShape of Uri * PropertyShape list | EnumShape of Uri * NonEmptyList<Uri>\n"
-                  + "namespace Frank.Validation\nmodule Shapes =\n    let toShapesGraph (_: Frank.Semantic.ShapeDecl list) : VDS.RDF.Shacl.ShapesGraph = Unchecked.defaultof<_>\n"
+              let assemblies =
+                  [ typeof<Frank.Semantic.ShapeDecl>.Assembly
+                    typeof<Frank.Validation.ValidationConfig>.Assembly
+                    typeof<VDS.RDF.Shacl.ShapesGraph>.Assembly
+                    typeof<VDS.RDF.IGraph>.Assembly ]
 
-              let diagnostics = typecheckTwoSources domainSrc src
+              let diagnostics = typecheckAgainstRealAssemblies src assemblies
               Expect.isEmpty diagnostics $"emitted Validation module compiles cleanly; errors: {diagnostics}"
           } ]
 
