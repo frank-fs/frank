@@ -72,6 +72,7 @@ let private addShape (g: IGraph) (ri: int) (shape: ShapeDecl) : unit =
 
 /// THE single place SHACL triples are built. Total over ShapeDecl, correct by construction.
 let toShapesGraph (shapes: ShapeDecl list) : ShapesGraph =
+    // not `use`-bound: ownership transfers to the returned ShapesGraph (use would dispose before the caller validates)
     let g = new Graph() :> IGraph
     g.NamespaceMap.AddNamespace("sh", UriFactory.Create "http://www.w3.org/ns/shacl#")
     g.NamespaceMap.AddNamespace("xsd", UriFactory.Create "http://www.w3.org/2001/XMLSchema#")

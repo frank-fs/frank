@@ -36,8 +36,8 @@ module GeneratedModuleReflection =
         match candidates with
         | [] ->
             Error
-                $"useDiscovery/useLinkedData: no {simpleName} type found in loaded assemblies. \
-                 Ensure {simpleName}.fs is generated and compiled into your application \
+                $"no {simpleName} generated type found in the referenced assemblies. \
+                 Ensure the generated module is referenced and the project has been built \
                  (Frank.Cli.MSBuild generates this file)."
         | [ t ] -> Ok t
         | _ ->

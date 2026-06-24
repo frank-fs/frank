@@ -29,7 +29,7 @@ let tests =
                           Tail = [ Uri "https://schema.org/CompletedActionStatus" ] }
                     ) ]
 
-              let sg = Shapes.toShapesGraph shapes
+              use sg = Shapes.toShapesGraph shapes
 
               let report =
                   sg.Validate(dataGraph "https://schema.org/GameStatusType" "https://schema.org/ActiveActionStatus")
@@ -44,7 +44,7 @@ let tests =
                           Tail = [] }
                     ) ]
 
-              let sg = Shapes.toShapesGraph shapes
+              use sg = Shapes.toShapesGraph shapes
 
               let report =
                   sg.Validate(dataGraph "https://schema.org/GameStatusType" "https://schema.org/UnknownStatus")
@@ -62,7 +62,7 @@ let tests =
                             Pattern = None } ]
                     ) ]
 
-              let sg = Shapes.toShapesGraph shapes
+              use sg = Shapes.toShapesGraph shapes
 
               let report =
                   sg.Validate(dataGraph "https://schema.org/MoveAction" "https://example.org/move1")
