@@ -326,38 +326,7 @@ let private sdkRefs () =
 let at6SourceSetTests =
     testList
         "AT6 - extractTypeInfosFromSources"
-        [ test "extracts Move record from two temp source files" {
-              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
-              Directory.CreateDirectory(tmpDir) |> ignore
-
-              try
-                  let src1 =
-                      """namespace MultiSrc
-
-type Move = { position: int; notes: string option; tags: string list }
-"""
-
-                  let src2 =
-                      """namespace MultiSrc
-
-type Board = { size: int; label: string }
-"""
-
-                  let file1 = Path.Combine(tmpDir, "Move.fs")
-                  let file2 = Path.Combine(tmpDir, "Board.fs")
-                  File.WriteAllText(file1, src1)
-                  File.WriteAllText(file2, src2)
-
-                  let refs = sdkRefs ()
-                  let result = Extractor.extractTypeInfosFromSources [| file1; file2 |] refs
-                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
-                  let move = types |> List.tryFind (fun t -> t.LocalName = "Move")
-                  Expect.isSome move "Move type extracted"
-              finally
-                  Directory.Delete(tmpDir, true)
-          }
-
-          test "Move.position field TypeName is int" {
+        [ test "Move.position field TypeName is int" {
               let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
               Directory.CreateDirectory(tmpDir) |> ignore
 
@@ -483,6 +452,27 @@ type Board = { size: int; label: string }
               Expect.throws
                   (fun () -> Extractor.extractTypeInfosFromSources [||] [||] |> ignore)
                   "empty sourceFiles must throw"
+          }
+
+          test "returns Error when FCS project check has critical errors (bad assembly ref)" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src =
+                      """namespace BrokenSrc
+
+type Broken = { Field: int }
+"""
+
+                  let file = Path.Combine(tmpDir, "Broken.fs")
+                  File.WriteAllText(file, src)
+
+                  let badRefs = [| "/nonexistent/path/DoesNotExist.dll" |]
+                  let result = Extractor.extractTypeInfosFromSources [| file |] badRefs
+                  Expect.isError result "critical FCS errors must not silently return Ok"
+              finally
+                  Directory.Delete(tmpDir, true)
           } ]
 
 // ── Integration test: .fsproj wrapper ────────────────────────────────────────

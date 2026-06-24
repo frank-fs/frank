@@ -296,18 +296,32 @@ let private buildProjectOptions (projectFile: string) (sourceFiles: string[]) (r
 
 // ── shared project-check core ─────────────────────────────────────────────────
 
-let private checkProjectAndCollect (options: FSharpProjectOptions) (sourceFiles: string[]) : TypeInfo list =
+let private checkProjectAndCollect
+    (options: FSharpProjectOptions)
+    (sourceFiles: string[])
+    : Result<TypeInfo list, string> =
     let checker = FSharpChecker.Create(keepAssemblyContents = true)
     let results = checker.ParseAndCheckProject(options) |> Async.RunSynchronously
-    let projectSourceFiles = sourceFiles |> Array.map Path.GetFullPath |> Set.ofArray
 
-    let inProject (entity: FSharpEntity) =
-        let loc = Path.GetFullPath(entity.DeclarationLocation.FileName)
-        Set.contains loc projectSourceFiles
+    if results.HasCriticalErrors then
+        let msgs =
+            results.Diagnostics
+            |> Array.filter (fun d -> d.Severity = FSharp.Compiler.Diagnostics.FSharpDiagnosticSeverity.Error)
+            |> Array.map (fun d -> d.Message)
+            |> String.concat "; "
 
-    results.AssemblySignature.Entities
-    |> Seq.collect (collectFromEntity inProject)
-    |> Seq.toList
+        Error $"FCS project check failed: {msgs}"
+    else
+        let projectSourceFiles = sourceFiles |> Array.map Path.GetFullPath |> Set.ofArray
+
+        let inProject (entity: FSharpEntity) =
+            Set.contains (Path.GetFullPath(entity.DeclarationLocation.FileName)) projectSourceFiles
+
+        Ok(
+            results.AssemblySignature.Entities
+            |> Seq.collect (collectFromEntity inProject)
+            |> Seq.toList
+        )
 
 // ── .fsproj wrapper ───────────────────────────────────────────────────────────
 
@@ -328,7 +342,7 @@ let extractTypeInfos (projectFile: string) : Result<TypeInfo list, string> =
         else
 
             let options = buildProjectOptions projectFile sourceFiles refs
-            Ok(checkProjectAndCollect options sourceFiles)
+            checkProjectAndCollect options sourceFiles
 
 // ── source-set entry point ─────────────────────────────────────────────────────
 
@@ -347,6 +361,6 @@ let extractTypeInfosFromSources (sourceFiles: string[]) (refs: string[]) : Resul
         Error $"Source files not found: {missingList}"
     else
 
-        let projectFile = sourceFiles.[0]
+        let projectFile = Path.Combine(Path.GetTempPath(), "frank_virtual_project.fsproj")
         let options = buildProjectOptions projectFile sourceFiles refs
-        Ok(checkProjectAndCollect options sourceFiles)
+        checkProjectAndCollect options sourceFiles
