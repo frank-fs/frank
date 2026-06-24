@@ -300,6 +300,191 @@ let at5SourceOnlyTests =
               Expect.isEmpty nonMyApp $"Expected only MyApp types, got: {nonMyApp |> List.map _.FullName}"
           } ]
 
+// ── AT6: extractTypeInfosFromSources ─────────────────────────────────────────
+
+let private sdkRefs () =
+    let checker = FSharp.Compiler.CodeAnalysis.FSharpChecker.Create()
+    let src = FSharp.Compiler.Text.SourceText.ofString "let x = 1"
+
+    let opts, _ =
+        checker.GetProjectOptionsFromScript(
+            "/tmp/frank_sdk_probe.fsx",
+            src,
+            assumeDotNetFramework = false,
+            useSdkRefs = true
+        )
+        |> Async.RunSynchronously
+
+    opts.OtherOptions
+    |> Array.choose (fun o ->
+        if o.StartsWith("-r:", StringComparison.Ordinal) then
+            Some(o.[3..])
+        else
+            None)
+
+[<Tests>]
+let at6SourceSetTests =
+    testList
+        "AT6 - extractTypeInfosFromSources"
+        [ test "extracts Move record from two temp source files" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src1 =
+                      """namespace MultiSrc
+
+type Move = { position: int; notes: string option; tags: string list }
+"""
+
+                  let src2 =
+                      """namespace MultiSrc
+
+type Board = { size: int; label: string }
+"""
+
+                  let file1 = Path.Combine(tmpDir, "Move.fs")
+                  let file2 = Path.Combine(tmpDir, "Board.fs")
+                  File.WriteAllText(file1, src1)
+                  File.WriteAllText(file2, src2)
+
+                  let refs = sdkRefs ()
+                  let result = Extractor.extractTypeInfosFromSources [| file1; file2 |] refs
+                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
+                  let move = types |> List.tryFind (fun t -> t.LocalName = "Move")
+                  Expect.isSome move "Move type extracted"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Move.position field TypeName is int" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src =
+                      """namespace MultiSrc
+
+type Move = { position: int; notes: string option; tags: string list }
+"""
+
+                  let file = Path.Combine(tmpDir, "Move.fs")
+                  File.WriteAllText(file, src)
+
+                  let refs = sdkRefs ()
+                  let result = Extractor.extractTypeInfosFromSources [| file |] refs
+                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
+                  let move = types |> List.find (fun t -> t.LocalName = "Move")
+
+                  match move.Shape with
+                  | TypeShape.Record fields ->
+                      let pos = fields |> List.find (fun f -> f.Name = "position")
+                      Expect.equal pos.TypeName "int" "position TypeName"
+                  | TypeShape.Union _ -> failwith "Move should be a Record"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Move.notes field TypeName is string option" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src =
+                      """namespace MultiSrc
+
+type Move = { position: int; notes: string option; tags: string list }
+"""
+
+                  let file = Path.Combine(tmpDir, "Move.fs")
+                  File.WriteAllText(file, src)
+
+                  let refs = sdkRefs ()
+                  let result = Extractor.extractTypeInfosFromSources [| file |] refs
+                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
+                  let move = types |> List.find (fun t -> t.LocalName = "Move")
+
+                  match move.Shape with
+                  | TypeShape.Record fields ->
+                      let notes = fields |> List.find (fun f -> f.Name = "notes")
+                      Expect.equal notes.TypeName "string option" "notes TypeName"
+                  | TypeShape.Union _ -> failwith "Move should be a Record"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Move.tags field TypeName is string list" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src =
+                      """namespace MultiSrc
+
+type Move = { position: int; notes: string option; tags: string list }
+"""
+
+                  let file = Path.Combine(tmpDir, "Move.fs")
+                  File.WriteAllText(file, src)
+
+                  let refs = sdkRefs ()
+                  let result = Extractor.extractTypeInfosFromSources [| file |] refs
+                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
+                  let move = types |> List.find (fun t -> t.LocalName = "Move")
+
+                  match move.Shape with
+                  | TypeShape.Record fields ->
+                      let tags = fields |> List.find (fun f -> f.Name = "tags")
+                      Expect.equal tags.TypeName "string list" "tags TypeName"
+                  | TypeShape.Union _ -> failwith "Move should be a Record"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "types from second file are extracted" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let src1 =
+                      """namespace MultiSrc
+
+type Move = { position: int; notes: string option; tags: string list }
+"""
+
+                  let src2 =
+                      """namespace MultiSrc
+
+type Board = { size: int; label: string }
+"""
+
+                  let file1 = Path.Combine(tmpDir, "Move.fs")
+                  let file2 = Path.Combine(tmpDir, "Board.fs")
+                  File.WriteAllText(file1, src1)
+                  File.WriteAllText(file2, src2)
+
+                  let refs = sdkRefs ()
+                  let result = Extractor.extractTypeInfosFromSources [| file1; file2 |] refs
+                  let types = Expect.wantOk result "extractTypeInfosFromSources should succeed"
+                  let board = types |> List.tryFind (fun t -> t.LocalName = "Board")
+                  Expect.isSome board "Board type from second file extracted"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "returns Error for missing source file" {
+              let result =
+                  Extractor.extractTypeInfosFromSources [| "/nonexistent/path/Missing.fs" |] [||]
+
+              Expect.isError result "should return Error for missing file"
+          }
+
+          test "raises invalidArg for empty sourceFiles" {
+              Expect.throws
+                  (fun () -> Extractor.extractTypeInfosFromSources [||] [||] |> ignore)
+                  "empty sourceFiles must throw"
+          } ]
+
 // ── Integration test: .fsproj wrapper ────────────────────────────────────────
 
 [<Tests>]

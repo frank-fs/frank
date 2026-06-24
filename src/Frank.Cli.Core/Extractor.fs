@@ -294,6 +294,21 @@ let private buildProjectOptions (projectFile: string) (sourceFiles: string[]) (r
       OriginalLoadReferences = []
       Stamp = None }
 
+// ── shared project-check core ─────────────────────────────────────────────────
+
+let private checkProjectAndCollect (options: FSharpProjectOptions) (sourceFiles: string[]) : TypeInfo list =
+    let checker = FSharpChecker.Create(keepAssemblyContents = true)
+    let results = checker.ParseAndCheckProject(options) |> Async.RunSynchronously
+    let projectSourceFiles = sourceFiles |> Array.map Path.GetFullPath |> Set.ofArray
+
+    let inProject (entity: FSharpEntity) =
+        let loc = Path.GetFullPath(entity.DeclarationLocation.FileName)
+        Set.contains loc projectSourceFiles
+
+    results.AssemblySignature.Entities
+    |> Seq.collect (collectFromEntity inProject)
+    |> Seq.toList
+
 // ── .fsproj wrapper ───────────────────────────────────────────────────────────
 
 /// Extract TypeInfo records for all F# record and DU types defined in the
@@ -313,19 +328,25 @@ let extractTypeInfos (projectFile: string) : Result<TypeInfo list, string> =
         else
 
             let options = buildProjectOptions projectFile sourceFiles refs
-            let checker = FSharpChecker.Create(keepAssemblyContents = true)
+            Ok(checkProjectAndCollect options sourceFiles)
 
-            let results = checker.ParseAndCheckProject(options) |> Async.RunSynchronously
+// ── source-set entry point ─────────────────────────────────────────────────────
 
-            let projectSourceFiles = sourceFiles |> Array.map Path.GetFullPath |> Set.ofArray
+/// Extract TypeInfo records from a set of on-disk F# source files and explicit
+/// assembly references.  Reads each file from disk, builds FSharpProjectOptions,
+/// and runs ParseAndCheckProject.  Only types whose declaration location resolves
+/// to one of the given sourceFiles are returned.
+let extractTypeInfosFromSources (sourceFiles: string[]) (refs: string[]) : Result<TypeInfo list, string> =
+    if sourceFiles.Length = 0 then
+        invalidArg "sourceFiles" "sourceFiles must not be empty"
 
-            let inProject (entity: FSharpEntity) =
-                let loc = Path.GetFullPath(entity.DeclarationLocation.FileName)
-                Set.contains loc projectSourceFiles
+    let missing = sourceFiles |> Array.filter (fun f -> not (File.Exists(f)))
 
-            let types =
-                results.AssemblySignature.Entities
-                |> Seq.collect (collectFromEntity inProject)
-                |> Seq.toList
+    if missing.Length > 0 then
+        let missingList = missing |> String.concat ", "
+        Error $"Source files not found: {missingList}"
+    else
 
-            Ok types
+        let projectFile = sourceFiles.[0]
+        let options = buildProjectOptions projectFile sourceFiles refs
+        Ok(checkProjectAndCollect options sourceFiles)
