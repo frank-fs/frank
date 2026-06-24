@@ -615,5 +615,5 @@ let compileGateTierTests =
                     typeof<VDS.RDF.IGraph>.Assembly ]
 
               let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
-              Expect.isEmpty diagnostics "emitted LinkedData module compiles cleanly"
+              Expect.isEmpty diagnostics $"emitted LinkedData module compiles cleanly; errors: {diagnostics}"
           } ]

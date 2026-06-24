@@ -474,7 +474,7 @@ let compileGateTests =
               let assemblies = [ typeof<Frank.Discovery.DiscoveryConfig>.Assembly ]
 
               let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
-              Expect.isEmpty diagnostics "emitted Discovery module compiles cleanly"
+              Expect.isEmpty diagnostics $"emitted Discovery module compiles cleanly; errors: {diagnostics}"
           } ]
 
 [<Tests>]
