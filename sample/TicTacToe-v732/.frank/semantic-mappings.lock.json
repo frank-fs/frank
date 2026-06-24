@@ -18,7 +18,7 @@
       "alternates": [],
       "fields": [
         {
-          "name": "identifier",
+          "name": "Id",
           "iri": "schema:identifier",
           "confidence": 1,
           "source": "convention",
@@ -39,14 +39,14 @@
           "iri": "schema:position",
           "confidence": 1,
           "source": "llm",
-          "status": "confirmed"
+          "status": "excluded"
         },
         {
           "name": "agent",
           "iri": "schema:agent",
           "confidence": 1,
           "source": "llm",
-          "status": "confirmed"
+          "status": "excluded"
         }
       ]
     },

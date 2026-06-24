@@ -13,6 +13,8 @@
     <FrankVocabularyBinding>TicTacToe.Vocabulary.registry</FrankVocabularyBinding>
     <!-- SemanticModel codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
     <FrankSemanticsModuleName>TicTacToe.GeneratedSemantics</FrankSemanticsModuleName>
+    <!-- Validation codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
+    <FrankValidationModuleName>TicTacToe.GeneratedValidation</FrankValidationModuleName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +31,7 @@
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
     <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
                       ReferenceOutputAssembly="false"
