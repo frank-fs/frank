@@ -448,7 +448,7 @@ let projectionTests =
                       | Ok m -> m
                       | Error e -> failwith $"Expected Ok but got Error: {e}"
 
-              let descriptors, links = DiscoveryEmitter.projectDiscovery "/alps/tictactoe" model
+              let descriptors, links = DiscoveryEmitter.projectDiscovery model
 
               Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "type descriptor present"
 
@@ -456,6 +456,11 @@ let projectionTests =
                   (descriptors |> List.map (fun d -> d.Href))
                   (Some "https://schema.org/MoveAction")
                   "type href present"
+
+              Expect.contains
+                  (descriptors |> List.map (fun d -> d.Href))
+                  (Some "https://schema.org/rowIndex")
+                  "field href for rowIndex present"
 
               Expect.isNonEmpty links "describedBy links present"
           } ]

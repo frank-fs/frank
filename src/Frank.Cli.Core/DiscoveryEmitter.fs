@@ -21,6 +21,9 @@ let private localName (iri: string) : string =
 
 type internal ResolvedDescriptor = { Id: string; Href: string option }
 
+let private hrefOption (href: string) : string option =
+    if String.IsNullOrEmpty href then None else Some href
+
 /// Resolve the type-level descriptor for one ResolvedResource. Returns None if ClassIri is absent.
 let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
     r.ClassIri
@@ -28,7 +31,7 @@ let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
         let href = uri.AbsoluteUri
 
         { Id = localName href
-          Href = Some href })
+          Href = hrefOption href })
 
 /// Resolve field descriptors for one resource; skip fields with no Iri.
 let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor list =
@@ -39,7 +42,7 @@ let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor l
             let href = uri.AbsoluteUri
 
             { Id = localName href
-              Href = Some href }))
+              Href = hrefOption href }))
 
 /// Collect all descriptors from all resources in dependency order: each type then its fields.
 let private collectDescriptors (resources: ResolvedResource list) : ResolvedDescriptor list =
@@ -69,7 +72,7 @@ let private collectDescribedByLinks (resources: ResolvedResource list) : string 
 // ── Pure projection ───────────────────────────────────────────────────────────
 
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
-let internal projectDiscovery (_profileUri: string) (model: ResolvedModel) : ResolvedDescriptor list * string list =
+let internal projectDiscovery (model: ResolvedModel) : ResolvedDescriptor list * string list =
     collectDescriptors model.Resources, collectDescribedByLinks model.Resources
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
@@ -113,7 +116,7 @@ let emit
     match ResolvedModel.build registry lock with
     | Error e -> Error e
     | Ok model ->
-        let descriptors, links = projectDiscovery profileUri model
+        let descriptors, links = projectDiscovery model
         let value = configExpr profileUri descriptors links
 
         Ok(

@@ -287,7 +287,7 @@ git commit -m "test(cli): extract typecheckTwoSources to shared FcsTypecheck mod
 
 **Interfaces:**
 - Consumes: `AstRender.*` (Task 1), `FcsTypecheck.typecheckTwoSources` (Task 2).
-- Produces: `DiscoveryEmitter.emit` (signature unchanged: `moduleName:string -> profileUri:string -> registry:VocabularyRegistry -> lock:LockFile -> Result<string,string>`); new internal `DiscoveryEmitter.projectDiscovery : profileUri:string -> ResolvedModel -> ResolvedDescriptor list * string list` (descriptors, describedByLinks).
+- Produces: `DiscoveryEmitter.emit` (signature unchanged: `moduleName:string -> profileUri:string -> registry:VocabularyRegistry -> lock:LockFile -> Result<string,string>`); new internal `DiscoveryEmitter.projectDiscovery : ResolvedModel -> (descriptors, describedBy links)`.
 
 - [ ] **Step 1: Write the failing tier-1 projection test.** In `test/Frank.Cli.Core.Tests/DiscoveryEmitterTests.fs`, add (use the existing fixture registry/lock in that file; mirror their shape):
 
