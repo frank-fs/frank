@@ -213,32 +213,75 @@ let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) 
 
 // ── Public: apply ─────────────────────────────────────────────────────────────
 
-/// (knownTerms, coveredBases): term existence oracle built from cached vocab graphs.
-/// knownTerms = absolute IRI strings of all known terms across all cached vocabs.
-/// coveredBases = base URI strings (e.g. "https://schema.org/") whose cache was loaded.
-/// An empty oracle (Set.empty, []) disables existence checking (back-compat).
-type TermOracle = Set<string> * string list
+/// Term existence oracle built from cached vocabulary graphs.
+/// Classes/Properties/Individuals hold absolute IRI strings per category.
+/// CoveredBases = base URI strings (e.g. "https://schema.org/") whose cache was loaded.
+/// An empty oracle (all Set.empty, CoveredBases=[]) disables existence checking (back-compat).
+type TermOracle =
+    { Classes: Set<string>
+      Properties: Set<string>
+      Individuals: Set<string>
+      CoveredBases: string list }
 
+let private emptyTermOracle =
+    { Classes = Set.empty
+      Properties = Set.empty
+      Individuals = Set.empty
+      CoveredBases = [] }
+
+type private IriPosition =
+    | TypePos
+    | FieldPos
+    | CasePos
+
+/// "Covered" means we hold a cache for this namespace — NOT authoritative term identity.
+/// This is deliberately fail-open: an IRI from an uncached namespace is never rejected,
+/// even if it would be absent from the vocabulary. Do NOT normalize http/https schemes
+/// here; fail-open is the correct safe behavior for offline/uncached scenarios.
 let private isCoveredByOracle (coveredBases: string list) (absIri: string) : bool =
     coveredBases
     |> List.exists (fun b -> absIri.StartsWith(b, System.StringComparison.Ordinal))
 
+let private positionLabel (pos: IriPosition) : string =
+    match pos with
+    | TypePos -> "class"
+    | FieldPos -> "property"
+    | CasePos -> "class-or-individual"
+
+let private allowedForPosition (oracle: TermOracle) (pos: IriPosition) : Set<string> =
+    match pos with
+    | TypePos -> oracle.Classes
+    | FieldPos -> oracle.Properties
+    | CasePos -> Set.union oracle.Classes oracle.Individuals
+
+let private isInAnyCategory (oracle: TermOracle) (absIri: string) : bool =
+    Set.contains absIri oracle.Classes
+    || Set.contains absIri oracle.Properties
+    || Set.contains absIri oracle.Individuals
+
 let private checkIri
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
-    (label: string)
+    (pos: IriPosition)
     (iri: string)
     : string option =
     match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
-    | Error msg -> Some $"unresolvable {label} '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
+    | Error msg -> Some $"unresolvable iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
     | Ok(Some absUri) ->
-        let knownTerms, coveredBases = oracle
         let absIri = absUri.AbsoluteUri
 
-        if isCoveredByOracle coveredBases absIri && not (Set.contains absIri knownTerms) then
-            Some $"term '{absIri}' not found in vocabulary; check spelling"
-        else
+        if not (isCoveredByOracle oracle.CoveredBases absIri) then
             None
+        else
+            let allowed = allowedForPosition oracle pos
+
+            if Set.contains absIri allowed then
+                None
+            elif isInAnyCategory oracle absIri then
+                let expected = positionLabel pos
+                Some $"term '{iri}' exists in the vocabulary but not as a {expected} (used in {pos} position)"
+            else
+                Some $"term '{iri}' not found in vocabulary; check spelling"
     | Ok None -> None
 
 let private firstCaseIriError
@@ -246,11 +289,11 @@ let private firstCaseIriError
     (oracle: TermOracle)
     (c: ResolvedCase)
     : string option =
-    match c.Iri |> Option.bind (checkIri prefixes oracle "case iri") with
+    match c.Iri |> Option.bind (checkIri prefixes oracle CasePos) with
     | Some err -> Some err
     | None ->
         c.Payload
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle "payload iri"))
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle FieldPos))
 
 let private firstShapeIriError
     (prefixes: Map<string, System.Uri>)
@@ -260,11 +303,11 @@ let private firstShapeIriError
     match shape with
     | ResolvedShape.Record fs ->
         fs
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle "field iri"))
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle FieldPos))
     | ResolvedShape.Union cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle)
 
 let private firstIriError (prefixes: Map<string, System.Uri>) (oracle: TermOracle) (e: ResolvedEntry) : string option =
-    match e.Iri |> Option.bind (checkIri prefixes oracle "iri") with
+    match e.Iri |> Option.bind (checkIri prefixes oracle TypePos) with
     | Some err -> Some err
     | None -> firstShapeIriError prefixes oracle e.Shape
 
@@ -350,23 +393,22 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
 /// Vocabs with no cache file contribute nothing (offline / un-fetched).
 /// The resulting oracle only enforces existence for namespaces whose cache loaded.
 let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : TermOracle =
-    let folder (terms: Set<string>, bases: string list) (prefix: string) (entry: VocabularyEntry) =
+    let folder (acc: TermOracle) (prefix: string) (entry: VocabularyEntry) =
         match loadCachedGraph cacheDir prefix with
-        | None -> terms, bases
-        | Some(Error _) -> terms, bases
+        | None -> acc
+        | Some(Error _) -> acc
         | Some(Ok graph) ->
             let vocabTerms = ConventionEngine.extractVocabTerms graph
+            let newClasses = vocabTerms.Classes |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+            let newProps = vocabTerms.Properties |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+            let newIndiv = vocabTerms.Individuals |> Map.toSeq |> Seq.map snd |> Set.ofSeq
 
-            let allIris =
-                [ vocabTerms.Classes |> Map.toSeq |> Seq.map snd
-                  vocabTerms.Properties |> Map.toSeq |> Seq.map snd
-                  vocabTerms.Individuals |> Map.toSeq |> Seq.map snd ]
-                |> Seq.concat
+            { Classes = Set.union acc.Classes newClasses
+              Properties = Set.union acc.Properties newProps
+              Individuals = Set.union acc.Individuals newIndiv
+              CoveredBases = entry.Uri :: acc.CoveredBases }
 
-            let newTerms = allIris |> Seq.fold (fun s iri -> Set.add iri s) terms
-            newTerms, (entry.Uri :: bases)
-
-    Map.fold folder (Set.empty, []) vocabs
+    Map.fold folder emptyTermOracle vocabs
 
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 

@@ -5,7 +5,11 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
 
-let private emptyOracle: Accept.TermOracle = Set.empty, []
+let private emptyOracle: Accept.TermOracle =
+    { Classes = Set.empty
+      Properties = Set.empty
+      Individuals = Set.empty
+      CoveredBases = [] }
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -294,7 +298,11 @@ let acceptTests =
               let json = Accept.summaryToJson summary
               let doc = System.Text.Json.Nodes.JsonNode.Parse json
               let r0 = doc.["rejected"].[0]
-              Expect.equal (r0.["reason"].GetValue<string>()) "unresolvable iri \"schema:Foo\\bar\"" "round-trip preserves quotes and backslash"
+
+              Expect.equal
+                  (r0.["reason"].GetValue<string>())
+                  "unresolvable iri \"schema:Foo\\bar\""
+                  "round-trip preserves quotes and backslash"
           }
 
           test "accept a union investment produces a Union mapping with confirmed cases" {
@@ -461,10 +469,10 @@ let acceptTests =
 
           test "term-existence: typo CURIE on type iri is rejected when namespace covered" {
               let oracle: Accept.TermOracle =
-                  Set.ofList
-                      [ "https://schema.org/Game"
-                        "https://schema.org/identifier" ],
-                  [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/Game" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -499,10 +507,10 @@ let acceptTests =
 
           test "term-existence: known CURIE on type iri is accepted when namespace covered" {
               let oracle: Accept.TermOracle =
-                  Set.ofList
-                      [ "https://schema.org/Game"
-                        "https://schema.org/identifier" ],
-                  [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/Game" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -533,7 +541,10 @@ let acceptTests =
 
           test "term-existence: uncached namespace is not existence-checked (no false reject)" {
               let oracle: Accept.TermOracle =
-                  Set.ofList [ "https://schema.org/Game" ], [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/Game" ]
+                    Properties = Set.empty
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -595,10 +606,10 @@ let acceptTests =
 
           test "term-existence: typo on field iri is caught (record field path)" {
               let oracle: Accept.TermOracle =
-                  Set.ofList
-                      [ "https://schema.org/Game"
-                        "https://schema.org/identifier" ],
-                  [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/Game" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -639,10 +650,10 @@ let acceptTests =
 
           test "term-existence: typo on union case iri is caught (union case path)" {
               let oracle: Accept.TermOracle =
-                  Set.ofList
-                      [ "https://schema.org/WinAction"
-                        "https://schema.org/MoveAction" ],
-                  [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/WinAction"; "https://schema.org/MoveAction" ]
+                    Properties = Set.empty
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -684,11 +695,10 @@ let acceptTests =
 
           test "term-existence: typo on union case payload iri is caught" {
               let oracle: Accept.TermOracle =
-                  Set.ofList
-                      [ "https://schema.org/WinAction"
-                        "https://schema.org/MoveAction"
-                        "https://schema.org/position" ],
-                  [ "https://schema.org/" ]
+                  { Classes = Set.ofList [ "https://schema.org/WinAction"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/position" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
 
               let lock =
                   { SchemaVersion = 1
@@ -730,6 +740,298 @@ let acceptTests =
               let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Result")
 
               Expect.isSome rej "App.Result must be rejected for payload typo"
+          }
+
+          // ── Category-aware oracle tests ────────────────────────────────────────
+
+          // Shared oracle: Game+MoveAction = Classes; identifier = Properties; FailedActionStatus = Individuals
+          // CoveredBases = ["https://schema.org/"]
+          test "category: property used as TYPE iri → category error, not 'not found'" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Item"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Item", "iri": "schema:identifier", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "property used as type must be rejected"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Item")
+
+              Expect.isSome rej "App.Item must be rejected for category mismatch"
+
+              Expect.stringContains
+                  rej.Value.Reason
+                  "exists in the vocabulary but not as a"
+                  "reason is a category error, not 'not found'"
+
+              Expect.isFalse
+                  (rej.Value.Reason.Contains "not found in vocabulary")
+                  "must NOT say 'not found in vocabulary'"
+          }
+
+          test "category: class used as FIELD iri → category error" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "f"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [ { "name": "f", "iri": "schema:Game" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "class used as field must be rejected"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Game")
+
+              Expect.isSome rej "App.Game must be rejected for field category mismatch"
+              Expect.stringContains rej.Value.Reason "exists in the vocabulary but not as a" "reason is category error"
+          }
+
+          test "category: class used as TYPE iri → OK" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "class as type iri must be accepted"
+              Expect.equal summary.Rejected [] "no rejection for correct category"
+          }
+
+          test "category: property used as FIELD iri → OK" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "id"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "property as field iri must be accepted"
+              Expect.equal summary.Rejected [] "no rejection for correct category"
+          }
+
+          test "category: individual used as CASE iri → OK (case allows Class∪Individual)" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Status"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "Failed"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = [] } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Status", "iri": "schema:MoveAction", "cases": [ { "name": "Failed", "iri": "schema:FailedActionStatus", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "individual as case iri must be accepted (no false-reject)"
+              Expect.equal summary.Rejected [] "no rejection for individual in case position"
+          }
+
+          test "category: class used as CASE iri → OK (case allows Class∪Individual)" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Move"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "M"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = [] } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Move", "iri": "schema:Game", "cases": [ { "name": "M", "iri": "schema:MoveAction", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "class as case iri must be accepted"
+              Expect.equal summary.Rejected [] "no rejection for class in case position"
+          }
+
+          test "category: typo TYPE iri (not in any set) → 'not found', not category error" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.ofList [ "https://schema.org/FailedActionStatus" ]
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.X"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.X", "iri": "schema:WinActoin", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "typo must be rejected"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.X")
+
+              Expect.isSome rej "App.X must be rejected"
+              Expect.stringContains rej.Value.Reason "not found in vocabulary" "typo gives 'not found' message"
+
+              Expect.isFalse
+                  (rej.Value.Reason.Contains "exists in the vocabulary")
+                  "must NOT say 'exists in vocabulary'"
           }
 
           test "VocabFetcher.loadCachedGraph: absent cache returns None" {
