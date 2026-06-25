@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generated": "2026-06-25T03:08:15+00:00",
+  "generated": "2026-06-24T22:58:23+00:00",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
@@ -249,10 +249,10 @@
     },
     {
       "fsharpType": "TicTacToe.Model.MoveResult",
-      "iri": "schema:GamePlayMode",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "iri": "schema:MoveAction",
+      "confidence": 0.4173333333333333,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/ResumeAction"
@@ -261,109 +261,109 @@
       "cases": [
         {
           "name": "XTurn",
-          "iri": "schema:GamePlayMode",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:Attorney",
+          "confidence": 0.6583333333333333,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "GameState",
               "iri": "schema:game",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "confidence": 0.88,
+              "source": "convention",
+              "status": "excluded"
             },
             {
               "name": "ValidMovesForX",
-              "iri": "schema:eligibleTransactionVolume",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:validFor",
+              "confidence": 0.8205882352941177,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         },
         {
           "name": "OTurn",
-          "iri": "schema:GamePlayMode",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:Course",
+          "confidence": 0.7000000000000001,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "GameState",
               "iri": "schema:game",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "confidence": 0.88,
+              "source": "convention",
+              "status": "excluded"
             },
             {
               "name": "ValidMovesForO",
-              "iri": "schema:eligibleTransactionVolume",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:validFor",
+              "confidence": 0.8205882352941177,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         },
         {
           "name": "Won",
-          "iri": "schema:WinAction",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:Bone",
+          "confidence": 0.7222222222222222,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "GameState",
               "iri": "schema:game",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "confidence": 0.88,
+              "source": "convention",
+              "status": "excluded"
             },
             {
               "name": "Player",
-              "iri": "schema:participant",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:playerType",
+              "confidence": 0.92,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         },
         {
           "name": "Draw",
-          "iri": "schema:GamePlayMode",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:Drawing",
+          "confidence": 0.9142857142857143,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "GameState",
               "iri": "schema:game",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "confidence": 0.88,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         },
         {
           "name": "Error",
-          "iri": "schema:FailedActionStatus",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:Report",
+          "confidence": 0.7388888888888889,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "GameState",
               "iri": "schema:game",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "confidence": 0.88,
+              "source": "convention",
+              "status": "excluded"
             },
             {
               "name": "string",
-              "iri": "schema:description",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:steeringPosition",
+              "confidence": 0.8333333333333333,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         }
@@ -372,9 +372,9 @@
     {
       "fsharpType": "TicTacToe.Model.Move",
       "iri": "schema:MoveAction",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "confidence": 0.528,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -383,33 +383,33 @@
       "cases": [
         {
           "name": "XMove",
-          "iri": "schema:MoveAction",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:MovieClip",
+          "confidence": 0.7481481481481481,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "SquarePosition",
-              "iri": "schema:target",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:namedPosition",
+              "confidence": 0.8119658119658121,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         },
         {
           "name": "OMove",
-          "iri": "schema:MoveAction",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed",
+          "iri": "schema:AutomotiveBusiness",
+          "confidence": 0.7592592592592592,
+          "source": "convention",
+          "status": "excluded",
           "payload": [
             {
               "name": "SquarePosition",
-              "iri": "schema:target",
-              "confidence": 1,
-              "source": "llm",
-              "status": "confirmed"
+              "iri": "schema:namedPosition",
+              "confidence": 0.8119658119658121,
+              "source": "convention",
+              "status": "excluded"
             }
           ]
         }
@@ -419,7 +419,7 @@
       "fsharpType": "TicTacToe.Model.Game",
       "iri": "schema:Game",
       "confidence": 1,
-      "source": "llm",
+      "source": "convention",
       "status": "confirmed",
       "alternates": [
         "https://schema.org/GameServer",
@@ -429,16 +429,16 @@
       "fields": [
         {
           "name": "Id",
-          "iri": "schema:identifier",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed"
+          "iri": "https://www.omg.org/spec/Commons/Identifiers/identifiedBy",
+          "confidence": 0.7777777777777779,
+          "source": "convention",
+          "status": "excluded"
         },
         {
           "name": "Result",
           "iri": "schema:result",
           "confidence": 1,
-          "source": "llm",
+          "source": "convention",
           "status": "confirmed"
         }
       ]
@@ -447,7 +447,7 @@
       "fsharpType": "TicTacToe.Model.MoveLog`1",
       "iri": "schema:ItemList",
       "confidence": 1,
-      "source": "llm",
+      "source": "manual",
       "status": "confirmed",
       "alternates": [
         "https://schema.org/MovieClip",
@@ -458,25 +458,25 @@
         {
           "name": "Items",
           "iri": "schema:item",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed"
+          "confidence": 0.96,
+          "source": "convention",
+          "status": "excluded"
         },
         {
           "name": "Count",
-          "iri": "schema:numberOfItems",
-          "confidence": 1,
-          "source": "llm",
-          "status": "confirmed"
+          "iri": "schema:countryOfOrigin",
+          "confidence": 0.8666666666666666,
+          "source": "convention",
+          "status": "excluded"
         }
       ]
     },
     {
       "fsharpType": "XMove",
       "iri": "schema:MoveAction",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "confidence": 0.264,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -487,9 +487,9 @@
     {
       "fsharpType": "OMove",
       "iri": "schema:MoveAction",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "confidence": 0.474,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -499,10 +499,10 @@
     },
     {
       "fsharpType": "StartGame",
-      "iri": "schema:StartAction",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "iri": "schema:GameServerStatus",
+      "confidence": 0.40041666666666664,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/GameServer",
         "https://schema.org/GamePlayMode"
@@ -513,9 +513,9 @@
     {
       "fsharpType": "MakeMove",
       "iri": "schema:MoveAction",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "confidence": 0.447,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -613,9 +613,9 @@
     {
       "fsharpType": "TicTacToe.Model.GameStore",
       "iri": "schema:GameServer",
-      "confidence": 1,
-      "source": "llm",
-      "status": "confirmed",
+      "confidence": 0.794,
+      "source": "convention",
+      "status": "excluded",
       "alternates": [
         "https://schema.org/GamePlayMode",
         "https://schema.org/GameServerStatus"
@@ -626,7 +626,7 @@
           "name": "agent",
           "iri": "schema:agent",
           "confidence": 1,
-          "source": "llm",
+          "source": "convention",
           "status": "confirmed"
         }
       ]
