@@ -143,14 +143,13 @@ let private fetchVocabTerms
 
         let firstError =
             results
-            |> Array.tryFind (fun r ->
-                match r with
-                | Error _ -> true
-                | Ok _ -> false)
+            |> Array.tryPick (function
+                | Error e -> Some e
+                | Ok _ -> None)
 
         match firstError with
-        | Some(Error e) -> return Error e
-        | _ ->
+        | Some e -> return Error e
+        | None ->
             let emptyTerms =
                 { Classes = Map.empty
                   Properties = Map.empty

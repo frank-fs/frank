@@ -1,5 +1,7 @@
 module Frank.Cli.Core.Accept
 
+open System.Text.Encodings.Web
+open System.Text.Json
 open System.Text.Json.Nodes
 open Frank.Semantic
 open Frank.Semantic.LockFile
@@ -12,9 +14,10 @@ type ResolvedCase =
       Iri: string option
       Payload: ResolvedField list }
 
+[<RequireQualifiedAccess>]
 type ResolvedShape =
-    | RecordShape of ResolvedField list
-    | UnionShape of ResolvedCase list
+    | Record of ResolvedField list
+    | Union of ResolvedCase list
 
 type ResolvedEntry =
     { FSharpType: string
@@ -87,8 +90,8 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
 
         let shapeResult =
             match node.["cases"] with
-            | null -> parseFieldsArray node.["fields"] |> Result.map RecordShape
-            | casesNode -> parseCasesArray casesNode |> Result.map UnionShape
+            | null -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
+            | casesNode -> parseCasesArray casesNode |> Result.map ResolvedShape.Union
 
         shapeResult
         |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
@@ -188,8 +191,8 @@ let private buildCaseMapping (source: MappingSource) (rc: ResolvedCase) : CaseMa
 
 let private buildShape (source: MappingSource) (shape: ResolvedShape) : MappingShape =
     match shape with
-    | RecordShape fs -> MappingShape.Record(fs |> List.map (buildFieldMapping source))
-    | UnionShape cs -> MappingShape.Union(cs |> List.map (buildCaseMapping source))
+    | ResolvedShape.Record fs -> MappingShape.Record(fs |> List.map (buildFieldMapping source))
+    | ResolvedShape.Union cs -> MappingShape.Union(cs |> List.map (buildCaseMapping source))
 
 let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: string) : Mapping =
     { FSharpType = entry.FSharpType
@@ -255,10 +258,10 @@ let private firstShapeIriError
     (shape: ResolvedShape)
     : string option =
     match shape with
-    | RecordShape fs ->
+    | ResolvedShape.Record fs ->
         fs
         |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle "field iri"))
-    | UnionShape cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle)
+    | ResolvedShape.Union cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle)
 
 let private firstIriError (prefixes: Map<string, System.Uri>) (oracle: TermOracle) (e: ResolvedEntry) : string option =
     match e.Iri |> Option.bind (checkIri prefixes oracle "iri") with
@@ -309,11 +312,14 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
 
     let iriRejected, toMerge = partitionByIri prefixes oracle withIri
 
+    let confirmedTypes =
+        lf.Mappings
+        |> List.choose (fun m -> if m.Status = Confirmed then Some m.FSharpType else None)
+        |> Set.ofList
+
     let alreadyConfirmed =
         toMerge
-        |> List.filter (fun e ->
-            lf.Mappings
-            |> List.exists (fun m -> m.FSharpType = e.FSharpType && m.Status = Confirmed))
+        |> List.filter (fun e -> Set.contains e.FSharpType confirmedTypes)
         |> List.length
 
     let mergedMappings =
@@ -364,12 +370,22 @@ let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : Term
 
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 
+let private summaryWriteOptions =
+    JsonSerializerOptions(WriteIndented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping)
+
 let summaryToJson (s: AcceptSummary) : string =
-    let rejectedItems =
-        s.Rejected
-        |> List.map (fun r -> $"""  {{"fsharpType":"{r.FSharpType}","reason":"{r.Reason}"}}""")
-        |> String.concat ","
+    let rejectedArr = JsonArray()
 
-    let rejectedArr = if s.Rejected.IsEmpty then "[]" else $"[{rejectedItems}]"
+    for r in s.Rejected do
+        let entry = JsonObject()
+        entry.Add("fsharpType", JsonValue.Create r.FSharpType)
+        entry.Add("reason", JsonValue.Create r.Reason)
+        rejectedArr.Add(entry)
 
-    $"""{{"merged":{s.Merged},"rejected":{rejectedArr},"unchanged":{s.Unchanged},"alreadyConfirmed":{s.AlreadyConfirmed},"fieldsUnresolved":{s.FieldsUnresolved}}}"""
+    let root = JsonObject()
+    root.Add("merged", JsonValue.Create s.Merged)
+    root.Add("rejected", rejectedArr)
+    root.Add("unchanged", JsonValue.Create s.Unchanged)
+    root.Add("alreadyConfirmed", JsonValue.Create s.AlreadyConfirmed)
+    root.Add("fieldsUnresolved", JsonValue.Create s.FieldsUnresolved)
+    root.ToJsonString summaryWriteOptions

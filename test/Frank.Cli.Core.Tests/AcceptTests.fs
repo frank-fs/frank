@@ -281,6 +281,22 @@ let acceptTests =
               Expect.equal (r0.GetProperty("fsharpType").GetString()) "MyApp.Ghost" "fsharpType"
               Expect.equal (r0.GetProperty("reason").GetString()) "not in lock file" "reason"
 
+          test "json output: summaryToJson round-trips reason containing quote and backslash" {
+              let summary: Accept.AcceptSummary =
+                  { Merged = 0
+                    Rejected =
+                      [ { FSharpType = "MyApp.Tricky"
+                          Reason = "unresolvable iri \"schema:Foo\\bar\"" } ]
+                    Unchanged = 0
+                    AlreadyConfirmed = 0
+                    FieldsUnresolved = 0 }
+
+              let json = Accept.summaryToJson summary
+              let doc = System.Text.Json.Nodes.JsonNode.Parse json
+              let r0 = doc.["rejected"].[0]
+              Expect.equal (r0.["reason"].GetValue<string>()) "unresolvable iri \"schema:Foo\\bar\"" "round-trip preserves quotes and backslash"
+          }
+
           test "accept a union investment produces a Union mapping with confirmed cases" {
               let unresolvedPayload =
                   [ { Name = "position"
@@ -395,12 +411,12 @@ let acceptTests =
               let entry = doc.Resolved |> List.exactlyOne
 
               match entry.Shape with
-              | Accept.RecordShape fields ->
+              | Accept.ResolvedShape.Record fields ->
                   Expect.equal
                       (fields |> List.map (fun f -> f.Name))
                       [ "alpha"; "beta"; "gamma" ]
                       "field order preserved"
-              | Accept.UnionShape _ -> failwith "expected RecordShape"
+              | Accept.ResolvedShape.Union _ -> failwith "expected ResolvedShape.Record"
           }
 
           test "a union case with an unresolvable iri is rejected" {

@@ -378,7 +378,7 @@ let clarifyTests =
                       |> List.find (fun e -> e.FSharpType = "MyApp.MoveResult")
 
                   match entry.Shape with
-                  | Accept.UnionShape cases ->
+                  | Accept.ResolvedShape.Union cases ->
                       let names = cases |> List.map (fun c -> c.Name)
                       Expect.equal names [ "XTurn"; "OTurn"; "Won"; "Draw"; "Error" ] "round-trip case names"
 
@@ -388,7 +388,7 @@ let clarifyTests =
 
                       let xTurn = cases |> List.find (fun c -> c.Name = "XTurn")
                       Expect.equal xTurn.Payload.Length 0 "nullary XTurn round-trip has empty payload"
-                  | Accept.RecordShape _ -> failtest "expected UnionShape but got RecordShape"
+                  | Accept.ResolvedShape.Record _ -> failtest "expected ResolvedShape.Union but got ResolvedShape.Record"
 
           testCase "AT-U4: toResolvedTemplate — nullary cases emit payload: [] not omitted"
           <| fun () ->
@@ -450,5 +450,5 @@ let clarifyTests =
                   let entry = doc.Resolved |> List.find (fun e -> e.FSharpType = "MyApp.Order")
 
                   match entry.Shape with
-                  | Accept.RecordShape _ -> ()
-                  | Accept.UnionShape _ -> failtest "expected RecordShape but got UnionShape" ]
+                  | Accept.ResolvedShape.Record _ -> ()
+                  | Accept.ResolvedShape.Union _ -> failtest "expected ResolvedShape.Record but got ResolvedShape.Union" ]
