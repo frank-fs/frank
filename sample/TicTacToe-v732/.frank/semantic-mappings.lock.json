@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generated": "2026-06-25T03:35:37+00:00",
+  "generated": "2026-06-25T05:31:22+00:00",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
@@ -249,7 +249,7 @@
     },
     {
       "fsharpType": "TicTacToe.Model.MoveResult",
-      "iri": "schema:Action",
+      "iri": "schema:ActionStatusType",
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
@@ -261,85 +261,85 @@
       "cases": [
         {
           "name": "XTurn",
-          "iri": "schema:Attorney",
-          "confidence": 0.6583333333333333,
-          "source": "convention",
-          "status": "excluded",
-          "payload": [
-            {
-              "name": "GameState",
-              "iri": "schema:game",
-              "confidence": 0.88,
-              "source": "convention",
-              "status": "excluded"
-            },
-            {
-              "name": "ValidMovesForX",
-              "iri": "schema:validFor",
-              "confidence": 0.8205882352941177,
-              "source": "convention",
-              "status": "excluded"
-            }
-          ]
-        },
-        {
-          "name": "OTurn",
-          "iri": "schema:Course",
-          "confidence": 0.7000000000000001,
-          "source": "convention",
-          "status": "excluded",
-          "payload": [
-            {
-              "name": "GameState",
-              "iri": "schema:game",
-              "confidence": 0.88,
-              "source": "convention",
-              "status": "excluded"
-            },
-            {
-              "name": "ValidMovesForO",
-              "iri": "schema:validFor",
-              "confidence": 0.8205882352941177,
-              "source": "convention",
-              "status": "excluded"
-            }
-          ]
-        },
-        {
-          "name": "Won",
-          "iri": "schema:WinAction",
+          "iri": "schema:ActiveActionStatus",
           "confidence": 1,
           "source": "manual",
           "status": "confirmed",
           "payload": [
             {
               "name": "GameState",
-              "iri": "schema:game",
-              "confidence": 0.88,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
+              "status": "excluded"
+            },
+            {
+              "name": "ValidMovesForX",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "OTurn",
+          "iri": "schema:ActiveActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
+              "status": "excluded"
+            },
+            {
+              "name": "ValidMovesForO",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Won",
+          "iri": "schema:CompletedActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             },
             {
               "name": "Player",
-              "iri": "schema:playerType",
-              "confidence": 0.92,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             }
           ]
         },
         {
           "name": "Draw",
-          "iri": "schema:Drawing",
-          "confidence": 0.9142857142857143,
-          "source": "convention",
-          "status": "excluded",
+          "iri": "schema:CompletedActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
           "payload": [
             {
               "name": "GameState",
-              "iri": "schema:game",
-              "confidence": 0.88,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             }
           ]
@@ -353,16 +353,16 @@
           "payload": [
             {
               "name": "GameState",
-              "iri": "schema:game",
-              "confidence": 0.88,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             },
             {
               "name": "string",
-              "iri": "schema:steeringPosition",
-              "confidence": 0.8333333333333333,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             }
           ]
@@ -383,32 +383,32 @@
       "cases": [
         {
           "name": "XMove",
-          "iri": "schema:MoveAction",
-          "confidence": 1,
+          "iri": null,
+          "confidence": 0,
           "source": "manual",
-          "status": "confirmed",
+          "status": "excluded",
           "payload": [
             {
               "name": "SquarePosition",
-              "iri": "schema:namedPosition",
-              "confidence": 0.8119658119658121,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             }
           ]
         },
         {
           "name": "OMove",
-          "iri": "schema:MoveAction",
-          "confidence": 1,
+          "iri": null,
+          "confidence": 0,
           "source": "manual",
-          "status": "confirmed",
+          "status": "excluded",
           "payload": [
             {
               "name": "SquarePosition",
-              "iri": "schema:namedPosition",
-              "confidence": 0.8119658119658121,
-              "source": "convention",
+              "iri": null,
+              "confidence": 0,
+              "source": "manual",
               "status": "excluded"
             }
           ]
@@ -429,10 +429,10 @@
       "fields": [
         {
           "name": "Id",
-          "iri": "schema:identifier",
-          "confidence": 1,
+          "iri": null,
+          "confidence": 0,
           "source": "manual",
-          "status": "confirmed"
+          "status": "excluded"
         },
         {
           "name": "Result",

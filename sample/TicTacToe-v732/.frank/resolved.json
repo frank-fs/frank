@@ -4,14 +4,16 @@
     {
       "fsharpType": "TicTacToe.Model.Game",
       "iri": "schema:Game",
+      "shape": "record",
       "fields": [
-        { "name": "Id", "iri": "schema:identifier" },
+        { "name": "Id", "iri": null },
         { "name": "Result", "iri": "schema:result" }
       ]
     },
     {
       "fsharpType": "TicTacToe.Model.MoveLog`1",
       "iri": "schema:ItemList",
+      "shape": "record",
       "fields": [
         { "name": "Items", "iri": "schema:item" },
         { "name": "Count", "iri": "schema:numberOfItems" }
@@ -20,17 +22,68 @@
     {
       "fsharpType": "TicTacToe.Model.Move",
       "iri": "schema:MoveAction",
+      "shape": "union",
       "cases": [
-        { "name": "XMove", "iri": "schema:MoveAction" },
-        { "name": "OMove", "iri": "schema:MoveAction" }
+        {
+          "name": "XMove",
+          "iri": null,
+          "payload": [
+            { "name": "SquarePosition", "iri": null }
+          ]
+        },
+        {
+          "name": "OMove",
+          "iri": null,
+          "payload": [
+            { "name": "SquarePosition", "iri": null }
+          ]
+        }
       ]
     },
     {
       "fsharpType": "TicTacToe.Model.MoveResult",
-      "iri": "schema:Action",
+      "iri": "schema:ActionStatusType",
+      "shape": "union",
       "cases": [
-        { "name": "Won", "iri": "schema:WinAction" },
-        { "name": "Error", "iri": "schema:FailedActionStatus" }
+        {
+          "name": "XTurn",
+          "iri": "schema:ActiveActionStatus",
+          "payload": [
+            { "name": "GameState", "iri": null },
+            { "name": "ValidMovesForX", "iri": null }
+          ]
+        },
+        {
+          "name": "OTurn",
+          "iri": "schema:ActiveActionStatus",
+          "payload": [
+            { "name": "GameState", "iri": null },
+            { "name": "ValidMovesForO", "iri": null }
+          ]
+        },
+        {
+          "name": "Won",
+          "iri": "schema:CompletedActionStatus",
+          "payload": [
+            { "name": "GameState", "iri": null },
+            { "name": "Player", "iri": null }
+          ]
+        },
+        {
+          "name": "Draw",
+          "iri": "schema:CompletedActionStatus",
+          "payload": [
+            { "name": "GameState", "iri": null }
+          ]
+        },
+        {
+          "name": "Error",
+          "iri": "schema:FailedActionStatus",
+          "payload": [
+            { "name": "GameState", "iri": null },
+            { "name": "string", "iri": null }
+          ]
+        }
       ]
     }
   ]

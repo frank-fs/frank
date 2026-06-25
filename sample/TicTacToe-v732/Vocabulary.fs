@@ -6,7 +6,7 @@ open TicTacToe.Model
 let registry =
     vocabulary {
         prefix "schema" "https://schema.org/"
-        prefix "wikidata" "https://www.wikidata.org/wiki/"
+        prefix "wikidata" "http://www.wikidata.org/entity/"
         using "schema"
         seeAlso typeof<Game> "wikidata:Q210339"
         seeAlso typeof<Game> "wikidata:Q573573"
