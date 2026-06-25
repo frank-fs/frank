@@ -268,6 +268,23 @@ let at_tri =
               match VocabularyRegistry.tryResolveIri prefixes (Some "schema:bad local name") with
               | Error msg -> Expect.stringContains msg "not a well-formed" "error must cite malformed IRI"
               | Ok _ -> failwith "Expected Error for malformed expansion"
+          }
+
+          // Finding #4: bare name without colon must return Error, not throw UriFormatException.
+          test "Finding #4: bare name (no colon) returns Error and does not throw" {
+              let prefixes = Map.ofList [ "schema", Uri "https://schema.org/" ]
+
+              let result =
+                  try
+                      VocabularyRegistry.tryResolveIri prefixes (Some "Game")
+                  with ex ->
+                      failwith $"tryResolveIri must not throw; got {ex.GetType().Name}: {ex.Message}"
+
+              Expect.isTrue (Result.isError result) "non-CURIE bare name must return Error"
+
+              match result with
+              | Error msg -> Expect.stringContains msg "Game" "error message must cite the input"
+              | Ok _ -> failwith "Expected Error"
           } ]
 
 // FsCheck property tests for include union laws.

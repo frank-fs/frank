@@ -1186,3 +1186,108 @@ let isInScopeBoundaryTests =
               Expect.notEqual mBar.Status Confirmed "#10: Bar (in voc2#Bar) must NOT be Confirmed — sibling namespace"
               Expect.isNone mBar.Iri "#10: out-of-scope IRI must not surface"
           } ]
+
+// ── Finding #7: OWL-typed terms recognized by extractVocabTerms ───────────────
+
+[<Tests>]
+let owlTypedTermsTests =
+    testList
+        "Finding #7: extractVocabTerms recognizes OWL-typed terms"
+        [ test "#7 owl:Class lands in Classes bucket" {
+              let turtle =
+                  """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<https://ex.org/Person> a owl:Class .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Classes.ContainsKey "person") $"owl:Class must land in Classes; got {terms.Classes}"
+              Expect.equal terms.Classes.["person"] "https://ex.org/Person" "IRI correct"
+          }
+
+          test "#7 owl:ObjectProperty lands in Properties bucket" {
+              let turtle =
+                  """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<https://ex.org/knows> a owl:ObjectProperty .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue
+                  (terms.Properties.ContainsKey "knows")
+                  $"owl:ObjectProperty must land in Properties; got {terms.Properties}"
+
+              Expect.equal terms.Properties.["knows"] "https://ex.org/knows" "IRI correct"
+          }
+
+          test "#7 owl:DatatypeProperty lands in Properties bucket" {
+              let turtle =
+                  """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<https://ex.org/age> a owl:DatatypeProperty .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue
+                  (terms.Properties.ContainsKey "age")
+                  $"owl:DatatypeProperty must land in Properties; got {terms.Properties}"
+
+              Expect.equal terms.Properties.["age"] "https://ex.org/age" "IRI correct"
+          }
+
+          test "#7 rdfs:Datatype lands in Classes bucket" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<https://ex.org/ZipCode> a rdfs:Datatype .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue
+                  (terms.Classes.ContainsKey "zipcode")
+                  $"rdfs:Datatype must land in Classes; got {terms.Classes}"
+
+              Expect.equal terms.Classes.["zipcode"] "https://ex.org/ZipCode" "IRI correct"
+          }
+
+          test "#7 regression: existing rdfs:Class and rdf:Property still extracted" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<https://ex.org/Order> a rdfs:Class .
+<https://ex.org/price> a rdf:Property .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Classes.ContainsKey "order") "rdfs:Class regression"
+              Expect.isTrue (terms.Properties.ContainsKey "price") "rdf:Property regression"
+          } ]

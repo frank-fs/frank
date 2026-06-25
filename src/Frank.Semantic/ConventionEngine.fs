@@ -242,10 +242,17 @@ module ConventionEngine =
     // ── IGraph extraction ─────────────────────────────────────────────────────
 
     let private rdfsClassIri = "http://www.w3.org/2000/01/rdf-schema#Class"
+    let private rdfsDatatypeIri = "http://www.w3.org/2000/01/rdf-schema#Datatype"
     let private rdfPropertyIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"
     let private schemaClassIri = "https://schema.org/Class"
     let private schemaPropertyIri = "https://schema.org/Property"
     let private rdfTypeIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    let private owlClassIri = "http://www.w3.org/2002/07/owl#Class"
+    let private owlObjectPropertyIri = "http://www.w3.org/2002/07/owl#ObjectProperty"
+
+    let private owlDatatypePropertyIri =
+        "http://www.w3.org/2002/07/owl#DatatypeProperty"
+
     let private owlNamedIndividualIri = "http://www.w3.org/2002/07/owl#NamedIndividual"
     let private skosConceptIri = "http://www.w3.org/2004/02/skos/core#Concept"
 
@@ -288,8 +295,10 @@ module ConventionEngine =
         |> Map.ofSeq
 
     /// Extract class, property, and individual local names from a vocabulary IGraph.
-    /// Recognizes rdfs:Class, rdf:Property, schema:Class, schema:Property typings,
-    /// plus owl:NamedIndividual and skos:Concept as individuals (enumerated values).
+    /// Recognized typings:
+    ///   Classes    — rdfs:Class, schema:Class, owl:Class, rdfs:Datatype
+    ///   Properties — rdf:Property, schema:Property, owl:ObjectProperty, owl:DatatypeProperty
+    ///   Individuals — owl:NamedIndividual, skos:Concept
     /// Keys are lowercase local names; values are absolute IRI strings.
     /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
     let extractVocabTerms (graph: IGraph) : VocabTerms =
@@ -297,9 +306,17 @@ module ConventionEngine =
             invalidArg (nameof graph) "graph must not be null"
 
         { Classes =
-            buildTermMap (Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph))
+            buildTermMap (
+                Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph)
+                |> Seq.append (collectByTypeIri owlClassIri graph)
+                |> Seq.append (collectByTypeIri rdfsDatatypeIri graph)
+            )
           Properties =
-            buildTermMap (Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph))
+            buildTermMap (
+                Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph)
+                |> Seq.append (collectByTypeIri owlObjectPropertyIri graph)
+                |> Seq.append (collectByTypeIri owlDatatypePropertyIri graph)
+            )
           Individuals =
             buildTermMap (
                 Seq.append (collectByTypeIri owlNamedIndividualIri graph) (collectByTypeIri skosConceptIri graph)

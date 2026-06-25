@@ -94,14 +94,15 @@ module VocabularyRegistry =
           ProvClasses = mergeMap "ProvClasses" base'.ProvClasses other.ProvClasses
           ConstraintPatterns = mergeMap "ConstraintPatterns" base'.ConstraintPatterns other.ConstraintPatterns }
 
-    /// Total version of resolveIri: returns Ok(Some uri) for prefixed/absolute IRIs,
-    /// Ok None for None, Error for unknown prefix.
+    /// Total version of resolveIri: returns Ok(Some uri) for CURIE inputs (prefix:local),
+    /// Ok None for None, Error for unknown prefix or non-CURIE input.
+    /// Only CURIE form is accepted; bare names without a colon are rejected with Error.
     let tryResolveIri (prefixes: Map<string, Uri>) (iri: string option) : Result<Uri option, string> =
         match iri with
         | None -> Ok None
         | Some s ->
             match s.IndexOf(':') with
-            | -1 -> Ok(Some(Uri s))
+            | -1 -> Error $"IRI '{s}' is not a CURIE (expected 'prefix:local')"
             | idx ->
                 let prefix = s.[.. idx - 1]
                 let local = s.[idx + 1 ..]
