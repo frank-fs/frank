@@ -391,7 +391,7 @@ let at5ExcludedPreservationTests =
                   Directory.Delete(tmpDir, true)
           }
 
-          test "Confirmed+Convention entry IS overwritten by fresh convention proposal" {
+          test "Confirmed+Convention entry is preserved after re-extract (decided regardless of source)" {
               let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
               Directory.CreateDirectory(tmpDir) |> ignore
 
@@ -428,7 +428,55 @@ let at5ExcludedPreservationTests =
 
                   Expect.isSome order "Order mapping must be present"
                   let m = order.Value
-                  Expect.notEqual m.Status Confirmed "Confirmed+Convention must NOT be preserved (re-scored)"
+                  Expect.equal m.Status Confirmed "Confirmed+Convention must be preserved (decided entry)"
+                  Expect.equal m.Source Convention "Source=Convention preserved on Confirmed entry"
+                  Expect.equal m.Iri (Some "https://schema.org/Order") "human-confirmed IRI must not be overwritten"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "Proposed+Convention entry is replaced by fresh re-extract (undecided re-runs)" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProject tmpDir
+                  Directory.CreateDirectory(Path.GetDirectoryName lockFilePath) |> ignore
+
+                  let existingLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.UtcNow
+                        Vocabularies = Map.empty
+                        Mappings =
+                          [ { FSharpType = "FixtureApp.Order"
+                              Iri = Some "https://schema.org/SomeStaleProposal"
+                              Confidence = 0.3
+                              Source = Convention
+                              Status = Proposed
+                              Alternates = []
+                              Shape = MappingShape.Record [] } ] }
+
+                  LockFile.write lockFilePath existingLock
+
+                  Pipeline.run
+                      { ProjectFile = projectFile
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+                  |> ignore
+
+                  let updated = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+
+                  let order =
+                      updated.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Order")
+
+                  Expect.isSome order "Order mapping must be present"
+                  let m = order.Value
+
+                  Expect.notEqual
+                      m.Iri
+                      (Some "https://schema.org/SomeStaleProposal")
+                      "stale Proposed IRI must be replaced by fresh extract"
               finally
                   Directory.Delete(tmpDir, true)
           } ]

@@ -91,20 +91,17 @@ let private readOrEmptyLock (path: string) : LockFile =
           Vocabularies = Map.empty
           Mappings = [] }
 
-/// Merge semantics: confirmed llm/manual entries are preserved; convention entries re-run.
+/// Merge semantics: all decided (confirmed/excluded) entries preserved regardless of source;
+/// undecided convention guesses (proposed/unresolved) are replaced by fresh extract output.
 let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list) : Mapping list =
     let freshByType = fresh |> List.map (fun m -> m.FSharpType, m) |> Map.ofList
 
     let updatedExisting =
         existing
         |> List.map (fun m ->
-            let isProtected =
-                m.Status = Excluded
-                || (m.Status = Confirmed && (m.Source = Llm || m.Source = Manual))
-
             match Map.tryFind m.FSharpType freshByType with
             | None -> m
-            | Some r -> if isProtected then m else r)
+            | Some r -> if LockFile.isDecided m.Status then m else r)
 
     let existingTypes = existing |> List.map (fun m -> m.FSharpType) |> Set.ofList
 
