@@ -1291,3 +1291,109 @@ let owlTypedTermsTests =
               Expect.isTrue (terms.Classes.ContainsKey "order") "rdfs:Class regression"
               Expect.isTrue (terms.Properties.ContainsKey "price") "rdf:Property regression"
           } ]
+
+// ── Enumeration members (instances of a class) recognized as Individuals ─────
+
+[<Tests>]
+let enumerationMemberTests =
+    testList
+        "extractVocabTerms recognizes enumeration members as Individuals"
+        [ test "basic: :Red rdf:type :Color → Red in Individuals, Color in Classes" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <https://ex.org/> .
+ex:Color a rdfs:Class .
+ex:Red a ex:Color .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Classes.ContainsKey "color") $"Color must be in Classes; got {terms.Classes}"
+
+              Expect.isTrue
+                  (terms.Individuals.ContainsKey "red")
+                  $"Red (instance of Color class) must be in Individuals; got {terms.Individuals}"
+
+              Expect.equal terms.Individuals.["red"] "https://ex.org/Red" "IRI correct"
+          }
+
+          test
+              "schema.org mirror: ActionStatusType rdfs:Class + CompletedActionStatus rdf:type ActionStatusType → Individual" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <https://ex.org/> .
+ex:ActionStatusType a rdfs:Class .
+ex:CompletedActionStatus a ex:ActionStatusType .
+ex:FailedActionStatus a ex:ActionStatusType .
+ex:ActiveActionStatus a ex:ActionStatusType .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isTrue
+                  (terms.Individuals.ContainsKey "completedactionstatus")
+                  $"CompletedActionStatus must be in Individuals; got {terms.Individuals}"
+
+              Expect.isTrue
+                  (terms.Individuals.ContainsKey "failedactionstatus")
+                  $"FailedActionStatus must be in Individuals; got {terms.Individuals}"
+
+              Expect.isTrue
+                  (terms.Individuals.ContainsKey "activeactionstatus")
+                  $"ActiveActionStatus must be in Individuals; got {terms.Individuals}"
+
+              Expect.isFalse
+                  (terms.Individuals.ContainsKey "actionstatustype")
+                  "ActionStatusType (the class itself) must NOT appear in Individuals"
+          }
+
+          test "plain class with no instances: :Foo rdfs:Class → Classes only" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <https://ex.org/> .
+ex:Foo a rdfs:Class .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Classes.ContainsKey "foo") "Foo must be in Classes"
+              Expect.isFalse (terms.Individuals.ContainsKey "foo") "Foo must NOT appear in Individuals"
+          }
+
+          test "precedence guard: a Class that is also an instance of a metaclass stays in Classes" {
+              let turtle =
+                  """
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix ex: <https://ex.org/> .
+ex:MetaClass a rdfs:Class .
+ex:Color a rdfs:Class, ex:MetaClass .
+ex:Red a ex:Color .
+"""
+
+              let graph = new Graph() :> IGraph
+              let parser = TurtleParser()
+              use stream = new MemoryStream(Encoding.UTF8.GetBytes turtle)
+              use reader = new StreamReader(stream)
+              parser.Load(graph, reader)
+              let terms = ConventionEngine.extractVocabTerms graph
+              Expect.isTrue (terms.Classes.ContainsKey "color") "Color must be in Classes"
+              Expect.isFalse (terms.Individuals.ContainsKey "color") "Color (a class) must NOT appear in Individuals"
+              Expect.isTrue (terms.Individuals.ContainsKey "red") "Red (instance of Color) must be in Individuals"
+          } ]

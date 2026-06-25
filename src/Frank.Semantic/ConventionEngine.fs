@@ -294,32 +294,64 @@ module ConventionEngine =
             | _ -> None)
         |> Map.ofSeq
 
+    /// Collect enumeration members: subjects S where S rdf:type C and C is a known
+    /// class IRI, excluding any S that is itself already a class or property IRI.
+    let private collectEnumMembers
+        (classIris: Set<string>)
+        (excludeIris: Set<string>)
+        (graph: IGraph)
+        : (string * string) seq =
+        let typeNode = graph.CreateUriNode(Uri(rdfTypeIri))
+
+        graph.GetTriplesWithPredicate(typeNode)
+        |> Seq.choose (fun triple ->
+            match triple.Subject with
+            | :? IUriNode as subj ->
+                match triple.Object with
+                | :? IUriNode as typeClass ->
+                    let subjIri = subj.Uri.AbsoluteUri
+                    let classIri = typeClass.Uri.AbsoluteUri
+
+                    if Set.contains classIri classIris && not (Set.contains subjIri excludeIris) then
+                        Some(iriLocalName subjIri, subjIri)
+                    else
+                        None
+                | _ -> None
+            | _ -> None)
+
     /// Extract class, property, and individual local names from a vocabulary IGraph.
     /// Recognized typings:
     ///   Classes    — rdfs:Class, schema:Class, owl:Class, rdfs:Datatype
     ///   Properties — rdf:Property, schema:Property, owl:ObjectProperty, owl:DatatypeProperty
-    ///   Individuals — owl:NamedIndividual, skos:Concept
+    ///   Individuals — owl:NamedIndividual, skos:Concept, or any subject S where
+    ///                 S rdf:type C and C is a known class (enumeration member pattern).
+    ///                 A subject already in Classes or Properties is never re-bucketed here.
     /// Keys are lowercase local names; values are absolute IRI strings.
     /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
     let extractVocabTerms (graph: IGraph) : VocabTerms =
         if isNull graph then
             invalidArg (nameof graph) "graph must not be null"
 
-        { Classes =
-            buildTermMap (
-                Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph)
-                |> Seq.append (collectByTypeIri owlClassIri graph)
-                |> Seq.append (collectByTypeIri rdfsDatatypeIri graph)
-            )
-          Properties =
-            buildTermMap (
-                Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph)
-                |> Seq.append (collectByTypeIri owlObjectPropertyIri graph)
-                |> Seq.append (collectByTypeIri owlDatatypePropertyIri graph)
-            )
+        let classPairs =
+            Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph)
+            |> Seq.append (collectByTypeIri owlClassIri graph)
+            |> Seq.append (collectByTypeIri rdfsDatatypeIri graph)
+
+        let propertyPairs =
+            Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph)
+            |> Seq.append (collectByTypeIri owlObjectPropertyIri graph)
+            |> Seq.append (collectByTypeIri owlDatatypePropertyIri graph)
+
+        let classIris = classPairs |> Seq.map snd |> Set.ofSeq
+        let propertyIris = propertyPairs |> Seq.map snd |> Set.ofSeq
+        let excludeIris = Set.union classIris propertyIris
+
+        { Classes = buildTermMap classPairs
+          Properties = buildTermMap propertyPairs
           Individuals =
             buildTermMap (
                 Seq.append (collectByTypeIri owlNamedIndividualIri graph) (collectByTypeIri skosConceptIri graph)
+                |> Seq.append (collectEnumMembers classIris excludeIris graph)
             ) }
 
     // ── CURIE reverse-resolution ──────────────────────────────────────────────
