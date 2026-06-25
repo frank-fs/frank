@@ -267,6 +267,17 @@ module ConventionEngine =
     let private owlNamedIndividualIri = "http://www.w3.org/2002/07/owl#NamedIndividual"
     let private skosConceptIri = "http://www.w3.org/2004/02/skos/core#Concept"
 
+    let private classTypeIris =
+        [ rdfsClassIri; schemaClassIri; owlClassIri; rdfsDatatypeIri ]
+
+    let private propertyTypeIris =
+        [ rdfPropertyIri
+          schemaPropertyIri
+          owlObjectPropertyIri
+          owlDatatypePropertyIri ]
+
+    let private individualTypeIris = [ owlNamedIndividualIri; skosConceptIri ]
+
     let private iriLocalName (iri: string) : string =
         let hashIdx = iri.LastIndexOf('#')
         let slashIdx = iri.LastIndexOf('/')
@@ -343,15 +354,10 @@ module ConventionEngine =
         if isNull graph then
             invalidArg (nameof graph) "graph must not be null"
 
-        let classPairs =
-            Seq.append (collectByTypeIri rdfsClassIri graph) (collectByTypeIri schemaClassIri graph)
-            |> Seq.append (collectByTypeIri owlClassIri graph)
-            |> Seq.append (collectByTypeIri rdfsDatatypeIri graph)
+        let classPairs = classTypeIris |> Seq.collect (fun t -> collectByTypeIri t graph)
 
         let propertyPairs =
-            Seq.append (collectByTypeIri rdfPropertyIri graph) (collectByTypeIri schemaPropertyIri graph)
-            |> Seq.append (collectByTypeIri owlObjectPropertyIri graph)
-            |> Seq.append (collectByTypeIri owlDatatypePropertyIri graph)
+            propertyTypeIris |> Seq.collect (fun t -> collectByTypeIri t graph)
 
         let classIris = classPairs |> Seq.map snd |> Set.ofSeq
         let propertyIris = propertyPairs |> Seq.map snd |> Set.ofSeq
@@ -361,8 +367,9 @@ module ConventionEngine =
           Properties = buildTermMap propertyPairs
           Individuals =
             buildTermMap (
-                Seq.append (collectByTypeIri owlNamedIndividualIri graph) (collectByTypeIri skosConceptIri graph)
-                |> Seq.append (collectEnumMembers classIris excludeIris graph)
+                Seq.append
+                    (individualTypeIris |> Seq.collect (fun t -> collectByTypeIri t graph))
+                    (collectEnumMembers classIris excludeIris graph)
             ) }
 
     /// Extract absolute IRI sets per term category from a vocabulary IGraph.
@@ -375,23 +382,15 @@ module ConventionEngine =
 
         let toIriSet (typeIris: string list) =
             typeIris
-            |> List.collect (fun typeIri -> collectByTypeIri typeIri graph |> Seq.map snd |> Seq.toList)
-            |> Set.ofList
+            |> Seq.collect (fun t -> collectByTypeIri t graph |> Seq.map snd)
+            |> Set.ofSeq
 
-        let classIris =
-            toIriSet [ rdfsClassIri; schemaClassIri; owlClassIri; rdfsDatatypeIri ]
-
-        let propertyIris =
-            toIriSet
-                [ rdfPropertyIri
-                  schemaPropertyIri
-                  owlObjectPropertyIri
-                  owlDatatypePropertyIri ]
-
+        let classIris = toIriSet classTypeIris
+        let propertyIris = toIriSet propertyTypeIris
         let excludeIris = Set.union classIris propertyIris
 
         let individualIris =
-            toIriSet [ owlNamedIndividualIri; skosConceptIri ]
+            toIriSet individualTypeIris
             |> Set.union (collectEnumMembers classIris excludeIris graph |> Seq.map snd |> Set.ofSeq)
 
         { ClassIris = classIris

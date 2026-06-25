@@ -50,14 +50,22 @@ let private casesArray (cases: CaseMapping list) : JsonArray =
 
     arr
 
-let private addShapeToObject (shape: MappingShape) (obj: JsonObject) : unit =
+let private addShapeToObjectWith
+    (fieldsArr: FieldMapping list -> JsonArray)
+    (casesArr: CaseMapping list -> JsonArray)
+    (shape: MappingShape)
+    (obj: JsonObject)
+    : unit =
     match shape with
     | MappingShape.Record fs ->
         obj.Add("shape", JsonValue.Create "record")
-        obj.Add("fields", fieldsArray fs)
+        obj.Add("fields", fieldsArr fs)
     | MappingShape.Union cases ->
         obj.Add("shape", JsonValue.Create "union")
-        obj.Add("cases", casesArray cases)
+        obj.Add("cases", casesArr cases)
+
+let private addShapeToObject (shape: MappingShape) (obj: JsonObject) : unit =
+    addShapeToObjectWith fieldsArray casesArray shape obj
 
 let private candidatesArray (alternates: string list) : JsonArray =
     let arr = JsonArray()
@@ -138,19 +146,16 @@ let private templateCaseNode (c: CaseMapping) : JsonObject =
     obj.Add("payload", templateFieldsArray c.Payload)
     obj
 
+let private templateCasesArray (cases: CaseMapping list) : JsonArray =
+    let arr = JsonArray()
+
+    for c in cases do
+        arr.Add(templateCaseNode c)
+
+    arr
+
 let private addTemplateShapeToObject (shape: MappingShape) (obj: JsonObject) : unit =
-    match shape with
-    | MappingShape.Record fs ->
-        obj.Add("shape", JsonValue.Create "record")
-        obj.Add("fields", templateFieldsArray fs)
-    | MappingShape.Union cases ->
-        let arr = JsonArray()
-
-        for c in cases do
-            arr.Add(templateCaseNode c)
-
-        obj.Add("shape", JsonValue.Create "union")
-        obj.Add("cases", arr)
+    addShapeToObjectWith templateFieldsArray templateCasesArray shape obj
 
 let private templateResolvedNode (m: Mapping) : JsonObject =
     let obj = JsonObject()

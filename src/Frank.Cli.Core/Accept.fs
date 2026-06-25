@@ -82,23 +82,31 @@ let private parseCase (node: JsonNode) : Result<ResolvedCase, string> =
 let private parseCasesArray (node: JsonNode) : Result<ResolvedCase list, string> =
     parseJsonArray "cases" (fun i el -> parseCase el |> Result.mapError (fun e -> $"cases[{i}]: {e}")) node
 
-let private parseShapeByTag (i: int) (tag: string) (node: JsonNode) : Result<ResolvedShape, string> =
-    match tag with
-    | "union" ->
-        match node.["cases"] with
-        | null -> Error $"resolved[{i}]: shape:union but 'cases' key is absent"
-        | casesNode -> parseCasesArray casesNode |> Result.map ResolvedShape.Union
-    | "record" -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
-    | other -> Error $"resolved[{i}]: unknown shape '{other}'"
-
-let private parseShapeLegacy (i: int) (node: JsonNode) : Result<ResolvedShape, string> =
+let private rejectBothCasesAndFields (node: JsonNode) : Result<unit, string> =
     let hasCases = not (isNull node.["cases"])
     let hasFields = not (isNull node.["fields"])
 
-    match hasCases, hasFields with
-    | true, true -> Error $"resolved[{i}]: entry has both 'cases' and 'fields'; specify one"
-    | true, false -> parseCasesArray node.["cases"] |> Result.map ResolvedShape.Union
-    | false, _ -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
+    if hasCases && hasFields then
+        Error "entry has both 'cases' and 'fields'; specify one"
+    else
+        Ok()
+
+let private parseShapeByTag (tag: string) (node: JsonNode) : Result<ResolvedShape, string> =
+    match tag with
+    | "union" ->
+        match node.["cases"] with
+        | null -> Error "shape:union but 'cases' key is absent"
+        | casesNode -> parseCasesArray casesNode |> Result.map ResolvedShape.Union
+    | "record" -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
+    | other -> Error $"unknown shape '{other}'"
+
+let private parseShapeLegacy (node: JsonNode) : Result<ResolvedShape, string> =
+    let hasCases = not (isNull node.["cases"])
+
+    if hasCases then
+        parseCasesArray node.["cases"] |> Result.map ResolvedShape.Union
+    else
+        parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
 
 let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string> =
     requireString node "fsharpType"
@@ -107,23 +115,14 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
         let iri = optionalString node "iri"
 
         let shapeResult =
-            match optionalString node "shape" with
-            | Some tag ->
-                let hasCases = not (isNull node.["cases"])
-                let hasFields = not (isNull node.["fields"])
-
-                if hasCases && hasFields then
-                    Error $"resolved[{i}]: entry has both 'cases' and 'fields'; specify one"
-                else
-                    parseShapeByTag i tag node
-            | None -> parseShapeLegacy i node
+            rejectBothCasesAndFields node
+            |> Result.bind (fun () ->
+                match optionalString node "shape" with
+                | Some tag -> parseShapeByTag tag node
+                | None -> parseShapeLegacy node)
 
         shapeResult
-        |> Result.mapError (fun e ->
-            if e.StartsWith($"resolved[{i}]:", System.StringComparison.Ordinal) then
-                e
-            else
-                $"resolved[{i}]: {e}")
+        |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
         |> Result.map (fun shape ->
             { FSharpType = fsType
               Iri = iri
@@ -277,11 +276,11 @@ let private positionLabel (pos: IriPosition) : string =
     | FieldPos -> "property"
     | CasePos -> "class-or-individual"
 
-let private allowedForPosition (oracle: TermOracle) (pos: IriPosition) : Set<string> =
+let private allowedForPosition (oracle: TermOracle) (casesAllowed: Set<string>) (pos: IriPosition) : Set<string> =
     match pos with
     | TypePos -> oracle.Classes
     | FieldPos -> oracle.Properties
-    | CasePos -> Set.union oracle.Classes oracle.Individuals
+    | CasePos -> casesAllowed
 
 let private isInAnyCategory (oracle: TermOracle) (absIri: string) : bool =
     Set.contains absIri oracle.Classes
@@ -291,6 +290,7 @@ let private isInAnyCategory (oracle: TermOracle) (absIri: string) : bool =
 let private checkIri
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
+    (casesAllowed: Set<string>)
     (pos: IriPosition)
     (iri: string)
     : string option =
@@ -302,7 +302,7 @@ let private checkIri
         if not (isCoveredByOracle oracle.CoveredBases absIri) then
             None
         else
-            let allowed = allowedForPosition oracle pos
+            let allowed = allowedForPosition oracle casesAllowed pos
 
             if Set.contains absIri allowed then
                 None
@@ -316,37 +316,46 @@ let private checkIri
 let private firstCaseIriError
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
+    (casesAllowed: Set<string>)
     (c: ResolvedCase)
     : string option =
-    match c.Iri |> Option.bind (checkIri prefixes oracle CasePos) with
+    match c.Iri |> Option.bind (checkIri prefixes oracle casesAllowed CasePos) with
     | Some err -> Some err
     | None ->
         c.Payload
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle FieldPos))
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle casesAllowed FieldPos))
 
 let private firstShapeIriError
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
+    (casesAllowed: Set<string>)
     (shape: ResolvedShape)
     : string option =
     match shape with
     | ResolvedShape.Record fs ->
         fs
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle FieldPos))
-    | ResolvedShape.Union cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle)
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle casesAllowed FieldPos))
+    | ResolvedShape.Union cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle casesAllowed)
 
-let private firstIriError (prefixes: Map<string, System.Uri>) (oracle: TermOracle) (e: ResolvedEntry) : string option =
-    match e.Iri |> Option.bind (checkIri prefixes oracle TypePos) with
+let private firstIriError
+    (prefixes: Map<string, System.Uri>)
+    (oracle: TermOracle)
+    (casesAllowed: Set<string>)
+    (e: ResolvedEntry)
+    : string option =
+    match e.Iri |> Option.bind (checkIri prefixes oracle casesAllowed TypePos) with
     | Some err -> Some err
-    | None -> firstShapeIriError prefixes oracle e.Shape
+    | None -> firstShapeIriError prefixes oracle casesAllowed e.Shape
 
 let private partitionByIri
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
     (entries: ResolvedEntry list)
     : RejectedEntry list * ResolvedEntry list =
+    let casesAllowed = Set.union oracle.Classes oracle.Individuals
+
     let folder (rejected, ok) e =
-        match firstIriError prefixes oracle e with
+        match firstIriError prefixes oracle casesAllowed e with
         | Some reason ->
             ({ FSharpType = e.FSharpType
                Reason = reason }
@@ -422,19 +431,18 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
 /// Vocabs with no cache file contribute nothing (offline / un-fetched).
 /// The resulting oracle only enforces existence for namespaces whose cache loaded.
 let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : TermOracle =
-    let folder (acc: TermOracle) (prefix: string) (entry: VocabularyEntry) =
-        match loadCachedGraph cacheDir prefix with
-        | None -> acc
-        | Some(Error _) -> acc
-        | Some(Ok graph) ->
-            let termIris = ConventionEngine.extractTermIris graph
+    let loaded =
+        vocabs
+        |> Map.toList
+        |> List.choose (fun (prefix, entry) ->
+            match loadCachedGraph cacheDir prefix with
+            | Some(Ok graph) -> Some(entry, ConventionEngine.extractTermIris graph)
+            | _ -> None)
 
-            { Classes = Set.union acc.Classes termIris.ClassIris
-              Properties = Set.union acc.Properties termIris.PropertyIris
-              Individuals = Set.union acc.Individuals termIris.IndividualIris
-              CoveredBases = entry.Uri :: acc.CoveredBases }
-
-    Map.fold folder emptyTermOracle vocabs
+    { Classes = loaded |> Seq.map (fun (_, t) -> t.ClassIris) |> Set.unionMany
+      Properties = loaded |> Seq.map (fun (_, t) -> t.PropertyIris) |> Set.unionMany
+      Individuals = loaded |> Seq.map (fun (_, t) -> t.IndividualIris) |> Set.unionMany
+      CoveredBases = loaded |> List.map (fun (e, _) -> e.Uri) }
 
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 
