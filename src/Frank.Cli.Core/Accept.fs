@@ -3,6 +3,7 @@ module Frank.Cli.Core.Accept
 open System.Text.Json.Nodes
 open Frank.Semantic
 open Frank.Semantic.LockFile
+open Frank.Semantic.VocabFetcher
 
 type ResolvedField = { Name: string; Iri: string option }
 
@@ -209,36 +210,68 @@ let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) 
 
 // ── Public: apply ─────────────────────────────────────────────────────────────
 
-let private checkIri (prefixes: Map<string, System.Uri>) (label: string) (iri: string) : string option =
+/// (knownTerms, coveredBases): term existence oracle built from cached vocab graphs.
+/// knownTerms = absolute IRI strings of all known terms across all cached vocabs.
+/// coveredBases = base URI strings (e.g. "https://schema.org/") whose cache was loaded.
+/// An empty oracle (Set.empty, []) disables existence checking (back-compat).
+type TermOracle = Set<string> * string list
+
+let private isCoveredByOracle (coveredBases: string list) (absIri: string) : bool =
+    coveredBases
+    |> List.exists (fun b -> absIri.StartsWith(b, System.StringComparison.Ordinal))
+
+let private checkIri
+    (prefixes: Map<string, System.Uri>)
+    (oracle: TermOracle)
+    (label: string)
+    (iri: string)
+    : string option =
     match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
     | Error msg -> Some $"unresolvable {label} '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
-    | Ok _ -> None
+    | Ok(Some absUri) ->
+        let knownTerms, coveredBases = oracle
+        let absIri = absUri.AbsoluteUri
 
-let private firstCaseIriError (prefixes: Map<string, System.Uri>) (c: ResolvedCase) : string option =
-    match c.Iri |> Option.bind (checkIri prefixes "case iri") with
+        if isCoveredByOracle coveredBases absIri && not (Set.contains absIri knownTerms) then
+            Some $"term '{absIri}' not found in vocabulary; check spelling"
+        else
+            None
+    | Ok None -> None
+
+let private firstCaseIriError
+    (prefixes: Map<string, System.Uri>)
+    (oracle: TermOracle)
+    (c: ResolvedCase)
+    : string option =
+    match c.Iri |> Option.bind (checkIri prefixes oracle "case iri") with
     | Some err -> Some err
     | None ->
         c.Payload
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes "payload iri"))
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle "payload iri"))
 
-let private firstShapeIriError (prefixes: Map<string, System.Uri>) (shape: ResolvedShape) : string option =
+let private firstShapeIriError
+    (prefixes: Map<string, System.Uri>)
+    (oracle: TermOracle)
+    (shape: ResolvedShape)
+    : string option =
     match shape with
     | RecordShape fs ->
         fs
-        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes "field iri"))
-    | UnionShape cs -> cs |> List.tryPick (firstCaseIriError prefixes)
+        |> List.tryPick (fun f -> f.Iri |> Option.bind (checkIri prefixes oracle "field iri"))
+    | UnionShape cs -> cs |> List.tryPick (firstCaseIriError prefixes oracle)
 
-let private firstIriError (prefixes: Map<string, System.Uri>) (e: ResolvedEntry) : string option =
-    match e.Iri |> Option.bind (checkIri prefixes "iri") with
+let private firstIriError (prefixes: Map<string, System.Uri>) (oracle: TermOracle) (e: ResolvedEntry) : string option =
+    match e.Iri |> Option.bind (checkIri prefixes oracle "iri") with
     | Some err -> Some err
-    | None -> firstShapeIriError prefixes e.Shape
+    | None -> firstShapeIriError prefixes oracle e.Shape
 
 let private partitionByIri
     (prefixes: Map<string, System.Uri>)
+    (oracle: TermOracle)
     (entries: ResolvedEntry list)
     : RejectedEntry list * ResolvedEntry list =
     let folder (rejected, ok) e =
-        match firstIriError prefixes e with
+        match firstIriError prefixes oracle e with
         | Some reason ->
             ({ FSharpType = e.FSharpType
                Reason = reason }
@@ -249,7 +282,7 @@ let private partitionByIri
     let rejected, ok = List.fold folder ([], []) entries
     List.rev rejected, List.rev ok
 
-let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile * AcceptSummary =
+let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: TermOracle) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
 
     let notInLock =
@@ -274,7 +307,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile *
     let prefixes =
         lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
 
-    let iriRejected, toMerge = partitionByIri prefixes withIri
+    let iriRejected, toMerge = partitionByIri prefixes oracle withIri
 
     let alreadyConfirmed =
         toMerge
@@ -304,6 +337,30 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) : LockFile *
           FieldsUnresolved = fieldsUnresolved }
 
     updated, summary
+
+// ── Public: buildOracle ───────────────────────────────────────────────────────
+
+/// Build a TermOracle from cached vocabulary graphs in cacheDir.
+/// Vocabs with no cache file contribute nothing (offline / un-fetched).
+/// The resulting oracle only enforces existence for namespaces whose cache loaded.
+let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : TermOracle =
+    let folder (terms: Set<string>, bases: string list) (prefix: string) (entry: VocabularyEntry) =
+        match loadCachedGraph cacheDir prefix with
+        | None -> terms, bases
+        | Some(Error _) -> terms, bases
+        | Some(Ok graph) ->
+            let vocabTerms = ConventionEngine.extractVocabTerms graph
+
+            let allIris =
+                [ vocabTerms.Classes |> Map.toSeq |> Seq.map snd
+                  vocabTerms.Properties |> Map.toSeq |> Seq.map snd
+                  vocabTerms.Individuals |> Map.toSeq |> Seq.map snd ]
+                |> Seq.concat
+
+            let newTerms = allIris |> Seq.fold (fun s iri -> Set.add iri s) terms
+            newTerms, (entry.Uri :: bases)
+
+    Map.fold folder (Set.empty, []) vocabs
 
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 

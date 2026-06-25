@@ -5,6 +5,8 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
 
+let private emptyOracle: Accept.TermOracle = Set.empty, []
+
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 let private emptyVocabs: Map<string, VocabularyEntry> = Map.empty
@@ -73,7 +75,7 @@ let acceptTests =
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 1 "Merged count"
                   Expect.equal summary.Rejected [] "no rejections"
                   Expect.equal summary.Unchanged 0 "unchanged count"
@@ -96,7 +98,7 @@ let acceptTests =
               match Accept.parseResolved at3Json with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 1 "Merged count"
                   let rejectedTypes = summary.Rejected |> List.map (fun r -> r.FSharpType)
                   Expect.equal rejectedTypes [ "MyApp.Nonexistent" ] "rejected types"
@@ -115,7 +117,7 @@ let acceptTests =
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, _ = Accept.apply lock doc Manual
+                  let updated, _ = Accept.apply lock doc Manual emptyOracle
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
                   Expect.equal m.Source Manual "source must be Manual"
 
@@ -129,7 +131,7 @@ let acceptTests =
               match Accept.parseResolved nullIriJson with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 0 "nothing merged"
                   Expect.equal (summary.Rejected |> List.length) 1 "one rejection"
                   let rej = summary.Rejected |> List.head
@@ -148,7 +150,7 @@ let acceptTests =
               match Accept.parseResolved fieldNullIriJson with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 1 "one merged"
                   Expect.isTrue (summary.FieldsUnresolved >= 1) "at least one field unresolved"
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
@@ -177,7 +179,7 @@ let acceptTests =
               match Accept.parseResolved at1Json with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let _updated, summary = Accept.apply lock doc Llm
+                  let _updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 1 "Merged=1"
                   Expect.equal summary.AlreadyConfirmed 1 "AlreadyConfirmed=1"
 
@@ -224,7 +226,7 @@ let acceptTests =
               match Accept.parseResolved absoluteIriJson with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 0 "absolute iri must not be merged"
 
                   let rej =
@@ -248,7 +250,7 @@ let acceptTests =
               match Accept.parseResolved curieIriJson with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let updated, summary = Accept.apply lock doc Llm
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 1 "valid CURIE must be merged"
                   Expect.equal summary.Rejected [] "no rejections for valid CURIE"
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
@@ -328,7 +330,7 @@ let acceptTests =
                   """
 
               let doc = Expect.wantOk (Accept.parseResolved json) "parse"
-              let updated, _ = Accept.apply lock doc Manual
+              let updated, _ = Accept.apply lock doc Manual emptyOracle
 
               let move = updated.Mappings |> List.find (fun m -> m.FSharpType = "App.Move")
 
@@ -372,7 +374,7 @@ let acceptTests =
                   """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
 
               let doc = Expect.wantOk (Accept.parseResolved json) "parse"
-              let updated, _ = Accept.apply lock doc Manual
+              let updated, _ = Accept.apply lock doc Manual emptyOracle
 
               let game = updated.Mappings |> List.find (fun m -> m.FSharpType = "App.Game")
 
@@ -431,10 +433,323 @@ let acceptTests =
                   """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Move", "iri": "schema:MoveAction", "cases": [ { "name": "XMove", "iri": "bogus:NotAPrefix", "payload": [] } ] } ] }"""
 
               let doc = Expect.wantOk (Accept.parseResolved json) "parse"
-              let _, summary = Accept.apply lock doc Manual
+              let _, summary = Accept.apply lock doc Manual emptyOracle
               Expect.isNonEmpty summary.Rejected "unresolvable case iri must be rejected"
 
               let r = summary.Rejected |> List.find (fun r -> r.FSharpType = "App.Move")
 
               Expect.stringContains r.Reason "iri" "rejection reason mentions the iri problem"
+          }
+
+          // ── Term-existence oracle tests ────────────────────────────────────────
+
+          test "term-existence: typo CURIE on type iri is rejected when namespace covered" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList
+                      [ "https://schema.org/Game"
+                        "https://schema.org/identifier" ],
+                  [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:WinActoin", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "typo iri must not be merged"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Game")
+
+              Expect.isSome rej "App.Game must be in Rejected"
+              Expect.stringContains rej.Value.Reason "not found" "reason mentions not found"
+          }
+
+          test "term-existence: known CURIE on type iri is accepted when namespace covered" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList
+                      [ "https://schema.org/Game"
+                        "https://schema.org/identifier" ],
+                  [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "known iri must be merged"
+              Expect.equal summary.Rejected [] "no rejections for known iri"
+          }
+
+          test "term-existence: uncached namespace is not existence-checked (no false reject)" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList [ "https://schema.org/Game" ], [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" }
+                            "myns",
+                            { Uri = "https://example.com/ns/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Foo"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Foo", "iri": "myns:AnythingAtAll", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 1 "uncached namespace must not be existence-checked"
+              Expect.equal summary.Rejected [] "no rejection for uncached namespace"
+          }
+
+          test "term-existence: empty oracle behaves like no check (back-compat)" {
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:WinActoin", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm emptyOracle
+              Expect.equal summary.Merged 1 "empty oracle: typo still merged (back-compat)"
+          }
+
+          test "term-existence: typo on field iri is caught (record field path)" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList
+                      [ "https://schema.org/Game"
+                        "https://schema.org/identifier" ],
+                  [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "Id"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Game", "iri": "schema:Game", "fields": [ { "name": "Id", "iri": "schema:identifyer" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "field typo must cause rejection"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Game")
+
+              Expect.isSome rej "App.Game must be rejected for field typo"
+              Expect.stringContains rej.Value.Reason "not found" "reason mentions not found"
+          }
+
+          test "term-existence: typo on union case iri is caught (union case path)" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList
+                      [ "https://schema.org/WinAction"
+                        "https://schema.org/MoveAction" ],
+                  [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Result"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "Won"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload = [] } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Result", "iri": "schema:MoveAction", "cases": [ { "name": "Won", "iri": "schema:WinActoin", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "case iri typo must cause rejection"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Result")
+
+              Expect.isSome rej "App.Result must be rejected for case iri typo"
+              Expect.stringContains rej.Value.Reason "not found" "reason mentions not found"
+          }
+
+          test "term-existence: typo on union case payload iri is caught" {
+              let oracle: Accept.TermOracle =
+                  Set.ofList
+                      [ "https://schema.org/WinAction"
+                        "https://schema.org/MoveAction"
+                        "https://schema.org/position" ],
+                  [ "https://schema.org/" ]
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    Mappings =
+                      [ { FSharpType = "App.Result"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Union
+                                [ { Name = "Won"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved
+                                    Payload =
+                                      [ { Name = "pos"
+                                          Iri = None
+                                          Confidence = 0.0
+                                          Source = Convention
+                                          Status = Unresolved } ] } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [ { "fsharpType": "App.Result", "iri": "schema:MoveAction", "cases": [ { "name": "Won", "iri": "schema:WinAction", "payload": [ { "name": "pos", "iri": "schema:positionn" } ] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Llm oracle
+              Expect.equal summary.Merged 0 "case payload typo must cause rejection"
+
+              let rej = summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.Result")
+
+              Expect.isSome rej "App.Result must be rejected for payload typo"
+          }
+
+          test "VocabFetcher.loadCachedGraph: absent cache returns None" {
+              let cacheDir =
+                  System.IO.Path.Combine(
+                      "/private/tmp/claude-501/-Users-ryanr-Code-frank/8dcbe96d-0ab3-41b3-9ce3-5abb4ec9c623/scratchpad",
+                      "vocab-test-empty"
+                  )
+
+              System.IO.Directory.CreateDirectory(cacheDir) |> ignore
+              let result = VocabFetcher.loadCachedGraph cacheDir "no-such-vocab"
+              Expect.isNone result "absent vocab returns None"
+          }
+
+          test "VocabFetcher.loadCachedGraph: present cache file returns Some (Ok graph)" {
+              let cacheDir =
+                  System.IO.Path.Combine(
+                      "/private/tmp/claude-501/-Users-ryanr-Code-frank/8dcbe96d-0ab3-41b3-9ce3-5abb4ec9c623/scratchpad",
+                      "vocab-test-present"
+                  )
+
+              System.IO.Directory.CreateDirectory(cacheDir) |> ignore
+
+              let jsonLdBytes =
+                  """{"@context":{"rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#","rdfs":"http://www.w3.org/2000/01/rdf-schema#","schema":"https://schema.org/"},"@graph":[{"@id":"https://schema.org/Game","@type":"rdfs:Class"}]}"""
+                  |> System.Text.Encoding.UTF8.GetBytes
+
+              let hash = VocabFetcher.sha256Hex jsonLdBytes
+              let fileName = $"testvocab.{hash}.jsonld"
+              let filePath = System.IO.Path.Combine(cacheDir, fileName)
+              System.IO.File.WriteAllBytes(filePath, jsonLdBytes)
+
+              let result = VocabFetcher.loadCachedGraph cacheDir "testvocab"
+
+              match result with
+              | None -> failtest "expected Some result for present cache file"
+              | Some(Error e) -> failtest $"expected Ok graph, got Error: {e}"
+              | Some(Ok graph) -> Expect.isGreaterThan graph.Triples.Count 0 "graph has triples"
           } ]

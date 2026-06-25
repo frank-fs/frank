@@ -163,6 +163,22 @@ module VocabFetcher =
             with ex ->
                 Error $"could not read cache file: {ex.Message}"
 
+    // ── Cache-only load ───────────────────────────────────────────────────────
+
+    /// Load a vocabulary graph from the cache directory without network access.
+    /// Returns None if no cache file for 'name' exists (vocab not yet fetched).
+    /// Returns Some (Ok graph) on success; Some (Error msg) if the file is corrupt.
+    let loadCachedGraph (cacheDir: string) (name: string) : Result<IGraph, string> option =
+        if not (System.IO.Directory.Exists cacheDir) then
+            None
+        else
+            match findCacheFile cacheDir name with
+            | None -> None
+            | Some filePath ->
+                match loadCacheFile filePath with
+                | Error e -> Some(Error e)
+                | Ok(bytes, format) -> Some(parseGraph format bytes)
+
     // ── Effectful: fetch and cache ────────────────────────────────────────────
 
     /// Fetch a vocabulary URI, parse it, and write it to cacheDir.

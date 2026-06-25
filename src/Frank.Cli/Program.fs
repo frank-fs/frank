@@ -291,7 +291,12 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
                             1
                         | Ok lf ->
 
-                            let updated, summary = Accept.apply lf doc source
+                            let cacheDir =
+                                Path.Combine(Path.GetDirectoryName(Path.GetFullPath lockPath), "vocab")
+
+                            let oracle = Accept.buildOracle lf.Vocabularies cacheDir
+
+                            let updated, summary = Accept.apply lf doc source oracle
 
                             write
                                 lockPath
