@@ -185,6 +185,27 @@ let private genLockWithSchemaIris =
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 [<Tests>]
+let badModuleNameTests =
+    testList
+        "DiscoveryEmitter — bad module name returns Error"
+        [ test "empty module name returns Error not exception" {
+              let result = DiscoveryEmitter.emit "" "/alps" schemaRegistry ticTacToeLock
+              Expect.isError result "empty module name must return Error"
+          }
+
+          test "dotless module name returns Error not exception" {
+              let result = DiscoveryEmitter.emit "NoNamespace" "/alps" schemaRegistry ticTacToeLock
+              Expect.isError result "dotless module name must return Error"
+          }
+
+          test "valid qualified name still produces Ok" {
+              let result =
+                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk result "qualified name must succeed"
+          } ]
+
+[<Tests>]
 let noUrnFrankTests =
     testList
         "DiscoveryEmitter — no urn:frank:"

@@ -160,8 +160,7 @@ let emit
     (typesByName: Map<string, TypeInfo>)
     : Result<string, string> =
     AstRender.validateModuleName moduleName
-
-    ResolvedModel.build registry lock
+    |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.bind (ResolvedModel.enrichTypes typesByName)
     |> Result.bind projectShapes
     |> Result.map (renderShapes moduleName)

@@ -118,6 +118,27 @@ let private typesByName: Map<string, TypeInfo> =
             Attributes = Map.empty
             DocComment = None } ]
 
+// ── bad module name ───────────────────────────────────────────────────────────
+
+[<Tests>]
+let badModuleNameTests =
+    testList
+        "ValidationEmitter — bad module name returns Error"
+        [ test "empty module name returns Error not exception" {
+              let result = ValidationEmitter.emit "" registry lock typesByName
+              Expect.isError result "empty module name must return Error"
+          }
+
+          test "dotless module name returns Error not exception" {
+              let result = ValidationEmitter.emit "NoNamespace" registry lock typesByName
+              Expect.isError result "dotless module name must return Error"
+          }
+
+          test "valid qualified name still produces Ok" {
+              let result = ValidationEmitter.emit "TicTacToe.GeneratedValidation" registry lock typesByName
+              Expect.isOk result "valid module name must succeed"
+          } ]
+
 // ── tier-1 projection ─────────────────────────────────────────────────────────
 
 [<Tests>]

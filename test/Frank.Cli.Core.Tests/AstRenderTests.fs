@@ -111,24 +111,25 @@ let astRenderTests =
           }
 
           test "validateModuleName accepts namespace-qualified name" {
-              AstRender.validateModuleName "A.B"
-              AstRender.validateModuleName "My.Namespace.Module"
+              Expect.isOk (AstRender.validateModuleName "A.B") "A.B is valid"
+              Expect.isOk (AstRender.validateModuleName "My.Namespace.Module") "multi-segment valid"
           }
 
           test "validateModuleName rejects whitespace" {
-              Expect.throwsT<System.ArgumentException>
-                  (fun () -> AstRender.validateModuleName "")
-                  "empty must throw ArgumentException"
+              Expect.isError (AstRender.validateModuleName "") "empty must return Error"
+              Expect.isError (AstRender.validateModuleName "   ") "whitespace must return Error"
 
-              Expect.throwsT<System.ArgumentException>
-                  (fun () -> AstRender.validateModuleName "   ")
-                  "whitespace must throw ArgumentException"
+              match AstRender.validateModuleName "" with
+              | Error msg -> Expect.stringContains msg "whitespace" "error mentions whitespace"
+              | Ok _ -> failtest "expected Error"
           }
 
           test "validateModuleName rejects dotless name" {
-              Expect.throwsT<System.ArgumentException>
-                  (fun () -> AstRender.validateModuleName "NoDot")
-                  "dotless name must throw ArgumentException"
+              Expect.isError (AstRender.validateModuleName "NoDot") "dotless must return Error"
+
+              match AstRender.validateModuleName "NoDot" with
+              | Error msg -> Expect.stringContains msg "." "error mentions dot requirement"
+              | Ok _ -> failtest "expected Error"
           }
 
           test "optionExpr None yields noneExpr output" {
