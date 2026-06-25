@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "resolved": [
+    {
+      "fsharpType": "TicTacToe.Model.Game",
+      "iri": "schema:Game",
+      "fields": [
+        { "name": "Id", "iri": "schema:identifier" },
+        { "name": "Result", "iri": "schema:result" }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveLog`1",
+      "iri": "schema:ItemList",
+      "fields": [
+        { "name": "Items", "iri": "schema:item" },
+        { "name": "Count", "iri": "schema:numberOfItems" }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.Move",
+      "iri": "schema:MoveAction",
+      "cases": [
+        { "name": "XMove", "iri": "schema:MoveAction" },
+        { "name": "OMove", "iri": "schema:MoveAction" }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveResult",
+      "iri": "schema:Action",
+      "cases": [
+        { "name": "Won", "iri": "schema:WinAction" },
+        { "name": "Error", "iri": "schema:FailedActionStatus" }
+      ]
+    }
+  ]
+}
