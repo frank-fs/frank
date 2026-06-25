@@ -283,12 +283,12 @@ let unionCaseEmissionTests =
 
               Expect.stringContains
                   src
-                  "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")"
+                  "| Probe.Move.XMove _ -> Some (System.Uri \"https://ex.org/XMove\")"
                   "XMove arm over constructor"
 
               Expect.stringContains
                   src
-                  "| OMove _ -> Some (System.Uri \"https://ex.org/OMove\")"
+                  "| Probe.Move.OMove _ -> Some (System.Uri \"https://ex.org/OMove\")"
                   "OMove arm over constructor"
 
               Expect.stringContains src ": System.Uri option" "return type is Uri option"
@@ -338,15 +338,17 @@ let unionCaseEmissionTests =
 
               Expect.stringContains
                   src
-                  "| Red -> Some (System.Uri \"https://ex.org/Red\")"
+                  "| Probe.Light.Red -> Some (System.Uri \"https://ex.org/Red\")"
                   "nullary Red arm, no underscore"
 
               Expect.stringContains
                   src
-                  "| Green -> Some (System.Uri \"https://ex.org/Green\")"
+                  "| Probe.Light.Green -> Some (System.Uri \"https://ex.org/Green\")"
                   "nullary Green arm, no underscore"
 
-              Expect.isFalse (src.Contains "| Red _ ->") "nullary case must NOT have a wildcard payload binding"
+              Expect.isFalse
+                  (src.Contains "| Probe.Light.Red _ ->")
+                  "nullary case must NOT have a wildcard payload binding"
           }
 
           test "partially-confirmed union appends a wildcard arm" {
@@ -401,7 +403,10 @@ let unionCaseEmissionTests =
               let src =
                   Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" registry lock) "emit"
 
-              Expect.stringContains src "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")" "confirmed XMove arm"
+              Expect.stringContains
+                  src
+                  "| Probe.Move.XMove _ -> Some (System.Uri \"https://ex.org/XMove\")"
+                  "confirmed XMove arm"
 
               Expect.stringContains src "| _ -> None" "trailing wildcard returns None for unconfirmed case"
               Expect.isFalse (src.Contains "urn:frank:unmapped") "no dead-end urn:frank:unmapped in output"
@@ -527,9 +532,15 @@ let at4UnionCaseIriTests =
 
               Expect.stringContains src "moveCaseIri" "moveCaseIri function emitted"
 
-              Expect.stringContains src "| XMove _ -> Some (System.Uri \"https://ex.org/XMove\")" "XMove arm present"
+              Expect.stringContains
+                  src
+                  "| Probe.Move.XMove _ -> Some (System.Uri \"https://ex.org/XMove\")"
+                  "XMove arm present"
 
-              Expect.stringContains src "| OMove _ -> Some (System.Uri \"https://ex.org/OMove\")" "OMove arm present"
+              Expect.stringContains
+                  src
+                  "| Probe.Move.OMove _ -> Some (System.Uri \"https://ex.org/OMove\")"
+                  "OMove arm present"
 
               let errors = typecheckTwoSources moveDomainSrc src
               Expect.isEmpty errors $"generated union match must compile against real DU; diagnostics: {errors}"
@@ -548,4 +559,80 @@ let at4UnionCaseIriTests =
               let mentionsXMove = errors |> List.exists (fun e -> e.Contains "XMove")
 
               Expect.isTrue mentionsXMove $"at least one diagnostic must reference XMove; got: {errors}"
+          } ]
+
+// ── Cross-namespace qualification test ──────────────────────────────────────
+
+let private crossNsDomainSrc =
+    """
+namespace CrossNs.Domain
+
+type Status = | Active of int | Inactive
+"""
+
+let private crossNsRegistry: VocabularyRegistry =
+    { VocabularyRegistry.empty with
+        Prefixes = Map.ofList [ "ex", Uri "https://ex.org/" ]
+        Using = Set.ofList [ "ex" ] }
+
+let private crossNsLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+      Vocabularies =
+        Map.ofList
+            [ "ex",
+              { Uri = "https://ex.org/"
+                FetchedAt = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+                Hash = "sha256:t" } ]
+      Mappings =
+        [ { FSharpType = "CrossNs.Domain.Status"
+            Iri = Some "ex:Status"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Union
+                  [ { Name = "Active"
+                      Iri = Some "ex:Active"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed
+                      Payload =
+                        [ { Name = "code"
+                            Iri = None
+                            Confidence = 0.0
+                            Source = Convention
+                            Status = Unresolved } ] }
+                    { Name = "Inactive"
+                      Iri = Some "ex:Inactive"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed
+                      Payload = [] } ] } ] }
+
+[<Tests>]
+let crossNamespaceQualificationTests =
+    testList
+        "SemanticModelEmitter — cross-namespace union case qualification"
+        [ test "union CaseIri patterns are qualified and compile without opening domain namespace" {
+              let src =
+                  Expect.wantOk (SemanticModelEmitter.emit "CrossNs.Generated" crossNsRegistry crossNsLock) "emit"
+
+              Expect.stringContains
+                  src
+                  "| CrossNs.Domain.Status.Active _ -> Some (System.Uri \"https://ex.org/Active\")"
+                  "non-nullary pattern is fully qualified"
+
+              Expect.stringContains
+                  src
+                  "| CrossNs.Domain.Status.Inactive -> Some (System.Uri \"https://ex.org/Inactive\")"
+                  "nullary pattern is fully qualified"
+
+              Expect.isFalse
+                  (src.Contains "| Active _")
+                  "bare unqualified pattern must NOT appear (would fail FS0039 in a real build)"
+
+              let errors = typecheckTwoSources crossNsDomainSrc src
+              Expect.isEmpty errors $"qualified patterns must compile with no open; got: {errors}"
           } ]

@@ -43,6 +43,12 @@ let private clrTypeExpr (fsharpType: string) (genericArity: int) : string =
         let underscores = List.replicate genericArity "_" |> String.concat ","
         "typedefof<" + baseName + "<" + underscores + ">>"
 
+/// Qualified prefix for case patterns: strip the backtick-arity suffix if present.
+let private casePatternPrefix (fsharpType: string) : string =
+    match fsharpType.IndexOf('`') with
+    | -1 -> fsharpType
+    | idx -> fsharpType.[.. idx - 1]
+
 let private camel (s: string) : string =
     if String.IsNullOrEmpty s then
         s
@@ -86,7 +92,13 @@ let private caseFns (mapped: MappedResource list) =
             let mappedClauses =
                 m.Cases
                 |> List.map (fun c ->
-                    let pat = if c.IsNullary then c.CaseName else c.CaseName + " _"
+                    let prefix = casePatternPrefix m.FSharpType
+
+                    let pat =
+                        if c.IsNullary then
+                            prefix + "." + c.CaseName
+                        else
+                            prefix + "." + c.CaseName + " _"
 
                     pat,
                     AstRender.appExpr
