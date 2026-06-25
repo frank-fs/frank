@@ -1034,6 +1034,132 @@ let acceptTests =
                   "must NOT say 'exists in vocabulary'"
           }
 
+          // ── Shape tag discriminator tests (Finding #8) ────────────────────────
+
+          test "SHAPE-DISC-1: shape:union + cases → UnionShape" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.State", "iri": "schema:Thing", "shape": "union",
+                         "cases": [ { "name": "A", "iri": "schema:MoveAction", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.ResolvedShape.Union _ -> ()
+              | Accept.ResolvedShape.Record _ -> failwith "expected Union for shape:union + cases"
+          }
+
+          test "SHAPE-DISC-2: shape:record + fields → RecordShape" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.Order", "iri": "schema:Thing", "shape": "record",
+                         "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.ResolvedShape.Record _ -> ()
+              | Accept.ResolvedShape.Union _ -> failwith "expected Record for shape:record + fields"
+          }
+
+          test "SHAPE-DISC-3: shape:bogus → Error with unknown shape message" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.X", "iri": "schema:Thing", "shape": "bogus",
+                         "fields": [] } ] }"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failwith "expected Error for shape:bogus"
+              | Error msg -> Expect.stringContains msg "unknown shape" "error mentions unknown shape"
+          }
+
+          test "SHAPE-DISC-4: both cases and fields present → Error (silent-drop guard)" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.X", "iri": "schema:Thing",
+                         "cases": [ { "name": "A", "iri": "schema:A", "payload": [] } ],
+                         "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failwith "expected Error when both cases and fields are present"
+              | Error msg -> Expect.stringContains msg "both 'cases' and 'fields'" "error mentions both keys"
+          }
+
+          test "SHAPE-DISC-5: legacy no-shape tag + cases only → UnionShape (back-compat)" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.Move", "iri": "schema:MoveAction",
+                         "cases": [ { "name": "X", "iri": "schema:MoveAction", "payload": [] } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.ResolvedShape.Union _ -> ()
+              | Accept.ResolvedShape.Record _ -> failwith "expected Union for legacy cases-only (back-compat)"
+          }
+
+          test "SHAPE-DISC-6: legacy no-shape tag + fields only → RecordShape (back-compat)" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.Game", "iri": "schema:Game",
+                         "fields": [ { "name": "id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.ResolvedShape.Record _ -> ()
+              | Accept.ResolvedShape.Union _ -> failwith "expected Record for legacy fields-only (back-compat)"
+          }
+
+          test "SHAPE-DISC-7: shape:union without cases → Error" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.X", "iri": "schema:Thing", "shape": "union" } ] }"""
+
+              match Accept.parseResolved json with
+              | Ok _ -> failwith "expected Error for shape:union without cases"
+              | Error msg -> Expect.stringContains msg "shape" "error mentions shape context"
+          }
+
+          test "SHAPE-DISC-8: shape:record without fields → RecordShape with empty fields (null treated as empty)" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.X", "iri": "schema:Thing", "shape": "record" } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let entry = doc.Resolved |> List.exactlyOne
+
+              match entry.Shape with
+              | Accept.ResolvedShape.Record fields -> Expect.equal fields [] "no-fields record has empty list"
+              | Accept.ResolvedShape.Union _ -> failwith "expected Record for shape:record without fields key"
+          }
+
+          test "SHAPE-DISC-9: sample resolved.json (no shape tag, cases present) still parses (back-compat)" {
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "TicTacToe.Model.Move", "iri": "schema:MoveAction",
+                         "cases": [ { "name": "XMove", "iri": "schema:MoveAction" },
+                                    { "name": "OMove", "iri": "schema:MoveAction" } ] },
+                       { "fsharpType": "TicTacToe.Model.Game", "iri": "schema:Game",
+                         "fields": [ { "name": "Id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse sample-style no-tag entries"
+              let move = doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Move")
+              let game = doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Game")
+
+              match move.Shape with
+              | Accept.ResolvedShape.Union cases -> Expect.equal cases.Length 2 "Move has two cases"
+              | _ -> failwith "expected Union for Move (back-compat)"
+
+              match game.Shape with
+              | Accept.ResolvedShape.Record fields -> Expect.equal fields.Length 1 "Game has one field"
+              | _ -> failwith "expected Record for Game (back-compat)"
+          }
+
           test "VocabFetcher.loadCachedGraph: absent cache returns None" {
               let cacheDir =
                   System.IO.Path.Combine(

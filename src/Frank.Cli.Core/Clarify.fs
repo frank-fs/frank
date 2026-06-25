@@ -52,8 +52,12 @@ let private casesArray (cases: CaseMapping list) : JsonArray =
 
 let private addShapeToObject (shape: MappingShape) (obj: JsonObject) : unit =
     match shape with
-    | MappingShape.Record fs -> obj.Add("fields", fieldsArray fs)
-    | MappingShape.Union cases -> obj.Add("cases", casesArray cases)
+    | MappingShape.Record fs ->
+        obj.Add("shape", JsonValue.Create "record")
+        obj.Add("fields", fieldsArray fs)
+    | MappingShape.Union cases ->
+        obj.Add("shape", JsonValue.Create "union")
+        obj.Add("cases", casesArray cases)
 
 let private candidatesArray (alternates: string list) : JsonArray =
     let arr = JsonArray()
@@ -136,13 +140,16 @@ let private templateCaseNode (c: CaseMapping) : JsonObject =
 
 let private addTemplateShapeToObject (shape: MappingShape) (obj: JsonObject) : unit =
     match shape with
-    | MappingShape.Record fs -> obj.Add("fields", templateFieldsArray fs)
+    | MappingShape.Record fs ->
+        obj.Add("shape", JsonValue.Create "record")
+        obj.Add("fields", templateFieldsArray fs)
     | MappingShape.Union cases ->
         let arr = JsonArray()
 
         for c in cases do
             arr.Add(templateCaseNode c)
 
+        obj.Add("shape", JsonValue.Create "union")
         obj.Add("cases", arr)
 
 let private templateResolvedNode (m: Mapping) : JsonObject =

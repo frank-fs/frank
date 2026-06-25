@@ -82,6 +82,24 @@ let private parseCase (node: JsonNode) : Result<ResolvedCase, string> =
 let private parseCasesArray (node: JsonNode) : Result<ResolvedCase list, string> =
     parseJsonArray "cases" (fun i el -> parseCase el |> Result.mapError (fun e -> $"cases[{i}]: {e}")) node
 
+let private parseShapeByTag (i: int) (tag: string) (node: JsonNode) : Result<ResolvedShape, string> =
+    match tag with
+    | "union" ->
+        match node.["cases"] with
+        | null -> Error $"resolved[{i}]: shape:union but 'cases' key is absent"
+        | casesNode -> parseCasesArray casesNode |> Result.map ResolvedShape.Union
+    | "record" -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
+    | other -> Error $"resolved[{i}]: unknown shape '{other}'"
+
+let private parseShapeLegacy (i: int) (node: JsonNode) : Result<ResolvedShape, string> =
+    let hasCases = not (isNull node.["cases"])
+    let hasFields = not (isNull node.["fields"])
+
+    match hasCases, hasFields with
+    | true, true -> Error $"resolved[{i}]: entry has both 'cases' and 'fields'; specify one"
+    | true, false -> parseCasesArray node.["cases"] |> Result.map ResolvedShape.Union
+    | false, _ -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
+
 let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string> =
     requireString node "fsharpType"
     |> Result.mapError (fun _ -> $"resolved[{i}]: fsharpType is required")
@@ -89,12 +107,23 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
         let iri = optionalString node "iri"
 
         let shapeResult =
-            match node.["cases"] with
-            | null -> parseFieldsArray node.["fields"] |> Result.map ResolvedShape.Record
-            | casesNode -> parseCasesArray casesNode |> Result.map ResolvedShape.Union
+            match optionalString node "shape" with
+            | Some tag ->
+                let hasCases = not (isNull node.["cases"])
+                let hasFields = not (isNull node.["fields"])
+
+                if hasCases && hasFields then
+                    Error $"resolved[{i}]: entry has both 'cases' and 'fields'; specify one"
+                else
+                    parseShapeByTag i tag node
+            | None -> parseShapeLegacy i node
 
         shapeResult
-        |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
+        |> Result.mapError (fun e ->
+            if e.StartsWith($"resolved[{i}]:", System.StringComparison.Ordinal) then
+                e
+            else
+                $"resolved[{i}]: {e}")
         |> Result.map (fun shape ->
             { FSharpType = fsType
               Iri = iri

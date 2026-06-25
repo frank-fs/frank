@@ -451,4 +451,66 @@ let clarifyTests =
 
                   match entry.Shape with
                   | Accept.ResolvedShape.Record _ -> ()
-                  | Accept.ResolvedShape.Union _ -> failtest "expected ResolvedShape.Record but got ResolvedShape.Union" ]
+                  | Accept.ResolvedShape.Union _ -> failtest "expected ResolvedShape.Record but got ResolvedShape.Union"
+
+          // ── Shape tag tests (Finding #8) ──────────────────────────────────────
+
+          testCase "SHAPE-1: toJson union emits explicit shape:union tag"
+          <| fun () ->
+              let json: string = Clarify.toJson unionLock
+              let root: JsonNode = JsonNode.Parse json
+              let proposed: JsonArray = root.["proposed"].AsArray()
+              let entry: JsonNode = proposed.[0]
+              Expect.equal (entry.["shape"].GetValue<string>()) "union" "union entry must have shape:union"
+
+          testCase "SHAPE-2: toJson record emits explicit shape:record tag"
+          <| fun () ->
+              let json: string = Clarify.toJson mixedLock
+              let root: JsonNode = JsonNode.Parse json
+              let unresolved: JsonArray = root.["unresolved"].AsArray()
+              let entry: JsonNode = unresolved.[0]
+              Expect.equal (entry.["shape"].GetValue<string>()) "record" "record entry must have shape:record"
+
+          testCase "SHAPE-3: toResolvedTemplate union emits explicit shape:union tag alongside cases[]"
+          <| fun () ->
+              let template: string = Clarify.toResolvedTemplate unionLock
+              let root: JsonNode = JsonNode.Parse template
+              let resolved: JsonArray = root.["resolved"].AsArray()
+
+              let moveResultEntry: JsonNode =
+                  resolved
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun n -> n.["fsharpType"].GetValue<string>() = "MyApp.MoveResult")
+
+              Expect.equal (moveResultEntry.["shape"].GetValue<string>()) "union" "template union must have shape:union"
+              Expect.isNotNull moveResultEntry.["cases"] "cases[] must still be present"
+
+          testCase "SHAPE-4: toResolvedTemplate record emits explicit shape:record tag alongside fields[]"
+          <| fun () ->
+              let template: string = Clarify.toResolvedTemplate mixedLock
+              let root: JsonNode = JsonNode.Parse template
+              let resolved: JsonArray = root.["resolved"].AsArray()
+
+              let orderEntry: JsonNode =
+                  resolved
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun n -> n.["fsharpType"].GetValue<string>() = "MyApp.Order")
+
+              Expect.equal (orderEntry.["shape"].GetValue<string>()) "record" "template record must have shape:record"
+              Expect.isNotNull orderEntry.["fields"] "fields[] must still be present"
+
+          testCase "SHAPE-5: AT-U3 round-trip still closes with shape tag present"
+          <| fun () ->
+              let template: string = Clarify.toResolvedTemplate unionLock
+              let roundTrip = Accept.parseResolved template
+
+              match roundTrip with
+              | Error e -> failtest $"parseResolved failed with shape tag present: {e}"
+              | Ok doc ->
+                  let entry = doc.Resolved |> List.find (fun e -> e.FSharpType = "MyApp.MoveResult")
+
+                  match entry.Shape with
+                  | Accept.ResolvedShape.Union cases ->
+                      let names = cases |> List.map (fun c -> c.Name)
+                      Expect.equal names [ "XTurn"; "OTurn"; "Won"; "Draw"; "Error" ] "round-trip case names with shape tag"
+                  | Accept.ResolvedShape.Record _ -> failtest "expected Union but got Record" ]
