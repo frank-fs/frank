@@ -10,6 +10,17 @@ type VocabTerms =
       Properties: Map<string, string>
       Individuals: Map<string, string> }
 
+/// Absolute IRI sets per term category, with NO local-name deduplication.
+/// Used for term-existence checking in the accept oracle: identity is the absolute
+/// IRI, never the local name. Two properties sharing a local name across different
+/// namespaces (e.g. schema:identifier and dct:identifier) are both valid and must
+/// both appear here — unlike VocabTerms which drops ambiguous local names to prevent
+/// wrong-namespace convention matches.
+type VocabTermIris =
+    { ClassIris: Set<string>
+      PropertyIris: Set<string>
+      IndividualIris: Set<string> }
+
 module ConventionEngine =
 
     // ── Jaro distance ─────────────────────────────────────────────────────────
@@ -353,6 +364,39 @@ module ConventionEngine =
                 Seq.append (collectByTypeIri owlNamedIndividualIri graph) (collectByTypeIri skosConceptIri graph)
                 |> Seq.append (collectEnumMembers classIris excludeIris graph)
             ) }
+
+    /// Extract absolute IRI sets per term category from a vocabulary IGraph.
+    /// Unlike extractVocabTerms, there is NO local-name deduplication: both
+    /// http://a/identifier and http://b/identifier are kept even though they share
+    /// the local name "identifier". Term-existence identity is the absolute IRI.
+    let extractTermIris (graph: IGraph) : VocabTermIris =
+        if isNull graph then
+            invalidArg (nameof graph) "graph must not be null"
+
+        let toIriSet (typeIris: string list) =
+            typeIris
+            |> List.collect (fun typeIri -> collectByTypeIri typeIri graph |> Seq.map snd |> Seq.toList)
+            |> Set.ofList
+
+        let classIris =
+            toIriSet [ rdfsClassIri; schemaClassIri; owlClassIri; rdfsDatatypeIri ]
+
+        let propertyIris =
+            toIriSet
+                [ rdfPropertyIri
+                  schemaPropertyIri
+                  owlObjectPropertyIri
+                  owlDatatypePropertyIri ]
+
+        let excludeIris = Set.union classIris propertyIris
+
+        let individualIris =
+            toIriSet [ owlNamedIndividualIri; skosConceptIri ]
+            |> Set.union (collectEnumMembers classIris excludeIris graph |> Seq.map snd |> Set.ofSeq)
+
+        { ClassIris = classIris
+          PropertyIris = propertyIris
+          IndividualIris = individualIris }
 
     // ── CURIE reverse-resolution ──────────────────────────────────────────────
 

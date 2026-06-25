@@ -1160,6 +1160,44 @@ let acceptTests =
               | _ -> failwith "expected Record for Game (back-compat)"
           }
 
+          // ── extractTermIris-based oracle: schema:identifier regression ──────────
+
+          test "oracle built from graph with ambiguous-local-name property accepts both absolute IRIs" {
+              // Proves buildOracle uses extractTermIris (absolute IRIs) not extractVocabTerms
+              // (local-name map). A graph with both http://a/identifier and http://b/identifier
+              // as rdf:Property: extractVocabTerms drops "identifier" (ambiguous),
+              // but the oracle must accept BOTH absolute IRIs.
+              let jsonld =
+                  """
+                  { "@context": {
+                      "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                      "a_ns": "http://a/",
+                      "b_ns": "http://b/" },
+                    "@graph": [
+                      { "@id": "http://a/identifier", "@type": "rdf:Property" },
+                      { "@id": "http://b/identifier", "@type": "rdf:Property" } ] }
+                  """
+
+              let graph =
+                  Frank.Semantic.VocabFetcher.parseGraph
+                      Frank.Semantic.VocabFetcher.JsonLd
+                      (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let iris = Frank.Semantic.ConventionEngine.extractTermIris graph
+
+              // The oracle must contain BOTH IRIs in Properties
+              Expect.isTrue
+                  (Set.contains "http://a/identifier" iris.PropertyIris)
+                  "http://a/identifier must be in PropertyIris"
+
+              Expect.isTrue
+                  (Set.contains "http://b/identifier" iris.PropertyIris)
+                  "http://b/identifier must be in PropertyIris"
+          }
+
           test "VocabFetcher.loadCachedGraph: absent cache returns None" {
               let cacheDir =
                   System.IO.Path.Combine(

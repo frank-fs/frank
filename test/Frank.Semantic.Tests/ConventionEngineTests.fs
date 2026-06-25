@@ -1397,3 +1397,70 @@ ex:Red a ex:Color .
               Expect.isFalse (terms.Individuals.ContainsKey "color") "Color (a class) must NOT appear in Individuals"
               Expect.isTrue (terms.Individuals.ContainsKey "red") "Red (instance of Color) must be in Individuals"
           } ]
+
+// ── extractTermIris: absolute IRI sets, no local-name dedup ──────────────────
+
+[<Tests>]
+let extractTermIrisTests =
+    testList
+        "extractTermIris: existence oracle uses absolute IRIs (no local-name dedup)"
+        [ test "two rdf:Properties with same local name in different namespaces → BOTH IRIs in PropertyIris" {
+              // This is the bug scenario: schema:identifier and dct:identifier both have local name
+              // "identifier". extractVocabTerms drops "identifier" entirely (ambiguous).
+              // extractTermIris must keep BOTH absolute IRIs.
+              let jsonld =
+                  """
+                  { "@context": {
+                      "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                      "a_ns": "http://a/",
+                      "b_ns": "http://b/" },
+                    "@graph": [
+                      { "@id": "http://a/identifier", "@type": "rdf:Property" },
+                      { "@id": "http://b/identifier", "@type": "rdf:Property" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let iris = ConventionEngine.extractTermIris graph
+
+              Expect.isTrue
+                  (Set.contains "http://a/identifier" iris.PropertyIris)
+                  $"http://a/identifier must be in PropertyIris; got {iris.PropertyIris}"
+
+              Expect.isTrue
+                  (Set.contains "http://b/identifier" iris.PropertyIris)
+                  $"http://b/identifier must be in PropertyIris; got {iris.PropertyIris}"
+
+              // Contrast: extractVocabTerms drops the ambiguous local name
+              let terms = ConventionEngine.extractVocabTerms graph
+
+              Expect.isFalse
+                  (terms.Properties.ContainsKey "identifier")
+                  $"extractVocabTerms must drop ambiguous 'identifier'; got {terms.Properties}"
+          }
+
+          test "real-cache proof: schema:identifier in PropertyIris (schema cache loaded from sample)" {
+              let cacheDir =
+                  "/Users/ryanr/Code/frank/.claude/worktrees/v732-codegen-remediation/sample/TicTacToe-v732/.frank/vocab"
+
+              match Frank.Semantic.VocabFetcher.loadCachedGraph cacheDir "schema" with
+              | None -> skiptest "schema vocab cache not found — run frank semantic refresh first"
+              | Some(Error e) -> skiptest $"schema cache parse error: {e}"
+              | Some(Ok graph) ->
+                  let iris = ConventionEngine.extractTermIris graph
+
+                  Expect.isTrue
+                      (Set.contains "https://schema.org/identifier" iris.PropertyIris)
+                      $"https://schema.org/identifier must be in PropertyIris; PropertyIris count: {iris.PropertyIris.Count}"
+
+                  // Also verify extractVocabTerms drops "identifier" (proving the fix is needed)
+                  let terms = ConventionEngine.extractVocabTerms graph
+
+                  Expect.isFalse
+                      (terms.Properties.ContainsKey "identifier")
+                      "extractVocabTerms must drop ambiguous 'identifier' (schema:identifier vs dct:identifier)"
+          } ]

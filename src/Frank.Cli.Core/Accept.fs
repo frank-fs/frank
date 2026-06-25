@@ -427,14 +427,11 @@ let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : Term
         | None -> acc
         | Some(Error _) -> acc
         | Some(Ok graph) ->
-            let vocabTerms = ConventionEngine.extractVocabTerms graph
-            let newClasses = vocabTerms.Classes |> Map.toSeq |> Seq.map snd |> Set.ofSeq
-            let newProps = vocabTerms.Properties |> Map.toSeq |> Seq.map snd |> Set.ofSeq
-            let newIndiv = vocabTerms.Individuals |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+            let termIris = ConventionEngine.extractTermIris graph
 
-            { Classes = Set.union acc.Classes newClasses
-              Properties = Set.union acc.Properties newProps
-              Individuals = Set.union acc.Individuals newIndiv
+            { Classes = Set.union acc.Classes termIris.ClassIris
+              Properties = Set.union acc.Properties termIris.PropertyIris
+              Individuals = Set.union acc.Individuals termIris.IndividualIris
               CoveredBases = entry.Uri :: acc.CoveredBases }
 
     Map.fold folder emptyTermOracle vocabs

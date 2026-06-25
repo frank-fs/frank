@@ -6,7 +6,7 @@
       "iri": "schema:Game",
       "shape": "record",
       "fields": [
-        { "name": "Id", "iri": null },
+        { "name": "Id", "iri": "schema:identifier" },
         { "name": "Result", "iri": "schema:result" }
       ]
     },
