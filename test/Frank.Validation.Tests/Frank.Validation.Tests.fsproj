@@ -10,6 +10,9 @@
   <ItemGroup>
     <Compile Include="ShapesTests.fs" />
     <Compile Include="ResolverTests.fs" />
+    <Compile Include="ValidatorTests.fs" />
+    <Compile Include="MiddlewareTestHelpers.fs" />
+    <Compile Include="MiddlewareTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
@@ -17,6 +20,11 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Expecto" Version="10.2.3" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.3" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
