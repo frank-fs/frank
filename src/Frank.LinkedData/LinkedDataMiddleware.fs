@@ -120,13 +120,7 @@ module private Serializers =
         serializeGraphToString (RdfXmlWriter()) graph
 
     let serializeGraphJsonLd (graph: IGraph) : string =
-        use store = new TripleStore()
-        store.Add(graph) |> ignore
-        let sb = StringBuilder()
-        use sw = new System.IO.StringWriter(sb)
-        let writer = JsonLdWriter()
-        writer.Save(store :> ITripleStore, sw :> System.IO.TextWriter)
-        sb.ToString()
+        Frank.Semantic.RdfSerialization.serializeGraphJsonLd graph
 
     let buildJsonLdResponse (graph: IGraph) (externalContext: string) : string =
         let graphJson = serializeGraphJsonLd graph

@@ -17,6 +17,7 @@
     <Compile Include="ShapeTypes.fs" />
     <Compile Include="ConventionEngine.fs" />
     <Compile Include="VocabFetcher.fs" />
+    <Compile Include="RdfSerialization.fs" />
   </ItemGroup>
 
   <ItemGroup>
