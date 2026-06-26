@@ -8,6 +8,14 @@ open VDS.RDF
 open Frank.Semantic
 open Frank.Validation
 
+let private schemaOrgContextJson =
+    """{"@context":{"@vocab":"https://schema.org/"}}"""
+
+let private offlineLoader =
+    JsonLdLoader.seeded
+        [ "https://schema.org", schemaOrgContextJson
+          "https://schema.org/", schemaOrgContextJson ]
+
 let orderConfig () : ValidationConfig =
     let shapes =
         Shapes.toShapesGraph
@@ -20,7 +28,7 @@ let orderConfig () : ValidationConfig =
                       Pattern = None } ]
               ) ]
 
-    { Shapes = shapes }
+    { Shapes = shapes; ContextLoader = offlineLoader }
 
 let startValidationServer (config: ValidationConfig) =
     let builder = WebApplication.CreateBuilder()

@@ -7,9 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="ValidationTypes.fs" />
     <Compile Include="Shapes.fs" />
+    <Compile Include="Validator.fs" />
+    <Compile Include="JsonLdLoader.fs" />
     <Compile Include="GeneratedValidationResolver.fs" />
+    <Compile Include="ValidationMiddleware.fs" />
+    <Compile Include="Frank.Validation.fs" />
   </ItemGroup>
 
   <ItemGroup>

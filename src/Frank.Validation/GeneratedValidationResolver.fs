@@ -9,7 +9,10 @@ module GeneratedValidationResolver =
 
     let private buildConfig (t: Type) : Result<ValidationConfig, string> =
         match readStaticProp<ShapesGraph> "shapesGraph" t with
-        | Ok s -> Ok { Shapes = s }
+        | Ok s ->
+            Ok
+                { Shapes = s
+                  ContextLoader = JsonLdLoader.defaultRemote }
         | Error e -> Error e
 
     /// Build a ValidationConfig from an arbitrary Type. Used in tests to exercise
