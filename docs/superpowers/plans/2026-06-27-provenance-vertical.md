@@ -960,7 +960,9 @@ Expected: pass. Fix any drift, recommit.
 - Modify: an existing sample under `sample/` (the tic-tac-toe-style sample used by the other verticals — locate via `find sample -name '*.fsproj'` and the one already referencing `Frank.Discovery`/`Frank.Validation`).
 - Modify: that sample's `test-e2e.sh` if present (`find sample/ -name test-e2e.sh`).
 
-- [ ] **Step 1: Add `useProvenance` to the sample host**, declare `provClass` on the relevant domain type in its vocabulary CE, and ensure the move operation declares `produces typeof<…> <status>`.
+> **Composition constraint discovered at Task 15 (must honor here):** when `useProvenance` and `useLinkedData` are composed on one host, `ProvenanceMiddleware` must be registered OUTERMOST (its buffer-and-replace wraps LinkedData's ld+json short-circuit). And because the domain-type lookup matches the response status, a resource SERVED by LinkedData at 200 needs its `produces typeof<T> 200` declaration (not 201). POSTs that create resources (201) live on routes LinkedData does not intercept. Wire the capstone accordingly.
+
+- [ ] **Step 1: Add `useProvenance` to the sample host**, declare `provClass` on the relevant domain type in its vocabulary CE, and ensure the move operation declares `produces typeof<…> <status>` (status matching how the resource is served — see the composition constraint above).
 
 - [ ] **Step 2: Build the sample with the MSBuild generator active**; confirm `obj/.../GeneratedProvenance.fs` is generated and injected (check it compiled). Run `dotnet build-server shutdown` first (cached task DLL).
 
@@ -974,7 +976,7 @@ Expected: pass. Fix any drift, recommit.
 
 - [ ] **Step 2: `/discipline`** on the changed `src/` files. Fix any rule 9–15 violations (nesting, function length, bounded loops, preconditions). Recommit fixes.
 
-- [ ] **Step 3: `/expert-review`** — dispatch Tim Berners-Lee (Linked Data: are the PROV-O + domain IRIs dereferenceable/consistent, is `@context` correct), Darrel Miller (HTTP: content-negotiation profile semantics, status codes, problem+json), David Fowler (.NET/ASP.NET: metadata read, middleware ordering, response-body swap correctness), @7sharp9 (F# perf: allocations in the capture hot path, store agent throughput). Treat all findings as potentially blocking; surface to the user — never self-triage.
+- [ ] **Step 3: `/expert-review`** — dispatch Tim Berners-Lee (Linked Data: are the PROV-O + domain IRIs dereferenceable/consistent, is `@context` correct, should output be COMPACTED vs the current expanded JSON-LD), Darrel Miller (HTTP: content-negotiation profile semantics — **the LinkedData/Provenance `application/ld+json` profile collision found at Task 15**, status codes, problem+json), David Fowler (.NET/ASP.NET: metadata read, **middleware ordering requirement — Provenance must be outermost when composed with LinkedData**, response-body swap correctness), @7sharp9 (F# perf: allocations in the capture hot path, blocking `PostAndReply` in the store/query endpoint, store agent throughput). Treat all findings as potentially blocking; surface to the user — never self-triage.
 
 - [ ] **Step 4: `/simplify`** on the diff; apply in-scope cleanups. **Known finding to resolve here (rule 8):** `writeProblemJson` is duplicated between `src/Frank.Provenance/ProvenanceEndpoint.fs` and `src/Frank.Validation/ValidationMiddleware.fs` (also the `respond400/413/422` family). Extract a shared problem+json writer (candidate home: `Frank.Semantic`, next to `RdfSerialization`) and have both packages consume it.
 

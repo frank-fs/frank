@@ -15,6 +15,7 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="EndpointTests.fs" />
     <Compile Include="CeTests.fs" />
+    <Compile Include="CompositionTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
@@ -32,6 +33,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
   </ItemGroup>
 
 </Project>
