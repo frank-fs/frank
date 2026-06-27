@@ -129,13 +129,17 @@ let private shapeExpr (shape: ShapeDecl) =
                   [ "Head", sysUriExpr nel.Head
                     "Tail", AstRender.listExpr (nel.Tail |> List.map sysUriExpr) ] ]
 
-let private renderShapes (moduleName: string) (shapes: ShapeDecl list) : string =
+let private renderShapes (moduleName: string) (knownNamespaces: string list) (shapes: ShapeDecl list) : string =
     let decls =
         [ AstRender.valueDecl "shapes" "ShapeDecl list" (AstRender.listExpr (shapes |> List.map shapeExpr))
           AstRender.valueDecl
               "shapesGraph"
               "VDS.RDF.Shacl.ShapesGraph"
-              (AstRender.appExpr "Shapes.toShapesGraph" (AstRender.rawExpr "shapes")) ]
+              (AstRender.appExpr "Shapes.toShapesGraph" (AstRender.rawExpr "shapes"))
+          AstRender.valueDecl
+              "knownNamespaces"
+              "string[]"
+              (AstRender.arrayExpr (knownNamespaces |> List.map AstRender.strExpr)) ]
 
     AstRender.formatModule
         moduleName
@@ -153,14 +157,27 @@ let private renderShapes (moduleName: string) (shapes: ShapeDecl list) : string 
 /// typesByName — FCS-extracted TypeInfo map keyed by FullName
 ///
 /// Returns Ok with the F# source string, or Error if any shaped field has an empty TypeName.
+let private computeKnownNamespaces (registry: VocabularyRegistry) : string list =
+    let inScope =
+        if Set.isEmpty registry.Using then
+            registry.Prefixes |> Map.toSeq |> Seq.map snd
+        else
+            registry.Using
+            |> Set.toSeq
+            |> Seq.choose (fun p -> Map.tryFind p registry.Prefixes)
+
+    inScope |> Seq.map (fun u -> u.AbsoluteUri) |> Seq.distinct |> Seq.toList
+
 let emit
     (moduleName: string)
     (registry: VocabularyRegistry)
     (lock: LockFile)
     (typesByName: Map<string, TypeInfo>)
     : Result<string, string> =
+    let knownNamespaces = computeKnownNamespaces registry
+
     AstRender.validateModuleName moduleName
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.bind (ResolvedModel.enrichTypes typesByName)
     |> Result.bind projectShapes
-    |> Result.map (renderShapes moduleName)
+    |> Result.map (renderShapes moduleName knownNamespaces)

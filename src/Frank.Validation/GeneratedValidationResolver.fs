@@ -8,12 +8,13 @@ open Frank.GeneratedModuleReflection
 module GeneratedValidationResolver =
 
     let private buildConfig (t: Type) : Result<ValidationConfig, string> =
-        match readStaticProp<ShapesGraph> "shapesGraph" t with
-        | Ok s ->
+        match readStaticProp<ShapesGraph> "shapesGraph" t, readStaticProp<string[]> "knownNamespaces" t with
+        | Ok s, Ok ns ->
             Ok
                 { Shapes = s
-                  ContextLoader = JsonLdLoader.defaultRemote }
-        | Error e -> Error e
+                  ContextLoader = JsonLdLoader.synthesizing ns }
+        | Error e, _ -> Error e
+        | _, Error e -> Error e
 
     /// Build a ValidationConfig from an arbitrary Type. Used in tests to exercise
     /// the member-resolution path without needing a real assembly scan.

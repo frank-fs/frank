@@ -20,6 +20,7 @@ type GeneratedValidation private () =
               ) ]
 
     static member val shapesGraph: ShapesGraph = fixtureGraph
+    static member val knownNamespaces: string[] = [| "https://example.org/" |]
 
 /// Type missing the shapesGraph property — tests member-resolution errors.
 [<AbstractClass; Sealed>]
@@ -72,4 +73,15 @@ module ResolverTests =
 
                   match result with
                   | Error msg -> Expect.stringContains msg "shapesGraph" "error names the missing property"
-                  | Ok _ -> failtest "Expected Error for missing shapesGraph but got Ok" ]
+                  | Ok _ -> failtest "Expected Error for missing shapesGraph but got Ok"
+
+              testCase "loader is synthesizing — unknown @context IRI throws (fail-closed)"
+              <| fun _ ->
+                  let result = resolveFromType typeof<GeneratedValidation>
+
+                  match result with
+                  | Error msg -> failtest $"Expected Ok but got Error: {msg}"
+                  | Ok config ->
+                      let unknownUri = System.Uri("http://example.com/unknown")
+                      let opts = VDS.RDF.JsonLd.JsonLdLoaderOptions()
+                      Expect.throws (fun () -> config.ContextLoader.Invoke(unknownUri, opts) |> ignore) "unknown context IRI must throw (fail-closed)" ]

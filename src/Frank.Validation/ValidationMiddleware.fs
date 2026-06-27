@@ -34,7 +34,7 @@ module private JsonLdBody =
 
         merged
 
-    let parseToGraph (loader: ContextLoader) (body: string) : Result<IGraph, exn> =
+    let parseToGraph (loader: JsonLdDocumentLoader) (body: string) : Result<IGraph, exn> =
         let options = JsonLdProcessorOptions()
         options.DocumentLoader <- loader
         let parser = JsonLdParser(options)

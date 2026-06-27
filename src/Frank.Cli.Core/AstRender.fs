@@ -45,6 +45,9 @@ let recordExpr (fields: (string * WidgetBuilder<Expr>) list) : WidgetBuilder<Exp
 /// A list literal: [ e1; e2; ... ]
 let listExpr (items: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> = ListExpr items
 
+/// An array literal: [| e1; e2; ... |]
+let arrayExpr (items: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> = ArrayExpr items
+
 // ── Module assembly ───────────────────────────────────────────────────────────
 
 /// Split "A.B.Name" into ("A.B", "Name"); a dotless name becomes ("", name).

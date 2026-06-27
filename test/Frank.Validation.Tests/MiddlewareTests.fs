@@ -112,4 +112,18 @@ let tests =
               let (resp: HttpResponseMessage) = postLdJson client validOrderBody
               Expect.equal (int resp.StatusCode) 200 "passed through"
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              Expect.stringContains body "bytes" "handler read body bytes (body was rewound)" ]
+              Expect.stringContains body "bytes" "handler read body bytes (body was rewound)"
+
+          testCase "POST ld+json with unknown @context → synthesizing loader fails-closed → 400"
+          <| fun _ ->
+              let config = orderConfig ()
+              use app = startValidationServer config
+              use client = app.GetTestClient()
+              let unknownContextBody =
+                  """{
+  "@context": "http://example.com/unknown",
+  "@type": "Order",
+  "totalPaymentDue": {"@value": "100", "@type": "http://www.w3.org/2001/XMLSchema#decimal"}
+}"""
+              let (resp: HttpResponseMessage) = postLdJson client unknownContextBody
+              Expect.equal (int resp.StatusCode) 400 "unknown @context IRI causes parse failure → 400 (fail-closed)" ]

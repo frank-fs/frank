@@ -1,42 +1,35 @@
 module Frank.Validation.JsonLdLoader
 
 open System
-open System.Collections.Concurrent
+open System.Collections.Generic
 open Newtonsoft.Json.Linq
 open VDS.RDF.JsonLd
 
-/// Wraps an inner fetch function with a process-lifetime ConcurrentDictionary cache.
-/// The cache is unbounded by design: callers use a small, fixed set of vocab IRIs.
-let memoizing (fetch: Uri -> RemoteDocument) : ContextLoader =
-    let cache = ConcurrentDictionary<string, RemoteDocument>()
+/// Offline JSON-LD context loader. For a context IRI that matches a known vocabulary
+/// namespace, returns a synthesized {"@context":{"@vocab": ns}} document so bare terms
+/// expand by concatenation to the SAME IRIs Frank's shapes use. Fails closed (throws)
+/// for any unknown context IRI — a validator must never let missing context look like conforming data.
+let synthesizing (namespaces: string seq) : JsonLdDocumentLoader =
+    let index = Dictionary<string, string>(StringComparer.Ordinal)
+
+    for ns in namespaces do
+        let json = sprintf """{"@context":{"@vocab":"%s"}}""" ns
+        index.[ns] <- json
+        index.[ns.TrimEnd('/')] <- json
 
     let load (uri: Uri) (_opts: JsonLdLoaderOptions) : RemoteDocument =
-        cache.GetOrAdd(uri.AbsoluteUri, (fun _ -> fetch uri))
+        let key = uri.AbsoluteUri
 
-    ContextLoader(load)
-
-/// Production loader: HTTP fetch via dotNetRDF's DefaultDocumentLoader, memoized.
-let defaultRemote: ContextLoader =
-    memoizing (fun uri -> DefaultDocumentLoader.LoadJson(uri, JsonLdLoaderOptions()))
-
-/// Offline loader for tests: returns pre-seeded context strings, fails closed for unknown IRIs.
-/// Each pair maps a context IRI to an inline JSON-LD context document string.
-let seeded (entries: (string * string) list) : ContextLoader =
-    let cache = ConcurrentDictionary<string, RemoteDocument>(StringComparer.Ordinal)
-
-    for (iri, json) in entries do
-        let doc = RemoteDocument()
-        doc.DocumentUrl <- Uri(iri)
-        doc.Document <- JObject.Parse(json)
-        cache.[iri] <- doc
-
-    let load (uri: Uri) (_opts: JsonLdLoaderOptions) : RemoteDocument =
-        match cache.TryGetValue(uri.AbsoluteUri) with
-        | true, doc -> doc
-        | false, _ ->
+        match index.TryGetValue(key) with
+        | true, json ->
             let doc = RemoteDocument()
             doc.DocumentUrl <- uri
-            doc.Document <- JObject()
+            doc.Document <- JObject.Parse(json)
             doc
+        | false, _ ->
+            failwithf
+                "Frank.Validation: no known vocabulary namespace for JSON-LD @context '%s'; \
+                 declare its prefix in the vocabulary CE"
+                key
 
-    ContextLoader(load)
+    JsonLdDocumentLoader(load)
