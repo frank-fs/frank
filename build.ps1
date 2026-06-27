@@ -32,3 +32,13 @@ dotnet pack -c Release src/Frank.OpenApi /p:Version=$version$versionSuffix -o $p
 
 dotnet test test/Frank.Datastar.Tests
 dotnet pack -c Release src/Frank.Datastar /p:Version=$version$versionSuffix -o $psscriptroot/bin
+
+# v7.3.2 in-development packages (Frank.Semantic, Frank.Validation, Frank.LinkedData,
+# Frank.Discovery, Frank.Provenance, Frank.Cli.*) — test only; not yet published, so no pack.
+dotnet test test/Frank.Semantic.Tests
+dotnet test test/Frank.Validation.Tests
+dotnet test test/Frank.LinkedData.Tests
+dotnet test test/Frank.Discovery.Tests
+dotnet test test/Frank.Provenance.Tests
+dotnet test test/Frank.Cli.Core.Tests
+dotnet test test/Frank.Cli.MSBuild.Tests
