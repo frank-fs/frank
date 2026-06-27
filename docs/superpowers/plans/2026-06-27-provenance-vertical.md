@@ -106,7 +106,8 @@ This task proves the test harness compiles and the AC fails for the right reason
     <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
-    <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
+    <!-- No Frank.OpenApi ref: the test helper attaches the STANDARD
+         Microsoft.AspNetCore.Http.Metadata.ProducesResponseTypeMetadata directly. -->
   </ItemGroup>
 </Project>
 ```
@@ -269,7 +270,6 @@ Expected: commit succeeds. The project will not yet build (depends on Tasks 2–
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
     <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
-    <ProjectReference Include="../Frank.OpenApi/Frank.OpenApi.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
@@ -277,6 +277,7 @@ Expected: commit succeeds. The project will not yet build (depends on Tasks 2–
 </Project>
 ```
 > Confirm `dotNetRdf.Core` version against `src/Frank.Validation/Frank.Validation.fsproj` (3.5.1). No `dotNetRdf.Shacl` needed here.
+> **No Frank.OpenApi reference.** The middleware reads the **standard** `Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata` (available net8/9/10 via `FrameworkReference Microsoft.AspNetCore.App`), not an OpenApi type. Frank.OpenApi targets net10.0-only and would break multi-target. Authoring `produces` is the consumer project's concern, not Frank.Provenance's. (Verified 2026-06-27: `produces` attaches the standard `ProducesResponseTypeMetadata` — `src/Frank.OpenApi/HandlerDefinition.fs:71`.)
 
 - [ ] **Step 2: Write `ProvenanceTypes.fs`** with the exact types from Interfaces above, namespace `Frank.Provenance`, plus:
 ```fsharp
@@ -659,7 +660,7 @@ let resolveGeneratedConfig (assemblies: Assembly[]) : Result<ProvenanceConfig, s
 **Capture algorithm (one job: observe a request and record provenance):**
 1. Run `next.Invoke ctx` (handler executes, sets status). For the inline-prov case, buffer the response body first (see Step 3).
 2. `let endpoint = ctx.GetEndpoint()`; resource IRI = the matched route pattern raw text (`endpoint.Metadata.GetMetadata<IRouteDiagnosticsMetadata>()` or `ctx.Request.Path`). Use `ctx.Request.Path.Value` for the resource URI — it is the concrete instance IRI (`/orders/1`), which is what PROV wants.
-3. Domain type: from `endpoint`, get all `ProducesResponseTypeMetadata`; pick the entry whose `StatusCode = ctx.Response.StatusCode`; read its `Type.FullName`; `Map.tryFind` in `config.ProvClasses`. Absent ⇒ `DomainType = None`.
+3. Domain type: `open Microsoft.AspNetCore.Http.Metadata`; from `endpoint.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()` pick the entry whose `StatusCode = ctx.Response.StatusCode`; read its `Type.FullName`; `Map.tryFind` in `config.ProvClasses`. Absent ⇒ `DomainType = None`. **Read the interface `IProducesResponseTypeMetadata` (standard ASP.NET), NOT a Frank.OpenApi type — Frank.Provenance has no OpenApi reference.** `Type` may be `typeof<Void>` (the `producesEmpty`/no-type case) → treat as no match → `DomainType = None`.
 4. Agent: `ctx.User.Identity.Name` if authenticated, else `"urn:frank:agent:anonymous"`; `ProvAgent.Id` = `"urn:frank:agent:" + name`.
 5. Build `ProvenanceRecord` (Id = `"urn:uuid:" + Guid.NewGuid()`; Started/Ended captured around `next`).
 6. `store.Append record`.

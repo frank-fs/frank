@@ -25,7 +25,7 @@ The old package coupled provenance to `Frank.Statecharts` (`ConformanceChecker`,
 
 1. **IRI mapping is compile-time generated, never runtime-resolved.** `GeneratedProvenance.fs` carries `typeName → (ProvOClass, IRI)`. The runtime never reflects a type to mint an IRI.
 2. **No route→type FCS extractor.** The codegen model is type-centric (`ResolvedModel.Resources` are domain types, not routes). The request→type bridge is supplied at runtime by **stable ASP.NET endpoint metadata** — the route pattern (resource IRI) and `ProducesResponseTypeMetadata` (the type, by status). Both are intrinsic ASP.NET surfaces, not Frank-invented attachable conventions.
-3. **Reuse `produces`, do not compete with it.** `produces` stays an OpenApi extension. `Frank.Provenance` takes `Frank.OpenApi` as a package dependency to make the op authorable; it reads the resulting `ProducesResponseTypeMetadata` at runtime. No second `CustomOperation("produces")` is defined anywhere (that would be an F# CE conflict).
+3. **Reuse `produces`, do not compete with it.** `produces` stays an OpenApi extension. The consumer's *resource project* references `Frank.OpenApi` to author `produces`; `Frank.Provenance` itself takes **no** `Frank.OpenApi` dependency — at runtime it reads the **standard** `Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata` that `produces` attaches (verified `src/Frank.OpenApi/HandlerDefinition.fs:71`). This keeps Frank.Provenance multi-targeting net8/9/10 (Frank.OpenApi is net10.0-only) with zero coupling. No second `CustomOperation("produces")` is defined anywhere (that would be an F# CE conflict). *(Corrected 2026-06-27 during execution: the earlier "Frank.Provenance depends on Frank.OpenApi" was a misread — the metadata is standard ASP.NET, not an OpenApi type.)*
 4. **Graceful degradation.** Provenance always records request=Activity / response=Entity / principal=Agent. The Activity carries a domain-type IRI **only when** the operation declared `produces typeof<T>` for the response status and `T` has a `provClass`. Otherwise the Activity is an untyped `prov:Activity`. Coverage is never silently dropped.
 5. **Two exposures.** (a) Sidecar query endpoint `GET /provenance?resource=<iri>` serves lineage history from the store. (b) Content-negotiated inline: a request carrying `Accept: application/ld+json; profile="http://www.w3.org/ns/prov"` receives that request's PROV-O graph as the response body.
 6. **Store is load-bearing.** Port the deleted `MailboxProcessorStore` (append + resource/agent/time indexes + bounded eviction), dropping only statechart-derived record fields. Backs the query endpoint.
@@ -38,8 +38,10 @@ The old package coupled provenance to `Frank.Statecharts` (`ConformanceChecker`,
 ```
 Frank ──────────────┐
 Frank.Semantic ─────┤
-Frank.OpenApi ──────┼──> Frank.Provenance ──> dotNetRdf.Core
-                    │
+                    └──> Frank.Provenance ──> dotNetRdf.Core
+                         (reads standard ASP.NET IProducesResponseTypeMetadata;
+                          NO Frank.OpenApi dependency)
+
 GeneratedProvenance.fs (emitted into obj/, conditional on Frank.Provenance ref)
 ```
 
