@@ -183,7 +183,7 @@ type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logge
         if String.IsNullOrWhiteSpace config.JsonLdContext then
             invalidArg (nameof config) "LinkedDataConfig.JsonLdContext must not be null or whitespace"
 
-    member _.Invoke(ctx: HttpContext) : Task =
+    member _.InvokeAsync(ctx: HttpContext) : Task =
         let acceptHeader =
             match ctx.Request.Headers.TryGetValue "Accept" with
             | true, v -> v.ToString()

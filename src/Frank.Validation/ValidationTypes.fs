@@ -8,4 +8,9 @@ type JsonLdDocumentLoader = Func<Uri, JsonLdLoaderOptions, RemoteDocument>
 
 type ValidationConfig =
     { Shapes: VDS.RDF.Shacl.ShapesGraph
-      ContextLoader: JsonLdDocumentLoader }
+      ContextLoader: JsonLdDocumentLoader
+      MaxBodyBytes: int64 }
+
+module ValidationConfig =
+
+    let defaultMaxBodyBytes: int64 = 1L * 1024L * 1024L

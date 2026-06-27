@@ -22,7 +22,9 @@ let orderConfig () : ValidationConfig =
                       Pattern = None } ]
               ) ]
 
-    { Shapes = shapes; ContextLoader = offlineLoader }
+    { Shapes = shapes
+      ContextLoader = offlineLoader
+      MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes }
 
 let startValidationServer (config: ValidationConfig) =
     let builder = WebApplication.CreateBuilder()

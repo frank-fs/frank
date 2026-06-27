@@ -12,7 +12,8 @@ module GeneratedValidationResolver =
         | Ok s, Ok ns ->
             Ok
                 { Shapes = s
-                  ContextLoader = JsonLdLoader.synthesizing ns }
+                  ContextLoader = JsonLdLoader.synthesizing ns
+                  MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

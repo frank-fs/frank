@@ -2,6 +2,7 @@ namespace Frank.Validation
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.DependencyInjection.Extensions
 open Frank.Builder
 
 [<AutoOpen>]
@@ -29,5 +30,17 @@ module ValidationExtensions =
             let assemblies = System.AppDomain.CurrentDomain.GetAssemblies()
 
             match GeneratedValidationResolver.resolveGeneratedConfig assemblies with
-            | Ok config -> this.UseValidationWith(spec, config)
+            | Ok config ->
+                let addServices (services: IServiceCollection) =
+                    services.TryAddSingleton<ValidationConfig>(config)
+                    spec.Services services
+
+                let addMiddleware (app: IApplicationBuilder) =
+                    let configured = spec.Middleware app
+                    configured.UseMiddleware<ValidationMiddleware>() |> ignore
+                    configured
+
+                { spec with
+                    Services = addServices
+                    Middleware = addMiddleware }
             | Error msg -> invalidOp msg
