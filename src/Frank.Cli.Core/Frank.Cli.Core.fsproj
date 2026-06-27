@@ -16,9 +16,11 @@
     <Compile Include="Status.fs" />
     <Compile Include="Finalize.fs" />
     <Compile Include="AstRender.fs" />
+    <Compile Include="EmitterShared.fs" />
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
     <Compile Include="ValidationEmitter.fs" />
+    <Compile Include="ProvenanceEmitter.fs" />
     <Compile Include="SemanticModelEmitter.fs" />
   </ItemGroup>
 

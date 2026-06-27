@@ -116,6 +116,9 @@ let optionExpr (render: 'a -> WidgetBuilder<Expr>) (value: 'a option) : WidgetBu
     | None -> noneExpr
     | Some x -> someExpr (render x)
 
+/// A bare tuple expression: (a, b, ...)
+let tupleExpr (items: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> = TupleExpr items
+
 /// A tupled discriminated-union case application: Ctor(a, b, ...)
 let tupleAppExpr (ctor: string) (args: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> =
     AppExpr(ctor, ParenExpr(TupleExpr args))

@@ -157,24 +157,13 @@ let private renderShapes (moduleName: string) (knownNamespaces: string list) (sh
 /// typesByName — FCS-extracted TypeInfo map keyed by FullName
 ///
 /// Returns Ok with the F# source string, or Error if any shaped field has an empty TypeName.
-let private computeKnownNamespaces (registry: VocabularyRegistry) : string list =
-    let inScope =
-        if Set.isEmpty registry.Using then
-            registry.Prefixes |> Map.toSeq |> Seq.map snd
-        else
-            registry.Using
-            |> Set.toSeq
-            |> Seq.choose (fun p -> Map.tryFind p registry.Prefixes)
-
-    inScope |> Seq.map (fun u -> u.AbsoluteUri) |> Seq.distinct |> Seq.toList
-
 let emit
     (moduleName: string)
     (registry: VocabularyRegistry)
     (lock: LockFile)
     (typesByName: Map<string, TypeInfo>)
     : Result<string, string> =
-    let knownNamespaces = computeKnownNamespaces registry
+    let knownNamespaces = EmitterShared.computeKnownNamespaces registry
 
     AstRender.validateModuleName moduleName
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
