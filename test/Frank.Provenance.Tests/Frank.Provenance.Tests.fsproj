@@ -13,6 +13,7 @@
     <Compile Include="ResolverTests.fs" />
     <Compile Include="MiddlewareTestHelpers.fs" />
     <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="EndpointTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

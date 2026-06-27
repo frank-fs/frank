@@ -976,7 +976,7 @@ Expected: pass. Fix any drift, recommit.
 
 - [ ] **Step 3: `/expert-review`** — dispatch Tim Berners-Lee (Linked Data: are the PROV-O + domain IRIs dereferenceable/consistent, is `@context` correct), Darrel Miller (HTTP: content-negotiation profile semantics, status codes, problem+json), David Fowler (.NET/ASP.NET: metadata read, middleware ordering, response-body swap correctness), @7sharp9 (F# perf: allocations in the capture hot path, store agent throughput). Treat all findings as potentially blocking; surface to the user — never self-triage.
 
-- [ ] **Step 4: `/simplify`** on the diff; apply in-scope cleanups.
+- [ ] **Step 4: `/simplify`** on the diff; apply in-scope cleanups. **Known finding to resolve here (rule 8):** `writeProblemJson` is duplicated between `src/Frank.Provenance/ProvenanceEndpoint.fs` and `src/Frank.Validation/ValidationMiddleware.fs` (also the `respond400/413/422` family). Extract a shared problem+json writer (candidate home: `Frank.Semantic`, next to `RdfSerialization`) and have both packages consume it.
 
 - [ ] **Step 5: Final full build + test + fantomas** (repeat Task 14 commands). Report verified pass counts with evidence.
 
