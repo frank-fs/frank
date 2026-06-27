@@ -108,6 +108,54 @@ let private makeTaskItem (path: string) : ITaskItem =
         member _.MetadataCount = 0
         member _.MetadataNames = System.Collections.ArrayList() :> _ }
 
+/// Vocab source where OrderPlaced has BOTH provClass Activity AND a schema:OrderAction class mapping.
+/// The lock (orderActionLock) maps TicTacToe.OrderPlaced → schema:OrderAction, giving ClassIri.
+/// The provClass entry gives ProvClass = Activity.
+/// The join in ProvenanceEmitter.entryExpr produces ("TicTacToe.OrderPlaced", ("Activity", "https://schema.org/OrderAction")).
+let private writeOrderActionVocabSource (dir: string) : string =
+    let path = Path.Combine(dir, "OrderActionVocab.fs")
+
+    let source =
+        """namespace TicTacToe
+
+open Frank.Semantic
+
+type OrderPlaced =
+    { orderId: string }
+
+module OrderActionVocab =
+
+    let registry =
+        vocabulary {
+            prefix "schema" "https://schema.org/"
+            using "schema"
+            provClass typeof<OrderPlaced> Activity
+        }
+"""
+
+    File.WriteAllText(path, source)
+    path
+
+/// Lock file with TicTacToe.OrderPlaced → schema:OrderAction.
+/// Combined with provClass Activity in the vocab CE, the emitter must produce
+/// ("TicTacToe.OrderPlaced", ("Activity", "https://schema.org/OrderAction")).
+let private orderActionLock: LockFile =
+    { confirmedLock with
+        Vocabularies =
+            Map.ofList
+                [ "schema",
+                  { Uri = "https://schema.org/"
+                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Hash = "sha256:abc" } ]
+        Mappings =
+            [ { FSharpType = "TicTacToe.OrderPlaced"
+                Iri = Some "schema:OrderAction"
+                Confidence = 1.0
+                Source = Convention
+                Status = Confirmed
+                Alternates = []
+                Shape = MappingShape.Record [] } ] }
+
 let private makeTask
     (engine: StubBuildEngine)
     (lockPath: string)
@@ -223,4 +271,33 @@ let provenanceTests =
                   let a = run outDir1
                   let b = run outDir2
                   Expect.equal a b "two runs are byte-identical")
+          }
+
+          test "generates exact (Activity, schema IRI) entry for a provClass+classmapped type" {
+              withTempDir (fun dir ->
+                  let outDir = Path.Combine(dir, "obj")
+                  let engine = StubBuildEngine()
+                  let lockPath = writeLockFile dir orderActionLock
+                  let srcPath = writeOrderActionVocabSource dir
+                  let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
+                  let task = makeTask engine lockPath outDir [ srcPath ] refs
+                  task.VocabularyBinding <- "TicTacToe.OrderActionVocab.registry"
+
+                  let result = task.Execute()
+                  let errMsgs = engine.Errors |> List.map (fun e -> e.Message) |> String.concat "; "
+
+                  Expect.isTrue result ("Execute returned false; errors: " + errMsgs)
+                  Expect.isEmpty engine.Errors "no errors logged"
+
+                  let outFile = Path.Combine(outDir, "GeneratedProvenance.fs")
+                  let source = File.ReadAllText outFile
+
+                  Expect.stringContains source "TicTacToe.OrderPlaced" "type FullName in provClasses"
+                  Expect.stringContains source "Activity" "ProvOClass Activity in provClasses"
+                  Expect.stringContains source "https://schema.org/OrderAction" "resolved schema IRI in provClasses"
+
+                  Expect.stringContains
+                      source
+                      "(\"Activity\", \"https://schema.org/OrderAction\")"
+                      "exact (Activity, schema IRI) tuple present — proves the ClassIri join")
           } ]
