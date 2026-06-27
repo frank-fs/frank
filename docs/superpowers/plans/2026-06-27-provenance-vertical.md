@@ -960,7 +960,7 @@ Expected: pass. Fix any drift, recommit.
 - Modify: an existing sample under `sample/` (the tic-tac-toe-style sample used by the other verticals — locate via `find sample -name '*.fsproj'` and the one already referencing `Frank.Discovery`/`Frank.Validation`).
 - Modify: that sample's `test-e2e.sh` if present (`find sample/ -name test-e2e.sh`).
 
-> **Composition constraint discovered at Task 15 (must honor here):** when `useProvenance` and `useLinkedData` are composed on one host, `ProvenanceMiddleware` must be registered OUTERMOST (its buffer-and-replace wraps LinkedData's ld+json short-circuit). And because the domain-type lookup matches the response status, a resource SERVED by LinkedData at 200 needs its `produces typeof<T> 200` declaration (not 201). POSTs that create resources (201) live on routes LinkedData does not intercept. Wire the capstone accordingly.
+> **Composition (updated after expert-review #7):** the earlier Provenance-must-be-outermost requirement is REMOVED — LinkedData negotiation is now profile-aware, so an `application/ld+json; profile="…prov"` request passes through LinkedData regardless of middleware order (commutative; see the order-independence test in CompositionTests). Remaining note: the domain-type lookup matches the response status, so a resource SERVED by LinkedData at 200 needs its `produces typeof<T> 200` declaration; POSTs that create resources (201) live on routes LinkedData does not intercept.
 
 - [ ] **Step 1: Add `useProvenance` to the sample host**, declare `provClass` on the relevant domain type in its vocabulary CE, and ensure the move operation declares `produces typeof<…> <status>` (status matching how the resource is served — see the composition constraint above).
 

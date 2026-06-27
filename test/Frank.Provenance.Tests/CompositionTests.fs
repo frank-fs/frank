@@ -153,6 +153,50 @@ let private startComposedServer () =
     app
 
 // ---------------------------------------------------------------------------
+// Reversed-order server: LinkedData OUTERMOST, Provenance INNER.
+// After the profile-aware fix, a prov-profile Accept must still reach Provenance
+// even when LinkedData sits outermost — the key order-independence invariant.
+// ---------------------------------------------------------------------------
+
+let private startComposedServerLdOuter () =
+    let provConfig = buildProvConfig orderActionIri
+    let ldConfig = buildLinkedDataConfig orderActionIri
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(provConfig) |> ignore
+    builder.Services.AddLogging() |> ignore
+
+    builder.Services.AddSingleton<IProvenanceStore>(fun sp ->
+        let logFactory =
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+
+        new MailboxProcessorProvenanceStore(provConfig.StoreConfig, logFactory.CreateLogger("prov"))
+        :> IProvenanceStore)
+    |> ignore
+
+    builder.Services.AddSingleton(ldConfig) |> ignore
+    let app = builder.Build()
+    // LinkedData OUTERMOST — the previously-broken order.
+    app.UseMiddleware<LinkedDataMiddleware>() |> ignore
+    // Provenance INNER.
+    app.UseMiddleware<ProvenanceMiddleware>() |> ignore
+
+    app
+        .MapGet(
+            "/orders",
+            Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+                ctx.Response.StatusCode <- 200
+                ctx.Response.WriteAsync("{}"))
+        )
+        .WithMetadata(
+            Microsoft.AspNetCore.Http.ProducesResponseTypeMetadata(200, typeof<OrderPlaced>, [| "application/json" |])
+        )
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+// ---------------------------------------------------------------------------
 // Dedicated TestServers — one per middleware for per-concern evidence.
 // ---------------------------------------------------------------------------
 
@@ -407,4 +451,49 @@ let tests =
                   provActivityTypeIri
                   linkedDataClassIri
                   "same type → same IRI across PROV-O and LinkedData on ONE composed server"
+          }
+
+          // ---------------------------------------------------------------
+          // Miller MAJOR (expert-review fix #7): order-independence.
+          // LinkedData OUTERMOST must NOT steal prov-profile requests.
+          // Before the profile-aware fix this test would fail:
+          //   LinkedData intercepted application/ld+json; profile=prov as plain ld+json
+          //   and Provenance never ran.
+          // ---------------------------------------------------------------
+          testCaseAsync "ORDER-INDEPENDENCE: prov-profile GET yields PROV-O even with LinkedData registered outermost"
+          <| async {
+              use app = startComposedServerLdOuter ()
+              use client = app.GetTestClient()
+
+              // prov-profile GET — must reach ProvenanceMiddleware despite LinkedData being outer.
+              use provReq = new HttpRequestMessage(HttpMethod.Get, "/orders")
+
+              provReq.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              let! (provResp: HttpResponseMessage) = client.SendAsync(provReq) |> Async.AwaitTask
+              let! provBody = provResp.Content.ReadAsStringAsync() |> Async.AwaitTask
+
+              Expect.stringContains
+                  provResp.Content.Headers.ContentType.MediaType
+                  "application/ld+json"
+                  "prov-profile response content-type is application/ld+json"
+
+              Expect.stringContains provBody "prov:Activity" "prov:Activity present — Provenance ran (not LinkedData)"
+
+              Expect.stringContains
+                  provBody
+                  orderActionIri
+                  "schema:OrderAction IRI present in PROV-O body — order-independent composition"
+
+              // Sanity: plain ld+json (no profile) is STILL served by LinkedData (outer).
+              use ldReq = new HttpRequestMessage(HttpMethod.Get, "/orders")
+              ldReq.Headers.Add("Accept", "application/ld+json")
+              let! (ldResp: HttpResponseMessage) = client.SendAsync(ldReq) |> Async.AwaitTask
+              let! ldBody = ldResp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int ldResp.StatusCode) 200 "plain ld+json → 200"
+              Expect.stringContains ldBody orderActionIri "LinkedData still serves unprofiled ld+json when outermost"
           } ]

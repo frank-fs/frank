@@ -216,3 +216,56 @@ let qvalueTests =
                   resp.Content.Headers.ContentType.MediaType
                   "text/turtle"
                   "application/* q=0 excludes ld+json and rdf+xml; turtle served" ]
+
+[<Tests>]
+let profileAwareTests =
+    testList
+        "LinkedDataMiddleware profile-aware negotiation"
+        [ testCase
+              "Accept: application/ld+json; profile=prov → passes through (LinkedData does not serve profiled ld+json)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "downstream 200 — LinkedData did not intercept"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "downstream" "downstream handler ran; LinkedData passed through"
+
+          testCase "Accept: application/ld+json (no profile) → still served by LinkedData"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              Expect.equal resp.Content.Headers.ContentType.MediaType "application/ld+json" "ld+json served"
+
+          testCase
+              "Accept: application/ld+json; profile=prov, text/turtle → Serve text/turtle (unprofiled turtle still matches)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\", text/turtle"
+              )
+              |> ignore
+
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "text/turtle"
+                  "turtle served; profiled ld+json skipped, turtle falls through as next match" ]

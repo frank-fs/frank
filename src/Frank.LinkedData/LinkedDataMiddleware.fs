@@ -53,6 +53,15 @@ module private AcceptNegotiation =
         || (eMain = mainType && eSub = "*")
         || (eMain = mainType && eSub = subType)
 
+    /// Returns true if the entry carries a non-empty `profile` parameter.
+    /// RFC 6906 / JSON-LD: profile is a separate concern from the base media type.
+    /// LinkedData has no profile of its own, so a profiled ld+json request is not ours to serve.
+    let private hasProfileParam (entry: MediaTypeHeaderValue) =
+        entry.Parameters
+        |> Seq.exists (fun p ->
+            p.Name.Value.Equals("profile", StringComparison.OrdinalIgnoreCase)
+            && not (String.IsNullOrEmpty p.Value.Value))
+
     /// Parse Accept header into (mediaType, q) pairs sorted by q descending (then by header order for ties).
     /// q=0 entries are retained so callers can apply exclusions.
     let private parseAcceptWithQ (acceptHeader: string) : (MediaTypeHeaderValue * double) list =
@@ -85,7 +94,9 @@ module private AcceptNegotiation =
                 |> List.tryPick (fun (entry, _) ->
                     supportedTypes
                     |> Array.tryFind (fun candidate ->
-                        matchesType entry candidate && not (isExcluded entries candidate)))
+                        matchesType entry candidate
+                        && not (isExcluded entries candidate)
+                        && not (candidate = "application/ld+json" && hasProfileParam entry)))
 
             match bestSupported with
             | Some t -> Serve t
@@ -94,7 +105,10 @@ module private AcceptNegotiation =
                     entries
                     |> List.exists (fun (entry, _) ->
                         isConcrete entry
-                        && rdfScopeTypes |> Set.exists (fun candidate -> matchesType entry candidate))
+                        && rdfScopeTypes
+                           |> Set.exists (fun candidate ->
+                               matchesType entry candidate
+                               && not (candidate = "application/ld+json" && hasProfileParam entry)))
 
                 if anyConcreteRdfMentioned then
                     NotAcceptable
