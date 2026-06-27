@@ -2,6 +2,8 @@ namespace Frank.Provenance
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.DependencyInjection.Extensions
 open Microsoft.Extensions.Logging
@@ -10,6 +12,18 @@ open Frank.Builder
 [<AutoOpen>]
 module ProvenanceExtensions =
 
+    let private buildProvenanceEndpoint () : Endpoint =
+        let handler =
+            RequestDelegate(fun ctx ->
+                ProvenanceEndpoint.handle (ctx.RequestServices.GetRequiredService<IProvenanceStore>()) ctx)
+
+        let builder =
+            RouteEndpointBuilder(handler, RoutePatternFactory.Parse "/provenance", 0)
+
+        builder.DisplayName <- "GET Provenance"
+        builder.Metadata.Add(HttpMethodMetadata [| "GET" |])
+        builder.Build()
+
     let private wireMiddlewareAndEndpoint
         (spec: WebHostSpec)
         (addServices: IServiceCollection -> IServiceCollection)
@@ -17,20 +31,10 @@ module ProvenanceExtensions =
         let addMiddleware (app: IApplicationBuilder) =
             let configured = spec.Middleware app
             configured.UseMiddleware<ProvenanceMiddleware>() |> ignore
-
-            configured.Map(
-                PathString "/provenance",
-                System.Action<IApplicationBuilder>(fun branch ->
-                    branch.Run(
-                        RequestDelegate(fun ctx ->
-                            ProvenanceEndpoint.handle (ctx.RequestServices.GetRequiredService<IProvenanceStore>()) ctx)
-                    ))
-            )
-            |> ignore
-
             configured
 
         { spec with
+            Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint () |]
             Services = addServices
             Middleware = addMiddleware }
 

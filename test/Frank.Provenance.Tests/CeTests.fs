@@ -4,11 +4,13 @@ open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank.Builder
 open Frank.Provenance
+open Frank.Tests.Shared.TestEndpointDataSource
 
 let private startCeServer (config: ProvenanceConfig) =
     let ceBuilder = WebHostBuilder([||])
@@ -18,7 +20,12 @@ let private startCeServer (config: ProvenanceConfig) =
     spec.Services(builder.Services) |> ignore
     let app = builder.Build()
 
-    (app :> IApplicationBuilder) |> spec.Middleware |> ignore
+    (app :> IApplicationBuilder)
+    |> fun a -> a.UseRouting()
+    |> spec.Middleware
+    |> ignore
+
+    (app :> IEndpointRouteBuilder).DataSources.Add(TestEndpointDataSource(spec.Endpoints))
 
     app
         .MapPost(

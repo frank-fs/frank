@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="ProvenanceGraphTests.fs" />
     <Compile Include="StoreTests.fs" />
     <Compile Include="ResolverTests.fs" />
@@ -16,6 +17,7 @@
     <Compile Include="EndpointTests.fs" />
     <Compile Include="CeTests.fs" />
     <Compile Include="CompositionTests.fs" />
+    <Compile Include="NegotiationTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
