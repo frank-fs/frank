@@ -70,9 +70,9 @@ let tests =
                   (resp.Content.Headers.ContentType.MediaType.StartsWith("application/ld+json"))
                   "content-type is ld+json"
 
-              let count = countOccurrences "http://www.w3.org/ns/prov#Activity" body
+              let count = countOccurrences "prov:Activity" body
 
-              Expect.isGreaterThanOrEqual count 2 "at least two prov:Activity IRIs in body"
+              Expect.isGreaterThanOrEqual count 2 "at least two prov:Activity CURIEs in body"
           }
 
           testCaseAsync "GET /provenance without resource param returns 400 problem+json"

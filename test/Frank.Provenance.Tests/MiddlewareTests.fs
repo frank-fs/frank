@@ -23,15 +23,15 @@ let tests =
 
               let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
               let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
-              Expect.stringContains body "http://www.w3.org/ns/prov#Activity" "Activity type present"
+              Expect.stringContains body "prov:Activity" "Activity type present as CURIE"
               Expect.stringContains body "https://schema.org/OrderAction" "domain IRI from provClass"
-              Expect.stringContains body "http://www.w3.org/ns/prov#Agent" "Agent present"
+              Expect.stringContains body "prov:Agent" "Agent present as CURIE"
               Expect.isFalse (body.Contains "urn:frank:") "no hardcoded urn:frank: activity IRI"
               Expect.isFalse (body.Contains "urn:provenance:agent:") "no opaque urn:provenance:agent: IRI"
               Expect.stringContains body "/agents/anonymous" "agent IRI uses HTTP /agents/ path"
-              Expect.stringContains body "http://www.w3.org/2011/http#methodName" "W3C HTTP methodName term"
-              Expect.stringContains body "http://www.w3.org/2011/http#statusCodeValue" "W3C HTTP statusCodeValue term"
-              Expect.stringContains body "http://www.w3.org/ns/prov#used" "prov:used asserted"
+              Expect.stringContains body "http:methodName" "W3C HTTP methodName term as CURIE"
+              Expect.stringContains body "http:statusCodeValue" "W3C HTTP statusCodeValue term as CURIE"
+              Expect.stringContains body "prov:used" "prov:used asserted as CURIE"
               Expect.stringContains body "localhost" "entity @id is absolute (contains host)"
           }
 

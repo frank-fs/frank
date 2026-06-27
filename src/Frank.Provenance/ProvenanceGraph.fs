@@ -2,10 +2,20 @@ module Frank.Provenance.ProvenanceGraph
 
 open System
 open VDS.RDF
+open VDS.RDF.JsonLd
+open Newtonsoft.Json.Linq
 open Frank.Semantic
 
-let private provContext =
-    """{"@context":{"prov":"http://www.w3.org/ns/prov#","http":"http://www.w3.org/2011/http#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}}"""
+let private provContextObj =
+    JObject.Parse(
+        """{"prov":"http://www.w3.org/ns/prov#","http":"http://www.w3.org/2011/http#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}"""
+    )
+
+let private compact (graph: IGraph) : string =
+    let expanded = RdfSerialization.serializeGraphJsonLd graph
+    let input = JToken.Parse expanded
+    let opts = JsonLdProcessorOptions()
+    JsonLdProcessor.Compact(input, provContextObj, opts).ToString()
 
 let private u (g: IGraph) (s: string) =
     g.CreateUriNode(UriFactory.Create s) :> INode
@@ -79,8 +89,7 @@ let toGraph (record: ProvenanceRecord) : IGraph =
     addAgent g record agent
     g
 
-let toJsonLd (record: ProvenanceRecord) : string =
-    RdfSerialization.serializeGraphJsonLdWithContext (toGraph record) provContext
+let toJsonLd (record: ProvenanceRecord) : string = compact (toGraph record)
 
 let listToJsonLd (records: ProvenanceRecord list) : string =
     let g = new Graph() :> IGraph
@@ -88,4 +97,4 @@ let listToJsonLd (records: ProvenanceRecord list) : string =
     for r in records do
         g.Merge(toGraph r) |> ignore
 
-    RdfSerialization.serializeGraphJsonLdWithContext g provContext
+    compact g

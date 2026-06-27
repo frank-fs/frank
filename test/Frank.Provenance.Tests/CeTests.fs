@@ -58,8 +58,8 @@ let tests =
 
               let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
               let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
-              Expect.stringContains body "http://www.w3.org/ns/prov#Activity" "Activity present"
-              Expect.stringContains body "http://www.w3.org/ns/prov#Agent" "Agent present"
+              Expect.stringContains body "prov:Activity" "Activity present as CURIE"
+              Expect.stringContains body "prov:Agent" "Agent present as CURIE"
           }
 
           testCaseAsync
@@ -79,5 +79,5 @@ let tests =
                   (resp.Content.Headers.ContentType.MediaType.StartsWith("application/ld+json"))
                   "content-type is ld+json"
 
-              Expect.stringContains body "http://www.w3.org/ns/prov#Activity" "at least one Activity"
+              Expect.stringContains body "prov:Activity" "at least one Activity as CURIE"
           } ]

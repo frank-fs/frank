@@ -57,11 +57,11 @@ PROV_RESPONSE=$(curl -sf \
 
 echo "[e2e] PROV response: $PROV_RESPONSE"
 
-if ! echo "$PROV_RESPONSE" | grep -q 'http://www.w3.org/ns/prov#Activity'; then
-    echo "[e2e] FAIL: response missing prov#Activity" >&2
+if ! echo "$PROV_RESPONSE" | grep -q 'prov:Activity'; then
+    echo "[e2e] FAIL: response missing prov:Activity CURIE" >&2
     exit 1
 fi
-echo "[e2e] PASS: prov#Activity present"
+echo "[e2e] PASS: prov:Activity present"
 
 if ! echo "$PROV_RESPONSE" | grep -q 'https://schema.org/MoveAction'; then
     echo "[e2e] FAIL: response missing schema:MoveAction" >&2
@@ -75,10 +75,10 @@ LINEAGE=$(curl -sf "$BASE_URL/provenance?resource=%2Fgames%2F$GAME_ID%2Fmoves")
 
 echo "[e2e] Lineage response: $LINEAGE"
 
-if ! echo "$LINEAGE" | grep -q 'http://www.w3.org/ns/prov#Activity'; then
-    echo "[e2e] FAIL: lineage missing prov#Activity" >&2
+if ! echo "$LINEAGE" | grep -q 'prov:Activity'; then
+    echo "[e2e] FAIL: lineage missing prov:Activity CURIE" >&2
     exit 1
 fi
-echo "[e2e] PASS: lineage contains prov#Activity"
+echo "[e2e] PASS: lineage contains prov:Activity"
 
 echo "[e2e] ALL ASSERTIONS PASSED"

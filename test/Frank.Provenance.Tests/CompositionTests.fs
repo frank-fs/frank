@@ -8,7 +8,7 @@ module Frank.Provenance.Tests.CompositionTests
 ///   - SHACL sh:targetClass / sh:path (Validation)
 ///
 /// Hermetic: hand-built configs. No MSBuild gen, no network.
-/// JSON-LD output is EXPANDED — assert FULL IRIs (no CURIEs).
+/// PROV-O output is COMPACTED: prov:/http:/rdfs: terms are CURIEs; domain IRIs (schema.org) stay full.
 ///
 /// Composition strategy: each middleware pair runs its own TestServer (prevents
 /// LinkedData from intercepting the prov-profile Accept header). The thesis assertion
@@ -264,10 +264,7 @@ let tests =
               let! (provResp: HttpResponseMessage) = provClient.SendAsync(provReq) |> Async.AwaitTask
               let! provBody = provResp.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-              Expect.stringContains
-                  provBody
-                  "http://www.w3.org/ns/prov#Activity"
-                  "prov:Activity IRI present (full IRI, expanded JSON-LD)"
+              Expect.stringContains provBody "prov:Activity" "prov:Activity CURIE present (compacted JSON-LD)"
 
               Expect.stringContains
                   provBody
@@ -392,10 +389,7 @@ let tests =
                   "application/ld+json"
                   "prov response content-type is application/ld+json"
 
-              Expect.stringContains
-                  provBody
-                  "http://www.w3.org/ns/prov#Activity"
-                  "prov:Activity full IRI in PROV-O body"
+              Expect.stringContains provBody "prov:Activity" "prov:Activity CURIE in PROV-O body (compacted)"
 
               Expect.stringContains
                   provBody

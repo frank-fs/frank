@@ -25,8 +25,8 @@ let tests =
               let g =
                   ProvenanceGraph.toJsonLd (rec0 (Some(ProvOClass.Activity, Uri "https://schema.org/OrderAction")))
 
-              Expect.stringContains g "Activity" "prov:Activity present"
-              Expect.stringContains g "https://schema.org/OrderAction" "domain IRI present"
+              Expect.stringContains g "prov:Activity" "CURIE prov:Activity proves compaction"
+              Expect.stringContains g "https://schema.org/OrderAction" "domain IRI stays full (no schema: prefix)"
               Expect.stringContains g "wasAssociatedWith" "agent association present"
           }
           test "untyped Activity omits any domain IRI but is still prov:Activity" {
