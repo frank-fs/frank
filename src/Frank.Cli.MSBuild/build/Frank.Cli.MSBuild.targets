@@ -32,6 +32,10 @@
     TaskName="Frank.Cli.MSBuild.GenerateValidationTask"
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
+  <UsingTask
+    TaskName="Frank.Cli.MSBuild.GenerateProvenanceTask"
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
+
   <!--
     FrankGenerateSemantic: validate lock file and generate GeneratedDiscovery.fs.
     Incremental: skipped when lock file is unchanged and output already exists.
@@ -387,6 +391,95 @@
       <Compile Remove="@(_FrankLastCompileVal)" />
       <Compile Include="$(_FrankGeneratedValFile)" />
       <Compile Include="@(_FrankLastCompileVal)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankGenerateProvenance: evaluate the vocabulary CE in-process via FCS and emit
+    GeneratedProvenance.fs. Only runs when Frank.Provenance is referenced.
+
+    Incremental: Inputs = lock file + all project compile items (vocab CE source).
+                 Outputs = $(IntermediateOutputPath)GeneratedProvenance.fs.
+
+    Separation of concerns mirrors the LinkedData pair:
+    - FrankGenerateProvenance writes the file (incremental, skippable when inputs unchanged).
+    - FrankInjectGeneratedProvenanceFile wires the file into @(Compile) (always).
+  -->
+  <Target Name="FrankGenerateProvenance"
+          BeforeTargets="FrankInjectGeneratedProvenanceFile"
+          Inputs="$(FrankLockFilePath);@(Compile)"
+          Outputs="$(IntermediateOutputPath)GeneratedProvenance.fs"
+          Condition="Exists('$(FrankLockFilePath)') and (@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Provenance')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Provenance')) == 'True')">
+
+    <!-- Late-bind SDK-computed properties inside the target. -->
+    <PropertyGroup>
+      <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+      <FrankProvenanceModuleName Condition="'$(FrankProvenanceModuleName)' == ''">$(RootNamespace).GeneratedProvenance</FrankProvenanceModuleName>
+      <FrankVocabularyBinding Condition="'$(FrankVocabularyBinding)' == ''">registry</FrankVocabularyBinding>
+    </PropertyGroup>
+
+    <!--
+      Source files for the in-process FCS eval = the vocabulary CE's dependency closure.
+      Exclude: .fsi (FCS cannot #load a standalone signature file), the entry point
+      Program.fs (it references the not-yet-generated modules), and any Generated*.fs.
+      An explicit $(FrankVocabularySourceFiles) overrides this default when set.
+    -->
+    <ItemGroup>
+      <_FrankProvVocabSource Include="$(FrankVocabularySourceFiles)" Condition="'$(FrankVocabularySourceFiles)' != ''" />
+      <_FrankProvVocabSource Include="@(Compile->'%(FullPath)')"
+                             Condition="'$(FrankVocabularySourceFiles)' == '' And '%(Extension)' != '.fsi' And '%(Filename)%(Extension)' != 'Program.fs' And !$([System.String]::Copy('%(Filename)').StartsWith('Generated'))" />
+    </ItemGroup>
+
+    <GenerateProvenanceTask
+      LockFilePath="$(FrankLockFilePath)"
+      OutputPath="$(IntermediateOutputPath)"
+      ModuleName="$(FrankProvenanceModuleName)"
+      SourceFiles="@(_FrankProvVocabSource)"
+      AssemblyRefs="@(ReferencePath)"
+      VocabularyBinding="$(FrankVocabularyBinding)">
+      <Output TaskParameter="GeneratedFile" PropertyName="_FrankGeneratedProvenanceFile" />
+    </GenerateProvenanceTask>
+
+    <ItemGroup Condition="'$(_FrankGeneratedProvenanceFile)' != ''">
+      <FileWrites Include="$(_FrankGeneratedProvenanceFile)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    FrankInjectGeneratedProvenanceFile: always runs before CoreCompile (not incremental).
+    Injects the already-generated GeneratedProvenance.fs into @(Compile).
+
+    Same ordering strategy as FrankInjectGeneratedValidationFile: explicit-item-first,
+    Program.fs-or-last-item best-effort default.
+  -->
+  <Target Name="FrankInjectGeneratedProvenanceFile"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Condition="Exists('$(IntermediateOutputPath)GeneratedProvenance.fs')">
+
+    <PropertyGroup>
+      <_FrankGeneratedProvFile>$(IntermediateOutputPath)GeneratedProvenance.fs</_FrankGeneratedProvFile>
+    </PropertyGroup>
+
+    <!-- Step 1: capture anchor candidates. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedProvFile)'))">
+      <_FrankProgramFsProv Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
+      <_FrankLastCompileProv Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsProv)' == ''" />
+    </ItemGroup>
+
+    <!-- Step 2 Case A: Program.fs present. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedProvFile)')) and '@(_FrankProgramFsProv)' != ''">
+      <Compile Remove="@(_FrankProgramFsProv)" />
+      <Compile Include="$(_FrankGeneratedProvFile)" />
+      <Compile Include="@(_FrankProgramFsProv)" />
+    </ItemGroup>
+
+    <!-- Step 2 Case B: no Program.fs — insert before last item. -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedProvFile)')) and '@(_FrankProgramFsProv)' == '' and '@(_FrankLastCompileProv)' != ''">
+      <Compile Remove="@(_FrankLastCompileProv)" />
+      <Compile Include="$(_FrankGeneratedProvFile)" />
+      <Compile Include="@(_FrankLastCompileProv)" />
     </ItemGroup>
 
   </Target>
