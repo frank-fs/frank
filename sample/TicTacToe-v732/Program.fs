@@ -8,6 +8,8 @@ open Frank
 open Frank.Builder
 open Frank.Discovery
 open Frank.LinkedData
+open Frank.OpenApi
+open Frank.Provenance
 open TicTacToe.Model
 open TicTacToe.GameStore
 
@@ -158,12 +160,19 @@ let private movesResource =
     resource "/games/{id}/moves" {
         name "GameMoves"
         relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Move).AbsoluteUri)
-        post moveHandler
+
+        post (
+            handler {
+                handle moveHandler
+                produces typeof<Move> 200
+            }
+        )
     }
 
 [<EntryPoint>]
 let main args =
     webHost args {
+        useProvenance
         useDiscovery
         useLinkedData
         resource homeResource

@@ -15,6 +15,8 @@
     <FrankSemanticsModuleName>TicTacToe.GeneratedSemantics</FrankSemanticsModuleName>
     <!-- Validation codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
     <FrankValidationModuleName>TicTacToe.GeneratedValidation</FrankValidationModuleName>
+    <!-- Provenance codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
+    <FrankProvenanceModuleName>TicTacToe.GeneratedProvenance</FrankProvenanceModuleName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,6 +34,8 @@
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
+    <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
     <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
                       ReferenceOutputAssembly="false"
