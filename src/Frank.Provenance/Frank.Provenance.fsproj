@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>provenance;prov-o;rdf;lineage</PackageTags>
+    <Description>Request-level W3C PROV-O for Frank resources</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="ProvenanceTypes.fs" />
+    <Compile Include="ProvVocabulary.fs" />
+    <!-- added in later tasks -->
+    <!--<Compile Include="ProvenanceGraph.fs" />-->
+    <!--<Compile Include="IProvenanceStore.fs" />-->
+    <!--<Compile Include="MailboxProcessorStore.fs" />-->
+    <!--<Compile Include="GeneratedProvenanceResolver.fs" />-->
+    <!--<Compile Include="ProvenanceMiddleware.fs" />-->
+    <!--<Compile Include="ProvenanceEndpoint.fs" />-->
+    <!--<Compile Include="Frank.Provenance.fs" />-->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank/Frank.fsproj" />
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+    <!-- No Frank.OpenApi reference: the middleware reads the STANDARD
+         Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata, not an
+         OpenApi type. Authoring `produces` is the consumer project's concern. -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
+  </ItemGroup>
+
+</Project>
