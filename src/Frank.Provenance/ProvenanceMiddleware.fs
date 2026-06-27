@@ -11,13 +11,17 @@ open Microsoft.Extensions.Logging
 module private ProvNegotiation =
 
     let requested (ctx: HttpContext) : bool =
-        ctx.Request.Headers.Accept
-        |> Seq.exists (fun v ->
-            v.Contains("profile=", StringComparison.OrdinalIgnoreCase)
-            && v.Contains("http://www.w3.org/ns/prov", StringComparison.OrdinalIgnoreCase))
+        Frank.AcceptNegotiation.wantsProfile ctx "application/ld+json" "http://www.w3.org/ns/prov"
 
 [<RequireQualifiedAccess>]
 module private Capture =
+
+    // Prefer an entry whose Type is non-null / non-sentinel; first-match-by-metadata-order is the contract
+    // when multiple entries share a status code and all have usable types.
+    let private sentinelTypes = [| typeof<Void>; typeof<unit>; typeof<obj> |]
+
+    let private isSentinel (t: Type) =
+        sentinelTypes |> Array.exists (fun s -> s = t)
 
     let private resolveDomainType
         (endpoint: Endpoint)
@@ -28,13 +32,11 @@ module private Capture =
             None
         else
             endpoint.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
-            |> Seq.tryFind (fun m -> m.StatusCode = statusCode)
+            |> Seq.filter (fun m -> m.StatusCode = statusCode)
+            |> Seq.tryFind (fun m -> not (isNull m.Type) && not (isSentinel m.Type))
             |> Option.bind (fun m ->
-                if isNull m.Type || m.Type = typeof<Void> then
-                    None
-                else
-                    let key = m.Type.FullName.Replace('+', '.')
-                    Map.tryFind key config.ProvClasses)
+                let key = m.Type.FullName.Replace('+', '.')
+                Map.tryFind key config.ProvClasses)
             |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
 
     let private absoluteUri (ctx: HttpContext) =
@@ -87,8 +89,7 @@ type ProvenanceMiddleware
 
     member private _.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
         let originalBody = ctx.Response.Body
-        let buffer = new MemoryStream()
-        ctx.Response.Body <- buffer
+        ctx.Response.Body <- Stream.Null
 
         task {
             try
@@ -97,12 +98,19 @@ type ProvenanceMiddleware
                 let record = Capture.build config ctx started ended
                 store.Append record
                 ctx.Response.Body <- originalBody
-                ctx.Response.ContentLength <- System.Nullable()
-                ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
-                do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
+
+                if ctx.Response.HasStarted then
+                    logger.LogWarning(
+                        "ProvenanceMiddleware: response already started for {Method} {Path}; skipping prov rewrite",
+                        ctx.Request.Method,
+                        ctx.Request.Path
+                    )
+                else
+                    ctx.Response.ContentLength <- System.Nullable()
+                    ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+                    do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
             finally
                 ctx.Response.Body <- originalBody
-                buffer.Dispose()
         }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
