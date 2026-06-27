@@ -5,7 +5,7 @@ open VDS.RDF
 open Frank.Semantic
 
 let private provContext =
-    """{"@context":{"prov":"http://www.w3.org/ns/prov#","frank":"https://frankfs.dev/ns/prov#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}}"""
+    """{"@context":{"prov":"http://www.w3.org/ns/prov#","http":"http://www.w3.org/2011/http#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}}"""
 
 let private u (g: IGraph) (s: string) =
     g.CreateUriNode(UriFactory.Create s) :> INode
@@ -29,7 +29,7 @@ let private addEntity (g: IGraph) (record: ProvenanceRecord) (entity: INode) (ac
     domainTypeNode g record ProvOClass.Entity
     |> Option.iter (assertT g entity rdfType)
 
-let private addActivity (g: IGraph) (record: ProvenanceRecord) (activity: INode) (agent: INode) =
+let private addActivity (g: IGraph) (record: ProvenanceRecord) (activity: INode) (agent: INode) (entity: INode) =
     let rdfType = u g ProvVocabulary.Rdf.Type
     assertT g activity rdfType (u g ProvVocabulary.Class.Activity)
 
@@ -49,12 +49,13 @@ let private addActivity (g: IGraph) (record: ProvenanceRecord) (activity: INode)
         (lit g (record.EndedAt.ToString "o") ProvVocabulary.Xsd.DateTime)
 
     assertT g activity (u g ProvVocabulary.Property.WasAssociatedWith) agent
-    assertT g activity (u g ProvVocabulary.Frank.HttpMethod) (plain g record.HttpMethod)
+    assertT g activity (u g ProvVocabulary.Property.Used) entity
+    assertT g activity (u g ProvVocabulary.Http.MethodName) (plain g record.HttpMethod)
 
     assertT
         g
         activity
-        (u g ProvVocabulary.Frank.StatusCode)
+        (u g ProvVocabulary.Http.StatusCodeValue)
         (lit g (string record.StatusCode) ProvVocabulary.Xsd.Integer)
 
 let private addAgent (g: IGraph) (record: ProvenanceRecord) (agent: INode) =
@@ -74,7 +75,7 @@ let toGraph (record: ProvenanceRecord) : IGraph =
     let activity = u g record.Id
     let agent = u g record.Agent.Id
     addEntity g record entity activity
-    addActivity g record activity agent
+    addActivity g record activity agent entity
     addAgent g record agent
     g
 

@@ -24,8 +24,7 @@ module ProvVocabulary =
         let DateTime = "http://www.w3.org/2001/XMLSchema#dateTime"
         let Integer = "http://www.w3.org/2001/XMLSchema#integer"
 
-    let FrankNamespace = "https://frankfs.dev/ns/prov#"
-
-    module Frank =
-        let HttpMethod = FrankNamespace + "httpMethod"
-        let StatusCode = FrankNamespace + "statusCode"
+    module Http =
+        let Namespace = "http://www.w3.org/2011/http#"
+        let MethodName = Namespace + "methodName"
+        let StatusCodeValue = Namespace + "statusCodeValue"

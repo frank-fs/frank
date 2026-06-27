@@ -27,6 +27,12 @@ let tests =
               Expect.stringContains body "https://schema.org/OrderAction" "domain IRI from provClass"
               Expect.stringContains body "http://www.w3.org/ns/prov#Agent" "Agent present"
               Expect.isFalse (body.Contains "urn:frank:") "no hardcoded urn:frank: activity IRI"
+              Expect.isFalse (body.Contains "urn:provenance:agent:") "no opaque urn:provenance:agent: IRI"
+              Expect.stringContains body "/agents/anonymous" "agent IRI uses HTTP /agents/ path"
+              Expect.stringContains body "http://www.w3.org/2011/http#methodName" "W3C HTTP methodName term"
+              Expect.stringContains body "http://www.w3.org/2011/http#statusCodeValue" "W3C HTTP statusCodeValue term"
+              Expect.stringContains body "http://www.w3.org/ns/prov#used" "prov:used asserted"
+              Expect.stringContains body "localhost" "entity @id is absolute (contains host)"
           }
 
           testCaseAsync "records untyped Activity when no produces metadata"

@@ -37,17 +37,25 @@ module private Capture =
                     Map.tryFind key config.ProvClasses)
             |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
 
+    let private absoluteUri (ctx: HttpContext) =
+        ctx.Request.Scheme + "://" + ctx.Request.Host.Value + ctx.Request.Path.Value
+
     let private resolveAgent (ctx: HttpContext) : ProvAgent =
         let name =
             if not (isNull ctx.User) && not (isNull ctx.User.Identity) then
                 let n = ctx.User.Identity.Name
-
                 if String.IsNullOrEmpty n then "anonymous" else n
             else
                 "anonymous"
 
-        { Id = "urn:provenance:agent:" + name
-          Label = Some name }
+        let id =
+            ctx.Request.Scheme
+            + "://"
+            + ctx.Request.Host.Value
+            + "/agents/"
+            + Uri.EscapeDataString name
+
+        { Id = id; Label = Some name }
 
     let build
         (config: ProvenanceConfig)
@@ -59,7 +67,7 @@ module private Capture =
         let domainType = resolveDomainType endpoint config ctx.Response.StatusCode
 
         { Id = "urn:uuid:" + Guid.NewGuid().ToString()
-          ResourceUri = ctx.Request.Path.Value
+          ResourceUri = absoluteUri ctx
           HttpMethod = ctx.Request.Method
           StatusCode = ctx.Response.StatusCode
           DomainType = domainType

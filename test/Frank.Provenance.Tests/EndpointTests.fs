@@ -43,8 +43,8 @@ let private startEndpointServer () =
     builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
     let app = builder.Build()
     let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
-    resolvedStore.Append(mkRecord "urn:uuid:act-1" "/r")
-    resolvedStore.Append(mkRecord "urn:uuid:act-2" "/r")
+    resolvedStore.Append(mkRecord "urn:uuid:act-1" "http://localhost/r")
+    resolvedStore.Append(mkRecord "urn:uuid:act-2" "http://localhost/r")
 
     app.MapGet("/provenance", Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore))
     |> ignore
