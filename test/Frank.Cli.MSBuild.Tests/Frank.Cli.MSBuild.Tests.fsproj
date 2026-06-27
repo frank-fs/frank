@@ -14,6 +14,7 @@
     <Compile Include="GenerateDiscoveryTaskTests.fs" />
     <Compile Include="GenerateLinkedDataTaskTests.fs" />
     <Compile Include="GenerateValidationTaskTests.fs" />
+    <Compile Include="GenerateProvenanceTaskTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

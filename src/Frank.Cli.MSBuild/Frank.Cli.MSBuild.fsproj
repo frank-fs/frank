@@ -17,6 +17,7 @@
     <Compile Include="GenerateDiscoveryTask.fs" />
     <Compile Include="GenerateLinkedDataTask.fs" />
     <Compile Include="GenerateValidationTask.fs" />
+    <Compile Include="GenerateProvenanceTask.fs" />
     <Compile Include="GenerateSemanticsTask.fs" />
   </ItemGroup>
 
