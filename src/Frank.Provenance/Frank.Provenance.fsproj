@@ -14,7 +14,7 @@
     <Compile Include="ProvenanceTypes.fs" />
     <Compile Include="ProvVocabulary.fs" />
     <!-- added in later tasks -->
-    <!--<Compile Include="ProvenanceGraph.fs" />-->
+    <Compile Include="ProvenanceGraph.fs" />
     <!--<Compile Include="IProvenanceStore.fs" />-->
     <!--<Compile Include="MailboxProcessorStore.fs" />-->
     <!--<Compile Include="GeneratedProvenanceResolver.fs" />-->

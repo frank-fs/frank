@@ -14,6 +14,7 @@
 - **Test sln:** `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"`. New test projects under `test/` target **net10.0 only** and must be added to `Frank.sln`.
 - **Worktree:** all work in `.claude/worktrees/provenance-vertical` (branch `provenance-vertical`). Bash cwd resets to master between calls — **use absolute worktree paths in every command**.
 - **Codegen MUST use Fabulous.AST + Fantomas via `AstRender` helpers. NEVER string concatenation.** (CLAUDE.md, hard rule.)
+- **JSON-LD output is EXPANDED, not compacted.** `RdfSerialization.serializeGraphJsonLdWithContext` runs `JsonLdWriter` (full-IRI `@type`/predicates) and prepends a decorative `@context`. **Every test assertion must match FULL IRIs** (`http://www.w3.org/ns/prov#Activity`, `http://www.w3.org/ns/prov#Agent`, `https://schema.org/OrderAction`), never CURIEs (`prov:Activity`). Whether to emit *compacted* PROV-O is a TimBL-lens question raised at Task 17 expert review, not assumed here.
 - **No statechart coupling:** `Frank.Provenance` must not reference `Frank.Statecharts`/`Frank.Statecharts.Core`.
 - **Holzmann:** ≤2 nesting levels, ≤60-line functions, bounded loops, preconditions via `invalidArg`/`invalidOp`, no module-level mutable, `Result<_,string>` over `Option` for diagnostics.
 - **Disposal:** `use` for every `IDisposable`. **No bare `with _ ->`** — log via `ILogger`.
@@ -136,10 +137,12 @@ let tests =
                 "Accept", "application/ld+json; profile=\"http://www.w3.org/ns/prov\"") |> ignore
             let! resp = client.SendAsync(req) |> Async.AwaitTask
             let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
-            Expect.stringContains body "prov:Activity" "Activity type present"
+            // The shared serializer (RdfSerialization.serializeGraphJsonLdWithContext) emits
+            // EXPANDED JSON-LD — @type values are FULL IRIs, not CURIEs. Assert full IRIs.
+            Expect.stringContains body "http://www.w3.org/ns/prov#Activity" "Activity type present"
             Expect.stringContains body "https://schema.org/OrderAction" "domain IRI from provClass"
-            Expect.stringContains body "prov:Agent" "Agent present"
-            Expect.isFalse (body.Contains "urn:frank:") "no hardcoded urn:frank: IRI"
+            Expect.stringContains body "http://www.w3.org/ns/prov#Agent" "Agent present"
+            Expect.isFalse (body.Contains "urn:frank:") "no hardcoded urn:frank: activity IRI"
         }
     ]
 ```
@@ -717,7 +720,7 @@ Put `ProvNegotiation.requested`, `Capture.build`, and the `ProducesResponseTypeM
 **Interfaces:**
 - Produces: `module ProvenanceEndpoint` with `val handle : IProvenanceStore -> HttpContext -> Task` serving `GET /provenance?resource=<iri>` → `ProvenanceGraph.listToJsonLd (store.QueryByResource resource)`. Missing `resource` query param ⇒ 400 problem+json (reuse a small problem+json writer; mirror `ValidationRespond.writeProblemJson` shape).
 
-- [ ] **Step 1: Write the failing test** (`EndpointTests.fs`): start a server with the endpoint mapped, append two records via the store, `GET /provenance?resource=/r` → body contains two `prov:Activity`; `GET /provenance` (no param) → 400.
+- [ ] **Step 1: Write the failing test** (`EndpointTests.fs`): start a server with the endpoint mapped, append two records via the store, `GET /provenance?resource=/r` → body contains two `http://www.w3.org/ns/prov#Activity` occurrences (full IRI — see serialization constraint); `GET /provenance` (no param) → 400.
 
 - [ ] **Step 2: Run, verify it fails.**
 
