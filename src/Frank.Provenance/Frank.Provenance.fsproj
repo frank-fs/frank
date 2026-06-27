@@ -18,7 +18,7 @@
     <Compile Include="IProvenanceStore.fs" />
     <Compile Include="MailboxProcessorStore.fs" />
     <Compile Include="GeneratedProvenanceResolver.fs" />
-    <!--<Compile Include="ProvenanceMiddleware.fs" />-->
+    <Compile Include="ProvenanceMiddleware.fs" />
     <!--<Compile Include="ProvenanceEndpoint.fs" />-->
     <!--<Compile Include="Frank.Provenance.fs" />-->
   </ItemGroup>
