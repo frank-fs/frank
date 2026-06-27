@@ -32,7 +32,9 @@ let handle (store: IProvenanceStore) (ctx: HttpContext) : Task =
     if StringValues.IsNullOrEmpty resource then
         writeProblemJson ctx "Missing required query parameter" "provenance query requires a 'resource' parameter"
     else
-        let records = store.QueryByResource(resource.ToString())
-        ctx.Response.StatusCode <- 200
-        ctx.Response.ContentType <- "application/ld+json"
-        ctx.Response.WriteAsync(ProvenanceGraph.listToJsonLd records)
+        task {
+            let! records = store.QueryByResource(resource.ToString())
+            ctx.Response.StatusCode <- 200
+            ctx.Response.ContentType <- "application/ld+json"
+            do! ctx.Response.WriteAsync(ProvenanceGraph.listToJsonLd records)
+        }

@@ -20,15 +20,17 @@ let private mk id resource =
 let tests =
     testList
         "MailboxProcessorProvenanceStore"
-        [ test "append then query by resource returns the record" {
+        [ testCaseAsync "append then query by resource returns the record"
+          <| async {
               use store =
                   new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
 
               (store :> IProvenanceStore).Append(mk "a1" "/orders/1")
-              let got = (store :> IProvenanceStore).QueryByResource "/orders/1"
+              let! got = (store :> IProvenanceStore).QueryByResource "/orders/1" |> Async.AwaitTask
               Expect.equal got.Length 1 "one record for the resource"
           }
-          test "bounded eviction caps retained records" {
+          testCaseAsync "bounded eviction caps retained records"
+          <| async {
               let cfg =
                   { MaxRecords = 4
                     EvictionBatchSize = 2 }
@@ -39,5 +41,6 @@ let tests =
               for i in 1..10 do
                   s.Append(mk (string i) "/r")
 
-              Expect.isLessThanOrEqual (s.QueryByResource "/r").Length cfg.MaxRecords "never exceeds MaxRecords"
+              let! results = s.QueryByResource "/r" |> Async.AwaitTask
+              Expect.isLessThanOrEqual results.Length cfg.MaxRecords "never exceeds MaxRecords"
           } ]

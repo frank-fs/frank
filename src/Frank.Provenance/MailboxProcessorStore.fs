@@ -1,6 +1,7 @@
 namespace Frank.Provenance
 
 open System.Collections.Generic
+open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 
 type private StoreMessage =
@@ -72,7 +73,7 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
             let lookupByIndex (index: Dictionary<string, ResizeArray<int>>) key =
                 match index.TryGetValue(key) with
-                | true, indices -> indices |> Seq.map (fun i -> records.[i]) |> Seq.toList
+                | true, indices -> List.init indices.Count (fun j -> records.[indices.[j]])
                 | false, _ -> []
 
             let rec loop () =
@@ -120,11 +121,15 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
         member _.QueryByResource(resourceUri) =
             ensureNotDisposed ()
-            agent.PostAndReply(fun reply -> QueryByResource(resourceUri, reply))
+
+            agent.PostAndAsyncReply(fun reply -> QueryByResource(resourceUri, reply))
+            |> Async.StartImmediateAsTask
 
         member _.QueryByAgent(agentId) =
             ensureNotDisposed ()
-            agent.PostAndReply(fun reply -> QueryByAgent(agentId, reply))
+
+            agent.PostAndAsyncReply(fun reply -> QueryByAgent(agentId, reply))
+            |> Async.StartImmediateAsTask
 
     interface System.IDisposable with
         member _.Dispose() =
