@@ -43,7 +43,8 @@ type private OrderPlaced =
 // ---------------------------------------------------------------------------
 
 let private buildProvConfig (classIri: string) : ProvenanceConfig =
-    { ProvClasses = Map.ofList [ typeof<OrderPlaced>.FullName, (ProvOClass.Activity, Some(Uri classIri)) ]
+    { ProvClasses =
+        Map.ofList [ typeof<OrderPlaced>.FullName.Replace('+', '.'), (ProvOClass.Activity, Some(Uri classIri)) ]
       KnownNamespaces = [| "https://schema.org/" |]
       StoreConfig = ProvenanceStoreConfig.defaults }
 

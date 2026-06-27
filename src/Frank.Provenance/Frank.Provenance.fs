@@ -39,6 +39,7 @@ module ProvenanceExtensions =
         [<CustomOperation("useProvenanceWith")>]
         member _.UseProvenanceWith(spec: WebHostSpec, config: ProvenanceConfig) : WebHostSpec =
             let addServices (services: IServiceCollection) =
+                // AddSingleton (last-wins) is intentional: explicit caller config must override auto-loaded defaults.
                 services.AddSingleton<ProvenanceConfig>(config) |> ignore
 
                 services.TryAddSingleton<IProvenanceStore>(fun sp ->

@@ -14,7 +14,8 @@ type FakeGeneratedProvenance() =
 
 // Fixture for resolveGeneratedConfig — must be named "GeneratedProvenance" so that
 // findSinglePublicType "GeneratedProvenance" finds exactly one match.
-// provClasses carries the F#/dotted name; resolveClrName must rewrite it to CLR name (+).
+// provClasses carries the F#/dotted name as emitted by the code generator.
+// No key rewriting occurs; the middleware normalises the runtime CLR name at lookup time.
 type GeneratedProvenance() =
     static member val provClasses: (string * (string * string)) list =
         [ "Frank.Provenance.Tests.ResolverTests.CapstoneLike.MovePlaced", ("Activity", "https://schema.org/MoveAction") ] with get
@@ -27,8 +28,7 @@ module ResolverTests =
 
     // CapstoneLike is a nested module — MovePlaced compiles to a CLR nested type.
     // typeof<CapstoneLike.MovePlaced>.FullName contains '+' delimiters, not '.'.
-    // If resolveClrName were a no-op, cfg.ProvClasses would be keyed by the dotted name
-    // and Map.containsKey clrName would return false.  This test proves rewriting occurs.
+    // The generator emits dotted names; the resolver keeps them; the middleware normalises at lookup.
     module CapstoneLike =
         type MovePlaced = { Pos: int }
 
@@ -48,7 +48,7 @@ module ResolverTests =
                   | Error e -> failtestf "expected Ok, got %s" e
               }
 
-              test "resolveGeneratedConfig rewrites dotted F# name to CLR nested-type name" {
+              test "resolveGeneratedConfig keeps dotted key as generated; middleware normalises at lookup" {
                   let asm = typeof<CapstoneLike.MovePlaced>.Assembly
                   let clrName = typeof<CapstoneLike.MovePlaced>.FullName
                   let dottedName = clrName.Replace('+', '.')
@@ -56,11 +56,11 @@ module ResolverTests =
                   match GeneratedProvenanceResolver.resolveGeneratedConfig [| asm |] with
                   | Ok cfg ->
                       Expect.isTrue
-                          (Map.containsKey clrName cfg.ProvClasses)
-                          $"CLR name '{clrName}' must be present after resolveClrName rewrite"
+                          (Map.containsKey dottedName cfg.ProvClasses)
+                          $"dotted key '{dottedName}' must be present as generated"
 
                       Expect.isFalse
-                          (Map.containsKey dottedName cfg.ProvClasses)
-                          $"dotted name '{dottedName}' must NOT be present (proves rewrite happened)"
+                          (Map.containsKey clrName cfg.ProvClasses)
+                          $"CLR nested key '{clrName}' must NOT be present (no scan/rewrite in resolver)"
                   | Error e -> failtestf "expected Ok, got %s" e
               } ]

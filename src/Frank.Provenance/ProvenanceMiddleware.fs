@@ -33,7 +33,8 @@ module private Capture =
                 if isNull m.Type || m.Type = typeof<Void> then
                     None
                 else
-                    Map.tryFind m.Type.FullName config.ProvClasses)
+                    let key = m.Type.FullName.Replace('+', '.')
+                    Map.tryFind key config.ProvClasses)
             |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
 
     let private resolveAgent (ctx: HttpContext) : ProvAgent =

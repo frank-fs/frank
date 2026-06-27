@@ -47,46 +47,10 @@ module GeneratedProvenanceResolver =
         | Error e, _ -> Error e
         | _, Error e -> Error e
 
-    let private tryGetTypes (asm: Assembly) : Type[] =
-        try
-            asm.GetTypes()
-        with :? ReflectionTypeLoadException as ex ->
-            ex.Types |> Array.filter (isNull >> not)
-
-    let private isSkippable (asm: Assembly) =
-        asm.IsDynamic
-        || asm.FullName.StartsWith("System.", StringComparison.Ordinal)
-        || asm.FullName.StartsWith("Microsoft.", StringComparison.Ordinal)
-        || asm.FullName.StartsWith("mscorlib,", StringComparison.Ordinal)
-
-    let private resolveClrName (fsharpName: string) (assemblies: Assembly[]) : string =
-        let simpleName =
-            let idx = fsharpName.LastIndexOf('.')
-            if idx >= 0 then fsharpName.[idx + 1 ..] else fsharpName
-
-        let candidates =
-            assemblies
-            |> Array.filter (isSkippable >> not)
-            |> Array.collect tryGetTypes
-            |> Array.filter (fun t -> t.Name = simpleName && (t.IsPublic || t.IsNestedPublic))
-            |> Array.toList
-
-        match candidates with
-        | [ t ] -> t.FullName
-        | _ -> fsharpName
-
-    let private resolveKeys (assemblies: Assembly[]) (entries: (string * (string * string)) list) =
-        entries
-        |> List.map (fun (fsharpName, rest) -> resolveClrName fsharpName assemblies, rest)
-
     let resolveFromType (t: Type) : Result<ProvenanceConfig, string> =
         readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns)
 
     let resolveGeneratedConfig (assemblies: Assembly[]) : Result<ProvenanceConfig, string> =
         assemblies
         |> findSinglePublicType "GeneratedProvenance"
-        |> Result.bind (fun t ->
-            readConfig t
-            |> Result.bind (fun (entries, ns) ->
-                let resolved = resolveKeys assemblies entries
-                buildConfig resolved ns))
+        |> Result.bind (fun t -> readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns))

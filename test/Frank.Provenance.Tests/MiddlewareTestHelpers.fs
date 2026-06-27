@@ -9,12 +9,12 @@ open Frank.Provenance
 
 type OrderPlaced = { Id: string }
 
-/// typeof<OrderPlaced>.FullName = "Frank.Provenance.Tests.MiddlewareTestHelpers+OrderPlaced"
-/// because OrderPlaced is a nested type inside the compiled module class.
+/// Keys use dotted form (matching the code generator output).
+/// The middleware normalises typeof<T>.FullName via Replace('+','.') at lookup time.
 let orderProvConfig () : ProvenanceConfig =
     { ProvClasses =
         Map.ofList
-            [ typeof<OrderPlaced>.FullName,
+            [ typeof<OrderPlaced>.FullName.Replace('+', '.'),
               (Frank.Semantic.ProvOClass.Activity, Some(Uri "https://schema.org/OrderAction")) ]
       KnownNamespaces = [| "https://schema.org/" |]
       StoreConfig = ProvenanceStoreConfig.defaults }
