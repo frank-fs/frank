@@ -41,4 +41,25 @@ let tests =
               use client = app.GetTestClient()
               let! (resp: HttpResponseMessage) = client.GetAsync("/no-produces") |> Async.AwaitTask
               Expect.equal (int resp.StatusCode) 200 "passes through"
+          }
+
+          testCaseAsync "non-prov response carries Vary: Accept and Link: has_provenance (fix #8/#9)"
+          <| async {
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/no-produces") |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "passes through"
+
+              let varyValues = resp.Headers.GetValues("Vary") |> Seq.toList
+
+              Expect.isTrue
+                  (varyValues |> List.exists (fun v -> v.Contains "Accept"))
+                  "Vary: Accept present on pass-through"
+
+              let linkValues = resp.Headers.GetValues("Link") |> Seq.toList
+
+              Expect.isTrue
+                  (linkValues
+                   |> List.exists (fun v -> v.Contains "http://www.w3.org/ns/prov#has_provenance"))
+                  "Link: has_provenance rel present on pass-through"
           } ]

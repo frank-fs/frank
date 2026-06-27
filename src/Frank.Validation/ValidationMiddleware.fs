@@ -56,27 +56,16 @@ module private JsonLdBody =
 
 module private ValidationRespond =
 
-    let private writeProblemJson (ctx: HttpContext) (status: int) (title: string) (detail: string) : Task =
-        ctx.Response.StatusCode <- status
-        ctx.Response.ContentType <- "application/problem+json"
-        let opts = JsonWriterOptions(Indented = false)
-        use outStream = new System.IO.MemoryStream()
-        use jsonWriter = new Utf8JsonWriter(outStream, opts)
-        jsonWriter.WriteStartObject()
-        jsonWriter.WriteString("type", "about:blank")
-        jsonWriter.WriteString("title", title)
-        jsonWriter.WriteNumber("status", status)
-        jsonWriter.WriteString("detail", detail)
-        jsonWriter.WriteEndObject()
-        jsonWriter.Flush()
-        let body = System.Text.Encoding.UTF8.GetString(outStream.ToArray())
-        ctx.Response.WriteAsync(body)
-
     let respond400 (detail: string) (ctx: HttpContext) : Task =
-        writeProblemJson ctx 400 "Invalid JSON-LD body" detail
+        Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" detail
 
     let respond413 (ctx: HttpContext) : Task =
-        writeProblemJson ctx 413 "Payload Too Large" "Request body exceeds the configured maximum size"
+        Frank.ProblemJson.write
+            ctx
+            413
+            "about:blank"
+            "Payload Too Large"
+            "Request body exceeds the configured maximum size"
 
     let respond422 (reportJsonLd: string) (ctx: HttpContext) : Task =
         ctx.Response.StatusCode <- 422

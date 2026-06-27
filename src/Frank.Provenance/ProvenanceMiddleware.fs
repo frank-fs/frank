@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.Extensions.Logging
+open Microsoft.Extensions.Primitives
 
 [<RequireQualifiedAccess>]
 module private ProvNegotiation =
@@ -39,7 +40,7 @@ module private Capture =
                 Map.tryFind key config.ProvClasses)
             |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
 
-    let private absoluteUri (ctx: HttpContext) =
+    let absoluteUri (ctx: HttpContext) =
         ctx.Request.Scheme + "://" + ctx.Request.Host.Value + ctx.Request.Path.Value
 
     let private resolveAgent (ctx: HttpContext) : ProvAgent =
@@ -108,6 +109,8 @@ type ProvenanceMiddleware
                 else
                     ctx.Response.ContentLength <- System.Nullable()
                     ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+                    let varyValue = StringValues "Accept"
+                    ctx.Response.Headers.Append("Vary", varyValue)
                     do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
             finally
                 ctx.Response.Body <- originalBody
@@ -119,6 +122,17 @@ type ProvenanceMiddleware
         if ProvNegotiation.requested ctx then
             this.InvokeWithProv(ctx, started)
         else
+            let resourceUri = Capture.absoluteUri ctx
+
+            let linkHeaderValue =
+                StringValues(
+                    $"<{resourceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; type=\"application/ld+json\""
+                )
+
+            let varyValue = StringValues "Accept"
+            ctx.Response.Headers.Append("Vary", varyValue)
+            ctx.Response.Headers.Append("Link", linkHeaderValue)
+
             task {
                 do! next.Invoke ctx
                 let ended = DateTimeOffset.UtcNow
