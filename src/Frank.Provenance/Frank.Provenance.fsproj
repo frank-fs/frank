@@ -20,7 +20,7 @@
     <Compile Include="GeneratedProvenanceResolver.fs" />
     <Compile Include="ProvenanceMiddleware.fs" />
     <Compile Include="ProvenanceEndpoint.fs" />
-    <!--<Compile Include="Frank.Provenance.fs" />-->
+    <Compile Include="Frank.Provenance.fs" />
   </ItemGroup>
 
   <ItemGroup>
