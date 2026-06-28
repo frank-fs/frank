@@ -127,7 +127,7 @@ let acceptTests =
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
                   Expect.equal m.Source Manual "source must be Manual"
 
-          testCase "null-iri: known type with iri:null in resolved — rejected, lock unchanged"
+          testCase "null-iri: known type with iri:null in resolved — explicitly excluded in lock"
           <| fun () ->
               let nullIriJson =
                   """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":null,"fields":[]}]}"""
@@ -139,12 +139,10 @@ let acceptTests =
               | Ok doc ->
                   let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 0 "nothing merged"
-                  Expect.equal (summary.Rejected |> List.length) 1 "one rejection"
-                  let rej = summary.Rejected |> List.head
-                  Expect.equal rej.FSharpType "MyApp.Order" "rejected type"
-                  Expect.stringContains rej.Reason "iri is required" "reason mentions iri"
+                  Expect.equal summary.Excluded 1 "one exclusion"
+                  Expect.equal (summary.Rejected |> List.length) 0 "no rejections"
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
-                  Expect.equal m.Status Unresolved "lock entry unchanged"
+                  Expect.equal m.Status Excluded "lock entry is now Excluded"
 
           testCase "field null-iri: type iri present, field iri null — field stays Unresolved"
           <| fun () ->
@@ -267,6 +265,7 @@ let acceptTests =
           <| fun () ->
               let summary: Accept.AcceptSummary =
                   { Merged = 2
+                    Excluded = 0
                     Rejected =
                       [ { FSharpType = "MyApp.Ghost"
                           Reason = "not in lock file" } ]
@@ -291,6 +290,7 @@ let acceptTests =
           test "json output: summaryToJson round-trips reason containing quote and backslash" {
               let summary: Accept.AcceptSummary =
                   { Merged = 0
+                    Excluded = 0
                     Rejected =
                       [ { FSharpType = "MyApp.Tricky"
                           Reason = "unresolvable iri \"schema:Foo\\bar\"" } ]

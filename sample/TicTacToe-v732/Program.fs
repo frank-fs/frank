@@ -159,7 +159,10 @@ let private gameResource =
 let private movesResource =
     resource "/games/{id}/moves" {
         name "GameMoves"
-        relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Move).AbsoluteUri)
+
+        relation (
+            (TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest).AbsoluteUri
+        )
 
         post (
             handler {

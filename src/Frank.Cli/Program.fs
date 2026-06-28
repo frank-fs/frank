@@ -313,8 +313,9 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
                             | Pipeline.Json -> printfn "%s" (Accept.summaryToJson summary)
                             | Pipeline.Text ->
                                 printfn
-                                    "Merged %d mapping(s); %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
+                                    "Merged %d mapping(s); %d excluded; %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
                                     summary.Merged
+                                    summary.Excluded
                                     summary.Rejected.Length
                                     summary.Unchanged
                                     summary.AlreadyConfirmed

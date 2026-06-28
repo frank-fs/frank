@@ -32,6 +32,7 @@ type RejectedEntry = { FSharpType: string; Reason: string }
 
 type AcceptSummary =
     { Merged: int
+      Excluded: int
       Rejected: RejectedEntry list
       Unchanged: int
       AlreadyConfirmed: int
@@ -232,6 +233,15 @@ let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: st
       Alternates = []
       Shape = buildShape source entry.Shape }
 
+let private buildExcludedMapping (source: MappingSource) (entry: ResolvedEntry) : Mapping =
+    { FSharpType = entry.FSharpType
+      Iri = None
+      Confidence = 1.0
+      Source = source
+      Status = Excluded
+      Alternates = []
+      Shape = buildShape source entry.Shape }
+
 let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) : int =
     mappings
     |> List.filter (fun m -> Set.contains m.FSharpType types)
@@ -415,13 +425,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let inLock =
         doc.Resolved |> List.filter (fun e -> Set.contains e.FSharpType lockTypes)
 
-    let nullIriRejected =
-        inLock
-        |> List.filter (fun e -> e.Iri.IsNone)
-        |> List.map (fun e ->
-            { FSharpType = e.FSharpType
-              Reason = "iri is required for a confirmed mapping" })
-
+    let toExclude = inLock |> List.filter (fun e -> e.Iri.IsNone)
     let withIri = inLock |> List.filter (fun e -> e.Iri.IsSome)
 
     let prefixes =
@@ -446,20 +450,29 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let mergedMappings =
         toMerge |> List.map (fun e -> buildMapping source e e.Iri.Value)
 
-    let mergedTypes = toMerge |> List.map (fun e -> e.FSharpType) |> Set.ofList
+    let excludedMappings = toExclude |> List.map (buildExcludedMapping source)
+
+    let decidedTypes =
+        (toMerge |> List.map (fun e -> e.FSharpType))
+        @ (toExclude |> List.map (fun e -> e.FSharpType))
+        |> Set.ofList
 
     let unchanged =
         lf.Mappings
-        |> List.filter (fun m -> not (Set.contains m.FSharpType mergedTypes))
+        |> List.filter (fun m -> not (Set.contains m.FSharpType decidedTypes))
         |> List.length
 
-    let updated = LockFile.merge lf mergedMappings
-    let fieldsUnresolved = countUnresolvedFields updated.Mappings mergedTypes
+    let updated = LockFile.merge lf (mergedMappings @ excludedMappings)
+
+    let fieldsUnresolved =
+        countUnresolvedFields updated.Mappings (toMerge |> List.map (fun e -> e.FSharpType) |> Set.ofList)
+
     let warnings = collectPrefixWarnings lf toMerge
 
     let summary =
         { Merged = toMerge.Length
-          Rejected = notInLock @ nullIriRejected @ iriRejected
+          Excluded = toExclude.Length
+          Rejected = notInLock @ iriRejected
           Unchanged = unchanged
           AlreadyConfirmed = alreadyConfirmed
           FieldsUnresolved = fieldsUnresolved
@@ -507,6 +520,7 @@ let summaryToJson (s: AcceptSummary) : string =
 
     let root = JsonObject()
     root.Add("merged", JsonValue.Create s.Merged)
+    root.Add("excluded", JsonValue.Create s.Excluded)
     root.Add("rejected", rejectedArr)
     root.Add("unchanged", JsonValue.Create s.Unchanged)
     root.Add("alreadyConfirmed", JsonValue.Create s.AlreadyConfirmed)
