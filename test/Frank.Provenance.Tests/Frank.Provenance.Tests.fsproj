@@ -37,6 +37,7 @@
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
+    <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -4,6 +4,11 @@ open System
 open Frank.Semantic
 open Frank.Provenance
 
+// Fixture for GAP 2a: empty provClasses — resolver must return Ok with Map.empty, no crash.
+type EmptyGeneratedProvenance() =
+    static member val provClasses: (string * (string * string)) list = [] with get
+    static member val knownNamespaces: string[] = [||] with get
+
 // Fixture for resolveFromType tests — dotted names stay as-is (no resolveClrName call).
 type FakeGeneratedProvenance() =
     static member val provClasses: (string * (string * string)) list =
@@ -36,7 +41,15 @@ module ResolverTests =
     let tests =
         testList
             "GeneratedProvenanceResolver"
-            [ test "resolveFromType maps case name + IRI, empty IRI -> None" {
+            [ test "resolveFromType on empty provClasses returns Ok with Map.empty — no crash (GAP 2a)" {
+                  match GeneratedProvenanceResolver.resolveFromType typeof<EmptyGeneratedProvenance> with
+                  | Ok cfg ->
+                      Expect.isTrue (Map.isEmpty cfg.ProvClasses) "ProvClasses is empty — no entries"
+                      Expect.equal cfg.KnownNamespaces [||] "KnownNamespaces is empty array"
+                  | Error e -> failtestf "expected Ok, got %s" e
+              }
+
+              test "resolveFromType maps case name + IRI, empty IRI -> None" {
                   match GeneratedProvenanceResolver.resolveFromType typeof<FakeGeneratedProvenance> with
                   | Ok cfg ->
                       Expect.equal

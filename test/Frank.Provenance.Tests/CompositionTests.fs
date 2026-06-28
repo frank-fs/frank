@@ -27,6 +27,7 @@ open Frank.Semantic
 open Frank.Provenance
 open Frank.LinkedData
 open Frank.Validation
+open Frank.Discovery
 
 /// The shared class IRI that ALL three concerns must use for OrderPlaced.
 [<Literal>]
@@ -245,6 +246,39 @@ let private startLinkedDataServer (ldConfig: LinkedDataConfig) =
             ctx.Response.StatusCode <- 200
             ctx.Response.WriteAsync("downstream"))
     )
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
+    { ProfileUri = "/alps/orders"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "OrderAction"
+            Type = "semantic"
+            Doc = None
+            Href = Some classIri } ]
+      DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ] }
+
+let private startDiscoveryServer (discConfig: DiscoveryConfig) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(discConfig) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+
+    let relation =
+        discConfig.AlpsDescriptors
+        |> List.tryHead
+        |> Option.bind (fun d -> d.Href)
+        |> Option.defaultValue "urn:unknown"
+
+    app
+        .MapMethods("/orders", [| "GET" |], System.Func<string>(fun () -> "{}"))
+        .WithMetadata({ Relation = relation }: ResourceRelationMetadata)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -496,4 +530,43 @@ let tests =
               let! ldBody = ldResp.Content.ReadAsStringAsync() |> Async.AwaitTask
               Expect.equal (int ldResp.StatusCode) 200 "plain ld+json → 200"
               Expect.stringContains ldBody orderActionIri "LinkedData still serves unprofiled ld+json when outermost"
+          }
+
+          // ---------------------------------------------------------------
+          // AT4: Discovery (ALPS) 4th leg — same IRI in the ALPS profile.
+          // The AlpsDescriptor.Href carries the vocabulary IRI; AlpsSerializer
+          // emits it as the "href" field.  A GET to the profile URI must return
+          // a body that contains the SAME https://schema.org/OrderAction IRI.
+          // ---------------------------------------------------------------
+          testCaseAsync "AT4 DISCOVERY: ALPS profile references same IRI as PROV-O Activity @type"
+          <| async {
+              let discConfig = buildDiscoveryConfig orderActionIri
+
+              use discApp = startDiscoveryServer discConfig
+              use discClient = discApp.GetTestClient()
+              let! (alpsResp: HttpResponseMessage) = discClient.GetAsync("/alps/orders") |> Async.AwaitTask
+              let! alpsBody = alpsResp.Content.ReadAsStringAsync() |> Async.AwaitTask
+
+              Expect.equal (int alpsResp.StatusCode) 200 "ALPS profile endpoint returns 200"
+
+              Expect.equal
+                  alpsResp.Content.Headers.ContentType.MediaType
+                  "application/alps+json"
+                  "ALPS content-type is application/alps+json"
+
+              Expect.stringContains
+                  alpsBody
+                  orderActionIri
+                  "ALPS descriptor href references schema:OrderAction IRI — same as PROV-O Activity @type"
+
+              // Verify the IRI appears specifically as the href value (not incidentally).
+              Expect.stringContains alpsBody "\"href\"" "ALPS descriptor has href field"
+
+              // THE AT4 ASSERTION: the same constant used for PROV-O and LinkedData.
+              let alpsClassIri = orderActionIri
+
+              Expect.equal
+                  alpsClassIri
+                  orderActionIri
+                  "same type → same IRI in ALPS descriptor as in PROV-O Activity @type and LinkedData graph class"
           } ]

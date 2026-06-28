@@ -35,12 +35,48 @@ let tests =
               Expect.stringContains body "localhost" "entity @id is absolute (contains host)"
           }
 
-          testCaseAsync "records untyped Activity when no produces metadata"
+          testCaseAsync "records untyped Activity when no produces metadata (AT3)"
           <| async {
               use app = startProvenanceServer (orderProvConfig ())
               use client = app.GetTestClient()
-              let! (resp: HttpResponseMessage) = client.GetAsync("/no-produces") |> Async.AwaitTask
-              Expect.equal (int resp.StatusCode) 200 "passes through"
+              use req = new HttpRequestMessage(HttpMethod.Get, "/no-produces")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "passes through as 200"
+              Expect.stringContains body "prov:Activity" "Activity recorded as prov:Activity CURIE"
+              Expect.isFalse (body.Contains "https://schema.org/") "no domain-type IRI — untyped activity"
+          }
+
+          testCaseAsync
+              "empty ProvClasses config: prov-profile request returns untyped prov:Activity, no crash (GAP 2b)"
+          <| async {
+              let emptyConfig: Frank.Provenance.ProvenanceConfig =
+                  { ProvClasses = Map.empty
+                    KnownNamespaces = [||]
+                    StoreConfig = Frank.Provenance.ProvenanceStoreConfig.defaults }
+
+              use app = startProvenanceServer emptyConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/no-produces")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "200 — no crash with empty ProvClasses"
+              Expect.stringContains body "prov:Activity" "prov:Activity present in untyped record"
+              Expect.isFalse (body.Contains "https://schema.org/") "no domain IRI when ProvClasses is empty"
           }
 
           testCaseAsync "non-prov response carries Vary: Accept and Link: has_provenance (fix #8/#9)"
