@@ -97,13 +97,26 @@ v7.3.2 suite additions already made) so the capstone is gated on merge. Note: it
 `dotnet run` and uses Playwright's API request context — confirm the CI runner has the Playwright driver
 (API context needs the driver, not browsers).
 
+### D7 — Provenance is usable via discovery (replay or verify-result)
+Provenance is in scope and must do real work, not merely be advertised. After the naive client plays the
+game, it follows the `Link: rel="http://www.w3.org/ns/prov#has_provenance"` header (RFC 6903) — discovered,
+not hardcoded — to the lineage, and uses it for ONE of:
+- **Replay:** reconstruct the move sequence from the ordered PROV-O Activities (each a `schema:MoveAction`
+  with `startedAtTime`, agent, resource) and confirm replaying them reproduces the final game state; or
+- **Verify result:** confirm the recorded terminal Activity's outcome IRI (e.g. win/draw via the mapped
+  `MoveResult` cases — `schema:CompletedActionStatus`) matches the game's actual final state.
+
+Either path proves the shipped Provenance vertical participates in the discovery story and the lineage is
+semantically usable, not decorative. (Verify-result is the smaller of the two — recommended first.)
+
 ## Acceptance criteria
 
 The existing AT-S1..AT-S6 ALL green (S4/S6 currently red → must turn green), PLUS:
 - **AT-S7 (D5):** vocab swap `schema`→`ex` → hardcoded-IRI client fails, discovery client still completes a game.
-- **AT-S8 (optional):** a provenance discovery leg — the move's PROV-O lineage is reachable via the
-  advertised `rel="http://www.w3.org/ns/prov#has_provenance"` Link header (proves the just-shipped
-  Provenance vertical participates in discovery). Decide inclusion during planning.
+- **AT-S8 (D7, in scope):** the client follows the discovered `has_provenance` Link to the lineage and
+  uses it to **verify the game result** (recorded terminal Activity outcome IRI matches the final state) —
+  or **replay** the move sequence to reproduce the final state. Proves provenance is discoverable AND
+  semantically usable, not decorative.
 
 All are real HTTP request/response checks against the live sample (the existing E2E style).
 
