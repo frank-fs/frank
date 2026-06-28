@@ -42,49 +42,82 @@
 
 ---
 
-## Task 1 (SPIKE): Model `MoveRequest` into the sample's semantic artifacts
+## Task 1 (SPIKE): Model `MoveRequest` with HONEST IRIs, produced via the `frank semantic` CLI clarify workflow
 
-**Goal of the spike:** make `position` and `agent` (player) appear as schema.org-aligned descriptors in the generated ALPS profile AND as properties in the generated SHACL shape, by adding a mapped `MoveRequest` type. This is a spike because the exact `frank semantic` CLI invocation + lock-entry shape must be determined against the live tooling — do that first, then lock it into the steps below.
+**Goal of the spike:** make the move request's two inputs appear as honestly-mapped descriptors in the generated ALPS profile AND as a SHACL shape, by adding a mapped `MoveRequest` type whose mapping is **produced through the CLI extract→clarify→accept pipeline** (the hand-written resolution simulating the human/LLM clarify decision), NOT by editing the lock JSON directly.
 
-**Files:** `sample/TicTacToe-v732/Model.fs(i)`, `.frank/semantic-mappings.lock.json`, possibly `Vocabulary.fs`.
+**Honest mappings (decided by meaning, not by test literals):**
+- `MoveRequest` (type/class) → `schema:MoveAction`
+- `Player` (field) → `schema:agent` (the load-bearing universal term)
+- `Position` (field) → a **domain term** `ttt:square` (declare `prefix "ttt" "https://example.org/tictactoe#"`); there is no honest schema.org term for a board cell — the accept oracle is fail-open for the uncached `ttt:` namespace (`Accept.fs:266-271`), so a declared-prefix CURIE is permitted.
 
-- [ ] **Step 1: Add the request type.** In `Model.fs` (and signature in `Model.fsi`), add:
+**Why a spike:** two live unknowns must be settled against the tooling and recorded here before the rest:
+(U1) the `Move`↔`MoveRequest` shared-`schema:MoveAction` local-name collision in `ResolvedModel.checkLocalNameCollisions`; (U2) whether `accept` writes the new mapping with the exact field IRIs from the resolved template.
+
+**This task SUPERSEDES the prior commit `732e12c5`** (which hand-edited the lock with the dishonest `schema:position`/`schema:Action`). Revert it first.
+
+**Files:** `sample/TicTacToe-v732/Model.fs`, `Vocabulary.fs`, `.frank/semantic-mappings.lock.json` (written *by the CLI*), plus a scratch `resolved.json`.
+
+- [ ] **Step 0: Revert the prior shortcut commit.**
+  ```bash
+  cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery && git revert --no-edit 732e12c5
+  ```
+  (Or `git reset` if it is still HEAD and nothing depends on it — confirm `git log` first.) Verify the lock no longer contains a `MoveRequest`/`schema:position` entry.
+
+- [ ] **Step 1: Add the request type.** In `Model.fs`, after `Move`/`Game`, add:
   ```fsharp
   /// The wire shape of a move request — modeled so discovery/validation can describe it.
   type MoveRequest = { Position: SquarePosition; Player: Player }
   ```
-  Place it after `Player`/`SquarePosition` are defined.
+  (There is currently no `Model.fsi` — do not create one. If the prior commit added one, the revert removes it.)
 
-- [ ] **Step 2: Determine the semantic-pipeline commands.** Run the CLI help to learn the extract/accept/finalize flow:
+- [ ] **Step 2: Declare the domain prefix + the square constraint in `Vocabulary.fs`.** Inside the `vocabulary { … }` block add:
+  ```fsharp
+  prefix "ttt" "https://example.org/tictactoe#"
+  constrainPattern typeof<MoveRequest> "Position" "^(TopLeft|TopCenter|TopRight|MiddleLeft|MiddleCenter|MiddleRight|BottomLeft|BottomCenter|BottomRight)$"
+  ```
+  (Confirm the op name `constrainPattern` and arg order in `VocabularyBuilder.fs:78`.) The pattern enumerates the legal squares — it is the self-describing value constraint that makes an out-of-range square 422.
+
+- [ ] **Step 3: Run the CLI pipeline (this is the simulate-clarify workflow).**
   ```bash
   cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic --help 2>&1 | tail -40
+  # a) extract candidate mappings (MoveRequest now appears, convention-guessed)
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic extract -p sample/TicTacToe-v732/TicTacToe.v732.fsproj -v sample/TicTacToe-v732/Vocabulary.fs
+  # b) emit the resolution template (the LLM/human contract)
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic clarify -p sample/TicTacToe-v732/TicTacToe.v732.fsproj --output-format resolved-template > /tmp/resolved.json
   ```
-  Identify the command(s) that (a) extract candidate mappings for new types, (b) accept/confirm a mapping. Record them in this task before proceeding.
+  Inspect `/tmp/resolved.json`. **Hand-write the resolution** for `TicTacToe.Model.MoveRequest` (this is the predetermined/simulated clarify decision): class `schema:MoveAction`, field `Position → ttt:square`, field `Player → schema:agent`. Keep the template's structure.
 
-- [ ] **Step 3: Map `MoveRequest`.** Get a `confirmed` lock entry for `TicTacToe.Model.MoveRequest` with `iri` = a schema.org class (e.g. `schema:MoveAction` reuse, or `schema:PlayAction`) AND field mappings `Position → schema:<position-ish>` (the lock already uses `schema:namedPosition` for SquarePosition payloads — reuse it) and `Player → schema:agent` (the lock already maps `agent → schema:agent`). Prefer the CLI accept path; hand-edit the lock only if the CLI cannot target a specific type, and if hand-edited, set `source: "manual"`, `status: "confirmed"`, `confidence: 1`.
+- [ ] **Step 4: Accept the resolution into the lock (CLI writes it — no manual JSON edit).**
+  ```bash
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic accept --input /tmp/resolved.json --source manual -p sample/TicTacToe-v732/TicTacToe.v732.fsproj
+  # smoke-run the remaining CLI surface (coverage):
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic status -p sample/TicTacToe-v732/TicTacToe.v732.fsproj
+  ```
+  Read the resulting lock entry and confirm the CLI wrote `schema:MoveAction` / `ttt:square` / `schema:agent` with `status: confirmed`. If `accept` rejected an IRI (term oracle), paste the verbatim error and STOP — do NOT swap to a test-pleasing IRI.
 
-- [ ] **Step 4: Regenerate + verify the artifacts contain the fields.**
+- [ ] **Step 5: Resolve the collision (U1).** Rebuild and watch for `checkLocalNameCollisions` ("share local name 'MoveAction'"):
+  ```bash
+  cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery && dotnet build-server shutdown && DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build sample/TicTacToe-v732/TicTacToe.v732.fsproj 2>&1 | tail -25
+  ```
+  If it fires, resolve honestly and record which: (a) confirm `Move` does not separately need a class descriptor and exclude its class mapping, or (b) give the *recorded* move and the *request* distinct honest classes. Do NOT resolve it by renaming to a dishonest IRI. Re-run the build to green.
+
+- [ ] **Step 6: Verify the generated artifacts (read them yourself).**
   ```bash
   cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery
-  dotnet build-server shutdown
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build sample/TicTacToe-v732/TicTacToe.v732.fsproj
-  # ALPS descriptors now include the request fields:
-  grep -E "position|namedPosition|agent" sample/TicTacToe-v732/obj/Debug/net10.0/GeneratedDiscovery.fs
-  # SHACL shape now covers MoveRequest:
-  grep -E "MoveRequest|MoveAction|PlayAction" sample/TicTacToe-v732/obj/Debug/net10.0/GeneratedValidation.fs
+  grep -nE "agent|square|example.org/tictactoe|MoveAction" sample/TicTacToe-v732/obj/Debug/net10.0/GeneratedDiscovery.fs
+  grep -nE "schema.org/MoveAction|example.org/tictactoe#square|schema.org/agent|Pattern|RecordShape" sample/TicTacToe-v732/obj/Debug/net10.0/GeneratedValidation.fs
   ```
-  Expected: the position + agent IRIs appear in `GeneratedDiscovery.fs`; a MoveRequest shape appears in `GeneratedValidation.fs`. If they do not, the lock mapping is wrong — fix and re-run.
+  EXPECTED: GeneratedDiscovery has field descriptors with hrefs `https://schema.org/agent` and `https://example.org/tictactoe#square`; GeneratedValidation has `RecordShape(System.Uri "https://schema.org/MoveAction", …)` whose props include path `…/agent` and path `…tictactoe#square` WITH `Pattern = Some "^(TopLeft|…)$"`.
 
-- [ ] **Step 5: Lock-gate sanity.** `dotnet build` must not fail the lock gate (no `proposed`/`unresolved` entries introduced).
+- [ ] **Step 7: Lock-gate sanity** — the build must not fail the lock gate (no `proposed`/`unresolved`).
 
-- [ ] **Step 6: Commit.**
+- [ ] **Step 8: Commit.**
   ```bash
-  git add sample/TicTacToe-v732/Model.fs sample/TicTacToe-v732/Model.fsi sample/TicTacToe-v732/.frank/semantic-mappings.lock.json sample/TicTacToe-v732/Vocabulary.fs
-  git commit -m "feat(capstone): #333 model MoveRequest so its fields generate ALPS+SHACL"
+  cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery && dotnet fantomas sample/TicTacToe-v732/Model.fs sample/TicTacToe-v732/Vocabulary.fs && git add sample/TicTacToe-v732/Model.fs sample/TicTacToe-v732/Vocabulary.fs sample/TicTacToe-v732/.frank/semantic-mappings.lock.json && git commit -m "feat(capstone): #333 model MoveRequest via CLI clarify — honest agent/ttt:square IRIs"
   ```
 
-> **Reviewer gate:** confirm — by reading the generated `obj/.../GeneratedDiscovery.fs` and `GeneratedValidation.fs` yourself — that `position`/`agent` are really present. This is the load-bearing precondition for AT-S6.
+> **Reviewer gate:** confirm by reading the generated files yourself that the honest IRIs (`schema:agent`, `ttt:square`, `schema:MoveAction`) are present, that the lock was written **by the CLI** (not hand-edited), and record the U1/U2 resolutions. This is the load-bearing precondition for AT-S4/S6.
 
 ---
 
@@ -133,33 +166,37 @@
   dotnet build-server shutdown
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test sample/TicTacToe-v732.E2E/TicTacToe.v732.E2E.fsproj --filter "AT-S4" 2>&1 | tail -5
   ```
-  Expected: PASS (invalid move → 422 ValidationReport, no `urn:frank:`, cites schema.org). If still red, the SHACL shape for the move body isn't targeting the posted `@type` — verify the move body's `@type` matches the MoveRequest class IRI the shape targets.
+  Expected: PASS (invalid move → 422 ValidationReport, no `urn:frank:`, cites a vocabulary IRI). The SHACL shape targets `schema:MoveAction`, so the posted body MUST be `@type = https://schema.org/MoveAction`, agent key `https://schema.org/agent`, square key `https://example.org/tictactoe#square`, with an out-of-range value (`"NotASquare"`) tripping the `sh:pattern`. **Update the AT-S4 body in `SemanticTests.fs`** from the old `schema.org/Action`/`schema.org/position` literals to this honest contract. If still red, confirm the body `@type` equals the shape's targetClass and the pattern is present on the square property.
 
 - [ ] **Step 4: Commit** — `git commit -m "feat(capstone): #333 wire useValidation — AT-S4 green (illegal move 422)"`.
 
 ---
 
-## Task 4: AT-S6 — naive client plays a full game via discovery
+## Task 4: AT-S6 (revised) — the agent-simulator: follow links, verify they resolve, verify the term set, play
 
-**Files:** `sample/TicTacToe-v732.E2E/SemanticTests.fs` (AT-S6 — likely needs the navigation completed now that the descriptors exist).
+**Files:** `sample/TicTacToe-v732.E2E/SemanticTests.fs` (AT-S6 rewritten — the current `fieldIri "position"` string-match is replaced).
 
-- [ ] **Step 1: Run AT-S6, capture the exact failure** (it currently dies at `failwith "ALPS missing position IRI"`, line ~208, then the SHACL-leg at ~267):
-  ```bash
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test sample/TicTacToe-v732.E2E/TicTacToe.v732.E2E.fsproj --filter "AT-S6" 2>&1 | tail -25
-  ```
-  After Tasks 1–3, the `fieldIri "position"`/`"agent"` lookups should now resolve (descriptors exist) and the SHACL leg should 422. Re-run; the remaining failures (if any) are in the full-game turn loop.
+**The anti-string-match rewrite.** The deterministic client is a *stand-in for an agent*. Passing must prove it read MEANING, not spelling. Rewrite AT-S6 to:
 
-- [ ] **Step 2: Complete the turn loop in AT-S6** if needed. The client must: discover game + moves URIs from JSON Home; read ALPS for the request fields; play a legal two-player game (X then O, alternating) by POSTing discovered move requests; detect terminal state via the affordance set (no available transitions / game-over in the response). It must NOT hardcode URLs/state-names/payload keys beyond what it reads from discovery. Use the existing helpers (`LinkRels`, JSON Home template expansion, `fieldIri`). Read the current AT-S6 body fully (lines 144–267) and finish whatever step throws.
+- [ ] **Step 1: Follow links and assert each resolves.** JSON Home → game/moves resources → OPTIONS → `Link rel=describedby` → ALPS. Assert the ALPS fetch returns 200 (the link "leads somewhere"), and that the field descriptor `href`s are well-formed absolute IRIs. Replace the `fieldIri name`-by-local-name helper with one that selects descriptors by their **absolute term IRI** (`href`).
 
-- [ ] **Step 3: Run AT-S6, confirm PASS.** Paste full output.
+- [ ] **Step 2: Verify the term set matches an EXPECTED SET.** Collect the ALPS descriptor term IRIs and assert the expected semantic set is present: `{ https://schema.org/MoveAction, https://schema.org/agent, https://example.org/tictactoe#square, https://schema.org/Game, https://schema.org/result }` (adjust to the actual generated set, but it MUST include the agent + square + class). A meaningless-but-named mapping would lack these IRIs → fail.
 
-- [ ] **Step 4: Run the WHOLE SemanticTests suite** — AT-S1..S6 all green:
+- [ ] **Step 3: Dereference EVERY URI received (D-deref).** Add a helper the client applies to every URI it encounters — resource links, the ALPS profile URL, each field/class term IRI, `seeAlso` targets, and (in Task 6) the lineage URL — that GETs/HEADs the URI and asserts it resolves (2xx, or 303→2xx). No URI may be a dead label. This REQUIRES that the `ttt:` domain vocabulary be served and that reused `schema.org` terms resolve — settle the two D-deref decisions (serve the domain vocab; decide CI handling of external term dereference) and record them. If a term IRI does not dereference, that is a real failure — fix the design (publish the term), do not skip the check.
+
+- [ ] **Step 4: Identify inputs by meaning, then play.** The client selects the actor input by recognizing `https://schema.org/agent` and the target input by the `ttt:square` IRI (NOT by field name). It plays a full two-player game (X/O alternating) to a terminal state, POSTing ld+json bodies whose keys are the discovered IRIs and whose `@type` is the discovered class IRI — no hardcoded URLs, state names, class, or field IRIs. Legal squares come from the game-state representation (empty cells). The illegal-move leg posts an out-of-range square and asserts 422 citing a vocabulary IRI.
+
+- [ ] **Step 6: Run AT-S6, confirm PASS.** Paste full output.
+
+- [ ] **Step 7: Extend AT-S5 to three-format negotiation (LinkedData coverage).** AT-S5 currently asserts only `application/ld+json`. Add assertions that the same game also negotiates `application/json` (200, compact JSON) and `text/turtle` (200, Turtle body) — so `Frank.LinkedData` content negotiation is fully exercised per the coverage matrix. If `text/turtle` is not yet supported by the sample's `useLinkedData`, surface it (do not silently drop the format).
+
+- [ ] **Step 8: Run the WHOLE SemanticTests suite** — AT-S1..S6 all green:
   ```bash
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test sample/TicTacToe-v732.E2E/TicTacToe.v732.E2E.fsproj --filter "SemanticTests" 2>&1 | tail -8
   ```
   Expected: 6/6 (was 4/6).
 
-- [ ] **Step 5: Commit** — `git commit -m "feat(capstone): #333 AT-S6 — naive client plays a full game via discovery"`.
+- [ ] **Step 9: Commit** — `git commit -m "feat(capstone): #333 AT-S6 agent-simulator + AT-S5 three-format negotiation"`.
 
 ---
 
@@ -185,21 +222,23 @@
 
 ---
 
-## Task 6: AT-S8 — provenance verify-result via discovery
+## Task 6: AT-S8 — provenance as the end-of-game COMPLETE-CAPTURE audit
 
 **Files:** `sample/TicTacToe-v732.E2E/SemanticTests.fs` (new AT-S8).
 
-**Approach (verify-result — the smaller path per the spec):** after AT-S6 completes a game, the client follows the **discovered** `Link: rel="http://www.w3.org/ns/prov#has_provenance"` header (emitted by `ProvenanceMiddleware` on pass-through responses) to the lineage, then confirms the recorded provenance matches the played game.
+**Approach:** the closing act. As the AT-S6 navigator plays, it keeps **its own log** of every move it posted (agent + square, in order). At the end it follows the **discovered** `Link: rel="http://www.w3.org/ns/prov#has_provenance"` header (RFC 6903 — read, not hardcoded) to the lineage and proves the lineage captured the WHOLE session faithfully — not merely that one activity exists.
 
-- [ ] **Step 1: Confirm the sample wires `useProvenance`** (it does — from the provenance vertical) and that move responses carry the `has_provenance` Link header. Quick check:
+- [ ] **Step 1: Confirm the sample wires `useProvenance`** and that responses carry the `has_provenance` Link header. Quick check:
   ```bash
-  # from a running sample: a normal GET /games/{id} response should carry
+  # from a running sample: a GET /games/{id} response should carry
   # Link: <...>; rel="http://www.w3.org/ns/prov#has_provenance"
   ```
 
-- [ ] **Step 2: Write AT-S8 (failing first).** The client: plays a short game (reuse the AT-S6 navigator), reads the `has_provenance` Link from a game response (NOT hardcoded), GETs the lineage, and asserts:
-  - the lineage contains one `prov:Activity` per move played (count matches), each `wasAssociatedWith` an agent and typed `schema:MoveAction`;
-  - **verify-result:** the lineage is consistent with the final state (e.g. the number/sequence of move Activities reproduces the moves; or, if a terminal outcome Activity is recorded, its outcome IRI matches the game's actual result). Pick the concrete, falsifiable assertion against the real lineage body.
+- [ ] **Step 2: Write AT-S8 (failing first) — cross-check lineage against the client's own move log.** The client plays a full game (reuse the AT-S6 navigator, capturing each posted move), reads the `has_provenance` Link from a response, GETs the lineage, and asserts:
+  - **Completeness:** exactly one `prov:Activity` per posted move — count matches the client's log, none dropped, none invented; each typed `schema:MoveAction` and `wasAssociatedWith` an agent.
+  - **Attribution + order:** each Activity's agent + targeted square match the client's log entry at that position; the Activities' `startedAtTime`/sequence reproduce the exact play order (alternating X/O) — a replay reconstructs the client's log.
+  - **Outcome:** the recorded terminal outcome (final Activity's mapped `MoveResult` case — `schema:CompletedActionStatus` for Won/Draw) matches the final game state observed over HTTP.
+  - The assertion must be falsifiable: a lineage that drops, reorders, or fabricates a move FAILS.
 
 - [ ] **Step 3: Run — fail then pass.** Paste.
 
@@ -238,6 +277,7 @@
 
 - [ ] **Step 1:** Full solution build (`dotnet build Frank.sln -c Release`) → 0 errors.
 - [ ] **Step 2:** Run the E2E suite yourself (absolute path); confirm AT-S1..S8 all green. Re-run — do not trust a single pass for a server-backed E2E (flake check).
+- [ ] **Step 2b: Coverage-matrix audit (D8).** Confirm every cell of the spec §D8 matrix is genuinely exercised: Semantic+CLI (extract/clarify/accept ran in Task 1; smoke `status`/`finalize`/`refresh`), all four generated modules compiled and consumed, Discovery (S1/S2/S3/S6), Validation (S4), LinkedData three formats (S5), Provenance complete-capture (S8), full composition (sample runs every `use*`). Any unexercised cell → add coverage or surface the gap; do not leave a shipped piece untested.
 - [ ] **Step 3:** `dotnet fantomas --check src/` clean (and the sample files you changed).
 - [ ] **Step 4: `/discipline`** on changed sample/E2E files; fix Criticals/Highs.
 - [ ] **Step 5: `/self-reflect`** against this plan + spec ATs — confirm AT-S4/S6/S7/S8 each have observed green evidence; hunt for weakened assertions (an E2E that asserts only status, not the discovery behavior) and any hardcoded-knowledge leak in the navigator that would make AT-S6/S7 vacuous.
@@ -250,20 +290,24 @@
 
 **Spec coverage:**
 - D1 useValidation → Task 3. ✓
-- D2 model MoveRequest → Task 1. ✓
-- D3 request shape discoverable (ALPS + SHACL, no Discovery feature — investigation-resolved) → Task 1 (descriptors) + Task 2/3 (accepts + validation). ✓
+- D2 model MoveRequest via CLI clarify, honest IRIs → Task 1. ✓
+- D3 client simulates an agent (follow links, resolve, expected term set, **dereference every URI**) → Task 4. ✓
 - D4 AT-S6 full game → Task 4. ✓
 - D5 AT-S7 vocab swap → Task 5. ✓
 - D6 CI + sln → Task 7. ✓
-- D7 AT-S8 provenance verify-result → Task 6. ✓
+- D7 AT-S8 provenance complete-capture audit → Task 6. ✓
+- D8 capstone touches every shipped piece (coverage matrix) → Task 4 Step 5 (S5 three-format) + Task 8 Step 2b. ✓
 - ACs AT-S1..S8 → Tasks 3/4 (S1-S6), 5 (S7), 6 (S8). ✓
 
-**Placeholder scan:** Task 1 is a declared SPIKE (legitimate — it resolves the lock/CLI mechanics); Tasks 5 & 7 carry explicit "investigate the mechanism, then record it" steps (the `ex:` variant + Playwright-in-CI) — these are real unknowns the implementer must settle against the tooling, not hand-waved code. No "add error handling"/"TBD" placeholders.
+**Placeholder scan:** Task 1 is a declared SPIKE (legitimate — it resolves the CLI/lock + U1 collision mechanics); Tasks 5 & 7 carry explicit "investigate the mechanism, then record it" steps (the `ex:` variant + Playwright-in-CI). No "add error handling"/"TBD" placeholders.
 
-**Type consistency:** `MoveRequest = { Position: SquarePosition; Player: Player }` defined in Task 1, consumed by Task 2 (`accepts typeof<MoveRequest>`). The discovered field names the client looks up are `position`/`agent` (per the existing AT-S6 `fieldIri` calls + the lock's `schema:agent` mapping) — Task 1 Step 3 must map `Player → schema:agent` so the ALPS descriptor name the client scans for (`agent`) is present.
+**Type consistency:** `MoveRequest = { Position: SquarePosition; Player: Player }` defined in Task 1, consumed by Task 2 (`accepts typeof<MoveRequest>`). The client selects inputs by **absolute term IRI** (`https://schema.org/agent`, the `ttt:square` IRI), not field name — Task 1 maps `Player → schema:agent` and `Position → ttt:square`.
 
-**Open items the implementer must settle early (surface if blocked):**
-1. Exact `frank semantic` command to map a single new type (Task 1 Step 2).
-2. Whether the move body's `@type` must equal the MoveRequest class IRI for the SHACL shape to target it (Task 3 Step 3).
+**Settled decisions (D-deref, user-confirmed 2026-06-28):**
+1. The sample **serves its `ttt:` domain vocabulary** (Frank as LD publisher); the agent-simulator rebases the term path onto the test server base and asserts the GET resolves.
+2. Reused `schema.org` terms are **dereferenced live**; the simulator fails loudly if unreachable (no silent skip).
+
+**Open items the spike must settle (surface if blocked):**
 3. The `ex:` vocab-variant mechanism (Task 5 Step 1).
 4. Playwright driver availability in CI (Task 7 Step 2).
+5. U1: `Move`↔`MoveRequest` shared-class local-name collision (Task 1 Step 5).
