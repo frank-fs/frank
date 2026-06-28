@@ -73,12 +73,15 @@ describe.
 - **Validation / SHACL:** the generated SHACL shape for `MoveRequest` describes the same required
   properties; a client may read the shape (or learn from a 422 report) as a second source.
 
-> **EARLY INVESTIGATION TASK (resolve before client work):** determine whether `Frank.Discovery` already
-> emits ALPS **input** descriptors from an `accepts` type, or only entity/class descriptors. If it does
-> not, that is a Discovery feature to build (emit input-field descriptors for accepted request types) —
-> OR fall back to the SHACL shape as the sole request-shape source. Settle this against the actual
-> `GeneratedDiscovery`/ALPS output before writing the client navigation. The answer changes whether D3
-> is "wire-up only" or "build an ALPS-input-descriptor feature in Frank.Discovery."
+> **INVESTIGATION RESOLVED (2026-06-27):** `DiscoveryEmitter.projectDiscovery` builds ALPS descriptors
+> purely from `ResolvedModel.Resources` — a type-level descriptor (ClassIri) plus **field descriptors**
+> from each resolved type's `Fields`. It reads nothing from `accepts`/request metadata. **Therefore no
+> Discovery feature is needed:** modeling `MoveRequest` as a *mapped resolved type* (lock entry with
+> `Position`/`Player` fields → schema IRIs) makes those fields appear automatically in the existing flat
+> ALPS descriptor list. AT-S6's `fieldIri "position"`/`"agent"` just scans the ALPS doc for those names,
+> so a flat descriptor entry satisfies it. SHACL shapes likewise generate from the mapped type's fields.
+> D3 is **modeling + wiring**, not a Frank.Discovery code change. (`accepts typeof<MoveRequest>` on the
+> resource is still wanted for Validation/OpenApi request-typing, but ALPS discovery does not depend on it.)
 
 ### D4 — AT-S6 full two-player game via discovery
 Make the existing AT-S6 green: discover game + moves URIs from JSON Home, read ALPS for the request
