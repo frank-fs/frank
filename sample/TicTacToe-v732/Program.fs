@@ -158,27 +158,6 @@ let private tttVocabGraph =
     parser.Load(g, reader)
     g
 
-let private tttVocabJsonLd = Frank.Semantic.RdfSerialization.serializeGraphJsonLd tttVocabGraph
-
-let private tttVocabMiddleware (app: IApplicationBuilder) : IApplicationBuilder =
-    app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-        (task {
-            if ctx.Request.Path.Equals(PathString "/tictactoe") then
-                let accept =
-                    match ctx.Request.Headers.TryGetValue "Accept" with
-                    | true, v -> v.ToString()
-                    | _ -> ""
-
-                if accept.Contains("application/ld+json") then
-                    ctx.Response.ContentType <- "application/ld+json"
-                    do! ctx.Response.WriteAsync(tttVocabJsonLd)
-                else
-                    ctx.Response.ContentType <- "text/turtle"
-                    do! ctx.Response.WriteAsync(tttVocabTtl)
-            else
-                return! next.Invoke(ctx)
-        } :> Task))
-
 let private homeResource =
     resource "/" {
         name "Home"
@@ -209,16 +188,28 @@ let private movesResource =
         )
     }
 
+let private tttVocabResource =
+    resource "/tictactoe" {
+        name "TttVocabulary"
+        linkedDataGraph tttVocabGraph """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                ctx.Response.ContentType <- "text/turtle"
+                do! ctx.Response.WriteAsync(tttVocabTtl)
+            })
+    }
+
 [<EntryPoint>]
 let main args =
     webHost args {
         useProvenance
         useDiscovery
         useLinkedData
-        plugBeforeRouting tttVocabMiddleware
         resource homeResource
         resource gameResource
         resource movesResource
+        resource tttVocabResource
     }
 
     0

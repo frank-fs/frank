@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="TestHelpers.fs" />
     <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="EndpointMetadataTests.fs" />
     <Compile Include="PropertyTests.fs" />
     <Compile Include="ResolverTests.fs" />
     <Compile Include="OntologyTests.fs" />

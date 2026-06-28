@@ -209,8 +209,15 @@ type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logge
         | AcceptNegotiation.Serve mediaType ->
             logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
 
+            let effective =
+                match ctx.GetEndpoint() with
+                | null -> config
+                | ep ->
+                    let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
+                    if isNull (box meta) then config else meta
+
             match mediaType with
-            | "text/turtle" -> Serializers.respondTurtle config.Graph ctx
-            | "application/rdf+xml" -> Serializers.respondRdfXml config.Graph ctx
-            | "application/ld+json" -> Serializers.respondJsonLd config.Graph config.JsonLdContext ctx
+            | "text/turtle" -> Serializers.respondTurtle effective.Graph ctx
+            | "application/rdf+xml" -> Serializers.respondRdfXml effective.Graph ctx
+            | "application/ld+json" -> Serializers.respondJsonLd effective.Graph effective.JsonLdContext ctx
             | _ -> next.Invoke ctx
