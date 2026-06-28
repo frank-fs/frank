@@ -62,10 +62,6 @@ type Move =
 
 type Game = { Id: string; Result: MoveResult }
 
-type MoveRequest =
-    { Position: SquarePosition
-      Player: Player }
-
 type MoveLog<'T> = { Items: 'T list; Count: int }
 
 type StartGame = unit -> MoveResult

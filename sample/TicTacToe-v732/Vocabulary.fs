@@ -13,9 +13,4 @@ let registry =
         seeAlso typeof<Game> "wikidata:Q573520"
         equivalentClass typedefof<MoveLog<_>> "schema:ItemList"
         provClass typeof<Move> Activity
-
-        constrainPattern
-            typeof<MoveRequest>
-            "Position"
-            "^(TopLeft|TopCenter|TopRight|MiddleLeft|MiddleCenter|MiddleRight|BottomLeft|BottomCenter|BottomRight)$"
     }
