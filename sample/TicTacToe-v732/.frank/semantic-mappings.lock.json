@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generated": "2026-06-28T20:55:19+00:00",
+  "generated": "2026-06-28T21:35:50+00:00",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
@@ -384,41 +384,8 @@
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
       ],
-      "shape": "union",
-      "cases": [
-        {
-          "name": "XMove",
-          "iri": null,
-          "confidence": 0,
-          "source": "manual",
-          "status": "excluded",
-          "payload": [
-            {
-              "name": "SquarePosition",
-              "iri": null,
-              "confidence": 0,
-              "source": "manual",
-              "status": "excluded"
-            }
-          ]
-        },
-        {
-          "name": "OMove",
-          "iri": null,
-          "confidence": 0,
-          "source": "manual",
-          "status": "excluded",
-          "payload": [
-            {
-              "name": "SquarePosition",
-              "iri": null,
-              "confidence": 0,
-              "source": "manual",
-              "status": "excluded"
-            }
-          ]
-        }
-      ]
+      "shape": "record",
+      "fields": []
     },
     {
       "fsharpType": "TicTacToe.Model.Game",

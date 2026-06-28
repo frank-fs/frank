@@ -127,7 +127,7 @@ let acceptTests =
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.OrderLine")
                   Expect.equal m.Source Manual "source must be Manual"
 
-          testCase "null-iri: known type with iri:null in resolved — explicitly excluded in lock"
+          testCase "null-iri: known type with iri:null → rejected, lock unchanged"
           <| fun () ->
               let nullIriJson =
                   """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":null,"fields":[]}]}"""
@@ -139,10 +139,28 @@ let acceptTests =
               | Ok doc ->
                   let updated, summary = Accept.apply lock doc Llm emptyOracle
                   Expect.equal summary.Merged 0 "nothing merged"
-                  Expect.equal summary.Excluded 1 "one exclusion"
-                  Expect.equal (summary.Rejected |> List.length) 0 "no rejections"
+                  Expect.equal summary.Excluded 0 "no exclusions"
+                  Expect.equal (summary.Rejected |> List.length) 1 "one rejection"
+                  let r = summary.Rejected |> List.exactlyOne
+                  Expect.stringContains r.Reason "iri is required" "reason contains 'iri is required'"
                   let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
-                  Expect.equal m.Status Excluded "lock entry is now Excluded"
+                  Expect.equal m.Status Unresolved "lock entry stays Unresolved"
+
+          testCase "explicit-excluded: status:excluded → Excluded in lock, no rejection"
+          <| fun () ->
+              let excludedJson =
+                  """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","status":"excluded","fields":[]}]}"""
+
+              let lock = mkLock [ unresolvedOrder ]
+
+              match Accept.parseResolved excludedJson with
+              | Error e -> failtest $"parseResolved failed: {e}"
+              | Ok doc ->
+                  let updated, summary = Accept.apply lock doc Llm emptyOracle
+                  Expect.equal summary.Excluded 1 "one exclusion"
+                  Expect.equal summary.Rejected [] "no rejections"
+                  let m = updated.Mappings |> List.find (fun m -> m.FSharpType = "MyApp.Order")
+                  Expect.equal m.Status Excluded "lock entry is Excluded"
 
           testCase "field null-iri: type iri present, field iri null — field stays Unresolved"
           <| fun () ->

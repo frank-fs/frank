@@ -22,6 +22,7 @@ type ResolvedShape =
 type ResolvedEntry =
     { FSharpType: string
       Iri: string option
+      Status: MappingStatus option
       Shape: ResolvedShape }
 
 type ResolvedDoc =
@@ -116,6 +117,14 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
     |> Result.bind (fun fsType ->
         let iri = optionalString node "iri"
 
+        let statusResult =
+            match optionalString node "status" with
+            | None -> Ok None
+            | Some s ->
+                LockFile.mappingStatusFromString s
+                |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
+                |> Result.map Some
+
         let shapeResult =
             rejectBothCasesAndFields node
             |> Result.bind (fun () ->
@@ -123,12 +132,15 @@ let private parseEntry (i: int) (node: JsonNode) : Result<ResolvedEntry, string>
                 | Some tag -> parseShapeByTag tag node
                 | None -> parseShapeLegacy node)
 
-        shapeResult
-        |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
-        |> Result.map (fun shape ->
-            { FSharpType = fsType
-              Iri = iri
-              Shape = shape }))
+        statusResult
+        |> Result.bind (fun status ->
+            shapeResult
+            |> Result.mapError (fun e -> $"resolved[{i}]: {e}")
+            |> Result.map (fun shape ->
+                { FSharpType = fsType
+                  Iri = iri
+                  Status = status
+                  Shape = shape })))
 
 let private parseEntries (arr: JsonArray) : Result<ResolvedEntry list, string> =
     arr
@@ -425,8 +437,17 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let inLock =
         doc.Resolved |> List.filter (fun e -> Set.contains e.FSharpType lockTypes)
 
-    let toExclude = inLock |> List.filter (fun e -> e.Iri.IsNone)
-    let withIri = inLock |> List.filter (fun e -> e.Iri.IsSome)
+    let toExclude = inLock |> List.filter (fun e -> e.Status = Some Excluded)
+    let notExcluded = inLock |> List.filter (fun e -> e.Status <> Some Excluded)
+
+    let nullIriRejected =
+        notExcluded
+        |> List.filter (fun e -> e.Iri.IsNone)
+        |> List.map (fun e ->
+            { FSharpType = e.FSharpType
+              Reason = "iri is required for a confirmed mapping" })
+
+    let withIri = notExcluded |> List.filter (fun e -> e.Iri.IsSome)
 
     let prefixes =
         let fromVocabs =
@@ -472,7 +493,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let summary =
         { Merged = toMerge.Length
           Excluded = toExclude.Length
-          Rejected = notInLock @ iriRejected
+          Rejected = notInLock @ nullIriRejected @ iriRejected
           Unchanged = unchanged
           AlreadyConfirmed = alreadyConfirmed
           FieldsUnresolved = fieldsUnresolved
