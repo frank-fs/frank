@@ -1,9 +1,14 @@
 module TicTacToe.Program
 
+open System
 open System.IO
 open System.Text.Json
 open System.Text.Json.Nodes
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open VDS.RDF
+open VDS.RDF.Parsing
 open Frank
 open Frank.Builder
 open Frank.Discovery
@@ -142,6 +147,38 @@ let private moveHandler (ctx: HttpContext) =
             do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
     }
 
+let private tttVocabTtl =
+    let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ttt.ttl")
+    File.ReadAllText(path)
+
+let private tttVocabGraph =
+    let g = new Graph()
+    let parser = TurtleParser()
+    use reader = new StringReader(tttVocabTtl)
+    parser.Load(g, reader)
+    g
+
+let private tttVocabJsonLd = Frank.Semantic.RdfSerialization.serializeGraphJsonLd tttVocabGraph
+
+let private tttVocabMiddleware (app: IApplicationBuilder) : IApplicationBuilder =
+    app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+        (task {
+            if ctx.Request.Path.Equals(PathString "/tictactoe") then
+                let accept =
+                    match ctx.Request.Headers.TryGetValue "Accept" with
+                    | true, v -> v.ToString()
+                    | _ -> ""
+
+                if accept.Contains("application/ld+json") then
+                    ctx.Response.ContentType <- "application/ld+json"
+                    do! ctx.Response.WriteAsync(tttVocabJsonLd)
+                else
+                    ctx.Response.ContentType <- "text/turtle"
+                    do! ctx.Response.WriteAsync(tttVocabTtl)
+            else
+                return! next.Invoke(ctx)
+        } :> Task))
+
 let private homeResource =
     resource "/" {
         name "Home"
@@ -178,6 +215,7 @@ let main args =
         useProvenance
         useDiscovery
         useLinkedData
+        plugBeforeRouting tttVocabMiddleware
         resource homeResource
         resource gameResource
         resource movesResource

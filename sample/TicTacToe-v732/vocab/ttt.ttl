@@ -1,0 +1,23 @@
+@prefix ttt:    <https://example.org/tictactoe#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix schema: <https://schema.org/> .
+
+ttt:Square a owl:Class ;
+    rdfs:label "Tic-tac-toe board cell" .
+
+ttt:square a rdf:Property ;
+    rdfs:domain schema:MoveAction ;
+    rdfs:range ttt:Square ;
+    rdfs:label "target board square of a move" .
+
+ttt:TopLeft     a ttt:Square .
+ttt:TopCenter   a ttt:Square .
+ttt:TopRight    a ttt:Square .
+ttt:MiddleLeft  a ttt:Square .
+ttt:MiddleCenter a ttt:Square .
+ttt:MiddleRight a ttt:Square .
+ttt:BottomLeft  a ttt:Square .
+ttt:BottomCenter a ttt:Square .
+ttt:BottomRight a ttt:Square .
