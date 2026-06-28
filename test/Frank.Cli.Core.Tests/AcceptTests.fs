@@ -1147,9 +1147,14 @@ let acceptTests =
                        { "fsharpType": "TicTacToe.Model.Game", "iri": "schema:Game",
                          "fields": [ { "name": "Id", "iri": "schema:identifier" } ] } ] }"""
 
-              let doc = Expect.wantOk (Accept.parseResolved json) "parse sample-style no-tag entries"
-              let move = doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Move")
-              let game = doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Game")
+              let doc =
+                  Expect.wantOk (Accept.parseResolved json) "parse sample-style no-tag entries"
+
+              let move =
+                  doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Move")
+
+              let game =
+                  doc.Resolved |> List.find (fun e -> e.FSharpType = "TicTacToe.Model.Game")
 
               match move.Shape with
               | Accept.ResolvedShape.Union cases -> Expect.equal cases.Length 2 "Move has two cases"
@@ -1200,10 +1205,7 @@ let acceptTests =
 
           test "VocabFetcher.loadCachedGraph: absent cache returns None" {
               let cacheDir =
-                  System.IO.Path.Combine(
-                      "/private/tmp/claude-501/-Users-ryanr-Code-frank/8dcbe96d-0ab3-41b3-9ce3-5abb4ec9c623/scratchpad",
-                      "vocab-test-empty"
-                  )
+                  System.IO.Path.Combine(System.IO.Path.GetTempPath(), "vocab-test-empty")
 
               System.IO.Directory.CreateDirectory(cacheDir) |> ignore
               let result = VocabFetcher.loadCachedGraph cacheDir "no-such-vocab"
@@ -1212,10 +1214,7 @@ let acceptTests =
 
           test "VocabFetcher.loadCachedGraph: present cache file returns Some (Ok graph)" {
               let cacheDir =
-                  System.IO.Path.Combine(
-                      "/private/tmp/claude-501/-Users-ryanr-Code-frank/8dcbe96d-0ab3-41b3-9ce3-5abb4ec9c623/scratchpad",
-                      "vocab-test-present"
-                  )
+                  System.IO.Path.Combine(System.IO.Path.GetTempPath(), "vocab-test-present")
 
               System.IO.Directory.CreateDirectory(cacheDir) |> ignore
 
