@@ -8,6 +8,9 @@ let handle (store: IProvenanceStore) (ctx: HttpContext) : Task =
     if isNull (box store) then
         invalidArg (nameof store) "store must not be null"
 
+    if isNull ctx then
+        invalidArg (nameof ctx) "HttpContext must not be null"
+
     let resource = ctx.Request.Query.["resource"]
 
     if StringValues.IsNullOrEmpty resource then

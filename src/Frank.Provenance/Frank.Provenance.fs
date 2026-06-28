@@ -58,20 +58,24 @@ module ProvenanceExtensions =
 
         [<CustomOperation("useProvenance")>]
         member _.UseProvenance(spec: WebHostSpec) : WebHostSpec =
-            match
-                GeneratedProvenanceResolver.resolveGeneratedConfig (System.AppDomain.CurrentDomain.GetAssemblies())
-            with
-            | Error msg -> invalidOp msg
-            | Ok config ->
-                let addServices (services: IServiceCollection) =
-                    services.TryAddSingleton<ProvenanceConfig>(config)
+            let addServices (services: IServiceCollection) =
+                services.TryAddSingleton<ProvenanceConfig>(fun _ ->
+                    match
+                        GeneratedProvenanceResolver.resolveGeneratedConfig (
+                            System.AppDomain.CurrentDomain.GetAssemblies()
+                        )
+                    with
+                    | Ok c -> c
+                    | Error m -> invalidOp m)
 
-                    services.TryAddSingleton<IProvenanceStore>(fun sp ->
-                        let logger =
-                            sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
+                services.TryAddSingleton<IProvenanceStore>(fun sp ->
+                    let cfg = sp.GetRequiredService<ProvenanceConfig>()
 
-                        new MailboxProcessorProvenanceStore(config.StoreConfig, logger) :> IProvenanceStore)
+                    let logger =
+                        sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
 
-                    spec.Services services
+                    new MailboxProcessorProvenanceStore(cfg.StoreConfig, logger) :> IProvenanceStore)
 
-                wireMiddlewareAndEndpoint spec addServices
+                spec.Services services
+
+            wireMiddlewareAndEndpoint spec addServices

@@ -51,6 +51,9 @@ module GeneratedProvenanceResolver =
         readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns)
 
     let resolveGeneratedConfig (assemblies: Assembly[]) : Result<ProvenanceConfig, string> =
+        if isNull assemblies then
+            invalidArg (nameof assemblies) "assemblies must not be null"
+
         assemblies
         |> findSinglePublicType "GeneratedProvenance"
         |> Result.bind (fun t -> readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns))

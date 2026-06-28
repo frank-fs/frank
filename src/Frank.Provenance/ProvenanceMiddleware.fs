@@ -82,38 +82,46 @@ type ProvenanceMiddleware
     (next: RequestDelegate, config: ProvenanceConfig, store: IProvenanceStore, logger: ILogger<ProvenanceMiddleware>) =
 
     do
+        if isNull (box next) then
+            invalidArg (nameof next) "RequestDelegate must not be null"
+
         if isNull (box config) then
             invalidArg (nameof config) "ProvenanceConfig must not be null"
 
         if isNull (box store) then
             invalidArg (nameof store) "IProvenanceStore must not be null"
 
-    member private _.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
+    static member private withDiscardedBody (ctx: HttpContext) (inner: unit -> Task) : Task =
         let originalBody = ctx.Response.Body
         ctx.Response.Body <- Stream.Null
 
         task {
             try
-                do! next.Invoke ctx
-                let ended = DateTimeOffset.UtcNow
-                let record = Capture.build config ctx started ended
-                store.Append record
-                ctx.Response.Body <- originalBody
-
-                if ctx.Response.HasStarted then
-                    logger.LogWarning(
-                        "ProvenanceMiddleware: response already started for {Method} {Path}; skipping prov rewrite",
-                        ctx.Request.Method,
-                        ctx.Request.Path
-                    )
-                else
-                    ctx.Response.ContentLength <- System.Nullable()
-                    ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
-                    let varyValue = StringValues "Accept"
-                    ctx.Response.Headers.Append("Vary", varyValue)
-                    do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
+                do! inner ()
             finally
                 ctx.Response.Body <- originalBody
+        }
+
+    member private this.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
+        task {
+            do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
+
+            let ended = DateTimeOffset.UtcNow
+            let record = Capture.build config ctx started ended
+            store.Append record
+
+            if ctx.Response.HasStarted then
+                logger.LogWarning(
+                    "ProvenanceMiddleware: response already started for {Method} {Path}; skipping prov rewrite",
+                    ctx.Request.Method,
+                    ctx.Request.Path
+                )
+            else
+                ctx.Response.ContentLength <- System.Nullable()
+                ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+                let varyValue = StringValues "Accept"
+                ctx.Response.Headers.Append("Vary", varyValue)
+                do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
         }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =

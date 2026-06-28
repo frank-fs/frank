@@ -82,6 +82,13 @@ module private AcceptNegotiation =
     let private isExcluded (entries: (MediaTypeHeaderValue * double) list) (candidate: string) =
         entries |> List.exists (fun (e, q) -> q = 0.0 && matchesType e candidate)
 
+    let private isRdfMentioned (entry: MediaTypeHeaderValue) : bool =
+        isConcrete entry
+        && rdfScopeTypes
+           |> Set.exists (fun candidate ->
+               matchesType entry candidate
+               && not (candidate = "application/ld+json" && hasProfileParam entry))
+
     let negotiate (acceptHeader: string) : NegotiationResult =
         if String.IsNullOrEmpty acceptHeader then
             PassThrough
@@ -101,16 +108,7 @@ module private AcceptNegotiation =
             match bestSupported with
             | Some t -> Serve t
             | None ->
-                let anyConcreteRdfMentioned =
-                    entries
-                    |> List.exists (fun (entry, _) ->
-                        isConcrete entry
-                        && rdfScopeTypes
-                           |> Set.exists (fun candidate ->
-                               matchesType entry candidate
-                               && not (candidate = "application/ld+json" && hasProfileParam entry)))
-
-                if anyConcreteRdfMentioned then
+                if entries |> List.exists (fun (entry, _) -> isRdfMentioned entry) then
                     NotAcceptable
                 else
                     PassThrough
