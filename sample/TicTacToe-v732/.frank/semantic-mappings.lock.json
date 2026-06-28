@@ -444,6 +444,19 @@
       ]
     },
     {
+      "fsharpType": "TicTacToe.Model.MoveRequest",
+      "iri": "schema:Action",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "shape": "record",
+      "fields": [
+        { "name": "Position", "iri": "schema:position", "confidence": 1, "source": "manual", "status": "confirmed" },
+        { "name": "Player",   "iri": "schema:agent",    "confidence": 1, "source": "manual", "status": "confirmed" }
+      ]
+    },
+    {
       "fsharpType": "TicTacToe.Model.MoveLog`1",
       "iri": "schema:ItemList",
       "confidence": 1,
