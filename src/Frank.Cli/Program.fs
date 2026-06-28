@@ -303,6 +303,9 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
                                 { updated with
                                     Generated = DateTimeOffset.UtcNow }
 
+                            for w in summary.Warnings do
+                                eprintfn "warning: %s" w
+
                             for r in summary.Rejected do
                                 eprintfn "%s: %s" r.FSharpType r.Reason
 

@@ -96,6 +96,10 @@ type Move =
         | Some O, Some pos -> Some(OMove pos)
         | _ -> None
 
+type MoveRequest =
+    { Position: SquarePosition
+      Player: Player }
+
 type Game = { Id: string; Result: MoveResult }
 
 type MoveLog<'T> = { Items: 'T list; Count: int }

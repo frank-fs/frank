@@ -33,6 +33,7 @@ let private lock: LockFile =
               { Uri = "https://schema.org/"
                 FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                 Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.MoveAction"
             Iri = Some "schema:MoveAction"
@@ -135,7 +136,9 @@ let badModuleNameTests =
           }
 
           test "valid qualified name still produces Ok" {
-              let result = ValidationEmitter.emit "TicTacToe.GeneratedValidation" registry lock typesByName
+              let result =
+                  ValidationEmitter.emit "TicTacToe.GeneratedValidation" registry lock typesByName
+
               Expect.isOk result "valid module name must succeed"
           } ]
 
@@ -254,6 +257,7 @@ let skipPathTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                               Hash = "sha256:test" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "TicTacToe.NoIriType"
                           Iri = None
@@ -286,6 +290,7 @@ let skipPathTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                               Hash = "sha256:test" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "TicTacToe.PayloadUnion"
                           Iri = Some "schema:PayloadUnion"

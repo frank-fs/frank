@@ -21,6 +21,7 @@ let private emptyLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
       Vocabularies = Map.empty
+      DeclaredPrefixes = Map.empty
       Mappings = [] }
 
 /// Lock pre-loaded with the schema: prefix — used by tests that resolve schema:* IRIs.
@@ -76,6 +77,7 @@ let at_rm1 =
 
         let lock =
             { lockWithSchema with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build registry lock with
@@ -107,6 +109,7 @@ let at_rm2 =
 
               let lock =
                   { emptyLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -122,6 +125,7 @@ let at_rm2 =
 
               let lock =
                   { emptyLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -137,6 +141,7 @@ let at_rm2 =
 
               let lock =
                   { emptyLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -156,6 +161,7 @@ let at_rm3 =
 
         let lock =
             { emptyLock with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build baseRegistry lock with
@@ -173,6 +179,7 @@ let at_rm4 =
 
         let lock =
             { lockWithSchemaAndEx with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ m1; m2 ] }
 
         match ResolvedModel.build baseRegistry lock with
@@ -223,6 +230,7 @@ let at_rm7 =
 
         let lock =
             { emptyLock with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ m1; m2; m3 ] }
 
         match ResolvedModel.build baseRegistry lock with
@@ -243,6 +251,7 @@ let at_rm_kw =
 
               let lock =
                   { lockWithSchema with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -257,6 +266,7 @@ let at_rm_kw =
 
               let lock =
                   { lockWithSchema with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -269,6 +279,7 @@ let at_rm_kw =
 
               let lock =
                   { emptyLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               match ResolvedModel.build baseRegistry lock with
@@ -294,6 +305,7 @@ let at_rm8 =
 
         let lock =
             { lockWithSchema with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build registry lock with
@@ -332,6 +344,7 @@ let at_rm10 =
 
         let lock =
             { lockWithSchema with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ confirmed; excluded ] }
 
         match ResolvedModel.build baseRegistry lock with
@@ -368,6 +381,7 @@ let at_rm_ef =
 
         let lock =
             { lockWithSchema with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ mapping ] }
 
         match ResolvedModel.build baseRegistry lock with
@@ -397,6 +411,7 @@ let at_rm_ci =
                       { Uri = "http://example.com/vocab#"
                         FetchedAt = DateTimeOffset.UtcNow
                         Hash = "test" } ]
+              DeclaredPrefixes = Map.empty
               Mappings =
                 [ { FSharpType = "MyApp.Color"
                     Iri = Some "ex:Color"
@@ -445,6 +460,7 @@ let private enrichMapping =
 
 let private enrichLock =
     { lockWithSchema with
+        DeclaredPrefixes = Map.empty
         Mappings = [ enrichMapping ] }
 
 let private mkFieldInfo name typeName : FieldInfo =
@@ -573,6 +589,7 @@ let at_rm9 =
               // Lock carries schema: but registry has NO prefixes at all.
               let lock =
                   { lockWithSchema with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               let registryNoPrefixes = VocabularyRegistry.empty
@@ -590,6 +607,7 @@ let at_rm9 =
               // myns: is absent from lock.Vocabularies — even if registry carries it, still Error.
               let lock =
                   { emptyLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ mapping ] }
 
               let registryWithMyns =

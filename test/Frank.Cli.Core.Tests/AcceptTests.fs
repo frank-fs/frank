@@ -26,12 +26,14 @@ let private mkLock (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
+      DeclaredPrefixes = Map.empty
       Mappings = mappings }
 
 let private mkLockWithVocabs (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = schemaVocabs
+      DeclaredPrefixes = Map.empty
       Mappings = mappings }
 
 let private unresolvedOrderLine: Mapping =
@@ -270,7 +272,8 @@ let acceptTests =
                           Reason = "not in lock file" } ]
                     Unchanged = 1
                     AlreadyConfirmed = 0
-                    FieldsUnresolved = 3 }
+                    FieldsUnresolved = 3
+                    Warnings = [] }
 
               let json = Accept.summaryToJson summary
               let doc = System.Text.Json.JsonDocument.Parse(json)
@@ -293,7 +296,8 @@ let acceptTests =
                           Reason = "unresolvable iri \"schema:Foo\\bar\"" } ]
                     Unchanged = 0
                     AlreadyConfirmed = 0
-                    FieldsUnresolved = 0 }
+                    FieldsUnresolved = 0
+                    Warnings = [] }
 
               let json = Accept.summaryToJson summary
               let doc = System.Text.Json.Nodes.JsonNode.Parse json
@@ -322,6 +326,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
                               Hash = "h" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
                           Iri = Some "schema:MoveAction"
@@ -379,6 +384,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
                               Hash = "h" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -437,6 +443,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
                               Hash = "h" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
                           Iri = Some "schema:MoveAction"
@@ -483,6 +490,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -521,6 +529,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -559,6 +568,7 @@ let acceptTests =
                             { Uri = "https://example.com/ns/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Foo"
                           Iri = None
@@ -587,6 +597,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -620,6 +631,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -664,6 +676,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Result"
                           Iri = None
@@ -709,6 +722,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Result"
                           Iri = None
@@ -762,6 +776,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Item"
                           Iri = None
@@ -808,6 +823,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -852,6 +868,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -886,6 +903,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None
@@ -926,6 +944,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Status"
                           Iri = None
@@ -967,6 +986,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
                           Iri = None
@@ -1008,6 +1028,7 @@ let acceptTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = System.DateTimeOffset.UnixEpoch
                               Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.X"
                           Iri = None
@@ -1233,4 +1254,146 @@ let acceptTests =
               | None -> failtest "expected Some result for present cache file"
               | Some(Error e) -> failtest $"expected Ok graph, got Error: {e}"
               | Some(Ok graph) -> Expect.isGreaterThan graph.Triples.Count 0 "graph has triples"
+          }
+
+          // ── Step 3.5 capstone tests (TDD — written before implementation) ──────
+
+          test "capstone-step35: covered-vocab typo still rejects with DeclaredPrefixes present" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/agent" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    Mappings =
+                      [ { FSharpType = "App.MoveRequest"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape = MappingShape.Record [] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.MoveRequest", "iri": "schema:MoveActoin", "shape": "record", "fields": [] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Manual oracle
+              Expect.equal summary.Merged 0 "covered-vocab typo must still be rejected"
+
+              let rej =
+                  summary.Rejected |> List.tryFind (fun r -> r.FSharpType = "App.MoveRequest")
+
+              Expect.isSome rej "App.MoveRequest must appear in Rejected"
+              Expect.stringContains rej.Value.Reason "not found" "reason cites not found"
+          }
+
+          test "capstone-step35: uncovered declared-prefix CURIE warns but still writes the mapping" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/MoveAction" ]
+                    Properties = Set.ofList [ "https://schema.org/agent" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    Mappings =
+                      [ { FSharpType = "App.MoveRequest"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "Position"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved }
+                                  { Name = "Player"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.MoveRequest", "iri": "schema:MoveAction", "shape": "record",
+                         "fields": [
+                           { "name": "Position", "iri": "ttt:square" },
+                           { "name": "Player", "iri": "schema:agent" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Manual oracle
+              Expect.equal summary.Merged 1 "mapping must be written (warn, not reject)"
+              Expect.equal summary.Rejected [] "no rejections for uncovered declared-prefix CURIE"
+              Expect.isNonEmpty summary.Warnings "must emit a warning for the unfetched ttt prefix"
+
+              let hasExpectedWarning = summary.Warnings |> List.exists (fun w -> w.Contains "ttt")
+
+              Expect.isTrue hasExpectedWarning "warning must mention the 'ttt' prefix"
+          }
+
+          test "capstone-step35: fully-covered correct term produces no warning and is accepted" {
+              let oracle: Accept.TermOracle =
+                  { Classes = Set.ofList [ "https://schema.org/Game" ]
+                    Properties = Set.ofList [ "https://schema.org/identifier" ]
+                    Individuals = Set.empty
+                    CoveredBases = [ "https://schema.org/" ] }
+
+              let lock =
+                  { SchemaVersion = 1
+                    Generated = System.DateTimeOffset.UnixEpoch
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { Uri = "https://schema.org/"
+                              FetchedAt = System.DateTimeOffset.UnixEpoch
+                              Hash = "stub" } ]
+                    DeclaredPrefixes = Map.empty
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = None
+                          Confidence = 0.0
+                          Source = Convention
+                          Status = Unresolved
+                          Alternates = []
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "Id"
+                                    Iri = None
+                                    Confidence = 0.0
+                                    Source = Convention
+                                    Status = Unresolved } ] } ] }
+
+              let json =
+                  """{ "schemaVersion": 1, "resolved": [
+                       { "fsharpType": "App.Game", "iri": "schema:Game", "shape": "record",
+                         "fields": [ { "name": "Id", "iri": "schema:identifier" } ] } ] }"""
+
+              let doc = Expect.wantOk (Accept.parseResolved json) "parse"
+              let _, summary = Accept.apply lock doc Manual oracle
+              Expect.equal summary.Merged 1 "fully-covered correct term must be accepted"
+              Expect.equal summary.Rejected [] "no rejections for correct covered-vocab IRI"
+              Expect.equal summary.Warnings [] "no warnings when vocab is fetched and term correct"
           } ]

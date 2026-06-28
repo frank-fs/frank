@@ -1,12 +1,17 @@
 {
   "schemaVersion": 1,
-  "generated": "2026-06-25T05:39:00+00:00",
+  "generated": "2026-06-28T20:37:39+00:00",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
-      "fetchedAt": "2026-06-25T03:34:37+00:00",
+      "fetchedAt": "2026-06-28T20:36:58+00:00",
       "hash": "0f0c97a4f666b2f8563573fe48453782fd51b87a504523cf0c9aff6a71c3eec4"
     }
+  },
+  "declaredPrefixes": {
+    "schema": "https://schema.org/",
+    "ttt": "https://example.org/tictactoe#",
+    "wikidata": "http://www.wikidata.org/entity/"
   },
   "mappings": [
     {
@@ -627,6 +632,34 @@
           "iri": "schema:agent",
           "confidence": 1,
           "source": "convention",
+          "status": "confirmed"
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveRequest",
+      "iri": "schema:MoveAction",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [
+        "https://schema.org/MovieSeries",
+        "https://schema.org/MovieClip"
+      ],
+      "shape": "record",
+      "fields": [
+        {
+          "name": "Position",
+          "iri": "ttt:square",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        },
+        {
+          "name": "Player",
+          "iri": "schema:agent",
+          "confidence": 1,
+          "source": "manual",
           "status": "confirmed"
         }
       ]

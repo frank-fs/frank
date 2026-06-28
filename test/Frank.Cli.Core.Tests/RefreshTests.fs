@@ -29,6 +29,7 @@ let private mkLock (vocabs: Map<string, VocabularyEntry>) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UnixEpoch
       Vocabularies = vocabs
+      DeclaredPrefixes = Map.empty
       Mappings = [] }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

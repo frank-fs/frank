@@ -31,6 +31,7 @@ let private ticTacToeLock: LockFile =
               { Uri = "https://schema.org/"
                 FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                 Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
             Iri = Some "schema:Game"
@@ -83,6 +84,7 @@ let private minimalLock (mapping: Mapping) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
       Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
       Mappings = [ mapping ] }
 
 // ── Result helpers ────────────────────────────────────────────────────────────
@@ -173,6 +175,7 @@ let private genLockWithSchemaIris =
             { SchemaVersion = 1
               Generated = DateTimeOffset.UtcNow
               Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+              DeclaredPrefixes = Map.empty
               Mappings = mappings }
     }
 
@@ -502,6 +505,7 @@ let excludedMappingTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Game"
                           Iri = Some "schema:Game"

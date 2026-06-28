@@ -84,11 +84,13 @@ let private readOrEmptyLock (path: string) : LockFile =
             { SchemaVersion = 1
               Generated = DateTimeOffset.UtcNow
               Vocabularies = Map.empty
+              DeclaredPrefixes = Map.empty
               Mappings = [] }
     else
         { SchemaVersion = 1
           Generated = DateTimeOffset.UtcNow
           Vocabularies = Map.empty
+          DeclaredPrefixes = Map.empty
           Mappings = [] }
 
 /// Merge semantics: all decided (confirmed/excluded) entries preserved regardless of source;
@@ -198,6 +200,7 @@ let private writeLock
     (existing: LockFile)
     (fresh: Mapping list)
     (vocabularies: Map<string, VocabularyEntry>)
+    (declaredPrefixes: Map<string, string>)
     : ExtractSummary =
     let merged = mergeWithPreservation existing.Mappings fresh
 
@@ -205,6 +208,7 @@ let private writeLock
         { existing with
             Generated = DateTimeOffset.UtcNow
             Vocabularies = vocabularies
+            DeclaredPrefixes = declaredPrefixes
             Mappings = merged }
 
     Directory.CreateDirectory(Path.GetDirectoryName lockPath) |> ignore
@@ -249,7 +253,11 @@ let internal runWithFetch (fetch: VocabFetcher.Fetch) (opts: ExtractOptions) : R
                             let freshMappings = typeInfos |> List.map (ConventionEngine.score terms registry)
                             let lockPath = lockFilePath projectFile
                             let existingLock = readOrEmptyLock lockPath
-                            Ok(writeLock lockPath existingLock freshMappings vocabEntries)
+
+                            let declaredPrefixes =
+                                registry.Prefixes |> Map.map (fun _ (u: Uri) -> u.AbsoluteUri)
+
+                            Ok(writeLock lockPath existingLock freshMappings vocabEntries declaredPrefixes)
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.

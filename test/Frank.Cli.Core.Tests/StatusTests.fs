@@ -20,6 +20,7 @@ let private lockWith (mappings: Mapping list) : LockFile.LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UtcNow
       Vocabularies = Map.empty
+      DeclaredPrefixes = Map.empty
       Mappings = mappings }
 
 // ── AT5: status format ────────────────────────────────────────────────────────

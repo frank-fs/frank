@@ -88,6 +88,7 @@ let private genLockFile =
             ({ SchemaVersion = 1
                Generated = generated
                Vocabularies = vocabs
+               DeclaredPrefixes = Map.empty
                Mappings = mappings }
             : LockFile.LockFile)
     }
@@ -242,6 +243,7 @@ let roundTripTests =
                             { Uri = "https://schema.org/"
                               FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
                               Hash = "sha256:abc123" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Order"
                           Iri = Some "schema:Order"
@@ -287,6 +289,7 @@ let roundTripTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Unknown"
                           Iri = None
@@ -324,6 +327,7 @@ let roundTripTests =
                             { Uri = "http://www.w3.org/ns/prov#"
                               FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
                               Hash = "sha256:def456" } ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Order"
                           Iri = Some "schema:Order"
@@ -415,10 +419,12 @@ let diffFriendlyTests =
             { SchemaVersion = 1
               Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
               Vocabularies = Map.ofList [ "schema", vocab ]
+              DeclaredPrefixes = Map.empty
               Mappings = [ mapping1 ] }
 
         let lf2 =
             { lf1 with
+                DeclaredPrefixes = Map.empty
                 Mappings = [ mapping1; mapping2 ] }
 
         let path1 = Path.GetTempFileName()
@@ -474,6 +480,7 @@ let mergeTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
 
               let result = LockFile.merge lf [ resolved ]
@@ -507,6 +514,7 @@ let mergeTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
 
               let result = LockFile.merge lf [ resolved ]
@@ -546,6 +554,7 @@ let mergeTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
 
               let result = LockFile.merge lf [ resolved ]
@@ -568,6 +577,7 @@ let mergeTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
 
               let resolved =
@@ -769,6 +779,7 @@ let excludedStatusTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Legacy"
                           Iri = None
@@ -824,6 +835,7 @@ let vocabKeySortTests =
                       { Uri = "http://www.w3.org/ns/dcat#"
                         FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
                         Hash = "sha256:ccc" } ]
+              DeclaredPrefixes = Map.empty
               Mappings = [] }
 
         let path = Path.GetTempFileName()
@@ -907,6 +919,7 @@ let unionShapeRoundTripTests =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
                     Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
                     Mappings = [ mapping ] }
 
               let path = System.IO.Path.GetTempFileName()

@@ -143,10 +143,16 @@ module ResolvedModel =
         | Error e -> Error e
         | Ok ys -> Ok(List.rev ys)
 
-    /// Build a prefix map from the lock's vocabularies block.
+    /// Build a prefix map from the lock's vocabularies block and declared prefixes.
     /// Each key is the vocabulary prefix (e.g. "schema"); each value is its base Uri.
-    let private lockPrefixes (vocabularies: Map<string, VocabularyEntry>) : Map<string, Uri> =
-        vocabularies |> Map.map (fun _ entry -> Uri(entry.Uri))
+    /// DeclaredPrefixes (unfetched) are merged in so domain CURIEs (e.g. ttt:square) expand.
+    let private lockPrefixes
+        (vocabularies: Map<string, VocabularyEntry>)
+        (declaredPrefixes: Map<string, string>)
+        : Map<string, Uri> =
+        let fromVocabs = vocabularies |> Map.map (fun _ entry -> Uri(entry.Uri))
+        let fromDeclared = declaredPrefixes |> Map.map (fun _ uri -> Uri(uri))
+        Map.fold (fun acc k v -> Map.add k v acc) fromVocabs fromDeclared
 
     let private buildField
         (prefixes: Map<string, Uri>)
@@ -324,7 +330,7 @@ module ResolvedModel =
         List.fold folder (Ok()) withClassIri
 
     let build (registry: VocabularyRegistry) (lock: LockFile) : Result<ResolvedModel, string> =
-        let lockIriPrefixes = lockPrefixes lock.Vocabularies
+        let lockIriPrefixes = lockPrefixes lock.Vocabularies lock.DeclaredPrefixes
         let included = lock.Mappings |> List.filter (fun m -> m.Status <> Excluded)
 
         match buildResources lockIriPrefixes registry included with

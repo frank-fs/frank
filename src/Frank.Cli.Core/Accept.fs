@@ -35,7 +35,8 @@ type AcceptSummary =
       Rejected: RejectedEntry list
       Unchanged: int
       AlreadyConfirmed: int
-      FieldsUnresolved: int }
+      FieldsUnresolved: int
+      Warnings: string list }
 
 // ── Parse helpers ─────────────────────────────────────────────────────────────
 
@@ -366,6 +367,41 @@ let private partitionByIri
     let rejected, ok = List.fold folder ([], []) entries
     List.rev rejected, List.rev ok
 
+let private prefixOfCurie (iri: string) : string option =
+    match iri.IndexOf(':') with
+    | -1 -> None
+    | idx -> Some iri.[.. idx - 1]
+
+let private iriStringsFromEntry (e: ResolvedEntry) : string list =
+    let fromFields (fs: ResolvedField list) = fs |> List.choose (fun f -> f.Iri)
+
+    let fromCases (cs: ResolvedCase list) =
+        cs |> List.collect (fun c -> (c.Iri |> Option.toList) @ fromFields c.Payload)
+
+    (e.Iri |> Option.toList)
+    @ match e.Shape with
+      | ResolvedShape.Record fs -> fromFields fs
+      | ResolvedShape.Union cs -> fromCases cs
+
+let private collectPrefixWarnings (lf: LockFile) (entries: ResolvedEntry list) : string list =
+    let fetchedKeys = lf.Vocabularies |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+
+    let unfetchedDeclared =
+        lf.DeclaredPrefixes
+        |> Map.filter (fun k _ -> not (Set.contains k fetchedKeys))
+        |> Map.toSeq
+        |> Seq.map fst
+        |> Set.ofSeq
+
+    entries
+    |> List.collect iriStringsFromEntry
+    |> List.choose (fun iri ->
+        match prefixOfCurie iri with
+        | Some prefix when Set.contains prefix unfetchedDeclared ->
+            Some $"vocabulary '{prefix}' referenced but not published — host it or check the URL"
+        | _ -> None)
+    |> List.distinct
+
 let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: TermOracle) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
 
@@ -389,7 +425,11 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let withIri = inLock |> List.filter (fun e -> e.Iri.IsSome)
 
     let prefixes =
-        lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
+        let fromVocabs =
+            lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
+
+        let fromDeclared = lf.DeclaredPrefixes |> Map.map (fun _ uri -> System.Uri uri)
+        Map.fold (fun acc k v -> Map.add k v acc) fromVocabs fromDeclared
 
     let iriRejected, toMerge = partitionByIri prefixes oracle withIri
 
@@ -415,13 +455,15 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
 
     let updated = LockFile.merge lf mergedMappings
     let fieldsUnresolved = countUnresolvedFields updated.Mappings mergedTypes
+    let warnings = collectPrefixWarnings lf toMerge
 
     let summary =
         { Merged = toMerge.Length
           Rejected = notInLock @ nullIriRejected @ iriRejected
           Unchanged = unchanged
           AlreadyConfirmed = alreadyConfirmed
-          FieldsUnresolved = fieldsUnresolved }
+          FieldsUnresolved = fieldsUnresolved
+          Warnings = warnings }
 
     updated, summary
 
@@ -458,10 +500,16 @@ let summaryToJson (s: AcceptSummary) : string =
         entry.Add("reason", JsonValue.Create r.Reason)
         rejectedArr.Add(entry)
 
+    let warningsArr = JsonArray()
+
+    for w in s.Warnings do
+        warningsArr.Add(JsonValue.Create w)
+
     let root = JsonObject()
     root.Add("merged", JsonValue.Create s.Merged)
     root.Add("rejected", rejectedArr)
     root.Add("unchanged", JsonValue.Create s.Unchanged)
     root.Add("alreadyConfirmed", JsonValue.Create s.AlreadyConfirmed)
     root.Add("fieldsUnresolved", JsonValue.Create s.FieldsUnresolved)
+    root.Add("warnings", warningsArr)
     root.ToJsonString summaryWriteOptions

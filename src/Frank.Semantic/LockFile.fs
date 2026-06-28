@@ -18,6 +18,7 @@ module LockFile =
         { SchemaVersion: int
           Generated: DateTimeOffset
           Vocabularies: Map<string, VocabularyEntry>
+          DeclaredPrefixes: Map<string, string>
           Mappings: Mapping list }
 
     // ── DU ↔ string maps (total, defined once) ────────────────────────────────
@@ -248,6 +249,23 @@ module LockFile =
                       FetchedAt = fetchedAt
                       Hash = hash })))
 
+    let private parseDeclaredPrefixes (node: JsonNode) : Result<Map<string, string>, string> =
+        match node with
+        | null -> Ok Map.empty
+        | :? JsonObject as obj ->
+            obj
+            |> Seq.fold
+                (fun acc kvp ->
+                    match acc with
+                    | Error e -> Error e
+                    | Ok m ->
+                        try
+                            Ok(Map.add kvp.Key (kvp.Value.GetValue<string>()) m)
+                        with _ ->
+                            Error $"declaredPrefixes['{kvp.Key}']: not a string")
+                (Ok Map.empty)
+        | _ -> Error "field 'declaredPrefixes' must be an object"
+
     let private parseVocabularies (node: JsonNode) : Result<Map<string, VocabularyEntry>, string> =
         match node with
         | null -> Ok Map.empty
@@ -298,12 +316,15 @@ module LockFile =
                             |> Result.bind (fun generated ->
                                 parseVocabularies node.["vocabularies"]
                                 |> Result.bind (fun vocabularies ->
-                                    parseMappingList node.["mappings"]
-                                    |> Result.map (fun mappings ->
-                                        { SchemaVersion = version
-                                          Generated = generated
-                                          Vocabularies = vocabularies
-                                          Mappings = mappings }))))
+                                    parseDeclaredPrefixes node.["declaredPrefixes"]
+                                    |> Result.bind (fun declaredPrefixes ->
+                                        parseMappingList node.["mappings"]
+                                        |> Result.map (fun mappings ->
+                                            { SchemaVersion = version
+                                              Generated = generated
+                                              Vocabularies = vocabularies
+                                              DeclaredPrefixes = declaredPrefixes
+                                              Mappings = mappings })))))
             | _ -> Error "lock file: root must be a JSON object")
 
     // ── JSON serialization (pure, deterministic) ──────────────────────────────
@@ -396,6 +417,13 @@ module LockFile =
             vocabs.Add(key, serializeVocabEntry lf.Vocabularies.[key])
 
         root.Add("vocabularies", vocabs)
+
+        let declaredPrefixesObj = JsonObject()
+
+        for key in lf.DeclaredPrefixes |> Map.toSeq |> Seq.map fst |> Seq.sort do
+            declaredPrefixesObj.Add(key, JsonValue.Create lf.DeclaredPrefixes.[key])
+
+        root.Add("declaredPrefixes", declaredPrefixesObj)
 
         let mappings = JsonArray()
 

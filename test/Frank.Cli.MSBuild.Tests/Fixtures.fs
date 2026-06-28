@@ -13,6 +13,7 @@ let confirmedLock: LockFile =
               { Uri = "https://schema.org/"
                 FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                 Hash = "sha256:abc" } ]
+      DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
             Iri = Some "schema:Game"
@@ -43,6 +44,7 @@ let confirmedLock: LockFile =
 
 let proposedLock: LockFile =
     { confirmedLock with
+        DeclaredPrefixes = Map.empty
         Mappings =
             [ { FSharpType = "TicTacToe.Game"
                 Iri = Some "schema:Game"

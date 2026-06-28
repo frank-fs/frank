@@ -29,6 +29,7 @@ let private lock: LockFile =
               { Uri = "https://schema.org/"
                 FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                 Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "MyApp.OrderPlaced"
             Iri = Some "schema:OrderAction"
@@ -60,7 +61,8 @@ let emitTests =
                       Using = Set.ofList [ "schema" ] }
 
               let src =
-                  ProvenanceEmitter.emit "MyApp.GeneratedProvenance" emptyRegistry lock |> okOrFail
+                  ProvenanceEmitter.emit "MyApp.GeneratedProvenance" emptyRegistry lock
+                  |> okOrFail
 
               Expect.stringContains src "provClasses" "provClasses binding emitted"
           }

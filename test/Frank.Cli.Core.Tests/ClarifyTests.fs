@@ -89,6 +89,7 @@ let private unionLock: LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = Map.empty
+      DeclaredPrefixes = Map.empty
       Mappings = [ proposedUnionMapping; unresolvedUnionMapping ] }
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -140,12 +141,14 @@ let private mixedLock: LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
+      DeclaredPrefixes = Map.empty
       Mappings = [ unresolvedMapping; proposedMapping; confirmedMapping ] }
 
 let private allConfirmedLock: LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
       Vocabularies = emptyVocabs
+      DeclaredPrefixes = Map.empty
       Mappings = [ confirmedMapping ] }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -227,6 +230,7 @@ let clarifyTests =
           <| fun () ->
               let lock: LockFile =
                   { mixedLock with
+                      DeclaredPrefixes = Map.empty
                       Mappings = [ unresolvedMapping ] }
 
               let json: string = Clarify.toJson lock
@@ -319,14 +323,18 @@ let clarifyTests =
               Expect.equal caseNames [ "XTurn"; "OTurn"; "Won"; "Draw"; "Error" ] "all case names present in order"
 
               let wonCase: JsonNode =
-                  cases |> Seq.cast<JsonNode> |> Seq.find (fun c -> c.["name"].GetValue<string>() = "Won")
+                  cases
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun c -> c.["name"].GetValue<string>() = "Won")
 
               let wonPayload: JsonArray = wonCase.["payload"].AsArray()
               Expect.equal wonPayload.Count 1 "Won case has one payload field"
               Expect.equal (wonPayload.[0].["name"].GetValue<string>()) "Winner" "Won payload field name"
 
               let xTurnCase: JsonNode =
-                  cases |> Seq.cast<JsonNode> |> Seq.find (fun c -> c.["name"].GetValue<string>() = "XTurn")
+                  cases
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun c -> c.["name"].GetValue<string>() = "XTurn")
 
               let xTurnPayload: JsonArray = xTurnCase.["payload"].AsArray()
               Expect.equal xTurnPayload.Count 0 "nullary XTurn case has empty payload array"
@@ -373,9 +381,7 @@ let clarifyTests =
               match roundTrip with
               | Error e -> failtest $"parseResolved failed: {e}"
               | Ok doc ->
-                  let entry =
-                      doc.Resolved
-                      |> List.find (fun e -> e.FSharpType = "MyApp.MoveResult")
+                  let entry = doc.Resolved |> List.find (fun e -> e.FSharpType = "MyApp.MoveResult")
 
                   match entry.Shape with
                   | Accept.ResolvedShape.Union cases ->
@@ -388,7 +394,8 @@ let clarifyTests =
 
                       let xTurn = cases |> List.find (fun c -> c.Name = "XTurn")
                       Expect.equal xTurn.Payload.Length 0 "nullary XTurn round-trip has empty payload"
-                  | Accept.ResolvedShape.Record _ -> failtest "expected ResolvedShape.Union but got ResolvedShape.Record"
+                  | Accept.ResolvedShape.Record _ ->
+                      failtest "expected ResolvedShape.Union but got ResolvedShape.Record"
 
           testCase "AT-U4: toResolvedTemplate — nullary cases emit payload: [] not omitted"
           <| fun () ->
@@ -404,7 +411,9 @@ let clarifyTests =
               let cases: JsonArray = moveResultEntry.["cases"].AsArray()
 
               let xTurnCase: JsonNode =
-                  cases |> Seq.cast<JsonNode> |> Seq.find (fun c -> c.["name"].GetValue<string>() = "XTurn")
+                  cases
+                  |> Seq.cast<JsonNode>
+                  |> Seq.find (fun c -> c.["name"].GetValue<string>() = "XTurn")
 
               Expect.isNotNull xTurnCase.["payload"] "payload key must be present on nullary case"
               Expect.equal (xTurnCase.["payload"].AsArray().Count) 0 "nullary case payload is empty array"
@@ -512,5 +521,9 @@ let clarifyTests =
                   match entry.Shape with
                   | Accept.ResolvedShape.Union cases ->
                       let names = cases |> List.map (fun c -> c.Name)
-                      Expect.equal names [ "XTurn"; "OTurn"; "Won"; "Draw"; "Error" ] "round-trip case names with shape tag"
+
+                      Expect.equal
+                          names
+                          [ "XTurn"; "OTurn"; "Won"; "Draw"; "Error" ]
+                          "round-trip case names with shape tag"
                   | Accept.ResolvedShape.Record _ -> failtest "expected Union but got Record" ]

@@ -24,6 +24,7 @@ let private ticTacToeLock: LockFile =
               { Uri = "https://schema.org/"
                 FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
                 Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
             Iri = Some "schema:Game"
@@ -76,6 +77,7 @@ let private minimalLock (mapping: Mapping) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
       Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
       Mappings = [ mapping ] }
 
 let private singleTypeLock: LockFile =
@@ -179,6 +181,7 @@ let private genLockWithSchemaIris =
             { SchemaVersion = 1
               Generated = DateTimeOffset.UtcNow
               Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+              DeclaredPrefixes = Map.empty
               Mappings = mappings }
     }
 
@@ -194,7 +197,9 @@ let badModuleNameTests =
           }
 
           test "dotless module name returns Error not exception" {
-              let result = DiscoveryEmitter.emit "NoNamespace" "/alps" schemaRegistry ticTacToeLock
+              let result =
+                  DiscoveryEmitter.emit "NoNamespace" "/alps" schemaRegistry ticTacToeLock
+
               Expect.isError result "dotless module name must return Error"
           }
 
@@ -433,6 +438,7 @@ let excludedMappingTests =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
                     Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Game"
                           Iri = Some "schema:Game"
