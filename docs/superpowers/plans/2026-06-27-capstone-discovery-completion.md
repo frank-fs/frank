@@ -14,7 +14,7 @@
 - **Worktree:** all work in `.claude/worktrees/capstone-discovery` (branch `capstone-discovery-completion`). Bash cwd resets to master between calls — **absolute worktree paths in every command**.
 - **The E2E is the truth (STUBS.md discipline):** never stub the Playwright AT layer. Make deeper layers real until each AT is green with no `FRANK-STUB(AT-Sx)` remaining.
 - **MSBuild task DLL caching:** run `dotnet build-server shutdown` before rebuilding the sample after any `Frank.Cli.MSBuild`/codegen change (src/CLAUDE.md).
-- **Codegen MUST use Fabulous.AST** (no string concat) — but this plan adds **no emitter code**; it only changes the sample's model + lock so existing emitters produce more.
+- **Codegen MUST use Fabulous.AST** (no string concat) — this plan adds **no emitter code**. The only library/CLI change is the minimal `accept` declared-prefix expansion + warn-not-reject (Task 1 Step 3.5); otherwise it changes the sample's model + lock so existing emitters produce more.
 - **No hardcoded machine paths in tests** (the CI bug just fixed: use `Path.GetTempPath()`, not scratchpad paths).
 - **Fantomas** must pass on changed `src/` before commits; the pre-commit hook enforces it.
 - **Discovery-only constraint (AT-S6/S7):** the naive client may NOT hardcode URLs, state names, or message constructors — it reads them from JSON Home / ALPS / Link headers / response bodies only.
@@ -31,14 +31,16 @@
 | File | Change | Responsibility |
 |------|--------|----------------|
 | `sample/TicTacToe-v732/Model.fs(i)` | modify | add `MoveRequest` record (`Position: SquarePosition; Player: Player`) |
-| `sample/TicTacToe-v732/Vocabulary.fs` | modify | declare `MoveRequest` alignment if the vocab CE drives it (prefixes/using already present) |
+| `sample/TicTacToe-v732/Vocabulary.fs` | modify | `prefix "ttt" …` + `constrainPattern` on `MoveRequest.Position` (do NOT `using "ttt"` — keep it unpublished so accept warns) |
 | `sample/TicTacToe-v732/.frank/semantic-mappings.lock.json` | regenerate | add the `MoveRequest` mapping (class IRI + `Position`/`Player` field IRIs) via the `frank semantic` pipeline |
-| `sample/TicTacToe-v732/Program.fs` | modify | `useValidation`; move handler accepts ld+json `MoveRequest`; `accepts typeof<MoveRequest>` on the moves resource |
+| `sample/TicTacToe-v732/vocab/ttt.ttl` | **new** | authored `ttt` ontology doc (`ttt:Square` class + `ttt:square` property + 9 cell individuals); served by the `/tictactoe` resource (Task 1b) |
+| `sample/TicTacToe-v732/Program.fs` | modify | `useValidation`; move handler accepts ld+json `MoveRequest`; `accepts typeof<MoveRequest>`; **host the `ttt` vocab as a resource at `/tictactoe`** (Task 1b) |
+| `src/Frank.Cli.Core/Accept.fs` (+ declared-prefix source) | modify | carry declared `prefix` namespaces into accept; warn-not-reject for an uncovered/unpublished referenced vocab (Task 1 Step 3.5) |
 | `sample/TicTacToe-v732.E2E/SemanticTests.fs` | modify | AT-S6 turn green; add AT-S7 (vocab-swap), AT-S8 (provenance verify) |
 | `sample/TicTacToe-v732.E2E/ServerFixture.fs` | maybe | second server config for the `ex:` vocab variant (AT-S7) |
 | `Frank.sln` + `.github/workflows/ci.yml` | modify | add the E2E project to sln + CI |
 
-**Read before starting:** `sample/TicTacToe-v732.E2E/SemanticTests.fs` (the AT harness), `sample/TicTacToe-v732/Program.fs` (current handler + webHost), `sample/TicTacToe-v732/Vocabulary.fs`, `sample/TicTacToe-v732/.frank/semantic-mappings.lock.json`, `src/Frank.Cli.Core/DiscoveryEmitter.fs` (descriptors come from `ResolvedModel` fields), `src/Frank.OpenApi/HandlerBuilder.fs` (`accepts`), `src/Frank.Validation/Frank.Validation.fs` (`useValidation`), `src/Frank.Cli/` (the `frank semantic` commands).
+**Read before starting:** `sample/TicTacToe-v732.E2E/SemanticTests.fs` (the AT harness), `sample/TicTacToe-v732/Program.fs` (current handler + webHost), `sample/TicTacToe-v732/Vocabulary.fs`, `sample/TicTacToe-v732/.frank/semantic-mappings.lock.json`, `src/Frank.Cli.Core/DiscoveryEmitter.fs` (descriptors come from `ResolvedModel` fields), `src/Frank.OpenApi/HandlerBuilder.fs` (`accepts`), `src/Frank.Validation/Frank.Validation.fs` (`useValidation`), `src/Frank.Cli/` (the `frank semantic` commands), `src/Frank.Cli.Core/Accept.fs` + `Pipeline.fs` (the accept prefix/oracle path — Step 3.5).
 
 ---
 
@@ -49,7 +51,7 @@
 **Honest mappings (decided by meaning, not by test literals):**
 - `MoveRequest` (type/class) → `schema:MoveAction`
 - `Player` (field) → `schema:agent` (the load-bearing universal term)
-- `Position` (field) → a **domain term** `ttt:square` (declare `prefix "ttt" "https://example.org/tictactoe#"`); there is no honest schema.org term for a board cell — the accept oracle is fail-open for the uncached `ttt:` namespace (`Accept.fs:266-271`), so a declared-prefix CURIE is permitted.
+- `Position` (field) → a **domain term** `ttt:square` (declare `prefix "ttt" "https://example.org/tictactoe#"`); no honest schema.org term for a board cell. **Blocker resolution (verified 2026-06-28):** accept builds `prefixes` only from fetched `lf.Vocabularies` (`Accept.fs:391`), so an unfetched declared prefix hits "Unknown prefix 'ttt'" *before* the fail-open path (`Accept.fs:302-303`) is reached. Minimal fix (Step 3.5): carry declared `prefix` namespaces into accept so `ttt:square` **expands** to its absolute IRI for codegen; accept then **warns** (vocab unpublished) and still writes the mapping — never hard-rejects. The author hosts `ttt` as a resource (Task 1b).
 
 **Why a spike:** two live unknowns must be settled against the tooling and recorded here before the rest:
 (U1) the `Move`↔`MoveRequest` shared-`schema:MoveAction` local-name collision in `ResolvedModel.checkLocalNameCollisions`; (U2) whether `accept` writes the new mapping with the exact field IRIs from the resolved template.
@@ -58,25 +60,25 @@
 
 **Files:** `sample/TicTacToe-v732/Model.fs`, `Vocabulary.fs`, `.frank/semantic-mappings.lock.json` (written *by the CLI*), plus a scratch `resolved.json`.
 
-- [ ] **Step 0: Revert the prior shortcut commit.**
-  ```bash
-  cd /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery && git revert --no-edit 732e12c5
-  ```
-  (Or `git reset` if it is still HEAD and nothing depends on it — confirm `git log` first.) Verify the lock no longer contains a `MoveRequest`/`schema:position` entry.
+- [x] **Step 0: Revert the prior shortcut commit — DONE (HEAD `7e323aef`, 2026-06-28).** Verified: lock has no `MoveRequest`/`schema:position`/dishonest `schema:Action` (only `schema:ActionStatusType` substring-matches); `Model.fsi` reverted to its pre-shortcut form. Do not redo.
 
 - [ ] **Step 1: Add the request type.** In `Model.fs`, after `Move`/`Game`, add:
   ```fsharp
   /// The wire shape of a move request — modeled so discovery/validation can describe it.
   type MoveRequest = { Position: SquarePosition; Player: Player }
   ```
-  (There is currently no `Model.fsi` — do not create one. If the prior commit added one, the revert removes it.)
+  **`Model.fsi` EXISTS** (pre-dates this work — `2670054a`, 2026-06-15; wired at `TicTacToe.v732.fsproj:23`). A signature file hides anything not declared, so `MoveRequest` MUST also be added to `Model.fsi`:
+  ```fsharp
+  type MoveRequest = { Position: SquarePosition; Player: Player }
+  ```
+  Otherwise it is private and `Vocabulary.fs`/`Program.fs` cannot reference it → build breaks. (This 4-line `.fsi` addition is the only legitimate part of the reverted shortcut — re-add it honestly; the shortcut's sin was the dishonest lock IRIs, not the signature.)
 
 - [ ] **Step 2: Declare the domain prefix + the square constraint in `Vocabulary.fs`.** Inside the `vocabulary { … }` block add:
   ```fsharp
   prefix "ttt" "https://example.org/tictactoe#"
   constrainPattern typeof<MoveRequest> "Position" "^(TopLeft|TopCenter|TopRight|MiddleLeft|MiddleCenter|MiddleRight|BottomLeft|BottomCenter|BottomRight)$"
   ```
-  (Confirm the op name `constrainPattern` and arg order in `VocabularyBuilder.fs:78`.) The pattern enumerates the legal squares — it is the self-describing value constraint that makes an out-of-range square 422.
+  (Confirm the op name `constrainPattern` and arg order in `VocabularyBuilder.fs:78`.) The pattern enumerates the legal squares — the self-describing value constraint that makes an out-of-range square 422. **Declare `prefix` only — do NOT `using "ttt"`** (no remote document to fetch). `ttt` therefore stays *unpublished* at extract time; accept expands it from the `prefix` declaration and **warns** (Step 4). Hosting it as a resource (Task 1b) is what makes it dereferenceable at runtime.
 
 - [ ] **Step 3: Run the CLI pipeline (this is the simulate-clarify workflow).**
   ```bash
@@ -88,13 +90,18 @@
   ```
   Inspect `/tmp/resolved.json`. **Hand-write the resolution** for `TicTacToe.Model.MoveRequest` (this is the predetermined/simulated clarify decision): class `schema:MoveAction`, field `Position → ttt:square`, field `Player → schema:agent`. Keep the template's structure.
 
+- [ ] **Step 3.5: Minimal `accept` change — expand declared prefixes + warn-not-reject (the unblock).** This is the only library/CLI code change in Task 1; it is the minimal slice of Stream 2 the capstone needs.
+  - **Expansion:** today `apply` builds `prefixes` from `lf.Vocabularies` only (`Accept.fs:391`). Add the *declared* `prefix` namespaces (the vocabulary registry's `Prefixes`) so `ttt:square` expands to `https://example.org/tictactoe#square` for codegen. **Spike unknown (settle + record):** where accept obtains declared prefixes at command time — (a) re-evaluate `Vocabulary.fs` via `VocabularyEvaluator`, or (b) persist declared prefixes into the lock during `extract`. Pick the smaller honest change; record which.
+  - **Warn-not-reject:** in `checkIri`, the `Ok(Some absUri)` branch currently returns `None` *silently* when the namespace is not covered by the oracle (`Accept.fs:302-303`, fail-open). Change ONLY the uncovered case to **collect a warning** ("vocabulary `ttt` referenced but not published — host it or check the URL") while still treating the mapping as acceptable (merged, `status: confirmed`). A term in a *covered* vocab that is wrong (typo) MUST still reject (unchanged). Surface warnings in the accept summary output.
+  - **Test (TDD, before the code):** a covered-typo still rejects; an uncovered declared-prefix CURIE warns + writes the mapping; a fully-covered correct term neither warns nor rejects.
+
 - [ ] **Step 4: Accept the resolution into the lock (CLI writes it — no manual JSON edit).**
   ```bash
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic accept --input /tmp/resolved.json --source manual -p sample/TicTacToe-v732/TicTacToe.v732.fsproj
   # smoke-run the remaining CLI surface (coverage):
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet run --project src/Frank.Cli -- semantic status -p sample/TicTacToe-v732/TicTacToe.v732.fsproj
   ```
-  Read the resulting lock entry and confirm the CLI wrote `schema:MoveAction` / `ttt:square` / `schema:agent` with `status: confirmed`. If `accept` rejected an IRI (term oracle), paste the verbatim error and STOP — do NOT swap to a test-pleasing IRI.
+  Read the resulting lock entry and confirm the CLI wrote `schema:MoveAction` / `ttt:square` / `schema:agent` with `status: confirmed`, and that accept emitted a **warning** for the unpublished `ttt` vocab (expected, per Step 3.5) — not a rejection. If `accept` *rejected* the `schema:agent`/`schema:MoveAction` IRIs (covered-vocab oracle), paste the verbatim error and STOP — do NOT swap to a test-pleasing IRI. A rejection of `ttt:square` means Step 3.5 is incomplete (expansion or warn-not-reject not wired) — fix that, do not change the IRI.
 
 - [ ] **Step 5: Resolve the collision (U1).** Rebuild and watch for `checkLocalNameCollisions` ("share local name 'MoveAction'"):
   ```bash
@@ -118,6 +125,42 @@
   ```
 
 > **Reviewer gate:** confirm by reading the generated files yourself that the honest IRIs (`schema:agent`, `ttt:square`, `schema:MoveAction`) are present, that the lock was written **by the CLI** (not hand-edited), and record the U1/U2 resolutions. This is the load-bearing precondition for AT-S4/S6.
+
+---
+
+## Task 1b: Author + host the `ttt` domain vocabulary as a normal resource (publishes it for deref)
+
+**Goal:** make `ttt:square` (and the cell individuals) **dereferenceable** at runtime by hosting the authored domain ontology as a normal Frank resource — Constitution pillar 1, "a custom vocabulary is just another resource." This is what turns the accept *warning* (Task 1, Step 3.5) into a published vocab. No `useVocabulary`/`publish` CE surface.
+
+**Files:** `sample/TicTacToe-v732/vocab/ttt.ttl` (new, authored, committed), `sample/TicTacToe-v732/Program.fs`.
+
+- [ ] **Step 1: Author the ontology document** `vocab/ttt.ttl` (Turtle). It defines the term, its class, range, and the closed set of 9 cells as **named individuals** (the chosen value-set modeling — each cell dereferenceable):
+  ```turtle
+  @prefix ttt:  <https://example.org/tictactoe#> .
+  @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+  @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+  @prefix owl:  <http://www.w3.org/2002/07/owl#> .
+  @prefix schema: <https://schema.org/> .
+
+  ttt:Square a owl:Class ; rdfs:label "Tic-tac-toe board cell" .
+  ttt:square a rdf:Property ; rdfs:domain schema:MoveAction ; rdfs:range ttt:Square ;
+             rdfs:label "target board square of a move" .
+  ttt:TopLeft a ttt:Square . ttt:TopCenter a ttt:Square . ttt:TopRight a ttt:Square .
+  ttt:MiddleLeft a ttt:Square . ttt:MiddleCenter a ttt:Square . ttt:MiddleRight a ttt:Square .
+  ttt:BottomLeft a ttt:Square . ttt:BottomCenter a ttt:Square . ttt:BottomRight a ttt:Square .
+  ```
+
+- [ ] **Step 2: Host it as a resource.** `ttt` is a **hash namespace** (`https://example.org/tictactoe#…`) → deref strips the fragment and GETs `https://example.org/tictactoe`. Serve the whole doc at the matching app path **`/tictactoe`** (a normal `resource`), content-negotiated. Reuse `Frank.LinkedData`'s serializers (parse `ttt.ttl` → `IGraph` → `Serializers.respondTurtle`/`respondJsonLd`) so turtle + ld+json both work; do NOT invent a new CE op. Confirm the resource CE wiring against an existing sample resource.
+
+- [ ] **Step 3: Verify deref locally.**
+  ```bash
+  # with the sample running on $PORT
+  curl -sS -H "Accept: text/turtle" http://localhost:$PORT/tictactoe | grep -E "ttt:square|ttt:Square|TopLeft"
+  curl -sS -H "Accept: application/ld+json" http://localhost:$PORT/tictactoe | head
+  ```
+  EXPECTED: both return the vocab; the turtle contains `ttt:square`, `ttt:Square`, and the 9 individuals. This is the (rebased) target the agent-simulator GETs in Task 4 (D-deref).
+
+> **Reviewer gate:** GET the hosted route yourself and confirm the authored terms are present in BOTH turtle and ld+json. The rebasing contract (client maps `example.org/tictactoe` → `localhost:$PORT/tictactoe`) is exercised in Task 4.
 
 ---
 
@@ -182,7 +225,7 @@
 
 - [ ] **Step 2: Verify the term set matches an EXPECTED SET.** Collect the ALPS descriptor term IRIs and assert the expected semantic set is present: `{ https://schema.org/MoveAction, https://schema.org/agent, https://example.org/tictactoe#square, https://schema.org/Game, https://schema.org/result }` (adjust to the actual generated set, but it MUST include the agent + square + class). A meaningless-but-named mapping would lack these IRIs → fail.
 
-- [ ] **Step 3: Dereference EVERY URI received (D-deref).** Add a helper the client applies to every URI it encounters — resource links, the ALPS profile URL, each field/class term IRI, `seeAlso` targets, and (in Task 6) the lineage URL — that GETs/HEADs the URI and asserts it resolves (2xx, or 303→2xx). No URI may be a dead label. This REQUIRES that the `ttt:` domain vocabulary be served and that reused `schema.org` terms resolve — settle the two D-deref decisions (serve the domain vocab; decide CI handling of external term dereference) and record them. If a term IRI does not dereference, that is a real failure — fix the design (publish the term), do not skip the check.
+- [ ] **Step 3: Dereference EVERY URI received (D-deref).** Add a helper the client applies to every URI it encounters — resource links, the ALPS profile URL, each field/class term IRI, `seeAlso` targets, and (in Task 6) the lineage URL — that GETs/HEADs the URI and asserts it resolves (2xx, or 303→2xx). No URI may be a dead label. For the domain `ttt:` term, **rebase** onto the test base before GETting: `https://example.org/tictactoe#square` → strip fragment → `https://example.org/tictactoe` → swap scheme+host → `http://localhost:$PORT/tictactoe` (the resource hosted in **Task 1b**), assert 2xx + the term present. Reused `schema.org` term IRIs dereference LIVE over the network (fail loudly if unreachable — no silent skip; runners have network). If a term IRI does not dereference, that is a real failure — fix the design (publish the term), do not skip the check.
 
 - [ ] **Step 4: Identify inputs by meaning, then play.** The client selects the actor input by recognizing `https://schema.org/agent` and the target input by the `ttt:square` IRI (NOT by field name). It plays a full two-player game (X/O alternating) to a terminal state, POSTing ld+json bodies whose keys are the discovered IRIs and whose `@type` is the discovered class IRI — no hardcoded URLs, state names, class, or field IRIs. Legal squares come from the game-state representation (empty cells). The illegal-move leg posts an out-of-range square and asserts 422 citing a vocabulary IRI.
 
@@ -304,7 +347,7 @@
 **Type consistency:** `MoveRequest = { Position: SquarePosition; Player: Player }` defined in Task 1, consumed by Task 2 (`accepts typeof<MoveRequest>`). The client selects inputs by **absolute term IRI** (`https://schema.org/agent`, the `ttt:square` IRI), not field name — Task 1 maps `Player → schema:agent` and `Position → ttt:square`.
 
 **Settled decisions (D-deref, user-confirmed 2026-06-28):**
-1. The sample **serves its `ttt:` domain vocabulary** (Frank as LD publisher); the agent-simulator rebases the term path onto the test server base and asserts the GET resolves.
+1. The sample **serves its `ttt:` domain vocabulary as a normal resource** (Task 1b; Frank as LD publisher — "a vocabulary is just another resource"); the agent-simulator rebases the term path onto the test server base and asserts the GET resolves.
 2. Reused `schema.org` terms are **dereferenced live**; the simulator fails loudly if unreachable (no silent skip).
 
 **Open items the spike must settle (surface if blocked):**
