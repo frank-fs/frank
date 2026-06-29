@@ -115,8 +115,19 @@ let private gameHandler (ctx: HttpContext) =
         do! writeJson ctx (wireJson game.Id game.Result)
     }
 
-let private agentIri = "https://schema.org/agent"
-let private squareIri = "https://example.org/tictactoe#square"
+// When FRANK_VOCAB=ex the server uses the ex: namespace throughout ALPS and the
+// move handler — the discovery client reads whatever IRIs the server advertises,
+// while a hardcoded schema.org client fails (AT-S7 falsifiability lever).
+let private isExVocab =
+    Environment.GetEnvironmentVariable "FRANK_VOCAB" = "ex"
+
+let private exPrefix = "https://example.org/ex#"
+
+let private activeAgentIri =
+    if isExVocab then exPrefix + "agent" else "https://schema.org/agent"
+
+let private activeSquareIri =
+    if isExVocab then exPrefix + "square" else "https://example.org/tictactoe#square"
 
 let private isLdJson (ctx: HttpContext) =
     let ct = ctx.Request.ContentType
@@ -125,10 +136,10 @@ let private isLdJson (ctx: HttpContext) =
 let private parseMoveFromDoc (isLd: bool) (doc: JsonNode) =
     if isLd then
         let pos =
-            doc.[squareIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+            doc.[activeSquareIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
 
         let plr =
-            doc.[agentIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+            doc.[activeAgentIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
 
         pos, plr
     else
@@ -221,12 +232,66 @@ let private tttVocabResource =
             })
     }
 
+let private exDiscoveryConfig: DiscoveryConfig =
+    { ProfileUri = "/alps/tictactoe.v732"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "ActionStatusType"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "ActionStatusType") }
+          { Id = "Game"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "Game") }
+          { Id = "identifier"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "identifier") }
+          { Id = "result"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "result") }
+          { Id = "ItemList"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "ItemList") }
+          { Id = "item"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "item") }
+          { Id = "numberOfItems"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "numberOfItems") }
+          { Id = "MoveAction"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "MoveAction") }
+          { Id = "square"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "square") }
+          { Id = "agent"
+            Type = "semantic"
+            Doc = None
+            Href = Some(exPrefix + "agent") } ]
+      DescribedByLinks =
+        [ sprintf "<%sActionStatusType>; rel=\"type\"" exPrefix
+          sprintf "<%sGame>; rel=\"type\"" exPrefix
+          sprintf "<%sItemList>; rel=\"type\"" exPrefix
+          sprintf "<%sMoveAction>; rel=\"type\"" exPrefix ] }
+
 [<EntryPoint>]
 let main args =
+    let discoConfig =
+        if isExVocab then exDiscoveryConfig
+        else TicTacToe.GeneratedDiscovery.discoveryConfig
+
     webHost args {
         useProvenance
         useValidation
-        useDiscovery
+        useDiscoveryWith discoConfig
         useLinkedData
         resource homeResource
         resource gameResource

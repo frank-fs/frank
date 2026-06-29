@@ -15,6 +15,15 @@ module Server =
     let internal setUrl u = url <- u
     let Url () = url
 
+/// Second server instance using the ex: vocabulary (FRANK_VOCAB=ex). Used by
+/// AT-S7 to prove falsifiability — the schema.org client fails against it while
+/// the discovery-only client still navigates it successfully.
+module ExServer =
+    let mutable private url = ""
+    let mutable internal proc: Process option = None
+    let internal setUrl u = url <- u
+    let Url () = url
+
 [<SetUpFixture>]
 type ServerFixture() =
 
@@ -47,12 +56,8 @@ type ServerFixture() =
         if not ready then
             failwith "TicTacToe server did not become ready within 60s"
 
-    [<OneTimeSetUp>]
-    member _.StartServer() =
-        let port = 15321
+    let startSampleOn (port: int) (extraEnv: (string * string) list) (app: string) =
         let url = sprintf "http://localhost:%d" port
-        let app = findAppProject ()
-
         let psi = ProcessStartInfo("dotnet")
         psi.ArgumentList.Add "run"
         psi.ArgumentList.Add "--project"
@@ -60,20 +65,27 @@ type ServerFixture() =
         psi.ArgumentList.Add "--urls"
         psi.ArgumentList.Add url
         psi.EnvironmentVariables.["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] <- "1"
-        psi.UseShellExecute <- false
 
-        Server.proc <- Some(Process.Start psi)
-        Server.setUrl url
-        waitUntilReady url
+        for (k, v) in extraEnv do
+            psi.EnvironmentVariables.[k] <- v
+
+        psi.UseShellExecute <- false
+        url, Process.Start psi
+
+    [<OneTimeSetUp>]
+    member _.StartServer() =
+        let app = findAppProject ()
+        let schemaUrl, schemaProc = startSampleOn 15321 [] app
+        Server.proc <- Some schemaProc
+        Server.setUrl schemaUrl
+        waitUntilReady schemaUrl
+        let exUrl, exProc = startSampleOn 15322 [ "FRANK_VOCAB", "ex" ] app
+        ExServer.proc <- Some exProc
+        ExServer.setUrl exUrl
+        waitUntilReady exUrl
 
     [<OneTimeTearDown>]
     member _.StopServer() =
-        match Server.proc with
-        | Some p ->
-            (try
-                p.Kill true
-             with _ ->
-                 ())
-
+        for p in [ Server.proc; ExServer.proc ] |> List.choose id do
+            (try p.Kill true with _ -> ())
             p.Dispose()
-        | None -> ()

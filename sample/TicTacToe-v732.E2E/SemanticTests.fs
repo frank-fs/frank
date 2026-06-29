@@ -77,6 +77,27 @@ type SemanticTests() =
         walk doc.RootElement
         acc |> Seq.toList
 
+    /// Return the href of the ALPS descriptor whose id matches localId, or None.
+    /// Navigates alps.descriptor directly — no unbounded recursion.
+    static member private AlpsDescriptorHrefByLocalId(alpsBody: string, localId: string) : string option =
+        use doc = JsonDocument.Parse alpsBody
+        let mutable result: string option = None
+        let mutable alpsEl = Unchecked.defaultof<JsonElement>
+        let mutable descriptorEl = Unchecked.defaultof<JsonElement>
+
+        if doc.RootElement.TryGetProperty("alps", &alpsEl)
+           && alpsEl.TryGetProperty("descriptor", &descriptorEl) then
+            for d in descriptorEl.EnumerateArray() do
+                let mutable idEl = Unchecked.defaultof<JsonElement>
+                let mutable hrefEl = Unchecked.defaultof<JsonElement>
+
+                if d.TryGetProperty("id", &idEl)
+                   && idEl.GetString() = localId
+                   && d.TryGetProperty("href", &hrefEl) then
+                    result <- hrefEl.GetString() |> Option.ofObj
+
+        result
+
     /// Extract rdfs:seeAlso target URIs from a JSON-LD @graph body.
     static member private SeeAlsoUris(ldBody: string) : string list =
         use doc = JsonDocument.Parse ldBody
@@ -463,4 +484,149 @@ type SemanticTests() =
                     turn <- turn + 1
 
             Assert.That(finished, Is.True, "Naive client could not finish the game via discovery")
+        }
+
+    // ── AT-S7: vocab-swap negative — hardcoded schema.org fails, discovery survives ──
+    //
+    // The ex: server serves the same game but with ALPS descriptors in the
+    // https://example.org/ex# namespace instead of schema.org. A client that
+    // hardcodes schema.org IRIs as POST body keys gets a 400 (wrong keys). The
+    // discovery navigator finds IRIs by their ALPS descriptor local id (vocab-neutral),
+    // reads whatever href the server advertises, and still completes a full game.
+    [<Test>]
+    member this.``AT-S7 vocab-swap — hardcoded schema.org client fails, discovery client succeeds``() =
+        task {
+            use! ctx =
+                this.Playwright.APIRequest.NewContextAsync(
+                    APIRequestNewContextOptions(BaseURL = ExServer.Url())
+                )
+
+            let gameId = "at-s7"
+
+            // ── Phase 1: Follow links to the ex: ALPS profile ──────────────────
+            let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
+            let rels = SemanticTests.LinkRels opts
+            Assert.That(rels.ContainsKey "describedby", Is.True, "ex: server missing Link rel=describedby")
+            let alpsUrl = rels.["describedby"]
+            let! alpsResp = ctx.GetAsync alpsUrl
+            Assert.That(alpsResp.Status, Is.EqualTo 200, "ex: server ALPS not 200")
+            let! alpsBody = alpsResp.TextAsync()
+
+            // ── Phase 2: Hardcoded schema.org client would fail here ────────────
+            // The ALPS must contain NO schema.org IRIs — a client that hardcodes
+            // "https://schema.org/agent" as a POST key would get no matching
+            // descriptor and post an empty/wrong body.
+            Assert.That(
+                alpsBody.Contains "schema.org",
+                Is.False,
+                "ex: server ALPS still references schema.org — hardcoded schema.org client would not fail"
+            )
+
+            Assert.That(
+                alpsBody.Contains "example.org/ex",
+                Is.True,
+                "ex: server ALPS does not contain ex: namespace IRIs"
+            )
+
+            // ── Phase 3: Discovery navigator — find IRIs by local name ──────────
+            // Vocab-neutral: looks up ALPS descriptor by id (local name), reads
+            // whatever href the server chose. Works for schema: OR ex: servers.
+            let agentIri =
+                SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "agent")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='agent'")
+
+            let squareIri =
+                SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "square")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='square'")
+
+            let classIri =
+                SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "MoveAction")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='MoveAction'")
+
+            // Confirm the server actually served ex: IRIs (not schema.org).
+            Assert.That(agentIri.Contains "example.org/ex", Is.True, "agentIri not in ex: namespace")
+            Assert.That(squareIri.Contains "example.org/ex", Is.True, "squareIri not in ex: namespace")
+            Assert.That(classIri.Contains "example.org/ex", Is.True, "classIri not in ex: namespace")
+
+            // ── Phase 4: Navigate JSON Home for game and move URLs ──────────────
+            let! home =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
+            Assert.That(home.Status, Is.EqualTo 200, "JSON Home not 200")
+            let! homeJson = home.JsonAsync()
+            let resources = homeJson.Value.GetProperty "resources"
+
+            let templateFor (verb: string) =
+                resources.EnumerateObject()
+                |> Seq.tryPick (fun r ->
+                    let mutable hints = Unchecked.defaultof<JsonElement>
+                    let mutable allow = Unchecked.defaultof<JsonElement>
+                    let mutable tmpl = Unchecked.defaultof<JsonElement>
+
+                    let hasVerb =
+                        r.Value.TryGetProperty("hints", &hints)
+                        && hints.TryGetProperty("allow", &allow)
+                        && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb)
+
+                    if hasVerb && r.Value.TryGetProperty("href-template", &tmpl) then
+                        Some(tmpl.GetString())
+                    else
+                        None)
+
+            let expand (tpl: string) =
+                let o = tpl.IndexOf '{'
+
+                if o < 0 then
+                    tpl
+                else
+                    tpl.Substring(0, o) + Uri.EscapeDataString gameId + tpl.Substring(tpl.IndexOf '}' + 1)
+
+            let gameUrl =
+                templateFor "GET"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no GET game template")
+
+            let moveUrl =
+                templateFor "POST"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves template")
+
+            // ── Phase 5: Play full game using discovered ex: IRIs ───────────────
+            // POST bodies keyed by the ex: IRIs read from ALPS — no hardcoded values.
+            let mutable finished = false
+            let mutable turn = 0
+
+            while not finished && turn < 9 do
+                let! stateResp = ctx.GetAsync gameUrl
+                let! stateJson = stateResp.JsonAsync()
+                let root = stateJson.Value
+                let status = root.GetProperty("status").GetString()
+
+                if status = "Won" || status = "Draw" then
+                    finished <- true
+                else
+                    let player = root.GetProperty("currentPlayer").GetString()
+
+                    let square =
+                        root.GetProperty("validMoves").EnumerateArray()
+                        |> Seq.map (fun v -> v.GetString())
+                        |> Seq.head
+
+                    let moveBody = Dictionary<string, obj>()
+                    moveBody.["@type"] <- classIri
+                    moveBody.[agentIri] <- player
+                    moveBody.[squareIri] <- square
+
+                    let! _ =
+                        ctx.PostAsync(
+                            moveUrl,
+                            APIRequestContextOptions(
+                                Headers = dict [ "Content-Type", "application/ld+json" ],
+                                DataObject = moveBody
+                            )
+                        )
+
+                    turn <- turn + 1
+
+            Assert.That(finished, Is.True, "Discovery client could not finish game against ex: server")
         }
