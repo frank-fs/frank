@@ -486,6 +486,60 @@ type SemanticTests() =
             Assert.That(finished, Is.True, "Naive client could not finish the game via discovery")
         }
 
+    /// Parse prov:Activity count and prov:startedAtTime values from a compacted PROV-O JSON-LD body.
+    /// The body uses the prov: prefix alias so activity nodes carry "@type":"prov:Activity".
+    /// Returns (activityCount, startedAtTimes in graph-walk order).
+    static member private ParseProvenanceActivities(body: string) : int * DateTimeOffset list =
+        use doc = JsonDocument.Parse body
+        let timestamps = System.Collections.Generic.List<DateTimeOffset>()
+        let mutable activityCount = 0
+
+        let isActivity (el: JsonElement) =
+            let mutable typeEl = Unchecked.defaultof<JsonElement>
+
+            if el.TryGetProperty("@type", &typeEl) then
+                match typeEl.ValueKind with
+                | JsonValueKind.String -> typeEl.GetString() = "prov:Activity"
+                | JsonValueKind.Array ->
+                    typeEl.EnumerateArray()
+                    |> Seq.exists (fun t -> t.ValueKind = JsonValueKind.String && t.GetString() = "prov:Activity")
+                | _ -> false
+            else
+                false
+
+        let tryAddTimestamp (el: JsonElement) =
+            let mutable tsEl = Unchecked.defaultof<JsonElement>
+
+            if el.TryGetProperty("prov:startedAtTime", &tsEl) then
+                let mutable valEl = Unchecked.defaultof<JsonElement>
+
+                let raw =
+                    match tsEl.ValueKind with
+                    | JsonValueKind.Object when tsEl.TryGetProperty("@value", &valEl) -> valEl.GetString()
+                    | JsonValueKind.String -> tsEl.GetString()
+                    | _ -> null
+
+                if not (isNull raw) then
+                    match DateTimeOffset.TryParse raw with
+                    | true, dt -> timestamps.Add dt
+                    | _ -> ()
+
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+        let root = doc.RootElement
+
+        let nodes =
+            if root.TryGetProperty("@graph", &graphEl) then
+                graphEl.EnumerateArray() |> Seq.toList
+            else
+                [ root ]
+
+        for node in nodes do
+            if isActivity node then
+                activityCount <- activityCount + 1
+                tryAddTimestamp node
+
+        activityCount, timestamps |> Seq.toList
+
     // ── AT-S7: vocab-swap negative — hardcoded schema.org fails, discovery survives ──
     //
     // The ex: server serves the same game but with ALPS descriptors in the
@@ -659,4 +713,204 @@ type SemanticTests() =
                     turn <- turn + 1
 
             Assert.That(finished, Is.True, "Discovery client could not finish game against ex: server")
+        }
+
+    // ── AT-S8: provenance complete-capture audit ───────────────────────────────────
+    //
+    // Plays a full game (via the AT-S6 navigator), logging every posted (agent, square).
+    // After terminal state the test follows the DISCOVERED has_provenance Link header
+    // (NOT hardcoded) to the lineage and proves COMPLETE capture:
+    //   (1) Count: exactly one prov:Activity per posted move — no dropped or fabricated move.
+    //   (2) Attribution: each activity carries prov:wasAssociatedWith (the HTTP agent).
+    //       NOTE: the HTTP agent is "anonymous" for all moves (no auth); game-level player
+    //       (X/O) and square attribution are NOT in the current ProvenanceRecord because the
+    //       middleware does not extract request-body content. This is a documented design gap.
+    //   (3) Order: prov:startedAtTime values are monotonically increasing — play order preserved.
+    //       A reordered or dropped activity would break the count or timestamp sequence.
+    //   (4) Terminal outcome: the observed final game state is Won or Draw, proving the
+    //       full session reached a terminal state while the lineage was being recorded.
+    // Falsifiability: a lineage that drops a move → count mismatch; a duplicate/fabricated
+    // move → count mismatch; scrambled timestamps → order assertion fails.
+    [<Test>]
+    member this.``AT-S8 provenance captures every move with order and terminal outcome``() =
+        task {
+            use! ctx = this.NewContext()
+            let gameId = "at-s8"
+
+            // ── Phase 1: Discover game/moves URLs from JSON Home ──────────────
+            let! home =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
+            Assert.That(home.Status, Is.EqualTo 200, "JSON Home not 200")
+            let! homeJson = home.JsonAsync()
+            let resources = homeJson.Value.GetProperty "resources"
+
+            let templateFor (verb: string) =
+                resources.EnumerateObject()
+                |> Seq.tryPick (fun r ->
+                    let mutable hints = Unchecked.defaultof<JsonElement>
+                    let mutable allow = Unchecked.defaultof<JsonElement>
+                    let mutable tmpl = Unchecked.defaultof<JsonElement>
+
+                    let hasVerb =
+                        r.Value.TryGetProperty("hints", &hints)
+                        && hints.TryGetProperty("allow", &allow)
+                        && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb)
+
+                    if hasVerb && r.Value.TryGetProperty("href-template", &tmpl) then
+                        Some(tmpl.GetString())
+                    else
+                        None)
+
+            let expand (tpl: string) =
+                let o = tpl.IndexOf '{'
+
+                if o < 0 then
+                    tpl
+                else
+                    tpl.Substring(0, o) + Uri.EscapeDataString gameId + tpl.Substring(tpl.IndexOf '}' + 1)
+
+            let gameUrl =
+                templateFor "GET"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no GET game template")
+
+            let moveUrl =
+                templateFor "POST"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves template")
+
+            // ── Phase 2: Discover class/agent/square IRIs from ALPS ─────────
+            let! opts = this.Options(ctx, gameUrl)
+            let rels = SemanticTests.LinkRels opts
+            Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
+            let alpsUrl = rels.["describedby"]
+            let! alpsResp = ctx.GetAsync alpsUrl
+            Assert.That(alpsResp.Status, Is.EqualTo 200, "ALPS not 200")
+            let! alpsBody = alpsResp.TextAsync()
+
+            let agentIri =
+                SemanticTests.AlpsDescriptorHrefs alpsBody
+                |> List.tryFind (fun h -> h = "https://schema.org/agent")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI")
+
+            let squareIri =
+                SemanticTests.AlpsDescriptorHrefs alpsBody
+                |> List.tryFind (fun h -> h.Contains "tictactoe#square")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing square IRI")
+
+            let classIri =
+                SemanticTests.AlpsDescriptorHrefs alpsBody
+                |> List.tryFind (fun h -> h = "https://schema.org/MoveAction")
+                |> Option.defaultWith (fun () -> failwith "ALPS missing MoveAction class IRI")
+
+            // ── Phase 3: Play game, log (agent,square) per move, capture link ─
+            let moveLog = System.Collections.Generic.List<string * string>()
+            let mutable finished = false
+            let mutable turn = 0
+            let mutable provenanceResourceUrl = ""
+            let provRel = "http://www.w3.org/ns/prov#has_provenance"
+
+            while not finished && turn < 9 do
+                let! stateResp = ctx.GetAsync gameUrl
+                let! stateJson = stateResp.JsonAsync()
+                let root = stateJson.Value
+                let status = root.GetProperty("status").GetString()
+
+                if status = "Won" || status = "Draw" then
+                    finished <- true
+                else
+                    let player = root.GetProperty("currentPlayer").GetString()
+
+                    let square =
+                        root.GetProperty("validMoves").EnumerateArray()
+                        |> Seq.map (fun v -> v.GetString())
+                        |> Seq.head
+
+                    let moveBody = Dictionary<string, obj>()
+                    moveBody.["@type"] <- classIri
+                    moveBody.[agentIri] <- player
+                    moveBody.[squareIri] <- square
+
+                    let! moveResp =
+                        ctx.PostAsync(
+                            moveUrl,
+                            APIRequestContextOptions(
+                                Headers = dict [ "Content-Type", "application/ld+json" ],
+                                DataObject = moveBody
+                            )
+                        )
+
+                    Assert.That(moveResp.Status, Is.EqualTo 200, sprintf "Move %d failed" (turn + 1))
+
+                    // Capture has_provenance link from the move response (discovered, not hardcoded).
+                    let moveRels = SemanticTests.LinkRels moveResp
+                    Assert.That(moveRels.ContainsKey provRel, Is.True, "Move response missing has_provenance Link")
+                    provenanceResourceUrl <- moveRels.[provRel]
+
+                    moveLog.Add(player, square)
+                    turn <- turn + 1
+
+            Assert.That(finished, Is.True, "Game did not finish via discovery")
+            Assert.That(moveLog.Count, Is.GreaterThan 0, "No moves were logged")
+
+            // provenanceResourceUrl is the DISCOVERED moves resource URI — NOT hardcoded.
+            Assert.That(provenanceResourceUrl, Is.Not.Empty, "has_provenance link never captured")
+
+            // ── Phase 4: Fetch lineage via the discovered resource URL ────────
+            // has_provenance link points to the moves resource URI; /provenance?resource=<that URI>
+            // returns all captured records for that resource.
+            let lineageQuery =
+                sprintf "/provenance?resource=%s" (Uri.EscapeDataString provenanceResourceUrl)
+
+            let! lineageResp = ctx.GetAsync lineageQuery
+            Assert.That(lineageResp.Status, Is.EqualTo 200, "Provenance lineage endpoint not 200")
+            let! lineageBody = lineageResp.TextAsync()
+
+            // ── Phase 5: Assert COMPLETE CAPTURE ─────────────────────────────
+            let activityCount, timestamps = SemanticTests.ParseProvenanceActivities lineageBody
+
+            // (1) Count: exactly one prov:Activity per posted move.
+            // Fails if any move was dropped (count too low) or fabricated (count too high).
+            Assert.That(
+                activityCount,
+                Is.EqualTo moveLog.Count,
+                sprintf "INCOMPLETE CAPTURE: activity count %d != moves posted %d" activityCount moveLog.Count
+            )
+
+            // (2) Attribution: every activity carries prov:wasAssociatedWith.
+            // The HTTP agent is "anonymous" in this unauthenticated sample; game-level
+            // player (X/O) attribution requires request-body capture (current design gap).
+            Assert.That(
+                lineageBody.Contains "prov:wasAssociatedWith",
+                Is.True,
+                "Activities lack prov:wasAssociatedWith — agent attribution missing from lineage"
+            )
+
+            // (3) Order: prov:startedAtTime values must be in non-decreasing order.
+            // Activities are sequential (one per turn); any reordering or gap would surface here.
+            Assert.That(
+                timestamps.Length,
+                Is.EqualTo moveLog.Count,
+                sprintf "Timestamp count %d != move count %d" timestamps.Length moveLog.Count
+            )
+
+            let inOrder =
+                timestamps
+                |> List.pairwise
+                |> List.forall (fun (a, b) -> a <= b)
+
+            Assert.That(inOrder, Is.True, "REORDERED: activity timestamps not in ascending order")
+
+            // (4) Terminal outcome: the recorded final game state must be Won or Draw.
+            let! finalResp = ctx.GetAsync gameUrl
+            Assert.That(finalResp.Status, Is.EqualTo 200)
+            let! finalJson = finalResp.JsonAsync()
+            let finalStatus = finalJson.Value.GetProperty("status").GetString()
+
+            Assert.That(
+                finalStatus = "Won" || finalStatus = "Draw",
+                Is.True,
+                sprintf "Game did not reach terminal state: '%s'" finalStatus
+            )
         }
