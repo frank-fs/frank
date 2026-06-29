@@ -2,6 +2,7 @@ namespace TicTacToe.E2E
 
 open System
 open System.Collections.Generic
+open System.Net.Http
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.Playwright
@@ -20,6 +21,11 @@ open NUnit.Framework
 [<TestFixture>]
 type SemanticTests() =
     inherit PlaywrightTest()
+
+    static let httpClient =
+        let c = new HttpClient()
+        c.DefaultRequestHeaders.Add("User-Agent", "Frank-E2E-Test/1.0")
+        c
 
     member this.NewContext() : Task<IAPIRequestContext> =
         this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = Server.Url()))
@@ -85,15 +91,19 @@ type SemanticTests() =
         let mutable alpsEl = Unchecked.defaultof<JsonElement>
         let mutable descriptorEl = Unchecked.defaultof<JsonElement>
 
-        if doc.RootElement.TryGetProperty("alps", &alpsEl)
-           && alpsEl.TryGetProperty("descriptor", &descriptorEl) then
+        if
+            doc.RootElement.TryGetProperty("alps", &alpsEl)
+            && alpsEl.TryGetProperty("descriptor", &descriptorEl)
+        then
             for d in descriptorEl.EnumerateArray() do
                 let mutable idEl = Unchecked.defaultof<JsonElement>
                 let mutable hrefEl = Unchecked.defaultof<JsonElement>
 
-                if d.TryGetProperty("id", &idEl)
-                   && idEl.GetString() = localId
-                   && d.TryGetProperty("href", &hrefEl) then
+                if
+                    d.TryGetProperty("id", &idEl)
+                    && idEl.GetString() = localId
+                    && d.TryGetProperty("href", &hrefEl)
+                then
                     result <- hrefEl.GetString() |> Option.ofObj
 
         result
@@ -228,10 +238,7 @@ type SemanticTests() =
 
             // ── application/json: compact JSON game state ────────────────────────
             let! json =
-                ctx.GetAsync(
-                    "/games/at-s5",
-                    APIRequestContextOptions(Headers = dict [ "Accept", "application/json" ])
-                )
+                ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "application/json" ]))
 
             Assert.That(json.Status, Is.EqualTo 200, "application/json not negotiated")
 
@@ -251,10 +258,7 @@ type SemanticTests() =
 
             // ── text/turtle: vocabulary graph in Turtle ──────────────────────────
             let! turtle =
-                ctx.GetAsync(
-                    "/games/at-s5",
-                    APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ])
-                )
+                ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
 
             Assert.That(turtle.Status, Is.EqualTo 200, "text/turtle not negotiated")
 
@@ -306,7 +310,9 @@ type SemanticTests() =
                 if o < 0 then
                     tpl
                 else
-                    tpl.Substring(0, o) + Uri.EscapeDataString gameId + tpl.Substring(tpl.IndexOf '}' + 1)
+                    tpl.Substring(0, o)
+                    + Uri.EscapeDataString gameId
+                    + tpl.Substring(tpl.IndexOf '}' + 1)
 
             let gameUrl =
                 templateFor "GET"
@@ -352,17 +358,20 @@ type SemanticTests() =
                   "https://schema.org/result" ]
 
             for term in expectedTerms do
-                Assert.That(
-                    hrefSet.Contains term,
-                    Is.True,
-                    sprintf "Expected semantic term absent from ALPS: %s" term
-                )
+                Assert.That(hrefSet.Contains term, Is.True, sprintf "Expected semantic term absent from ALPS: %s" term)
 
             // ── Phase 4: Dereference every URI the client received ───────────────
-            // schema.org term IRIs — dereference live over the network
+            // schema.org term IRIs — dereference live using HttpClient (host network,
+            // avoids Playwright DNS sandbox flake; follows redirects by default).
+            // A network failure or non-2xx FAILS the test — no swallowing.
             for iri in descriptorHrefs |> List.filter (fun u -> u.StartsWith "https://schema.org/") do
-                let! r = ctx.GetAsync iri
-                Assert.That(r.Status, Is.InRange(200, 299), sprintf "schema.org IRI not dereferenceable: %s" iri)
+                let! r = httpClient.GetAsync iri
+
+                Assert.That(
+                    int r.StatusCode,
+                    Is.InRange(200, 299),
+                    sprintf "schema.org IRI not dereferenceable: %s" iri
+                )
 
             // domain ttt: term — rebase to test host (strip fragment, swap origin)
             for tttIri in descriptorHrefs |> List.filter (fun u -> u.Contains "example.org/tictactoe") do
@@ -370,11 +379,7 @@ type SemanticTests() =
                 let tttPath = Uri(baseIri).AbsolutePath
                 let! r = ctx.GetAsync(testBase + tttPath)
 
-                Assert.That(
-                    r.Status,
-                    Is.EqualTo 200,
-                    sprintf "ttt vocab resource not served at %s%s" testBase tttPath
-                )
+                Assert.That(r.Status, Is.EqualTo 200, sprintf "ttt vocab resource not served at %s%s" testBase tttPath)
 
                 let! tttBody = r.TextAsync()
                 // Turtle uses prefixed form (ttt:square); JSON-LD uses full IRI
@@ -386,10 +391,7 @@ type SemanticTests() =
 
             // seeAlso targets from game's ld+json — dereference live
             let! ldGame =
-                ctx.GetAsync(
-                    gameUrl,
-                    APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
-                )
+                ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
 
             let! ldBody = ldGame.TextAsync()
 
@@ -400,8 +402,13 @@ type SemanticTests() =
             )
 
             for seeAlsoUri in SemanticTests.SeeAlsoUris ldBody do
-                let! r = ctx.GetAsync seeAlsoUri
-                Assert.That(r.Status, Is.InRange(200, 299), sprintf "seeAlso target did not resolve: %s" seeAlsoUri)
+                let! r = httpClient.GetAsync seeAlsoUri
+
+                Assert.That(
+                    int r.StatusCode,
+                    Is.InRange(200, 299),
+                    sprintf "seeAlso target did not resolve: %s" seeAlsoUri
+                )
 
             // ── Phase 5: Identify inputs by absolute IRI — NOT by field name ────
             // A meaningless mapping (schema:position, schema:Action) would not
@@ -563,8 +570,10 @@ type SemanticTests() =
         let tryGetStr (el: JsonElement) (key: string) : string option =
             let mutable p = Unchecked.defaultof<JsonElement>
 
-            if not (el.TryGetProperty(key, &p)) then None
-            elif p.ValueKind = JsonValueKind.String then Some(p.GetString())
+            if not (el.TryGetProperty(key, &p)) then
+                None
+            elif p.ValueKind = JsonValueKind.String then
+                Some(p.GetString())
             else
                 let mutable v = Unchecked.defaultof<JsonElement>
 
@@ -582,9 +591,12 @@ type SemanticTests() =
                 let mutable v = Unchecked.defaultof<JsonElement>
 
                 let raw =
-                    if ts.ValueKind = JsonValueKind.String then ts.GetString()
-                    elif ts.ValueKind = JsonValueKind.Object && ts.TryGetProperty("@value", &v) then v.GetString()
-                    else null
+                    if ts.ValueKind = JsonValueKind.String then
+                        ts.GetString()
+                    elif ts.ValueKind = JsonValueKind.Object && ts.TryGetProperty("@value", &v) then
+                        v.GetString()
+                    else
+                        null
 
                 match DateTimeOffset.TryParse raw with
                 | true, dt -> Some dt
@@ -622,10 +634,7 @@ type SemanticTests() =
     [<Test>]
     member this.``AT-S7 vocab-swap — hardcoded schema.org client fails, discovery client succeeds``() =
         task {
-            use! ctx =
-                this.Playwright.APIRequest.NewContextAsync(
-                    APIRequestNewContextOptions(BaseURL = ExServer.Url())
-                )
+            use! ctx = this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = ExServer.Url()))
 
             let gameId = "at-s7"
 
@@ -705,7 +714,9 @@ type SemanticTests() =
                 if o < 0 then
                     tpl
                 else
-                    tpl.Substring(0, o) + Uri.EscapeDataString gameId + tpl.Substring(tpl.IndexOf '}' + 1)
+                    tpl.Substring(0, o)
+                    + Uri.EscapeDataString gameId
+                    + tpl.Substring(tpl.IndexOf '}' + 1)
 
             let gameUrl =
                 templateFor "GET"
@@ -839,7 +850,9 @@ type SemanticTests() =
                 if o < 0 then
                     tpl
                 else
-                    tpl.Substring(0, o) + Uri.EscapeDataString gameId + tpl.Substring(tpl.IndexOf '}' + 1)
+                    tpl.Substring(0, o)
+                    + Uri.EscapeDataString gameId
+                    + tpl.Substring(tpl.IndexOf '}' + 1)
 
             let gameUrl =
                 templateFor "GET"
@@ -991,10 +1004,7 @@ type SemanticTests() =
                 sprintf "Timestamp count %d != move count %d" timestamps.Length moveLog.Count
             )
 
-            let inOrder =
-                timestamps
-                |> List.pairwise
-                |> List.forall (fun (a, b) -> a <= b)
+            let inOrder = timestamps |> List.pairwise |> List.forall (fun (a, b) -> a <= b)
 
             Assert.That(inOrder, Is.True, "REORDERED: activity timestamps not in ascending order")
 

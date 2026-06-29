@@ -54,7 +54,12 @@ module private BodyCapture =
 
                 let! json = reader.ReadToEndAsync()
                 ctx.Request.Body.Position <- 0L
-                return if String.IsNullOrEmpty json then [] else extractFromJson json
+
+                return
+                    if String.IsNullOrEmpty json then
+                        []
+                    else
+                        extractFromJson json
             }
 
 [<RequireQualifiedAccess>]
@@ -69,6 +74,7 @@ module private Capture =
 
     let private lookupProvClass (config: ProvenanceConfig) (t: Type) : (Frank.Semantic.ProvOClass * Uri) option =
         let key = t.FullName.Replace('+', '.')
+
         Map.tryFind key config.ProvClasses
         |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
 

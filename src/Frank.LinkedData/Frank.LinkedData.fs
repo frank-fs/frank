@@ -71,5 +71,9 @@ module ResourceLinkedDataExtensions =
             ResourceBuilder.AddMetadata(
                 spec,
                 fun (b: EndpointBuilder) ->
-                    b.Metadata.Add({ Graph = graph; JsonLdContext = jsonLdContext }: LinkedDataConfig)
+                    b.Metadata.Add(
+                        { Graph = graph
+                          JsonLdContext = jsonLdContext }
+                        : LinkedDataConfig
+                    )
             )

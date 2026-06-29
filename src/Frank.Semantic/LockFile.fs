@@ -498,7 +498,9 @@ module LockFile =
                 | Some r -> r
                 | None -> f)
 
-        let newFields = resolved |> List.filter (fun f -> not (Set.contains f.Name existingNames))
+        let newFields =
+            resolved |> List.filter (fun f -> not (Set.contains f.Name existingNames))
+
         updated @ newFields
 
     let private mergeShape (existing: MappingShape) (resolved: MappingShape) : MappingShape =
