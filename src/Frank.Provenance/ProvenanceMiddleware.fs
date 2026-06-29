@@ -67,6 +67,31 @@ module private Capture =
     let private isSentinel (t: Type) =
         sentinelTypes |> Array.exists (fun s -> s = t)
 
+    let private lookupProvClass (config: ProvenanceConfig) (t: Type) : (Frank.Semantic.ProvOClass * Uri) option =
+        let key = t.FullName.Replace('+', '.')
+        Map.tryFind key config.ProvClasses
+        |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
+
+    // A prov:Activity represents the action performed (the request), so type it from the
+    // request type (IAcceptsMetadata) when present — not from the response type.
+    let private resolveFromAccepts
+        (endpoint: Endpoint)
+        (config: ProvenanceConfig)
+        : (Frank.Semantic.ProvOClass * Uri) option =
+        endpoint.Metadata.GetOrderedMetadata<IAcceptsMetadata>()
+        |> Seq.tryFind (fun m -> not (isNull m.RequestType) && not (isSentinel m.RequestType))
+        |> Option.bind (fun m -> lookupProvClass config m.RequestType)
+
+    let private resolveFromProduces
+        (endpoint: Endpoint)
+        (config: ProvenanceConfig)
+        (statusCode: int)
+        : (Frank.Semantic.ProvOClass * Uri) option =
+        endpoint.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+        |> Seq.filter (fun m -> m.StatusCode = statusCode)
+        |> Seq.tryFind (fun m -> not (isNull m.Type) && not (isSentinel m.Type))
+        |> Option.bind (fun m -> lookupProvClass config m.Type)
+
     let private resolveDomainType
         (endpoint: Endpoint)
         (config: ProvenanceConfig)
@@ -75,13 +100,8 @@ module private Capture =
         if isNull endpoint then
             None
         else
-            endpoint.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
-            |> Seq.filter (fun m -> m.StatusCode = statusCode)
-            |> Seq.tryFind (fun m -> not (isNull m.Type) && not (isSentinel m.Type))
-            |> Option.bind (fun m ->
-                let key = m.Type.FullName.Replace('+', '.')
-                Map.tryFind key config.ProvClasses)
-            |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
+            resolveFromAccepts endpoint config
+            |> Option.orElseWith (fun () -> resolveFromProduces endpoint config statusCode)
 
     let absoluteUri (ctx: HttpContext) =
         ctx.Request.Scheme + "://" + ctx.Request.Host.Value + ctx.Request.Path.Value

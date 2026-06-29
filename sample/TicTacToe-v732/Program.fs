@@ -210,7 +210,7 @@ let private movesResource =
             handler {
                 handle moveHandler
                 accepts typeof<MoveRequest>
-                produces typeof<MoveRequest> 200
+                produces typeof<MoveResult> 200
             }
         )
     }
