@@ -14,7 +14,8 @@ let private sampleRecord: ProvenanceRecord =
       DomainType = Some(Frank.Semantic.ProvOClass.Activity, Uri "https://schema.org/CreateAction")
       Agent = { Id = "https://example.org/agents/alice"; Label = Some "Alice" }
       StartedAt = DateTimeOffset.UtcNow.AddMilliseconds(-5.0)
-      EndedAt = DateTimeOffset.UtcNow }
+      EndedAt = DateTimeOffset.UtcNow
+      BodyAttributes = [] }
 
 [<MemoryDiagnoser>]
 [<SimpleJob(warmupCount = 1, iterationCount = 3)>]

@@ -12,7 +12,8 @@ type ProvenanceRecord =
       DomainType: (Frank.Semantic.ProvOClass * Uri) option
       Agent: ProvAgent
       StartedAt: DateTimeOffset
-      EndedAt: DateTimeOffset }
+      EndedAt: DateTimeOffset
+      BodyAttributes: (string * string) list }
 
 type ProvenanceStoreConfig =
     { MaxRecords: int

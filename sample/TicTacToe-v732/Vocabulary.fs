@@ -13,7 +13,7 @@ let registry =
         seeAlso typeof<Game> "wikidata:Q573573"
         seeAlso typeof<Game> "wikidata:Q573520"
         equivalentClass typedefof<MoveLog<_>> "schema:ItemList"
-        provClass typeof<Move> Activity
+        provClass typeof<MoveRequest> Activity
 
         constrainPattern
             typeof<MoveRequest>

@@ -540,6 +540,78 @@ type SemanticTests() =
 
         activityCount, timestamps |> Seq.toList
 
+    /// For each prov:Activity in the lineage (sorted by prov:startedAtTime), return (player, square)
+    /// from the IRI-keyed body attributes emitted by the provenance middleware.
+    static member private ParseMoveAttributes(body: string) : (string * string) list =
+        use doc = JsonDocument.Parse body
+        let agentIri = "https://schema.org/agent"
+        let squareIri = "https://example.org/tictactoe#square"
+
+        let isActivity (el: JsonElement) =
+            let mutable t = Unchecked.defaultof<JsonElement>
+
+            if not (el.TryGetProperty("@type", &t)) then
+                false
+            else
+                match t.ValueKind with
+                | JsonValueKind.String -> t.GetString() = "prov:Activity"
+                | JsonValueKind.Array ->
+                    t.EnumerateArray()
+                    |> Seq.exists (fun x -> x.ValueKind = JsonValueKind.String && x.GetString() = "prov:Activity")
+                | _ -> false
+
+        let tryGetStr (el: JsonElement) (key: string) : string option =
+            let mutable p = Unchecked.defaultof<JsonElement>
+
+            if not (el.TryGetProperty(key, &p)) then None
+            elif p.ValueKind = JsonValueKind.String then Some(p.GetString())
+            else
+                let mutable v = Unchecked.defaultof<JsonElement>
+
+                if p.ValueKind = JsonValueKind.Object && p.TryGetProperty("@value", &v) then
+                    Some(v.GetString())
+                else
+                    None
+
+        let tryGetTimestamp (el: JsonElement) : DateTimeOffset option =
+            let mutable ts = Unchecked.defaultof<JsonElement>
+
+            if not (el.TryGetProperty("prov:startedAtTime", &ts)) then
+                None
+            else
+                let mutable v = Unchecked.defaultof<JsonElement>
+
+                let raw =
+                    if ts.ValueKind = JsonValueKind.String then ts.GetString()
+                    elif ts.ValueKind = JsonValueKind.Object && ts.TryGetProperty("@value", &v) then v.GetString()
+                    else null
+
+                match DateTimeOffset.TryParse raw with
+                | true, dt -> Some dt
+                | _ -> None
+
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+        let root = doc.RootElement
+
+        let nodes =
+            if root.TryGetProperty("@graph", &graphEl) then
+                graphEl.EnumerateArray() |> Seq.toList
+            else
+                [ root ]
+
+        let acc = System.Collections.Generic.List<DateTimeOffset * string * string>()
+
+        for node in nodes do
+            if isActivity node then
+                match tryGetStr node agentIri, tryGetStr node squareIri, tryGetTimestamp node with
+                | Some a, Some s, Some t -> acc.Add(t, a, s)
+                | _ -> ()
+
+        acc
+        |> Seq.toList
+        |> List.sortBy (fun (t, _, _) -> t)
+        |> List.map (fun (_, a, s) -> (a, s))
+
     // ── AT-S7: vocab-swap negative — hardcoded schema.org fails, discovery survives ──
     //
     // The ex: server serves the same game but with ALPS descriptors in the
@@ -721,10 +793,9 @@ type SemanticTests() =
     // After terminal state the test follows the DISCOVERED has_provenance Link header
     // (NOT hardcoded) to the lineage and proves COMPLETE capture:
     //   (1) Count: exactly one prov:Activity per posted move — no dropped or fabricated move.
-    //   (2) Attribution: each activity carries prov:wasAssociatedWith (the HTTP agent).
-    //       NOTE: the HTTP agent is "anonymous" for all moves (no auth); game-level player
-    //       (X/O) and square attribution are NOT in the current ProvenanceRecord because the
-    //       middleware does not extract request-body content. This is a documented design gap.
+    //   (2) Attribution: each activity carries prov:wasAssociatedWith (the HTTP agent) AND
+    //       the per-move player (X/O) and square from the POST body, verified in order.
+    //       A dropped, reordered, or mis-attributed move fails here.
     //   (3) Order: prov:startedAtTime values are monotonically increasing — play order preserved.
     //       A reordered or dropped activity would break the count or timestamp sequence.
     //   (4) Terminal outcome: the observed final game state is Won or Draw, proving the
@@ -878,14 +949,39 @@ type SemanticTests() =
                 sprintf "INCOMPLETE CAPTURE: activity count %d != moves posted %d" activityCount moveLog.Count
             )
 
-            // (2) Attribution: every activity carries prov:wasAssociatedWith.
-            // The HTTP agent is "anonymous" in this unauthenticated sample; game-level
-            // player (X/O) attribution requires request-body capture (current design gap).
+            // (2) Attribution: HTTP agent association present AND per-move player/square match in order.
             Assert.That(
                 lineageBody.Contains "prov:wasAssociatedWith",
                 Is.True,
-                "Activities lack prov:wasAssociatedWith — agent attribution missing from lineage"
+                "Activities lack prov:wasAssociatedWith — HTTP agent attribution missing"
             )
+
+            let moveAttributes = SemanticTests.ParseMoveAttributes lineageBody
+
+            Assert.That(
+                moveAttributes.Length,
+                Is.EqualTo moveLog.Count,
+                sprintf
+                    "Attribution: captured move-attribute count %d != posted move count %d"
+                    moveAttributes.Length
+                    moveLog.Count
+            )
+
+            for i in 0 .. moveLog.Count - 1 do
+                let loggedPlayer, loggedSquare = moveLog.[i]
+                let capturedPlayer, capturedSquare = moveAttributes.[i]
+
+                Assert.That(
+                    capturedPlayer,
+                    Is.EqualTo loggedPlayer,
+                    sprintf "Attribution[%d]: captured player '%s' != logged player '%s'" i capturedPlayer loggedPlayer
+                )
+
+                Assert.That(
+                    capturedSquare,
+                    Is.EqualTo loggedSquare,
+                    sprintf "Attribution[%d]: captured square '%s' != logged square '%s'" i capturedSquare loggedSquare
+                )
 
             // (3) Order: prov:startedAtTime values must be in non-decreasing order.
             // Activities are sequential (one per turn); any reordering or gap would surface here.

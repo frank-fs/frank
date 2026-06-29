@@ -14,7 +14,8 @@ let private mk id resource =
       DomainType = None
       Agent = { Id = "urn:agent:a"; Label = None }
       StartedAt = DateTimeOffset.UnixEpoch
-      EndedAt = DateTimeOffset.UnixEpoch }
+      EndedAt = DateTimeOffset.UnixEpoch
+      BodyAttributes = [] }
 
 [<Tests>]
 let tests =

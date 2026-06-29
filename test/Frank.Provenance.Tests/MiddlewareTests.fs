@@ -79,6 +79,31 @@ let tests =
               Expect.isFalse (body.Contains "https://schema.org/") "no domain IRI when ProvClasses is empty"
           }
 
+          testCaseAsync "POST with IRI-keyed JSON body emits attributes on prov:Activity node"
+          <| async {
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Post, "/orders")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              req.Content <-
+                  new System.Net.Http.StringContent(
+                      """{"https://schema.org/agent":"Alice","https://schema.org/object":"order-1"}""",
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.stringContains body "schema.org/agent" "schema:agent IRI from body attrs"
+              Expect.stringContains body "Alice" "schema:agent value from body attrs"
+          }
+
           testCaseAsync "non-prov response carries Vary: Accept and Link: has_provenance (fix #8/#9)"
           <| async {
               use app = startProvenanceServer (orderProvConfig ())

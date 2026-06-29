@@ -2,6 +2,7 @@ namespace Frank.Provenance
 
 open System
 open System.IO
+open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
@@ -13,6 +14,48 @@ module private ProvNegotiation =
 
     let requested (ctx: HttpContext) : bool =
         Frank.AcceptNegotiation.wantsProfile ctx "application/ld+json" "http://www.w3.org/ns/prov"
+
+[<RequireQualifiedAccess>]
+module private BodyCapture =
+
+    let private isAbsoluteIri (s: string) =
+        s.StartsWith("http://", StringComparison.Ordinal)
+        || s.StartsWith("https://", StringComparison.Ordinal)
+
+    let private extractFromJson (json: string) : (string * string) list =
+        try
+            use doc = JsonDocument.Parse json
+
+            if doc.RootElement.ValueKind <> JsonValueKind.Object then
+                []
+            else
+                doc.RootElement.EnumerateObject()
+                |> Seq.choose (fun p ->
+                    if isAbsoluteIri p.Name && p.Value.ValueKind = JsonValueKind.String then
+                        Some(p.Name, p.Value.GetString())
+                    else
+                        None)
+                |> Seq.toList
+        with :? JsonException ->
+            []
+
+    // Read request body for provenance capture, then reset Position to 0 so the downstream
+    // handler can read it. Must be called BEFORE next.Invoke. leaveOpen=true prevents the
+    // StreamReader from disposing ctx.Request.Body.
+    let readAndResetAsync (ctx: HttpContext) : Task<(string * string) list> =
+        if ctx.Request.Method <> "POST" || not ctx.Request.Body.CanSeek then
+            Task.FromResult []
+        else
+            task {
+                ctx.Request.Body.Position <- 0L
+
+                use reader =
+                    new StreamReader(ctx.Request.Body, Text.Encoding.UTF8, false, 4096, true)
+
+                let! json = reader.ReadToEndAsync()
+                ctx.Request.Body.Position <- 0L
+                return if String.IsNullOrEmpty json then [] else extractFromJson json
+            }
 
 [<RequireQualifiedAccess>]
 module private Capture =
@@ -65,6 +108,7 @@ module private Capture =
         (ctx: HttpContext)
         (started: DateTimeOffset)
         (ended: DateTimeOffset)
+        (bodyAttrs: (string * string) list)
         : ProvenanceRecord =
         let endpoint = ctx.GetEndpoint()
         let domainType = resolveDomainType endpoint config ctx.Response.StatusCode
@@ -76,7 +120,8 @@ module private Capture =
           DomainType = domainType
           Agent = resolveAgent ctx
           StartedAt = started
-          EndedAt = ended }
+          EndedAt = ended
+          BodyAttributes = bodyAttrs }
 
 type ProvenanceMiddleware
     (next: RequestDelegate, config: ProvenanceConfig, store: IProvenanceStore, logger: ILogger<ProvenanceMiddleware>) =
@@ -104,10 +149,11 @@ type ProvenanceMiddleware
 
     member private this.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
         task {
+            let! bodyAttrs = BodyCapture.readAndResetAsync ctx
             do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
 
             let ended = DateTimeOffset.UtcNow
-            let record = Capture.build config ctx started ended
+            let record = Capture.build config ctx started ended bodyAttrs
             store.Append record
 
             if ctx.Response.HasStarted then
@@ -127,6 +173,9 @@ type ProvenanceMiddleware
     member this.InvokeAsync(ctx: HttpContext) : Task =
         let started = DateTimeOffset.UtcNow
 
+        if ctx.Request.Method = "POST" then
+            ctx.Request.EnableBuffering()
+
         if ProvNegotiation.requested ctx then
             this.InvokeWithProv(ctx, started)
         else
@@ -142,7 +191,8 @@ type ProvenanceMiddleware
             ctx.Response.Headers.Append("Link", linkHeaderValue)
 
             task {
+                let! bodyAttrs = BodyCapture.readAndResetAsync ctx
                 do! next.Invoke ctx
                 let ended = DateTimeOffset.UtcNow
-                store.Append(Capture.build config ctx started ended)
+                store.Append(Capture.build config ctx started ended bodyAttrs)
             }

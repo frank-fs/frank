@@ -18,7 +18,8 @@ let private mkRecord id resource =
       DomainType = None
       Agent = { Id = "urn:agent:anon"; Label = None }
       StartedAt = DateTimeOffset.UnixEpoch
-      EndedAt = DateTimeOffset.UnixEpoch }
+      EndedAt = DateTimeOffset.UnixEpoch
+      BodyAttributes = [] }
 
 let private countOccurrences (sub: string) (s: string) =
     let mutable count = 0
