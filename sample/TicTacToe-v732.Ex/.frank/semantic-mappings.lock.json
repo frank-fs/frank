@@ -1,0 +1,614 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-06-29T03:18:44+00:00",
+  "vocabularies": {},
+  "declaredPrefixes": {
+    "ex": "https://example.org/ex#",
+    "ttt": "https://example.org/tictactoe#"
+  },
+  "mappings": [
+    {
+      "fsharpType": "TicTacToe.Model.SquarePosition",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "TopLeft",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "TopCenter",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "TopRight",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "MiddleLeft",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "MiddleCenter",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "MiddleRight",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "BottomLeft",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "BottomCenter",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "BottomRight",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.Player",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "X",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        },
+        {
+          "name": "O",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.SquareState",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "Taken",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "Player",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Empty",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": []
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.XPosition",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "XPos",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "SquarePosition",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.OPosition",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "OPos",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "SquarePosition",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fsharpType": "ValidMovesForX",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "ValidMovesForO",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "GameState",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveResult",
+      "iri": "ex:ActionStatusType",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "XTurn",
+          "iri": "ex:ActiveActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "ValidMovesForX",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "OTurn",
+          "iri": "ex:ActiveActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "ValidMovesForO",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Won",
+          "iri": "ex:CompletedActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "Player",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Draw",
+          "iri": "ex:CompletedActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Error",
+          "iri": "ex:FailedActionStatus",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed",
+          "payload": [
+            {
+              "name": "GameState",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "string",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.Move",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "XMove",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "SquarePosition",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "OMove",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "SquarePosition",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveRequest",
+      "iri": "ex:MoveAction",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "shape": "record",
+      "fields": [
+        {
+          "name": "Position",
+          "iri": "ex:square",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        },
+        {
+          "name": "Player",
+          "iri": "ex:agent",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.Game",
+      "iri": "ex:Game",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "shape": "record",
+      "fields": [
+        {
+          "name": "Id",
+          "iri": "ex:identifier",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        },
+        {
+          "name": "Result",
+          "iri": "ex:result",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveLog`1",
+      "iri": "ex:ItemList",
+      "confidence": 1,
+      "source": "manual",
+      "status": "confirmed",
+      "alternates": [],
+      "shape": "record",
+      "fields": [
+        {
+          "name": "Items",
+          "iri": "ex:item",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        },
+        {
+          "name": "Count",
+          "iri": "ex:numberOfItems",
+          "confidence": 1,
+          "source": "manual",
+          "status": "confirmed"
+        }
+      ]
+    },
+    {
+      "fsharpType": "XMove",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "OMove",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "StartGame",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "MakeMove",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    },
+    {
+      "fsharpType": "TicTacToe.Model.Msg",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "union",
+      "cases": [
+        {
+          "name": "GetOrCreate",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "string",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "AsyncReplyChannel",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Get",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "string",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "AsyncReplyChannel",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        },
+        {
+          "name": "Update",
+          "iri": null,
+          "confidence": 0,
+          "source": "convention",
+          "status": "excluded",
+          "payload": [
+            {
+              "name": "string",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "Move",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            },
+            {
+              "name": "AsyncReplyChannel",
+              "iri": null,
+              "confidence": 0,
+              "source": "convention",
+              "status": "excluded"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.GameStore",
+      "iri": null,
+      "confidence": 0,
+      "source": "convention",
+      "status": "excluded",
+      "alternates": [],
+      "shape": "record",
+      "fields": []
+    }
+  ]
+}

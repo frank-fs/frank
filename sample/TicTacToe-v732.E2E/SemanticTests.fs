@@ -591,6 +591,36 @@ type SemanticTests() =
                 |> Option.map expand
                 |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves template")
 
+            // ── Leg A: hardcoded schema.org client breaks against ex: server ───
+            // A client that hardcodes schema.org IRIs as body keys cannot find the
+            // ex: descriptor hrefs in the body — the handler returns 400 because
+            // squareIri/agentIri keys are absent. This is a DEMONSTRATED failure,
+            // not just an assertion about the ALPS content.
+            let legABody = Dictionary<string, obj>()
+            legABody.["@type"] <- "https://schema.org/MoveAction"
+            legABody.["https://schema.org/agent"] <- "X"
+            legABody.["https://example.org/tictactoe#square"] <- "TopLeft"
+
+            let! legAResp =
+                ctx.PostAsync(
+                    moveUrl,
+                    APIRequestContextOptions(
+                        Headers = dict [ "Content-Type", "application/ld+json" ],
+                        DataObject = legABody
+                    )
+                )
+
+            let! legAText = legAResp.TextAsync()
+
+            Assert.That(
+                legAResp.Status,
+                Is.InRange(400, 499),
+                sprintf
+                    "Leg A: hardcoded schema.org client expected 4xx from ex: server but got %d — body: %s"
+                    legAResp.Status
+                    legAText
+            )
+
             // ── Phase 5: Play full game using discovered ex: IRIs ───────────────
             // POST bodies keyed by the ex: IRIs read from ALPS — no hardcoded values.
             let mutable finished = false

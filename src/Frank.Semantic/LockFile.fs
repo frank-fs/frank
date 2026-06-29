@@ -489,12 +489,17 @@ module LockFile =
 
     let private mergeFields (existing: FieldMapping list) (resolved: FieldMapping list) : FieldMapping list =
         let resolvedByName = resolved |> List.map (fun f -> f.Name, f) |> Map.ofList
+        let existingNames = existing |> List.map (fun f -> f.Name) |> Set.ofList
 
-        existing
-        |> List.map (fun f ->
-            match Map.tryFind f.Name resolvedByName with
-            | Some r -> r
-            | None -> f)
+        let updated =
+            existing
+            |> List.map (fun f ->
+                match Map.tryFind f.Name resolvedByName with
+                | Some r -> r
+                | None -> f)
+
+        let newFields = resolved |> List.filter (fun f -> not (Set.contains f.Name existingNames))
+        updated @ newFields
 
     let private mergeShape (existing: MappingShape) (resolved: MappingShape) : MappingShape =
         match existing, resolved with

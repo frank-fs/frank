@@ -1,25 +1,14 @@
 module TicTacToe.Program
 
-open System
 open System.IO
-open System.Text.Json
 open System.Text.Json.Nodes
-open System.Threading.Tasks
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
-open VDS.RDF
-open VDS.RDF.Parsing
 open Frank
 open Frank.Builder
 open Frank.Discovery
-open Frank.LinkedData
-open Frank.OpenApi
-open Frank.Provenance
-open Frank.Validation
 open TicTacToe.Model
 open TicTacToe.GameStore
 
-/// Single in-memory store for this sample app.
 let private store = GameStore()
 
 let private allPositions =
@@ -64,7 +53,6 @@ let private getGameState (result: MoveResult) : GameState =
     | Error(gs, _) -> gs
     | Draw gs -> gs
 
-/// Project a MoveResult into the wire shape the naive client reads.
 let private wireJson (id: string) (result: MoveResult) : JsonObject =
     let gs = getGameState result
     let obj = JsonObject()
@@ -101,20 +89,6 @@ let private writeJson (ctx: HttpContext) (node: JsonNode) =
 let private routeId (ctx: HttpContext) =
     ctx.Request.RouteValues.["id"] :?> string
 
-let private homeHandler (ctx: HttpContext) =
-    task { do! ctx.Response.WriteAsync("Frank TicTacToe v7.3.2") }
-
-let private gameHandler (ctx: HttpContext) =
-    task {
-        let id = routeId ctx
-
-        let game: Game =
-            { Id = id
-              Result = store.GetOrCreate id }
-
-        do! writeJson ctx (wireJson game.Id game.Result)
-    }
-
 let private findDescriptorHref (id: string) =
     TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
     |> List.tryFind (fun d -> d.Id = id)
@@ -146,6 +120,20 @@ let private parseMoveFromDoc (isLd: bool) (doc: JsonNode) =
 
         pos, plr
 
+let private homeHandler (ctx: HttpContext) =
+    task { do! ctx.Response.WriteAsync("Frank TicTacToe v7.3.2 — ex: vocab") }
+
+let private gameHandler (ctx: HttpContext) =
+    task {
+        let id = routeId ctx
+
+        let game: Game =
+            { Id = id
+              Result = store.GetOrCreate id }
+
+        do! writeJson ctx (wireJson game.Id game.Result)
+    }
+
 let private moveHandler (ctx: HttpContext) =
     task {
         let id = routeId ctx
@@ -173,17 +161,6 @@ let private moveHandler (ctx: HttpContext) =
             do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
     }
 
-let private tttVocabTtl =
-    let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ttt.ttl")
-    File.ReadAllText(path)
-
-let private tttVocabGraph =
-    let g = new Graph()
-    let parser = TurtleParser()
-    use reader = new StringReader(tttVocabTtl)
-    parser.Load(g, reader)
-    g
-
 let private homeResource =
     resource "/" {
         name "Home"
@@ -206,38 +183,16 @@ let private movesResource =
             (TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest).AbsoluteUri
         )
 
-        post (
-            handler {
-                handle moveHandler
-                accepts typeof<MoveRequest>
-                produces typeof<Move> 200
-            }
-        )
-    }
-
-let private tttVocabResource =
-    resource "/tictactoe" {
-        name "TttVocabulary"
-        linkedDataGraph tttVocabGraph """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
-
-        get (fun (ctx: HttpContext) ->
-            task {
-                ctx.Response.ContentType <- "text/turtle"
-                do! ctx.Response.WriteAsync(tttVocabTtl)
-            })
+        post moveHandler
     }
 
 [<EntryPoint>]
 let main args =
     webHost args {
-        useProvenance
-        useValidation
         useDiscoveryWith TicTacToe.GeneratedDiscovery.discoveryConfig
-        useLinkedData
         resource homeResource
         resource gameResource
         resource movesResource
-        resource tttVocabResource
     }
 
     0

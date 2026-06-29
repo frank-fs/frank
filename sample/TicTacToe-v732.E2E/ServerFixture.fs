@@ -38,6 +38,17 @@ type ServerFixture() =
 
         up (DirectoryInfo(AppContext.BaseDirectory))
 
+    let findExAppProject () =
+        let rec up (dir: DirectoryInfo) =
+            let candidate =
+                Path.Combine(dir.FullName, "sample", "TicTacToe-v732.Ex", "TicTacToe.v732.Ex.fsproj")
+
+            if File.Exists candidate then candidate
+            elif isNull dir.Parent then failwith "TicTacToe.v732.Ex.fsproj not found walking up from test output"
+            else up dir.Parent
+
+        up (DirectoryInfo(AppContext.BaseDirectory))
+
     let waitUntilReady (url: string) =
         use client = new HttpClient()
         let deadline = DateTime.UtcNow.AddSeconds 60.0
@@ -79,7 +90,8 @@ type ServerFixture() =
         Server.proc <- Some schemaProc
         Server.setUrl schemaUrl
         waitUntilReady schemaUrl
-        let exUrl, exProc = startSampleOn 15322 [ "FRANK_VOCAB", "ex" ] app
+        let exApp = findExAppProject ()
+        let exUrl, exProc = startSampleOn 15322 [] exApp
         ExServer.proc <- Some exProc
         ExServer.setUrl exUrl
         waitUntilReady exUrl

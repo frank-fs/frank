@@ -563,6 +563,42 @@ let mergeTests =
               Expect.equal field.Status MappingStatus.Confirmed "field status updated"
           }
 
+          test "merge adds new fields when existing record has no fields" {
+              let existing: Mapping =
+                  { FSharpType = "MyApp.Order"
+                    Iri = None
+                    Confidence = 0.0
+                    Source = MappingSource.Convention
+                    Status = MappingStatus.Unresolved
+                    Alternates = []
+                    Shape = MappingShape.Record [] }
+
+              let newField: FieldMapping =
+                  { Name = "Total"
+                    Iri = Some "schema:totalPaymentDue"
+                    Confidence = 1.0
+                    Source = MappingSource.Manual
+                    Status = MappingStatus.Confirmed }
+
+              let resolved: Mapping =
+                  { existing with
+                      Iri = Some "schema:Order"
+                      Status = MappingStatus.Confirmed
+                      Shape = MappingShape.Record [ newField ] }
+
+              let lf: LockFile.LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.UtcNow
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
+                    Mappings = [ existing ] }
+
+              let result = LockFile.merge lf [ resolved ]
+              let fields = MappingShape.payloadFields result.Mappings.[0].Shape
+              Expect.equal fields.Length 1 "new field appended"
+              Expect.equal fields.[0].Iri (Some "schema:totalPaymentDue") "field iri correct"
+          }
+
           test "merge is pure: original LockFile unchanged" {
               let existing: Mapping =
                   { FSharpType = "MyApp.Order"

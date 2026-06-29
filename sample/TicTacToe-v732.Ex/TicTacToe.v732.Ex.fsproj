@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <!-- Module name must match the open/reference in Program.fs -->
+    <FrankDiscoveryModuleName>TicTacToe.GeneratedDiscovery</FrankDiscoveryModuleName>
+    <!-- Lock file produced by the CLI pipeline (frank semantic accept) -->
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+    <!-- LinkedData/Validation/Provenance codegen not used in the ex: variant -->
+    <FrankVocabularyBinding>TicTacToe.VocabularyEx.registry</FrankVocabularyBinding>
+    <!-- SemanticModel codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
+    <FrankSemanticsModuleName>TicTacToe.GeneratedSemantics</FrankSemanticsModuleName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Share domain source files with the schema: sample — no shared project needed -->
+    <Compile Include="../TicTacToe-v732/Model.fsi" />
+    <Compile Include="../TicTacToe-v732/Model.fs" />
+    <Compile Include="../TicTacToe-v732/GameStore.fs" />
+    <Compile Include="Vocabulary.Ex.fs" />
+    <!-- GeneratedSemantics.fs + GeneratedDiscovery.fs injected before Program.fs -->
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
+    <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType=""
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <Import Project="../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
+
+</Project>
