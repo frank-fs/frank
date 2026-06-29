@@ -15,6 +15,7 @@ open Frank.Discovery
 open Frank.LinkedData
 open Frank.OpenApi
 open Frank.Provenance
+open Frank.Validation
 open TicTacToe.Model
 open TicTacToe.GameStore
 
@@ -114,20 +115,39 @@ let private gameHandler (ctx: HttpContext) =
         do! writeJson ctx (wireJson game.Id game.Result)
     }
 
-/// Pre-semantic move shape: plain JSON { "position": "TopLeft", "player": "X" }.
-/// JSON-LD/IRI parsing is added when the validation layer lands.
+let private agentIri = "https://schema.org/agent"
+let private squareIri = "https://example.org/tictactoe#square"
+
+let private isLdJson (ctx: HttpContext) =
+    let ct = ctx.Request.ContentType
+    ct <> null && ct.Contains("application/ld+json")
+
+let private parseMoveFromDoc (isLd: bool) (doc: JsonNode) =
+    if isLd then
+        let pos =
+            doc.[squareIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+
+        let plr =
+            doc.[agentIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+
+        pos, plr
+    else
+        let pos =
+            doc.["position"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+
+        let plr =
+            doc.["player"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+
+        pos, plr
+
 let private moveHandler (ctx: HttpContext) =
     task {
         let id = routeId ctx
         use reader = new StreamReader(ctx.Request.Body)
         let! body = reader.ReadToEndAsync()
         let doc = JsonNode.Parse body
-
-        let position =
-            doc.["position"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
-
-        let player =
-            doc.["player"] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+        let ld = isLdJson ctx
+        let position, player = parseMoveFromDoc ld doc
 
         match position, player with
         | Some pos, Some plr ->
@@ -183,6 +203,7 @@ let private movesResource =
         post (
             handler {
                 handle moveHandler
+                accepts typeof<MoveRequest>
                 produces typeof<Move> 200
             }
         )
@@ -204,6 +225,7 @@ let private tttVocabResource =
 let main args =
     webHost args {
         useProvenance
+        useValidation
         useDiscovery
         useLinkedData
         resource homeResource

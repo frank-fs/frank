@@ -39,7 +39,10 @@ type SemanticTests() =
 
             if seg.Contains "<" && seg.Contains ">" && seg.Contains "rel=" then
                 let url = seg.Substring(seg.IndexOf '<' + 1, seg.IndexOf '>' - seg.IndexOf '<' - 1)
-                let rel = seg.Substring(seg.IndexOf "rel=" + 4).Trim().Split(';').[0].Trim().Trim('"', '\'')
+
+                let rel =
+                    seg.Substring(seg.IndexOf "rel=" + 4).Trim().Split(';').[0].Trim().Trim('"', '\'')
+
                 rels.[rel] <- url
 
         rels
@@ -52,15 +55,17 @@ type SemanticTests() =
     member this.``AT-S1 JSON Home lists resources with vocabulary-mapped rels``() =
         task {
             use! ctx = this.NewContext()
-            let! resp = ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
+            let! resp =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
             Assert.That(resp.Status, Is.EqualTo 200)
             let! json = resp.JsonAsync()
             let resources = json.Value.GetProperty("resources")
             Assert.That(resources.EnumerateObject() |> Seq.isEmpty |> not, "JSON Home has no resources")
             // rels ARE vocabulary terms (absolute IRIs), never urn:frank:
             let relsAreVocab =
-                resources.EnumerateObject()
-                |> Seq.exists (fun r -> r.Name.StartsWith "http")
+                resources.EnumerateObject() |> Seq.exists (fun r -> r.Name.StartsWith "http")
 
             Assert.That(relsAreVocab, Is.True, "JSON Home rels are not vocabulary IRIs")
             let! body = resp.TextAsync()
@@ -99,9 +104,9 @@ type SemanticTests() =
             use! ctx = this.NewContext()
 
             let badMove =
-                {| ``@type`` = "https://schema.org/Action"
+                {| ``@type`` = "https://schema.org/MoveAction"
                    ``https://schema.org/agent`` = "X"
-                   ``https://schema.org/position`` = "NotASquare" |}
+                   ``https://example.org/tictactoe#square`` = "NotASquare" |}
 
             let! resp =
                 ctx.PostAsync(
@@ -116,7 +121,9 @@ type SemanticTests() =
             let! body = resp.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "422 body leaks urn:frank: IRIs")
             Assert.That(body.Contains "ValidationReport", Is.True, "422 body is not a W3C SHACL ValidationReport")
-            Assert.That(body.Contains "schema.org", Is.True, "422 ValidationReport cites no vocabulary IRIs")
+            // sh:resultPath carries the ttt:square IRI; dotNetRdf sh:sourceShape points to the
+            // blank-node property shape, so schema:MoveAction does not appear in the report.
+            Assert.That(body.Contains "example.org/tictactoe", Is.True, "422 ValidationReport cites no vocabulary IRIs")
         // valid-move → 200 is covered by the capstone (AT-S6) using discovered IRIs.
         }
 
@@ -127,16 +134,28 @@ type SemanticTests() =
             use! ctx = this.NewContext()
 
             let! ld =
-                ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+                ctx.GetAsync(
+                    "/games/at-s5",
+                    APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
+                )
 
             Assert.That(ld.Status, Is.EqualTo 200, "ld+json not negotiated")
-            let contentType = match ld.Headers.TryGetValue "content-type" with | true, v -> v | _ -> ""
+
+            let contentType =
+                match ld.Headers.TryGetValue "content-type" with
+                | true, v -> v
+                | _ -> ""
+
             Assert.That(contentType.Contains "ld+json", Is.True, "ld+json Accept did not yield ld+json")
             let! body = ld.TextAsync()
             Assert.That(body.Contains "@context", Is.True, "JSON-LD body lacks @context")
             Assert.That(body.Contains "schema.org", Is.True, "@context does not reference external schema.org")
             // declared outbound link (vocabulary CE: seeAlso wikidata:Q11907)
-            Assert.That(body.Contains "seeAlso" || body.Contains "wikidata", Is.True, "JSON-LD lacks rdfs:seeAlso outbound link")
+            Assert.That(
+                body.Contains "seeAlso" || body.Contains "wikidata",
+                Is.True,
+                "JSON-LD lacks rdfs:seeAlso outbound link"
+            )
         }
 
     // ── AT-S6: capstone — naive client plays a full game via discovery only ──────
@@ -147,7 +166,9 @@ type SemanticTests() =
             let gameId = "at-s6"
 
             // 1. JSON Home → game resource (GET) and moves resource (POST) templates
-            let! home = ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+            let! home =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
             let! homeJson = home.JsonAsync()
             let resources = homeJson.Value.GetProperty("resources")
 
@@ -172,11 +193,23 @@ type SemanticTests() =
 
             let expand (template: string) =
                 let o = template.IndexOf '{'
-                if o < 0 then template
-                else template.Substring(0, o) + Uri.EscapeDataString gameId + template.Substring(template.IndexOf '}' + 1)
 
-            let gameUrl = templateWith "GET" |> Option.map expand |> Option.defaultWith (fun () -> failwith "JSON Home: no GET game resource")
-            let moveUrl = templateWith "POST" |> Option.map expand |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves resource")
+                if o < 0 then
+                    template
+                else
+                    template.Substring(0, o)
+                    + Uri.EscapeDataString gameId
+                    + template.Substring(template.IndexOf '}' + 1)
+
+            let gameUrl =
+                templateWith "GET"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no GET game resource")
+
+            let moveUrl =
+                templateWith "POST"
+                |> Option.map expand
+                |> Option.defaultWith (fun () -> failwith "JSON Home: no POST moves resource")
 
             // 2. OPTIONS game → ALPS profile → field IRIs (schema.org)
             let! opts = this.Options(ctx, gameUrl)
@@ -194,24 +227,42 @@ type SemanticTests() =
                         let mutable idEl = Unchecked.defaultof<JsonElement>
                         let mutable hrefEl = Unchecked.defaultof<JsonElement>
 
-                        if el.TryGetProperty("id", &idEl) && idEl.GetString() = name && el.TryGetProperty("href", &hrefEl) then
+                        if
+                            el.TryGetProperty("id", &idEl)
+                            && idEl.GetString() = name
+                            && el.TryGetProperty("href", &hrefEl)
+                        then
                             found <- Some(hrefEl.GetString())
 
                         for p in el.EnumerateObject() do
                             walk p.Value
-                    | JsonValueKind.Array -> for item in el.EnumerateArray() do walk item
+                    | JsonValueKind.Array ->
+                        for item in el.EnumerateArray() do
+                            walk item
                     | _ -> ()
 
                 walk alpsDoc.RootElement
                 found
 
-            let positionIri = fieldIri "position" |> Option.defaultWith (fun () -> failwith "ALPS missing position IRI")
-            let agentIri = fieldIri "agent" |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI")
+            let positionIri =
+                fieldIri "position"
+                |> Option.defaultWith (fun () -> failwith "ALPS missing position IRI")
+
+            let agentIri =
+                fieldIri "agent"
+                |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI")
 
             // 3. capstone also reads JSON-LD responses (external @context) ...
-            let! ldState = ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+            let! ldState =
+                ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+
             let! ldBody = ldState.TextAsync()
-            Assert.That(ldBody.Contains "@context" && ldBody.Contains "schema.org", Is.True, "capstone: game not available as external-context JSON-LD")
+
+            Assert.That(
+                ldBody.Contains "@context" && ldBody.Contains "schema.org",
+                Is.True,
+                "capstone: game not available as external-context JSON-LD"
+            )
 
             // ... and an illegal move is rejected by SHACL with a schema.org IRI in the report
             let invalid = Dictionary<string, obj>()
@@ -222,7 +273,10 @@ type SemanticTests() =
             let! bad =
                 ctx.PostAsync(
                     moveUrl,
-                    APIRequestContextOptions(Headers = dict [ "Content-Type", "application/ld+json" ], DataObject = invalid)
+                    APIRequestContextOptions(
+                        Headers = dict [ "Content-Type", "application/ld+json" ],
+                        DataObject = invalid
+                    )
                 )
 
             Assert.That(bad.Status, Is.EqualTo 422, "capstone: SHACL did not reject an illegal move")
