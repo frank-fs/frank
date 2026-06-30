@@ -11,6 +11,7 @@ The assistant's Achilles heel: making **unilateral decisions** and then **finish
 - The assistant performs **ONLY adversarial review** — actively hunting for gaps, false-green, weakened assertions, and "passes for the wrong reason."
 - **Incomplete work is passed BACK to the subagent** with the specific gap. The assistant NEVER finishes, patches, or completes a subagent's work — doing so forfeits the adversarial perspective.
 - **Surface issues and questions to the maintainer as they arise.** Do not decide unilaterally; do not batch-defer.
+- **Use the gate:** after each item's implementation subagent reports done, run the `adversarial-review` skill (dispatches the `adversarial-reviewer` agent) against this plan's AC/shortcut/thesis for that item; bounce INCOMPLETE straight back to the implementer. The orchestrator only routes gaps.
 
 ## Foundation (interdependent — do first)
 
