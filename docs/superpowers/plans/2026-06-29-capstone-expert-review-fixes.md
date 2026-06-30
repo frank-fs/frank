@@ -2,8 +2,10 @@
 
 Source: `/expert-review` panel (Berners-Lee, Miller, Fielding, @7sharp9) on branch `capstone-discovery-completion` (diff vs master). The capstone's AT-S1..S8 were partly **false-green** (passed without proving the claim). Every item below is a **maintainer-ratified decision** (grilled one-by-one). NO deferrals to Track A unless explicitly noted; two attempts to over-defer (#6, #7) were caught and corrected — read-side semantic self-description IS v7.3.2.
 
-## This is CLEANUP, in scope — NOT a "major second pass"
+## This is CLEANUP, in scope — NOT a "major second pass", NOT new issues
 All 21 items were in scope for the capstone. The volume exists because the first pass let incomplete / false-green subagent work through the gates — an **accountability failure**, not new scope. Do NOT re-characterize it as foundational/large to justify a different process.
+
+**These are NOT 21 new issues.** They are the original work (#333) **incomplete vs its own acceptance criteria** — the false-green proves the spec's ACs (AT-S1..S8 + D-deref + thesis) were never actually met. The original work is **returned for completion**: #333 stays open + In Progress; this plan is the adversarial-reviewer's gap list; close the gaps against #333's existing ACs through the adversarial loop. Creating new issues for them would falsely log implementation bugs as new scope.
 
 ## OPERATING MODE (non-negotiable — the assistant's repeated failure pattern)
 The assistant's Achilles heel: making **unilateral decisions** and then **finishing/patching subagent work itself**, which drops it out of the adversarial gap-finding seat → it stops catching gaps (this is how the false-green slipped through the gates).
