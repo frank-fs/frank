@@ -90,6 +90,7 @@ let private provenanceLock: LockFile =
                 Source = Convention
                 Status = Confirmed
                 Alternates = []
+                Rt = None
                 Shape = MappingShape.Record [] } ] }
 
 let private makeTaskItem (path: string) : ITaskItem =
@@ -154,6 +155,7 @@ let private orderActionLock: LockFile =
                 Source = Convention
                 Status = Confirmed
                 Alternates = []
+                Rt = None
                 Shape = MappingShape.Record [] } ] }
 
 let private makeTask

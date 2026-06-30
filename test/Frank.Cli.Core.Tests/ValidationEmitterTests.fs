@@ -41,6 +41,7 @@ let private lock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "position"
@@ -64,6 +65,7 @@ let private lock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Union
                   [ { Name = "Active"
@@ -265,6 +267,7 @@ let skipPathTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let shapes =
@@ -298,6 +301,7 @@ let skipPathTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "WithData"
@@ -349,6 +353,7 @@ let private hostRelLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "player"

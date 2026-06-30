@@ -44,6 +44,7 @@ let private mkMapping fsharpType iri fields : Mapping =
       Source = Convention
       Status = Confirmed
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record fields }
 
 let private mkField name iri : FieldMapping =
@@ -419,6 +420,7 @@ let at_rm_ci =
                     Source = Convention
                     Status = Confirmed
                     Alternates = []
+                    Rt = None
                     Shape =
                       MappingShape.Union
                           [ { Name = "Red"

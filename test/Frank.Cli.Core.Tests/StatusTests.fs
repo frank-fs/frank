@@ -14,6 +14,7 @@ let private mapping fsType status : Mapping =
       Source = Convention
       Status = status
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record [] }
 
 let private lockWith (mappings: Mapping list) : LockFile.LockFile =

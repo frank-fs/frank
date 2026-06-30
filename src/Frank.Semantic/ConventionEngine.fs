@@ -562,6 +562,7 @@ module ConventionEngine =
           Source = Convention
           Status = Unresolved
           Alternates = []
+          Rt = None
           Shape = MappingShape.Record [] }
 
     /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
@@ -614,6 +615,7 @@ module ConventionEngine =
                       Source = Convention
                       Status = status
                       Alternates = alternates
+                      Rt = None
                       Shape = shape }
 
         applyExplicitClass registry typeInfo terms conventionResult

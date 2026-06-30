@@ -93,6 +93,7 @@ let private validationLock: LockFile =
                 Source = Convention
                 Status = Confirmed
                 Alternates = []
+                Rt = None
                 Shape =
                   MappingShape.Record
                       [ { Name = "position"

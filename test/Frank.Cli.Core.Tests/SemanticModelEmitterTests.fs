@@ -32,6 +32,7 @@ let private probeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape = MappingShape.Record [] }
           { FSharpType = "Probe.Holder`1"
             Iri = Some "schema:Holder"
@@ -39,6 +40,7 @@ let private probeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape = MappingShape.Record [] }
           { FSharpType = "Probe.Unmapped"
             Iri = None
@@ -46,6 +48,7 @@ let private probeLock: LockFile =
             Source = Convention
             Status = Unresolved
             Alternates = []
+            Rt = None
             Shape = MappingShape.Record [] } ] }
 
 let private noClassLock: LockFile =
@@ -60,6 +63,7 @@ let private noClassLock: LockFile =
             Source = Convention
             Status = Unresolved
             Alternates = []
+            Rt = None
             Shape = MappingShape.Record [] } ] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -196,6 +200,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
@@ -203,6 +208,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Excluded
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let result =
@@ -250,6 +256,7 @@ let unionCaseEmissionTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "XMove"
@@ -318,6 +325,7 @@ let unionCaseEmissionTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "Red"
@@ -376,6 +384,7 @@ let unionCaseEmissionTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "XMove"
@@ -490,6 +499,7 @@ let private moveLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Union
                   [ { Name = "XMove"
@@ -599,6 +609,7 @@ let private crossNsLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Union
                   [ { Name = "Active"

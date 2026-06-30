@@ -21,6 +21,7 @@ let confirmedLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "identifier"
@@ -34,6 +35,7 @@ let confirmedLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "rowIndex"
@@ -52,6 +54,7 @@ let proposedLock: LockFile =
                 Source = Llm
                 Status = Proposed
                 Alternates = []
+                Rt = None
                 Shape =
                   MappingShape.Record
                       [ { Name = "identifier"

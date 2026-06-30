@@ -39,6 +39,7 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "identifier"
@@ -57,6 +58,7 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "rowIndex"
@@ -163,6 +165,7 @@ let private genMappingWithSchemaIri =
               Source = source
               Status = status
               Alternates = []
+              Rt = None
               Shape = MappingShape.Record fields }
     }
 
@@ -478,6 +481,7 @@ let parsesTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
+                        Rt = None
                         Shape =
                           MappingShape.Record
                               [ { Name = "bar"
@@ -513,6 +517,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
@@ -520,6 +525,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Excluded
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let reg =
@@ -549,6 +555,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
+                        Rt = None
                         Shape = MappingShape.Record [] }
 
               let result = LinkedDataEmitter.emit "My.Generated" noRegistry lockWithUnknown
@@ -569,6 +576,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Unresolved
                         Alternates = []
+                        Rt = None
                         Shape = MappingShape.Record [] }
 
               let result = LinkedDataEmitter.emit "My.Generated" reg lockWithNoneIri

@@ -32,6 +32,7 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "identifier"
@@ -50,6 +51,7 @@ let private ticTacToeLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = Some "schema:Game"
             Shape =
               MappingShape.Record
                   [ { Name = "rowIndex"
@@ -88,6 +90,7 @@ let private singleTypeLock: LockFile =
           Source = Convention
           Status = Confirmed
           Alternates = []
+          Rt = None
           Shape =
             MappingShape.Record
                 [ { Name = "bar"
@@ -169,6 +172,7 @@ let private genMappingWithSchemaIri =
               Source = source
               Status = status
               Alternates = []
+              Rt = None
               Shape = MappingShape.Record fields }
     }
 
@@ -367,6 +371,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Confirmed
                         Alternates = []
+                        Rt = None
                         Shape = MappingShape.Record [] }
 
               let result = DiscoveryEmitter.emit "My.Generated" "/alps" noRegistry lockWithUnknown
@@ -388,6 +393,7 @@ let prefixResolutionTests =
                         Source = Convention
                         Status = Unresolved
                         Alternates = []
+                        Rt = None
                         Shape = MappingShape.Record [] }
 
               let result =
@@ -446,6 +452,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] }
                         { FSharpType = "MyApp.Player"
                           Iri = Some "schema:Player"
@@ -453,6 +460,7 @@ let excludedMappingTests =
                           Source = Convention
                           Status = Excluded
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let result =
@@ -569,6 +577,7 @@ let private tttDeclaredOnlyLock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "square"
@@ -628,6 +637,7 @@ let private exDeclaredOnlyLock: LockFile =
             Source = Manual
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape =
               MappingShape.Record
                   [ { Name = "Id"
@@ -641,6 +651,7 @@ let private exDeclaredOnlyLock: LockFile =
             Source = Manual
             Status = Confirmed
             Alternates = []
+            Rt = Some "ex:Game"
             Shape =
               MappingShape.Record
                   [ { Name = "Position"
@@ -856,4 +867,61 @@ let nestingTests =
               Expect.isFalse (gameEl.TryGetProperty("descriptor", &nestedEl)) "leaf Game has no nested descriptor array"
               let mutable rtEl = Unchecked.defaultof<System.Text.Json.JsonElement>
               Expect.isFalse (gameEl.TryGetProperty("rt", &rtEl)) "leaf Game has no rt"
+          }
+
+          // ── Ordering-regression: ItemList declared BEFORE Game (the real rt target) ──
+          // Under the old positional heuristic, Rt would resolve to ItemList (first non-action
+          // non-union record in declaration order). Under the declared-linkage fix, Rt resolves
+          // to Game because the action's Rt field names it explicitly regardless of order.
+          test "Rt resolves from declared linkage not declaration order: ItemList before Game" {
+              let orderingRegressionLock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    DeclaredPrefixes = Map.empty
+                    Mappings =
+                      [ { FSharpType = "MyApp.ItemList"
+                          Iri = Some "schema:ItemList"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = None
+                          Shape = MappingShape.Record [] }
+                        { FSharpType = "MyApp.Game"
+                          Iri = Some "schema:Game"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = None
+                          Shape = MappingShape.Record [] }
+                        { FSharpType = "MyApp.MoveAction"
+                          Iri = Some "schema:MoveAction"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = Some "schema:Game"
+                          Shape = MappingShape.Record [] } ] }
+
+              let model =
+                  ResolvedModel.build schemaRegistry orderingRegressionLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery Set.empty model
+
+              let moveAction =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction not found")
+
+              // Must be Game — NOT ItemList (which would appear under the old positional heuristic
+              // because ItemList is declared first in declaration order).
+              Expect.equal
+                  moveAction.Rt
+                  (Some "https://schema.org/Game")
+                  "Rt must point to declared Game, not first-declared ItemList"
           } ]

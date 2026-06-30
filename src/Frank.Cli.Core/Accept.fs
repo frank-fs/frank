@@ -243,6 +243,7 @@ let private buildMapping (source: MappingSource) (entry: ResolvedEntry) (iri: st
       Source = source
       Status = Confirmed
       Alternates = []
+      Rt = None
       Shape = buildShape source entry.Shape }
 
 let private buildExcludedMapping (source: MappingSource) (entry: ResolvedEntry) : Mapping =
@@ -252,6 +253,7 @@ let private buildExcludedMapping (source: MappingSource) (entry: ResolvedEntry) 
       Source = source
       Status = Excluded
       Alternates = []
+      Rt = None
       Shape = buildShape source entry.Shape }
 
 let private countUnresolvedFields (mappings: Mapping list) (types: Set<string>) : int =

@@ -77,6 +77,7 @@ let validateTests =
                                     Source = Convention
                                     Status = Excluded
                                     Alternates = []
+                                    Rt = None
                                     Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir excludedLock
@@ -100,6 +101,7 @@ let validateTests =
                                     Source = Convention
                                     Status = Excluded
                                     Alternates = []
+                                    Rt = None
                                     Shape =
                                       MappingShape.Record
                                           [ { Name = "privateField"
@@ -128,6 +130,7 @@ let validateTests =
                                   Source = Llm
                                   Status = Proposed
                                   Alternates = []
+                                  Rt = None
                                   Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir proposedMappingLock
@@ -150,6 +153,7 @@ let validateTests =
                                   Source = Convention
                                   Status = Unresolved
                                   Alternates = []
+                                  Rt = None
                                   Shape = MappingShape.Record [] } ] }
 
                   let lockPath = writeLockFile dir unresolvedMappingLock
@@ -172,6 +176,7 @@ let validateTests =
                                   Source = Convention
                                   Status = Confirmed
                                   Alternates = []
+                                  Rt = None
                                   Shape =
                                     MappingShape.Record
                                         [ { Name = "pendingField"

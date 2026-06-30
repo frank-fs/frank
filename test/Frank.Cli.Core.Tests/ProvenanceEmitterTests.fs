@@ -37,6 +37,7 @@ let private lock: LockFile =
             Source = Convention
             Status = Confirmed
             Alternates = []
+            Rt = None
             Shape = MappingShape.Record [] } ] }
 
 [<Tests>]

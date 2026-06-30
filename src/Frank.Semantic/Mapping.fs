@@ -69,13 +69,18 @@ type MappingShape =
 /// Candidate mapping produced by the convention engine for one TypeInfo.
 /// B5 serializes this shape into the lock file.
 type Mapping =
-    { FSharpType: string
-      Iri: string option
-      Confidence: float
-      Source: MappingSource
-      Status: MappingStatus
-      Alternates: string list
-      Shape: MappingShape }
+    {
+        FSharpType: string
+        Iri: string option
+        Confidence: float
+        Source: MappingSource
+        Status: MappingStatus
+        Alternates: string list
+        /// Explicit return-type IRI (CURIE) for action descriptors (IRI ends in "Action").
+        /// Declared manually in the lock file; never set by the convention engine.
+        Rt: string option
+        Shape: MappingShape
+    }
 
 [<RequireQualifiedAccess>]
 module MappingShape =

@@ -68,22 +68,9 @@ let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDe
 
 /// Collect all class-level descriptors. Each class descriptor carries its field
 /// descriptors as Children (AC1 nesting). Action classes (IRI ends in "Action")
-/// get Type="unsafe" and Rt = the href of the first confirmed record (non-union,
-/// non-action) class — the primary domain resource the action operates on.
+/// get Type="unsafe" and Rt = the href of the declared return-type IRI (r.Rt),
+/// which must be set explicitly in the lock file mapping.
 let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
-    let firstNonActionHref =
-        resources
-        |> List.tryPick (fun r ->
-            r.ClassIri
-            |> Option.bind (fun uri ->
-                let isAction = isActionIri uri.AbsoluteUri
-                let isUnion = r.UnionCaseCount > 0
-
-                if not isAction && not isUnion then
-                    Some(hrefFor bases uri.AbsoluteUri)
-                else
-                    None))
-
     resources
     |> List.choose (fun r ->
         r.ClassIri
@@ -92,10 +79,16 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
             let isAction = isActionIri absolute
             let children = r.Fields |> List.choose (fieldDescriptor bases)
 
+            let rt =
+                if isAction then
+                    r.Rt |> Option.map (fun rtUri -> hrefFor bases rtUri.AbsoluteUri)
+                else
+                    None
+
             { Id = localName absolute
               Href = hrefOption (hrefFor bases absolute)
               IsAction = isAction
-              Rt = if isAction then firstNonActionHref else None
+              Rt = rt
               Children = children }))
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.

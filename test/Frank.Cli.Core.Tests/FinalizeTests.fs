@@ -14,6 +14,7 @@ let private mapping fsType status : Mapping =
       Source = Convention
       Status = status
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record [] }
 
 let private mappingWithFields fsType status (fields: FieldMapping list) : Mapping =
@@ -23,6 +24,7 @@ let private mappingWithFields fsType status (fields: FieldMapping list) : Mappin
       Source = Convention
       Status = status
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record fields }
 
 let private field name status : FieldMapping =
@@ -129,6 +131,7 @@ let finalizeTests =
                     Source = Convention
                     Status = Proposed
                     Alternates = []
+                    Rt = None
                     Shape =
                       MappingShape.Record
                           [ { Name = "Price"

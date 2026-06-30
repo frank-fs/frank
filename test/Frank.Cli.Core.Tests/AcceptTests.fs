@@ -43,6 +43,7 @@ let private unresolvedOrderLine: Mapping =
       Source = Convention
       Status = Unresolved
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record [] }
 
 let private unresolvedOrder: Mapping =
@@ -52,6 +53,7 @@ let private unresolvedOrder: Mapping =
       Source = Convention
       Status = Unresolved
       Alternates = []
+      Rt = None
       Shape =
         MappingShape.Record
             [ { Name = "Total"
@@ -194,6 +196,7 @@ let acceptTests =
                     Source = Llm
                     Status = Confirmed
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let lock = mkLockWithVocabs [ alreadyConfirmed ]
@@ -352,6 +355,7 @@ let acceptTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "XMove"
@@ -410,6 +414,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "id"
@@ -469,6 +474,7 @@ let acceptTests =
                           Source = Convention
                           Status = Confirmed
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "XMove"
@@ -516,6 +522,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -555,6 +562,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -594,6 +602,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -623,6 +632,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -657,6 +667,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "Id"
@@ -702,6 +713,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "Won"
@@ -748,6 +760,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "Won"
@@ -802,6 +815,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -849,6 +863,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "f"
@@ -894,6 +909,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -929,6 +945,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "id"
@@ -970,6 +987,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "Failed"
@@ -1012,6 +1030,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Union
                                 [ { Name = "M"
@@ -1054,6 +1073,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -1300,6 +1320,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let json =
@@ -1341,6 +1362,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "Position"
@@ -1396,6 +1418,7 @@ let acceptTests =
                           Source = Convention
                           Status = Unresolved
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "Id"

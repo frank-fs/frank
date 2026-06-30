@@ -201,6 +201,7 @@ module LockFile =
         requireString node "fsharpType"
         |> Result.bind (fun fsType ->
             let iri = optionalString node "iri"
+            let rt = optionalString node "rt"
 
             requireFloat node "confidence"
             |> Result.bind (fun confidence ->
@@ -220,6 +221,7 @@ module LockFile =
                                   Source = source
                                   Status = status
                                   Alternates = alternates
+                                  Rt = rt
                                   Shape = shape }))))))
 
     let private parseMappingList (node: JsonNode) : Result<Mapping list, string> =
@@ -371,6 +373,7 @@ module LockFile =
         obj.Add("confidence", JsonValue.Create m.Confidence)
         obj.Add("source", JsonValue.Create(mappingSourceToString m.Source))
         obj.Add("status", JsonValue.Create(mappingStatusToString m.Status))
+        obj.Add("rt", m.Rt |> Option.map JsonValue.Create<string> |> Option.toObj)
 
         let alternates = JsonArray()
 
@@ -527,6 +530,7 @@ module LockFile =
             Confidence = resolved.Confidence
             Source = resolved.Source
             Status = resolved.Status
+            Rt = existing.Rt
             Shape = mergeShape existing.Shape resolved.Shape }
 
     /// Merge resolved mappings into an existing lock file.

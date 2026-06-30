@@ -61,6 +61,7 @@ let private proposedUnionMapping: Mapping =
       Source = Convention
       Status = Proposed
       Alternates = [ "game:GameResult" ]
+      Rt = None
       Shape = MappingShape.Union unionCases }
 
 let private unresolvedUnionMapping: Mapping =
@@ -70,6 +71,7 @@ let private unresolvedUnionMapping: Mapping =
       Source = Convention
       Status = Unresolved
       Alternates = []
+      Rt = None
       Shape =
         MappingShape.Union
             [ { Name = "Active"
@@ -115,6 +117,7 @@ let private unresolvedMapping: Mapping =
       Source = Convention
       Status = Unresolved
       Alternates = [ "schema:Thing"; "schema:Event" ]
+      Rt = None
       Shape = MappingShape.Record [ unresolvedField ] }
 
 let private proposedMapping: Mapping =
@@ -124,6 +127,7 @@ let private proposedMapping: Mapping =
       Source = Convention
       Status = Proposed
       Alternates = [ "schema:OrderAction" ]
+      Rt = None
       Shape = MappingShape.Record [ proposedField ] }
 
 let private confirmedMapping: Mapping =
@@ -133,6 +137,7 @@ let private confirmedMapping: Mapping =
       Source = Llm
       Status = Confirmed
       Alternates = []
+      Rt = None
       Shape = MappingShape.Record [] }
 
 let private emptyVocabs: Map<string, VocabularyEntry> = Map.empty

@@ -191,6 +191,7 @@ let at2MergeTests =
                               Source = Llm
                               Status = Confirmed
                               Alternates = []
+                              Rt = None
                               Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
@@ -326,6 +327,7 @@ let at5ExcludedPreservationTests =
                               Source = Manual
                               Status = Excluded
                               Alternates = []
+                              Rt = None
                               Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
@@ -370,6 +372,7 @@ let at5ExcludedPreservationTests =
                               Source = Convention
                               Status = Excluded
                               Alternates = []
+                              Rt = None
                               Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
@@ -414,6 +417,7 @@ let at5ExcludedPreservationTests =
                               Source = Convention
                               Status = Confirmed
                               Alternates = []
+                              Rt = None
                               Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock
@@ -459,6 +463,7 @@ let at5ExcludedPreservationTests =
                               Source = Convention
                               Status = Proposed
                               Alternates = []
+                              Rt = None
                               Shape = MappingShape.Record [] } ] }
 
                   LockFile.write lockFilePath existingLock

@@ -47,6 +47,7 @@ let private genMapping =
               Source = source
               Status = status
               Alternates = alternates
+              Rt = None
               Shape = MappingShape.Record fields }
     }
 
@@ -251,6 +252,7 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Confirmed
                           Alternates = [ "schema:OrderAction" ]
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "Total"
@@ -297,6 +299,7 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Unresolved
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let path = Path.GetTempFileName()
@@ -335,6 +338,7 @@ let roundTripTests =
                           Source = MappingSource.Convention
                           Status = MappingStatus.Confirmed
                           Alternates = []
+                          Rt = None
                           Shape = MappingShape.Record [] } ] }
 
               let path1 = Path.GetTempFileName()
@@ -404,6 +408,7 @@ let diffFriendlyTests =
               Source = MappingSource.Convention
               Status = MappingStatus.Confirmed
               Alternates = []
+              Rt = None
               Shape = MappingShape.Record [] }
 
         let mapping2: Mapping =
@@ -413,6 +418,7 @@ let diffFriendlyTests =
               Source = MappingSource.Convention
               Status = MappingStatus.Confirmed
               Alternates = []
+              Rt = None
               Shape = MappingShape.Record [] }
 
         let lf1: LockFile.LockFile =
@@ -465,6 +471,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Unresolved
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let resolved: Mapping =
@@ -474,6 +481,7 @@ let mergeTests =
                     Source = MappingSource.Manual
                     Status = MappingStatus.Confirmed
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
@@ -499,6 +507,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Confirmed
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let resolved: Mapping =
@@ -508,6 +517,7 @@ let mergeTests =
                     Source = MappingSource.Llm
                     Status = MappingStatus.Confirmed
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
@@ -531,6 +541,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Confirmed
                     Alternates = []
+                    Rt = None
                     Shape =
                       MappingShape.Record
                           [ { Name = "Total"
@@ -571,6 +582,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Unresolved
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let newField: FieldMapping =
@@ -607,6 +619,7 @@ let mergeTests =
                     Source = MappingSource.Convention
                     Status = MappingStatus.Unresolved
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let lf: LockFile.LockFile =
@@ -755,6 +768,7 @@ let countByStatusTests =
                     Source = MappingSource.Convention
                     Status = status
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let mappings =
@@ -779,6 +793,7 @@ let countByStatusTests =
                     Source = MappingSource.Convention
                     Status = status
                     Alternates = []
+                    Rt = None
                     Shape = MappingShape.Record [] }
 
               let mappings =
@@ -823,6 +838,7 @@ let excludedStatusTests =
                           Source = MappingSource.Manual
                           Status = MappingStatus.Excluded
                           Alternates = []
+                          Rt = None
                           Shape =
                             MappingShape.Record
                                 [ { Name = "OldField"
@@ -937,6 +953,7 @@ let unionShapeRoundTripTests =
                     Source = Convention
                     Status = Confirmed
                     Alternates = []
+                    Rt = None
                     Shape =
                       MappingShape.Union
                           [ { Name = "XMove"

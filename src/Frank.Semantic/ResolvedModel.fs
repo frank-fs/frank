@@ -27,7 +27,8 @@ type ResolvedResource =
       ProvClass: ProvOClass option
       Fields: ResolvedField list
       Cases: ResolvedCase list
-      UnionCaseCount: int }
+      UnionCaseCount: int
+      Rt: Uri option }
 
 type ResolvedModel =
     { Prefixes: Map<string, Uri>
@@ -222,6 +223,15 @@ module ResolvedModel =
         |> traverseResult (buildCase prefixes fsharpType)
         |> Result.map (List.choose id)
 
+    let private resolveRt
+        (prefixes: Map<string, Uri>)
+        (fsharpType: string)
+        (rt: string option)
+        : Result<Uri option, string> =
+        match VocabularyRegistry.tryResolveIri prefixes rt with
+        | Ok uri -> Ok uri
+        | Error e -> Error $"type '{fsharpType}' rt: {e}"
+
     let private buildResolvedResource
         (prefixes: Map<string, Uri>)
         (registry: VocabularyRegistry)
@@ -245,7 +255,8 @@ module ResolvedModel =
                 let seeAlso = registry.SeeAlso |> Map.tryFind m.FSharpType |> Option.defaultValue []
                 let provClass = registry.ProvClasses |> Map.tryFind m.FSharpType
 
-                Ok
+                resolveRt prefixes m.FSharpType m.Rt
+                |> Result.map (fun rt ->
                     { FSharpType = m.FSharpType
                       LocalName = localName
                       GenericArity = genericArity
@@ -255,7 +266,8 @@ module ResolvedModel =
                       ProvClass = provClass
                       Fields = fields
                       Cases = cases
-                      UnionCaseCount = unionCaseCount }
+                      UnionCaseCount = unionCaseCount
+                      Rt = rt })
 
     let private buildResource
         (prefixes: Map<string, Uri>)

@@ -401,6 +401,7 @@
     {
       "fsharpType": "TicTacToe.Model.MoveRequest",
       "iri": "ex:MoveAction",
+      "rt": "ex:Game",
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
