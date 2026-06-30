@@ -12,6 +12,8 @@ open Microsoft.Net.Http.Headers
 open VDS.RDF
 open VDS.RDF.JsonLd
 open VDS.RDF.Parsing
+open VDS.RDF.Shacl.Validation
+open Frank.Semantic
 
 module private JsonLdBody =
 
@@ -74,6 +76,27 @@ module private ValidationRespond =
         ctx.Response.Headers.Append("Link", StringValues(linkValue))
         ctx.Response.WriteAsync(reportJsonLd)
 
+module private HostRelative =
+
+    let private resolveProps (props: (Uri * string * string option) list) (origin: string) : ShapeDecl list =
+        props
+        |> List.map (fun (classUri, relPath, pattern) ->
+            RecordShape(
+                classUri,
+                [ { Path = Uri(origin + relPath)
+                    Datatype = None
+                    MinCount = 1
+                    MaxCount = Some 1
+                    Pattern = pattern } ]
+            ))
+
+    let validateDynamic (props: (Uri * string * string option) list) (origin: string) (data: IGraph) : Report option =
+        if props.IsEmpty then
+            None
+        else
+            use sg = Shapes.toShapesGraph (resolveProps props origin)
+            Some(Validator.validate sg data)
+
 type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logger: ILogger<ValidationMiddleware>) =
 
     do
@@ -88,14 +111,27 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
 
     let validateAndRespond (ctx: HttpContext) (data: IGraph) : Task =
         use _ = data
-        let report = Validator.validate config.Shapes data
+        let staticReport = Validator.validate config.Shapes data
 
-        if report.Conforms then
-            logger.LogDebug("ValidationMiddleware: body conforms, passing through")
-            next.Invoke ctx
+        if not staticReport.Conforms then
+            logger.LogDebug("ValidationMiddleware: static shapes reject body, returning 422")
+            ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd staticReport.Normalised) ctx
         else
-            logger.LogDebug("ValidationMiddleware: body does not conform, returning 422")
-            ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd report.Normalised) ctx
+            let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+
+            let dynReport =
+                HostRelative.validateDynamic config.HostRelativeProperties origin data
+
+            match dynReport with
+            | None ->
+                logger.LogDebug("ValidationMiddleware: body conforms, passing through")
+                next.Invoke ctx
+            | Some r when r.Conforms ->
+                logger.LogDebug("ValidationMiddleware: body conforms, passing through")
+                next.Invoke ctx
+            | Some r ->
+                logger.LogDebug("ValidationMiddleware: host-relative shapes reject body, returning 422")
+                ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd r.Normalised) ctx
 
     member _.InvokeAsync(ctx: HttpContext) : Task =
         if not (JsonLdBody.isLdJson ctx) then

@@ -24,7 +24,8 @@ let orderConfig () : ValidationConfig =
 
     { Shapes = shapes
       ContextLoader = offlineLoader
-      MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes }
+      MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+      HostRelativeProperties = [] }
 
 let startValidationServer (config: ValidationConfig) =
     let builder = WebApplication.CreateBuilder()

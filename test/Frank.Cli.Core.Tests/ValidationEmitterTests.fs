@@ -321,6 +321,103 @@ let skipPathTests =
               Expect.isFalse (shapes.Contains "RecordShape") "non-nullary union must not produce RecordShape"
           } ]
 
+// ── host-relative filtering (Gap 1) ──────────────────────────────────────────
+
+// Fixture: registry with both schema: (external) and ttt: (app-owned) prefixes.
+// schema: is in Using; ttt: is in DeclaredPrefixes only → app-owned.
+let private tttPrefix = Uri("https://example.org/tictactoe#")
+
+let private hostRelRegistry: VocabularyRegistry =
+    { VocabularyRegistry.empty with
+        Prefixes = Map.ofList [ "schema", schemaPrefix; "ttt", tttPrefix ]
+        Using = Set.ofList [ "schema" ] }
+
+let private hostRelLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies =
+        Map.ofList
+            [ "schema",
+              { Uri = "https://schema.org/"
+                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+      Mappings =
+        [ { FSharpType = "TicTacToe.MoveRequest"
+            Iri = Some "schema:MoveAction"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Record
+                  [ { Name = "player"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "position"
+                      Iri = Some "ttt:square"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
+
+let private hostRelTypes: Map<string, TypeInfo> =
+    Map.ofList
+        [ "TicTacToe.MoveRequest",
+          { FullName = "TicTacToe.MoveRequest"
+            Namespace = "TicTacToe"
+            LocalName = "MoveRequest"
+            Shape =
+              TypeShape.Record
+                  [ { Name = "player"
+                      TypeName = "string"
+                      Attributes = Map.empty
+                      DocComment = None }
+                    { Name = "position"
+                      TypeName = "string"
+                      Attributes = Map.empty
+                      DocComment = None } ]
+            Attributes = Map.empty
+            DocComment = None } ]
+
+[<Tests>]
+let hostRelativeTests =
+    testList
+        "ValidationEmitter — host-relative filtering (Gap 1)"
+        [ test "app-owned field (ttt:square) excluded from static shapes" {
+              let src =
+                  ValidationEmitter.emit "T.GeneratedValidation" hostRelRegistry hostRelLock hostRelTypes
+                  |> okOrFail
+
+              Expect.isFalse (src.Contains "example.org/tictactoe") "full abs IRI of app-owned ttt:square absent from shapes binding"
+              Expect.stringContains src "schema.org/agent" "external schema:agent still in static shapes"
+          }
+
+          test "app-owned field (ttt:square) appears in hostRelativeProperties" {
+              let src =
+                  ValidationEmitter.emit "T.GeneratedValidation" hostRelRegistry hostRelLock hostRelTypes
+                  |> okOrFail
+
+              Expect.stringContains src "hostRelativeProperties" "hostRelativeProperties binding emitted"
+              Expect.stringContains src "/tictactoe#square" "root-relative relPath in hostRelativeProperties"
+          }
+
+          test "emitted source with hostRelativeProperties compiles cleanly (tier 3)" {
+              let src =
+                  ValidationEmitter.emit "T.GeneratedValidation" hostRelRegistry hostRelLock hostRelTypes
+                  |> okOrFail
+
+              let assemblies =
+                  [ typeof<Frank.Semantic.ShapeDecl>.Assembly
+                    typeof<Frank.Validation.ValidationConfig>.Assembly
+                    typeof<VDS.RDF.Shacl.ShapesGraph>.Assembly
+                    typeof<VDS.RDF.IGraph>.Assembly ]
+
+              let diagnostics = typecheckAgainstRealAssemblies src assemblies
+              Expect.isEmpty diagnostics $"emitted module with hostRelativeProperties compiles; errors: {diagnostics}"
+          } ]
+
 // ── determinism ───────────────────────────────────────────────────────────────
 
 [<Tests>]

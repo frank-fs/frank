@@ -60,3 +60,20 @@ let sampleConfig =
             Doc = None
             Href = Some "https://schema.org/agent" } ]
       DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ] }
+
+/// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.
+/// Used by the dereference acceptance test (item #6).
+let startVocabServer (config: DiscoveryConfig) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+
+    app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app

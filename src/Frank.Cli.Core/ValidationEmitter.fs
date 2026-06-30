@@ -22,6 +22,17 @@ let private xsdOf (typeName: string) : XsdDatatype option =
     | "DateTime" -> Some XsdDateTime
     | _ -> None
 
+// ── IRI ownership check ───────────────────────────────────────────────────────
+
+/// Returns true if the given absolute IRI starts with the namespace URI
+/// of any prefix that is in the `Using` set (i.e., is an external vocabulary).
+let private isExternalIri (using: Set<string>) (prefixes: Map<string, Uri>) (iri: Uri) : bool =
+    using
+    |> Set.exists (fun prefix ->
+        match Map.tryFind prefix prefixes with
+        | None -> false
+        | Some ns -> iri.AbsoluteUri.StartsWith(ns.AbsoluteUri, StringComparison.Ordinal))
+
 // ── PropertyShape projection ──────────────────────────────────────────────────
 
 let private projectProperty (path: Uri) (rf: ResolvedField) : Result<PropertyShape, string> =
@@ -56,7 +67,12 @@ let private projectProperties (fields: ResolvedField list) : Result<PropertyShap
 let private isAllNullary (r: ResolvedResource) : bool =
     r.Cases |> List.forall (fun c -> c.IsNullary)
 
-let private projectClassShape (classIri: Uri) (r: ResolvedResource) : Result<ShapeDecl option, string> =
+let private projectClassShape
+    (using: Set<string>)
+    (prefixes: Map<string, Uri>)
+    (classIri: Uri)
+    (r: ResolvedResource)
+    : Result<ShapeDecl option, string> =
     match r.Cases with
     | _ :: _ when isAllNullary r ->
         let iris = r.Cases |> List.map (fun c -> c.Iri)
@@ -68,14 +84,42 @@ let private projectClassShape (classIri: Uri) (r: ResolvedResource) : Result<Sha
         Ok(Some(EnumShape(classIri, nel)))
     | _ :: _ -> Ok None
     | [] ->
-        match projectProperties r.Fields with
+        let externalFields =
+            r.Fields
+            |> List.filter (fun f ->
+                match f.Iri with
+                | None -> false
+                | Some iri -> isExternalIri using prefixes iri)
+
+        match projectProperties externalFields with
         | Error e -> Error e
         | Ok props -> Ok(Some(RecordShape(classIri, props)))
 
-let private projectResource (r: ResolvedResource) : Result<ShapeDecl option, string> =
+let private projectResource
+    (using: Set<string>)
+    (prefixes: Map<string, Uri>)
+    (r: ResolvedResource)
+    : Result<ShapeDecl option, string> =
     match r.ClassIri with
     | None -> Ok None
-    | Some classIri -> projectClassShape classIri r
+    | Some classIri -> projectClassShape using prefixes classIri r
+
+let private projectHostRelativeProps
+    (using: Set<string>)
+    (prefixes: Map<string, Uri>)
+    (r: ResolvedResource)
+    : (Uri * string * string option) list =
+    match r.ClassIri with
+    | None -> []
+    | Some classIri ->
+        r.Fields
+        |> List.choose (fun f ->
+            match f.Iri with
+            | None -> None
+            | Some iri when not (isExternalIri using prefixes iri) ->
+                let relPath = iri.AbsolutePath + iri.Fragment
+                Some(classIri, relPath, f.ConstraintPattern)
+            | _ -> None)
 
 let private traverseResult (f: 'a -> Result<'b option, 'e>) (xs: 'a list) : Result<'b list, 'e> =
     let folder acc x =
@@ -91,9 +135,21 @@ let private traverseResult (f: 'a -> Result<'b option, 'e>) (xs: 'a list) : Resu
     | Error e -> Error e
     | Ok ys -> Ok(List.rev ys)
 
-/// Project an enriched ResolvedModel to a ShapeDecl list.
-let internal projectShapes (model: ResolvedModel) : Result<ShapeDecl list, string> =
-    traverseResult projectResource model.Resources
+/// Project an enriched ResolvedModel to static ShapeDecl list (external-vocab fields only)
+/// and host-relative property tuples (app-owned fields).
+let internal projectShapes
+    (model: ResolvedModel)
+    : Result<ShapeDecl list * (Uri * string * string option) list, string> =
+    let using = model.Using
+    let prefixes = model.Prefixes
+
+    match traverseResult (projectResource using prefixes) model.Resources with
+    | Error e -> Error e
+    | Ok shapes ->
+        let hrProps =
+            model.Resources |> List.collect (projectHostRelativeProps using prefixes)
+
+        Ok(shapes, hrProps)
 
 // ── AstRender helpers ─────────────────────────────────────────────────────────
 
@@ -129,7 +185,18 @@ let private shapeExpr (shape: ShapeDecl) =
                   [ "Head", sysUriExpr nel.Head
                     "Tail", AstRender.listExpr (nel.Tail |> List.map sysUriExpr) ] ]
 
-let private renderShapes (moduleName: string) (knownNamespaces: string list) (shapes: ShapeDecl list) : string =
+let private hostRelPropExpr (classUri: Uri) (relPath: string) (pattern: string option) =
+    AstRender.parenExpr (AstRender.tupleExpr [ sysUriExpr classUri; AstRender.strExpr relPath; patternExpr pattern ])
+
+let private renderShapes
+    (moduleName: string)
+    (knownNamespaces: string list)
+    (shapes: ShapeDecl list)
+    (hrProps: (Uri * string * string option) list)
+    : string =
+    let hrPropExprs =
+        hrProps |> List.map (fun (cls, rel, pat) -> hostRelPropExpr cls rel pat)
+
     let decls =
         [ AstRender.valueDecl "shapes" "ShapeDecl list" (AstRender.listExpr (shapes |> List.map shapeExpr))
           AstRender.valueDecl
@@ -139,7 +206,11 @@ let private renderShapes (moduleName: string) (knownNamespaces: string list) (sh
           AstRender.valueDecl
               "knownNamespaces"
               "string[]"
-              (AstRender.arrayExpr (knownNamespaces |> List.map AstRender.strExpr)) ]
+              (AstRender.arrayExpr (knownNamespaces |> List.map AstRender.strExpr))
+          AstRender.valueDecl
+              "hostRelativeProperties"
+              "(System.Uri * string * string option) list"
+              (AstRender.listExpr hrPropExprs) ]
 
     AstRender.formatModule
         moduleName
@@ -169,4 +240,4 @@ let emit
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.bind (ResolvedModel.enrichTypes typesByName)
     |> Result.bind projectShapes
-    |> Result.map (renderShapes moduleName knownNamespaces)
+    |> Result.map (fun (shapes, hrProps) -> renderShapes moduleName knownNamespaces shapes hrProps)

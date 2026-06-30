@@ -218,7 +218,10 @@ let private movesResource =
 let private tttVocabResource =
     resource "/tictactoe" {
         name "TttVocabulary"
-        linkedDataGraph tttVocabGraph """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
+        linkedDataGraphWith
+            { Graph = tttVocabGraph
+              JsonLdContext = """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
+              RelativeBase = Some "https://example.org" }
 
         get (fun (ctx: HttpContext) ->
             task {

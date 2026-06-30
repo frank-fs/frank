@@ -1,9 +1,12 @@
 module Frank.Validation.Tests.MiddlewareTests
 
+open System
 open System.Net.Http
 open System.Text
 open Microsoft.AspNetCore.TestHost
 open Expecto
+open Frank.Semantic
+open Frank.Validation
 open Frank.Validation.Tests.MiddlewareTestHelpers
 
 let private validOrderBody =
@@ -180,3 +183,59 @@ let tests =
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.stringContains body "@context" "422 report has @context"
               Expect.stringContains body "shacl#" "422 report context includes shacl# namespace" ]
+
+[<Tests>]
+let hostRelativePropertyTests =
+    testList
+        "ValidationMiddleware — host-relative SHACL property matching (item #6)"
+        [ testCase "POST body using host-resolved IRI passes when HostRelativeProperties declares that path"
+          <| fun _ ->
+              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let emptyShapes = Shapes.toShapesGraph []
+
+              let config =
+                  { Shapes = emptyShapes
+                    ContextLoader = offlineLoader
+                    MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+                    HostRelativeProperties =
+                      [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+
+              use app = startValidationServer config
+              use client = app.GetTestClient()
+
+              let hostRelativeBody =
+                  """{
+  "@context": "https://schema.org",
+  "@type": "MoveAction",
+  "@id": "https://example.org/move/1",
+  "http://localhost/tictactoe#square": {"@value": "TopLeft"}
+}"""
+
+              let (resp: HttpResponseMessage) = postLdJson client hostRelativeBody
+              Expect.equal (int resp.StatusCode) 200 "body using host-resolved IRI passes validation"
+
+          testCase "POST body using example.org IRI fails when HostRelativeProperties expects host-resolved IRI"
+          <| fun _ ->
+              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let emptyShapes = Shapes.toShapesGraph []
+
+              let config =
+                  { Shapes = emptyShapes
+                    ContextLoader = offlineLoader
+                    MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+                    HostRelativeProperties =
+                      [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+
+              use app = startValidationServer config
+              use client = app.GetTestClient()
+
+              let wrongHostBody =
+                  """{
+  "@context": "https://schema.org",
+  "@type": "MoveAction",
+  "@id": "https://example.org/move/1",
+  "https://example.org/tictactoe#square": {"@value": "TopLeft"}
+}"""
+
+              let (resp: HttpResponseMessage) = postLdJson client wrongHostBody
+              Expect.equal (int resp.StatusCode) 422 "body using example.org IRI fails validation (wrong host)" ]

@@ -475,7 +475,7 @@ let projectionTests =
                       | Ok m -> m
                       | Error e -> failwith $"Expected Ok but got Error: {e}"
 
-              let descriptors, links = DiscoveryEmitter.projectDiscovery model
+              let descriptors, links = DiscoveryEmitter.projectDiscovery Set.empty model
 
               Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "type descriptor present"
 
@@ -539,4 +539,67 @@ let homeResourcesAbsentTests =
 
               Expect.isOk src "emit should succeed"
               Expect.isTrue (parsesFsSource (unwrapOk src)) "parses as valid F#"
+          } ]
+
+// ── Fixture: declared-only prefix (ttt: in DeclaredPrefixes, NOT in Vocabularies) ──
+// tttRegistry reuses schemaRegistry — ttt: resolution comes from lock.DeclaredPrefixes, not registry.Prefixes
+
+let private tttDeclaredOnlyLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies =
+        Map.ofList
+            [ "schema",
+              { Uri = "https://schema.org/"
+                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+      Mappings =
+        [ { FSharpType = "TicTacToe.MoveAction"
+            Iri = Some "schema:MoveAction"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Record
+                  [ { Name = "square"
+                      Iri = Some "ttt:square"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed }
+                    { Name = "agent"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let relativeHrefTests =
+    testList
+        "DiscoveryEmitter — declared-only prefix emits relative href (item #6)"
+        [ test "ttt:square href is host-relative /tictactoe#square — NOT absolute example.org" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "/tictactoe#square" "relative href present"
+              Expect.isFalse (source.Contains "example.org/tictactoe#square") "absolute example.org href absent"
+          }
+
+          test "schema:agent href stays absolute (external vocab not relativised)" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.stringContains (unwrapOk src) "https://schema.org/agent" "schema href unchanged"
+          }
+
+          test "schema:MoveAction type href stays absolute (external vocab)" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.stringContains (unwrapOk src) "https://schema.org/MoveAction" "MoveAction href unchanged"
           } ]

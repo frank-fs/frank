@@ -24,32 +24,55 @@ type internal ResolvedDescriptor = { Id: string; Href: string option }
 let private hrefOption (href: string) : string option =
     if String.IsNullOrEmpty href then None else Some href
 
+/// Compute which prefixes are declared-only (in DeclaredPrefixes but not in Vocabularies).
+/// Their base URIs are returned as a set; matching IRIs will be emitted as relative paths.
+let private declaredOnlyBases (lock: LockFile) : Set<string> =
+    lock.DeclaredPrefixes
+    |> Map.filter (fun k _ -> not (Map.containsKey k lock.Vocabularies))
+    |> Map.toSeq
+    |> Seq.map snd
+    |> Set.ofSeq
+
+/// For a declared-only IRI, extract the host-relative path+fragment.
+/// For external vocab IRIs, return the absolute URI unchanged.
+let private hrefFor (bases: Set<string>) (absoluteUri: string) : string =
+    let matchingBase =
+        bases |> Set.toSeq |> Seq.tryFind (fun b -> absoluteUri.StartsWith(b))
+
+    match matchingBase with
+    | None -> absoluteUri
+    | Some _ ->
+        let uri = Uri(absoluteUri)
+        uri.PathAndQuery + uri.Fragment
+
 /// Resolve the type-level descriptor for one ResolvedResource. Returns None if ClassIri is absent.
-let private typeDescriptor (r: ResolvedResource) : ResolvedDescriptor option =
+let private typeDescriptor (bases: Set<string>) (r: ResolvedResource) : ResolvedDescriptor option =
     r.ClassIri
     |> Option.map (fun uri ->
-        let href = uri.AbsoluteUri
+        let absolute = uri.AbsoluteUri
+        let href = hrefFor bases absolute
 
-        { Id = localName href
+        { Id = localName absolute
           Href = hrefOption href })
 
 /// Resolve field descriptors for one resource; skip fields with no Iri.
-let private fieldDescriptors (fields: ResolvedField list) : ResolvedDescriptor list =
+let private fieldDescriptors (bases: Set<string>) (fields: ResolvedField list) : ResolvedDescriptor list =
     fields
     |> List.choose (fun f ->
         f.Iri
         |> Option.map (fun uri ->
-            let href = uri.AbsoluteUri
+            let absolute = uri.AbsoluteUri
+            let href = hrefFor bases absolute
 
-            { Id = localName href
+            { Id = localName absolute
               Href = hrefOption href }))
 
 /// Collect all descriptors from all resources in dependency order: each type then its fields.
-let private collectDescriptors (resources: ResolvedResource list) : ResolvedDescriptor list =
+let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
     resources
     |> List.collect (fun r ->
-        let typeDs = typeDescriptor r |> Option.toList
-        let fieldDs = fieldDescriptors r.Fields
+        let typeDs = typeDescriptor bases r |> Option.toList
+        let fieldDs = fieldDescriptors bases r.Fields
         typeDs @ fieldDs)
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.
@@ -72,8 +95,12 @@ let private collectDescribedByLinks (resources: ResolvedResource list) : string 
 // ── Pure projection ───────────────────────────────────────────────────────────
 
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
-let internal projectDiscovery (model: ResolvedModel) : ResolvedDescriptor list * string list =
-    collectDescriptors model.Resources, collectDescribedByLinks model.Resources
+/// declaredOnlyBases: set of base URI strings whose IRIs should be emitted as host-relative paths.
+let internal projectDiscovery
+    (declaredOnlyBases: Set<string>)
+    (model: ResolvedModel)
+    : ResolvedDescriptor list * string list =
+    collectDescriptors declaredOnlyBases model.Resources, collectDescribedByLinks model.Resources
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
 
@@ -114,7 +141,8 @@ let emit
     AstRender.validateModuleName moduleName
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.map (fun model ->
-        let descriptors, links = projectDiscovery model
+        let bases = declaredOnlyBases lock
+        let descriptors, links = projectDiscovery bases model
         let value = configExpr profileUri descriptors links
 
         AstRender.formatTypedValueModule

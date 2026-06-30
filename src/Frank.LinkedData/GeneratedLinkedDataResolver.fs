@@ -14,7 +14,11 @@ module GeneratedLinkedDataResolver =
 
     let private buildConfig (t: Type) : Result<LinkedDataConfig, string> =
         match readStaticProp<IGraph> "graph" t, readStaticProp<string> "jsonLdContext" t with
-        | Ok g, Ok ctx -> Ok { Graph = g; JsonLdContext = ctx }
+        | Ok g, Ok ctx ->
+            Ok
+                { Graph = g
+                  JsonLdContext = ctx
+                  RelativeBase = None }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

@@ -70,7 +70,7 @@ type SemanticTests() =
                 if el.TryGetProperty("href", &hrefEl) then
                     let v = hrefEl.GetString()
 
-                    if not (isNull v) && v.StartsWith "http" then
+                    if not (isNull v) then
                         acc.Add v
 
                 for p in el.EnumerateObject() do
@@ -180,11 +180,13 @@ type SemanticTests() =
     member this.``AT-S4 invalid move returns 422 ValidationReport with vocabulary IRIs``() =
         task {
             use! ctx = this.NewContext()
+            let originBase = (Server.Url()).TrimEnd('/')
+            let squareIri = originBase + "/tictactoe#square"
 
-            let badMove =
-                {| ``@type`` = "https://schema.org/MoveAction"
-                   ``https://schema.org/agent`` = "X"
-                   ``https://example.org/tictactoe#square`` = "NotASquare" |}
+            let badMove = Dictionary<string, obj>()
+            badMove.["@type"] <- "https://schema.org/MoveAction"
+            badMove.["https://schema.org/agent"] <- "X"
+            badMove.[squareIri] <- "NotASquare"
 
             let! resp =
                 ctx.PostAsync(
@@ -199,9 +201,8 @@ type SemanticTests() =
             let! body = resp.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "422 body leaks urn:frank: IRIs")
             Assert.That(body.Contains "ValidationReport", Is.True, "422 body is not a W3C SHACL ValidationReport")
-            // sh:resultPath carries the ttt:square IRI; dotNetRdf sh:sourceShape points to the
-            // blank-node property shape, so schema:MoveAction does not appear in the report.
-            Assert.That(body.Contains "example.org/tictactoe", Is.True, "422 ValidationReport cites no vocabulary IRIs")
+            Assert.That(body.Contains "tictactoe", Is.True, "422 ValidationReport must cite tictactoe path")
+            Assert.That(body.Contains "example.org", Is.False, "422 ValidationReport must not cite example.org")
         // valid-move → 200 is covered by the capstone (AT-S6) using discovered IRIs.
         }
 
@@ -338,8 +339,12 @@ type SemanticTests() =
             Assert.That(alpsResp.Status, Is.EqualTo 200, sprintf "ALPS profile '%s' not 200" alpsUrl)
             let! alpsBody = alpsResp.TextAsync()
 
-            // ── Phase 3: Collect hrefs; assert expected semantic term set ────────
-            let descriptorHrefs = SemanticTests.AlpsDescriptorHrefs alpsBody
+            // ── Phase 3: Collect hrefs; resolve relative hrefs to origin-absolute ──
+            let originBase = testBase.TrimEnd('/')
+
+            let descriptorHrefs =
+                SemanticTests.AlpsDescriptorHrefs alpsBody
+                |> List.map (fun href -> if href.StartsWith "/" then originBase + href else href)
 
             for href in descriptorHrefs do
                 Assert.That(
@@ -353,7 +358,7 @@ type SemanticTests() =
             let expectedTerms =
                 [ "https://schema.org/MoveAction"
                   "https://schema.org/agent"
-                  "https://example.org/tictactoe#square"
+                  originBase + "/tictactoe#square"
                   "https://schema.org/Game"
                   "https://schema.org/result" ]
 
@@ -373,20 +378,18 @@ type SemanticTests() =
                     sprintf "schema.org IRI not dereferenceable: %s" iri
                 )
 
-            // domain ttt: term — rebase to test host (strip fragment, swap origin)
-            for tttIri in descriptorHrefs |> List.filter (fun u -> u.Contains "example.org/tictactoe") do
-                let baseIri = tttIri.Split('#').[0]
-                let tttPath = Uri(baseIri).AbsolutePath
-                let! r = ctx.GetAsync(testBase + tttPath)
+            // local vocab term — dereference against the test server (origin-resolved)
+            for localHref in descriptorHrefs |> List.filter (fun u -> u.StartsWith originBase) do
+                let path = Uri(localHref).AbsolutePath
+                let! r = ctx.GetAsync(originBase + path)
 
-                Assert.That(r.Status, Is.EqualTo 200, sprintf "ttt vocab resource not served at %s%s" testBase tttPath)
+                Assert.That(r.Status, Is.EqualTo 200, sprintf "local vocab resource not served at %s" (originBase + path))
 
                 let! tttBody = r.TextAsync()
-                // Turtle uses prefixed form (ttt:square); JSON-LD uses full IRI
                 Assert.That(
                     tttBody.Contains "ttt:square" || tttBody.Contains "tictactoe#square",
                     Is.True,
-                    "ttt vocab body does not reference the square term"
+                    "vocab resource body does not reference the term"
                 )
 
             // seeAlso targets from game's ld+json — dereference live
@@ -549,10 +552,10 @@ type SemanticTests() =
 
     /// For each prov:Activity in the lineage (sorted by prov:startedAtTime), return (player, square)
     /// from the IRI-keyed body attributes emitted by the provenance middleware.
-    static member private ParseMoveAttributes(body: string) : (string * string) list =
+    /// squareIri: the origin-resolved absolute IRI for the square property (e.g. http://localhost:PORT/tictactoe#square).
+    static member private ParseMoveAttributes(body: string, squareIri: string) : (string * string) list =
         use doc = JsonDocument.Parse body
         let agentIri = "https://schema.org/agent"
-        let squareIri = "https://example.org/tictactoe#square"
 
         let isActivity (el: JsonElement) =
             let mutable t = Unchecked.defaultof<JsonElement>
@@ -873,18 +876,24 @@ type SemanticTests() =
             Assert.That(alpsResp.Status, Is.EqualTo 200, "ALPS not 200")
             let! alpsBody = alpsResp.TextAsync()
 
-            let agentIri =
+            let s8OriginBase = (Server.Url()).TrimEnd('/')
+
+            let s8Hrefs =
                 SemanticTests.AlpsDescriptorHrefs alpsBody
+                |> List.map (fun href -> if href.StartsWith "/" then s8OriginBase + href else href)
+
+            let agentIri =
+                s8Hrefs
                 |> List.tryFind (fun h -> h = "https://schema.org/agent")
                 |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI")
 
             let squareIri =
-                SemanticTests.AlpsDescriptorHrefs alpsBody
+                s8Hrefs
                 |> List.tryFind (fun h -> h.Contains "tictactoe#square")
                 |> Option.defaultWith (fun () -> failwith "ALPS missing square IRI")
 
             let classIri =
-                SemanticTests.AlpsDescriptorHrefs alpsBody
+                s8Hrefs
                 |> List.tryFind (fun h -> h = "https://schema.org/MoveAction")
                 |> Option.defaultWith (fun () -> failwith "ALPS missing MoveAction class IRI")
 
@@ -969,7 +978,7 @@ type SemanticTests() =
                 "Activities lack prov:wasAssociatedWith — HTTP agent attribution missing"
             )
 
-            let moveAttributes = SemanticTests.ParseMoveAttributes lineageBody
+            let moveAttributes = SemanticTests.ParseMoveAttributes(lineageBody, squareIri)
 
             Assert.That(
                 moveAttributes.Length,

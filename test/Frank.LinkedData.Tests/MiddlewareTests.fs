@@ -4,6 +4,7 @@ open System.Net.Http
 open Microsoft.AspNetCore.TestHost
 open Expecto
 open Frank.LinkedData.Tests.TestHelpers
+open System.Text.Json
 
 [<Tests>]
 let tests =
@@ -128,7 +129,51 @@ let tests =
               use app = startServer sampleConfig
               use client = app.GetTestClient()
               let (resp: HttpResponseMessage) = client.GetAsync("/data").GetAwaiter().GetResult()
-              Expect.equal (int resp.StatusCode) 200 "200 from downstream" ]
+              Expect.equal (int resp.StatusCode) 200 "200 from downstream"
+
+          testCase "GET /data Accept:application/ld+json body contains @base = request origin (item #6)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "@base" "@base key present in JSON-LD @context"
+              Expect.stringContains body "http://localhost" "request origin in @base value"
+
+          testCase "GET /data Accept:text/turtle body contains @base declaration (item #6)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "text/turtle")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "@base" "@base declaration present in Turtle"
+              Expect.stringContains body "http://localhost" "request origin in @base"
+
+          testCase "GET /data Accept:application/ld+json + RelativeBase → app-vocab IRI is root-relative, not example.org (Gap 3)"
+          <| fun _ ->
+              use app = startServer sampleConfigWithRebase
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.isFalse (body.Contains "example.org/tictactoe") "app-vocab absolute IRI stripped from JSON-LD body"
+              Expect.stringContains body "/tictactoe#" "root-relative IRI present in JSON-LD body"
+
+          testCase "GET /data Accept:text/turtle + RelativeBase → app-vocab IRI is root-relative, not example.org (Gap 3)"
+          <| fun _ ->
+              use app = startServer sampleConfigWithRebase
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "text/turtle")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.isFalse (body.Contains "example.org/tictactoe") "app-vocab absolute IRI stripped from Turtle body"
+              Expect.stringContains body "/tictactoe#" "root-relative IRI present in Turtle body" ]
 
 [<Tests>]
 let qvalueTests =

@@ -10,10 +10,16 @@ module GeneratedValidationResolver =
     let private buildConfig (t: Type) : Result<ValidationConfig, string> =
         match readStaticProp<ShapesGraph> "shapesGraph" t, readStaticProp<string[]> "knownNamespaces" t with
         | Ok s, Ok ns ->
+            let hrProps =
+                match readStaticProp<(Uri * string * string option) list> "hostRelativeProperties" t with
+                | Ok v -> v
+                | Error _ -> []
+
             Ok
                 { Shapes = s
                   ContextLoader = JsonLdLoader.synthesizing ns
-                  MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes }
+                  MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+                  HostRelativeProperties = hrProps }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

@@ -134,7 +134,16 @@ module private Serializers =
     let serializeGraphJsonLd (graph: IGraph) : string =
         Frank.Semantic.RdfSerialization.serializeGraphJsonLd graph
 
-    let buildJsonLdResponse (graph: IGraph) (externalContext: string) : string =
+    let private applyRelativeBaseJsonLd (relBase: string) (body: string) : string = body.Replace("\"" + relBase, "\"")
+
+    let private applyRelativeBaseTurtle (relBase: string) (body: string) : string = body.Replace("<" + relBase, "<")
+
+    let buildJsonLdResponse
+        (graph: IGraph)
+        (externalContext: string)
+        (base': string)
+        (relBase: string option)
+        : string =
         let graphJson = serializeGraphJsonLd graph
 
         let contextElement =
@@ -146,7 +155,18 @@ module private Serializers =
         use jsonWriter = new Utf8JsonWriter(outStream, opts)
         jsonWriter.WriteStartObject()
         jsonWriter.WritePropertyName("@context")
-        contextElement.WriteTo(jsonWriter)
+        jsonWriter.WriteStartArray()
+        jsonWriter.WriteStartObject()
+        jsonWriter.WriteString("@base", base')
+        jsonWriter.WriteEndObject()
+
+        match contextElement.ValueKind with
+        | JsonValueKind.Array ->
+            for el in contextElement.EnumerateArray() do
+                el.WriteTo(jsonWriter)
+        | _ -> contextElement.WriteTo(jsonWriter)
+
+        jsonWriter.WriteEndArray()
         jsonWriter.WritePropertyName("@graph")
 
         try
@@ -158,15 +178,25 @@ module private Serializers =
 
         jsonWriter.WriteEndObject()
         jsonWriter.Flush()
-        Encoding.UTF8.GetString(outStream.ToArray())
+        let rawBody = Encoding.UTF8.GetString(outStream.ToArray())
+
+        match relBase with
+        | Some r -> applyRelativeBaseJsonLd r rawBody
+        | None -> rawBody
 
     let respond406 (ctx: HttpContext) : Task =
         ctx.Response.StatusCode <- 406
         ctx.Response.ContentType <- "text/plain"
         ctx.Response.WriteAsync(notAcceptableBody)
 
-    let respondTurtle (graph: IGraph) (ctx: HttpContext) : Task =
-        let body = serializeTurtle graph
+    let respondTurtle (graph: IGraph) (origin: string) (relBase: string option) (ctx: HttpContext) : Task =
+        let rawBody = "@base <" + origin + "> .\n" + serializeTurtle graph
+
+        let body =
+            match relBase with
+            | Some r -> applyRelativeBaseTurtle r rawBody
+            | None -> rawBody
+
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "text/turtle"
         ctx.Response.WriteAsync(body)
@@ -177,8 +207,14 @@ module private Serializers =
         ctx.Response.ContentType <- "application/rdf+xml"
         ctx.Response.WriteAsync(body)
 
-    let respondJsonLd (graph: IGraph) (externalContext: string) (ctx: HttpContext) : Task =
-        let body = buildJsonLdResponse graph externalContext
+    let respondJsonLd
+        (graph: IGraph)
+        (externalContext: string)
+        (base': string)
+        (relBase: string option)
+        (ctx: HttpContext)
+        : Task =
+        let body = buildJsonLdResponse graph externalContext base' relBase
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)
@@ -216,8 +252,11 @@ type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logge
                     let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
                     if isNull (box meta) then config else meta
 
+            let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+
             match mediaType with
-            | "text/turtle" -> Serializers.respondTurtle effective.Graph ctx
+            | "text/turtle" -> Serializers.respondTurtle effective.Graph origin effective.RelativeBase ctx
             | "application/rdf+xml" -> Serializers.respondRdfXml effective.Graph ctx
-            | "application/ld+json" -> Serializers.respondJsonLd effective.Graph effective.JsonLdContext ctx
+            | "application/ld+json" ->
+                Serializers.respondJsonLd effective.Graph effective.JsonLdContext origin effective.RelativeBase ctx
             | _ -> next.Invoke ctx

@@ -53,7 +53,10 @@ let private startServerWithMetadata (globalConfig: LinkedDataConfig) (endpointCo
 [<Tests>]
 let endpointMetadataTests =
     let endpointGraph = buildEndpointGraph ()
-    let endpointConfig = { Graph = endpointGraph; JsonLdContext = endpointContext }
+    let endpointConfig =
+        { Graph = endpointGraph
+          JsonLdContext = endpointContext
+          RelativeBase = None }
 
     testList
         "LinkedDataMiddleware endpoint-metadata override"

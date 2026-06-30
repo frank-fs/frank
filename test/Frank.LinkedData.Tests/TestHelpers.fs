@@ -24,7 +24,23 @@ let schemaOrgContext = """{"@context":["https://schema.org"]}"""
 
 let sampleConfig =
     { Graph = buildFixtureGraph ()
-      JsonLdContext = schemaOrgContext }
+      JsonLdContext = schemaOrgContext
+      RelativeBase = None }
+
+/// Build a fixture graph with a ttt:square term that uses the example.org namespace.
+let buildTttGraph () : IGraph =
+    let graph = new Graph()
+    let subject = graph.CreateUriNode(System.Uri "https://example.org/tictactoe#square")
+    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+    let rdfsClass = graph.CreateUriNode(System.Uri "http://www.w3.org/2000/01/rdf-schema#Class")
+    graph.Assert(Triple(subject, rdfType, rdfsClass)) |> ignore
+    graph :> IGraph
+
+/// Config with RelativeBase set so middleware strips "https://example.org" from serialized IRIs.
+let sampleConfigWithRebase =
+    { Graph = buildTttGraph ()
+      JsonLdContext = """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
+      RelativeBase = Some "https://example.org" }
 
 /// Spin a TestServer with LinkedDataMiddleware installed and a no-op next delegate.
 let startServer (config: LinkedDataConfig) =
