@@ -25,22 +25,23 @@ let schemaOrgContext = """{"@context":["https://schema.org"]}"""
 let sampleConfig =
     { Graph = buildFixtureGraph ()
       JsonLdContext = schemaOrgContext
-      RelativeBase = None }
+      GraphFactory = None }
 
-/// Build a fixture graph with a ttt:square term that uses the example.org namespace.
-let buildTttGraph () : IGraph =
+/// Build a fixture graph with a ttt:square term using the given request origin.
+let buildTttGraphWithOrigin (origin: string) : IGraph =
     let graph = new Graph()
-    let subject = graph.CreateUriNode(System.Uri "https://example.org/tictactoe#square")
+    let subject = graph.CreateUriNode(System.Uri(origin + "/tictactoe#square"))
     let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
     let rdfsClass = graph.CreateUriNode(System.Uri "http://www.w3.org/2000/01/rdf-schema#Class")
     graph.Assert(Triple(subject, rdfType, rdfsClass)) |> ignore
     graph :> IGraph
 
-/// Config with RelativeBase set so middleware strips "https://example.org" from serialized IRIs.
-let sampleConfigWithRebase =
-    { Graph = buildTttGraph ()
-      JsonLdContext = """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
-      RelativeBase = Some "https://example.org" }
+/// Config with GraphFactory so the middleware builds an origin-resolved graph per request.
+/// No example.org placeholder — the factory receives the actual request origin.
+let sampleConfigWithFactory =
+    { Graph = buildFixtureGraph ()
+      JsonLdContext = """{"@context":{"ttt":"/tictactoe#"}}"""
+      GraphFactory = Some buildTttGraphWithOrigin }
 
 /// Spin a TestServer with LinkedDataMiddleware installed and a no-op next delegate.
 let startServer (config: LinkedDataConfig) =

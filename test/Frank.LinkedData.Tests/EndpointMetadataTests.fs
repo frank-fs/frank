@@ -56,7 +56,7 @@ let endpointMetadataTests =
     let endpointConfig =
         { Graph = endpointGraph
           JsonLdContext = endpointContext
-          RelativeBase = None }
+          GraphFactory = None }
 
     testList
         "LinkedDataMiddleware endpoint-metadata override"

@@ -397,6 +397,12 @@ type SemanticTests() =
                     "vocab resource body does not reference the term"
                 )
 
+                Assert.That(
+                    tttBody.Contains "example.org",
+                    Is.False,
+                    "vocab resource body must not contain example.org — term IRIs must be host-resolved, not example.org"
+                )
+
             // seeAlso targets from game's ld+json — dereference live
             let! ldGame =
                 ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))

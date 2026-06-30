@@ -18,7 +18,7 @@ module GeneratedLinkedDataResolver =
             Ok
                 { Graph = g
                   JsonLdContext = ctx
-                  RelativeBase = None }
+                  GraphFactory = None }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

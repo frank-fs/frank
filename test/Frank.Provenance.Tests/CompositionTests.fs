@@ -63,7 +63,7 @@ let private buildLinkedDataConfig (classIri: string) : LinkedDataConfig =
 
     { Graph = graph :> IGraph
       JsonLdContext = """{"@context":{"schema":"https://schema.org/"}}"""
-      RelativeBase = None }
+      GraphFactory = None }
 
 let private buildValidationConfig (classIri: string) (propIri: string) : ValidationConfig =
     let offlineLoader = JsonLdLoader.synthesizing [ "https://schema.org/" ]

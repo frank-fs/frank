@@ -153,27 +153,27 @@ let tests =
               Expect.stringContains body "@base" "@base declaration present in Turtle"
               Expect.stringContains body "http://localhost" "request origin in @base"
 
-          testCase "GET /data Accept:application/ld+json + RelativeBase → app-vocab IRI is root-relative, not example.org (Gap 3)"
+          testCase "GET /data Accept:application/ld+json + GraphFactory → app-vocab IRI is origin-resolved, no example.org"
           <| fun _ ->
-              use app = startServer sampleConfigWithRebase
+              use app = startServer sampleConfigWithFactory
               use client = app.GetTestClient()
               use req = new HttpRequestMessage(HttpMethod.Get, "/data")
               req.Headers.Add("Accept", "application/ld+json")
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              Expect.isFalse (body.Contains "example.org/tictactoe") "app-vocab absolute IRI stripped from JSON-LD body"
-              Expect.stringContains body "/tictactoe#" "root-relative IRI present in JSON-LD body"
+              Expect.isFalse (body.Contains "example.org/tictactoe") "no example.org in JSON-LD body"
+              Expect.stringContains body "/tictactoe#" "origin-relative IRI present in JSON-LD body"
 
-          testCase "GET /data Accept:text/turtle + RelativeBase → app-vocab IRI is root-relative, not example.org (Gap 3)"
+          testCase "GET /data Accept:text/turtle + GraphFactory → app-vocab IRI is origin-resolved, no example.org"
           <| fun _ ->
-              use app = startServer sampleConfigWithRebase
+              use app = startServer sampleConfigWithFactory
               use client = app.GetTestClient()
               use req = new HttpRequestMessage(HttpMethod.Get, "/data")
               req.Headers.Add("Accept", "text/turtle")
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              Expect.isFalse (body.Contains "example.org/tictactoe") "app-vocab absolute IRI stripped from Turtle body"
-              Expect.stringContains body "/tictactoe#" "root-relative IRI present in Turtle body" ]
+              Expect.isFalse (body.Contains "example.org/tictactoe") "no example.org in Turtle body"
+              Expect.stringContains body "/tictactoe#" "origin-relative IRI present in Turtle body" ]
 
 [<Tests>]
 let qvalueTests =

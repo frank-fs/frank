@@ -9,6 +9,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open VDS.RDF
 open VDS.RDF.Parsing
+open VDS.RDF.Writing
 open Frank
 open Frank.Builder
 open Frank.Discovery
@@ -180,12 +181,19 @@ let private tttVocabTtl =
     let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ttt.ttl")
     File.ReadAllText(path)
 
-let private tttVocabGraph =
+let private loadTttVocabGraph (origin: string) : IGraph =
     let g = new Graph()
+    g.BaseUri <- Uri origin
     let parser = TurtleParser()
     use reader = new StringReader(tttVocabTtl)
     parser.Load(g, reader)
-    g
+    g :> IGraph
+
+let private buildTurtleBody (origin: string) (graph: IGraph) : string =
+    use sw = new System.IO.StringWriter()
+    let writer = CompressingTurtleWriter()
+    writer.Save(graph, sw :> System.IO.TextWriter)
+    "@base <" + origin + "> .\n" + sw.ToString()
 
 let private homeResource =
     resource "/" {
@@ -223,14 +231,16 @@ let private tttVocabResource =
         name "TttVocabulary"
 
         linkedDataGraphWith
-            { Graph = tttVocabGraph
-              JsonLdContext = """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
-              RelativeBase = Some "https://example.org" }
+            { Graph = Unchecked.defaultof<IGraph>
+              JsonLdContext = """{"@context":{}}"""
+              GraphFactory = Some loadTttVocabGraph }
 
         get (fun (ctx: HttpContext) ->
             task {
+                let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+                let graph = loadTttVocabGraph origin
                 ctx.Response.ContentType <- "text/turtle"
-                do! ctx.Response.WriteAsync(tttVocabTtl)
+                do! ctx.Response.WriteAsync(buildTurtleBody origin graph)
             })
     }
 

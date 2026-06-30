@@ -134,16 +134,7 @@ module private Serializers =
     let serializeGraphJsonLd (graph: IGraph) : string =
         Frank.Semantic.RdfSerialization.serializeGraphJsonLd graph
 
-    let private applyRelativeBaseJsonLd (relBase: string) (body: string) : string = body.Replace("\"" + relBase, "\"")
-
-    let private applyRelativeBaseTurtle (relBase: string) (body: string) : string = body.Replace("<" + relBase, "<")
-
-    let buildJsonLdResponse
-        (graph: IGraph)
-        (externalContext: string)
-        (base': string)
-        (relBase: string option)
-        : string =
+    let buildJsonLdResponse (graph: IGraph) (externalContext: string) (base': string) : string =
         let graphJson = serializeGraphJsonLd graph
 
         let contextElement =
@@ -178,25 +169,15 @@ module private Serializers =
 
         jsonWriter.WriteEndObject()
         jsonWriter.Flush()
-        let rawBody = Encoding.UTF8.GetString(outStream.ToArray())
-
-        match relBase with
-        | Some r -> applyRelativeBaseJsonLd r rawBody
-        | None -> rawBody
+        Encoding.UTF8.GetString(outStream.ToArray())
 
     let respond406 (ctx: HttpContext) : Task =
         ctx.Response.StatusCode <- 406
         ctx.Response.ContentType <- "text/plain"
         ctx.Response.WriteAsync(notAcceptableBody)
 
-    let respondTurtle (graph: IGraph) (origin: string) (relBase: string option) (ctx: HttpContext) : Task =
-        let rawBody = "@base <" + origin + "> .\n" + serializeTurtle graph
-
-        let body =
-            match relBase with
-            | Some r -> applyRelativeBaseTurtle r rawBody
-            | None -> rawBody
-
+    let respondTurtle (graph: IGraph) (origin: string) (ctx: HttpContext) : Task =
+        let body = "@base <" + origin + "> .\n" + serializeTurtle graph
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "text/turtle"
         ctx.Response.WriteAsync(body)
@@ -207,14 +188,8 @@ module private Serializers =
         ctx.Response.ContentType <- "application/rdf+xml"
         ctx.Response.WriteAsync(body)
 
-    let respondJsonLd
-        (graph: IGraph)
-        (externalContext: string)
-        (base': string)
-        (relBase: string option)
-        (ctx: HttpContext)
-        : Task =
-        let body = buildJsonLdResponse graph externalContext base' relBase
+    let respondJsonLd (graph: IGraph) (externalContext: string) (base': string) (ctx: HttpContext) : Task =
+        let body = buildJsonLdResponse graph externalContext base'
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)
@@ -225,8 +200,8 @@ module private Serializers =
 type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logger: ILogger<LinkedDataMiddleware>) =
 
     do
-        if isNull (box config.Graph) then
-            invalidArg (nameof config) "LinkedDataConfig.Graph must not be null"
+        if config.GraphFactory.IsNone && isNull (box config.Graph) then
+            invalidArg (nameof config) "LinkedDataConfig.Graph must not be null when GraphFactory is None"
 
         if String.IsNullOrWhiteSpace config.JsonLdContext then
             invalidArg (nameof config) "LinkedDataConfig.JsonLdContext must not be null or whitespace"
@@ -254,9 +229,13 @@ type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logge
 
             let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
 
+            let effectiveGraph =
+                match effective.GraphFactory with
+                | Some factory -> factory origin
+                | None -> effective.Graph
+
             match mediaType with
-            | "text/turtle" -> Serializers.respondTurtle effective.Graph origin effective.RelativeBase ctx
-            | "application/rdf+xml" -> Serializers.respondRdfXml effective.Graph ctx
-            | "application/ld+json" ->
-                Serializers.respondJsonLd effective.Graph effective.JsonLdContext origin effective.RelativeBase ctx
+            | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
+            | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
+            | "application/ld+json" -> Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
             | _ -> next.Invoke ctx

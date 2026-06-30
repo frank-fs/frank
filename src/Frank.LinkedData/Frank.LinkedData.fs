@@ -74,16 +74,16 @@ module ResourceLinkedDataExtensions =
                     b.Metadata.Add(
                         { Graph = graph
                           JsonLdContext = jsonLdContext
-                          RelativeBase = None }
+                          GraphFactory = None }
                         : LinkedDataConfig
                     )
             )
 
-        /// Stamp a full LinkedDataConfig (including optional RelativeBase) as endpoint metadata.
-        /// Use this when you need RelativeBase set for host-relative IRI rebasing.
+        /// Stamp a full LinkedDataConfig (including an optional GraphFactory) as endpoint metadata.
+        /// Use GraphFactory when term IRIs must reflect the actual deployed host (e.g. app-owned vocab).
         [<CustomOperation("linkedDataGraphWith")>]
         member _.LinkedDataGraphWith(spec: ResourceSpec, ldConfig: LinkedDataConfig) : ResourceSpec =
-            if isNull (box ldConfig.Graph) then
-                invalidArg (nameof ldConfig) "ldConfig.Graph must not be null"
+            if ldConfig.GraphFactory.IsNone && isNull (box ldConfig.Graph) then
+                invalidArg (nameof ldConfig) "ldConfig.Graph must not be null when GraphFactory is None"
 
             ResourceBuilder.AddMetadata(spec, fun (b: EndpointBuilder) -> b.Metadata.Add(ldConfig: LinkedDataConfig))
