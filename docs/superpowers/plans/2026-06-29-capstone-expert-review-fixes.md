@@ -2,6 +2,16 @@
 
 Source: `/expert-review` panel (Berners-Lee, Miller, Fielding, @7sharp9) on branch `capstone-discovery-completion` (diff vs master). The capstone's AT-S1..S8 were partly **false-green** (passed without proving the claim). Every item below is a **maintainer-ratified decision** (grilled one-by-one). NO deferrals to Track A unless explicitly noted; two attempts to over-defer (#6, #7) were caught and corrected — read-side semantic self-description IS v7.3.2.
 
+## This is CLEANUP, in scope — NOT a "major second pass"
+All 21 items were in scope for the capstone. The volume exists because the first pass let incomplete / false-green subagent work through the gates — an **accountability failure**, not new scope. Do NOT re-characterize it as foundational/large to justify a different process.
+
+## OPERATING MODE (non-negotiable — the assistant's repeated failure pattern)
+The assistant's Achilles heel: making **unilateral decisions** and then **finishing/patching subagent work itself**, which drops it out of the adversarial gap-finding seat → it stops catching gaps (this is how the false-green slipped through the gates).
+- **ALL implementation goes through subagents.** The assistant writes NO production/test code itself.
+- The assistant performs **ONLY adversarial review** — actively hunting for gaps, false-green, weakened assertions, and "passes for the wrong reason."
+- **Incomplete work is passed BACK to the subagent** with the specific gap. The assistant NEVER finishes, patches, or completes a subagent's work — doing so forfeits the adversarial perspective.
+- **Surface issues and questions to the maintainer as they arise.** Do not decide unilaterally; do not batch-defer.
+
 ## Foundation (interdependent — do first)
 
 **#6 — Relative term IRI + runtime base-resolution (drop `example.org` + client rebasing).**
