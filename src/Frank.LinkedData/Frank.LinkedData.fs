@@ -2,8 +2,6 @@ namespace Frank.LinkedData
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Routing
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.DependencyInjection.Extensions
 open VDS.RDF
 open Frank.Builder
 
@@ -13,39 +11,22 @@ module LinkedDataExtensions =
     type WebHostBuilder with
 
         [<CustomOperation("useLinkedDataWith")>]
-        member _.UseLinkedDataWith(spec: WebHostSpec, config: LinkedDataConfig) : WebHostSpec =
-            let addServices (services: IServiceCollection) =
-                services.AddSingleton<LinkedDataConfig>(config) |> ignore
-                spec.Services services
-
+        member _.UseLinkedDataWith(spec: WebHostSpec, _config: LinkedDataConfig) : WebHostSpec =
             let addMiddleware (app: IApplicationBuilder) =
                 let configured = spec.Middleware app
                 configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
                 configured
 
-            { spec with
-                Services = addServices
-                Middleware = addMiddleware }
+            { spec with Middleware = addMiddleware }
 
         [<CustomOperation("useLinkedData")>]
-        member this.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
-            let assemblies = System.AppDomain.CurrentDomain.GetAssemblies()
+        member _.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
+            let addMiddleware (app: IApplicationBuilder) =
+                let configured = spec.Middleware app
+                configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
+                configured
 
-            match GeneratedLinkedDataResolver.resolveGeneratedConfig assemblies with
-            | Ok config ->
-                let addServices (services: IServiceCollection) =
-                    services.TryAddSingleton<LinkedDataConfig>(config)
-                    spec.Services services
-
-                let addMiddleware (app: IApplicationBuilder) =
-                    let configured = spec.Middleware app
-                    configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
-                    configured
-
-                { spec with
-                    Services = addServices
-                    Middleware = addMiddleware }
-            | Error msg -> invalidOp msg
+            { spec with Middleware = addMiddleware }
 
 /// Extends ResourceBuilder with a `linkedDataGraph` operation that stamps
 /// LinkedDataConfig onto every endpoint built by the resource CE block.
@@ -56,10 +37,10 @@ module ResourceLinkedDataExtensions =
 
     type ResourceBuilder with
 
-        /// Stamp a per-resource RDF graph and JSON-LD context as LinkedDataConfig
+        /// Stamp a pre-built RDF graph and JSON-LD context as LinkedDataConfig
         /// metadata on every endpoint produced by this resource block.
-        /// LinkedDataMiddleware reads this at request time and serves the endpoint's
-        /// own graph; endpoints without this metadata fall back to the global config.
+        /// LinkedDataMiddleware only serves RDF for endpoints that carry this metadata;
+        /// endpoints without it pass through to the downstream handler.
         [<CustomOperation("linkedDataGraph")>]
         member _.LinkedDataGraph(spec: ResourceSpec, graph: IGraph, jsonLdContext: string) : ResourceSpec =
             if isNull (box graph) then

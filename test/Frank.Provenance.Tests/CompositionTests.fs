@@ -127,19 +127,19 @@ let private startComposedServer () =
         :> IProvenanceStore)
     |> ignore
 
-    builder.Services.AddSingleton(ldConfig) |> ignore
     builder.Services.AddSingleton(valConfig) |> ignore
     let app = builder.Build()
+    app.UseRouting() |> ignore
     // Outermost: Provenance (buffers for prov-profile; passes through otherwise).
     app.UseMiddleware<ProvenanceMiddleware>() |> ignore
-    // Middle: LinkedData (content-negotiates ld+json).
+    // Middle: LinkedData (content-negotiates ld+json; only fires for endpoints with LinkedDataConfig metadata).
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
     // Innermost: Validation (validates ld+json POST bodies).
     app.UseMiddleware<ValidationMiddleware>() |> ignore
 
     // GET /orders: the resource endpoint.
-    // Status 200 declared: LinkedData intercepts ld+json GETs and sets 200;
-    // the Provenance capture reads 200 → finds the OrderPlaced metadata match.
+    // ldConfig stamped as metadata: LinkedData serves ld+json for this endpoint.
+    // Status 200 declared: the Provenance capture reads 200 → finds OrderPlaced metadata match.
     app
         .MapGet(
             "/orders",
@@ -150,6 +150,7 @@ let private startComposedServer () =
         .WithMetadata(
             Microsoft.AspNetCore.Http.ProducesResponseTypeMetadata(200, typeof<OrderPlaced>, [| "application/json" |])
         )
+        .WithMetadata(ldConfig)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -177,13 +178,14 @@ let private startComposedServerLdOuter () =
         :> IProvenanceStore)
     |> ignore
 
-    builder.Services.AddSingleton(ldConfig) |> ignore
     let app = builder.Build()
+    app.UseRouting() |> ignore
     // LinkedData OUTERMOST — the previously-broken order.
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
     // Provenance INNER.
     app.UseMiddleware<ProvenanceMiddleware>() |> ignore
 
+    // ldConfig stamped as endpoint metadata: LinkedData serves ld+json for GET /orders.
     app
         .MapGet(
             "/orders",
@@ -194,6 +196,7 @@ let private startComposedServerLdOuter () =
         .WithMetadata(
             Microsoft.AspNetCore.Http.ProducesResponseTypeMetadata(200, typeof<OrderPlaced>, [| "application/json" |])
         )
+        .WithMetadata(ldConfig)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -238,16 +241,19 @@ let private startProvServer (provConfig: ProvenanceConfig) =
 let private startLinkedDataServer (ldConfig: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(ldConfig) |> ignore
     let app = builder.Build()
+    app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
 
-    app.MapGet(
-        "/vocab",
-        Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
-            ctx.Response.StatusCode <- 200
-            ctx.Response.WriteAsync("downstream"))
-    )
+    // ldConfig stamped as endpoint metadata so LinkedData serves RDF for this endpoint.
+    app
+        .MapGet(
+            "/vocab",
+            Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+                ctx.Response.StatusCode <- 200
+                ctx.Response.WriteAsync("downstream"))
+        )
+        .WithMetadata(ldConfig)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()

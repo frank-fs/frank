@@ -181,7 +181,9 @@ let private tttVocabTtl =
     let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ttt.ttl")
     File.ReadAllText(path)
 
-let private loadTttVocabGraph (origin: string) : IGraph =
+/// Build the ttt vocabulary graph with term IRIs resolved to the request origin.
+let private loadTttVocabGraph (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
     let g = new Graph()
     g.BaseUri <- Uri origin
     let parser = TurtleParser()
@@ -195,6 +197,55 @@ let private buildTurtleBody (origin: string) (graph: IGraph) : string =
     writer.Save(graph, sw :> System.IO.TextWriter)
     "@base <" + origin + "> .\n" + sw.ToString()
 
+/// Build a per-game-instance RDF graph with schema: and ttt: terms.
+/// Subject = <origin>/games/<id>; predicates are host-resolved, no example.org.
+let private buildGameGraph (origin: string) (id: string) (result: MoveResult) : IGraph =
+    let schemaPrefix = "https://schema.org/"
+    let tttBase = origin + "/tictactoe#"
+    let gameIri = origin + "/games/" + id
+    let g = new Graph()
+    g.NamespaceMap.AddNamespace("schema", UriFactory.Create schemaPrefix)
+    g.NamespaceMap.AddNamespace("ttt", UriFactory.Create tttBase)
+    let gameSubj = g.CreateUriNode(UriFactory.Create gameIri)
+    let identifierPred = g.CreateUriNode(UriFactory.Create(schemaPrefix + "identifier"))
+    g.Assert(Triple(gameSubj, identifierPred, g.CreateLiteralNode(id))) |> ignore
+    let actionStatusPred = g.CreateUriNode(UriFactory.Create(schemaPrefix + "actionStatus"))
+
+    let statusIri =
+        match result with
+        | XTurn _ | OTurn _ -> schemaPrefix + "ActiveActionStatus"
+        | Won _ | Draw _ -> schemaPrefix + "CompletedActionStatus"
+        | Error _ -> schemaPrefix + "FailedActionStatus"
+
+    g.Assert(Triple(gameSubj, actionStatusPred, g.CreateUriNode(UriFactory.Create statusIri))) |> ignore
+
+    match result with
+    | XTurn(_, moves) ->
+        let currentPlayerPred = g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+        g.Assert(Triple(gameSubj, currentPlayerPred, g.CreateLiteralNode "X")) |> ignore
+        let validMovesPred = g.CreateUriNode(UriFactory.Create(tttBase + "validMoves"))
+
+        for XPos pos in moves do
+            g.Assert(Triple(gameSubj, validMovesPred, g.CreateLiteralNode(pos.ToString()))) |> ignore
+
+    | OTurn(_, moves) ->
+        let currentPlayerPred = g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+        g.Assert(Triple(gameSubj, currentPlayerPred, g.CreateLiteralNode "O")) |> ignore
+        let validMovesPred = g.CreateUriNode(UriFactory.Create(tttBase + "validMoves"))
+
+        for OPos pos in moves do
+            g.Assert(Triple(gameSubj, validMovesPred, g.CreateLiteralNode(pos.ToString()))) |> ignore
+
+    | _ -> ()
+
+    g :> IGraph
+
+/// Per-request game graph factory: reads route id, looks up game state, builds instance graph.
+let private gameGraphFactory (ctx: HttpContext) : IGraph =
+    let id = ctx.Request.RouteValues.["id"] :?> string
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    buildGameGraph origin id (store.GetOrCreate id)
+
 let private homeResource =
     resource "/" {
         name "Home"
@@ -206,6 +257,12 @@ let private gameResource =
         name "Game"
         entryPoint
         relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Game).AbsoluteUri)
+
+        linkedDataGraphWith
+            { Graph = Unchecked.defaultof<IGraph>
+              JsonLdContext = """{"@context":["https://schema.org"]}"""
+              GraphFactory = Some gameGraphFactory }
+
         get gameHandler
     }
 
@@ -238,7 +295,7 @@ let private tttVocabResource =
         get (fun (ctx: HttpContext) ->
             task {
                 let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-                let graph = loadTttVocabGraph origin
+                let graph = loadTttVocabGraph ctx
                 ctx.Response.ContentType <- "text/turtle"
                 do! ctx.Response.WriteAsync(buildTurtleBody origin graph)
             })

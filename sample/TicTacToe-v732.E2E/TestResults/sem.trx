@@ -1,0 +1,565 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="a13217e2-d9a1-4947-8286-7e042eeb5246" name="@Ryans-Mac-mini 2026-06-30 07:32:16" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-06-30T07:32:16.3595820-05:00" queuing="2026-06-30T07:32:16.3595820-05:00" start="2026-06-30T07:32:07.1336390-05:00" finish="2026-06-30T07:32:16.3623830-05:00" />
+  <TestSettings name="default" id="7cfd9280-115a-4987-976c-6581d58bf883">
+    <Deployment runDeploymentRoot="_Ryans-Mac-mini_2026-06-30_07_32_16" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="bbbcb4c5-2e25-4b13-a750-fb92052f5fae" testId="eda2527b-1772-e0cb-b244-54ecebeebf6b" testName="AT-S1 JSON Home lists resources with vocabulary-mapped rels" computerName="Ryans-Mac-mini" duration="00:00:00.2272730" startTime="2026-06-30T07:32:15.0592460-05:00" endTime="2026-06-30T07:32:15.2864910-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bbbcb4c5-2e25-4b13-a750-fb92052f5fae" />
+    <UnitTestResult executionId="0a0dd4d8-70e1-4b83-9678-8870d4d46327" testId="05325728-f389-002c-5105-561a3e50b67f" testName="AT-S7 vocab-swap — hardcoded schema.org client fails, discovery client succeeds" computerName="Ryans-Mac-mini" duration="00:00:00.0630770" startTime="2026-06-30T07:32:16.1246060-05:00" endTime="2026-06-30T07:32:16.1876820-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0a0dd4d8-70e1-4b83-9678-8870d4d46327" />
+    <UnitTestResult executionId="8b794af0-13d6-4584-8aa1-ed5162b24ad6" testId="6de0b029-8cb9-6cc9-e95d-5b01fc80ed3e" testName="AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS" computerName="Ryans-Mac-mini" duration="00:00:00.0102550" startTime="2026-06-30T07:32:15.2870480-05:00" endTime="2026-06-30T07:32:15.2973030-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8b794af0-13d6-4584-8aa1-ed5162b24ad6" />
+    <UnitTestResult executionId="bd01c347-1d7f-4786-b324-fa19be492ba6" testId="5a3afc77-baa8-613c-c96d-1d3ad8cb42bd" testName="AT-S8 provenance captures every move with order and terminal outcome" computerName="Ryans-Mac-mini" duration="00:00:00.0817060" startTime="2026-06-30T07:32:16.1877160-05:00" endTime="2026-06-30T07:32:16.2694210-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bd01c347-1d7f-4786-b324-fa19be492ba6" />
+    <UnitTestResult executionId="d4f8ad33-441f-485d-a7c2-ff1a4c0b8809" testId="5fc6b83e-dbfb-b62b-fc34-c84a3c9b5fe7" testName="AT-S5 game negotiates JSON-LD with external schema.org @context" computerName="Ryans-Mac-mini" duration="00:00:00.0272540" startTime="2026-06-30T07:32:15.4189810-05:00" endTime="2026-06-30T07:32:15.4462340-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d4f8ad33-441f-485d-a7c2-ff1a4c0b8809" />
+    <UnitTestResult executionId="f0d245ea-8cf5-4753-82ba-ed81990c8e9c" testId="d2561f1f-0e55-c06d-df51-b6f525363504" testName="AT-S4 invalid move returns 422 ValidationReport with vocabulary IRIs" computerName="Ryans-Mac-mini" duration="00:00:00.1123030" startTime="2026-06-30T07:32:15.3066500-05:00" endTime="2026-06-30T07:32:15.4189520-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f0d245ea-8cf5-4753-82ba-ed81990c8e9c" />
+    <UnitTestResult executionId="98a638fe-ab54-41b8-b3e6-105bbd1fab54" testId="4b97c4e5-2cfb-59e8-61ed-265ea94cae04" testName="AT-S6 naive client plays a full game via discovery only" computerName="Ryans-Mac-mini" duration="00:00:00.6783150" startTime="2026-06-30T07:32:15.4462580-05:00" endTime="2026-06-30T07:32:16.1245670-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="98a638fe-ab54-41b8-b3e6-105bbd1fab54" />
+    <UnitTestResult executionId="bd0ff469-5403-4303-9e9c-b436350f8d6e" testId="f126110c-4f4f-1de8-e679-69335dd41563" testName="AT-S3 ALPS profile descriptors reference schema.org IRIs" computerName="Ryans-Mac-mini" duration="00:00:00.0092980" startTime="2026-06-30T07:32:15.2973280-05:00" endTime="2026-06-30T07:32:15.3066270-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bd0ff469-5403-4303-9e9c-b436350f8d6e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="AT-S3 ALPS profile descriptors reference schema.org IRIs" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="f126110c-4f4f-1de8-e679-69335dd41563">
+      <Execution id="bd0ff469-5403-4303-9e9c-b436350f8d6e" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S3 ALPS profile descriptors reference schema.org IRIs" />
+    </UnitTest>
+    <UnitTest name="AT-S4 invalid move returns 422 ValidationReport with vocabulary IRIs" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="d2561f1f-0e55-c06d-df51-b6f525363504">
+      <Execution id="f0d245ea-8cf5-4753-82ba-ed81990c8e9c" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S4 invalid move returns 422 ValidationReport with vocabulary IRIs" />
+    </UnitTest>
+    <UnitTest name="AT-S6 naive client plays a full game via discovery only" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="4b97c4e5-2cfb-59e8-61ed-265ea94cae04">
+      <Execution id="98a638fe-ab54-41b8-b3e6-105bbd1fab54" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S6 naive client plays a full game via discovery only" />
+    </UnitTest>
+    <UnitTest name="AT-S5 game negotiates JSON-LD with external schema.org @context" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="5fc6b83e-dbfb-b62b-fc34-c84a3c9b5fe7">
+      <Execution id="d4f8ad33-441f-485d-a7c2-ff1a4c0b8809" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S5 game negotiates JSON-LD with external schema.org @context" />
+    </UnitTest>
+    <UnitTest name="AT-S1 JSON Home lists resources with vocabulary-mapped rels" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="eda2527b-1772-e0cb-b244-54ecebeebf6b">
+      <Execution id="bbbcb4c5-2e25-4b13-a750-fb92052f5fae" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S1 JSON Home lists resources with vocabulary-mapped rels" />
+    </UnitTest>
+    <UnitTest name="AT-S7 vocab-swap — hardcoded schema.org client fails, discovery client succeeds" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="05325728-f389-002c-5105-561a3e50b67f">
+      <Execution id="0a0dd4d8-70e1-4b83-9678-8870d4d46327" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S7 vocab-swap — hardcoded schema.org client fails, discovery client succeeds" />
+    </UnitTest>
+    <UnitTest name="AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="6de0b029-8cb9-6cc9-e95d-5b01fc80ed3e">
+      <Execution id="8b794af0-13d6-4584-8aa1-ed5162b24ad6" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS" />
+    </UnitTest>
+    <UnitTest name="AT-S8 provenance captures every move with order and terminal outcome" storage="/users/ryanr/code/frank/.claude/worktrees/capstone-discovery/sample/tictactoe-v732.e2e/bin/debug/net10.0/tictactoe.v732.e2e.dll" id="5a3afc77-baa8-613c-c96d-1d3ad8cb42bd">
+      <Execution id="bd01c347-1d7f-4786-b324-fa19be492ba6" />
+      <TestMethod codeBase="/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll" adapterTypeName="executor://nunit3testexecutor/" className="TicTacToe.E2E.SemanticTests" name="AT-S8 provenance captures every move with order and terminal outcome" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="eda2527b-1772-e0cb-b244-54ecebeebf6b" executionId="bbbcb4c5-2e25-4b13-a750-fb92052f5fae" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="05325728-f389-002c-5105-561a3e50b67f" executionId="0a0dd4d8-70e1-4b83-9678-8870d4d46327" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6de0b029-8cb9-6cc9-e95d-5b01fc80ed3e" executionId="8b794af0-13d6-4584-8aa1-ed5162b24ad6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5a3afc77-baa8-613c-c96d-1d3ad8cb42bd" executionId="bd01c347-1d7f-4786-b324-fa19be492ba6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5fc6b83e-dbfb-b62b-fc34-c84a3c9b5fe7" executionId="d4f8ad33-441f-485d-a7c2-ff1a4c0b8809" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d2561f1f-0e55-c06d-df51-b6f525363504" executionId="f0d245ea-8cf5-4753-82ba-ed81990c8e9c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4b97c4e5-2cfb-59e8-61ed-265ea94cae04" executionId="98a638fe-ab54-41b8-b3e6-105bbd1fab54" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f126110c-4f4f-1de8-e679-69335dd41563" executionId="bd0ff469-5403-4303-9e9c-b436350f8d6e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="8" executed="8" passed="8" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>NUnit Adapter 4.6.0.0: Test execution started
+Running selected tests in /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.E2E/bin/Debug/net10.0/TicTacToe.v732.E2E.dll
+   NUnit3TestExecutor discovered 8 of 8 NUnit test cases using Current Discovery mode, Non-Explicit run
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.Core/Frank.Cli.Core.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732/TicTacToe.v732.fsproj]
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732/TicTacToe.v732.fsproj]
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved.
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.Core/Frank.Cli.Core.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [TargetFramework=net8.0]
+info: Frank.Provenance[0]
+      MailboxProcessorProvenanceStore created (MaxRecords=10000, EvictionBatchSize=100)
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:15321
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/ - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Home'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Home'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/ - 200 - - 20.3809ms
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.Core/Frank.Cli.Core.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.Ex/TicTacToe.v732.Ex.fsproj]
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.Ex/TicTacToe.v732.Ex.fsproj]
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved.
+/Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/src/Frank.Cli.Core/Frank.Cli.Core.fsproj : warning NU1608: Detected package version outside of dependency constraint: FSharp.Compiler.Service 43.10.103 requires FSharp.Core (= 10.0.103) but version FSharp.Core 10.1.301 was resolved. [TargetFramework=net8.0]
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:15322
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /Users/ryanr/Code/frank/.claude/worktrees/capstone-discovery/sample/TicTacToe-v732.Ex
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/ - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Home'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Home'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/ - 200 - - 17.8842ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/ - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/ - 200 - application/json-home+json 5.4272ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 OPTIONS http://localhost:15321/games/at-s2 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 OPTIONS http://localhost:15321/games/at-s2 - 200 0 - 4.4096ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 OPTIONS http://localhost:15321/games/at-s3 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 OPTIONS http://localhost:15321/games/at-s3 - 200 0 - 0.4552ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - 200 - application/alps+json 0.4468ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s4/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s4/moves - 422 - application/ld+json;+profile="http://www.w3.org/ns/shacl#" 107.7698ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s5 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s5 - 200 - application/ld+json 11.7551ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s5 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s5 - 200 - application/json 2.9809ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s5 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s5 - 200 - text/turtle 5.5747ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/ - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/ - 200 - application/json-home+json 0.1208ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/json 0.2040ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 OPTIONS http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 OPTIONS http://localhost:15321/games/at-s6 - 200 0 - 0.1532ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - 200 - application/alps+json 0.1046ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/tictactoe - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET TttVocabulary'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET TttVocabulary'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/tictactoe - 200 - text/turtle 7.2243ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.5423ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 422 - application/ld+json;+profile="http://www.w3.org/ns/shacl#" 3.9593ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.6138ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 124
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 7.1043ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.3857ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 126
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 2.8500ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.3439ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 125
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 2.8055ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.3430ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 2.4785ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.3563ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 129
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 5.0083ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.4062ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 128
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 2.7830ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.3237ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s6/moves - 200 - application/json 2.7022ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s6 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s6 - 200 - application/ld+json 0.2760ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 OPTIONS http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 OPTIONS http://localhost:15322/games/at-s7 - 200 0 - 13.9775ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/alps/tictactoe.v732.ex - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/alps/tictactoe.v732.ex - 200 - application/alps+json 0.8315ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/ - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/ - 200 - application/json-home+json 1.9774ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 121
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 400 - - 4.9986ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 9.1425ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 131
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 3.6135ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.1156ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 133
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.5540ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.0800ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 132
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.3224ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.1063ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 134
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.1307ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.1125ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 136
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.1707ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.0876ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 135
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.1263ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.1042ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - application/ld+json 134
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15322/games/at-s7/moves - 200 - application/json 0.3955ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15322/games/at-s7 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15322/games/at-s7 - 200 - application/json 0.0847ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/ - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/ - 200 - application/json-home+json 0.1630ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 OPTIONS http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 OPTIONS http://localhost:15321/games/at-s8 - 200 0 - 0.1843ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/alps/tictactoe.v732 - 200 - application/alps+json 0.1127ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.2086ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 124
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 3.0601ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1869ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 126
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 2.5906ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1414ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 125
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 2.4553ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1215ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 2.4235ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1197ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 129
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 3.2727ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1612ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 128
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 3.1589ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1451ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - application/ld+json 127
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'POST GameMoves'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost:15321/games/at-s8/moves - 200 - application/json 2.5068ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.1194ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/provenance?resource=http%3A%2F%2Flocalhost%3A15321%2Fgames%2Fat-s8%2Fmoves - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Provenance'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Provenance'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/provenance?resource=http%3A%2F%2Flocalhost%3A15321%2Fgames%2Fat-s8%2Fmoves - 200 - application/ld+json 28.9180ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:15321/games/at-s8 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'GET Game'
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'GET Game'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:15321/games/at-s8 - 200 - application/json 0.2185ms
+NUnit Adapter 4.6.0.0: Test execution complete
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

@@ -108,6 +108,75 @@ type SemanticTests() =
 
         result
 
+    /// Parse schema:actionStatus IRI from the game's expanded JSON-LD @graph body.
+    /// Returns the actionStatus value IRI, or "" when not found.
+    static member private ParseActionStatus(ldBody: string, gameIri: string) : string =
+        use doc = JsonDocument.Parse ldBody
+        let mutable result = ""
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+
+        if doc.RootElement.TryGetProperty("@graph", &graphEl) then
+            for node in graphEl.EnumerateArray() do
+                let mutable idEl = Unchecked.defaultof<JsonElement>
+
+                if node.TryGetProperty("@id", &idEl) && idEl.GetString() = gameIri then
+                    let mutable statusEl = Unchecked.defaultof<JsonElement>
+
+                    if node.TryGetProperty("https://schema.org/actionStatus", &statusEl) then
+                        for v in statusEl.EnumerateArray() do
+                            let mutable idProp = Unchecked.defaultof<JsonElement>
+
+                            if v.TryGetProperty("@id", &idProp) then
+                                result <- idProp.GetString()
+
+        result
+
+    /// Parse ttt:currentPlayer literal from the game's expanded JSON-LD @graph body.
+    static member private ParseCurrentPlayer(ldBody: string, gameIri: string, originBase: string) : string =
+        use doc = JsonDocument.Parse ldBody
+        let mutable result = ""
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+        let currentPlayerPred = originBase + "/tictactoe#currentPlayer"
+
+        if doc.RootElement.TryGetProperty("@graph", &graphEl) then
+            for node in graphEl.EnumerateArray() do
+                let mutable idEl = Unchecked.defaultof<JsonElement>
+
+                if node.TryGetProperty("@id", &idEl) && idEl.GetString() = gameIri then
+                    let mutable playerEl = Unchecked.defaultof<JsonElement>
+
+                    if node.TryGetProperty(currentPlayerPred, &playerEl) then
+                        for v in playerEl.EnumerateArray() do
+                            let mutable valEl = Unchecked.defaultof<JsonElement>
+
+                            if v.TryGetProperty("@value", &valEl) then
+                                result <- valEl.GetString()
+
+        result
+
+    /// Parse ttt:validMoves literal values from the game's expanded JSON-LD @graph body.
+    static member private ParseValidMoves(ldBody: string, gameIri: string, originBase: string) : string list =
+        use doc = JsonDocument.Parse ldBody
+        let moves = System.Collections.Generic.List<string>()
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+        let validMovesPred = originBase + "/tictactoe#validMoves"
+
+        if doc.RootElement.TryGetProperty("@graph", &graphEl) then
+            for node in graphEl.EnumerateArray() do
+                let mutable idEl = Unchecked.defaultof<JsonElement>
+
+                if node.TryGetProperty("@id", &idEl) && idEl.GetString() = gameIri then
+                    let mutable movesEl = Unchecked.defaultof<JsonElement>
+
+                    if node.TryGetProperty(validMovesPred, &movesEl) then
+                        for v in movesEl.EnumerateArray() do
+                            let mutable valEl = Unchecked.defaultof<JsonElement>
+
+                            if v.TryGetProperty("@value", &valEl) then
+                                moves.Add(valEl.GetString())
+
+        moves |> Seq.toList
+
     /// Extract rdfs:seeAlso target URIs from a JSON-LD @graph body.
     static member private SeeAlsoUris(ldBody: string) : string list =
         use doc = JsonDocument.Parse ldBody
@@ -207,12 +276,16 @@ type SemanticTests() =
         }
 
     // ── AT-S5: content negotiation — all three formats ───────────────────────────
+    // The game endpoint serves its OWN instance graph (not the global ontology).
+    // JSON-LD and Turtle must carry the game's triples (schema:actionStatus, ttt: terms).
+    // No example.org in any RDF response — all term IRIs are host-resolved.
     [<Test>]
     member this.``AT-S5 game negotiates JSON-LD with external schema.org @context``() =
         task {
             use! ctx = this.NewContext()
+            let originBase = (Server.Url()).TrimEnd('/')
 
-            // ── ld+json: external @context + seeAlso outbound link ──────────────
+            // ── ld+json: game's OWN graph — schema:actionStatus + ttt: terms ─────
             let! ld =
                 ctx.GetAsync(
                     "/games/at-s5",
@@ -230,11 +303,27 @@ type SemanticTests() =
             let! body = ld.TextAsync()
             Assert.That(body.Contains "@context", Is.True, "JSON-LD body lacks @context")
             Assert.That(body.Contains "schema.org", Is.True, "@context does not reference external schema.org")
-            // declared outbound link (vocabulary CE: seeAlso wikidata:Q11907)
+            // Game's own triples: actionStatus (per-instance, not global ontology)
             Assert.That(
-                body.Contains "seeAlso" || body.Contains "wikidata",
+                body.Contains "actionStatus",
                 Is.True,
-                "JSON-LD lacks rdfs:seeAlso outbound link"
+                "JSON-LD game graph lacks schema:actionStatus — serving global ontology instead of game instance"
+            )
+            Assert.That(
+                body.Contains "ActiveActionStatus" || body.Contains "CompletedActionStatus",
+                Is.True,
+                "JSON-LD game graph lacks a schema:ActionStatus individual"
+            )
+            // ttt: terms are host-resolved (no example.org)
+            Assert.That(
+                body.Contains "tictactoe#",
+                Is.True,
+                "JSON-LD game graph lacks host-resolved ttt: terms"
+            )
+            Assert.That(
+                body.Contains "example.org",
+                Is.False,
+                "JSON-LD game graph must not contain example.org — IRIs must be host-resolved"
             )
 
             // ── application/json: compact JSON game state ────────────────────────
@@ -257,7 +346,7 @@ type SemanticTests() =
             let! jsonBody = json.TextAsync()
             Assert.That(jsonBody.Contains "status", Is.True, "compact JSON body lacks game status field")
 
-            // ── text/turtle: vocabulary graph in Turtle ──────────────────────────
+            // ── text/turtle: game instance graph in Turtle ───────────────────────
             let! turtle =
                 ctx.GetAsync("/games/at-s5", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
 
@@ -265,6 +354,18 @@ type SemanticTests() =
 
             let! turtleBody = turtle.TextAsync()
             Assert.That(turtleBody.Contains "@prefix", Is.True, "text/turtle body is not Turtle syntax")
+            Assert.That(
+                turtleBody.Contains "actionStatus",
+                Is.True,
+                "Turtle game graph lacks schema:actionStatus — serving global ontology instead of game instance"
+            )
+            Assert.That(
+                turtleBody.Contains "example.org",
+                Is.False,
+                "Turtle game graph must not contain example.org — IRIs must be host-resolved"
+            )
+
+            ignore originBase
         }
 
     // ── AT-S6: agent-simulator — follow links, verify term set, deref, play ──────
@@ -403,7 +504,7 @@ type SemanticTests() =
                     "vocab resource body must not contain example.org — term IRIs must be host-resolved, not example.org"
                 )
 
-            // seeAlso targets from game's ld+json — dereference live
+            // game's ld+json — must be the game instance graph, not the global ontology
             let! ldGame =
                 ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
 
@@ -415,6 +516,24 @@ type SemanticTests() =
                 "Game not available as external-context JSON-LD"
             )
 
+            // Game instance graph: schema:actionStatus and ttt: terms must be present
+            Assert.That(
+                ldBody.Contains "actionStatus",
+                Is.True,
+                "Game ld+json lacks schema:actionStatus — serving global ontology instead of game instance"
+            )
+            Assert.That(
+                ldBody.Contains "tictactoe#",
+                Is.True,
+                "Game ld+json lacks host-resolved ttt: terms"
+            )
+            Assert.That(
+                ldBody.Contains "example.org",
+                Is.False,
+                "Game ld+json must not contain example.org — IRIs must be host-resolved"
+            )
+
+            // seeAlso targets — game graph has none; loop is vacuous but not removed for structure
             for seeAlsoUri in SemanticTests.SeeAlsoUris ldBody do
                 let! r = httpClient.GetAsync seeAlsoUri
 
@@ -467,26 +586,34 @@ type SemanticTests() =
             )
 
             // ── Phase 7: Play full game via discovered IRIs ──────────────────────
-            // Keys and @type come from ALPS — no hardcoded field names or URLs.
-            // Legal squares come from the game-state's validMoves array.
+            // State is read from the game's RDF graph via schema:actionStatus and ttt: terms.
+            // No hardcoded field names ("status"/"Won"/"Draw") — IRIs only.
+            let gameAbsoluteIri = originBase + gameUrl
+            let completedStatusIri = "https://schema.org/CompletedActionStatus"
+            let failedStatusIri = "https://schema.org/FailedActionStatus"
             let mutable finished = false
             let mutable turn = 0
 
             while not finished && turn < 9 do
-                let! stateResp = ctx.GetAsync gameUrl
-                let! stateJson = stateResp.JsonAsync()
-                let root = stateJson.Value
-                let status = root.GetProperty("status").GetString()
+                let! stateResp =
+                    ctx.GetAsync(
+                        gameUrl,
+                        APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
+                    )
 
-                if status = "Won" || status = "Draw" then
+                let! ldStateBody = stateResp.TextAsync()
+                let actionStatus = SemanticTests.ParseActionStatus(ldStateBody, gameAbsoluteIri)
+
+                if actionStatus = completedStatusIri || actionStatus = failedStatusIri then
                     finished <- true
                 else
-                    let player = root.GetProperty("currentPlayer").GetString()
+                    let player = SemanticTests.ParseCurrentPlayer(ldStateBody, gameAbsoluteIri, originBase)
+                    let validMoves = SemanticTests.ParseValidMoves(ldStateBody, gameAbsoluteIri, originBase)
 
-                    let square =
-                        root.GetProperty("validMoves").EnumerateArray()
-                        |> Seq.map (fun v -> v.GetString())
-                        |> Seq.head
+                    Assert.That(player, Is.Not.Empty, sprintf "Turn %d: ttt:currentPlayer not found in game ld+json" turn)
+                    Assert.That(validMoves, Is.Not.Empty, sprintf "Turn %d: ttt:validMoves not found in game ld+json" turn)
+
+                    let square = validMoves |> List.head
 
                     let moveBody = Dictionary<string, obj>()
                     moveBody.["@type"] <- classIri

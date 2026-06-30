@@ -194,48 +194,51 @@ module private Serializers =
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)
 
-/// Content-negotiation middleware serving a pre-built RDF graph in multiple
+/// Content-negotiation middleware serving per-endpoint RDF graphs in multiple
 /// representations: application/ld+json, text/turtle, application/rdf+xml.
-/// Non-RDF Accept headers pass through. Unsupported RDF-scoped Accept headers → 406.
-type LinkedDataMiddleware(next: RequestDelegate, config: LinkedDataConfig, logger: ILogger<LinkedDataMiddleware>) =
-
-    do
-        if config.GraphFactory.IsNone && isNull (box config.Graph) then
-            invalidArg (nameof config) "LinkedDataConfig.Graph must not be null when GraphFactory is None"
-
-        if String.IsNullOrWhiteSpace config.JsonLdContext then
-            invalidArg (nameof config) "LinkedDataConfig.JsonLdContext must not be null or whitespace"
+/// Only fires for GET/HEAD (safe-method guard) on endpoints that carry a
+/// LinkedDataConfig in their metadata. All other requests pass through.
+type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>) =
 
     member _.InvokeAsync(ctx: HttpContext) : Task =
-        let acceptHeader =
-            match ctx.Request.Headers.TryGetValue "Accept" with
-            | true, v -> v.ToString()
-            | _ -> ""
+        let method = ctx.Request.Method
 
-        match AcceptNegotiation.negotiate acceptHeader with
-        | AcceptNegotiation.PassThrough -> next.Invoke ctx
-        | AcceptNegotiation.NotAcceptable ->
-            logger.LogDebug("LinkedDataMiddleware: 406 for Accept: {Accept}", acceptHeader)
-            Serializers.respond406 ctx
-        | AcceptNegotiation.Serve mediaType ->
-            logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
+        if not (HttpMethods.IsGet method || HttpMethods.IsHead method) then
+            next.Invoke ctx
+        else
 
-            let effective =
-                match ctx.GetEndpoint() with
-                | null -> config
-                | ep ->
-                    let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
-                    if isNull (box meta) then config else meta
+            let acceptHeader =
+                match ctx.Request.Headers.TryGetValue "Accept" with
+                | true, v -> v.ToString()
+                | _ -> ""
 
-            let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+            match AcceptNegotiation.negotiate acceptHeader with
+            | AcceptNegotiation.PassThrough -> next.Invoke ctx
+            | AcceptNegotiation.NotAcceptable ->
+                logger.LogDebug("LinkedDataMiddleware: 406 for Accept: {Accept}", acceptHeader)
+                Serializers.respond406 ctx
+            | AcceptNegotiation.Serve mediaType ->
+                let endpointConfig =
+                    match ctx.GetEndpoint() with
+                    | null -> None
+                    | ep ->
+                        let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
+                        if isNull (box meta) then None else Some meta
 
-            let effectiveGraph =
-                match effective.GraphFactory with
-                | Some factory -> factory origin
-                | None -> effective.Graph
+                match endpointConfig with
+                | None -> next.Invoke ctx
+                | Some effective ->
+                    logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
+                    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
 
-            match mediaType with
-            | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
-            | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
-            | "application/ld+json" -> Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
-            | _ -> next.Invoke ctx
+                    let effectiveGraph =
+                        match effective.GraphFactory with
+                        | Some factory -> factory ctx
+                        | None -> effective.Graph
+
+                    match mediaType with
+                    | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
+                    | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
+                    | "application/ld+json" ->
+                        Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
+                    | _ -> next.Invoke ctx
