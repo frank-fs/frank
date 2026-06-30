@@ -68,8 +68,10 @@ let private addActivity (g: IGraph) (record: ProvenanceRecord) (activity: INode)
         (u g ProvVocabulary.Http.StatusCodeValue)
         (lit g (string record.StatusCode) ProvVocabulary.Xsd.Integer)
 
-    for (iri, value) in record.BodyAttributes do
-        assertT g activity (u g iri) (plain g value)
+    for (iri, attrValue) in record.BodyAttributes do
+        match attrValue with
+        | Literal v -> assertT g activity (u g iri) (plain g v)
+        | IriNode valueIri -> assertT g activity (u g iri) (u g valueIri)
 
 let private addAgent (g: IGraph) (record: ProvenanceRecord) (agent: INode) =
     let rdfType = u g ProvVocabulary.Rdf.Type

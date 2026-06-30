@@ -22,17 +22,6 @@ let private xsdOf (typeName: string) : XsdDatatype option =
     | "DateTime" -> Some XsdDateTime
     | _ -> None
 
-// ── IRI ownership check ───────────────────────────────────────────────────────
-
-/// Returns true if the given absolute IRI starts with the namespace URI
-/// of any prefix that is in the `Using` set (i.e., is an external vocabulary).
-let private isExternalIri (using: Set<string>) (prefixes: Map<string, Uri>) (iri: Uri) : bool =
-    using
-    |> Set.exists (fun prefix ->
-        match Map.tryFind prefix prefixes with
-        | None -> false
-        | Some ns -> iri.AbsoluteUri.StartsWith(ns.AbsoluteUri, StringComparison.Ordinal))
-
 // ── PropertyShape projection ──────────────────────────────────────────────────
 
 let private projectProperty (path: Uri) (rf: ResolvedField) : Result<PropertyShape, string> =
@@ -89,7 +78,7 @@ let private projectClassShape
             |> List.filter (fun f ->
                 match f.Iri with
                 | None -> false
-                | Some iri -> isExternalIri using prefixes iri)
+                | Some iri -> EmitterShared.isExternalIri using prefixes iri)
 
         match projectProperties externalFields with
         | Error e -> Error e
@@ -116,7 +105,7 @@ let private projectHostRelativeProps
         |> List.choose (fun f ->
             match f.Iri with
             | None -> None
-            | Some iri when not (isExternalIri using prefixes iri) ->
+            | Some iri when not (EmitterShared.isExternalIri using prefixes iri) ->
                 let relPath = iri.AbsolutePath + iri.Fragment
                 Some(classIri, relPath, f.ConstraintPattern)
             | _ -> None)

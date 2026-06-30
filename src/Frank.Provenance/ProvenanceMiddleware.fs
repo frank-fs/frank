@@ -18,11 +18,18 @@ module private ProvNegotiation =
 [<RequireQualifiedAccess>]
 module private BodyCapture =
 
-    let private isAbsoluteIri (s: string) =
-        s.StartsWith("http://", StringComparison.Ordinal)
-        || s.StartsWith("https://", StringComparison.Ordinal)
+    // AC3/security: prefix check alone accepts malformed IRIs (e.g. "http://[invalid") that
+    // pass into UriFactory.Create and throw UriFormatException → 500. Use Uri.TryCreate instead.
+    let private isAbsoluteIri (logger: ILogger) (s: string) =
+        let mutable uri = Unchecked.defaultof<Uri>
 
-    let private extractFromJson (json: string) : (string * string) list =
+        if Uri.TryCreate(s, UriKind.Absolute, &uri) then
+            true
+        else
+            logger.LogWarning("ProvenanceMiddleware: dropping body key '{Key}' — not a valid absolute IRI", s)
+            false
+
+    let private extractFromJson (logger: ILogger) (json: string) : (string * string) list =
         try
             use doc = JsonDocument.Parse json
 
@@ -31,7 +38,7 @@ module private BodyCapture =
             else
                 doc.RootElement.EnumerateObject()
                 |> Seq.choose (fun p ->
-                    if isAbsoluteIri p.Name && p.Value.ValueKind = JsonValueKind.String then
+                    if isAbsoluteIri logger p.Name && p.Value.ValueKind = JsonValueKind.String then
                         Some(p.Name, p.Value.GetString())
                     else
                         None)
@@ -42,7 +49,7 @@ module private BodyCapture =
     // Read request body for provenance capture, then reset Position to 0 so the downstream
     // handler can read it. Must be called BEFORE next.Invoke. leaveOpen=true prevents the
     // StreamReader from disposing ctx.Request.Body.
-    let readAndResetAsync (ctx: HttpContext) : Task<(string * string) list> =
+    let readAndResetAsync (ctx: HttpContext) (logger: ILogger) : Task<(string * string) list> =
         if ctx.Request.Method <> "POST" || not ctx.Request.Body.CanSeek then
             Task.FromResult []
         else
@@ -59,7 +66,7 @@ module private BodyCapture =
                     if String.IsNullOrEmpty json then
                         []
                     else
-                        extractFromJson json
+                        extractFromJson logger json
             }
 
 [<RequireQualifiedAccess>]
@@ -112,6 +119,29 @@ module private Capture =
     let absoluteUri (ctx: HttpContext) =
         ctx.Request.Scheme + "://" + ctx.Request.Host.Value + ctx.Request.Path.Value
 
+    let private origin (ctx: HttpContext) =
+        ctx.Request.Scheme + "://" + ctx.Request.Host.Value
+
+    // AC4: if a body attribute's property IRI has a class range (app-owned vocab term),
+    // convert the raw string value to a URI node by resolving it against the class namespace.
+    // E.g. "/tictactoe#square" → class ns "/tictactoe#" → "TopLeft" → IRI "origin/tictactoe#TopLeft".
+    let private toBodyAttrValue
+        (originStr: string)
+        (classRanges: Map<string, string>)
+        (iri: string)
+        (rawValue: string)
+        : BodyAttributeValue =
+        let mutable uri = Unchecked.defaultof<Uri>
+
+        if not (Uri.TryCreate(iri, UriKind.Absolute, &uri)) then
+            Literal rawValue
+        else
+            let relPath = uri.AbsolutePath + uri.Fragment
+
+            match Map.tryFind relPath classRanges with
+            | None -> Literal rawValue
+            | Some classNs -> IriNode(originStr + classNs + rawValue)
+
     let private resolveAgent (ctx: HttpContext) : ProvAgent =
         let name =
             if not (isNull ctx.User) && not (isNull ctx.User.Identity) then
@@ -138,6 +168,7 @@ module private Capture =
         : ProvenanceRecord =
         let endpoint = ctx.GetEndpoint()
         let domainType = resolveDomainType endpoint config ctx.Response.StatusCode
+        let originStr = origin ctx
 
         { Id = "urn:uuid:" + Guid.NewGuid().ToString()
           ResourceUri = absoluteUri ctx
@@ -147,7 +178,9 @@ module private Capture =
           Agent = resolveAgent ctx
           StartedAt = started
           EndedAt = ended
-          BodyAttributes = bodyAttrs }
+          BodyAttributes =
+            bodyAttrs
+            |> List.map (fun (iri, rawValue) -> iri, toBodyAttrValue originStr config.PropertyClassRanges iri rawValue) }
 
 type ProvenanceMiddleware
     (next: RequestDelegate, config: ProvenanceConfig, store: IProvenanceStore, logger: ILogger<ProvenanceMiddleware>) =
@@ -175,7 +208,7 @@ type ProvenanceMiddleware
 
     member private this.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
         task {
-            let! bodyAttrs = BodyCapture.readAndResetAsync ctx
+            let! bodyAttrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
             do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
 
             let ended = DateTimeOffset.UtcNow
@@ -207,9 +240,18 @@ type ProvenanceMiddleware
         else
             let resourceUri = Capture.absoluteUri ctx
 
+            // PROV-AQ §4.1: target = provenance document, anchor = described resource.
+            // The type= param is not defined by PROV-AQ and was removed (it was misleading).
+            let provenanceUri =
+                ctx.Request.Scheme
+                + "://"
+                + ctx.Request.Host.Value
+                + "/provenance?resource="
+                + Uri.EscapeDataString resourceUri
+
             let linkHeaderValue =
                 StringValues(
-                    $"<{resourceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; type=\"application/ld+json\""
+                    $"<{provenanceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; anchor=\"{resourceUri}\""
                 )
 
             let varyValue = StringValues "Accept"
@@ -217,7 +259,7 @@ type ProvenanceMiddleware
             ctx.Response.Headers.Append("Link", linkHeaderValue)
 
             task {
-                let! bodyAttrs = BodyCapture.readAndResetAsync ctx
+                let! bodyAttrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
                 do! next.Invoke ctx
                 let ended = DateTimeOffset.UtcNow
                 store.Append(Capture.build config ctx started ended bodyAttrs)

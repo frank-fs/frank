@@ -47,6 +47,7 @@ let private buildProvConfig (classIri: string) : ProvenanceConfig =
     { ProvClasses =
         Map.ofList [ typeof<OrderPlaced>.FullName.Replace('+', '.'), (ProvOClass.Activity, Some(Uri classIri)) ]
       KnownNamespaces = [| "https://schema.org/" |]
+      PropertyClassRanges = Map.empty
       StoreConfig = ProvenanceStoreConfig.defaults }
 
 let private buildLinkedDataConfig (classIri: string) : LinkedDataConfig =

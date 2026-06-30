@@ -17,6 +17,7 @@ let orderProvConfig () : ProvenanceConfig =
             [ typeof<OrderPlaced>.FullName.Replace('+', '.'),
               (Frank.Semantic.ProvOClass.Activity, Some(Uri "https://schema.org/OrderAction")) ]
       KnownNamespaces = [| "https://schema.org/" |]
+      PropertyClassRanges = Map.empty
       StoreConfig = ProvenanceStoreConfig.defaults }
 
 let startProvenanceServer (config: ProvenanceConfig) =

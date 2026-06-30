@@ -780,6 +780,10 @@ type SemanticTests() =
 
                 if p.ValueKind = JsonValueKind.Object && p.TryGetProperty("@value", &v) then
                     Some(v.GetString())
+                elif p.ValueKind = JsonValueKind.Object && p.TryGetProperty("@id", &v) then
+                    let s = v.GetString()
+                    let hashIdx = s.LastIndexOf '#'
+                    if hashIdx >= 0 then Some(s.Substring(hashIdx + 1)) else Some s
                 else
                     None
 
@@ -1154,16 +1158,13 @@ type SemanticTests() =
             Assert.That(finished, Is.True, "Game did not finish via discovery")
             Assert.That(moveLog.Count, Is.GreaterThan 0, "No moves were logged")
 
-            // provenanceResourceUrl is the DISCOVERED moves resource URI — NOT hardcoded.
+            // provenanceResourceUrl is the DISCOVERED provenance document URL — NOT hardcoded.
             Assert.That(provenanceResourceUrl, Is.Not.Empty, "has_provenance link never captured")
 
-            // ── Phase 4: Fetch lineage via the discovered resource URL ────────
-            // has_provenance link points to the moves resource URI; /provenance?resource=<that URI>
-            // returns all captured records for that resource.
-            let lineageQuery =
-                sprintf "/provenance?resource=%s" (Uri.EscapeDataString provenanceResourceUrl)
-
-            let! lineageResp = ctx.GetAsync lineageQuery
+            // ── Phase 4: Follow the discovered has_provenance Link directly ───
+            // PROV-AQ §4.1: the Link target IS the provenance document URL.
+            // Do NOT reconstruct the URL — use the discovered link as-is.
+            let! lineageResp = ctx.GetAsync provenanceResourceUrl
             Assert.That(lineageResp.Status, Is.EqualTo 200, "Provenance lineage endpoint not 200")
             let! lineageBody = lineageResp.TextAsync()
 

@@ -60,6 +60,7 @@ let tests =
               let emptyConfig: Frank.Provenance.ProvenanceConfig =
                   { ProvClasses = Map.empty
                     KnownNamespaces = [||]
+                    PropertyClassRanges = Map.empty
                     StoreConfig = Frank.Provenance.ProvenanceStoreConfig.defaults }
 
               use app = startProvenanceServer emptyConfig
@@ -123,4 +124,44 @@ let tests =
                   (linkValues
                    |> List.exists (fun v -> v.Contains "http://www.w3.org/ns/prov#has_provenance"))
                   "Link: has_provenance rel present on pass-through"
+          }
+
+          testCaseAsync "Link has_provenance target is provenance doc with anchor= resource (AC1 / PROV-AQ)"
+          <| async {
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/no-produces") |> Async.AwaitTask
+              let linkValues = resp.Headers.GetValues("Link") |> Seq.toList
+              let provLink = linkValues |> List.tryFind (fun v -> v.Contains "has_provenance")
+              Expect.isSome provLink "has_provenance Link header must be present"
+              let link = provLink.Value
+              Expect.isTrue (link.Contains "/provenance?resource=") "Link target must point to provenance doc"
+              Expect.isTrue (link.Contains "anchor=") "Link must carry anchor= param (PROV-AQ §4.1)"
+              Expect.isFalse (link.Contains "; type=") "Link must not carry spurious type= param"
+          }
+
+          testCaseAsync "malformed IRI key in POST body is dropped — no 500 (AC3 / security)"
+          <| async {
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Post, "/orders")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              req.Content <-
+                  new System.Net.Http.StringContent(
+                      """{"http://[invalid":"bad-value","https://schema.org/agent":"Alice"}""",
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              Expect.isTrue (int resp.StatusCode < 500) "malformed IRI key must not cause 500"
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.stringContains body "Alice" "valid attribute is still captured after dropping malformed key"
+              Expect.isFalse (body.Contains "invalid") "malformed key must be dropped from output"
           } ]

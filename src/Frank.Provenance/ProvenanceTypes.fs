@@ -4,6 +4,10 @@ open System
 
 type ProvAgent = { Id: string; Label: string option }
 
+type BodyAttributeValue =
+    | Literal of string
+    | IriNode of string
+
 type ProvenanceRecord =
     { Id: string
       ResourceUri: string
@@ -13,7 +17,7 @@ type ProvenanceRecord =
       Agent: ProvAgent
       StartedAt: DateTimeOffset
       EndedAt: DateTimeOffset
-      BodyAttributes: (string * string) list }
+      BodyAttributes: (string * BodyAttributeValue) list }
 
 type ProvenanceStoreConfig =
     { MaxRecords: int
@@ -27,4 +31,5 @@ module ProvenanceStoreConfig =
 type ProvenanceConfig =
     { ProvClasses: Map<string, Frank.Semantic.ProvOClass * Uri option>
       KnownNamespaces: string[]
+      PropertyClassRanges: Map<string, string>
       StoreConfig: ProvenanceStoreConfig }

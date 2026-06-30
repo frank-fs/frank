@@ -23,6 +23,7 @@ module GeneratedProvenanceResolver =
     let private buildConfig
         (entries: (string * (string * string)) list)
         (ns: string[])
+        (classRanges: Map<string, string>)
         : Result<ProvenanceConfig, string> =
         let folded =
             (Ok [], entries)
@@ -36,19 +37,29 @@ module GeneratedProvenanceResolver =
         |> Result.map (fun pairs ->
             { ProvClasses = Map.ofList pairs
               KnownNamespaces = ns
+              PropertyClassRanges = classRanges
               StoreConfig = ProvenanceStoreConfig.defaults })
 
-    let private readConfig (t: Type) : Result<(string * (string * string)) list * string[], string> =
+    let private readConfig
+        (t: Type)
+        : Result<(string * (string * string)) list * string[] * Map<string, string>, string> =
         match
             readStaticProp<(string * (string * string)) list> "provClasses" t,
             readStaticProp<string[]> "knownNamespaces" t
         with
-        | Ok entries, Ok ns -> Ok(entries, ns)
+        | Ok entries, Ok ns ->
+            let classRanges =
+                match readStaticProp<(string * string) list> "propertyClassRanges" t with
+                | Ok pairs -> Map.ofList pairs
+                | Error _ -> Map.empty
+
+            Ok(entries, ns, classRanges)
         | Error e, _ -> Error e
         | _, Error e -> Error e
 
     let resolveFromType (t: Type) : Result<ProvenanceConfig, string> =
-        readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns)
+        readConfig t
+        |> Result.bind (fun (entries, ns, classRanges) -> buildConfig entries ns classRanges)
 
     let resolveGeneratedConfig (assemblies: Assembly[]) : Result<ProvenanceConfig, string> =
         if isNull assemblies then
@@ -56,4 +67,6 @@ module GeneratedProvenanceResolver =
 
         assemblies
         |> findSinglePublicType "GeneratedProvenance"
-        |> Result.bind (fun t -> readConfig t |> Result.bind (fun (entries, ns) -> buildConfig entries ns))
+        |> Result.bind (fun t ->
+            readConfig t
+            |> Result.bind (fun (entries, ns, classRanges) -> buildConfig entries ns classRanges))

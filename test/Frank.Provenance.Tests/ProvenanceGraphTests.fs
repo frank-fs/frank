@@ -40,11 +40,27 @@ let tests =
               let r =
                   { rec0 (Some(ProvOClass.Activity, Uri "https://schema.org/OrderAction")) with
                       BodyAttributes =
-                        [ "https://schema.org/agent", "alice"
-                          "https://schema.org/object", "order-1" ] }
+                        [ "https://schema.org/agent", Literal "alice"
+                          "https://schema.org/object", Literal "order-1" ] }
 
               let g = ProvenanceGraph.toJsonLd r
               Expect.stringContains g "schema.org/agent" "schema:agent IRI in body attrs"
               Expect.stringContains g "alice" "schema:agent value in body attrs"
               Expect.stringContains g "schema.org/object" "schema:object IRI in body attrs"
+          }
+
+          test "class-ranged body attribute emits URI node not plain literal (AC4)" {
+              let squareIri = "http://localhost/tictactoe#square"
+              let valueIri = "http://localhost/tictactoe#TopLeft"
+
+              let r =
+                  { rec0 (Some(ProvOClass.Activity, Uri "https://schema.org/OrderAction")) with
+                      BodyAttributes =
+                        [ squareIri, IriNode valueIri
+                          "https://schema.org/agent", Literal "alice" ] }
+
+              let g = ProvenanceGraph.toJsonLd r
+              Expect.stringContains g "tictactoe#TopLeft" "URI node IRI present in JSON-LD"
+              Expect.stringContains g "alice" "literal value still present"
+              Expect.isFalse (g.Contains "\"TopLeft\"") "TopLeft must not appear as standalone plain literal"
           } ]
