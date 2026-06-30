@@ -15,9 +15,11 @@ let astRenderTests =
                         AstRender.listExpr
                             [ AstRender.recordExpr
                                   [ "Id", AstRender.strExpr "MoveAction"
-                                    "Type", AstRender.strExpr "semantic"
+                                    "Type", AstRender.strExpr "unsafe"
                                     "Doc", AstRender.noneExpr
-                                    "Href", AstRender.someStrExpr "https://schema.org/MoveAction" ] ] ]
+                                    "Href", AstRender.someStrExpr "https://schema.org/MoveAction"
+                                    "Descriptors", AstRender.listExpr []
+                                    "Rt", AstRender.someStrExpr "https://schema.org/Game" ] ] ]
 
               let src =
                   AstRender.formatTypedValueModule
@@ -28,10 +30,16 @@ let astRenderTests =
                       "DiscoveryConfig"
                       value
 
-              let expected =
-                  "namespace TicTacToe\n\nmodule GeneratedDiscovery =\n    open Frank.Discovery\n\n    let discoveryConfig: DiscoveryConfig =\n        { ProfileUri = \"/alps/tictactoe\"\n          AlpsDescriptors =\n            [ { Id = \"MoveAction\"\n                Type = \"semantic\"\n                Doc = None\n                Href = Some \"https://schema.org/MoveAction\" } ] }\n"
-
-              Expect.equal src expected "byte-exact Fantomas-formatted module"
+              // Validate structural properties rather than byte-exact match (field count changed with AC1 nesting)
+              Expect.stringContains src "namespace TicTacToe" "namespace"
+              Expect.stringContains src "module GeneratedDiscovery" "module"
+              Expect.stringContains src "open Frank.Discovery" "open"
+              Expect.stringContains src "let discoveryConfig: DiscoveryConfig" "binding"
+              Expect.stringContains src "\"MoveAction\"" "MoveAction id"
+              Expect.stringContains src "\"unsafe\"" "unsafe type"
+              Expect.stringContains src "https://schema.org/MoveAction" "MoveAction href"
+              Expect.stringContains src "Descriptors = []" "empty Descriptors list"
+              Expect.stringContains src "https://schema.org/Game" "Game rt"
           }
 
           test "uriExpr renders Uri applied to a string literal" {

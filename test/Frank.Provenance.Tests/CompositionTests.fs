@@ -266,7 +266,9 @@ let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
         [ { Id = "OrderAction"
             Type = "semantic"
             Doc = None
-            Href = Some classIri } ]
+            Href = Some classIri
+            Descriptors = []
+            Rt = None } ]
       DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ] }
 
 let private startDiscoveryServer (discConfig: DiscoveryConfig) =

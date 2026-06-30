@@ -468,7 +468,7 @@ let excludedMappingTests =
 let projectionTests =
     testList
         "DiscoveryEmitter — typed projection (tier 1)"
-        [ test "projectDiscovery yields typed descriptors for class + fields (tier 1)" {
+        [ test "projectDiscovery: MoveAction top-level; rowIndex nested as child" {
               let model =
                   ResolvedModel.build schemaRegistry ticTacToeLock
                   |> function
@@ -477,17 +477,25 @@ let projectionTests =
 
               let descriptors, links = DiscoveryEmitter.projectDiscovery Set.empty model
 
-              Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "type descriptor present"
+              // MoveAction is at the top level
+              Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "MoveAction top-level present"
 
-              Expect.contains
-                  (descriptors |> List.map (fun d -> d.Href))
-                  (Some "https://schema.org/MoveAction")
-                  "type href present"
+              let moveAction =
+                  descriptors |> List.find (fun d -> d.Id = "MoveAction")
 
+              // MoveAction's href is present
+              Expect.equal moveAction.Href (Some "https://schema.org/MoveAction") "MoveAction href"
+
+              // rowIndex is NESTED inside MoveAction, not flat
               Expect.contains
-                  (descriptors |> List.map (fun d -> d.Href))
+                  (moveAction.Children |> List.map (fun d -> d.Href))
                   (Some "https://schema.org/rowIndex")
-                  "field href for rowIndex present"
+                  "rowIndex nested under MoveAction"
+
+              // rowIndex is NOT at the top-level flat list
+              Expect.isFalse
+                  (descriptors |> List.exists (fun d -> d.Id = "rowIndex"))
+                  "rowIndex must not be a flat top-level descriptor"
 
               Expect.isNonEmpty links "describedBy links present"
           } ]
@@ -602,4 +610,250 @@ let relativeHrefTests =
 
               Expect.isOk src "emit should succeed"
               Expect.stringContains (unwrapOk src) "https://schema.org/MoveAction" "MoveAction href unchanged"
+          } ]
+
+// ── Fixture: ex: declared-only variant with cell (for AT-S7 rename) ──────────
+
+let private exDeclaredOnlyLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.empty
+      DeclaredPrefixes =
+        Map.ofList
+            [ "ex", "https://example.org/ex#" ]
+      Mappings =
+        [ { FSharpType = "TicTacToe.Model.Game"
+            Iri = Some "ex:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Id"
+                      Iri = Some "ex:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] }
+          { FSharpType = "TicTacToe.Model.MoveRequest"
+            Iri = Some "ex:MoveAction"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Position"
+                      Iri = Some "ex:cell"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed }
+                    { Name = "Player"
+                      Iri = Some "ex:agent"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+// ── #4 AC1: ALPS nesting — MoveAction contains its field descriptors ────────
+
+[<Tests>]
+let nestingTests =
+    testList
+        "DiscoveryEmitter — #4 ALPS nesting (AC1)"
+        [ test "MoveAction descriptor type is unsafe (not semantic)" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              // In the generated F# record literal, the MoveAction entry must carry Type = "unsafe"
+              Expect.stringContains source "\"unsafe\"" "MoveAction descriptor type must be unsafe"
+          }
+
+          test "MoveAction has Rt pointing to schema:Game (return type)" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              // The MoveAction descriptor Rt must point to the schema:Game IRI
+              Expect.stringContains
+                  source
+                  "https://schema.org/Game"
+                  "MoveAction Rt must point to schema:Game"
+              Expect.stringContains source "Rt = Some" "MoveAction must have Rt = Some ..."
+          }
+
+          test "field descriptors nested under MoveAction — no flat-sibling rowIndex at top level" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+              // Top-level descriptors should only be class descriptors (Game, MoveAction)
+              // Field descriptors (rowIndex, columnIndex, agent) are Children, not top-level
+              let topLevelIds = descriptors |> List.map (fun d -> d.Id)
+              Expect.isFalse (List.contains "rowIndex" topLevelIds) "rowIndex must not be top-level"
+              Expect.isFalse (List.contains "columnIndex" topLevelIds) "columnIndex must not be top-level"
+              Expect.isFalse (List.contains "agent" topLevelIds) "agent must not be top-level (nested under MoveAction)"
+          }
+
+          test "MoveAction descriptor has children with rowIndex, columnIndex, agent" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let moveAction =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction descriptor not found")
+
+              let childIds = moveAction.Children |> List.map (fun d -> d.Id)
+              Expect.contains childIds "rowIndex" "rowIndex child present"
+              Expect.contains childIds "columnIndex" "columnIndex child present"
+              Expect.contains childIds "agent" "agent child present"
+          }
+
+          test "MoveAction IsAction = true; Game IsAction = false" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let game =
+                  descriptors |> List.tryFind (fun d -> d.Id = "Game") |> Option.defaultWith (fun () -> failwith "Game not found")
+
+              let moveAction =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction not found")
+
+              Expect.isFalse game.IsAction "Game is not an action"
+              Expect.isTrue moveAction.IsAction "MoveAction is an action"
+          }
+
+          test "MoveAction Rt = Some schema:Game href; Game Rt = None" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let game =
+                  descriptors |> List.tryFind (fun d -> d.Id = "Game") |> Option.defaultWith (fun () -> failwith "Game not found")
+
+              let moveAction =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction not found")
+
+              Expect.isNone game.Rt "Game has no Rt"
+              Expect.equal moveAction.Rt (Some "https://schema.org/Game") "MoveAction Rt = schema:Game"
+          }
+
+          test "ex:cell lock: MoveAction has child cell (not square)" {
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty exDeclaredOnlyLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let moveAction =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction not found")
+
+              let childIds = moveAction.Children |> List.map (fun d -> d.Id)
+              Expect.contains childIds "cell" "cell child present (renamed from square)"
+              Expect.isFalse (List.contains "square" childIds) "square must NOT be present (renamed to cell)"
+          }
+
+          test "AlpsSerializer emits nested descriptor array under MoveAction" {
+              let nested: Frank.Discovery.AlpsDescriptor =
+                  { Id = "square"
+                    Type = "semantic"
+                    Doc = None
+                    Href = Some "/ttt#square"
+                    Descriptors = []
+                    Rt = None }
+
+              let action: Frank.Discovery.AlpsDescriptor =
+                  { Id = "MoveAction"
+                    Type = "unsafe"
+                    Doc = None
+                    Href = Some "https://schema.org/MoveAction"
+                    Descriptors = [ nested ]
+                    Rt = Some "https://schema.org/Game" }
+
+              let json = Frank.Discovery.AlpsSerializer.serialize [ action ]
+              use doc = System.Text.Json.JsonDocument.Parse json
+              let mutable alpsEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              let mutable descEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+              let found =
+                  doc.RootElement.TryGetProperty("alps", &alpsEl)
+                  && alpsEl.TryGetProperty("descriptor", &descEl)
+
+              Expect.isTrue found "ALPS descriptor array present"
+
+              let moveActionEl =
+                  descEl.EnumerateArray()
+                  |> Seq.tryFind (fun d ->
+                      let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+                      d.TryGetProperty("id", &idEl) && idEl.GetString() = "MoveAction")
+                  |> Option.defaultWith (fun () -> failwith "MoveAction not in ALPS")
+
+              let mutable nestedEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              Expect.isTrue (moveActionEl.TryGetProperty("descriptor", &nestedEl)) "MoveAction has nested descriptor array"
+              let mutable rtEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              Expect.isTrue (moveActionEl.TryGetProperty("rt", &rtEl)) "MoveAction has rt property"
+              Expect.equal (rtEl.GetString()) "https://schema.org/Game" "rt = schema:Game"
+          }
+
+          test "AlpsSerializer: leaf descriptors have no descriptor array (clean output)" {
+              let leaf: Frank.Discovery.AlpsDescriptor =
+                  { Id = "Game"
+                    Type = "semantic"
+                    Doc = None
+                    Href = Some "https://schema.org/Game"
+                    Descriptors = []
+                    Rt = None }
+
+              let json = Frank.Discovery.AlpsSerializer.serialize [ leaf ]
+              use doc = System.Text.Json.JsonDocument.Parse json
+              let mutable alpsEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              let mutable descEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+              doc.RootElement.TryGetProperty("alps", &alpsEl) |> ignore
+              alpsEl.TryGetProperty("descriptor", &descEl) |> ignore
+
+              let gameEl =
+                  descEl.EnumerateArray()
+                  |> Seq.tryFind (fun d ->
+                      let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+                      d.TryGetProperty("id", &idEl) && idEl.GetString() = "Game")
+                  |> Option.defaultWith (fun () -> failwith "Game not in ALPS")
+
+              let mutable nestedEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              Expect.isFalse (gameEl.TryGetProperty("descriptor", &nestedEl)) "leaf Game has no nested descriptor array"
+              let mutable rtEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              Expect.isFalse (gameEl.TryGetProperty("rt", &rtEl)) "leaf Game has no rt"
           } ]

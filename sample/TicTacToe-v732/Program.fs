@@ -116,10 +116,14 @@ let private gameHandler (ctx: HttpContext) =
         do! writeJson ctx (wireJson game.Id game.Result)
     }
 
+let rec private findDescriptorHrefIn (id: string) (descriptors: Frank.Discovery.AlpsDescriptor list) : string option =
+    descriptors
+    |> List.tryPick (fun d ->
+        if d.Id = id then d.Href
+        else findDescriptorHrefIn id d.Descriptors)
+
 let private findDescriptorHref (id: string) =
-    TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
-    |> List.tryFind (fun d -> d.Id = id)
-    |> Option.bind (fun d -> d.Href)
+    findDescriptorHrefIn id TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
     |> Option.defaultWith (fun () -> invalidOp $"ALPS descriptor '{id}' not found in discoveryConfig")
 
 let private agentRelIri = findDescriptorHref "agent"

@@ -409,7 +409,7 @@
       "fields": [
         {
           "name": "Position",
-          "iri": "ex:square",
+          "iri": "ex:cell",
           "confidence": 1,
           "source": "manual",
           "status": "confirmed"

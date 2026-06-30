@@ -1,13 +1,16 @@
 namespace Frank.Discovery
 
-/// One ALPS descriptor entry. `Type` is "semantic" for resources/fields, or
-/// "safe"/"unsafe"/"idempotent" for HTTP-method action descriptors. No
-/// state/transition nesting — per-role projection is Track A (v7.4.0).
+/// One ALPS descriptor entry. `Type` is "semantic" for data descriptors or
+/// "unsafe" for action descriptors (e.g. schema:MoveAction). `Descriptors` holds
+/// nested field/input descriptors (AC1: field-shape nesting). `Rt` is the return
+/// type IRI for action descriptors. Per-role state/transition nesting is Track A.
 type AlpsDescriptor =
     { Id: string
       Type: string
       Doc: string option
-      Href: string option }
+      Href: string option
+      Descriptors: AlpsDescriptor list
+      Rt: string option }
 
 /// One JSON Home resource directory entry. Relation is a vocabulary IRI.
 type JsonHomeResource =

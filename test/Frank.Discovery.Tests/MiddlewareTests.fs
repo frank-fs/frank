@@ -54,13 +54,17 @@ let private tttVocabConfig =
       HomeRoute = "/"
       AlpsDescriptors =
         [ { Id = "MoveAction"
-            Type = "semantic"
+            Type = "unsafe"
             Doc = None
-            Href = Some "https://schema.org/MoveAction" }
-          { Id = "square"
-            Type = "semantic"
-            Doc = None
-            Href = Some "/tictactoe#square" } ]
+            Href = Some "https://schema.org/MoveAction"
+            Descriptors =
+              [ { Id = "square"
+                  Type = "semantic"
+                  Doc = None
+                  Href = Some "/tictactoe#square"
+                  Descriptors = []
+                  Rt = None } ]
+            Rt = Some "https://schema.org/Game" } ]
       DescribedByLinks = [] }
 
 [<Tests>]
@@ -78,23 +82,37 @@ let dereferenceTests =
               let alps = doc.RootElement.GetProperty("alps")
               let descriptors = alps.GetProperty("descriptor")
 
-              let squareHref =
+              // After AC1 nesting, square is inside MoveAction.descriptor — not top-level.
+              let moveActionEl =
                   descriptors.EnumerateArray()
                   |> Seq.tryPick (fun d ->
-                      if d.TryGetProperty("id", ref (Unchecked.defaultof<JsonElement>)) then
-                          let id = d.GetProperty("id").GetString()
+                      let mutable idEl = Unchecked.defaultof<JsonElement>
 
-                          if id = "square" then
-                              d.TryGetProperty("href")
-                              |> function
-                                  | true, h -> Some(h.GetString())
-                                  | false, _ -> None
-                          else
-                              None
+                      if d.TryGetProperty("id", &idEl) && idEl.GetString() = "MoveAction" then
+                          Some d
                       else
                           None)
 
-              Expect.isSome squareHref "square descriptor has href"
+              Expect.isSome moveActionEl "MoveAction descriptor present at top level"
+              let mutable nestedDescEl = Unchecked.defaultof<JsonElement>
+
+              Expect.isTrue
+                  (moveActionEl.Value.TryGetProperty("descriptor", &nestedDescEl))
+                  "MoveAction has nested descriptor array"
+
+              let squareHref =
+                  nestedDescEl.EnumerateArray()
+                  |> Seq.tryPick (fun d ->
+                      let mutable idEl = Unchecked.defaultof<JsonElement>
+
+                      if d.TryGetProperty("id", &idEl) && idEl.GetString() = "square" then
+                          let mutable hEl = Unchecked.defaultof<JsonElement>
+
+                          if d.TryGetProperty("href", &hEl) then Some(hEl.GetString()) else None
+                      else
+                          None)
+
+              Expect.isSome squareHref "square nested descriptor has href"
               Expect.equal squareHref.Value "/tictactoe#square" "href is host-relative"
 
           testCase "GET /tictactoe (relative IRI dereference, strip fragment) → 200 (item #6)"

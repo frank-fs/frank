@@ -84,29 +84,89 @@ type SemanticTests() =
         acc |> Seq.toList
 
     /// Return the href of the ALPS descriptor whose id matches localId, or None.
-    /// Navigates alps.descriptor directly — no unbounded recursion.
+    /// Searches nested descriptors recursively; depth bounded by ALPS document structure.
     static member private AlpsDescriptorHrefByLocalId(alpsBody: string, localId: string) : string option =
         use doc = JsonDocument.Parse alpsBody
-        let mutable result: string option = None
         let mutable alpsEl = Unchecked.defaultof<JsonElement>
         let mutable descriptorEl = Unchecked.defaultof<JsonElement>
+
+        let matchHref (d: JsonElement) : string option =
+            let mutable idEl = Unchecked.defaultof<JsonElement>
+            let mutable hrefEl = Unchecked.defaultof<JsonElement>
+
+            if
+                d.TryGetProperty("id", &idEl)
+                && idEl.GetString() = localId
+                && d.TryGetProperty("href", &hrefEl)
+            then
+                hrefEl.GetString() |> Option.ofObj
+            else
+                None
+
+        let rec findIn (arr: JsonElement) : string option =
+            arr.EnumerateArray()
+            |> Seq.tryPick (fun d ->
+                match matchHref d with
+                | Some h -> Some h
+                | None ->
+                    let mutable nestedEl = Unchecked.defaultof<JsonElement>
+
+                    if d.TryGetProperty("descriptor", &nestedEl) then
+                        findIn nestedEl
+                    else
+                        None)
 
         if
             doc.RootElement.TryGetProperty("alps", &alpsEl)
             && alpsEl.TryGetProperty("descriptor", &descriptorEl)
         then
-            for d in descriptorEl.EnumerateArray() do
-                let mutable idEl = Unchecked.defaultof<JsonElement>
-                let mutable hrefEl = Unchecked.defaultof<JsonElement>
+            findIn descriptorEl
+        else
+            None
 
-                if
-                    d.TryGetProperty("id", &idEl)
-                    && idEl.GetString() = localId
-                    && d.TryGetProperty("href", &hrefEl)
-                then
-                    result <- hrefEl.GetString() |> Option.ofObj
+    /// Find the non-agent input of the ALPS 'unsafe' (action) descriptor by role.
+    /// Returns the origin-resolved absolute IRI of the nested field whose href is NOT agentIri.
+    /// Relative hrefs are resolved using originBase. Returns None when no such field exists.
+    static member private FindMoveInputByRole
+        (alpsBody: string, agentIri: string, originBase: string)
+        : string option =
+        use doc = JsonDocument.Parse alpsBody
+        let mutable alpsEl = Unchecked.defaultof<JsonElement>
+        let mutable descriptorEl = Unchecked.defaultof<JsonElement>
 
-        result
+        let resolveHref (h: string) =
+            if h.StartsWith "/" then originBase + h else h
+
+        let fieldHref (d: JsonElement) : string option =
+            let mutable hEl = Unchecked.defaultof<JsonElement>
+
+            if d.TryGetProperty("href", &hEl) then
+                hEl.GetString() |> Option.ofObj |> Option.map resolveHref
+            else
+                None
+
+        if
+            not (
+                doc.RootElement.TryGetProperty("alps", &alpsEl)
+                && alpsEl.TryGetProperty("descriptor", &descriptorEl)
+            )
+        then
+            None
+        else
+            descriptorEl.EnumerateArray()
+            |> Seq.tryPick (fun d ->
+                let mutable typeEl = Unchecked.defaultof<JsonElement>
+                let mutable nestedEl = Unchecked.defaultof<JsonElement>
+                let isAction = d.TryGetProperty("type", &typeEl) && typeEl.GetString() = "unsafe"
+
+                if not isAction || not (d.TryGetProperty("descriptor", &nestedEl)) then
+                    None
+                else
+                    nestedEl.EnumerateArray()
+                    |> Seq.tryPick (fun field ->
+                        match fieldHref field with
+                        | Some h when h <> agentIri -> Some h
+                        | _ -> None))
 
     /// Parse schema:actionStatus IRI from the game's expanded JSON-LD @graph body.
     /// Returns the actionStatus value IRI, or "" when not found.
@@ -543,18 +603,18 @@ type SemanticTests() =
                     sprintf "seeAlso target did not resolve: %s" seeAlsoUri
                 )
 
-            // ── Phase 5: Identify inputs by absolute IRI — NOT by field name ────
-            // A meaningless mapping (schema:position, schema:Action) would not
-            // have these IRIs and the test would fail here.
+            // ── Phase 5: Identify inputs by absolute IRI and structural role ────
+            // agentIri is found by its well-known schema.org IRI.
+            // squareIri is found by ROLE — the MoveAction nested field that is NOT
+            // the agent — so the client survives term renames (AC2).
             let agentIri =
                 descriptorHrefs
                 |> List.tryFind (fun h -> h = "https://schema.org/agent")
                 |> Option.defaultWith (fun () -> failwith "ALPS missing agent IRI (https://schema.org/agent)")
 
             let squareIri =
-                descriptorHrefs
-                |> List.tryFind (fun h -> h.Contains "tictactoe#square")
-                |> Option.defaultWith (fun () -> failwith "ALPS missing square IRI (tictactoe#square)")
+                SemanticTests.FindMoveInputByRole(alpsBody, agentIri, originBase)
+                |> Option.defaultWith (fun () -> failwith "ALPS MoveAction has no non-agent nested descriptor")
 
             let classIri =
                 descriptorHrefs
@@ -800,10 +860,10 @@ type SemanticTests() =
 
             Assert.That(alpsBody.Contains "/ex#", Is.True, "ex: server ALPS does not contain ex: namespace IRIs")
 
-            // ── Phase 3: Discovery navigator — find IRIs by local name ──────────
-            // Vocab-neutral: looks up ALPS descriptor by id (local name), reads
-            // whatever href the server chose. Works for schema: OR ex: servers.
-            // Relative hrefs are resolved to origin-absolute before use.
+            // ── Phase 3: Discovery navigator — find IRIs by role and local name ──
+            // Vocab-neutral: looks up descriptors without hardcoding vocab IRIs.
+            // squareIri is found by ROLE (not by local-name) so the client survives
+            // the ex:square → ex:cell rename (AC2+AC3).
             let exOriginBase = (ExServer.Url()).TrimEnd('/')
 
             let agentIri =
@@ -811,21 +871,27 @@ type SemanticTests() =
                 |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
                 |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='agent'")
 
-            let squareIri =
-                SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "square")
-                |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
-                |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='square'")
-
             let classIri =
                 SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "MoveAction")
                 |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
                 |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='MoveAction'")
 
+            // Role-based: the nested MoveAction field that is NOT the agent (AC2+AC3).
+            // Must NOT use a literal "square" or "ex:square" lookup — proves rename resilience.
+            let squareIri =
+                SemanticTests.FindMoveInputByRole(alpsBody, agentIri, exOriginBase)
+                |> Option.defaultWith (fun () -> failwith "ALPS MoveAction has no non-agent nested descriptor")
+
             // Confirm the server actually served ex: IRIs (not schema.org).
-            // Host-relative hrefs resolve to origin-absolute; the path contains "/ex#".
             Assert.That(agentIri.Contains "/ex#", Is.True, "agentIri not in ex: namespace")
             Assert.That(squareIri.Contains "/ex#", Is.True, "squareIri not in ex: namespace")
             Assert.That(classIri.Contains "/ex#", Is.True, "classIri not in ex: namespace")
+            // AC3: the renamed term (ex:cell) must be exercised — discovered by role, not by name.
+            Assert.That(
+                squareIri.Contains "cell",
+                Is.True,
+                "squareIri does not contain 'cell' — ex:square → ex:cell rename was not exercised by role-based selection"
+            )
 
             // ── Phase 4: Navigate JSON Home for game and move URLs ──────────────
             let! home =

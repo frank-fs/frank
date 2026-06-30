@@ -54,11 +54,15 @@ let sampleConfig =
         [ { Id = "Game"
             Type = "semantic"
             Doc = None
-            Href = Some "https://schema.org/Game" }
+            Href = Some "https://schema.org/Game"
+            Descriptors = []
+            Rt = None }
           { Id = "agent"
             Type = "semantic"
             Doc = None
-            Href = Some "https://schema.org/agent" } ]
+            Href = Some "https://schema.org/agent"
+            Descriptors = []
+            Rt = None } ]
       DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ] }
 
 /// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.

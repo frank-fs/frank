@@ -19,7 +19,12 @@ let private localName (iri: string) : string =
 
 // ── Descriptor builders ───────────────────────────────────────────────────────
 
-type internal ResolvedDescriptor = { Id: string; Href: string option }
+type internal ResolvedDescriptor =
+    { Id: string
+      Href: string option
+      IsAction: bool
+      Rt: string option
+      Children: ResolvedDescriptor list }
 
 let private hrefOption (href: string) : string option =
     if String.IsNullOrEmpty href then None else Some href
@@ -45,35 +50,53 @@ let private hrefFor (bases: Set<string>) (absoluteUri: string) : string =
         let uri = Uri(absoluteUri)
         uri.PathAndQuery + uri.Fragment
 
-/// Resolve the type-level descriptor for one ResolvedResource. Returns None if ClassIri is absent.
-let private typeDescriptor (bases: Set<string>) (r: ResolvedResource) : ResolvedDescriptor option =
-    r.ClassIri
+/// True when the IRI local name ends in "Action" (ALPS unsafe transition convention).
+let private isActionIri (absoluteUri: string) : bool =
+    (localName absoluteUri).EndsWith("Action")
+
+/// Build a leaf field descriptor; returns None when the field has no IRI.
+let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDescriptor option =
+    f.Iri
     |> Option.map (fun uri ->
         let absolute = uri.AbsoluteUri
-        let href = hrefFor bases absolute
 
         { Id = localName absolute
-          Href = hrefOption href })
+          Href = hrefOption (hrefFor bases absolute)
+          IsAction = false
+          Rt = None
+          Children = [] })
 
-/// Resolve field descriptors for one resource; skip fields with no Iri.
-let private fieldDescriptors (bases: Set<string>) (fields: ResolvedField list) : ResolvedDescriptor list =
-    fields
-    |> List.choose (fun f ->
-        f.Iri
+/// Collect all class-level descriptors. Each class descriptor carries its field
+/// descriptors as Children (AC1 nesting). Action classes (IRI ends in "Action")
+/// get Type="unsafe" and Rt = the href of the first confirmed record (non-union,
+/// non-action) class — the primary domain resource the action operates on.
+let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
+    let firstNonActionHref =
+        resources
+        |> List.tryPick (fun r ->
+            r.ClassIri
+            |> Option.bind (fun uri ->
+                let isAction = isActionIri uri.AbsoluteUri
+                let isUnion = r.UnionCaseCount > 0
+
+                if not isAction && not isUnion then
+                    Some(hrefFor bases uri.AbsoluteUri)
+                else
+                    None))
+
+    resources
+    |> List.choose (fun r ->
+        r.ClassIri
         |> Option.map (fun uri ->
             let absolute = uri.AbsoluteUri
-            let href = hrefFor bases absolute
+            let isAction = isActionIri absolute
+            let children = r.Fields |> List.choose (fieldDescriptor bases)
 
             { Id = localName absolute
-              Href = hrefOption href }))
-
-/// Collect all descriptors from all resources in dependency order: each type then its fields.
-let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
-    resources
-    |> List.collect (fun r ->
-        let typeDs = typeDescriptor bases r |> Option.toList
-        let fieldDs = fieldDescriptors bases r.Fields
-        typeDs @ fieldDs)
+              Href = hrefOption (hrefFor bases absolute)
+              IsAction = isAction
+              Rt = if isAction then firstNonActionHref else None
+              Children = children }))
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.
 let private collectDescribedByLinks (resources: ResolvedResource list) : string list =
@@ -104,12 +127,14 @@ let internal projectDiscovery
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
 
-let private descriptorExpr (d: ResolvedDescriptor) =
+let rec private descriptorExpr (d: ResolvedDescriptor) =
     AstRender.recordExpr
         [ "Id", AstRender.strExpr d.Id
-          "Type", AstRender.strExpr "semantic"
+          "Type", AstRender.strExpr (if d.IsAction then "unsafe" else "semantic")
           "Doc", AstRender.noneExpr
-          "Href", AstRender.optionExpr AstRender.strExpr d.Href ]
+          "Href", AstRender.optionExpr AstRender.strExpr d.Href
+          "Descriptors", AstRender.listExpr (d.Children |> List.map descriptorExpr)
+          "Rt", AstRender.optionExpr AstRender.strExpr d.Rt ]
 
 let private configExpr (profileUri: string) (descriptors: ResolvedDescriptor list) (links: string list) =
     AstRender.recordExpr

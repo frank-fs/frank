@@ -16,7 +16,9 @@ type GeneratedDiscovery private () =
             [ { Id = "TestResource"
                 Type = "semantic"
                 Doc = None
-                Href = Some "https://schema.org/Thing" } ]
+                Href = Some "https://schema.org/Thing"
+                Descriptors = []
+                Rt = None } ]
           DescribedByLinks = [] }
 
 /// Type missing the discoveryConfig property — tests member-resolution error path.
