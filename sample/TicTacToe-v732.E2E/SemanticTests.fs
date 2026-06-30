@@ -383,9 +383,14 @@ type SemanticTests() =
                 let path = Uri(localHref).AbsolutePath
                 let! r = ctx.GetAsync(originBase + path)
 
-                Assert.That(r.Status, Is.EqualTo 200, sprintf "local vocab resource not served at %s" (originBase + path))
+                Assert.That(
+                    r.Status,
+                    Is.EqualTo 200,
+                    sprintf "local vocab resource not served at %s" (originBase + path)
+                )
 
                 let! tttBody = r.TextAsync()
+
                 Assert.That(
                     tttBody.Contains "ttt:square" || tttBody.Contains "tictactoe#square",
                     Is.True,
@@ -660,31 +665,34 @@ type SemanticTests() =
                 "ex: server ALPS still references schema.org — hardcoded schema.org client would not fail"
             )
 
-            Assert.That(
-                alpsBody.Contains "example.org/ex",
-                Is.True,
-                "ex: server ALPS does not contain ex: namespace IRIs"
-            )
+            Assert.That(alpsBody.Contains "/ex#", Is.True, "ex: server ALPS does not contain ex: namespace IRIs")
 
             // ── Phase 3: Discovery navigator — find IRIs by local name ──────────
             // Vocab-neutral: looks up ALPS descriptor by id (local name), reads
             // whatever href the server chose. Works for schema: OR ex: servers.
+            // Relative hrefs are resolved to origin-absolute before use.
+            let exOriginBase = (ExServer.Url()).TrimEnd('/')
+
             let agentIri =
                 SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "agent")
+                |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
                 |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='agent'")
 
             let squareIri =
                 SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "square")
+                |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
                 |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='square'")
 
             let classIri =
                 SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "MoveAction")
+                |> Option.map (fun h -> if h.StartsWith "/" then exOriginBase + h else h)
                 |> Option.defaultWith (fun () -> failwith "ALPS missing descriptor id='MoveAction'")
 
             // Confirm the server actually served ex: IRIs (not schema.org).
-            Assert.That(agentIri.Contains "example.org/ex", Is.True, "agentIri not in ex: namespace")
-            Assert.That(squareIri.Contains "example.org/ex", Is.True, "squareIri not in ex: namespace")
-            Assert.That(classIri.Contains "example.org/ex", Is.True, "classIri not in ex: namespace")
+            // Host-relative hrefs resolve to origin-absolute; the path contains "/ex#".
+            Assert.That(agentIri.Contains "/ex#", Is.True, "agentIri not in ex: namespace")
+            Assert.That(squareIri.Contains "/ex#", Is.True, "squareIri not in ex: namespace")
+            Assert.That(classIri.Contains "/ex#", Is.True, "classIri not in ex: namespace")
 
             // ── Phase 4: Navigate JSON Home for game and move URLs ──────────────
             let! home =

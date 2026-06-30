@@ -121,21 +121,23 @@ let private findDescriptorHref (id: string) =
     |> Option.bind (fun d -> d.Href)
     |> Option.defaultWith (fun () -> invalidOp $"ALPS descriptor '{id}' not found in discoveryConfig")
 
-let private agentIri = findDescriptorHref "agent"
-let private squareIri = findDescriptorHref "square"
+let private agentRelIri = findDescriptorHref "agent"
+let private squareRelIri = findDescriptorHref "square"
+
+let private resolveRelativeIri (origin: string) (iri: string) =
+    if iri.StartsWith "/" then origin + iri else iri
 
 let private isLdJson (ctx: HttpContext) =
     let ct = ctx.Request.ContentType
     ct <> null && ct.Contains("application/ld+json")
 
-let private parseMoveFromDoc (isLd: bool) (doc: JsonNode) =
+let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
+    let sq = resolveRelativeIri origin squareRelIri
+    let ag = resolveRelativeIri origin agentRelIri
+
     if isLd then
-        let pos =
-            doc.[squareIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
-
-        let plr =
-            doc.[agentIri] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
-
+        let pos = doc.[sq] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+        let plr = doc.[ag] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
         pos, plr
     else
         let pos =
@@ -153,7 +155,8 @@ let private moveHandler (ctx: HttpContext) =
         let! body = reader.ReadToEndAsync()
         let doc = JsonNode.Parse body
         let ld = isLdJson ctx
-        let position, player = parseMoveFromDoc ld doc
+        let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+        let position, player = parseMoveFromDoc origin ld doc
 
         match position, player with
         | Some pos, Some plr ->
@@ -218,6 +221,7 @@ let private movesResource =
 let private tttVocabResource =
     resource "/tictactoe" {
         name "TttVocabulary"
+
         linkedDataGraphWith
             { Graph = tttVocabGraph
               JsonLdContext = """{"@context":{"ttt":"https://example.org/tictactoe#"}}"""
