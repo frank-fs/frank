@@ -1,8 +1,13 @@
 module Frank.Provenance.Tests.MiddlewareTests
 
+open System
+open System.IO
 open System.Net.Http
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.Primitives
 open Expecto
+open Frank.Provenance
 open Frank.Provenance.Tests.MiddlewareTestHelpers
 
 [<Tests>]
@@ -164,4 +169,66 @@ let tests =
               let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
               Expect.stringContains body "Alice" "valid attribute is still captured after dropping malformed key"
               Expect.isFalse (body.Contains "invalid") "malformed key must be dropped from output"
+          }
+
+          testCaseAsync
+              "malformed Host with class-ranged value degrades to Literal in store — value-IRI sink guarded (security: Host vector)"
+          <| async {
+              // PropertyClassRanges maps "/square" → "/tictactoe#", so body value "TopLeft"
+              // becomes IriNode(originStr + "/tictactoe#" + "TopLeft").  When Host is
+              // "ex ample.com" (space), originStr is "http://ex ample.com" — an invalid URI —
+              // and the unguarded path would pass IriNode("http://ex ample.com/tictactoe#TopLeft")
+              // to UriFactory.Create which throws UriFormatException.
+              let config =
+                  { orderProvConfig() with
+                      PropertyClassRanges = Map.ofList [ "/square", "/tictactoe#" ] }
+
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore config captureStore
+              let server = app.GetTestServer()
+
+              let bodyBytes =
+                  System.Text.Encoding.UTF8.GetBytes """{"https://schema.org/square":"TopLeft"}"""
+
+              // Inject malformed Host directly via TestServer.SendAsync, bypassing HTTP
+              // parsing that would otherwise normalise or reject the host.
+              // The store.Append call inside the middleware happens before toJsonLd runs, so
+              // the record IS captured even when the downstream entity-URI path (issue #17)
+              // also throws with a malformed Host.
+              let! _ =
+                  server.SendAsync(
+                      Action<HttpContext>(fun ctx ->
+                          ctx.Request.Method <- "POST"
+                          ctx.Request.Scheme <- "http"
+                          ctx.Request.Host <- HostString "ex ample.com"
+                          ctx.Request.Path <- PathString "/orders"
+                          ctx.Request.Headers.Add("Accept", StringValues "application/ld+json; profile=\"http://www.w3.org/ns/prov\"")
+                          ctx.Request.Headers.Add("Content-Type", StringValues "application/json")
+                          ctx.Request.Body <- new MemoryStream(bodyBytes)
+                          ctx.Request.ContentLength <- Nullable(int64 bodyBytes.Length))
+                  )
+                  |> Async.AwaitTask
+                  |> Async.Catch
+
+              let records = captureStore.Records
+
+              Expect.hasLength
+                  records
+                  1
+                  "store.Append is called before toJsonLd — record captured even when entity URI also throws"
+
+              let bodyAttrs = records[0].BodyAttributes
+
+              let squareAttr =
+                  bodyAttrs |> List.tryFind (fun (iri, _) -> iri.Contains "square")
+
+              Expect.isSome squareAttr "class-ranged body attribute must be present in captured record"
+
+              let (_, attrValue) = squareAttr.Value
+
+              match attrValue with
+              | Literal v -> Expect.equal v "TopLeft" "value degraded to Literal — value-IRI sink is guarded"
+              | IriNode iri ->
+                  failtest
+                      $"expected Literal but store has IriNode '{iri}' — value-IRI sink is unguarded"
           } ]

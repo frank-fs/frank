@@ -1,6 +1,7 @@
 module Frank.Provenance.Tests.MiddlewareTestHelpers
 
 open System
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
@@ -20,19 +21,16 @@ let orderProvConfig () : ProvenanceConfig =
       PropertyClassRanges = Map.empty
       StoreConfig = ProvenanceStoreConfig.defaults }
 
-let startProvenanceServer (config: ProvenanceConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
+type CapturingStore() =
+    let records = System.Collections.Concurrent.ConcurrentBag<ProvenanceRecord>()
+    member _.Records = records |> Seq.toList
 
-    builder.Services.AddSingleton<IProvenanceStore>(fun sp ->
-        let loggerFactory =
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+    interface IProvenanceStore with
+        member _.Append r = records.Add r
+        member _.QueryByResource _ = Task.FromResult []
+        member _.QueryByAgent _ = Task.FromResult []
 
-        new MailboxProcessorProvenanceStore(config.StoreConfig, loggerFactory.CreateLogger("prov")) :> IProvenanceStore)
-    |> ignore
-
-    let app = builder.Build()
+let private configureProvenanceApp (app: WebApplication) : unit =
     app.UseMiddleware<ProvenanceMiddleware>() |> ignore
 
     app
@@ -55,5 +53,29 @@ let startProvenanceServer (config: ProvenanceConfig) =
     )
     |> ignore
 
+let startProvenanceServer (config: ProvenanceConfig) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(config) |> ignore
+
+    builder.Services.AddSingleton<IProvenanceStore>(fun sp ->
+        let loggerFactory =
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+
+        new MailboxProcessorProvenanceStore(config.StoreConfig, loggerFactory.CreateLogger("prov")) :> IProvenanceStore)
+    |> ignore
+
+    let app = builder.Build()
+    configureProvenanceApp app
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+let startProvenanceServerWithStore (config: ProvenanceConfig) (store: IProvenanceStore) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    let app = builder.Build()
+    configureProvenanceApp app
     app.StartAsync().GetAwaiter().GetResult()
     app

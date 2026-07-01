@@ -125,7 +125,10 @@ module private Capture =
     // AC4: if a body attribute's property IRI has a class range (app-owned vocab term),
     // convert the raw string value to a URI node by resolving it against the class namespace.
     // E.g. "/tictactoe#square" → class ns "/tictactoe#" → "TopLeft" → IRI "origin/tictactoe#TopLeft".
+    // Security: validate the fully-constructed value IRI before returning IriNode — a malformed
+    // Host header makes originStr invalid, so the concatenated IRI must be re-checked.
     let private toBodyAttrValue
+        (logger: ILogger)
         (originStr: string)
         (classRanges: Map<string, string>)
         (iri: string)
@@ -140,7 +143,19 @@ module private Capture =
 
             match Map.tryFind relPath classRanges with
             | None -> Literal rawValue
-            | Some classNs -> IriNode(originStr + classNs + rawValue)
+            | Some classNs ->
+                let valueIriStr = originStr + classNs + rawValue
+                let mutable valueUri = Unchecked.defaultof<Uri>
+
+                if Uri.TryCreate(valueIriStr, UriKind.Absolute, &valueUri) then
+                    IriNode valueIriStr
+                else
+                    logger.LogWarning(
+                        "ProvenanceMiddleware: class-range value IRI '{ValueIri}' is not a valid absolute IRI — degrading to literal",
+                        valueIriStr
+                    )
+
+                    Literal rawValue
 
     let private resolveAgent (ctx: HttpContext) : ProvAgent =
         let name =
@@ -160,6 +175,7 @@ module private Capture =
         { Id = id; Label = Some name }
 
     let build
+        (logger: ILogger)
         (config: ProvenanceConfig)
         (ctx: HttpContext)
         (started: DateTimeOffset)
@@ -180,7 +196,8 @@ module private Capture =
           EndedAt = ended
           BodyAttributes =
             bodyAttrs
-            |> List.map (fun (iri, rawValue) -> iri, toBodyAttrValue originStr config.PropertyClassRanges iri rawValue) }
+            |> List.map (fun (iri, rawValue) ->
+                iri, toBodyAttrValue logger originStr config.PropertyClassRanges iri rawValue) }
 
 type ProvenanceMiddleware
     (next: RequestDelegate, config: ProvenanceConfig, store: IProvenanceStore, logger: ILogger<ProvenanceMiddleware>) =
@@ -212,7 +229,7 @@ type ProvenanceMiddleware
             do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
 
             let ended = DateTimeOffset.UtcNow
-            let record = Capture.build config ctx started ended bodyAttrs
+            let record = Capture.build (logger :> ILogger) config ctx started ended bodyAttrs
             store.Append record
 
             if ctx.Response.HasStarted then
@@ -262,5 +279,5 @@ type ProvenanceMiddleware
                 let! bodyAttrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
                 do! next.Invoke ctx
                 let ended = DateTimeOffset.UtcNow
-                store.Append(Capture.build config ctx started ended bodyAttrs)
+                store.Append(Capture.build (logger :> ILogger) config ctx started ended bodyAttrs)
             }
