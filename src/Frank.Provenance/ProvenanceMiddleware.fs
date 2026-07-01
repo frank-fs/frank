@@ -46,11 +46,14 @@ module private BodyCapture =
         with :? JsonException ->
             []
 
+    let isBodyBearing (method: string) =
+        method = "POST" || method = "PUT" || method = "PATCH"
+
     // Read request body for provenance capture, then reset Position to 0 so the downstream
     // handler can read it. Must be called BEFORE next.Invoke. leaveOpen=true prevents the
     // StreamReader from disposing ctx.Request.Body.
     let readAndResetAsync (ctx: HttpContext) (logger: ILogger) : Task<(string * string) list> =
-        if ctx.Request.Method <> "POST" || not ctx.Request.Body.CanSeek then
+        if not (isBodyBearing ctx.Request.Method) || not ctx.Request.Body.CanSeek then
             Task.FromResult []
         else
             task {
@@ -161,7 +164,6 @@ module private Capture =
         { Id = id; Label = Some name }
 
     let build
-        (logger: ILogger)
         (config: ProvenanceConfig)
         (ctx: HttpContext)
         (started: DateTimeOffset)
@@ -209,13 +211,14 @@ type ProvenanceMiddleware
                 ctx.Response.Body <- originalBody
         }
 
-    member private this.InvokeWithProv(ctx: HttpContext, started: DateTimeOffset) : Task =
+    member private this.InvokeWithProv
+        (ctx: HttpContext, started: DateTimeOffset, bodyAttrs: (string * string) list)
+        : Task =
         task {
-            let! bodyAttrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
             do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
 
             let ended = DateTimeOffset.UtcNow
-            let record = Capture.build (logger :> ILogger) config ctx started ended bodyAttrs
+            let record = Capture.build config ctx started ended bodyAttrs
             store.Append record
 
             if ctx.Response.HasStarted then
@@ -232,41 +235,58 @@ type ProvenanceMiddleware
                 do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
         }
 
+    member private this.InvokeNonProv
+        (ctx: HttpContext, started: DateTimeOffset, bodyAttrs: (string * string) list)
+        : Task =
+        let resourceUri = Capture.absoluteUri ctx
+
+        // PROV-AQ §4.1: target = provenance document, anchor = described resource.
+        // The type= param is not defined by PROV-AQ and was removed (it was misleading).
+        let provenanceUri =
+            ctx.Request.Scheme
+            + "://"
+            + ctx.Request.Host.Value
+            + "/provenance?resource="
+            + Uri.EscapeDataString resourceUri
+
+        let linkHeaderValue =
+            StringValues(
+                $"<{provenanceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; anchor=\"{resourceUri}\""
+            )
+
+        ctx.Response.Headers.Append("Vary", StringValues "Accept")
+        ctx.Response.Headers.Append("Link", linkHeaderValue)
+
+        task {
+            do! next.Invoke ctx
+            let ended = DateTimeOffset.UtcNow
+            store.Append(Capture.build config ctx started ended bodyAttrs)
+        }
+
     member private this.InvokeCore(ctx: HttpContext) : Task =
         let started = DateTimeOffset.UtcNow
 
-        if ctx.Request.Method = "POST" then
-            ctx.Request.EnableBuffering()
+        if BodyCapture.isBodyBearing ctx.Request.Method then
+            Frank.RequestBodyBuffer.enable config.MaxBodyBytes ctx.Request
 
-        if ProvNegotiation.requested ctx then
-            this.InvokeWithProv(ctx, started)
-        else
-            let resourceUri = Capture.absoluteUri ctx
+        task {
+            let! bodyAttrsOpt =
+                task {
+                    try
+                        let! attrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
+                        return Some attrs
+                    with :? System.IO.IOException ->
+                        return None
+                }
 
-            // PROV-AQ §4.1: target = provenance document, anchor = described resource.
-            // The type= param is not defined by PROV-AQ and was removed (it was misleading).
-            let provenanceUri =
-                ctx.Request.Scheme
-                + "://"
-                + ctx.Request.Host.Value
-                + "/provenance?resource="
-                + Uri.EscapeDataString resourceUri
-
-            let linkHeaderValue =
-                StringValues(
-                    $"<{provenanceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; anchor=\"{resourceUri}\""
-                )
-
-            let varyValue = StringValues "Accept"
-            ctx.Response.Headers.Append("Vary", varyValue)
-            ctx.Response.Headers.Append("Link", linkHeaderValue)
-
-            task {
-                let! bodyAttrs = BodyCapture.readAndResetAsync ctx (logger :> ILogger)
-                do! next.Invoke ctx
-                let ended = DateTimeOffset.UtcNow
-                store.Append(Capture.build (logger :> ILogger) config ctx started ended bodyAttrs)
-            }
+            match bodyAttrsOpt with
+            | None -> do! Frank.RequestBodyBuffer.respond413 ctx
+            | Some bodyAttrs ->
+                if ProvNegotiation.requested ctx then
+                    do! this.InvokeWithProv(ctx, started, bodyAttrs)
+                else
+                    do! this.InvokeNonProv(ctx, started, bodyAttrs)
+        }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with

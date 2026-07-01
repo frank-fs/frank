@@ -182,7 +182,32 @@ let tests =
               let (resp: HttpResponseMessage) = postLdJson client invalidOrderBody
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.stringContains body "@context" "422 report has @context"
-              Expect.stringContains body "shacl#" "422 report context includes shacl# namespace" ]
+              Expect.stringContains body "shacl#" "422 report context includes shacl# namespace"
+
+          testCase "downstream IOException is NOT converted to 413 by ValidationMiddleware (narrow-catch guard)"
+          <| fun _ ->
+              // RED before fix: broad IOException catch wraps next.Invoke inside validateAndRespond →
+              //   handler IOException is caught and returns 413.
+              // GREEN after fix: narrow catch covers only readBody → handler IOException
+              //   propagates out of the middleware (not 413).
+              use app = startValidationServerWithThrowingEndpoint ()
+              use client = app.GetTestClient()
+              let mutable statusCode = 0
+
+              try
+                  let content =
+                      new System.Net.Http.StringContent(
+                          """{"@context":"https://schema.org"}""",
+                          System.Text.Encoding.UTF8,
+                          "application/ld+json"
+                      )
+
+                  let resp = client.PostAsync("/throw-io", content).GetAwaiter().GetResult()
+                  statusCode <- int resp.StatusCode
+              with _ ->
+                  statusCode <- 0
+
+              Expect.notEqual statusCode 413 "downstream IOException must propagate, not become 413" ]
 
 [<Tests>]
 let hostRelativePropertyTests =

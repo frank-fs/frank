@@ -32,4 +32,8 @@ type ProvenanceConfig =
     { ProvClasses: Map<string, Frank.Semantic.ProvOClass * Uri option>
       KnownNamespaces: string[]
       PropertyClassRanges: Map<string, string>
-      StoreConfig: ProvenanceStoreConfig }
+      StoreConfig: ProvenanceStoreConfig
+      MaxBodyBytes: int64 }
+
+module ProvenanceConfig =
+    let defaultMaxBodyBytes: int64 = Frank.RequestBodyBuffer.defaultMaxBodyBytes

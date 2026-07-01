@@ -38,7 +38,8 @@ module GeneratedProvenanceResolver =
             { ProvClasses = Map.ofList pairs
               KnownNamespaces = ns
               PropertyClassRanges = classRanges
-              StoreConfig = ProvenanceStoreConfig.defaults })
+              StoreConfig = ProvenanceStoreConfig.defaults
+              MaxBodyBytes = ProvenanceConfig.defaultMaxBodyBytes })
 
     let private readConfig
         (t: Type)

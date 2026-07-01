@@ -61,14 +61,6 @@ module private ValidationRespond =
     let respond400 (detail: string) (ctx: HttpContext) : Task =
         Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" detail
 
-    let respond413 (ctx: HttpContext) : Task =
-        Frank.ProblemJson.write
-            ctx
-            413
-            "about:blank"
-            "Payload Too Large"
-            "Request body exceeds the configured maximum size"
-
     let respond422 (reportJsonLd: string) (ctx: HttpContext) : Task =
         ctx.Response.StatusCode <- 422
         ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/shacl#\""
@@ -138,10 +130,21 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             next.Invoke ctx
         else
             task {
-                ctx.Request.EnableBuffering(config.MaxBodyBytes)
+                Frank.RequestBodyBuffer.enable config.MaxBodyBytes ctx.Request
 
-                try
-                    let! body = JsonLdBody.readBody ctx
+                let! bodyOpt =
+                    task {
+                        try
+                            let! body = JsonLdBody.readBody ctx
+                            return Some body
+                        with :? IOException as ex ->
+                            logger.LogDebug(ex, "ValidationMiddleware: body exceeded MaxBodyBytes limit")
+                            return None
+                    }
+
+                match bodyOpt with
+                | None -> do! Frank.RequestBodyBuffer.respond413 ctx
+                | Some body ->
                     ctx.Request.Body.Position <- 0L
 
                     match JsonLdBody.parseToGraph config.ContextLoader body with
@@ -149,7 +152,4 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
                         logger.LogDebug(ex, "ValidationMiddleware: failed to parse ld+json body")
                         do! ValidationRespond.respond400 ex.Message ctx
                     | Ok data -> do! validateAndRespond ctx data
-                with :? IOException as ex ->
-                    logger.LogDebug(ex, "ValidationMiddleware: body exceeded MaxBodyBytes limit")
-                    do! ValidationRespond.respond413 ctx
             }

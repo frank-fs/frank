@@ -49,3 +49,27 @@ let startValidationServer (config: ValidationConfig) =
 
     app.StartAsync().GetAwaiter().GetResult()
     app
+
+let startValidationServerWithThrowingEndpoint () =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let config =
+        { Shapes = Shapes.toShapesGraph []
+          ContextLoader = JsonLdLoader.synthesizing [ "https://schema.org/" ]
+          MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+          HostRelativeProperties = [] }
+
+    builder.Services.AddSingleton(config) |> ignore
+    let app = builder.Build()
+    app.UseMiddleware<ValidationMiddleware>() |> ignore
+
+    app.MapPost(
+        "/throw-io",
+        System.Func<Microsoft.AspNetCore.Http.HttpContext, System.Threading.Tasks.Task>(fun _ ->
+            System.Threading.Tasks.Task.FromException(System.IO.IOException "simulated downstream disk error"))
+    )
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app

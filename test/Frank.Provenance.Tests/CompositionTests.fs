@@ -48,7 +48,8 @@ let private buildProvConfig (classIri: string) : ProvenanceConfig =
         Map.ofList [ typeof<OrderPlaced>.FullName.Replace('+', '.'), (ProvOClass.Activity, Some(Uri classIri)) ]
       KnownNamespaces = [| "https://schema.org/" |]
       PropertyClassRanges = Map.empty
-      StoreConfig = ProvenanceStoreConfig.defaults }
+      StoreConfig = ProvenanceStoreConfig.defaults
+      MaxBodyBytes = ProvenanceConfig.defaultMaxBodyBytes }
 
 let private buildLinkedDataConfig (classIri: string) : LinkedDataConfig =
     let graph = new Graph()

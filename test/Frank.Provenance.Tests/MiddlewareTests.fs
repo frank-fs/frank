@@ -66,7 +66,8 @@ let tests =
                   { ProvClasses = Map.empty
                     KnownNamespaces = [||]
                     PropertyClassRanges = Map.empty
-                    StoreConfig = Frank.Provenance.ProvenanceStoreConfig.defaults }
+                    StoreConfig = Frank.Provenance.ProvenanceStoreConfig.defaults
+                    MaxBodyBytes = Frank.Provenance.ProvenanceConfig.defaultMaxBodyBytes }
 
               use app = startProvenanceServer emptyConfig
               use client = app.GetTestClient()
@@ -207,4 +208,124 @@ let tests =
 
               Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400, not 500"
               Expect.isEmpty captureStore.Records "store.Append must not be called — origin rejected at edge"
+          }
+
+          testCaseAsync "PUT with IRI-keyed body captures provenance attributes (#14)"
+          <| async {
+              // RED before impl: BodyCapture.readAndResetAsync guards on Method<>"POST" →
+              //   body attrs list is empty for PUT → test fails.
+              // GREEN after impl: body-bearing check covers POST/PUT/PATCH → attrs captured.
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Put, "/orders/1")
+
+              req.Content <-
+                  new System.Net.Http.StringContent(
+                      """{"https://schema.org/agent":"Alice"}""",
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! _ = client.SendAsync(req) |> Async.AwaitTask
+              let records = captureStore.Records
+
+              Expect.isNonEmpty records "PUT must produce a provenance record"
+
+              let attrs = records.Head.BodyAttributes
+
+              Expect.isNonEmpty attrs "PUT body IRI attrs must be captured"
+
+              Expect.isTrue
+                  (attrs |> List.exists (fun (iri, _) -> iri.Contains "schema.org/agent"))
+                  "schema:agent IRI captured from PUT body"
+          }
+
+          testCaseAsync "PATCH with IRI-keyed body captures provenance attributes (#14)"
+          <| async {
+              // RED before impl: same guard — PATCH body not captured.
+              // GREEN after impl: PATCH is in body-bearing set.
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Patch, "/orders/1")
+
+              req.Content <-
+                  new System.Net.Http.StringContent(
+                      """{"https://schema.org/agent":"Bob"}""",
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! _ = client.SendAsync(req) |> Async.AwaitTask
+              let records = captureStore.Records
+
+              Expect.isNonEmpty records "PATCH must produce a provenance record"
+
+              let attrs = records.Head.BodyAttributes
+
+              Expect.isNonEmpty attrs "PATCH body IRI attrs must be captured"
+
+              Expect.isTrue
+                  (attrs |> List.exists (fun (iri, _) -> iri.Contains "schema.org/agent"))
+                  "schema:agent IRI captured from PATCH body"
+          }
+
+          testCaseAsync "GET does not capture body attributes (#14 negative)"
+          <| async {
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              use client = app.GetTestClient()
+              let! _ = client.GetAsync("/no-produces") |> Async.AwaitTask
+              let records = captureStore.Records
+
+              Expect.isNonEmpty records "GET must still produce a provenance record"
+
+              Expect.isEmpty records.Head.BodyAttributes "GET must NOT capture body attributes"
+          }
+
+          testCaseAsync "over-limit POST body on provenance path returns 413 (#13)"
+          <| async {
+              // RED before impl: EnableBuffering() has no size limit → over-limit body is
+              //   read successfully → returns prov ld+json (not 413).
+              // GREEN after impl: EnableBuffering(MaxBodyBytes) + IOException catch → 413.
+              let config = { orderProvConfig () with MaxBodyBytes = 64L }
+              use app = startProvenanceServer config
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Post, "/orders")
+
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              req.Content <-
+                  new System.Net.Http.StringContent(
+                      System.String('x', 256),
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 413 "over-limit body on provenance path returns 413"
+          }
+
+          testCaseAsync "downstream IOException propagates and is NOT converted to 413 (narrow-catch guard)"
+          <| async {
+              // RED before fix: broad IOException catch in InvokeCore wraps next.Invoke →
+              //   handler IOException is caught and returns 413.
+              // GREEN after fix: narrow catch covers only readAndResetAsync → handler
+              //   IOException propagates out of the middleware (not 413).
+              use app = startProvenanceServerWithThrowingEndpoint (orderProvConfig ())
+              use client = app.GetTestClient()
+              let mutable statusCode = 0
+
+              try
+                  let! (resp: HttpResponseMessage) = client.GetAsync("/throw-io") |> Async.AwaitTask
+                  statusCode <- int resp.StatusCode
+              with ex ->
+                  statusCode <- 0
+
+              Expect.notEqual statusCode 413 "downstream IOException must propagate, not become 413"
           } ]
