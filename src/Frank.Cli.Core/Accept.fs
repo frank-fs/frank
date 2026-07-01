@@ -391,10 +391,13 @@ let private partitionByIri
     let rejected, ok = List.fold folder ([], []) entries
     List.rev rejected, List.rev ok
 
-let private prefixOfCurie (iri: string) : string option =
-    match iri.IndexOf(':') with
-    | -1 -> None
-    | idx -> Some iri.[.. idx - 1]
+let internal prefixOfCurie (iri: string) : string option =
+    if iri.Contains("://") then
+        None
+    else
+        match iri.IndexOf(':') with
+        | -1 -> None
+        | idx -> Some iri.[.. idx - 1]
 
 let private iriStringsFromEntry (e: ResolvedEntry) : string list =
     let fromFields (fs: ResolvedField list) = fs |> List.choose (fun f -> f.Iri)
@@ -451,12 +454,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
 
     let withIri = notExcluded |> List.filter (fun e -> e.Iri.IsSome)
 
-    let prefixes =
-        let fromVocabs =
-            lf.Vocabularies |> Map.map (fun _ (e: VocabularyEntry) -> System.Uri e.Uri)
-
-        let fromDeclared = lf.DeclaredPrefixes |> Map.map (fun _ uri -> System.Uri uri)
-        Map.fold (fun acc k v -> Map.add k v acc) fromVocabs fromDeclared
+    let prefixes = buildPrefixMap lf.Vocabularies lf.DeclaredPrefixes
 
     let iriRejected, toMerge = partitionByIri prefixes oracle withIri
 

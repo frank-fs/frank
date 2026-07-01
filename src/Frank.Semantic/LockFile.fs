@@ -251,6 +251,15 @@ module LockFile =
                       FetchedAt = fetchedAt
                       Hash = hash })))
 
+    let private parseDeclaredPrefixValue (key: string) (value: JsonNode) : Result<string, string> =
+        match value with
+        | null -> Error $"declaredPrefixes['{key}']: not a string"
+        | v ->
+            try
+                Ok(v.GetValue<string>())
+            with :? InvalidOperationException ->
+                Error $"declaredPrefixes['{key}']: not a string"
+
     let private parseDeclaredPrefixes (node: JsonNode) : Result<Map<string, string>, string> =
         match node with
         | null -> Ok Map.empty
@@ -261,10 +270,9 @@ module LockFile =
                     match acc with
                     | Error e -> Error e
                     | Ok m ->
-                        try
-                            Ok(Map.add kvp.Key (kvp.Value.GetValue<string>()) m)
-                        with _ ->
-                            Error $"declaredPrefixes['{kvp.Key}']: not a string")
+                        match parseDeclaredPrefixValue kvp.Key kvp.Value with
+                        | Error e -> Error e
+                        | Ok v -> Ok(Map.add kvp.Key v m))
                 (Ok Map.empty)
         | _ -> Error "field 'declaredPrefixes' must be an object"
 
@@ -487,6 +495,18 @@ module LockFile =
               Unresolved = 0
               Excluded = 0 }
             mappings
+
+    // ── Prefix utilities ─────────────────────────────────────────────────────
+
+    /// Build the combined prefix map from vocabularies and declared prefixes.
+    /// Declared prefixes take precedence over vocabulary entries on key conflict.
+    let buildPrefixMap
+        (vocabularies: Map<string, VocabularyEntry>)
+        (declaredPrefixes: Map<string, string>)
+        : Map<string, Uri> =
+        let fromVocabs = vocabularies |> Map.map (fun _ entry -> Uri(entry.Uri))
+        let fromDeclared = declaredPrefixes |> Map.map (fun _ uri -> Uri(uri))
+        Map.fold (fun acc k v -> Map.add k v acc) fromVocabs fromDeclared
 
     // ── Pure merge ────────────────────────────────────────────────────────────
 

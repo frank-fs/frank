@@ -1438,3 +1438,25 @@ let acceptTests =
               Expect.equal summary.Rejected [] "no rejections for correct covered-vocab IRI"
               Expect.equal summary.Warnings [] "no warnings when vocab is fetched and term correct"
           } ]
+
+[<Tests>]
+let prefixOfCurieTests =
+    testList
+        "prefixOfCurie"
+        [ testCase "absolute IRI with :// does not yield prefix" <| fun () ->
+              // Before fix: returns Some "http" — wrong (http:// is a scheme, not a CURIE prefix)
+              // After fix: returns None
+              let result = Accept.prefixOfCurie "http://example.org/x"
+              Expect.isNone result "absolute IRI must not be treated as a CURIE"
+
+          testCase "valid CURIE yields the prefix" <| fun () ->
+              let result = Accept.prefixOfCurie "schema:Game"
+              Expect.equal result (Some "schema") "schema:Game prefix is schema"
+
+          testCase "no colon yields None" <| fun () ->
+              let result = Accept.prefixOfCurie "nocolon"
+              Expect.isNone result "no colon → None"
+
+          testCase "https:// absolute IRI also returns None" <| fun () ->
+              let result = Accept.prefixOfCurie "https://schema.org/Thing"
+              Expect.isNone result "https:// absolute IRI must not yield prefix 'https'" ]

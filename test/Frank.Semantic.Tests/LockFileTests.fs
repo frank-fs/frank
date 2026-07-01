@@ -939,6 +939,80 @@ let backCompatNoShapeTests =
                   File.Delete path
           } ]
 
+// ── #19: parseDeclaredPrefixes non-string value handling ─────────────────────
+
+[<Tests>]
+let declaredPrefixesParsingTests =
+    testList
+        "parseDeclaredPrefixes: non-string values"
+        [ test "integer prefix value → Error mentioning 'not a string'" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-04-20T12:00:00Z","vocabularies":{},"declaredPrefixes":{"ex":42},"mappings":[]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for integer prefix value"
+                  | Error msg -> Expect.stringContains msg "not a string" "error mentions 'not a string'"
+              finally
+                  File.Delete path
+          }
+
+          test "null prefix value → Error mentioning 'not a string'" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-04-20T12:00:00Z","vocabularies":{},"declaredPrefixes":{"ex":null},"mappings":[]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for null prefix value"
+                  | Error msg -> Expect.stringContains msg "not a string" "error mentions 'not a string'"
+              finally
+                  File.Delete path
+          }
+
+          test "object prefix value → Error mentioning 'not a string'" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-04-20T12:00:00Z","vocabularies":{},"declaredPrefixes":{"ex":{"nested":"val"}},"mappings":[]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for object prefix value"
+                  | Error msg -> Expect.stringContains msg "not a string" "error mentions 'not a string'"
+              finally
+                  File.Delete path
+          }
+
+          test "valid string prefix value → Ok with correct mapping" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-04-20T12:00:00Z","vocabularies":{},"declaredPrefixes":{"ex":"https://example.org/"},"mappings":[]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Error e -> failtest $"expected Ok for valid string prefix: {e}"
+                  | Ok lf ->
+                      Expect.equal
+                          lf.DeclaredPrefixes
+                          (Map.ofList [ "ex", "https://example.org/" ])
+                          "declared prefix parsed correctly"
+              finally
+                  File.Delete path
+          } ]
+
 // ── Union shape round-trip ────────────────────────────────────────────────────
 
 [<Tests>]
