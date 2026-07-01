@@ -127,9 +127,7 @@ type SemanticTests() =
     /// Find the non-agent input of the ALPS 'unsafe' (action) descriptor by role.
     /// Returns the origin-resolved absolute IRI of the nested field whose href is NOT agentIri.
     /// Relative hrefs are resolved using originBase. Returns None when no such field exists.
-    static member private FindMoveInputByRole
-        (alpsBody: string, agentIri: string, originBase: string)
-        : string option =
+    static member private FindMoveInputByRole(alpsBody: string, agentIri: string, originBase: string) : string option =
         use doc = JsonDocument.Parse alpsBody
         let mutable alpsEl = Unchecked.defaultof<JsonElement>
         let mutable descriptorEl = Unchecked.defaultof<JsonElement>
@@ -369,17 +367,15 @@ type SemanticTests() =
                 Is.True,
                 "JSON-LD game graph lacks schema:actionStatus — serving global ontology instead of game instance"
             )
+
             Assert.That(
                 body.Contains "ActiveActionStatus" || body.Contains "CompletedActionStatus",
                 Is.True,
                 "JSON-LD game graph lacks a schema:ActionStatus individual"
             )
             // ttt: terms are host-resolved (no example.org)
-            Assert.That(
-                body.Contains "tictactoe#",
-                Is.True,
-                "JSON-LD game graph lacks host-resolved ttt: terms"
-            )
+            Assert.That(body.Contains "tictactoe#", Is.True, "JSON-LD game graph lacks host-resolved ttt: terms")
+
             Assert.That(
                 body.Contains "example.org",
                 Is.False,
@@ -414,11 +410,13 @@ type SemanticTests() =
 
             let! turtleBody = turtle.TextAsync()
             Assert.That(turtleBody.Contains "@prefix", Is.True, "text/turtle body is not Turtle syntax")
+
             Assert.That(
                 turtleBody.Contains "actionStatus",
                 Is.True,
                 "Turtle game graph lacks schema:actionStatus — serving global ontology instead of game instance"
             )
+
             Assert.That(
                 turtleBody.Contains "example.org",
                 Is.False,
@@ -582,11 +580,9 @@ type SemanticTests() =
                 Is.True,
                 "Game ld+json lacks schema:actionStatus — serving global ontology instead of game instance"
             )
-            Assert.That(
-                ldBody.Contains "tictactoe#",
-                Is.True,
-                "Game ld+json lacks host-resolved ttt: terms"
-            )
+
+            Assert.That(ldBody.Contains "tictactoe#", Is.True, "Game ld+json lacks host-resolved ttt: terms")
+
             Assert.That(
                 ldBody.Contains "example.org",
                 Is.False,
@@ -656,10 +652,7 @@ type SemanticTests() =
 
             while not finished && turn < 9 do
                 let! stateResp =
-                    ctx.GetAsync(
-                        gameUrl,
-                        APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
-                    )
+                    ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
 
                 let! ldStateBody = stateResp.TextAsync()
                 let actionStatus = SemanticTests.ParseActionStatus(ldStateBody, gameAbsoluteIri)
@@ -667,11 +660,23 @@ type SemanticTests() =
                 if actionStatus = completedStatusIri || actionStatus = failedStatusIri then
                     finished <- true
                 else
-                    let player = SemanticTests.ParseCurrentPlayer(ldStateBody, gameAbsoluteIri, originBase)
-                    let validMoves = SemanticTests.ParseValidMoves(ldStateBody, gameAbsoluteIri, originBase)
+                    let player =
+                        SemanticTests.ParseCurrentPlayer(ldStateBody, gameAbsoluteIri, originBase)
 
-                    Assert.That(player, Is.Not.Empty, sprintf "Turn %d: ttt:currentPlayer not found in game ld+json" turn)
-                    Assert.That(validMoves, Is.Not.Empty, sprintf "Turn %d: ttt:validMoves not found in game ld+json" turn)
+                    let validMoves =
+                        SemanticTests.ParseValidMoves(ldStateBody, gameAbsoluteIri, originBase)
+
+                    Assert.That(
+                        player,
+                        Is.Not.Empty,
+                        sprintf "Turn %d: ttt:currentPlayer not found in game ld+json" turn
+                    )
+
+                    Assert.That(
+                        validMoves,
+                        Is.Not.Empty,
+                        sprintf "Turn %d: ttt:validMoves not found in game ld+json" turn
+                    )
 
                     let square = validMoves |> List.head
 
@@ -783,7 +788,11 @@ type SemanticTests() =
                 elif p.ValueKind = JsonValueKind.Object && p.TryGetProperty("@id", &v) then
                     let s = v.GetString()
                     let hashIdx = s.LastIndexOf '#'
-                    if hashIdx >= 0 then Some(s.Substring(hashIdx + 1)) else Some s
+
+                    if hashIdx >= 0 then
+                        Some(s.Substring(hashIdx + 1))
+                    else
+                        Some s
                 else
                     None
 
@@ -1225,15 +1234,32 @@ type SemanticTests() =
 
             Assert.That(inOrder, Is.True, "REORDERED: activity timestamps not in ascending order")
 
-            // (4) Terminal outcome: the recorded final game state must be Won or Draw.
-            let! finalResp = ctx.GetAsync gameUrl
-            Assert.That(finalResp.Status, Is.EqualTo 200)
-            let! finalJson = finalResp.JsonAsync()
-            let finalStatus = finalJson.Value.GetProperty("status").GetString()
+            // (4) Terminal outcome: cross-check the final game state against the DISCOVERED
+            // outcome IRI from ALPS ('Won' case descriptor href). Not hardcoded.
+            // Note: game-loop state reads (player/validMoves) still use compact JSON via
+            // GetProperty — scoped to AT-S6 per plan; reported here for maintainer visibility.
+            let discoveredCompletedIri =
+                SemanticTests.AlpsDescriptorHrefByLocalId(alpsBody, "Won")
+                |> Option.map (fun h -> if h.StartsWith "/" then s8OriginBase + h else h)
+                |> Option.defaultWith (fun () ->
+                    failwith "ALPS missing 'Won' case descriptor — was outcome emitted by DiscoveryEmitter?")
+
+            let! finalLdResp =
+                ctx.GetAsync(gameUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+
+            Assert.That(finalLdResp.Status, Is.EqualTo 200, "Final ld+json fetch not 200")
+            let! finalLdBody = finalLdResp.TextAsync()
+            let gameAbsoluteIri8 = s8OriginBase + gameUrl
+
+            let finalActionStatus =
+                SemanticTests.ParseActionStatus(finalLdBody, gameAbsoluteIri8)
 
             Assert.That(
-                finalStatus = "Won" || finalStatus = "Draw",
+                finalActionStatus = discoveredCompletedIri,
                 Is.True,
-                sprintf "Game did not reach terminal state: '%s'" finalStatus
+                sprintf
+                    "Terminal outcome IRI '%s' does not match ALPS-discovered CompletedActionStatus '%s'"
+                    finalActionStatus
+                    discoveredCompletedIri
             )
         }

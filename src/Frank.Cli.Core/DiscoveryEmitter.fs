@@ -66,10 +66,21 @@ let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDe
           Rt = None
           Children = [] })
 
-/// Collect all class-level descriptors. Each class descriptor carries its field
-/// descriptors as Children (AC1 nesting). Action classes (IRI ends in "Action")
-/// get Type="unsafe" and Rt = the href of the declared return-type IRI (r.Rt),
-/// which must be set explicitly in the lock file mapping.
+/// Build a leaf case descriptor for a union case.
+let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDescriptor =
+    let absolute = c.Iri.AbsoluteUri
+
+    { Id = c.CaseName
+      Href = hrefOption (hrefFor bases absolute)
+      IsAction = false
+      Rt = None
+      Children = [] }
+
+/// Collect all class-level descriptors. Each class descriptor carries its children:
+/// - Union types: confirmed case descriptors (AC1 #17 — outcome terms discoverable).
+/// - Record types: field descriptors with IRIs (AC1 #4 nesting).
+/// Action classes (IRI ends in "Action") get Type="unsafe" and Rt = the href
+/// of the declared return-type IRI (r.Rt), set explicitly in the lock file.
 let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
     resources
     |> List.choose (fun r ->
@@ -77,7 +88,12 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
         |> Option.map (fun uri ->
             let absolute = uri.AbsoluteUri
             let isAction = isActionIri absolute
-            let children = r.Fields |> List.choose (fieldDescriptor bases)
+
+            let children =
+                if not (List.isEmpty r.Cases) then
+                    r.Cases |> List.map (caseDescriptor bases)
+                else
+                    r.Fields |> List.choose (fieldDescriptor bases)
 
             let rt =
                 if isAction then

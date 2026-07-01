@@ -488,8 +488,7 @@ let projectionTests =
               // MoveAction is at the top level
               Expect.contains (descriptors |> List.map (fun d -> d.Id)) "MoveAction" "MoveAction top-level present"
 
-              let moveAction =
-                  descriptors |> List.find (fun d -> d.Id = "MoveAction")
+              let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
 
               // MoveAction's href is present
               Expect.equal moveAction.Href (Some "https://schema.org/MoveAction") "MoveAction href"
@@ -597,7 +596,11 @@ let relativeHrefTests =
         "DiscoveryEmitter — declared-only prefix emits relative href (item #6)"
         [ test "ttt:square href is host-relative /tictactoe#square — NOT absolute example.org" {
               let src =
-                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+                  DiscoveryEmitter.emit
+                      "TicTacToe.GeneratedDiscovery"
+                      "/alps/tictactoe"
+                      schemaRegistry
+                      tttDeclaredOnlyLock
 
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
@@ -607,7 +610,11 @@ let relativeHrefTests =
 
           test "schema:agent href stays absolute (external vocab not relativised)" {
               let src =
-                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+                  DiscoveryEmitter.emit
+                      "TicTacToe.GeneratedDiscovery"
+                      "/alps/tictactoe"
+                      schemaRegistry
+                      tttDeclaredOnlyLock
 
               Expect.isOk src "emit should succeed"
               Expect.stringContains (unwrapOk src) "https://schema.org/agent" "schema href unchanged"
@@ -615,7 +622,11 @@ let relativeHrefTests =
 
           test "schema:MoveAction type href stays absolute (external vocab)" {
               let src =
-                  DiscoveryEmitter.emit "TicTacToe.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry tttDeclaredOnlyLock
+                  DiscoveryEmitter.emit
+                      "TicTacToe.GeneratedDiscovery"
+                      "/alps/tictactoe"
+                      schemaRegistry
+                      tttDeclaredOnlyLock
 
               Expect.isOk src "emit should succeed"
               Expect.stringContains (unwrapOk src) "https://schema.org/MoveAction" "MoveAction href unchanged"
@@ -627,9 +638,7 @@ let private exDeclaredOnlyLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
       Vocabularies = Map.empty
-      DeclaredPrefixes =
-        Map.ofList
-            [ "ex", "https://example.org/ex#" ]
+      DeclaredPrefixes = Map.ofList [ "ex", "https://example.org/ex#" ]
       Mappings =
         [ { FSharpType = "TicTacToe.Model.Game"
             Iri = Some "ex:Game"
@@ -688,10 +697,7 @@ let nestingTests =
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               // The MoveAction descriptor Rt must point to the schema:Game IRI
-              Expect.stringContains
-                  source
-                  "https://schema.org/Game"
-                  "MoveAction Rt must point to schema:Game"
+              Expect.stringContains source "https://schema.org/Game" "MoveAction Rt must point to schema:Game"
               Expect.stringContains source "Rt = Some" "MoveAction must have Rt = Some ..."
           }
 
@@ -744,7 +750,9 @@ let nestingTests =
               let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
 
               let game =
-                  descriptors |> List.tryFind (fun d -> d.Id = "Game") |> Option.defaultWith (fun () -> failwith "Game not found")
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "Game")
+                  |> Option.defaultWith (fun () -> failwith "Game not found")
 
               let moveAction =
                   descriptors
@@ -766,7 +774,9 @@ let nestingTests =
               let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
 
               let game =
-                  descriptors |> List.tryFind (fun d -> d.Id = "Game") |> Option.defaultWith (fun () -> failwith "Game not found")
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "Game")
+                  |> Option.defaultWith (fun () -> failwith "Game not found")
 
               let moveAction =
                   descriptors
@@ -779,6 +789,7 @@ let nestingTests =
 
           test "ex:cell lock: MoveAction has child cell (not square)" {
               let bases = Set.ofList [ "https://example.org/ex#" ]
+
               let model =
                   ResolvedModel.build VocabularyRegistry.empty exDeclaredOnlyLock
                   |> function
@@ -833,7 +844,11 @@ let nestingTests =
                   |> Option.defaultWith (fun () -> failwith "MoveAction not in ALPS")
 
               let mutable nestedEl = Unchecked.defaultof<System.Text.Json.JsonElement>
-              Expect.isTrue (moveActionEl.TryGetProperty("descriptor", &nestedEl)) "MoveAction has nested descriptor array"
+
+              Expect.isTrue
+                  (moveActionEl.TryGetProperty("descriptor", &nestedEl))
+                  "MoveAction has nested descriptor array"
+
               let mutable rtEl = Unchecked.defaultof<System.Text.Json.JsonElement>
               Expect.isTrue (moveActionEl.TryGetProperty("rt", &rtEl)) "MoveAction has rt property"
               Expect.equal (rtEl.GetString()) "https://schema.org/Game" "rt = schema:Game"
@@ -924,4 +939,126 @@ let nestingTests =
                   moveAction.Rt
                   (Some "https://schema.org/Game")
                   "Rt must point to declared Game, not first-declared ItemList"
+          } ]
+
+// ── Fixture: union type with outcome cases (MoveResult analogue) ─────────────
+
+let private outcomeUnionLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
+      Mappings =
+        [ { FSharpType = "TicTacToe.MoveResult"
+            Iri = Some "schema:ActionStatusType"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Union
+                  [ { Name = "Won"
+                      Iri = Some "schema:CompletedActionStatus"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] }
+                    { Name = "Draw"
+                      Iri = Some "schema:CompletedActionStatus"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] }
+                    { Name = "XTurn"
+                      Iri = Some "schema:ActiveActionStatus"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] } ] } ] }
+
+// ── #17 union-case outcome descriptors ───────────────────────────────────────
+
+[<Tests>]
+let unionCaseDescriptorTests =
+    testList
+        "DiscoveryEmitter — #17 union-case outcome descriptors"
+        [ test "union type: ActionStatusType descriptor has Won, Draw, XTurn as children" {
+              let model =
+                  ResolvedModel.build schemaRegistry outcomeUnionLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let actionStatus =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "ActionStatusType")
+                  |> Option.defaultWith (fun () -> failwith "ActionStatusType descriptor not found")
+
+              let childIds = actionStatus.Children |> List.map (fun d -> d.Id)
+              Expect.contains childIds "Won" "Won case descriptor present as child"
+              Expect.contains childIds "Draw" "Draw case descriptor present as child"
+              Expect.contains childIds "XTurn" "XTurn case descriptor present as child"
+          }
+
+          test "Won case child href = schema:CompletedActionStatus" {
+              let model =
+                  ResolvedModel.build schemaRegistry outcomeUnionLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let actionStatus = descriptors |> List.find (fun d -> d.Id = "ActionStatusType")
+
+              let wonChild =
+                  actionStatus.Children
+                  |> List.tryFind (fun d -> d.Id = "Won")
+                  |> Option.defaultWith (fun () -> failwith "Won child not found")
+
+              Expect.equal
+                  wonChild.Href
+                  (Some "https://schema.org/CompletedActionStatus")
+                  "Won href = schema:CompletedActionStatus"
+          }
+
+          test "case children are not action descriptors" {
+              let model =
+                  ResolvedModel.build schemaRegistry outcomeUnionLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.empty
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let actionStatus = descriptors |> List.find (fun d -> d.Id = "ActionStatusType")
+
+              for child in actionStatus.Children do
+                  Expect.isFalse child.IsAction $"case child '{child.Id}' must not be an action"
+          }
+
+          test "emitted source contains CompletedActionStatus IRI" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry outcomeUnionLock
+
+              Expect.isOk src "emit should succeed"
+
+              Expect.stringContains
+                  (unwrapOk src)
+                  "https://schema.org/CompletedActionStatus"
+                  "CompletedActionStatus IRI in emitted source"
+          }
+
+          test "emitted source parses as valid F# with case descriptors" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry outcomeUnionLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.isTrue (parsesFsSource (unwrapOk src)) "parses as valid F#"
           } ]
