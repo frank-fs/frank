@@ -1255,8 +1255,8 @@ type SemanticTests() =
                 SemanticTests.ParseActionStatus(finalLdBody, gameAbsoluteIri8)
 
             Assert.That(
-                finalActionStatus = discoveredCompletedIri,
-                Is.True,
+                finalActionStatus,
+                Is.EqualTo discoveredCompletedIri,
                 sprintf
                     "Terminal outcome IRI '%s' does not match ALPS-discovered CompletedActionStatus '%s'"
                     finalActionStatus
