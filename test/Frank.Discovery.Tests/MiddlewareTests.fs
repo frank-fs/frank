@@ -47,7 +47,28 @@ let tests =
               Expect.equal (int resp.StatusCode) 200 "200"
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.stringContains body "resources" "JSON Home resources key"
-              Expect.stringContains body "https://schema.org/Game" "vocabulary rel present" ]
+              Expect.stringContains body "https://schema.org/Game" "vocabulary rel present"
+
+          testCase "GET / Accept:application/json-home → Content-Type: application/json-home (#10)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200"
+              Expect.equal (resp.Content.Headers.ContentType.MediaType) "application/json-home" "Content-Type must be application/json-home"
+
+          testCase "GET / Accept:application/json-home → Vary: Accept (#8)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200"
+              let vary = resp.Headers.Vary |> Seq.toList
+              Expect.contains vary "Accept" "Vary: Accept must be present on JSON Home conneg response" ]
 
 let private tttVocabConfig =
     { ProfileUri = "/alps/tictactoe"
@@ -65,7 +86,8 @@ let private tttVocabConfig =
                   Descriptors = []
                   Rt = None } ]
             Rt = Some "https://schema.org/Game" } ]
-      DescribedByLinks = [] }
+      DescribedByLinks = []
+      ResourceHrefVars = Map.empty }
 
 [<Tests>]
 let dereferenceTests =

@@ -10,7 +10,11 @@ open Microsoft.Extensions.Primitives
 /// Build JSON Home resource entries from live endpoints at request time.
 /// Endpoints carrying ResourceRelationMetadata contribute one entry each; all
 /// others are skipped. HEAD is added when GET is present, matching OPTIONS logic.
-let homeResourcesFromEndpoints (dataSource: EndpointDataSource) : JsonHomeResource list =
+/// resourceHrefVars maps each relation IRI to its template-variable meaning IRIs.
+let homeResourcesFromEndpoints
+    (resourceHrefVars: Map<string, Map<string, string>>)
+    (dataSource: EndpointDataSource)
+    : JsonHomeResource list =
     let addHead (methods: string list) =
         if List.contains "GET" methods && not (List.contains "HEAD" methods) then
             "HEAD" :: methods
@@ -20,9 +24,13 @@ let homeResourcesFromEndpoints (dataSource: EndpointDataSource) : JsonHomeResour
     let toResource (re: RouteEndpoint) (meta: ResourceRelationMetadata) (methodMeta: HttpMethodMetadata) =
         let allow = methodMeta.HttpMethods |> Seq.toList |> addHead |> List.sort
 
+        let varMeanings =
+            resourceHrefVars |> Map.tryFind meta.Relation |> Option.defaultValue Map.empty
+
         { Relation = meta.Relation
           Href = re.RoutePattern.RawText
-          Allow = allow }
+          Allow = allow
+          HrefVars = varMeanings }
 
     dataSource.Endpoints
     |> Seq.choose (fun ep ->
@@ -107,7 +115,11 @@ type DiscoveryMiddleware(next: RequestDelegate, config: DiscoveryConfig, endpoin
             ctx.Response.ContentType <- "application/alps+json"
             ctx.Response.WriteAsync(AlpsSerializer.serialize config.AlpsDescriptors)
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
-            ctx.Response.ContentType <- "application/json-home+json"
-            ctx.Response.WriteAsync(JsonHomeSerializer.serialize (homeResourcesFromEndpoints endpointDataSource))
+            ctx.Response.Headers.Append("Vary", "Accept")
+            ctx.Response.ContentType <- "application/json-home"
+
+            ctx.Response.WriteAsync(
+                JsonHomeSerializer.serialize (homeResourcesFromEndpoints config.ResourceHrefVars endpointDataSource)
+            )
         else
             next.Invoke ctx

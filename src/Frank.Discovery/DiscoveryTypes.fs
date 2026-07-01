@@ -13,10 +13,15 @@ type AlpsDescriptor =
       Rt: string option }
 
 /// One JSON Home resource directory entry. Relation is a vocabulary IRI.
+/// HrefVars maps each URI-template variable name to its absolute meaning IRI
+/// (json-home draft §4.2). An empty-string value means the variable's meaning
+/// could not be derived from the semantic model; this should not occur for
+/// template variables whose names correspond to any confirmed resource field.
 type JsonHomeResource =
     { Relation: string
       Href: string
-      Allow: string list }
+      Allow: string list
+      HrefVars: Map<string, string> }
 
 /// Endpoint metadata stamped by the `relation` CE operation. Carries the
 /// vocabulary IRI for this resource so the middleware can build the JSON Home
@@ -37,10 +42,15 @@ type DiscoveryConfig =
         /// External vocabulary Link header values, e.g.
         /// `<https://schema.org/Game>; rel="describedby"`.
         DescribedByLinks: string list
+        /// Per-resource mapping: relation IRI → (template variable name → absolute meaning IRI).
+        /// Built at codegen time from the resolved model's field IRIs. Used by the middleware
+        /// to populate JsonHomeResource.HrefVars for json-home §4.2 href-vars emission.
+        ResourceHrefVars: Map<string, Map<string, string>>
     }
 
     static member Empty =
         { ProfileUri = "/alps"
           HomeRoute = "/"
           AlpsDescriptors = []
-          DescribedByLinks = [] }
+          DescribedByLinks = []
+          ResourceHrefVars = Map.empty }

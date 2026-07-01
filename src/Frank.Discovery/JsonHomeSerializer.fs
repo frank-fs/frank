@@ -2,9 +2,19 @@ module Frank.Discovery.JsonHomeSerializer
 
 open System.Text
 open System.Text.Json
+open System.Text.RegularExpressions
+
+/// Extract URI Template variable names from a template string.
+/// E.g. "/games/{id}/moves/{moveId}" → ["id"; "moveId"].
+let private templateVarNames (template: string) : string list =
+    Regex.Matches(template, @"\{([^}]+)\}")
+    |> Seq.cast<Match>
+    |> Seq.map (fun m -> m.Groups.[1].Value)
+    |> Seq.toList
 
 /// Serialize resource entries to a JSON Home document. A URI Template (contains
-/// '{') is written as `href-template`; a fixed URI as `href` (RFC draft-nottingham
+/// '{') is written as `href-template` with a companion `href-vars` object (JSON
+/// Home draft §4.2). A fixed URI is written as `href` (RFC draft-nottingham
 /// -json-home-06).
 let serialize (resources: JsonHomeResource list) : string =
     use ms = new System.IO.MemoryStream()
@@ -19,6 +29,16 @@ let serialize (resources: JsonHomeResource list) : string =
 
         if r.Href.Contains "{" then
             writer.WriteString("href-template", r.Href)
+            let vars = templateVarNames r.Href
+
+            if not vars.IsEmpty then
+                writer.WritePropertyName("href-vars")
+                writer.WriteStartObject()
+
+                for v in vars do
+                    writer.WriteString(v, r.HrefVars |> Map.tryFind v |> Option.defaultValue "")
+
+                writer.WriteEndObject()
         else
             writer.WriteString("href", r.Href)
 

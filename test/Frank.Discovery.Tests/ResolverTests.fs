@@ -19,7 +19,8 @@ type GeneratedDiscovery private () =
                 Href = Some "https://schema.org/Thing"
                 Descriptors = []
                 Rt = None } ]
-          DescribedByLinks = [] }
+          DescribedByLinks = []
+          ResourceHrefVars = Map.empty }
 
 /// Type missing the discoveryConfig property — tests member-resolution error path.
 [<AbstractClass; Sealed>]

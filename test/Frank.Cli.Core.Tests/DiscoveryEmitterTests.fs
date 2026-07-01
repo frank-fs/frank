@@ -536,7 +536,7 @@ let homeResourcesAbsentTests =
               Expect.isFalse ((unwrapOk src).Contains "HomeResources") "HomeResources absent"
           }
 
-          test "generated record literal contains ProfileUri, HomeRoute, AlpsDescriptors, DescribedByLinks" {
+          test "generated record literal contains ProfileUri, HomeRoute, AlpsDescriptors, DescribedByLinks, ResourceHrefVars" {
               let src =
                   DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
 
@@ -546,6 +546,18 @@ let homeResourcesAbsentTests =
               Expect.stringContains source "HomeRoute" "HomeRoute field present"
               Expect.stringContains source "AlpsDescriptors" "AlpsDescriptors field present"
               Expect.stringContains source "DescribedByLinks" "DescribedByLinks field present"
+              Expect.stringContains source "ResourceHrefVars" "ResourceHrefVars field present"
+          }
+
+          test "generated ResourceHrefVars contains schema:identifier for Game.identifier field (#9)" {
+              // ticTacToeLock fixture uses Name="identifier" (not "Id"); lowercased key is "identifier".
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "https://schema.org/identifier" "schema:identifier in ResourceHrefVars"
+              Expect.stringContains source "\"identifier\"" "lowercased 'identifier' key in ResourceHrefVars"
           }
 
           test "generated source parses as valid F# without HomeResources" {
@@ -605,7 +617,12 @@ let relativeHrefTests =
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               Expect.stringContains source "/tictactoe#square" "relative href present"
-              Expect.isFalse (source.Contains "example.org/tictactoe#square") "absolute example.org href absent"
+              // ALPS Href must be host-relative; the absolute URI legitimately appears in
+              // ResourceHrefVars (json-home §4.2 requires absolute meaning IRIs there).
+              // Check the ALPS Href specifically, not the whole source.
+              Expect.isFalse
+                  (source.Contains "Some \"https://example.org/tictactoe#square\"")
+                  "ALPS Href must not be the absolute example.org URI"
           }
 
           test "schema:agent href stays absolute (external vocab not relativised)" {
@@ -1061,4 +1078,250 @@ let unionCaseDescriptorTests =
 
               Expect.isOk src "emit should succeed"
               Expect.isTrue (parsesFsSource (unwrapOk src)) "parses as valid F#"
+          } ]
+
+// ── Fixture: duplicate descriptor IDs (same field IRI in two classes) ─────────
+// Both Alpha and Beta declare a field with IRI schema:identifier.
+// The local name of schema:identifier is "identifier", so after projection both
+// classes produce a child descriptor with Id = "identifier".
+// The uniqueness invariant must detect and reject this at codegen time.
+let private dupIdLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.UtcNow
+      Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
+      Mappings =
+        [ { FSharpType = "MyApp.Alpha"
+            Iri = Some "schema:Thing"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "id"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] }
+          { FSharpType = "MyApp.Beta"
+            Iri = Some "schema:Action"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "id"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let uniquenessCheckTests =
+    testList
+        "DiscoveryEmitter — #11 descriptor-id uniqueness check"
+        [ test "duplicate id 'identifier' (same IRI in two classes) triggers invalidOp" {
+              Expect.throws
+                  (fun () -> DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry dupIdLock |> ignore)
+                  "duplicate ALPS descriptor IDs must raise an exception"
+          }
+
+          test "TicTacToe fixture has no duplicate IDs — passes uniqueness check" {
+              let result =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk result "TicTacToe model must pass uniqueness check without error"
+          }
+
+          test "outcomeUnionLock has no duplicate IDs — passes uniqueness check" {
+              let result =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry outcomeUnionLock
+
+              Expect.isOk result "outcome union model must pass uniqueness check without error"
+          } ]
+
+// ── Fixture: parent-path variable inheritance via Rt linkage (#9) ─────────────
+// Game has class IRI schema:Game and field Id → schema:identifier.
+// MoveRequest has Rt = Some "schema:Game" (declared linkage to Game).
+// MoveRequest's own fields are Player/Position — no "id" of its own.
+// The {id} template variable in /games/{id}/moves belongs to the Game segment;
+// it resolves via Rt: MoveRequest.Rt → Game → Game.Id → schema:identifier.
+let private inheritVarLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
+      Mappings =
+        [ { FSharpType = "App.Game"
+            Iri = Some "schema:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Id"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] }
+          { FSharpType = "App.MoveRequest"
+            Iri = Some "schema:MoveAction"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = Some "schema:Game"
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Player"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed }
+                    { Name = "Position"
+                      Iri = Some "schema:rowIndex"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let parentPathVarTests =
+    testList
+        "DiscoveryEmitter — #9 parent-path template-variable inheritance"
+        [ test "MoveAction ResourceHrefVars inherits 'id' from Rt-target Game (declared linkage)" {
+              // MoveRequest.Rt = Some "schema:Game" → follow to Game → Game.Id → schema:identifier.
+              // MoveRequest's own fields (player, position) do not include "id".
+              // The Rt-based fix supplements "id" from Game's field, not from a global pool.
+              let src = DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry inheritVarLock
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "\"id\"" "MoveAction ResourceHrefVars must contain inherited 'id' key"
+
+              Expect.stringContains
+                  source
+                  "https://schema.org/identifier"
+                  "schema:identifier must appear in MoveAction's inherited href-var entry"
+          } ]
+
+// ── Fixture: collision — two resources share field name "Id" with DIFFERENT IRIs (#9) ──
+// Widget.Id → schema:productID (a different IRI from schema:identifier).
+// Game.Id   → schema:identifier.
+// Widget appears FIRST in the mappings list — this is the adversarial ordering that
+// would cause the old global-pool code to select productID for "id" (List.distinctBy
+// keeps the first occurrence), then stamp productID onto MoveRequest via supplemental.
+// Under Rt-based resolution, MoveRequest.Rt = Some "schema:Game" follows directly to
+// Game and reads schema:identifier — unaffected by Widget's declaration order.
+let private collisionHrefVarLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+      DeclaredPrefixes = Map.empty
+      Mappings =
+        [ { FSharpType = "App.Widget"
+            Iri = Some "schema:Product"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Id"
+                      Iri = Some "schema:productID"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] }
+          { FSharpType = "App.Game"
+            Iri = Some "schema:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Id"
+                      Iri = Some "schema:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] }
+          { FSharpType = "App.MoveRequest"
+            Iri = Some "schema:MoveAction"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = Some "schema:Game"
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Player"
+                      Iri = Some "schema:agent"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed }
+                    { Name = "Position"
+                      Iri = Some "schema:rowIndex"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let collisionHrefVarTests =
+    testList
+        "DiscoveryEmitter — #9 href-var collision: same field name, different IRIs (Rt-based fix)"
+        [ test "MoveAction.id resolves to schema:identifier via Rt, not schema:productID from Widget (first in list)" {
+              // Widget appears BEFORE Game in mappings. Under the old global-pool code,
+              // List.distinctBy fst would keep Widget's ("id", schema:productID) and MoveRequest
+              // would inherit productID — the wrong meaning for the {id} in /games/{id}/moves.
+              // Under Rt-based resolution, MoveRequest.Rt = schema:Game → Game.Id = schema:identifier.
+              //
+              // Proof: "https://schema.org/productID" appears exactly twice in the emitted source:
+              //   once in Widget's ALPS descriptor child Href, once in Widget's ResourceHrefVars.
+              // Under the old global-pool code it would appear a third time in MoveRequest's entry.
+              let src =
+                  DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry collisionHrefVarLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+
+              let productIdOccurrences =
+                  source.Split("https://schema.org/productID").Length - 1
+
+              Expect.equal
+                  productIdOccurrences
+                  2
+                  "schema:productID must appear exactly twice (Widget ALPS descriptor + Widget ResourceHrefVars) — NOT in MoveRequest entry"
+          }
+
+          test "MoveAction ResourceHrefVars contains schema:identifier (from Rt-target Game), not productID" {
+              let src =
+                  DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry collisionHrefVarLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "https://schema.org/identifier" "schema:identifier must be in source (Game + MoveAction)"
+          }
+
+          test "Game ResourceHrefVars is not polluted by MoveAction fields (no player/position in Game entry)" {
+              // Under old global-pool, Game's entry carries player + position from MoveRequest's
+              // own fields as supplemental (pollution). Under Rt-based fix, Game.Rt = None so
+              // Game's entry has only its own fields.
+              // Proof: "https://schema.org/agent" appears exactly once (MoveAction's descriptor child Href).
+              let src =
+                  DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry collisionHrefVarLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              let agentOccurrences = source.Split("https://schema.org/agent").Length - 1
+
+              Expect.equal
+                  agentOccurrences
+                  2
+                  "schema:agent appears in MoveAction ALPS descriptor child + MoveAction ResourceHrefVars only (not polluted into Game)"
           } ]

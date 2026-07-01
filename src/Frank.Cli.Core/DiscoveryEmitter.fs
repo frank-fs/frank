@@ -126,6 +126,29 @@ let private collectDescribedByLinks (resources: ResolvedResource list) : string 
 
 // ── Pure projection ───────────────────────────────────────────────────────────
 
+/// Recursively collect all descriptor IDs (top-level and nested children).
+let rec private collectAllIds (descriptors: ResolvedDescriptor list) : string list =
+    descriptors |> List.collect (fun d -> d.Id :: collectAllIds d.Children)
+
+/// Assert that all descriptor IDs in the projected list are unique (ALPS §3.1).
+/// Throws invalidOp naming the first duplicate — this is a codegen-time invariant.
+let private assertUniqueIds (descriptors: ResolvedDescriptor list) : unit =
+    let allIds = collectAllIds descriptors
+
+    let dups =
+        allIds
+        |> List.groupBy id
+        |> List.choose (fun (k, vs) -> if vs.Length > 1 then Some k else None)
+
+    if not dups.IsEmpty then
+        let dupsStr = String.concat ", " dups
+
+        invalidOp (
+            sprintf
+                "DiscoveryEmitter: duplicate ALPS descriptor ids: %s. ALPS §3.1 requires globally unique ids within a profile."
+                dupsStr
+        )
+
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
 /// declaredOnlyBases: set of base URI strings whose IRIs should be emitted as host-relative paths.
 let internal projectDiscovery
@@ -145,12 +168,72 @@ let rec private descriptorExpr (d: ResolvedDescriptor) =
           "Descriptors", AstRender.listExpr (d.Children |> List.map descriptorExpr)
           "Rt", AstRender.optionExpr AstRender.strExpr d.Rt ]
 
-let private configExpr (profileUri: string) (descriptors: ResolvedDescriptor list) (links: string list) =
+/// Map.ofList [("k1","v1"); ...] for a string*string list.
+let private fieldVarMapExpr (entries: (string * string) list) =
+    AstRender.appExpr
+        "Map.ofList"
+        (AstRender.listExpr (
+            entries
+            |> List.map (fun (k, v) -> AstRender.tupleExpr [ AstRender.strExpr k; AstRender.strExpr v ])
+        ))
+
+/// Map.ofList [("rel", Map.ofList [...]); ...] for the ResourceHrefVars field.
+let private resourceHrefVarsExpr (vars: (string * (string * string) list) list) =
+    AstRender.appExpr
+        "Map.ofList"
+        (AstRender.listExpr (
+            vars
+            |> List.map (fun (rel, entries) ->
+                AstRender.tupleExpr [ AstRender.strExpr rel; AstRender.parenExpr (fieldVarMapExpr entries) ])
+        ))
+
+/// For each resource with a class IRI and confirmed field IRIs, build a
+/// (classIri, [(varName, meaningIri)]) entry. varName is the field name lowercased;
+/// meaningIri is the absolute URI (not host-relative — href-vars requires absolute IRIs).
+/// Template variables from a parent path segment (e.g. {id} in /games/{id}/moves) are
+/// resolved by following the declared Rt linkage to the target resource and reading THAT
+/// resource's matching field — NOT a global name pool. Own field entries take precedence;
+/// supplemental entries come from the Rt target only (one hop).
+let private computeHrefVars (model: ResolvedModel) : (string * (string * string) list) list =
+    let toFieldEntry (f: ResolvedField) =
+        f.Iri |> Option.map (fun iri -> f.Name.ToLowerInvariant(), iri.AbsoluteUri)
+
+    let byClassIri =
+        model.Resources
+        |> List.choose (fun r -> r.ClassIri |> Option.map (fun uri -> uri.AbsoluteUri, r))
+        |> Map.ofList
+
+    model.Resources
+    |> List.choose (fun r ->
+        r.ClassIri
+        |> Option.map (fun classIri ->
+            let ownEntries = r.Fields |> List.choose toFieldEntry
+            let ownKeys = ownEntries |> List.map fst |> Set.ofList
+
+            let supplemental =
+                r.Rt
+                |> Option.bind (fun rtUri -> Map.tryFind rtUri.AbsoluteUri byClassIri)
+                |> Option.map (fun rtResource ->
+                    rtResource.Fields
+                    |> List.choose toFieldEntry
+                    |> List.filter (fun (k, _) -> not (Set.contains k ownKeys)))
+                |> Option.defaultValue []
+
+            classIri.AbsoluteUri, ownEntries @ supplemental))
+    |> List.filter (fun (_, entries) -> not entries.IsEmpty)
+
+let private configExpr
+    (profileUri: string)
+    (descriptors: ResolvedDescriptor list)
+    (links: string list)
+    (hrefVars: (string * (string * string) list) list)
+    =
     AstRender.recordExpr
         [ "ProfileUri", AstRender.strExpr profileUri
           "HomeRoute", AstRender.strExpr "/"
           "AlpsDescriptors", AstRender.listExpr (descriptors |> List.map descriptorExpr)
-          "DescribedByLinks", AstRender.listExpr (links |> List.map AstRender.strExpr) ]
+          "DescribedByLinks", AstRender.listExpr (links |> List.map AstRender.strExpr)
+          "ResourceHrefVars", resourceHrefVarsExpr hrefVars ]
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -177,7 +260,9 @@ let emit
     |> Result.map (fun model ->
         let bases = declaredOnlyBases lock
         let descriptors, links = projectDiscovery bases model
-        let value = configExpr profileUri descriptors links
+        assertUniqueIds descriptors
+        let hrefVars = computeHrefVars model
+        let value = configExpr profileUri descriptors links hrefVars
 
         AstRender.formatTypedValueModule
             moduleName

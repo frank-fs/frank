@@ -172,24 +172,28 @@ module private Serializers =
         Encoding.UTF8.GetString(outStream.ToArray())
 
     let respond406 (ctx: HttpContext) : Task =
+        ctx.Response.Headers.Append("Vary", "Accept")
         ctx.Response.StatusCode <- 406
         ctx.Response.ContentType <- "text/plain"
         ctx.Response.WriteAsync(notAcceptableBody)
 
     let respondTurtle (graph: IGraph) (origin: string) (ctx: HttpContext) : Task =
         let body = "@base <" + origin + "> .\n" + serializeTurtle graph
+        ctx.Response.Headers.Append("Vary", "Accept")
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "text/turtle"
         ctx.Response.WriteAsync(body)
 
     let respondRdfXml (graph: IGraph) (ctx: HttpContext) : Task =
         let body = serializeRdfXml graph
+        ctx.Response.Headers.Append("Vary", "Accept")
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/rdf+xml"
         ctx.Response.WriteAsync(body)
 
     let respondJsonLd (graph: IGraph) (externalContext: string) (base': string) (ctx: HttpContext) : Task =
         let body = buildJsonLdResponse graph externalContext base'
+        ctx.Response.Headers.Append("Vary", "Accept")
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)

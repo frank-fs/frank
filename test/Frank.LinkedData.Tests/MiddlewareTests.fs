@@ -176,7 +176,29 @@ let tests =
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.isFalse (body.Contains "example.org/tictactoe") "no example.org in Turtle body"
-              Expect.stringContains body "/tictactoe#" "origin-relative IRI present in Turtle body" ]
+              Expect.stringContains body "/tictactoe#" "origin-relative IRI present in Turtle body"
+
+          testCase "GET /data Accept:application/ld+json → Vary: Accept on conneg 200 response (#8)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let vary = resp.Headers.Vary |> Seq.toList
+              Expect.contains vary "Accept" "Vary: Accept must be present on conneg 200 response"
+
+          testCase "GET /data Accept:application/xml (406) → Vary: Accept on 406 response (#8)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/xml")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 406 "406 Not Acceptable"
+              let vary = resp.Headers.Vary |> Seq.toList
+              Expect.contains vary "Accept" "Vary: Accept must be present on 406 response" ]
 
 [<Tests>]
 let qvalueTests =

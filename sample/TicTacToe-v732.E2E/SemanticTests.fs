@@ -275,6 +275,41 @@ type SemanticTests() =
             Assert.That(relsAreVocab, Is.True, "JSON Home rels are not vocabulary IRIs")
             let! body = resp.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "JSON Home leaks urn:frank: rels")
+
+            // ── #9: move resource href-vars {id} must resolve to an absolute IRI ──
+            // The move resource (/games/{id}/moves) inherits {id} from the Game
+            // resource's path segment. Its href-vars must NOT contain "" for id.
+            let moveResource =
+                resources.EnumerateObject()
+                |> Seq.tryFind (fun r ->
+                    let mutable tmpl = Unchecked.defaultof<JsonElement>
+
+                    r.Value.TryGetProperty("href-template", &tmpl)
+                    && (tmpl.GetString() |> Option.ofObj |> Option.exists (fun s -> s.Contains "/moves")))
+
+            Assert.That(moveResource.IsSome, Is.True, "Move resource not found in JSON Home")
+            let mutable moveHrefVars = Unchecked.defaultof<JsonElement>
+
+            Assert.That(
+                moveResource.Value.Value.TryGetProperty("href-vars", &moveHrefVars),
+                Is.True,
+                "Move resource missing href-vars"
+            )
+
+            let mutable idVar = Unchecked.defaultof<JsonElement>
+            Assert.That(moveHrefVars.TryGetProperty("id", &idVar), Is.True, "href-vars missing 'id' key")
+
+            Assert.That(
+                idVar.GetString(),
+                Is.Not.Empty,
+                "href-vars 'id' must not be empty — {id} in /games/{id}/moves must resolve to schema:identifier"
+            )
+
+            Assert.That(
+                idVar.GetString().StartsWith "http",
+                Is.True,
+                "href-vars 'id' must be an absolute IRI (schema:identifier)"
+            )
         }
 
     // ── AT-S2: OPTIONS yields Allow + Link rel=describedby → ALPS ────────────────
@@ -685,7 +720,7 @@ type SemanticTests() =
                     moveBody.[agentIri] <- player
                     moveBody.[squareIri] <- square
 
-                    let! _ =
+                    let! moveResp =
                         ctx.PostAsync(
                             moveUrl,
                             APIRequestContextOptions(
@@ -693,6 +728,12 @@ type SemanticTests() =
                                 DataObject = moveBody
                             )
                         )
+
+                    Assert.That(
+                        moveResp.Status,
+                        Is.EqualTo 200,
+                        sprintf "Phase 7: move %d returned %d — expected 200" (turn + 1) moveResp.Status
+                    )
 
                     turn <- turn + 1
 

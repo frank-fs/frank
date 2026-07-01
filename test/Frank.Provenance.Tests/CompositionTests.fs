@@ -270,7 +270,8 @@ let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
             Href = Some classIri
             Descriptors = []
             Rt = None } ]
-      DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ] }
+      DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ]
+      ResourceHrefVars = Map.empty }
 
 let private startDiscoveryServer (discConfig: DiscoveryConfig) =
     let builder = WebApplication.CreateBuilder()

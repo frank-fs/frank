@@ -68,10 +68,12 @@ let jsonHomeTests =
               let resources =
                   [ { Relation = "https://schema.org/Game"
                       Href = "/games/{id}"
-                      Allow = [ "GET" ] }
+                      Allow = [ "GET" ]
+                      HrefVars = Map.empty }
                     { Relation = "https://schema.org/About"
                       Href = "/about"
-                      Allow = [ "GET" ] } ]
+                      Allow = [ "GET" ]
+                      HrefVars = Map.empty } ]
 
               let json = JsonHomeSerializer.serialize resources
               use _ = JsonDocument.Parse json
@@ -86,8 +88,43 @@ let jsonHomeTests =
                       |> List.mapi (fun i (rel, seg) ->
                           { Relation = rel + string i
                             Href = "/" + seg
-                            Allow = [ "GET" ] })
+                            Allow = [ "GET" ]
+                            HrefVars = Map.empty })
 
                   let json = JsonHomeSerializer.serialize resources
                   use _ = JsonDocument.Parse json
-                  resources |> List.forall (fun r -> json.Contains r.Relation)) ]
+                  resources |> List.forall (fun r -> json.Contains r.Relation))
+
+          testCase "href-template resource includes href-vars with meaningful absolute meaning IRI (#9)"
+          <| fun _ ->
+              let resources =
+                  [ { Relation = "https://schema.org/Game"
+                      Href = "/games/{id}"
+                      Allow = [ "GET" ]
+                      HrefVars = Map.ofList [ ("id", "https://schema.org/identifier") ] } ]
+
+              let json = JsonHomeSerializer.serialize resources
+              use doc = JsonDocument.Parse json
+              let mutable resourcesEl = Unchecked.defaultof<JsonElement>
+              Expect.isTrue (doc.RootElement.TryGetProperty("resources", &resourcesEl)) "resources present"
+              let mutable gameEl = Unchecked.defaultof<JsonElement>
+              Expect.isTrue (resourcesEl.TryGetProperty("https://schema.org/Game", &gameEl)) "game resource present"
+              let mutable hrefVarsEl = Unchecked.defaultof<JsonElement>
+              Expect.isTrue (gameEl.TryGetProperty("href-vars", &hrefVarsEl)) "href-vars present on href-template resource"
+              let mutable idEl = Unchecked.defaultof<JsonElement>
+              Expect.isTrue (hrefVarsEl.TryGetProperty("id", &idEl)) "href-vars contains 'id' key"
+              let idValue = idEl.GetString()
+              Expect.isFalse (System.String.IsNullOrEmpty idValue) "href-vars 'id' value must not be empty"
+              Expect.isTrue (idValue.StartsWith "http") "href-vars 'id' value must be an absolute URI"
+              Expect.equal idValue "https://schema.org/identifier" "href-vars 'id' value is schema:identifier"
+
+          testCase "fixed href resource does NOT include href-vars (#9)"
+          <| fun _ ->
+              let resources =
+                  [ { Relation = "https://schema.org/About"
+                      Href = "/about"
+                      Allow = [ "GET" ]
+                      HrefVars = Map.empty } ]
+
+              let json = JsonHomeSerializer.serialize resources
+              Expect.isFalse (json.Contains "href-vars") "fixed href resource must have no href-vars" ]

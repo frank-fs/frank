@@ -63,7 +63,8 @@ let sampleConfig =
             Href = Some "https://schema.org/agent"
             Descriptors = []
             Rt = None } ]
-      DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ] }
+      DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ]
+      ResourceHrefVars = Map.empty }
 
 /// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.
 /// Used by the dereference acceptance test (item #6).
