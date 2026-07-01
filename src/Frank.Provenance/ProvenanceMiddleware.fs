@@ -125,10 +125,8 @@ module private Capture =
     // AC4: if a body attribute's property IRI has a class range (app-owned vocab term),
     // convert the raw string value to a URI node by resolving it against the class namespace.
     // E.g. "/tictactoe#square" → class ns "/tictactoe#" → "TopLeft" → IRI "origin/tictactoe#TopLeft".
-    // Security: validate the fully-constructed value IRI before returning IriNode — a malformed
-    // Host header makes originStr invalid, so the concatenated IRI must be re-checked.
+    // Origin is already validated at the middleware edge — no per-value re-check needed.
     let private toBodyAttrValue
-        (logger: ILogger)
         (originStr: string)
         (classRanges: Map<string, string>)
         (iri: string)
@@ -143,19 +141,7 @@ module private Capture =
 
             match Map.tryFind relPath classRanges with
             | None -> Literal rawValue
-            | Some classNs ->
-                let valueIriStr = originStr + classNs + rawValue
-                let mutable valueUri = Unchecked.defaultof<Uri>
-
-                if Uri.TryCreate(valueIriStr, UriKind.Absolute, &valueUri) then
-                    IriNode valueIriStr
-                else
-                    logger.LogWarning(
-                        "ProvenanceMiddleware: class-range value IRI '{ValueIri}' is not a valid absolute IRI — degrading to literal",
-                        valueIriStr
-                    )
-
-                    Literal rawValue
+            | Some classNs -> IriNode(originStr + classNs + rawValue)
 
     let private resolveAgent (ctx: HttpContext) : ProvAgent =
         let name =
@@ -196,8 +182,8 @@ module private Capture =
           EndedAt = ended
           BodyAttributes =
             bodyAttrs
-            |> List.map (fun (iri, rawValue) ->
-                iri, toBodyAttrValue logger originStr config.PropertyClassRanges iri rawValue) }
+            |> List.map (fun (iri, rawValue) -> iri, toBodyAttrValue originStr config.PropertyClassRanges iri rawValue) }
+
 
 type ProvenanceMiddleware
     (next: RequestDelegate, config: ProvenanceConfig, store: IProvenanceStore, logger: ILogger<ProvenanceMiddleware>) =
@@ -246,7 +232,7 @@ type ProvenanceMiddleware
                 do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
         }
 
-    member this.InvokeAsync(ctx: HttpContext) : Task =
+    member private this.InvokeCore(ctx: HttpContext) : Task =
         let started = DateTimeOffset.UtcNow
 
         if ctx.Request.Method = "POST" then
@@ -281,3 +267,15 @@ type ProvenanceMiddleware
                 let ended = DateTimeOffset.UtcNow
                 store.Append(Capture.build (logger :> ILogger) config ctx started ended bodyAttrs)
             }
+
+    member this.InvokeAsync(ctx: HttpContext) : Task =
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            logger.LogWarning(
+                "ProvenanceMiddleware: malformed Host header '{Host}' — cannot mint resource IRIs, rejecting with 400",
+                ctx.Request.Host.Value
+            )
+
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some _ -> this.InvokeCore(ctx)

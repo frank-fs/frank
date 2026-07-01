@@ -63,3 +63,43 @@ let startServer (config: LinkedDataConfig) =
 
     app.StartAsync().GetAwaiter().GetResult()
     app
+
+/// Build a game graph using the request origin — matches the sample's gameGraphFactory pattern.
+let buildGameGraphWithOrigin (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    let graph = new Graph()
+    let subject = graph.CreateUriNode(System.Uri(origin + "/games/1"))
+    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+    let gameClass = graph.CreateUriNode(System.Uri "https://schema.org/Game")
+    graph.Assert(Triple(subject, rdfType, gameClass)) |> ignore
+    graph :> IGraph
+
+/// TestServer with /tictactoe and /games/{id} routes, each carrying a GraphFactory config.
+/// Mirrors the TicTacToe sample so the origin-DoS guard is tested on both factory paths.
+let startServerWithTttRoutes () =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<LinkedDataMiddleware>() |> ignore
+
+    let tttConfig =
+        { sampleConfigWithFactory with
+            GraphFactory = Some buildTttGraphWithOrigin }
+
+    let gameConfig =
+        { sampleConfigWithFactory with
+            GraphFactory = Some buildGameGraphWithOrigin }
+
+    app
+        .MapGet("/tictactoe", System.Func<string>(fun () -> "ttt downstream"))
+        .WithMetadata(tttConfig)
+    |> ignore
+
+    app
+        .MapGet("/games/{id}", System.Func<string>(fun () -> "game downstream"))
+        .WithMetadata(gameConfig)
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app

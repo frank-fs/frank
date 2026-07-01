@@ -1,7 +1,10 @@
 module Frank.LinkedData.Tests.MiddlewareTests
 
+open System
 open System.Net.Http
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.Primitives
 open Expecto
 open Frank.LinkedData.Tests.TestHelpers
 open System.Text.Json
@@ -314,3 +317,75 @@ let profileAwareTests =
                   resp.Content.Headers.ContentType.MediaType
                   "text/turtle"
                   "turtle served; profiled ld+json skipped, turtle falls through as next match" ]
+
+[<Tests>]
+let originSecurityTests =
+    testList
+        "LinkedDataMiddleware malformed-Host DoS guard"
+        [ testCaseAsync
+              "malformed Host on GET /tictactoe with GraphFactory → 400, not 500 (security: origin-at-edge)"
+          <| async {
+              // RED (before guard): factory calls System.Uri(origin + "/tictactoe#square") where
+              // origin = "http://ex ample.com" → UriFormatException → 500 / exception.
+              // GREEN (after guard): origin validated before factory is called → 400.
+              use app = startServerWithTttRoutes ()
+              let server = app.GetTestServer()
+
+              let! ctx =
+                  server.SendAsync(
+                      Action<HttpContext>(fun ctx ->
+                          ctx.Request.Method <- "GET"
+                          ctx.Request.Scheme <- "http"
+                          ctx.Request.Host <- HostString "ex ample.com"
+                          ctx.Request.Path <- PathString "/tictactoe"
+                          ctx.Request.Headers.Add("Accept", StringValues "application/ld+json"))
+                  )
+                  |> Async.AwaitTask
+
+              Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400 not 500 on /tictactoe"
+          }
+
+          testCaseAsync
+              "malformed Host on GET /games/{id} with GraphFactory → 400, not 500 (security: origin-at-edge)"
+          <| async {
+              // RED (before guard): factory calls System.Uri(origin + "/games/1") where
+              // origin = "http://ex ample.com" → UriFormatException → 500 / exception.
+              // GREEN (after guard): origin validated before factory is called → 400.
+              use app = startServerWithTttRoutes ()
+              let server = app.GetTestServer()
+
+              let! ctx =
+                  server.SendAsync(
+                      Action<HttpContext>(fun ctx ->
+                          ctx.Request.Method <- "GET"
+                          ctx.Request.Scheme <- "http"
+                          ctx.Request.Host <- HostString "ex ample.com"
+                          ctx.Request.Path <- PathString "/games/1"
+                          ctx.Request.Headers.Add("Accept", StringValues "application/ld+json"))
+                  )
+                  |> Async.AwaitTask
+
+              Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400 not 500 on /games/{id}"
+          }
+
+          testCaseAsync
+              "valid Host on GET /tictactoe with GraphFactory → 200 with ld+json (happy path)"
+          <| async {
+              use app = startServerWithTttRoutes ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/tictactoe")
+              req.Headers.Add("Accept", "application/ld+json")
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "valid Host → 200 on /tictactoe"
+          }
+
+          testCaseAsync
+              "valid Host on GET /games/{id} with GraphFactory → 200 with ld+json (happy path)"
+          <| async {
+              use app = startServerWithTttRoutes ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/games/1")
+              req.Headers.Add("Accept", "application/ld+json")
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "valid Host → 200 on /games/{id}"
+          } ]

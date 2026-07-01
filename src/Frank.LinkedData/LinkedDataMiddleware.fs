@@ -200,7 +200,31 @@ module private Serializers =
 /// LinkedDataConfig in their metadata. All other requests pass through.
 type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>) =
 
-    member _.InvokeAsync(ctx: HttpContext) : Task =
+    member private this.ServeRdf(ctx: HttpContext, mediaType: string, effective: LinkedDataConfig) : Task =
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            logger.LogWarning(
+                "LinkedDataMiddleware: malformed Host header '{Host}' — cannot mint resource IRIs, rejecting with 400",
+                ctx.Request.Host.Value
+            )
+
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some origin ->
+            logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
+
+            let effectiveGraph =
+                match effective.GraphFactory with
+                | Some factory -> factory ctx
+                | None -> effective.Graph
+
+            match mediaType with
+            | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
+            | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
+            | "application/ld+json" -> Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
+            | _ -> next.Invoke ctx
+
+    member this.InvokeAsync(ctx: HttpContext) : Task =
         let method = ctx.Request.Method
 
         if not (HttpMethods.IsGet method || HttpMethods.IsHead method) then
@@ -227,18 +251,4 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
 
                 match endpointConfig with
                 | None -> next.Invoke ctx
-                | Some effective ->
-                    logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
-                    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-
-                    let effectiveGraph =
-                        match effective.GraphFactory with
-                        | Some factory -> factory ctx
-                        | None -> effective.Graph
-
-                    match mediaType with
-                    | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
-                    | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
-                    | "application/ld+json" ->
-                        Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
-                    | _ -> next.Invoke ctx
+                | Some effective -> this.ServeRdf(ctx, mediaType, effective)

@@ -172,13 +172,12 @@ let tests =
           }
 
           testCaseAsync
-              "malformed Host with class-ranged value degrades to Literal in store — value-IRI sink guarded (security: Host vector)"
+              "malformed Host header → provenance endpoint returns 400, no record appended (security: origin-at-edge)"
           <| async {
-              // PropertyClassRanges maps "/square" → "/tictactoe#", so body value "TopLeft"
-              // becomes IriNode(originStr + "/tictactoe#" + "TopLeft").  When Host is
-              // "ex ample.com" (space), originStr is "http://ex ample.com" — an invalid URI —
-              // and the unguarded path would pass IriNode("http://ex ample.com/tictactoe#TopLeft")
-              // to UriFactory.Create which throws UriFormatException.
+              // RED (before fix): middleware faults with UriFormatException when toJsonLd calls
+              // UriFactory.Create on the malformed ResourceUri/Agent.Id — test throws and fails.
+              // GREEN (after fix): edge validation catches the bad Host before any IRI construction,
+              // returns 400, store.Append is never called.
               let config =
                   { orderProvConfig() with
                       PropertyClassRanges = Map.ofList [ "/square", "/tictactoe#" ] }
@@ -192,10 +191,7 @@ let tests =
 
               // Inject malformed Host directly via TestServer.SendAsync, bypassing HTTP
               // parsing that would otherwise normalise or reject the host.
-              // The store.Append call inside the middleware happens before toJsonLd runs, so
-              // the record IS captured even when the downstream entity-URI path (issue #17)
-              // also throws with a malformed Host.
-              let! _ =
+              let! ctx =
                   server.SendAsync(
                       Action<HttpContext>(fun ctx ->
                           ctx.Request.Method <- "POST"
@@ -208,27 +204,7 @@ let tests =
                           ctx.Request.ContentLength <- Nullable(int64 bodyBytes.Length))
                   )
                   |> Async.AwaitTask
-                  |> Async.Catch
 
-              let records = captureStore.Records
-
-              Expect.hasLength
-                  records
-                  1
-                  "store.Append is called before toJsonLd — record captured even when entity URI also throws"
-
-              let bodyAttrs = records[0].BodyAttributes
-
-              let squareAttr =
-                  bodyAttrs |> List.tryFind (fun (iri, _) -> iri.Contains "square")
-
-              Expect.isSome squareAttr "class-ranged body attribute must be present in captured record"
-
-              let (_, attrValue) = squareAttr.Value
-
-              match attrValue with
-              | Literal v -> Expect.equal v "TopLeft" "value degraded to Literal — value-IRI sink is guarded"
-              | IriNode iri ->
-                  failtest
-                      $"expected Literal but store has IriNode '{iri}' — value-IRI sink is unguarded"
+              Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400, not 500"
+              Expect.isEmpty captureStore.Records "store.Append must not be called — origin rejected at edge"
           } ]
