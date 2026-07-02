@@ -177,11 +177,19 @@ type SemanticTests() =
                 | JsonValueKind.String -> Some(v.GetString())
                 | JsonValueKind.Object ->
                     let mutable valEl = Unchecked.defaultof<JsonElement>
-                    if v.TryGetProperty("@value", &valEl) then Some(valEl.GetString()) else None
+
+                    if v.TryGetProperty("@value", &valEl) then
+                        Some(valEl.GetString())
+                    else
+                        None
                 | _ -> None)
         | JsonValueKind.Object ->
             let mutable valEl = Unchecked.defaultof<JsonElement>
-            if el.TryGetProperty("@value", &valEl) then Some(valEl.GetString()) else None
+
+            if el.TryGetProperty("@value", &valEl) then
+                Some(valEl.GetString())
+            else
+                None
         | _ -> None
 
     /// Extract all literal strings from a JSON element (handles arrays and single values).
@@ -194,11 +202,17 @@ type SemanticTests() =
                   | JsonValueKind.String -> yield v.GetString()
                   | JsonValueKind.Object ->
                       let mutable valEl = Unchecked.defaultof<JsonElement>
-                      if v.TryGetProperty("@value", &valEl) then yield valEl.GetString()
+
+                      if v.TryGetProperty("@value", &valEl) then
+                          yield valEl.GetString()
                   | _ -> () ]
         | JsonValueKind.Object ->
             let mutable valEl = Unchecked.defaultof<JsonElement>
-            if el.TryGetProperty("@value", &valEl) then [ valEl.GetString() ] else []
+
+            if el.TryGetProperty("@value", &valEl) then
+                [ valEl.GetString() ]
+            else
+                []
         | _ -> []
 
     /// Try reading a property on a node by full IRI key first, then its compacted CURIE.
@@ -213,13 +227,21 @@ type SemanticTests() =
             match SemanticTests.TryCompactIri(fullKey, prefixes) with
             | Some compact ->
                 let mutable el2 = Unchecked.defaultof<JsonElement>
-                if node.TryGetProperty(compact, &el2) then Some el2 else None
+
+                if node.TryGetProperty(compact, &el2) then
+                    Some el2
+                else
+                    None
             | None -> None
 
     /// True when the node's @id (expanded against context base) equals the target IRI.
     static member private NodeMatchesIri
-        (node: JsonElement, targetIri: string, prefixes: System.Collections.Generic.Dictionary<string, string>, contextBase: string)
-        : bool =
+        (
+            node: JsonElement,
+            targetIri: string,
+            prefixes: System.Collections.Generic.Dictionary<string, string>,
+            contextBase: string
+        ) : bool =
         let mutable idEl = Unchecked.defaultof<JsonElement>
 
         node.TryGetProperty("@id", &idEl)
@@ -239,9 +261,11 @@ type SemanticTests() =
         else
             let tryGetId (el: JsonElement) =
                 let mutable idEl = Unchecked.defaultof<JsonElement>
+
                 if el.TryGetProperty("@id", &idEl) then
                     Some(SemanticTests.ExpandIri(idEl.GetString(), prefixes, "https://schema.org/"))
-                else None
+                else
+                    None
 
             let extractStatus (statusEl: JsonElement) =
                 match statusEl.ValueKind with
@@ -251,7 +275,8 @@ type SemanticTests() =
 
             graphEl.EnumerateArray()
             |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then None
+                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
+                    None
                 else
                     SemanticTests.TryGetByEitherKey(node, "https://schema.org/actionStatus", prefixes)
                     |> Option.bind extractStatus)
@@ -266,18 +291,22 @@ type SemanticTests() =
         let mutable graphEl = Unchecked.defaultof<JsonElement>
         let fullKey = originBase + "/tictactoe#currentPlayer"
 
-        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then ""
+        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
+            ""
         else
             graphEl.EnumerateArray()
             |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then None
+                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
+                    None
                 else
                     SemanticTests.TryGetByEitherKey(node, fullKey, prefixes)
                     |> Option.bind SemanticTests.TryExtractLiteral)
             |> Option.defaultValue ""
 
-    /// Parse ttt:validMoves literal values from the game's JSON-LD @graph body.
-    /// Handles both expanded (full IRI key, @value wrappers) and compacted (CURIE key, string array/scalar) forms.
+    /// Parse ttt:validMoves values from the game's JSON-LD @graph body.
+    /// Dual-form: handles IRI nodes ({"@id":"ttt:TopLeft"} — emitted after MINOR-6)
+    /// and plain string literals (backward compat / provenance graph form).
+    /// Returns the local name of each move (e.g. "TopLeft") for use as POST body values.
     static member private ParseValidMoves(ldBody: string, gameIri: string, originBase: string) : string list =
         use doc = JsonDocument.Parse ldBody
         let prefixes = SemanticTests.ParseContextPrefixes ldBody
@@ -285,14 +314,51 @@ type SemanticTests() =
         let mutable graphEl = Unchecked.defaultof<JsonElement>
         let fullKey = originBase + "/tictactoe#validMoves"
 
-        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then []
+        let iriLocalName (iri: string) : string =
+            let hashIdx = iri.LastIndexOf '#'
+
+            if hashIdx >= 0 then
+                iri.Substring(hashIdx + 1)
+            else
+                let colonIdx = iri.LastIndexOf ':'
+                if colonIdx >= 0 then iri.Substring(colonIdx + 1) else iri
+
+        let extractMoveId (el: JsonElement) : string option =
+            match el.ValueKind with
+            | JsonValueKind.String -> Some(el.GetString())
+            | JsonValueKind.Object ->
+                let mutable v = Unchecked.defaultof<JsonElement>
+
+                if el.TryGetProperty("@id", &v) then
+                    Some(iriLocalName (SemanticTests.ExpandIri(v.GetString(), prefixes, contextBase)))
+                elif el.TryGetProperty("@value", &v) then
+                    Some(v.GetString())
+                else
+                    None
+            | _ -> None
+
+        let extractAllMoves (el: JsonElement) : string list =
+            match el.ValueKind with
+            | JsonValueKind.Array ->
+                [ for item in el.EnumerateArray() do
+                      match extractMoveId item with
+                      | Some s -> yield s
+                      | None -> () ]
+            | _ ->
+                match extractMoveId el with
+                | Some s -> [ s ]
+                | None -> []
+
+        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
+            []
         else
             graphEl.EnumerateArray()
             |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then None
+                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
+                    None
                 else
                     SemanticTests.TryGetByEitherKey(node, fullKey, prefixes)
-                    |> Option.map SemanticTests.ExtractAllLiterals)
+                    |> Option.map extractAllMoves)
             |> Option.defaultValue []
 
     /// Parse prefix→expansion mappings from a JSON-LD @context.
@@ -344,7 +410,11 @@ type SemanticTests() =
         : string option =
         prefixes
         |> Seq.tryPick (fun kv ->
-            if kv.Value.Length > 0 && fullIri.StartsWith kv.Value && fullIri.Length > kv.Value.Length then
+            if
+                kv.Value.Length > 0
+                && fullIri.StartsWith kv.Value
+                && fullIri.Length > kv.Value.Length
+            then
                 Some(kv.Key + ":" + fullIri.Substring kv.Value.Length)
             else
                 None)
@@ -967,10 +1037,15 @@ type SemanticTests() =
                     let s = v.GetString()
                     let hashIdx = s.LastIndexOf '#'
 
-                    if hashIdx >= 0 then Some(s.Substring(hashIdx + 1))
+                    if hashIdx >= 0 then
+                        Some(s.Substring(hashIdx + 1))
                     else
                         let colonIdx = s.LastIndexOf ':'
-                        if colonIdx >= 0 then Some(s.Substring(colonIdx + 1)) else Some s
+
+                        if colonIdx >= 0 then
+                            Some(s.Substring(colonIdx + 1))
+                        else
+                            Some s
                 else
                     None
             | _ -> None
@@ -1190,7 +1265,7 @@ type SemanticTests() =
                     moveBody.[agentIri] <- player
                     moveBody.[squareIri] <- square
 
-                    let! _ =
+                    let! moveResp =
                         ctx.PostAsync(
                             moveUrl,
                             APIRequestContextOptions(
@@ -1198,6 +1273,12 @@ type SemanticTests() =
                                 DataObject = moveBody
                             )
                         )
+
+                    Assert.That(
+                        moveResp.Status,
+                        Is.EqualTo 200,
+                        sprintf "AT-S7 move %d returned %d — expected 200" (turn + 1) moveResp.Status
+                    )
 
                     turn <- turn + 1
 
@@ -1453,8 +1534,7 @@ type SemanticTests() =
         task {
             use! ctx = this.NewContext()
 
-            let! resp =
-                ctx.GetAsync("/tictactoe", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
+            let! resp = ctx.GetAsync("/tictactoe", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
 
             Assert.That(resp.Status, Is.EqualTo 200, "vocab endpoint not 200")
             let! body = resp.TextAsync()

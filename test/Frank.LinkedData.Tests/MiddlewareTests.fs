@@ -156,7 +156,8 @@ let tests =
               Expect.stringContains body "@base" "@base declaration present in Turtle"
               Expect.stringContains body "http://localhost" "request origin in @base"
 
-          testCase "GET /data Accept:application/ld+json + GraphFactory → app-vocab IRI is origin-resolved, no example.org"
+          testCase
+              "GET /data Accept:application/ld+json + GraphFactory → app-vocab IRI is origin-resolved, no example.org"
           <| fun _ ->
               use app = startServer sampleConfigWithFactory
               use client = app.GetTestClient()
@@ -215,7 +216,11 @@ let tests =
               Expect.isTrue (firstObj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
               Expect.isTrue (firstObj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
               // #16 real compaction: @graph must contain the compacted ttt: IRI, not the full IRI.
-              Expect.stringContains body "\"ttt:Square\"" "@graph must contain compacted ttt:Square after JSON-LD compaction"
+              Expect.stringContains
+                  body
+                  "\"ttt:Square\""
+                  "@graph must contain compacted ttt:Square after JSON-LD compaction"
+
               Expect.isFalse
                   (body.Contains "/tictactoe#Square")
                   "full tictactoe#Square IRI must not appear in body after compaction"
@@ -229,7 +234,12 @@ let tests =
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               let lines = body.Split('\n')
-              let baseCount = lines |> Array.filter (fun l -> l.TrimStart().StartsWith "@base") |> Array.length
+
+              let baseCount =
+                  lines
+                  |> Array.filter (fun l -> l.TrimStart().StartsWith "@base")
+                  |> Array.length
+
               Expect.equal baseCount 1 "turtle body must contain exactly one @base declaration" ]
 
 [<Tests>]
@@ -376,8 +386,7 @@ let profileAwareTests =
 let originSecurityTests =
     testList
         "LinkedDataMiddleware malformed-Host DoS guard"
-        [ testCaseAsync
-              "malformed Host on GET /tictactoe with GraphFactory → 400, not 500 (security: origin-at-edge)"
+        [ testCaseAsync "malformed Host on GET /tictactoe with GraphFactory → 400, not 500 (security: origin-at-edge)"
           <| async {
               // RED (before guard): factory calls System.Uri(origin + "/tictactoe#square") where
               // origin = "http://ex ample.com" → UriFormatException → 500 / exception.
@@ -399,8 +408,7 @@ let originSecurityTests =
               Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400 not 500 on /tictactoe"
           }
 
-          testCaseAsync
-              "malformed Host on GET /games/{id} with GraphFactory → 400, not 500 (security: origin-at-edge)"
+          testCaseAsync "malformed Host on GET /games/{id} with GraphFactory → 400, not 500 (security: origin-at-edge)"
           <| async {
               // RED (before guard): factory calls System.Uri(origin + "/games/1") where
               // origin = "http://ex ample.com" → UriFormatException → 500 / exception.
@@ -422,8 +430,7 @@ let originSecurityTests =
               Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400 not 500 on /games/{id}"
           }
 
-          testCaseAsync
-              "valid Host on GET /tictactoe with GraphFactory → 200 with ld+json (happy path)"
+          testCaseAsync "valid Host on GET /tictactoe with GraphFactory → 200 with ld+json (happy path)"
           <| async {
               use app = startServerWithTttRoutes ()
               use client = app.GetTestClient()
@@ -433,8 +440,7 @@ let originSecurityTests =
               Expect.equal (int resp.StatusCode) 200 "valid Host → 200 on /tictactoe"
           }
 
-          testCaseAsync
-              "valid Host on GET /games/{id} with GraphFactory → 200 with ld+json (happy path)"
+          testCaseAsync "valid Host on GET /games/{id} with GraphFactory → 200 with ld+json (happy path)"
           <| async {
               use app = startServerWithTttRoutes ()
               use client = app.GetTestClient()
@@ -443,3 +449,35 @@ let originSecurityTests =
               let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
               Expect.equal (int resp.StatusCode) 200 "valid Host → 200 on /games/{id}"
           } ]
+
+[<Tests>]
+let minor3Tests =
+    testList
+        "MINOR-3 LinkedDataMiddleware endpoint-ownership gate"
+        [ testCase "GET /plain Accept:application/n-triples (no LinkedDataConfig) → passes through, not 406"
+          <| fun _ ->
+              // RED before fix: negotiate → NotAcceptable before endpoint check → 406 even for non-owned endpoint.
+              // GREEN after fix: endpoint check first → no config → unconditional pass-through.
+              use app = startServerWithPlainRoute sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/plain")
+              req.Headers.Add("Accept", "application/n-triples")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+
+              Expect.equal
+                  (int resp.StatusCode)
+                  200
+                  "no-config endpoint with unsupported RDF Accept must pass through (not 406)"
+
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.stringContains body "plain downstream" "downstream handler must serve the response"
+
+          testCase "GET /data Accept:application/n-triples (has LinkedDataConfig) → 406"
+          <| fun _ ->
+              // Config endpoint: negotiate runs and n-triples is unsupported → 406.
+              use app = startServerWithPlainRoute sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/n-triples")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 406 "config endpoint with unsupported RDF Accept must still 406" ]

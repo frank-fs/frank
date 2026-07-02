@@ -336,4 +336,41 @@ let tests =
                   statusCode <- 0
 
               Expect.notEqual statusCode 413 "downstream IOException must propagate, not become 413"
+          }
+
+          testCaseAsync "MINOR-2: 422 error response does NOT carry has_provenance Link"
+          <| async {
+              // RED before fix: InvokeNonProv appends Link before next.Invoke → 422 carries the header.
+              // GREEN after fix: OnStarting callback gates on status ≥ 200 && < 400 → 422 skips the header.
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.PostAsync("/reject", null) |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 422 "endpoint returns 422"
+
+              let hasProvLink =
+                  try
+                      resp.Headers.GetValues("Link")
+                      |> Seq.exists (fun v -> v.Contains "has_provenance")
+                  with _ ->
+                      false
+
+              Expect.isFalse hasProvLink "422 response must NOT carry has_provenance Link (MINOR-2)"
+          }
+
+          testCaseAsync "MINOR-2: 2xx response carries has_provenance Link"
+          <| async {
+              // Confirms the OnStarting gate allows the header on successful responses.
+              use app = startProvenanceServer (orderProvConfig ())
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/no-produces") |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "endpoint returns 200"
+
+              let hasProvLink =
+                  try
+                      resp.Headers.GetValues("Link")
+                      |> Seq.exists (fun v -> v.Contains "has_provenance")
+                  with _ ->
+                      false
+
+              Expect.isTrue hasProvLink "200 response must carry has_provenance Link (MINOR-2)"
           } ]

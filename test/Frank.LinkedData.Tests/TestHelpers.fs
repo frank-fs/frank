@@ -33,8 +33,13 @@ let buildTttGraphWithOrigin (ctx: HttpContext) : IGraph =
     let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
     let graph = new Graph()
     let subject = graph.CreateUriNode(System.Uri(origin + "/tictactoe#square"))
-    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-    let rdfsClass = graph.CreateUriNode(System.Uri "http://www.w3.org/2000/01/rdf-schema#Class")
+
+    let rdfType =
+        graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
+    let rdfsClass =
+        graph.CreateUriNode(System.Uri "http://www.w3.org/2000/01/rdf-schema#Class")
+
     graph.Assert(Triple(subject, rdfType, rdfsClass)) |> ignore
     graph :> IGraph
 
@@ -56,9 +61,7 @@ let startServer (config: LinkedDataConfig) =
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
 
-    app
-        .MapGet("/data", System.Func<string>(fun () -> "downstream"))
-        .WithMetadata(config)
+    app.MapGet("/data", System.Func<string>(fun () -> "downstream")).WithMetadata(config)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -69,7 +72,10 @@ let buildGameGraphWithOrigin (ctx: HttpContext) : IGraph =
     let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
     let graph = new Graph()
     let subject = graph.CreateUriNode(System.Uri(origin + "/games/1"))
-    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
+    let rdfType =
+        graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
     let gameClass = graph.CreateUriNode(System.Uri "https://schema.org/Game")
     graph.Assert(Triple(subject, rdfType, gameClass)) |> ignore
     graph :> IGraph
@@ -82,7 +88,10 @@ let buildGraphWithNamespacesAndBaseUri (ctx: HttpContext) : IGraph =
     graph.NamespaceMap.AddNamespace("schema", UriFactory.Create "https://schema.org/")
     graph.NamespaceMap.AddNamespace("ttt", UriFactory.Create(origin + "/tictactoe#"))
     let sub = graph.CreateUriNode(System.Uri(origin + "/tictactoe#Square"))
-    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
+    let rdfType =
+        graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
     let owlClass = graph.CreateUriNode(System.Uri "http://www.w3.org/2002/07/owl#Class")
     graph.Assert(Triple(sub, rdfType, owlClass)) |> ignore
     graph :> IGraph
@@ -92,6 +101,25 @@ let sampleConfigWithNamespaces =
     { Graph = buildFixtureGraph ()
       JsonLdContext = schemaOrgContext
       GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
+
+/// TestServer with a LinkedData-config endpoint (/data) AND a plain endpoint (/plain) without config.
+/// Used for MINOR-3: only LinkedData-owned endpoints should 406 for unsupported RDF Accept.
+let startServerWithPlainRoute (config: LinkedDataConfig) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(config) |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<LinkedDataMiddleware>() |> ignore
+
+    app.MapGet("/data", System.Func<string>(fun () -> "downstream")).WithMetadata(config)
+    |> ignore
+
+    app.MapGet("/plain", System.Func<string>(fun () -> "plain downstream"))
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
 
 /// TestServer with /tictactoe and /games/{id} routes, each carrying a GraphFactory config.
 /// Mirrors the TicTacToe sample so the origin-DoS guard is tested on both factory paths.
@@ -110,14 +138,10 @@ let startServerWithTttRoutes () =
         { sampleConfigWithFactory with
             GraphFactory = Some buildGameGraphWithOrigin }
 
-    app
-        .MapGet("/tictactoe", System.Func<string>(fun () -> "ttt downstream"))
-        .WithMetadata(tttConfig)
+    app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt downstream")).WithMetadata(tttConfig)
     |> ignore
 
-    app
-        .MapGet("/games/{id}", System.Func<string>(fun () -> "game downstream"))
-        .WithMetadata(gameConfig)
+    app.MapGet("/games/{id}", System.Func<string>(fun () -> "game downstream")).WithMetadata(gameConfig)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()

@@ -79,6 +79,14 @@ let private configureProvenanceApp (app: WebApplication) : unit =
     )
     |> ignore
 
+    app.MapPost(
+        "/reject",
+        Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+            ctx.Response.StatusCode <- 422
+            ctx.Response.WriteAsync("validation error"))
+    )
+    |> ignore
+
 let startProvenanceServer (config: ProvenanceConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore

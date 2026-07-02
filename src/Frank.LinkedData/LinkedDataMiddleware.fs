@@ -267,24 +267,24 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
             next.Invoke ctx
         else
 
-            let acceptHeader =
-                match ctx.Request.Headers.TryGetValue "Accept" with
-                | true, v -> v.ToString()
-                | _ -> ""
+            let endpointConfig =
+                match ctx.GetEndpoint() with
+                | null -> None
+                | ep ->
+                    let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
+                    if isNull (box meta) then None else Some meta
 
-            match AcceptNegotiation.negotiate acceptHeader with
-            | AcceptNegotiation.PassThrough -> next.Invoke ctx
-            | AcceptNegotiation.NotAcceptable ->
-                logger.LogDebug("LinkedDataMiddleware: 406 for Accept: {Accept}", acceptHeader)
-                Serializers.respond406 ctx
-            | AcceptNegotiation.Serve mediaType ->
-                let endpointConfig =
-                    match ctx.GetEndpoint() with
-                    | null -> None
-                    | ep ->
-                        let meta = ep.Metadata.GetMetadata<LinkedDataConfig>()
-                        if isNull (box meta) then None else Some meta
+            match endpointConfig with
+            | None -> next.Invoke ctx
+            | Some effective ->
+                let acceptHeader =
+                    match ctx.Request.Headers.TryGetValue "Accept" with
+                    | true, v -> v.ToString()
+                    | _ -> ""
 
-                match endpointConfig with
-                | None -> next.Invoke ctx
-                | Some effective -> this.ServeRdf(ctx, mediaType, effective)
+                match AcceptNegotiation.negotiate acceptHeader with
+                | AcceptNegotiation.PassThrough -> next.Invoke ctx
+                | AcceptNegotiation.NotAcceptable ->
+                    logger.LogDebug("LinkedDataMiddleware: 406 for Accept: {Accept}", acceptHeader)
+                    Serializers.respond406 ctx
+                | AcceptNegotiation.Serve mediaType -> this.ServeRdf(ctx, mediaType, effective)

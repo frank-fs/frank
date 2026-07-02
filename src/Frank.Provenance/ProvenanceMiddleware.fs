@@ -254,8 +254,14 @@ type ProvenanceMiddleware
                 $"<{provenanceUri}>; rel=\"http://www.w3.org/ns/prov#has_provenance\"; anchor=\"{resourceUri}\""
             )
 
-        ctx.Response.Headers.Append("Vary", StringValues "Accept")
-        ctx.Response.Headers.Append("Link", linkHeaderValue)
+        ctx.Response.OnStarting(fun () ->
+            let status = ctx.Response.StatusCode
+
+            if status >= 200 && status < 400 then
+                ctx.Response.Headers.Append("Vary", StringValues "Accept")
+                ctx.Response.Headers.Append("Link", linkHeaderValue)
+
+            Task.CompletedTask)
 
         task {
             do! next.Invoke ctx

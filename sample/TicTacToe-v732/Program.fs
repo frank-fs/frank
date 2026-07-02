@@ -119,8 +119,10 @@ let private gameHandler (ctx: HttpContext) =
 let rec private findDescriptorHrefIn (id: string) (descriptors: Frank.Discovery.AlpsDescriptor list) : string option =
     descriptors
     |> List.tryPick (fun d ->
-        if d.Id = id then d.Href
-        else findDescriptorHrefIn id d.Descriptors)
+        if d.Id = id then
+            d.Href
+        else
+            findDescriptorHrefIn id d.Descriptors)
 
 let private findDescriptorHref (id: string) =
     findDescriptorHrefIn id TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
@@ -217,32 +219,43 @@ let private buildGameGraph (origin: string) (id: string) (result: MoveResult) : 
     let gameSubj = g.CreateUriNode(UriFactory.Create gameIri)
     let identifierPred = g.CreateUriNode(UriFactory.Create(schemaPrefix + "identifier"))
     g.Assert(Triple(gameSubj, identifierPred, g.CreateLiteralNode(id))) |> ignore
-    let actionStatusPred = g.CreateUriNode(UriFactory.Create(schemaPrefix + "actionStatus"))
+
+    let actionStatusPred =
+        g.CreateUriNode(UriFactory.Create(schemaPrefix + "actionStatus"))
 
     let statusIri =
         match result with
-        | XTurn _ | OTurn _ -> schemaPrefix + "ActiveActionStatus"
-        | Won _ | Draw _ -> schemaPrefix + "CompletedActionStatus"
+        | XTurn _
+        | OTurn _ -> schemaPrefix + "ActiveActionStatus"
+        | Won _
+        | Draw _ -> schemaPrefix + "CompletedActionStatus"
         | Error _ -> schemaPrefix + "FailedActionStatus"
 
-    g.Assert(Triple(gameSubj, actionStatusPred, g.CreateUriNode(UriFactory.Create statusIri))) |> ignore
+    g.Assert(Triple(gameSubj, actionStatusPred, g.CreateUriNode(UriFactory.Create statusIri)))
+    |> ignore
 
     match result with
     | XTurn(_, moves) ->
-        let currentPlayerPred = g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+        let currentPlayerPred =
+            g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+
         g.Assert(Triple(gameSubj, currentPlayerPred, g.CreateLiteralNode "X")) |> ignore
         let validMovesPred = g.CreateUriNode(UriFactory.Create(tttBase + "validMoves"))
 
         for XPos pos in moves do
-            g.Assert(Triple(gameSubj, validMovesPred, g.CreateLiteralNode(pos.ToString()))) |> ignore
+            g.Assert(Triple(gameSubj, validMovesPred, g.CreateUriNode(UriFactory.Create(tttBase + pos.ToString()))))
+            |> ignore
 
     | OTurn(_, moves) ->
-        let currentPlayerPred = g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+        let currentPlayerPred =
+            g.CreateUriNode(UriFactory.Create(tttBase + "currentPlayer"))
+
         g.Assert(Triple(gameSubj, currentPlayerPred, g.CreateLiteralNode "O")) |> ignore
         let validMovesPred = g.CreateUriNode(UriFactory.Create(tttBase + "validMoves"))
 
         for OPos pos in moves do
-            g.Assert(Triple(gameSubj, validMovesPred, g.CreateLiteralNode(pos.ToString()))) |> ignore
+            g.Assert(Triple(gameSubj, validMovesPred, g.CreateUriNode(UriFactory.Create(tttBase + pos.ToString()))))
+            |> ignore
 
     | _ -> ()
 
