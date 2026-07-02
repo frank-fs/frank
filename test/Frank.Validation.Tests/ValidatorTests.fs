@@ -38,7 +38,10 @@ let private buildDataGraphWithLiteral (s: string) (p: string) (value: string) (d
     let pNode = g.CreateUriNode(UriFactory.Create p)
     let oNode = g.CreateLiteralNode(value, UriFactory.Create datatype)
     g.Assert(Triple(sNode, pNode, oNode)) |> ignore
-    let rdfType = g.CreateUriNode(UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
+    let rdfType =
+        g.CreateUriNode(UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
     let orderType = g.CreateUriNode(UriFactory.Create "https://schema.org/Order")
     g.Assert(Triple(sNode, rdfType, orderType)) |> ignore
     g
@@ -61,7 +64,10 @@ let private missingPropertyGraph () =
     let g = new Graph() :> IGraph
     g.NamespaceMap.AddNamespace("rdf", UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
     let inst = g.CreateUriNode(UriFactory.Create "https://example.org/order/1")
-    let rdfType = g.CreateUriNode(UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
+    let rdfType =
+        g.CreateUriNode(UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+
     let orderType = g.CreateUriNode(UriFactory.Create "https://schema.org/Order")
     g.Assert(Triple(inst, rdfType, orderType)) |> ignore
     g

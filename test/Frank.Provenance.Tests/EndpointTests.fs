@@ -123,7 +123,10 @@ let tests =
               // Use a server with schema body attrs so compaction is observable.
               use app = startEndpointServerWithSchemaAttrs ()
               use client = app.GetTestClient()
-              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
               let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
               Expect.equal (int resp.StatusCode) 200 "status 200"
               let mutable schemaEl = Unchecked.defaultof<JsonElement>

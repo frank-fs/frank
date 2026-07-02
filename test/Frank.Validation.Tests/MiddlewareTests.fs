@@ -69,7 +69,11 @@ let tests =
               let (resp: HttpResponseMessage) = postLdJson client invalidOrderBody
               let ct = resp.Content.Headers.ContentType.ToString()
               Expect.stringContains ct "application/ld+json" "422 body is ld+json"
-              Expect.stringContains ct "profile=\"http://www.w3.org/ns/shacl#\"" "422 Content-Type includes SHACL profile"
+
+              Expect.stringContains
+                  ct
+                  "profile=\"http://www.w3.org/ns/shacl#\""
+                  "422 Content-Type includes SHACL profile"
 
           testCase "POST ld+json invalid datatype report body contains schema.org/totalPaymentDue"
           <| fun _ ->
@@ -102,8 +106,13 @@ let tests =
               let config = orderConfig ()
               use app = startValidationServer config
               use client = app.GetTestClient()
-              let content = new StringContent("""{"foo":"bar"}""", Encoding.UTF8, "application/json")
-              let (resp: HttpResponseMessage) = client.PostAsync("/echo", content).GetAwaiter().GetResult()
+
+              let content =
+                  new StringContent("""{"foo":"bar"}""", Encoding.UTF8, "application/json")
+
+              let (resp: HttpResponseMessage) =
+                  client.PostAsync("/echo", content).GetAwaiter().GetResult()
+
               Expect.equal (int resp.StatusCode) 200 "plain JSON passes through"
 
           testCase "GET passes through (200)"
@@ -122,26 +131,33 @@ let tests =
               let (resp: HttpResponseMessage) = postLdJson client validOrderBody
               Expect.equal (int resp.StatusCode) 200 "passed through"
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              Expect.stringContains body (string validOrderBody.Length) "handler read exact byte count (body was rewound)"
+
+              Expect.stringContains
+                  body
+                  (string validOrderBody.Length)
+                  "handler read exact byte count (body was rewound)"
 
           testCase "POST ld+json with unknown @context → synthesizing loader fails-closed → 400"
           <| fun _ ->
               let config = orderConfig ()
               use app = startValidationServer config
               use client = app.GetTestClient()
+
               let unknownContextBody =
                   """{
   "@context": "http://example.com/unknown",
   "@type": "Order",
   "totalPaymentDue": {"@value": "100", "@type": "http://www.w3.org/2001/XMLSchema#decimal"}
 }"""
+
               let (resp: HttpResponseMessage) = postLdJson client unknownContextBody
               Expect.equal (int resp.StatusCode) 400 "unknown @context IRI causes parse failure → 400 (fail-closed)"
 
           testCase "POST ld+json body exceeding MaxBodyBytes returns 413"
           <| fun _ ->
               let config =
-                  { orderConfig () with MaxBodyBytes = 64L }
+                  { orderConfig () with
+                      MaxBodyBytes = 64L }
 
               use app = startValidationServer config
               use client = app.GetTestClient()
@@ -166,13 +182,13 @@ let tests =
               use client = app.GetTestClient()
               let (resp: HttpResponseMessage) = postLdJson client invalidOrderBody
               Expect.equal (int resp.StatusCode) 422 "422 status"
+
               let hasLink =
                   resp.Headers.TryGetValues("Link")
                   |> function
                       | true, vals ->
                           vals
-                          |> Seq.exists (fun v ->
-                              v.Contains("rel=\"describedby\"") && v.Contains("shacl#"))
+                          |> Seq.exists (fun v -> v.Contains("rel=\"describedby\"") && v.Contains("shacl#"))
                       | _ -> false
 
               Expect.isTrue hasLink "422 response has Link header with rel=describedby pointing to SHACL"
@@ -218,15 +234,16 @@ let hostRelativePropertyTests =
         "ValidationMiddleware — host-relative SHACL property matching (item #6)"
         [ testCase "POST body using host-resolved IRI passes when HostRelativeProperties declares that path"
           <| fun _ ->
-              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let offlineLoader =
+                  Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+
               let emptyShapes = Shapes.toShapesGraph []
 
               let config =
                   { Shapes = emptyShapes
                     ContextLoader = offlineLoader
                     MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
-                    HostRelativeProperties =
-                      [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+                    HostRelativeProperties = [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
 
               use app = startValidationServer config
               use client = app.GetTestClient()
@@ -244,15 +261,16 @@ let hostRelativePropertyTests =
 
           testCase "POST body using example.org IRI fails when HostRelativeProperties expects host-resolved IRI"
           <| fun _ ->
-              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let offlineLoader =
+                  Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+
               let emptyShapes = Shapes.toShapesGraph []
 
               let config =
                   { Shapes = emptyShapes
                     ContextLoader = offlineLoader
                     MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
-                    HostRelativeProperties =
-                      [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+                    HostRelativeProperties = [ System.Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
 
               use app = startValidationServer config
               use client = app.GetTestClient()
@@ -273,15 +291,16 @@ let hostRelativePropertyTests =
               // RED before fix: resolveProps constructs Uri("http://ex ample.com/tictactoe#square")
               // → UriFormatException propagates uncaught → test sees exception or 500.
               // GREEN after fix: InvokeAsync edge guard catches malformed host → 400 + LogWarning.
-              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let offlineLoader =
+                  Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+
               let emptyShapes = Shapes.toShapesGraph []
 
               let config =
                   { Shapes = emptyShapes
                     ContextLoader = offlineLoader
                     MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
-                    HostRelativeProperties =
-                      [ Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+                    HostRelativeProperties = [ Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
 
               use app = startValidationServer config
               let server = app.GetTestServer()

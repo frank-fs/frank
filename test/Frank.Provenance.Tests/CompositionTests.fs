@@ -585,24 +585,36 @@ let tests =
           }
 
           // ---------------------------------------------------------------
-          // MINOR-1: body buffered once at the edge — deterministic 413 limit.
+          // MINOR-1: body buffered once — outermost limit governs (positive case).
           //
-          // When Provenance (outer, smallLimit) and Validation (inner, 1 MB) are
-          // stacked, the effective 413 threshold is the OUTER middleware's limit.
-          // RequestBodyBuffer.enable checks CanSeek before calling EnableBuffering,
-          // so the second call (from the inner middleware) is a no-op. The body is
-          // buffered exactly once, at the edge, by the outermost middleware.
+          // RequestBodyBuffer.enable guards with `if not request.Body.CanSeek`.
+          // ASP.NET Core's BufferingHelper.EnableRewind has an identical
+          // `if (!body.CanSeek)` check, so removing our guard produces no
+          // observable HTTP-level difference: a discriminating test that fails
+          // with the guard removed is impossible without patching ASP.NET Core.
           //
-          // The test documents the guarantee: outermost limit wins.
+          // What this test DOES prove: with Provenance outer (bigLimit = 1 MB)
+          // and Validation inner (smallLimit = 200 B), a body between the two
+          // limits (body > 200 B, body < 1 MB) succeeds (201). Validation's
+          // enable call is a no-op; its 200 B config never applies.
+          //
+          // The body uses application/ld+json so Validation's InvokeCore ld+json
+          // branch — and its enable call — are actually reached and exercised.
+          // The previous test used application/json, so Validation bypassed the
+          // enable call entirely and the inner middleware never participated.
           // ---------------------------------------------------------------
-          testCaseAsync "MINOR-1: body buffered once — outermost middleware's limit governs 413 (PROV outer)"
+          testCaseAsync "MINOR-1: body buffered once — outer large limit governs; inner small limit is a no-op"
           <| async {
+              let bigLimit = 1L * 1024L * 1024L
               let smallLimit = 200L
+
               let provConfig =
                   { buildProvConfig orderActionIri with
-                      MaxBodyBytes = smallLimit }
+                      MaxBodyBytes = bigLimit }
 
-              let valConfig = buildValidationConfig orderActionIri totalPaymentDueIri
+              let valConfig =
+                  { buildValidationConfig orderActionIri totalPaymentDueIri with
+                      MaxBodyBytes = smallLimit }
 
               let builder = WebApplication.CreateBuilder()
               builder.WebHost.UseTestServer() |> ignore
@@ -620,37 +632,41 @@ let tests =
               builder.Services.AddSingleton(valConfig) |> ignore
 
               let app = builder.Build()
-              // Provenance OUTERMOST — owns the buffer + limit.
               app.UseMiddleware<ProvenanceMiddleware>() |> ignore
-              // Validation INNER — must not re-establish a smaller limit.
               app.UseMiddleware<ValidationMiddleware>() |> ignore
 
-              app
-                  .MapPost(
-                      "/orders",
-                      Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
-                          ctx.Response.StatusCode <- 201
-                          ctx.Response.WriteAsync("{}"))
-                  )
+              app.MapPost(
+                  "/orders",
+                  Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+                      ctx.Response.StatusCode <- 201
+                      ctx.Response.WriteAsync("{}"))
+              )
               |> ignore
 
               do! app.StartAsync() |> Async.AwaitTask
 
               use client = app.GetTestClient()
-              let oversizedBody = System.String('x', 300)
+
+              // ~241 bytes: > smallLimit (200 B), < bigLimit (1 MB).
+              // Valid JSON-LD OrderAction so Validation's ld+json branch is reached.
+              let betweenLimitsBody =
+                  """{
+  "@context": "https://schema.org",
+  "@type": "OrderAction",
+  "@id": "https://example.org/orders/placement-test-buffer-composition-guard",
+  "totalPaymentDue": {"@value": "99.00", "@type": "http://www.w3.org/2001/XMLSchema#decimal"}
+}"""
 
               use content =
-                  new StringContent(
-                      $"""{{"{totalPaymentDueIri}":"{oversizedBody}"}}""",
-                      System.Text.Encoding.UTF8,
-                      "application/json"
-                  )
+                  new StringContent(betweenLimitsBody, System.Text.Encoding.UTF8, "application/ld+json")
 
               let! (resp: HttpResponseMessage) = client.PostAsync("/orders", content) |> Async.AwaitTask
 
-              // Outer (Prov, 200 bytes) catches the oversized body → 413.
+              // 201 proves outer (1 MB) limit governs: body reached handler.
+              // If inner's 200 B limit had applied, 241 B > 200 B would have
+              // caused IOException in JsonLdBody.readBody → 413.
               Expect.equal
                   (int resp.StatusCode)
-                  413
-                  "outermost middleware's limit (200 bytes) governs — body buffered once at the edge"
+                  201
+                  "outer (1 MB) limit governs — body between limits succeeds; inner 200 B config is a no-op"
           } ]

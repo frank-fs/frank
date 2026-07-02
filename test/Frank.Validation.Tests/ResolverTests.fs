@@ -84,4 +84,7 @@ module ResolverTests =
                   | Ok config ->
                       let unknownUri = System.Uri("http://example.com/unknown")
                       let opts = VDS.RDF.JsonLd.JsonLdLoaderOptions()
-                      Expect.throws (fun () -> config.ContextLoader.Invoke(unknownUri, opts) |> ignore) "unknown context IRI must throw (fail-closed)" ]
+
+                      Expect.throws
+                          (fun () -> config.ContextLoader.Invoke(unknownUri, opts) |> ignore)
+                          "unknown context IRI must throw (fail-closed)" ]

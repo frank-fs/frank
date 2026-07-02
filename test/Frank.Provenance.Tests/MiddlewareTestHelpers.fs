@@ -123,8 +123,7 @@ let startProvenanceServerWithThrowingEndpoint (config: ProvenanceConfig) =
 
     app.MapGet(
         "/throw-io",
-        Func<HttpContext, Task>(fun _ ->
-            Task.FromException(System.IO.IOException "simulated downstream disk error"))
+        Func<HttpContext, Task>(fun _ -> Task.FromException(System.IO.IOException "simulated downstream disk error"))
     )
     |> ignore
 

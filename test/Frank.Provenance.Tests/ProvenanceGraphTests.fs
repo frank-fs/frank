@@ -41,8 +41,8 @@ let tests =
               let r =
                   { rec0 (Some(ProvOClass.Activity, Uri "https://schema.org/OrderAction")) with
                       BodyAttributes =
-                        [ "https://schema.org/agent", Literal "alice"
-                          "https://schema.org/object", Literal "order-1" ] }
+                          [ "https://schema.org/agent", Literal "alice"
+                            "https://schema.org/object", Literal "order-1" ] }
 
               let g = ProvenanceGraph.toJsonLd r
               Expect.stringContains g "schema.org/agent" "schema:agent IRI in body attrs"
@@ -56,9 +56,7 @@ let tests =
 
               let r =
                   { rec0 (Some(ProvOClass.Activity, Uri "https://schema.org/OrderAction")) with
-                      BodyAttributes =
-                        [ squareIri, IriNode valueIri
-                          "https://schema.org/agent", Literal "alice" ] }
+                      BodyAttributes = [ squareIri, IriNode valueIri; "https://schema.org/agent", Literal "alice" ] }
 
               let g = ProvenanceGraph.toJsonLd r
               Expect.stringContains g "tictactoe#TopLeft" "URI node IRI present in JSON-LD"
@@ -73,8 +71,7 @@ let tests =
                       BodyAttributes = [ "https://schema.org/actionStatus", Literal "Active" ] }
 
               let extra =
-                  [ "schema", "https://schema.org/"
-                    "ttt", "http://localhost/tictactoe#" ]
+                  [ "schema", "https://schema.org/"; "ttt", "http://localhost/tictactoe#" ]
 
               let json = ProvenanceGraph.listToJsonLd extra [ r ]
               let mutable schemaEl = Unchecked.defaultof<JsonElement>
@@ -90,14 +87,20 @@ let tests =
               let ctxObj =
                   match ctx.ValueKind with
                   | JsonValueKind.Object -> ctx
-                  | JsonValueKind.Array -> ctx.EnumerateArray() |> Seq.tryFind (fun e -> e.ValueKind = JsonValueKind.Object) |> Option.defaultWith (fun () -> Unchecked.defaultof<JsonElement>)
+                  | JsonValueKind.Array ->
+                      ctx.EnumerateArray()
+                      |> Seq.tryFind (fun e -> e.ValueKind = JsonValueKind.Object)
+                      |> Option.defaultWith (fun () -> Unchecked.defaultof<JsonElement>)
                   | _ -> Unchecked.defaultof<JsonElement>
 
               Expect.isTrue (ctxObj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
               Expect.isTrue (ctxObj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
               Expect.equal (schemaEl.GetString()) "https://schema.org/" "schema value is schema.org/"
               // #16 real compaction: schema body attr must appear as compacted CURIE, not full IRI.
-              Expect.stringContains json "schema:actionStatus" "schema:actionStatus must be compacted when schema in extraContext"
+              Expect.stringContains
+                  json
+                  "schema:actionStatus"
+                  "schema:actionStatus must be compacted when schema in extraContext"
 
               Expect.isFalse
                   (json.Contains "\"https://schema.org/actionStatus\"")

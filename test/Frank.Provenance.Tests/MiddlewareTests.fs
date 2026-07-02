@@ -180,7 +180,7 @@ let tests =
               // GREEN (after fix): edge validation catches the bad Host before any IRI construction,
               // returns 400, store.Append is never called.
               let config =
-                  { orderProvConfig() with
+                  { orderProvConfig () with
                       PropertyClassRanges = Map.ofList [ "/square", "/tictactoe#" ] }
 
               let captureStore = CapturingStore()
@@ -199,7 +199,12 @@ let tests =
                           ctx.Request.Scheme <- "http"
                           ctx.Request.Host <- HostString "ex ample.com"
                           ctx.Request.Path <- PathString "/orders"
-                          ctx.Request.Headers.Add("Accept", StringValues "application/ld+json; profile=\"http://www.w3.org/ns/prov\"")
+
+                          ctx.Request.Headers.Add(
+                              "Accept",
+                              StringValues "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+                          )
+
                           ctx.Request.Headers.Add("Content-Type", StringValues "application/json")
                           ctx.Request.Body <- new MemoryStream(bodyBytes)
                           ctx.Request.ContentLength <- Nullable(int64 bodyBytes.Length))
@@ -289,7 +294,10 @@ let tests =
               // RED before impl: EnableBuffering() has no size limit → over-limit body is
               //   read successfully → returns prov ld+json (not 413).
               // GREEN after impl: EnableBuffering(MaxBodyBytes) + IOException catch → 413.
-              let config = { orderProvConfig () with MaxBodyBytes = 64L }
+              let config =
+                  { orderProvConfig () with
+                      MaxBodyBytes = 64L }
+
               use app = startProvenanceServer config
               use client = app.GetTestClient()
               use req = new HttpRequestMessage(HttpMethod.Post, "/orders")
