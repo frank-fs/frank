@@ -72,7 +72,7 @@ module LockFile =
         | n ->
             try
                 Ok(n.GetValue<string>())
-            with _ ->
+            with :? InvalidOperationException ->
                 Error $"field '{key}' is not a string"
 
     let optionalString (node: JsonNode) (key: string) : string option =
@@ -82,7 +82,7 @@ module LockFile =
             try
                 let s = n.GetValue<string>()
                 if s = null then None else Some s
-            with _ ->
+            with :? InvalidOperationException ->
                 None
 
     let requireFloat (node: JsonNode) (key: string) : Result<float, string> =
@@ -91,7 +91,7 @@ module LockFile =
         | n ->
             try
                 Ok(n.GetValue<float>())
-            with _ ->
+            with :? InvalidOperationException ->
                 Error $"field '{key}' is not a number"
 
     let private parseAlternates (node: JsonNode) : Result<string list, string> =
@@ -105,7 +105,7 @@ module LockFile =
                 else
                     try
                         Ok(x.GetValue<string>())
-                    with _ ->
+                    with :? InvalidOperationException ->
                         Error $"alternates[{i}]: not a string")
             |> Seq.fold
                 (fun acc r ->
@@ -313,7 +313,7 @@ module LockFile =
                     let versionResult =
                         try
                             Ok(schemaVersionNode.GetValue<int>())
-                        with _ ->
+                        with :? InvalidOperationException ->
                             Error "lock file: schemaVersion must be an integer"
 
                     versionResult

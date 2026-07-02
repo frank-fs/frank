@@ -582,4 +582,75 @@ let tests =
                   alpsClassIri
                   orderActionIri
                   "same type → same IRI in ALPS descriptor as in PROV-O Activity @type and LinkedData graph class"
+          }
+
+          // ---------------------------------------------------------------
+          // MINOR-1: body buffered once at the edge — deterministic 413 limit.
+          //
+          // When Provenance (outer, smallLimit) and Validation (inner, 1 MB) are
+          // stacked, the effective 413 threshold is the OUTER middleware's limit.
+          // RequestBodyBuffer.enable checks CanSeek before calling EnableBuffering,
+          // so the second call (from the inner middleware) is a no-op. The body is
+          // buffered exactly once, at the edge, by the outermost middleware.
+          //
+          // The test documents the guarantee: outermost limit wins.
+          // ---------------------------------------------------------------
+          testCaseAsync "MINOR-1: body buffered once — outermost middleware's limit governs 413 (PROV outer)"
+          <| async {
+              let smallLimit = 200L
+              let provConfig =
+                  { buildProvConfig orderActionIri with
+                      MaxBodyBytes = smallLimit }
+
+              let valConfig = buildValidationConfig orderActionIri totalPaymentDueIri
+
+              let builder = WebApplication.CreateBuilder()
+              builder.WebHost.UseTestServer() |> ignore
+              builder.Services.AddSingleton(provConfig) |> ignore
+              builder.Services.AddLogging() |> ignore
+
+              builder.Services.AddSingleton<IProvenanceStore>(fun sp ->
+                  let logFactory =
+                      sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+
+                  new MailboxProcessorProvenanceStore(provConfig.StoreConfig, logFactory.CreateLogger("prov"))
+                  :> IProvenanceStore)
+              |> ignore
+
+              builder.Services.AddSingleton(valConfig) |> ignore
+
+              let app = builder.Build()
+              // Provenance OUTERMOST — owns the buffer + limit.
+              app.UseMiddleware<ProvenanceMiddleware>() |> ignore
+              // Validation INNER — must not re-establish a smaller limit.
+              app.UseMiddleware<ValidationMiddleware>() |> ignore
+
+              app
+                  .MapPost(
+                      "/orders",
+                      Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+                          ctx.Response.StatusCode <- 201
+                          ctx.Response.WriteAsync("{}"))
+                  )
+              |> ignore
+
+              do! app.StartAsync() |> Async.AwaitTask
+
+              use client = app.GetTestClient()
+              let oversizedBody = System.String('x', 300)
+
+              use content =
+                  new StringContent(
+                      $"""{{"{totalPaymentDueIri}":"{oversizedBody}"}}""",
+                      System.Text.Encoding.UTF8,
+                      "application/json"
+                  )
+
+              let! (resp: HttpResponseMessage) = client.PostAsync("/orders", content) |> Async.AwaitTask
+
+              // Outer (Prov, 200 bytes) catches the oversized body → 413.
+              Expect.equal
+                  (int resp.StatusCode)
+                  413
+                  "outermost middleware's limit (200 bytes) governs — body buffered once at the edge"
           } ]

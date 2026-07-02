@@ -125,7 +125,7 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
                 logger.LogDebug("ValidationMiddleware: host-relative shapes reject body, returning 422")
                 ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd r.Normalised) ctx
 
-    member _.InvokeAsync(ctx: HttpContext) : Task =
+    member private _.InvokeCore(ctx: HttpContext) : Task =
         if not (JsonLdBody.isLdJson ctx) then
             next.Invoke ctx
         else
@@ -153,3 +153,15 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
                         do! ValidationRespond.respond400 ex.Message ctx
                     | Ok data -> do! validateAndRespond ctx data
             }
+
+    member this.InvokeAsync(ctx: HttpContext) : Task =
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            logger.LogWarning(
+                "ValidationMiddleware: malformed Host header '{Host}' — cannot mint host-relative IRIs, rejecting with 400",
+                ctx.Request.Host.Value
+            )
+
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some _ -> this.InvokeCore(ctx)

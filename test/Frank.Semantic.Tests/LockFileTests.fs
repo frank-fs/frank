@@ -1054,3 +1054,80 @@ let unionShapeRoundTripTests =
               let parsed = Expect.wantOk (LockFile.read path) "read back"
               Expect.equal parsed.Mappings lf.Mappings "round-trips with union shape"
           } ]
+
+// ── Bare-catch narrowing: rule 7 guards ──────────────────────────────────────
+// Verify each narrowed catch still returns Error for type-mismatch inputs
+// and lets genuinely unexpected exceptions propagate (rule 7).
+
+[<Tests>]
+let bareCatchNarrowingTests =
+    testList
+        "LockFile bare-catch narrowing (rule 7)"
+        [ test "requireString: integer value → Error 'is not a string' (InvalidOperationException caught)" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-01-01T00:00:00Z","vocabularies":{},"mappings":[
+                {"fsharpType":42,"confidence":1.0,"source":"manual","status":"confirmed","alternates":[],"fields":[]}]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+                  let result = LockFile.read path
+                  Expect.isError result "integer fsharpType must produce Error"
+
+                  match result with
+                  | Error msg -> Expect.stringContains msg "fsharpType" "error cites fsharpType"
+                  | Ok _ -> ()
+              finally
+                  File.Delete path
+          }
+
+          test "requireFloat: string value for confidence → Error 'is not a number' (InvalidOperationException caught)" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-01-01T00:00:00Z","vocabularies":{},"mappings":[
+                {"fsharpType":"MyApp.Foo","confidence":"bad","source":"manual","status":"confirmed","alternates":[],"fields":[]}]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+                  let result = LockFile.read path
+                  Expect.isError result "string confidence must produce Error"
+              finally
+                  File.Delete path
+          }
+
+          test "schemaVersion as string → Error 'schemaVersion must be an integer' (InvalidOperationException caught)" {
+              let json =
+                  """{"schemaVersion":"one","generated":"2026-01-01T00:00:00Z","vocabularies":{},"mappings":[]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for string schemaVersion"
+                  | Error msg ->
+                      Expect.stringContains msg "schemaVersion must be an integer" "error cites schemaVersion"
+              finally
+                  File.Delete path
+          }
+
+          test "alternates element is object → Error mentioning alternates (InvalidOperationException caught)" {
+              let json =
+                  """{"schemaVersion":1,"generated":"2026-01-01T00:00:00Z","vocabularies":{},"mappings":[
+                {"fsharpType":"MyApp.Foo","confidence":1.0,"source":"manual","status":"confirmed",
+                 "alternates":[{"nested":"bad"}],"fields":[]}]}"""
+
+              let path = Path.GetTempFileName()
+
+              try
+                  File.WriteAllText(path, json)
+
+                  match LockFile.read path with
+                  | Ok _ -> failtest "expected Error for object alternate"
+                  | Error msg -> Expect.stringContains msg "alternates" "error cites alternates"
+              finally
+                  File.Delete path
+          } ]

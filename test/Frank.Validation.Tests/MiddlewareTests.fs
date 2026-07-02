@@ -1,9 +1,12 @@
 module Frank.Validation.Tests.MiddlewareTests
 
 open System
+open System.IO
 open System.Net.Http
 open System.Text
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.Primitives
 open Expecto
 open Frank.Semantic
 open Frank.Validation
@@ -263,4 +266,41 @@ let hostRelativePropertyTests =
 }"""
 
               let (resp: HttpResponseMessage) = postLdJson client wrongHostBody
-              Expect.equal (int resp.StatusCode) 422 "body using example.org IRI fails validation (wrong host)" ]
+              Expect.equal (int resp.StatusCode) 422 "body using example.org IRI fails validation (wrong host)"
+
+          testCaseAsync "POST ld+json with malformed Host header → 400 not 500 (M1 edge guard)"
+          <| async {
+              // RED before fix: resolveProps constructs Uri("http://ex ample.com/tictactoe#square")
+              // → UriFormatException propagates uncaught → test sees exception or 500.
+              // GREEN after fix: InvokeAsync edge guard catches malformed host → 400 + LogWarning.
+              let offlineLoader = Frank.Validation.JsonLdLoader.synthesizing [ "https://schema.org/" ]
+              let emptyShapes = Shapes.toShapesGraph []
+
+              let config =
+                  { Shapes = emptyShapes
+                    ContextLoader = offlineLoader
+                    MaxBodyBytes = ValidationConfig.defaultMaxBodyBytes
+                    HostRelativeProperties =
+                      [ Uri "https://schema.org/MoveAction", "/tictactoe#square", None ] }
+
+              use app = startValidationServer config
+              let server = app.GetTestServer()
+
+              let bodyBytes =
+                  Encoding.UTF8.GetBytes """{"@context":"https://schema.org","@type":"MoveAction"}"""
+
+              let! ctx =
+                  server.SendAsync(
+                      Action<HttpContext>(fun ctx ->
+                          ctx.Request.Method <- "POST"
+                          ctx.Request.Scheme <- "http"
+                          ctx.Request.Host <- HostString "ex ample.com"
+                          ctx.Request.Path <- PathString "/echo"
+                          ctx.Request.Headers.Append("Content-Type", StringValues "application/ld+json")
+                          ctx.Request.Body <- new MemoryStream(bodyBytes)
+                          ctx.Request.ContentLength <- Nullable(int64 bodyBytes.Length))
+                  )
+                  |> Async.AwaitTask
+
+              Expect.equal ctx.Response.StatusCode 400 "malformed Host → 400, not 500 or exception"
+          } ]
