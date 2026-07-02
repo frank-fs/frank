@@ -66,6 +66,7 @@ let tests =
                   { ProvClasses = Map.empty
                     KnownNamespaces = [||]
                     PropertyClassRanges = Map.empty
+                    DeclaredPrefixes = []
                     StoreConfig = Frank.Provenance.ProvenanceStoreConfig.defaults
                     MaxBodyBytes = Frank.Provenance.ProvenanceConfig.defaultMaxBodyBytes }
 

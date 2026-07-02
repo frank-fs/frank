@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Primitives
 
-let handle (store: IProvenanceStore) (ctx: HttpContext) : Task =
+let handle (store: IProvenanceStore) (config: ProvenanceConfig) (ctx: HttpContext) : Task =
     if isNull (box store) then
         invalidArg (nameof store) "store must not be null"
 
@@ -21,21 +21,24 @@ let handle (store: IProvenanceStore) (ctx: HttpContext) : Task =
             "Missing required query parameter"
             "provenance query requires a 'resource' parameter"
     else
-        task {
-            let rawResource = resource.ToString()
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some origin ->
+            task {
+                let rawResource = resource.ToString()
 
-            let resolvedResource =
-                if rawResource.StartsWith("/") then
-                    ctx.Request.Scheme + "://" + ctx.Request.Host.Value + rawResource
-                else
-                    rawResource
+                let resolvedResource =
+                    if rawResource.StartsWith("/") then
+                        origin + rawResource
+                    else
+                        rawResource
 
-            let origin = ctx.Request.Scheme + "://" + ctx.Request.Host.Value
-
-            let extraCtx = [ "schema", "https://schema.org/"; "ttt", origin + "/tictactoe#" ]
-
-            let! records = store.QueryByResource(resolvedResource)
-            ctx.Response.StatusCode <- 200
-            ctx.Response.ContentType <- "application/ld+json"
-            do! ctx.Response.WriteAsync(ProvenanceGraph.listToJsonLd extraCtx records)
-        }
+                let! records = store.QueryByResource(resolvedResource)
+                let g = ProvenanceGraph.buildMergedGraph records
+                let extraCtx = ProvenanceGraph.usedPrefixContext config.DeclaredPrefixes g
+                ctx.Response.StatusCode <- 200
+                ctx.Response.ContentType <- "application/ld+json"
+                do! ctx.Response.WriteAsync(ProvenanceGraph.compactGraph extraCtx g)
+            }

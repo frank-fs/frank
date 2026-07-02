@@ -15,7 +15,9 @@ module ProvenanceExtensions =
     let private buildProvenanceEndpoint () : Endpoint =
         let handler =
             RequestDelegate(fun ctx ->
-                ProvenanceEndpoint.handle (ctx.RequestServices.GetRequiredService<IProvenanceStore>()) ctx)
+                let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
+                let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
+                ProvenanceEndpoint.handle store config ctx)
 
         let builder =
             RouteEndpointBuilder(handler, RoutePatternFactory.Parse "/provenance", 0)

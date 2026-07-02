@@ -247,72 +247,86 @@ type SemanticTests() =
         node.TryGetProperty("@id", &idEl)
         && SemanticTests.ExpandIri(idEl.GetString(), prefixes, contextBase) = targetIri
 
+    /// Common skeleton: parse body once, extract prefixes+base from the same document,
+    /// walk @graph, find the game node, look up fullKey via TryGetByEitherKey.
+    /// Returns a Clone'd JsonElement so the caller owns the lifetime, or None when absent.
+    static member private TryReadGameNodeProperty
+        (ldBody: string, gameIri: string, fullKey: string)
+        : JsonElement option =
+        use doc = JsonDocument.Parse ldBody
+        let prefixes = System.Collections.Generic.Dictionary<string, string>()
+        let mutable contextBase = ""
+        let mutable ctxEl = Unchecked.defaultof<JsonElement>
+
+        if doc.RootElement.TryGetProperty("@context", &ctxEl) then
+            let scanObject (el: JsonElement) =
+                if el.ValueKind = JsonValueKind.Object then
+                    for prop in el.EnumerateObject() do
+                        if prop.Name = "@base" && prop.Value.ValueKind = JsonValueKind.String then
+                            contextBase <- prop.Value.GetString()
+                        elif not (prop.Name.StartsWith "@") && prop.Value.ValueKind = JsonValueKind.String then
+                            prefixes.[prop.Name] <- prop.Value.GetString()
+
+            match ctxEl.ValueKind with
+            | JsonValueKind.Array ->
+                for item in ctxEl.EnumerateArray() do
+                    scanObject item
+            | _ -> scanObject ctxEl
+
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+
+        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
+            None
+        else
+            graphEl.EnumerateArray()
+            |> Seq.tryPick (fun node ->
+                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
+                    None
+                else
+                    SemanticTests.TryGetByEitherKey(node, fullKey, prefixes))
+            |> Option.map (fun el -> el.Clone())
+
     /// Parse schema:actionStatus IRI from the game's JSON-LD @graph body.
     /// Handles both expanded (full IRI key + array value) and compacted (CURIE key + object value) forms.
     /// Returns the expanded actionStatus IRI, or "" when not found.
     static member private ParseActionStatus(ldBody: string, gameIri: string) : string =
-        use doc = JsonDocument.Parse ldBody
         let prefixes = SemanticTests.ParseContextPrefixes ldBody
-        let contextBase = SemanticTests.ExtractContextBase ldBody
-        let mutable graphEl = Unchecked.defaultof<JsonElement>
 
-        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
-            ""
-        else
-            let tryGetId (el: JsonElement) =
-                let mutable idEl = Unchecked.defaultof<JsonElement>
+        let tryGetId (el: JsonElement) =
+            let mutable idEl = Unchecked.defaultof<JsonElement>
 
-                if el.TryGetProperty("@id", &idEl) then
-                    Some(SemanticTests.ExpandIri(idEl.GetString(), prefixes, "https://schema.org/"))
-                else
-                    None
+            if el.TryGetProperty("@id", &idEl) then
+                Some(SemanticTests.ExpandIri(idEl.GetString(), prefixes, "https://schema.org/"))
+            else
+                None
 
-            let extractStatus (statusEl: JsonElement) =
-                match statusEl.ValueKind with
-                | JsonValueKind.Array -> statusEl.EnumerateArray() |> Seq.tryPick tryGetId
-                | JsonValueKind.Object -> tryGetId statusEl
-                | _ -> None
+        let extractStatus (statusEl: JsonElement) =
+            match statusEl.ValueKind with
+            | JsonValueKind.Array -> statusEl.EnumerateArray() |> Seq.tryPick tryGetId
+            | JsonValueKind.Object -> tryGetId statusEl
+            | _ -> None
 
-            graphEl.EnumerateArray()
-            |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
-                    None
-                else
-                    SemanticTests.TryGetByEitherKey(node, "https://schema.org/actionStatus", prefixes)
-                    |> Option.bind extractStatus)
-            |> Option.defaultValue ""
+        SemanticTests.TryReadGameNodeProperty(ldBody, gameIri, "https://schema.org/actionStatus")
+        |> Option.bind extractStatus
+        |> Option.defaultValue ""
 
     /// Parse ttt:currentPlayer literal from the game's JSON-LD @graph body.
     /// Handles both expanded (full IRI key, @value wrapper) and compacted (CURIE key, plain string) forms.
     static member private ParseCurrentPlayer(ldBody: string, gameIri: string, originBase: string) : string =
-        use doc = JsonDocument.Parse ldBody
-        let prefixes = SemanticTests.ParseContextPrefixes ldBody
-        let contextBase = SemanticTests.ExtractContextBase ldBody
-        let mutable graphEl = Unchecked.defaultof<JsonElement>
         let fullKey = originBase + "/tictactoe#currentPlayer"
 
-        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
-            ""
-        else
-            graphEl.EnumerateArray()
-            |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
-                    None
-                else
-                    SemanticTests.TryGetByEitherKey(node, fullKey, prefixes)
-                    |> Option.bind SemanticTests.TryExtractLiteral)
-            |> Option.defaultValue ""
+        SemanticTests.TryReadGameNodeProperty(ldBody, gameIri, fullKey)
+        |> Option.bind SemanticTests.TryExtractLiteral
+        |> Option.defaultValue ""
 
     /// Parse ttt:validMoves values from the game's JSON-LD @graph body.
     /// Dual-form: handles IRI nodes ({"@id":"ttt:TopLeft"} — emitted after MINOR-6)
     /// and plain string literals (backward compat / provenance graph form).
     /// Returns the local name of each move (e.g. "TopLeft") for use as POST body values.
     static member private ParseValidMoves(ldBody: string, gameIri: string, originBase: string) : string list =
-        use doc = JsonDocument.Parse ldBody
+        let fullKey = originBase + "/tictactoe#validMoves"
         let prefixes = SemanticTests.ParseContextPrefixes ldBody
         let contextBase = SemanticTests.ExtractContextBase ldBody
-        let mutable graphEl = Unchecked.defaultof<JsonElement>
-        let fullKey = originBase + "/tictactoe#validMoves"
 
         let iriLocalName (iri: string) : string =
             let hashIdx = iri.LastIndexOf '#'
@@ -349,17 +363,9 @@ type SemanticTests() =
                 | Some s -> [ s ]
                 | None -> []
 
-        if not (doc.RootElement.TryGetProperty("@graph", &graphEl)) then
-            []
-        else
-            graphEl.EnumerateArray()
-            |> Seq.tryPick (fun node ->
-                if not (SemanticTests.NodeMatchesIri(node, gameIri, prefixes, contextBase)) then
-                    None
-                else
-                    SemanticTests.TryGetByEitherKey(node, fullKey, prefixes)
-                    |> Option.map extractAllMoves)
-            |> Option.defaultValue []
+        SemanticTests.TryReadGameNodeProperty(ldBody, gameIri, fullKey)
+        |> Option.map extractAllMoves
+        |> Option.defaultValue []
 
     /// Parse prefix→expansion mappings from a JSON-LD @context.
     /// Skips keywords (@base, @vocab, etc.) and non-string values.

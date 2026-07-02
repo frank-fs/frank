@@ -122,9 +122,6 @@ module private Capture =
     let absoluteUri (ctx: HttpContext) =
         ctx.Request.Scheme + "://" + ctx.Request.Host.Value + ctx.Request.Path.Value
 
-    let private origin (ctx: HttpContext) =
-        ctx.Request.Scheme + "://" + ctx.Request.Host.Value
-
     // AC4: if a body attribute's property IRI has a class range (app-owned vocab term),
     // convert the raw string value to a URI node by resolving it against the class namespace.
     // E.g. "/tictactoe#square" → class ns "/tictactoe#" → "TopLeft" → IRI "origin/tictactoe#TopLeft".
@@ -146,7 +143,7 @@ module private Capture =
             | None -> Literal rawValue
             | Some classNs -> IriNode(originStr + classNs + rawValue)
 
-    let private resolveAgent (ctx: HttpContext) : ProvAgent =
+    let private resolveAgent (originStr: string) (ctx: HttpContext) : ProvAgent =
         let name =
             if not (isNull ctx.User) && not (isNull ctx.User.Identity) then
                 let n = ctx.User.Identity.Name
@@ -154,17 +151,12 @@ module private Capture =
             else
                 "anonymous"
 
-        let id =
-            ctx.Request.Scheme
-            + "://"
-            + ctx.Request.Host.Value
-            + "/agents/"
-            + Uri.EscapeDataString name
-
+        let id = originStr + "/agents/" + Uri.EscapeDataString name
         { Id = id; Label = Some name }
 
     let build
         (config: ProvenanceConfig)
+        (originStr: string)
         (ctx: HttpContext)
         (started: DateTimeOffset)
         (ended: DateTimeOffset)
@@ -172,14 +164,13 @@ module private Capture =
         : ProvenanceRecord =
         let endpoint = ctx.GetEndpoint()
         let domainType = resolveDomainType endpoint config ctx.Response.StatusCode
-        let originStr = origin ctx
 
         { Id = "urn:uuid:" + Guid.NewGuid().ToString()
           ResourceUri = absoluteUri ctx
           HttpMethod = ctx.Request.Method
           StatusCode = ctx.Response.StatusCode
           DomainType = domainType
-          Agent = resolveAgent ctx
+          Agent = resolveAgent originStr ctx
           StartedAt = started
           EndedAt = ended
           BodyAttributes =
@@ -212,13 +203,13 @@ type ProvenanceMiddleware
         }
 
     member private this.InvokeWithProv
-        (ctx: HttpContext, started: DateTimeOffset, bodyAttrs: (string * string) list)
+        (ctx: HttpContext, origin: string, started: DateTimeOffset, bodyAttrs: (string * string) list)
         : Task =
         task {
             do! ProvenanceMiddleware.withDiscardedBody ctx (fun () -> next.Invoke ctx)
 
             let ended = DateTimeOffset.UtcNow
-            let record = Capture.build config ctx started ended bodyAttrs
+            let record = Capture.build config origin ctx started ended bodyAttrs
             store.Append record
 
             if ctx.Response.HasStarted then
@@ -236,18 +227,14 @@ type ProvenanceMiddleware
         }
 
     member private this.InvokeNonProv
-        (ctx: HttpContext, started: DateTimeOffset, bodyAttrs: (string * string) list)
+        (ctx: HttpContext, origin: string, started: DateTimeOffset, bodyAttrs: (string * string) list)
         : Task =
         let resourceUri = Capture.absoluteUri ctx
 
         // PROV-AQ §4.1: target = provenance document, anchor = described resource.
         // The type= param is not defined by PROV-AQ and was removed (it was misleading).
         let provenanceUri =
-            ctx.Request.Scheme
-            + "://"
-            + ctx.Request.Host.Value
-            + "/provenance?resource="
-            + Uri.EscapeDataString resourceUri
+            origin + "/provenance?resource=" + Uri.EscapeDataString resourceUri
 
         let linkHeaderValue =
             StringValues(
@@ -266,10 +253,10 @@ type ProvenanceMiddleware
         task {
             do! next.Invoke ctx
             let ended = DateTimeOffset.UtcNow
-            store.Append(Capture.build config ctx started ended bodyAttrs)
+            store.Append(Capture.build config origin ctx started ended bodyAttrs)
         }
 
-    member private this.InvokeCore(ctx: HttpContext) : Task =
+    member private this.InvokeCore(ctx: HttpContext, origin: string) : Task =
         let started = DateTimeOffset.UtcNow
 
         if BodyCapture.isBodyBearing ctx.Request.Method then
@@ -289,9 +276,9 @@ type ProvenanceMiddleware
             | None -> do! Frank.RequestBodyBuffer.respond413 ctx
             | Some bodyAttrs ->
                 if ProvNegotiation.requested ctx then
-                    do! this.InvokeWithProv(ctx, started, bodyAttrs)
+                    do! this.InvokeWithProv(ctx, origin, started, bodyAttrs)
                 else
-                    do! this.InvokeNonProv(ctx, started, bodyAttrs)
+                    do! this.InvokeNonProv(ctx, origin, started, bodyAttrs)
         }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
@@ -304,4 +291,4 @@ type ProvenanceMiddleware
 
             ctx.Response.StatusCode <- 400
             Task.CompletedTask
-        | Some _ -> this.InvokeCore(ctx)
+        | Some origin -> this.InvokeCore(ctx, origin)

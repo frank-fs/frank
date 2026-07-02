@@ -19,6 +19,7 @@ let orderProvConfig () : ProvenanceConfig =
               (Frank.Semantic.ProvOClass.Activity, Some(Uri "https://schema.org/OrderAction")) ]
       KnownNamespaces = [| "https://schema.org/" |]
       PropertyClassRanges = Map.empty
+      DeclaredPrefixes = []
       StoreConfig = ProvenanceStoreConfig.defaults
       MaxBodyBytes = ProvenanceConfig.defaultMaxBodyBytes }
 

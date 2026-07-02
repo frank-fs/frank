@@ -71,10 +71,7 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
                     r.Fields |> List.choose (fieldDescriptor bases)
 
             let rt =
-                if isAction then
-                    r.Rt |> Option.map (fun rtUri -> EmitterShared.hrefFor bases rtUri.AbsoluteUri)
-                else
-                    None
+                r.Rt |> Option.map (fun rtUri -> EmitterShared.hrefFor bases rtUri.AbsoluteUri)
 
             { Id = localName absolute
               Href = hrefOption (EmitterShared.hrefFor bases absolute)

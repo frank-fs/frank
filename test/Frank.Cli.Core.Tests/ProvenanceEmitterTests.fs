@@ -86,3 +86,59 @@ let compileGateTests =
               let diagnostics = typecheckAgainstRealAssemblies src assemblies
               Expect.isEmpty diagnostics $"emitted Provenance module compiles cleanly; errors: {diagnostics}"
           } ]
+
+// A lock that has wikidata as a declared-only EXTERNAL reference prefix (not in vocabularies,
+// not used in any mapping IRI) and ttt as an app-owned declared-only prefix (used in ttt:square).
+let private lockWithExternalDeclared: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies =
+        Map.ofList
+            [ "schema",
+              { Uri = "https://schema.org/"
+                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                Hash = "sha256:test" } ]
+      DeclaredPrefixes =
+        Map.ofList
+            [ "schema", "https://schema.org/"
+              "wikidata", "http://www.wikidata.org/entity/"
+              "ttt", "https://example.org/tictactoe#" ]
+      Mappings =
+        [ { FSharpType = "MyApp.OrderPlaced"
+            Iri = Some "schema:OrderAction"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Position"
+                      Iri = Some "ttt:square"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let toStoredNsClassificationTests =
+    testList
+        "ProvenanceEmitter — toStoredNs classification"
+        [ test "external declared-only vocab keeps absolute URI; app-owned stays host-relative" {
+              // RED before fix: current Map.containsKey Vocabularies logic host-strips wikidata to /entity/
+              // GREEN after fix: wikidata (declared but not used in mappings) keeps absolute URI
+              let src =
+                  ProvenanceEmitter.emit "MyApp.GeneratedProvenance" registry lockWithExternalDeclared
+                  |> okOrFail
+
+              // wikidata must be absolute — not host-stripped
+              Expect.stringContains
+                  src
+                  "http://www.wikidata.org/entity/"
+                  "wikidata namespace must be absolute (external declared-only)"
+
+              // ttt must be host-stripped — it IS used in a mapping IRI (ttt:square)
+              Expect.stringContains src "/tictactoe#" "ttt namespace must be host-relative (app-owned)"
+
+              // schema must be absolute — it is in lock.Vocabularies
+              Expect.stringContains src "https://schema.org/" "schema namespace must be absolute (vocabulary entry)"
+          } ]

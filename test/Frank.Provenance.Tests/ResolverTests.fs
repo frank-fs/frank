@@ -8,6 +8,7 @@ open Frank.Provenance
 type EmptyGeneratedProvenance() =
     static member val provClasses: (string * (string * string)) list = [] with get
     static member val knownNamespaces: string[] = [||] with get
+    static member val declaredPrefixes: (string * string) list = [] with get
 
 // Fixture for resolveFromType tests — dotted names stay as-is (no resolveClrName call).
 type FakeGeneratedProvenance() =
@@ -16,6 +17,7 @@ type FakeGeneratedProvenance() =
           "MyApp.Ping", ("Activity", "") ] with get
 
     static member val knownNamespaces: string[] = [| "https://schema.org/" |] with get
+    static member val declaredPrefixes: (string * string) list = [] with get
 
 // Fixture for resolveGeneratedConfig — must be named "GeneratedProvenance" so that
 // findSinglePublicType "GeneratedProvenance" finds exactly one match.
@@ -26,6 +28,7 @@ type GeneratedProvenance() =
         [ "Frank.Provenance.Tests.ResolverTests.CapstoneLike.MovePlaced", ("Activity", "https://schema.org/MoveAction") ] with get
 
     static member val knownNamespaces: string[] = [||] with get
+    static member val declaredPrefixes: (string * string) list = [ "ex", "/ex#" ] with get
 
 module ResolverTests =
 

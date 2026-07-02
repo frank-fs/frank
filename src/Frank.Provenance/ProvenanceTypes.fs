@@ -32,6 +32,7 @@ type ProvenanceConfig =
     { ProvClasses: Map<string, Frank.Semantic.ProvOClass * Uri option>
       KnownNamespaces: string[]
       PropertyClassRanges: Map<string, string>
+      DeclaredPrefixes: (string * string) list
       StoreConfig: ProvenanceStoreConfig
       MaxBodyBytes: int64 }
 

@@ -48,6 +48,7 @@ let private buildProvConfig (classIri: string) : ProvenanceConfig =
         Map.ofList [ typeof<OrderPlaced>.FullName.Replace('+', '.'), (ProvOClass.Activity, Some(Uri classIri)) ]
       KnownNamespaces = [| "https://schema.org/" |]
       PropertyClassRanges = Map.empty
+      DeclaredPrefixes = []
       StoreConfig = ProvenanceStoreConfig.defaults
       MaxBodyBytes = ProvenanceConfig.defaultMaxBodyBytes }
 

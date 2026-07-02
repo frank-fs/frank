@@ -24,6 +24,7 @@ module GeneratedProvenanceResolver =
         (entries: (string * (string * string)) list)
         (ns: string[])
         (classRanges: Map<string, string>)
+        (declaredPrefixes: (string * string) list)
         : Result<ProvenanceConfig, string> =
         let folded =
             (Ok [], entries)
@@ -38,12 +39,13 @@ module GeneratedProvenanceResolver =
             { ProvClasses = Map.ofList pairs
               KnownNamespaces = ns
               PropertyClassRanges = classRanges
+              DeclaredPrefixes = declaredPrefixes
               StoreConfig = ProvenanceStoreConfig.defaults
               MaxBodyBytes = ProvenanceConfig.defaultMaxBodyBytes })
 
     let private readConfig
         (t: Type)
-        : Result<(string * (string * string)) list * string[] * Map<string, string>, string> =
+        : Result<(string * (string * string)) list * string[] * Map<string, string> * (string * string) list, string> =
         match
             readStaticProp<(string * (string * string)) list> "provClasses" t,
             readStaticProp<string[]> "knownNamespaces" t
@@ -54,13 +56,19 @@ module GeneratedProvenanceResolver =
                 | Ok pairs -> Map.ofList pairs
                 | Error _ -> Map.empty
 
-            Ok(entries, ns, classRanges)
+            let declaredPrefixes =
+                match readStaticProp<(string * string) list> "declaredPrefixes" t with
+                | Ok pairs -> pairs
+                | Error _ -> []
+
+            Ok(entries, ns, classRanges, declaredPrefixes)
         | Error e, _ -> Error e
         | _, Error e -> Error e
 
     let resolveFromType (t: Type) : Result<ProvenanceConfig, string> =
         readConfig t
-        |> Result.bind (fun (entries, ns, classRanges) -> buildConfig entries ns classRanges)
+        |> Result.bind (fun (entries, ns, classRanges, declaredPrefixes) ->
+            buildConfig entries ns classRanges declaredPrefixes)
 
     let resolveGeneratedConfig (assemblies: Assembly[]) : Result<ProvenanceConfig, string> =
         if isNull assemblies then
@@ -70,4 +78,5 @@ module GeneratedProvenanceResolver =
         |> findSinglePublicType "GeneratedProvenance"
         |> Result.bind (fun t ->
             readConfig t
-            |> Result.bind (fun (entries, ns, classRanges) -> buildConfig entries ns classRanges))
+            |> Result.bind (fun (entries, ns, classRanges, declaredPrefixes) ->
+                buildConfig entries ns classRanges declaredPrefixes))

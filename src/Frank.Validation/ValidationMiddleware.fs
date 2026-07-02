@@ -101,7 +101,7 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
         if config.MaxBodyBytes <= 0L then
             invalidArg (nameof config) "ValidationConfig.MaxBodyBytes must be positive"
 
-    let validateAndRespond (ctx: HttpContext) (data: IGraph) : Task =
+    let validateAndRespond (origin: string) (ctx: HttpContext) (data: IGraph) : Task =
         use _ = data
         let staticReport = Validator.validate config.Shapes data
 
@@ -109,8 +109,6 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             logger.LogDebug("ValidationMiddleware: static shapes reject body, returning 422")
             ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd staticReport.Normalised) ctx
         else
-            let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-
             let dynReport =
                 HostRelative.validateDynamic config.HostRelativeProperties origin data
 
@@ -125,7 +123,7 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
                 logger.LogDebug("ValidationMiddleware: host-relative shapes reject body, returning 422")
                 ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd r.Normalised) ctx
 
-    member private _.InvokeCore(ctx: HttpContext) : Task =
+    member private _.InvokeCore(ctx: HttpContext, origin: string) : Task =
         if not (JsonLdBody.isLdJson ctx) then
             next.Invoke ctx
         else
@@ -151,7 +149,7 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
                     | Error ex ->
                         logger.LogDebug(ex, "ValidationMiddleware: failed to parse ld+json body")
                         do! ValidationRespond.respond400 ex.Message ctx
-                    | Ok data -> do! validateAndRespond ctx data
+                    | Ok data -> do! validateAndRespond origin ctx data
             }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
@@ -164,4 +162,4 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
 
             ctx.Response.StatusCode <- 400
             Task.CompletedTask
-        | Some _ -> this.InvokeCore(ctx)
+        | Some origin -> this.InvokeCore(ctx, origin)
