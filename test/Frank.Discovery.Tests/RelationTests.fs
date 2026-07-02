@@ -48,7 +48,10 @@ let private startRelationServer () =
     let config =
         { DiscoveryConfig.Empty with
             ProfileUri = "/alps/test"
-            HomeRoute = "/" }
+            HomeRoute = "/"
+            ResourceHrefVars =
+              Map.ofList
+                  [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
 
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore

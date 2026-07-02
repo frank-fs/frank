@@ -29,31 +29,6 @@ type internal ResolvedDescriptor =
 let private hrefOption (href: string) : string option =
     if String.IsNullOrEmpty href then None else Some href
 
-/// Compute which prefixes are declared-only (in DeclaredPrefixes but not in Vocabularies).
-/// Their base URIs are returned as a set; matching IRIs will be emitted as relative paths.
-let private declaredOnlyBases (lock: LockFile) : Set<string> =
-    lock.DeclaredPrefixes
-    |> Map.filter (fun k _ -> not (Map.containsKey k lock.Vocabularies))
-    |> Map.toSeq
-    |> Seq.map snd
-    |> Set.ofSeq
-
-/// For a declared-only IRI, extract the host-relative path+fragment.
-/// For external vocab IRIs, return the absolute URI unchanged.
-let private hrefFor (bases: Set<string>) (absoluteUri: string) : string =
-    let matchingBase =
-        bases |> Set.toSeq |> Seq.tryFind (fun b -> absoluteUri.StartsWith(b))
-
-    match matchingBase with
-    | None -> absoluteUri
-    | Some _ ->
-        let uri = Uri(absoluteUri)
-        uri.PathAndQuery + uri.Fragment
-
-/// True when the IRI local name ends in "Action" (ALPS unsafe transition convention).
-let private isActionIri (absoluteUri: string) : bool =
-    (localName absoluteUri).EndsWith("Action")
-
 /// Build a leaf field descriptor; returns None when the field has no IRI.
 let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDescriptor option =
     f.Iri
@@ -61,7 +36,7 @@ let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDe
         let absolute = uri.AbsoluteUri
 
         { Id = localName absolute
-          Href = hrefOption (hrefFor bases absolute)
+          Href = hrefOption (EmitterShared.hrefFor bases absolute)
           IsAction = false
           Rt = None
           Children = [] })
@@ -71,7 +46,7 @@ let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDesc
     let absolute = c.Iri.AbsoluteUri
 
     { Id = c.CaseName
-      Href = hrefOption (hrefFor bases absolute)
+      Href = hrefOption (EmitterShared.hrefFor bases absolute)
       IsAction = false
       Rt = None
       Children = [] }
@@ -79,15 +54,15 @@ let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDesc
 /// Collect all class-level descriptors. Each class descriptor carries its children:
 /// - Union types: confirmed case descriptors (AC1 #17 — outcome terms discoverable).
 /// - Record types: field descriptors with IRIs (AC1 #4 nesting).
-/// Action classes (IRI ends in "Action") get Type="unsafe" and Rt = the href
-/// of the declared return-type IRI (r.Rt), set explicitly in the lock file.
+/// A resource with a declared Rt is an unsafe transition (isAction = r.Rt.IsSome).
+/// Rt is the href of the declared return-type IRI, set explicitly in the lock file.
 let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
     resources
     |> List.choose (fun r ->
         r.ClassIri
         |> Option.map (fun uri ->
             let absolute = uri.AbsoluteUri
-            let isAction = isActionIri absolute
+            let isAction = r.Rt.IsSome
 
             let children =
                 if not (List.isEmpty r.Cases) then
@@ -97,18 +72,19 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
 
             let rt =
                 if isAction then
-                    r.Rt |> Option.map (fun rtUri -> hrefFor bases rtUri.AbsoluteUri)
+                    r.Rt |> Option.map (fun rtUri -> EmitterShared.hrefFor bases rtUri.AbsoluteUri)
                 else
                     None
 
             { Id = localName absolute
-              Href = hrefOption (hrefFor bases absolute)
+              Href = hrefOption (EmitterShared.hrefFor bases absolute)
               IsAction = isAction
               Rt = rt
               Children = children }))
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.
-let private collectDescribedByLinks (resources: ResolvedResource list) : string list =
+/// Declared-only prefix class IRIs are emitted as host-relative link targets.
+let private collectDescribedByLinks (bases: Set<string>) (resources: ResolvedResource list) : string list =
     let folder (seen: Set<string>, acc: string list) (r: ResolvedResource) =
         match r.ClassIri with
         | None -> seen, acc
@@ -118,7 +94,8 @@ let private collectDescribedByLinks (resources: ResolvedResource list) : string 
             if Set.contains fullIri seen then
                 seen, acc
             else
-                let link = $"<{fullIri}>; rel=\"type\""
+                let linkIri = EmitterShared.hrefFor bases fullIri
+                let link = $"<{linkIri}>; rel=\"type\""
                 Set.add fullIri seen, link :: acc
 
     let _, revLinks = List.fold folder (Set.empty, []) resources
@@ -155,7 +132,7 @@ let internal projectDiscovery
     (declaredOnlyBases: Set<string>)
     (model: ResolvedModel)
     : ResolvedDescriptor list * string list =
-    collectDescriptors declaredOnlyBases model.Resources, collectDescribedByLinks model.Resources
+    collectDescriptors declaredOnlyBases model.Resources, collectDescribedByLinks declaredOnlyBases model.Resources
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
 
@@ -189,14 +166,15 @@ let private resourceHrefVarsExpr (vars: (string * (string * string) list) list) 
 
 /// For each resource with a class IRI and confirmed field IRIs, build a
 /// (classIri, [(varName, meaningIri)]) entry. varName is the field name lowercased;
-/// meaningIri is the absolute URI (not host-relative — href-vars requires absolute IRIs).
+/// meaningIri is host-relative for declared-only prefix IRIs, absolute for external vocab IRIs.
 /// Template variables from a parent path segment (e.g. {id} in /games/{id}/moves) are
 /// resolved by following the declared Rt linkage to the target resource and reading THAT
 /// resource's matching field — NOT a global name pool. Own field entries take precedence;
 /// supplemental entries come from the Rt target only (one hop).
-let private computeHrefVars (model: ResolvedModel) : (string * (string * string) list) list =
+let private computeHrefVars (bases: Set<string>) (model: ResolvedModel) : (string * (string * string) list) list =
     let toFieldEntry (f: ResolvedField) =
-        f.Iri |> Option.map (fun iri -> f.Name.ToLowerInvariant(), iri.AbsoluteUri)
+        f.Iri
+        |> Option.map (fun iri -> f.Name.ToLowerInvariant(), EmitterShared.hrefFor bases iri.AbsoluteUri)
 
     let byClassIri =
         model.Resources
@@ -258,10 +236,10 @@ let emit
     AstRender.validateModuleName moduleName
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.map (fun model ->
-        let bases = declaredOnlyBases lock
+        let bases = EmitterShared.declaredOnlyBases lock
         let descriptors, links = projectDiscovery bases model
         assertUniqueIds descriptors
-        let hrefVars = computeHrefVars model
+        let hrefVars = computeHrefVars bases model
         let value = configExpr profileUri descriptors links hrefVars
 
         AstRender.formatTypedValueModule

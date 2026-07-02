@@ -36,7 +36,11 @@ let serialize (resources: JsonHomeResource list) : string =
                 writer.WriteStartObject()
 
                 for v in vars do
-                    writer.WriteString(v, r.HrefVars |> Map.tryFind v |> Option.defaultValue "")
+                    match r.HrefVars |> Map.tryFind v with
+                    | None ->
+                        invalidOp
+                            $"JSON Home template variable '{v}' in href '{r.Href}' has no derived meaning IRI. Ensure the semantic model maps this field."
+                    | Some meaning -> writer.WriteString(v, meaning)
 
                 writer.WriteEndObject()
         else

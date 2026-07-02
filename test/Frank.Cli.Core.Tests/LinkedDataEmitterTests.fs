@@ -612,6 +612,65 @@ let contextBasesTypedTests =
               Expect.equal result [ Uri("https://schema.org/") ] "context base resolved"
           } ]
 
+// ── Fixture: declared-only ttt: prefix (not in Vocabularies) ─────────────────
+// This is the M3 test fixture: ttt: is declared in DeclaredPrefixes only,
+// so all ttt: IRIs must be host-relativized in the generated ontology.
+
+let private tttDeclaredOnlyLinkedDataLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.empty
+      DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+      Mappings =
+        [ { FSharpType = "TicTacToe.Game"
+            Iri = Some "ttt:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "Id"
+                      Iri = Some "ttt:identifier"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed } ] } ] }
+
+[<Tests>]
+let m3LinkedDataHostRelativeTests =
+    testList
+        "LinkedDataEmitter — M3: declared-only prefix host-relativized in generated ontology"
+        [ test "ttt: class IRI is host-relative in generated ontology (no example.org)" {
+              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "/tictactoe#Game" "ttt:Game must be host-relative /tictactoe#Game"
+              Expect.isFalse (source.Contains "https://example.org/tictactoe#Game") "no absolute example.org for ttt:Game"
+          }
+
+          test "ttt: property IRI is host-relative in generated ontology (no example.org)" {
+              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "/tictactoe#identifier" "ttt:identifier must be host-relative /tictactoe#identifier"
+              Expect.isFalse (source.Contains "https://example.org/tictactoe#identifier") "no absolute example.org for ttt:identifier"
+          }
+
+          test "schema.org terms in external vocab lock stay absolute (not relativized)" {
+              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "https://schema.org/Game" "schema:Game stays absolute"
+              Expect.stringContains source "https://schema.org/identifier" "schema:identifier stays absolute"
+          }
+
+          test "emitted source with host-relative ttt: URIs uses UriKind.Relative constructor" {
+              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              Expect.isOk src "emit should succeed"
+              Expect.stringContains (unwrapOk src) "UriKind.Relative" "relative URI must use System.Uri(s, UriKind.Relative) constructor"
+          } ]
+
 [<Tests>]
 let compileGateTierTests =
     testList

@@ -958,6 +958,120 @@ let nestingTests =
                   "Rt must point to declared Game, not first-declared ItemList"
           } ]
 
+// ── Fixture: declared Rt on a class whose local name does NOT end in "Action" (M2) ─
+// Under the old suffix heuristic (isActionIri), "Submit" does not end in "Action",
+// so it would emit IsAction=false and drop the Rt entirely (silent data loss).
+// Under the declared-linkage fix (r.Rt.IsSome), it IS an unsafe transition because
+// it has a declared Rt, regardless of the class local name.
+
+let private nonActionNameWithRtLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Vocabularies = Map.empty
+      DeclaredPrefixes = Map.ofList [ "ex", "https://example.org/ex#" ]
+      Mappings =
+        [ { FSharpType = "App.Target"
+            Iri = Some "ex:Target"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape = MappingShape.Record [] }
+          { FSharpType = "App.Submit"
+            Iri = Some "ex:Submit"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = Some "ex:Target"
+            Shape = MappingShape.Record [] } ] }
+
+[<Tests>]
+let m2DeclaredLinkageTests =
+    testList
+        "DiscoveryEmitter — M2: isAction derived from declared Rt linkage not name suffix"
+        [ test "class with Rt=Some but name not ending in 'Action' → IsAction=true" {
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let submit =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "Submit")
+                  |> Option.defaultWith (fun () -> failwith "Submit descriptor not found")
+
+              Expect.isTrue submit.IsAction "Submit (Rt=Some) must be an action even though name doesn't end in 'Action'"
+          }
+
+          test "class with Rt=Some but name not ending in 'Action' → type='unsafe' in emitted source" {
+              let src =
+                  DiscoveryEmitter.emit
+                      "App.GeneratedDiscovery"
+                      "/alps"
+                      VocabularyRegistry.empty
+                      nonActionNameWithRtLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.stringContains (unwrapOk src) "\"unsafe\"" "Submit must emit type='unsafe' (declared Rt)"
+          }
+
+          test "class with Rt=Some but name not ending in 'Action' → Rt is emitted (not dropped)" {
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let submit =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "Submit")
+                  |> Option.defaultWith (fun () -> failwith "Submit descriptor not found")
+
+              Expect.isSome submit.Rt "Submit (Rt=Some) must have Rt in the descriptor (not silently dropped)"
+          }
+
+          test "class with Rt=None and name not ending in 'Action' → IsAction=false (Target)" {
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+
+              let target =
+                  descriptors
+                  |> List.tryFind (fun d -> d.Id = "Target")
+                  |> Option.defaultWith (fun () -> failwith "Target descriptor not found")
+
+              Expect.isFalse target.IsAction "Target (Rt=None) must not be an action"
+          }
+
+          test "sample fixture unaffected: MoveAction (Rt=Some) → unsafe; Game (Rt=None) → semantic" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery Set.empty model
+
+              let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
+              let game = descriptors |> List.find (fun d -> d.Id = "Game")
+              Expect.isTrue moveAction.IsAction "MoveAction (Rt=Some) is action"
+              Expect.isFalse game.IsAction "Game (Rt=None) is not action"
+          } ]
+
 // ── Fixture: union type with outcome cases (MoveResult analogue) ─────────────
 
 let private outcomeUnionLock: LockFile =
@@ -1078,6 +1192,75 @@ let unionCaseDescriptorTests =
 
               Expect.isOk src "emit should succeed"
               Expect.isTrue (parsesFsSource (unwrapOk src)) "parses as valid F#"
+          } ]
+
+// ── MINOR-7: collectDescribedByLinks + computeHrefVars host-relativize declared-only prefixes ──
+
+[<Tests>]
+let minor7HostRelativeTests =
+    testList
+        "DiscoveryEmitter — MINOR-7: declared-only prefix host-relative in Link headers and href-vars"
+        [ test "collectDescribedByLinks: declared-only class IRI becomes host-relative in Link header" {
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty exDeclaredOnlyLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+              let _, links = DiscoveryEmitter.projectDiscovery bases model
+              Expect.exists
+                  links
+                  (fun l -> l.Contains "/ex#Game")
+                  "declared-only ex:Game class IRI must be host-relative in Link header"
+
+              Expect.isFalse
+                  (links |> List.exists (fun l -> l.Contains "example.org"))
+                  "no example.org absolute IRI in Link headers for declared-only prefix"
+          }
+
+          test "collectDescribedByLinks: external vocab class IRI stays absolute in Link header" {
+              let model =
+                  ResolvedModel.build schemaRegistry tttDeclaredOnlyLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let bases = Set.ofList [ "https://example.org/tictactoe#" ]
+              let _, links = DiscoveryEmitter.projectDiscovery bases model
+              Expect.exists
+                  links
+                  (fun l -> l.Contains "https://schema.org/MoveAction")
+                  "external vocab class IRI (schema:MoveAction) stays absolute in Link header"
+          }
+
+          test "computeHrefVars: declared-only field IRIs emit host-relative meaning in generated source" {
+              let src =
+                  DiscoveryEmitter.emit
+                      "Ex.Generated"
+                      "/alps"
+                      VocabularyRegistry.empty
+                      exDeclaredOnlyLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "/ex#identifier" "declared-only field IRI /ex#identifier is host-relative in href-vars"
+
+              Expect.isFalse
+                  (source.Contains "\"https://example.org/ex#identifier\"")
+                  "no absolute example.org IRI in href-var meaning for declared-only prefix"
+          }
+
+          test "computeHrefVars: external vocab field IRIs stay absolute" {
+              let src =
+                  DiscoveryEmitter.emit
+                      "TicTacToe.Generated"
+                      "/alps"
+                      schemaRegistry
+                      tttDeclaredOnlyLock
+
+              Expect.isOk src "emit should succeed"
+              Expect.stringContains (unwrapOk src) "https://schema.org/agent" "schema:agent stays absolute in href-vars"
           } ]
 
 // ── Fixture: duplicate descriptor IDs (same field IRI in two classes) ─────────

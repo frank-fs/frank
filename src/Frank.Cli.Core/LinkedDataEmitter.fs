@@ -45,36 +45,45 @@ let internal projectOntology (model: ResolvedModel) : OntologyDecl =
 
 // ── AstRender helpers ────────────────────────────────────────────────────────
 
-let private uriField (name: string) (u: Uri) =
-    name, AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri)
+/// Emit a System.Uri expression: absolute form for external vocab IRIs,
+/// relative form (with System.UriKind.Relative) for declared-only prefix IRIs.
+let private uriExprFor (bases: Set<string>) (u: Uri) =
+    let href = EmitterShared.hrefFor bases u.AbsoluteUri
 
-let private renderUriOpt (u: Uri) =
-    AstRender.parenExpr (AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri))
+    if href = u.AbsoluteUri then
+        AstRender.appExpr "System.Uri" (AstRender.strExpr href)
+    else
+        AstRender.appExpr
+            "System.Uri"
+            (AstRender.parenExpr (
+                AstRender.tupleExpr [ AstRender.strExpr href; AstRender.rawExpr "System.UriKind.Relative" ]
+            ))
 
-let private optUriField (name: string) (u: Uri option) =
-    name, AstRender.optionExpr renderUriOpt u
+let private uriField (bases: Set<string>) (name: string) (u: Uri) = name, uriExprFor bases u
 
-let private uriListField (name: string) (us: Uri list) =
-    let items =
-        us
-        |> List.map (fun u -> AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri))
+let private renderUriOpt (bases: Set<string>) (u: Uri) =
+    AstRender.parenExpr (uriExprFor bases u)
 
-    name, AstRender.listExpr items
+let private optUriField (bases: Set<string>) (name: string) (u: Uri option) =
+    name, AstRender.optionExpr (renderUriOpt bases) u
 
-let private propExpr (p: PropertyDecl) =
-    AstRender.recordExpr [ uriField "Iri" p.Iri; uriField "Domain" p.Domain ]
+let private uriListField (bases: Set<string>) (name: string) (us: Uri list) =
+    name, AstRender.listExpr (us |> List.map (uriExprFor bases))
 
-let private classExpr (c: ClassDecl) =
+let private propExpr (bases: Set<string>) (p: PropertyDecl) =
+    AstRender.recordExpr [ uriField bases "Iri" p.Iri; uriField bases "Domain" p.Domain ]
+
+let private classExpr (bases: Set<string>) (c: ClassDecl) =
     AstRender.recordExpr
-        [ uriField "Iri" c.Iri
-          optUriField "EquivalentClass" c.EquivalentClass
-          uriListField "SeeAlso" c.SeeAlso
-          "Properties", AstRender.listExpr (c.Properties |> List.map propExpr) ]
+        [ uriField bases "Iri" c.Iri
+          optUriField bases "EquivalentClass" c.EquivalentClass
+          uriListField bases "SeeAlso" c.SeeAlso
+          "Properties", AstRender.listExpr (c.Properties |> List.map (propExpr bases)) ]
 
-let private ontologyExpr (onto: OntologyDecl) =
+let private ontologyExpr (bases: Set<string>) (onto: OntologyDecl) =
     AstRender.recordExpr
-        [ "Classes", AstRender.listExpr (onto.Classes |> List.map classExpr)
-          uriListField "ContextBases" onto.ContextBases ]
+        [ "Classes", AstRender.listExpr (onto.Classes |> List.map (classExpr bases))
+          uriListField bases "ContextBases" onto.ContextBases ]
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -91,13 +100,15 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.bind (fun model ->
         contextBases model
-        |> Result.map (fun bases ->
+        |> Result.map (fun ctxBases ->
+            let bases = EmitterShared.declaredOnlyBases lock
+
             let onto =
                 { projectOntology model with
-                    ContextBases = bases }
+                    ContextBases = ctxBases }
 
             let decls =
-                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr onto)
+                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr bases onto)
                   AstRender.valueDecl
                       "graph"
                       "VDS.RDF.IGraph"

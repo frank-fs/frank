@@ -69,7 +69,7 @@ let jsonHomeTests =
                   [ { Relation = "https://schema.org/Game"
                       Href = "/games/{id}"
                       Allow = [ "GET" ]
-                      HrefVars = Map.empty }
+                      HrefVars = Map.ofList [ ("id", "https://schema.org/identifier") ] }
                     { Relation = "https://schema.org/About"
                       Href = "/about"
                       Allow = [ "GET" ]
@@ -127,4 +127,48 @@ let jsonHomeTests =
                       HrefVars = Map.empty } ]
 
               let json = JsonHomeSerializer.serialize resources
-              Expect.isFalse (json.Contains "href-vars") "fixed href resource must have no href-vars" ]
+              Expect.isFalse (json.Contains "href-vars") "fixed href resource must have no href-vars"
+
+          testCase "MINOR-4: template variable with no meaning IRI throws invalidOp (not silent empty string)"
+          <| fun _ ->
+              let resources =
+                  [ { Relation = "https://schema.org/Game"
+                      Href = "/games/{id}"
+                      Allow = [ "GET" ]
+                      HrefVars = Map.empty } ]
+
+              Expect.throws
+                  (fun () -> JsonHomeSerializer.serialize resources |> ignore)
+                  "missing href-var meaning must throw invalidOp naming the variable"
+
+          testCase "MINOR-4: partial HrefVars (covers one variable, missing another) also throws"
+          <| fun _ ->
+              let resources =
+                  [ { Relation = "https://schema.org/Game"
+                      Href = "/games/{gameId}/moves/{moveId}"
+                      Allow = [ "GET" ]
+                      HrefVars = Map.ofList [ ("gameId", "https://schema.org/identifier") ] } ]
+
+              Expect.throws
+                  (fun () -> JsonHomeSerializer.serialize resources |> ignore)
+                  "partially-covered href-template must throw for the unmapped variable"
+
+          testCase "MINOR-4: all template variables covered → no throw (sample passes)"
+          <| fun _ ->
+              let resources =
+                  [ { Relation = "https://schema.org/Game"
+                      Href = "/games/{id}"
+                      Allow = [ "GET" ]
+                      HrefVars = Map.ofList [ ("id", "https://schema.org/identifier") ] } ]
+
+              let json = JsonHomeSerializer.serialize resources
+              use doc = JsonDocument.Parse json
+              let mutable resourcesEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              doc.RootElement.TryGetProperty("resources", &resourcesEl) |> ignore
+              let mutable gameEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              resourcesEl.TryGetProperty("https://schema.org/Game", &gameEl) |> ignore
+              let mutable hrefVarsEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              Expect.isTrue (gameEl.TryGetProperty("href-vars", &hrefVarsEl)) "href-vars present when all vars resolved"
+              let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+              hrefVarsEl.TryGetProperty("id", &idEl) |> ignore
+              Expect.equal (idEl.GetString()) "https://schema.org/identifier" "id maps to schema:identifier (no empty string)" ]
