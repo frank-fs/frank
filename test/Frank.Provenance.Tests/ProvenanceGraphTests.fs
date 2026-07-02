@@ -1,6 +1,7 @@
 module Frank.Provenance.Tests.ProvenanceGraphTests
 
 open System
+open System.Text.Json
 open Expecto
 open Frank.Semantic
 open Frank.Provenance
@@ -63,4 +64,42 @@ let tests =
               Expect.stringContains g "tictactoe#TopLeft" "URI node IRI present in JSON-LD"
               Expect.stringContains g "alice" "literal value still present"
               Expect.isFalse (g.Contains "\"TopLeft\"") "TopLeft must not appear as standalone plain literal"
+          }
+
+          test "#16 listToJsonLd with extra context injects schema and ttt into @context" {
+              // Use a record with a schema body attribute so compaction is observable.
+              let r =
+                  { rec0 None with
+                      BodyAttributes = [ "https://schema.org/actionStatus", Literal "Active" ] }
+
+              let extra =
+                  [ "schema", "https://schema.org/"
+                    "ttt", "http://localhost/tictactoe#" ]
+
+              let json = ProvenanceGraph.listToJsonLd extra [ r ]
+              let mutable schemaEl = Unchecked.defaultof<JsonElement>
+              let mutable tttEl = Unchecked.defaultof<JsonElement>
+              use doc = JsonDocument.Parse json
+              let root = doc.RootElement
+
+              let ctx =
+                  match root.ValueKind with
+                  | JsonValueKind.Object -> root.GetProperty("@context")
+                  | _ -> Unchecked.defaultof<JsonElement>
+
+              let ctxObj =
+                  match ctx.ValueKind with
+                  | JsonValueKind.Object -> ctx
+                  | JsonValueKind.Array -> ctx.EnumerateArray() |> Seq.tryFind (fun e -> e.ValueKind = JsonValueKind.Object) |> Option.defaultWith (fun () -> Unchecked.defaultof<JsonElement>)
+                  | _ -> Unchecked.defaultof<JsonElement>
+
+              Expect.isTrue (ctxObj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
+              Expect.isTrue (ctxObj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
+              Expect.equal (schemaEl.GetString()) "https://schema.org/" "schema value is schema.org/"
+              // #16 real compaction: schema body attr must appear as compacted CURIE, not full IRI.
+              Expect.stringContains json "schema:actionStatus" "schema:actionStatus must be compacted when schema in extraContext"
+
+              Expect.isFalse
+                  (json.Contains "\"https://schema.org/actionStatus\"")
+                  "full schema.org property IRI must not appear as JSON key after compaction"
           } ]

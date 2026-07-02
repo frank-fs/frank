@@ -30,8 +30,12 @@ let handle (store: IProvenanceStore) (ctx: HttpContext) : Task =
                 else
                     rawResource
 
+            let origin = ctx.Request.Scheme + "://" + ctx.Request.Host.Value
+
+            let extraCtx = [ "schema", "https://schema.org/"; "ttt", origin + "/tictactoe#" ]
+
             let! records = store.QueryByResource(resolvedResource)
             ctx.Response.StatusCode <- 200
             ctx.Response.ContentType <- "application/ld+json"
-            do! ctx.Response.WriteAsync(ProvenanceGraph.listToJsonLd records)
+            do! ctx.Response.WriteAsync(ProvenanceGraph.listToJsonLd extraCtx records)
         }

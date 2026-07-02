@@ -198,7 +198,39 @@ let tests =
               let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
               Expect.equal (int resp.StatusCode) 406 "406 Not Acceptable"
               let vary = resp.Headers.Vary |> Seq.toList
-              Expect.contains vary "Accept" "Vary: Accept must be present on 406 response" ]
+              Expect.contains vary "Accept" "Vary: Accept must be present on 406 response"
+
+          testCase "#16 ld+json @context includes schema and ttt from graph.NamespaceMap"
+          <| fun _ ->
+              use app = startServer sampleConfigWithNamespaces
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              let mutable schemaEl = Unchecked.defaultof<JsonElement>
+              let mutable tttEl = Unchecked.defaultof<JsonElement>
+              use doc = JsonDocument.Parse(body)
+              let firstObj = doc.RootElement.GetProperty("@context").EnumerateArray() |> Seq.head
+              Expect.isTrue (firstObj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
+              Expect.isTrue (firstObj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
+              // #16 real compaction: @graph must contain the compacted ttt: IRI, not the full IRI.
+              Expect.stringContains body "\"ttt:Square\"" "@graph must contain compacted ttt:Square after JSON-LD compaction"
+              Expect.isFalse
+                  (body.Contains "/tictactoe#Square")
+                  "full tictactoe#Square IRI must not appear in body after compaction"
+
+          testCase "double-@base: turtle body has exactly one @base line when graph.BaseUri is set"
+          <| fun _ ->
+              use app = startServer sampleConfigWithNamespaces
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "text/turtle")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              let lines = body.Split('\n')
+              let baseCount = lines |> Array.filter (fun l -> l.TrimStart().StartsWith "@base") |> Array.length
+              Expect.equal baseCount 1 "turtle body must contain exactly one @base declaration" ]
 
 [<Tests>]
 let qvalueTests =

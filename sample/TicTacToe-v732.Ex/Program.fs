@@ -1,8 +1,12 @@
 module TicTacToe.Program
 
+open System
 open System.IO
 open System.Text.Json.Nodes
 open Microsoft.AspNetCore.Http
+open VDS.RDF
+open VDS.RDF.Parsing
+open VDS.RDF.Writing
 open Frank
 open Frank.Builder
 open Frank.Discovery
@@ -168,6 +172,28 @@ let private moveHandler (ctx: HttpContext) =
             do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
     }
 
+let private exVocabTtl =
+    let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ex.ttl")
+    File.ReadAllText(path)
+
+let private loadExVocabGraph (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    let g = new Graph()
+    g.BaseUri <- Uri origin
+    let parser = TurtleParser()
+    use reader = new StringReader(exVocabTtl)
+    parser.Load(g, reader)
+    g :> IGraph
+
+let private buildExTurtleBody (origin: string) (graph: IGraph) : string =
+    use sw = new System.IO.StringWriter()
+    let writer = CompressingTurtleWriter()
+    writer.Save(graph, sw :> System.IO.TextWriter)
+    if isNull (box graph.BaseUri) then
+        "@base <" + origin + "> .\n" + sw.ToString()
+    else
+        sw.ToString()
+
 let private homeResource =
     resource "/" {
         name "Home"
@@ -193,6 +219,19 @@ let private movesResource =
         post moveHandler
     }
 
+let private exVocabResource =
+    resource "/ex" {
+        name "ExVocabulary"
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+                let graph = loadExVocabGraph ctx
+                ctx.Response.ContentType <- "text/turtle"
+                do! ctx.Response.WriteAsync(buildExTurtleBody origin graph)
+            })
+    }
+
 [<EntryPoint>]
 let main args =
     webHost args {
@@ -200,6 +239,7 @@ let main args =
         resource homeResource
         resource gameResource
         resource movesResource
+        resource exVocabResource
     }
 
     0

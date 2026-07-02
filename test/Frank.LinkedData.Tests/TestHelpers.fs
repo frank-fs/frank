@@ -74,6 +74,25 @@ let buildGameGraphWithOrigin (ctx: HttpContext) : IGraph =
     graph.Assert(Triple(subject, rdfType, gameClass)) |> ignore
     graph :> IGraph
 
+/// Build a graph with named namespace prefixes (schema + ttt) to verify they surface in @context (#16).
+let buildGraphWithNamespacesAndBaseUri (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    let graph = new Graph()
+    graph.BaseUri <- System.Uri origin
+    graph.NamespaceMap.AddNamespace("schema", UriFactory.Create "https://schema.org/")
+    graph.NamespaceMap.AddNamespace("ttt", UriFactory.Create(origin + "/tictactoe#"))
+    let sub = graph.CreateUriNode(System.Uri(origin + "/tictactoe#Square"))
+    let rdfType = graph.CreateUriNode(System.Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+    let owlClass = graph.CreateUriNode(System.Uri "http://www.w3.org/2002/07/owl#Class")
+    graph.Assert(Triple(sub, rdfType, owlClass)) |> ignore
+    graph :> IGraph
+
+/// Config using a factory that sets namespace prefixes — for #16 and double-@base tests.
+let sampleConfigWithNamespaces =
+    { Graph = buildFixtureGraph ()
+      JsonLdContext = schemaOrgContext
+      GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
+
 /// TestServer with /tictactoe and /games/{id} routes, each carrying a GraphFactory config.
 /// Mirrors the TicTacToe sample so the origin-DoS guard is tested on both factory paths.
 let startServerWithTttRoutes () =

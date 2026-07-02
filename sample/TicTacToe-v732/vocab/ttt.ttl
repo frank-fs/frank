@@ -12,12 +12,12 @@ ttt:square a rdf:Property ;
     rdfs:range ttt:Square ;
     rdfs:label "target board square of a move" .
 
-ttt:TopLeft     a ttt:Square .
-ttt:TopCenter   a ttt:Square .
-ttt:TopRight    a ttt:Square .
-ttt:MiddleLeft  a ttt:Square .
-ttt:MiddleCenter a ttt:Square .
-ttt:MiddleRight a ttt:Square .
-ttt:BottomLeft  a ttt:Square .
-ttt:BottomCenter a ttt:Square .
-ttt:BottomRight a ttt:Square .
+ttt:TopLeft      a ttt:Square ; rdfs:label "Top left" .
+ttt:TopCenter    a ttt:Square ; rdfs:label "Top center" .
+ttt:TopRight     a ttt:Square ; rdfs:label "Top right" .
+ttt:MiddleLeft   a ttt:Square ; rdfs:label "Middle left" .
+ttt:MiddleCenter a ttt:Square ; rdfs:label "Middle center" .
+ttt:MiddleRight  a ttt:Square ; rdfs:label "Middle right" .
+ttt:BottomLeft   a ttt:Square ; rdfs:label "Bottom left" .
+ttt:BottomCenter a ttt:Square ; rdfs:label "Bottom center" .
+ttt:BottomRight  a ttt:Square ; rdfs:label "Bottom right" .

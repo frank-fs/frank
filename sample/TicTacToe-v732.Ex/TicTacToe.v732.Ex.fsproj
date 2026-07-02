@@ -15,6 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="vocab/ex.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Share domain source files with the schema: sample — no shared project needed -->
     <Compile Include="../TicTacToe-v732/Model.fsi" />
     <Compile Include="../TicTacToe-v732/Model.fs" />

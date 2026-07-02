@@ -134,39 +134,64 @@ module private Serializers =
     let serializeGraphJsonLd (graph: IGraph) : string =
         Frank.Semantic.RdfSerialization.serializeGraphJsonLd graph
 
+    let private collectNamespacePairs (graph: IGraph) : (string * string) list =
+        [ for prefix in graph.NamespaceMap.Prefixes do
+              yield prefix, (graph.NamespaceMap.GetNamespaceUri prefix).AbsoluteUri ]
+
+    /// Write the @graph array from a compacted JSON-LD string.
+    /// Handles both multi-node (@graph array) and single-node (root object) compacted forms.
+    let private writeCompactedGraph (jsonWriter: Utf8JsonWriter) (compactedJson: string) : unit =
+        use doc = JsonDocument.Parse compactedJson
+        let root = doc.RootElement
+        let mutable graphEl = Unchecked.defaultof<JsonElement>
+
+        if root.TryGetProperty("@graph", &graphEl) then
+            graphEl.WriteTo jsonWriter
+        else
+            jsonWriter.WriteStartArray()
+            jsonWriter.WriteStartObject()
+
+            for prop in root.EnumerateObject() do
+                if prop.Name <> "@context" then
+                    jsonWriter.WritePropertyName prop.Name
+                    prop.Value.WriteTo jsonWriter
+
+            jsonWriter.WriteEndObject()
+            jsonWriter.WriteEndArray()
+
     let buildJsonLdResponse (graph: IGraph) (externalContext: string) (base': string) : string =
-        let graphJson = serializeGraphJsonLd graph
+        let prefixPairs = collectNamespacePairs graph
+
+        let compactedJson =
+            Frank.Semantic.RdfSerialization.compactGraphJsonLd graph prefixPairs base'
 
         let contextElement =
-            use doc = JsonDocument.Parse(externalContext)
+            use doc = JsonDocument.Parse externalContext
             doc.RootElement.GetProperty("@context").Clone()
 
         let opts = JsonWriterOptions(Indented = false)
         use outStream = new MemoryStream()
         use jsonWriter = new Utf8JsonWriter(outStream, opts)
         jsonWriter.WriteStartObject()
-        jsonWriter.WritePropertyName("@context")
+        jsonWriter.WritePropertyName "@context"
         jsonWriter.WriteStartArray()
         jsonWriter.WriteStartObject()
         jsonWriter.WriteString("@base", base')
+
+        for prefix, iri in prefixPairs do
+            jsonWriter.WriteString(prefix, iri)
+
         jsonWriter.WriteEndObject()
 
         match contextElement.ValueKind with
         | JsonValueKind.Array ->
             for el in contextElement.EnumerateArray() do
-                el.WriteTo(jsonWriter)
-        | _ -> contextElement.WriteTo(jsonWriter)
+                el.WriteTo jsonWriter
+        | _ -> contextElement.WriteTo jsonWriter
 
         jsonWriter.WriteEndArray()
-        jsonWriter.WritePropertyName("@graph")
-
-        try
-            use graphDoc = JsonDocument.Parse(graphJson)
-            graphDoc.RootElement.WriteTo(jsonWriter)
-        with _ ->
-            jsonWriter.WriteStartArray()
-            jsonWriter.WriteEndArray()
-
+        jsonWriter.WritePropertyName "@graph"
+        writeCompactedGraph jsonWriter compactedJson
         jsonWriter.WriteEndObject()
         jsonWriter.Flush()
         Encoding.UTF8.GetString(outStream.ToArray())
@@ -178,7 +203,14 @@ module private Serializers =
         ctx.Response.WriteAsync(notAcceptableBody)
 
     let respondTurtle (graph: IGraph) (origin: string) (ctx: HttpContext) : Task =
-        let body = "@base <" + origin + "> .\n" + serializeTurtle graph
+        let serialized = serializeTurtle graph
+        // When graph.BaseUri is set the writer already emitted @base; avoid duplicating it.
+        let body =
+            if isNull (box graph.BaseUri) then
+                "@base <" + origin + "> .\n" + serialized
+            else
+                serialized
+
         ctx.Response.Headers.Append("Vary", "Accept")
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "text/turtle"

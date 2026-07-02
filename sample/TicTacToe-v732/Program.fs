@@ -199,7 +199,11 @@ let private buildTurtleBody (origin: string) (graph: IGraph) : string =
     use sw = new System.IO.StringWriter()
     let writer = CompressingTurtleWriter()
     writer.Save(graph, sw :> System.IO.TextWriter)
-    "@base <" + origin + "> .\n" + sw.ToString()
+    // When graph.BaseUri is set the writer already emitted @base; avoid duplicating it.
+    if isNull (box graph.BaseUri) then
+        "@base <" + origin + "> .\n" + sw.ToString()
+    else
+        sw.ToString()
 
 /// Build a per-game-instance RDF graph with schema: and ttt: terms.
 /// Subject = <origin>/games/<id>; predicates are host-resolved, no example.org.

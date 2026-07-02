@@ -76,3 +76,4 @@ sample/Frank.TicTacToe.Sample/frank/
 .remember/
 PROMPT.md
 BenchmarkDotNet.Artifacts/
+sample/**/TestResults/

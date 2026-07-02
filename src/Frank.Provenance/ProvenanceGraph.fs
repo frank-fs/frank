@@ -11,11 +11,22 @@ let private provContextObj =
         """{"prov":"http://www.w3.org/ns/prov#","http":"http://www.w3.org/2011/http#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}"""
     )
 
-let private compact (graph: IGraph) : string =
+let private compact (graph: IGraph) (extraContext: (string * string) list) : string =
     let expanded = RdfSerialization.serializeGraphJsonLd graph
     let input = JToken.Parse expanded
-    let opts = JsonLdProcessorOptions()
-    JsonLdProcessor.Compact(input, provContextObj, opts).ToString()
+
+    let ctx: JToken =
+        if List.isEmpty extraContext then
+            provContextObj
+        else
+            let merged = provContextObj.DeepClone() :?> JObject
+
+            for (k, v) in extraContext do
+                merged.[k] <- JToken.op_Implicit v
+
+            merged
+
+    JsonLdProcessor.Compact(input, ctx, JsonLdProcessorOptions()).ToString()
 
 let private u (g: IGraph) (s: string) =
     g.CreateUriNode(UriFactory.Create s) :> INode
@@ -94,12 +105,15 @@ let toGraph (record: ProvenanceRecord) : IGraph =
     addAgent g record agent
     g
 
-let toJsonLd (record: ProvenanceRecord) : string = compact (toGraph record)
+let toJsonLd (record: ProvenanceRecord) : string = compact (toGraph record) []
 
-let listToJsonLd (records: ProvenanceRecord list) : string =
+let toJsonLdWith (extraContext: (string * string) list) (record: ProvenanceRecord) : string =
+    compact (toGraph record) extraContext
+
+let listToJsonLd (extraContext: (string * string) list) (records: ProvenanceRecord list) : string =
     let g = new Graph() :> IGraph
 
     for r in records do
         g.Merge(toGraph r) |> ignore
 
-    compact g
+    compact g extraContext

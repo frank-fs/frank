@@ -2,6 +2,7 @@ module Frank.Provenance.Tests.EndpointTests
 
 open System
 open System.Net.Http
+open System.Text.Json
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
@@ -53,6 +54,31 @@ let private startEndpointServer () =
     app.StartAsync().GetAwaiter().GetResult()
     app
 
+/// Server whose records carry a schema:agent body attribute so compaction is observable.
+let private startEndpointServerWithSchemaAttrs () =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let store =
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
+
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    let app = builder.Build()
+    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+    let mkWithAttr id resource =
+        { mkRecord id resource with
+            BodyAttributes = [ "https://schema.org/agent", Literal "alice" ] }
+
+    resolvedStore.Append(mkWithAttr "urn:uuid:act-1" "http://localhost/r")
+    resolvedStore.Append(mkWithAttr "urn:uuid:act-2" "http://localhost/r")
+
+    app.MapGet("/provenance", Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore))
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
 [<Tests>]
 let tests =
     testList
@@ -90,4 +116,43 @@ let tests =
                   "content-type is problem+json"
 
               Expect.stringContains body "Missing required query parameter" "title in body"
+          }
+
+          testCaseAsync "#16 provenance endpoint @context includes schema and ttt prefixes"
+          <| async {
+              // Use a server with schema body attrs so compaction is observable.
+              use app = startEndpointServerWithSchemaAttrs ()
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let mutable schemaEl = Unchecked.defaultof<JsonElement>
+              let mutable tttEl = Unchecked.defaultof<JsonElement>
+              use doc = JsonDocument.Parse body
+              let root = doc.RootElement
+
+              let tryGetCtxObj () =
+                  let mutable ctxEl = Unchecked.defaultof<JsonElement>
+
+                  if root.TryGetProperty("@context", &ctxEl) then
+                      match ctxEl.ValueKind with
+                      | JsonValueKind.Object -> Some ctxEl
+                      | JsonValueKind.Array ->
+                          ctxEl.EnumerateArray()
+                          |> Seq.tryFind (fun e -> e.ValueKind = JsonValueKind.Object)
+                      | _ -> None
+                  else
+                      None
+
+              let ctxObj = tryGetCtxObj ()
+              Expect.isSome ctxObj "@context object must be present"
+              let obj = ctxObj.Value
+              Expect.isTrue (obj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
+              Expect.isTrue (obj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
+              // #16 real compaction: schema body attr must compact when schema is in extraContext.
+              Expect.stringContains body "schema:agent" "schema:agent must be compacted in provenance body"
+
+              Expect.isFalse
+                  (body.Contains "\"https://schema.org/agent\"")
+                  "full schema.org agent IRI must not appear as JSON property key after compaction"
           } ]
