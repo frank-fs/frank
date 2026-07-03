@@ -68,6 +68,19 @@ Run `/discipline` to grade changed code against these rules.
 
 Run `/karpathy-guidelines` to review code against these before sending.
 
+### False-green patterns (hunt these in adversarial review)
+
+Green tests that don't prove the claim. Each is RED-test-able — the fix has an observable failing test the shortcut lacks. Caught repeatedly across the #333 capstone:
+
+- **String-strip / post-hoc hack** — relativizing/fixing output via `.Replace` at one endpoint instead of at source. Fix at source; test every serving path.
+- **Hollow decoration** — declaring a prefix/field without the substance: `href-vars: ""`, an `@context` prefix present but terms never compacted, a `type=` param with no target. Assert the substance (compacted term present AND full IRI absent), not mere presence.
+- **Over-broad `catch`** — a guard wrapping more than the failing operation (413 catch around the whole pipeline, not just the body read) → unrelated errors mislabeled. Wrap only the throwing step; add a test that a downstream error is NOT mislabeled.
+- **Sample-vocab baked into a shipping library** — the sample's terms hardcoded in `src/` (e.g. `ttt` in a Frank.* package). Thread the app's declared vocab through config; test a non-sample app gets none of the sample's terms.
+- **Fragile heuristic** ("works for the sample, wrong in general") — positional `Rt`, name-suffix `isAction`, mapping-usage classifier. Derive from declared linkage or the produced artifact; test with a fixture whose ordering/naming breaks the heuristic.
+- **Weak assertion** — `Contains "/tictactoe#"` passes for the absolute `https://example.org/tictactoe#` too. Assert the exact value AND the absence of the wrong form.
+
+Per-item review misses cross-cutting defects; the final `/expert-review` + `/simplify` passes catch them (this session: Validation Host-guard, `isAction`, LinkedData-emitter example.org, the ProvenanceEndpoint library defect). Keep both in the merge sequence.
+
 ## F# Patterns
 
 Sub-directory CLAUDE.md files load when working in that area:
@@ -87,6 +100,8 @@ Sub-directory CLAUDE.md files load when working in that area:
 - **`Result` over `Option` for diagnostics**: Return `Result<'T, string>` when `None` would discard useful error context.
 - **`Option.orElse` for merge patterns**: `base.Field |> Option.orElse enriching.Field`; use `Option.orElseWith` for lazy fallbacks.
 - **FS3511 in Release builds**: `task { }` with complex match fails in CI (Release). Fix: extract pure logic into private static members.
+- **Shell `curl`/`nc` are sandboxed OUT; .NET `HttpClient` is sandboxed IN.** Probing live-network reachability with shell tools gives a false "no egress" — this misled ~5 agents into reporting the live-schema.org-deref test (AT-S6) as "environmental" when it would actually pass. Probe egress the way the test does: `dotnet fsi` GET, not shell `curl`.
+- **Emit only what's actually used, derived from the artifact.** When output must classify declared inputs (e.g. app-owned vs external prefix for a served `@context`), prefer deriving from the *produced* artifact instead: emit only the prefixes the graph actually uses, resolved from the graph's own URIs. This dissolved the provenance `@context` classification problem (no `isExternalIri`/mapping-usage/positional heuristic needed) — a used external term stays absolute because that's its real namespace in the graph.
 
 ## Workflow Rules
 
@@ -99,7 +114,7 @@ Trunk-based (sole maintainer). PRs fallback for external contributors.
 - Normal `git push origin master` OK. Destructive pushes (force without lease, branch deletion, history rewrite) require approval.
 - **Merge sequence**: build → test → fantomas → `/verification-before-completion` → `/simplify` → `/expert-review` → ff-merge → push.
 - Always `isolation: "worktree"` for implementation agents.
-- **Worktree Bash cwd resets to the main repo (master) between calls.** A bare `cd` does NOT persist to the next Bash call — it silently returns to the main checkout. Use ABSOLUTE worktree paths for every command (reads, greps, `dotnet test <abs-path>`), or `cd <abs>` as the first statement *and* verify `git branch --show-current` before trusting output. Prefer the Read tool (absolute path) over `cat`. If a file looks wrong (unexpected type shape / test count), suspect cwd contamination first and re-check with an absolute path before concluding the work is wrong.
+- **Worktree Bash cwd resets to the main repo (master) between calls.** A bare `cd` does NOT persist to the next Bash call — it silently returns to the main checkout. Use ABSOLUTE worktree paths for every command (reads, greps, `dotnet test <abs-path>`), or `cd <abs>` as the first statement *and* verify `git branch --show-current` before trusting output. Prefer the Read tool (absolute path) over `cat`. If a file looks wrong (unexpected type shape / test count), suspect cwd contamination first and re-check with an absolute path before concluding the work is wrong. This bites at the ff-merge step too: a bare `git status`/`git branch` runs in the *main repo* (master, clean), not the feature worktree — verify `git branch --show-current` before trusting status right before merging.
 - Never push without verifying agent output — may be partial. **Re-run test suites yourself (absolute paths); don't trust agent-reported counts or pasted artifacts** — agents miscount and paste from cwd-contaminated reads. Verify quantitative claims by running the code (e.g. `dotnet fsi` to compute real values), not by reading the report.
 
 External contributors: fill PR template fully with `Closes #XX`. See `.github/PULL_REQUEST_TEMPLATE.md`.
