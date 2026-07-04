@@ -687,6 +687,10 @@ type SemanticTests() =
             use! ctx = this.NewContext()
             let testBase = Server.Url()
             let gameId = "at-s6"
+            use stub = SchemaOrgStub.Start()
+
+            let toStub (iri: string) =
+                iri.Replace("https://schema.org", stub.BaseUrl.TrimEnd('/'))
 
             // ── Phase 1: JSON Home ──────────────────────────────────────────────
             let! home =
@@ -774,11 +778,12 @@ type SemanticTests() =
                 Assert.That(hrefSet.Contains term, Is.True, sprintf "Expected semantic term absent from ALPS: %s" term)
 
             // ── Phase 4: Dereference every URI the client received ───────────────
-            // schema.org term IRIs — dereference live using HttpClient (host network,
-            // avoids Playwright DNS sandbox flake; follows redirects by default).
-            // A network failure or non-2xx FAILS the test — no swallowing.
+            // schema.org term IRIs — rewritten to the loopback stub for the GET
+            // so the default suite passes offline. ALL assertions use the REAL
+            // schema.org IRI (recognition thesis unchanged). A hallucinated local-name
+            // 404s from the stub, so the load-bearing check is preserved.
             for iri in descriptorHrefs |> List.filter (fun u -> u.StartsWith "https://schema.org/") do
-                let! r = httpClient.GetAsync iri
+                let! r = httpClient.GetAsync(toStub iri)
 
                 Assert.That(
                     int r.StatusCode,
@@ -838,9 +843,16 @@ type SemanticTests() =
                 "Game ld+json must not contain example.org — IRIs must be host-resolved"
             )
 
-            // seeAlso targets — game graph has none; loop is vacuous but not removed for structure
+            // seeAlso targets — game graph has none; loop is vacuous but not removed for structure.
+            // schema.org seeAlso URIs are rewritten to the stub; non-schema.org URIs are unchanged.
             for seeAlsoUri in SemanticTests.SeeAlsoUris ldBody do
-                let! r = httpClient.GetAsync seeAlsoUri
+                let fetchUri =
+                    if seeAlsoUri.StartsWith "https://schema.org/" then
+                        toStub seeAlsoUri
+                    else
+                        seeAlsoUri
+
+                let! r = httpClient.GetAsync fetchUri
 
                 Assert.That(
                     int r.StatusCode,
@@ -1603,5 +1615,48 @@ type SemanticTests() =
                     cellHasOwnLabel body cell,
                     Is.True,
                     sprintf "cell '%s' missing rdfs:label in its own Turtle subject block" cell
+                )
+        }
+
+    // ── SchemaOrgStub smoke — load-bearing: unknown paths must 404 ──────────────
+    [<Test>]
+    member _.``SchemaOrgStub serves known terms 200 and unknown paths 404``() =
+        task {
+            use client = new HttpClient()
+            use stub = SchemaOrgStub.Start()
+            let! r200 = client.GetAsync(stub.BaseUrl + "/MoveAction")
+
+            Assert.That(int r200.StatusCode, Is.EqualTo 200, "stub must serve known term MoveAction as 200")
+
+            let! r404 = client.GetAsync(stub.BaseUrl + "/BogusTerm")
+
+            Assert.That(
+                int r404.StatusCode,
+                Is.EqualTo 404,
+                "stub must serve unknown path as 404 — hallucinated IRIs must still fail"
+            )
+        }
+
+    // ── AT-S6-live: opt-in live-network deref (excluded from default suite) ─────
+    [<Test>]
+    [<Category("LiveNetwork")>]
+    [<Explicit("requires outbound egress to schema.org")>]
+    member _.``AT-S6-live schema.org term IRIs dereference on the real web``() =
+        task {
+            let terms =
+                [ "MoveAction"
+                  "agent"
+                  "Game"
+                  "result"
+                  "CompletedActionStatus"
+                  "FailedActionStatus" ]
+
+            for term in terms do
+                let! r = httpClient.GetAsync(sprintf "https://schema.org/%s" term)
+
+                Assert.That(
+                    int r.StatusCode,
+                    Is.InRange(200, 299),
+                    sprintf "schema.org live deref failed: https://schema.org/%s" term
                 )
         }
