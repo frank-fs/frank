@@ -1534,6 +1534,40 @@ type SemanticTests() =
             )
         }
 
+    // ── compacted-CURIE ld+json POST ─────────────────────────────────────────────
+    // Proves parseMoveFromDoc expands @context prefix mappings so a natural
+    // compacted-CURIE body ("ttt:square"/"schema:agent") is accepted alongside
+    // the existing fully-expanded IRI key form used by AT-S6/AT-S8.
+    [<Test>]
+    member this.``compacted CURIE ld+json POST applies the move and returns 200``() =
+        task {
+            use! ctx = this.NewContext()
+            let originBase = (Server.Url()).TrimEnd('/')
+
+            // Unique game ID prevents state pollution from prior test runs.
+            let gameId = "curie-" + Guid.NewGuid().ToString("N").[..7]
+
+            // GET creates the game before the move is posted.
+            let! _ = ctx.GetAsync(sprintf "/games/%s" gameId)
+
+            // Natural compacted-CURIE body — the @context defines prefix expansions.
+            // parseMoveFromDoc must resolve ttt:square and schema:agent before lookup.
+            let body =
+                sprintf
+                    """{"@context":{"schema":"https://schema.org/","ttt":"%s/tictactoe#"},"@type":"schema:MoveAction","ttt:square":"TopLeft","schema:agent":"X"}"""
+                    originBase
+
+            let! resp =
+                ctx.PostAsync(
+                    sprintf "/games/%s/moves" gameId,
+                    APIRequestContextOptions(Headers = dict [ "Content-Type", "application/ld+json" ], Data = body)
+                )
+
+            Assert.That(resp.Status, Is.EqualTo 200, "compacted-CURIE ld+json POST should return 200")
+            let! json = resp.TextAsync()
+            Assert.That(json.Contains "\"TopLeft\"", Is.True, "move not applied — TopLeft missing from game state")
+        }
+
     // ── AT-C2-15: vocab turtle carries rdfs:label for each of the 9 board cells ──
     [<Test>]
     member this.``AT-C2-15 ttt vocab turtle has rdfs:label for all 9 cell individuals``() =

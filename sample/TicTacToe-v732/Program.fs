@@ -138,13 +138,68 @@ let private isLdJson (ctx: HttpContext) =
     let ct = ctx.Request.ContentType
     ct <> null && ct.Contains("application/ld+json")
 
+/// Accumulate prefix→expansion pairs from a single JSON-LD @context object.
+/// Skips @keyword entries and non-string values.
+let private addPrefixesFromObj (acc: Map<string, string>) (o: JsonObject) : Map<string, string> =
+    o
+    |> Seq.fold
+        (fun m kv ->
+            if kv.Key.StartsWith "@" then
+                m
+            else
+                match kv.Value with
+                | :? JsonValue as jv ->
+                    try
+                        m |> Map.add kv.Key (jv.GetValue<string>())
+                    with _ ->
+                        m
+                | _ -> m)
+        acc
+
+/// Extract prefix→expansion mappings from the @context of a JSON-LD document.
+/// Supports both plain-object and array-of-objects @context forms.
+let private extractContextPrefixes (doc: JsonNode) : Map<string, string> =
+    match doc.["@context"] |> Option.ofObj with
+    | None -> Map.empty
+    | Some(:? JsonObject as o) -> addPrefixesFromObj Map.empty o
+    | Some(:? JsonArray as arr) ->
+        arr
+        |> Seq.fold
+            (fun acc item ->
+                match item with
+                | :? JsonObject as o -> addPrefixesFromObj acc o
+                | _ -> acc)
+            Map.empty
+    | _ -> Map.empty
+
+/// Try finding the compacted CURIE form of a full IRI as a key in doc.
+/// Returns the node when the prefix map covers the IRI and that key exists.
+let private tryCompactLookup (prefixes: Map<string, string>) (doc: JsonNode) (fullIri: string) : JsonNode option =
+    prefixes
+    |> Map.tryPick (fun pfx expansion ->
+        if
+            expansion.Length > 0
+            && fullIri.StartsWith(expansion)
+            && fullIri.Length > expansion.Length
+        then
+            doc.[pfx + ":" + fullIri.Substring(expansion.Length)] |> Option.ofObj
+        else
+            None)
+
+/// Look up a full IRI as a body key: tries the full IRI directly, then the compacted CURIE.
+let private lookupByIri (prefixes: Map<string, string>) (doc: JsonNode) (iri: string) : JsonNode option =
+    doc.[iri]
+    |> Option.ofObj
+    |> Option.orElseWith (fun () -> tryCompactLookup prefixes doc iri)
+
 let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
     let sq = resolveRelativeIri origin squareRelIri
     let ag = resolveRelativeIri origin agentRelIri
 
     if isLd then
-        let pos = doc.[sq] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
-        let plr = doc.[ag] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())
+        let prefixes = extractContextPrefixes doc
+        let pos = lookupByIri prefixes doc sq |> Option.map (fun n -> n.GetValue<string>())
+        let plr = lookupByIri prefixes doc ag |> Option.map (fun n -> n.GetValue<string>())
         pos, plr
     else
         let pos =

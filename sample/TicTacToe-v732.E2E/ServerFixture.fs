@@ -32,9 +32,12 @@ type ServerFixture() =
             let candidate =
                 Path.Combine(dir.FullName, "sample", "TicTacToe-v732", "TicTacToe.v732.fsproj")
 
-            if File.Exists candidate then candidate
-            elif isNull dir.Parent then failwith "TicTacToe.v732.fsproj not found walking up from test output"
-            else up dir.Parent
+            if File.Exists candidate then
+                candidate
+            elif isNull dir.Parent then
+                failwith "TicTacToe.v732.fsproj not found walking up from test output"
+            else
+                up dir.Parent
 
         up (DirectoryInfo(AppContext.BaseDirectory))
 
@@ -43,9 +46,12 @@ type ServerFixture() =
             let candidate =
                 Path.Combine(dir.FullName, "sample", "TicTacToe-v732.Ex", "TicTacToe.v732.Ex.fsproj")
 
-            if File.Exists candidate then candidate
-            elif isNull dir.Parent then failwith "TicTacToe.v732.Ex.fsproj not found walking up from test output"
-            else up dir.Parent
+            if File.Exists candidate then
+                candidate
+            elif isNull dir.Parent then
+                failwith "TicTacToe.v732.Ex.fsproj not found walking up from test output"
+            else
+                up dir.Parent
 
         up (DirectoryInfo(AppContext.BaseDirectory))
 
@@ -75,6 +81,10 @@ type ServerFixture() =
         psi.ArgumentList.Add app
         psi.ArgumentList.Add "--urls"
         psi.ArgumentList.Add url
+        // Suppress NU1903 (Microsoft.OpenApi 2.0.0 advisory) until #383 bumps the package.
+        // src/Directory.Build.props sets TreatWarningsAsErrors=true which turns this into an
+        // error in the spawned build, preventing the server from starting.
+        psi.ArgumentList.Add "-p:TreatWarningsAsErrors=false"
         psi.EnvironmentVariables.["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] <- "1"
 
         for (k, v) in extraEnv do
@@ -99,5 +109,9 @@ type ServerFixture() =
     [<OneTimeTearDown>]
     member _.StopServer() =
         for p in [ Server.proc; ExServer.proc ] |> List.choose id do
-            (try p.Kill true with _ -> ())
+            (try
+                p.Kill true
+             with _ ->
+                 ())
+
             p.Dispose()
