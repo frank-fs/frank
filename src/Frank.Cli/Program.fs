@@ -363,29 +363,27 @@ let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
     match lockPathFrom (args.TryGetResult RefreshArgs.Lock_File) (args.TryGetResult RefreshArgs.Project) with
     | Error e ->
         eprintfn "error: %s" e
-        1
+        refreshExitCode (Error e)
     | Ok lockPath ->
         match read lockPath with
         | Error e ->
             eprintfn "error: %s" e
-            1
+            refreshExitCode (Error e)
         | Ok lf ->
             use client = new System.Net.Http.HttpClient()
             let fetch = VocabFetcher.httpFetch client
+            let result = refresh fetch lf |> Async.RunSynchronously
 
-            match refresh fetch lf |> Async.RunSynchronously with
-            | Error e ->
-                eprintfn "error: %s" e
-                1
+            match result with
+            | Error e -> eprintfn "error: %s" e
             | Ok report ->
                 for d in report.Drifted do
-                    printfn "%s vocabulary hash drift: %s → %s" d.Prefix d.Recorded d.Current
+                    eprintfn "%s vocabulary hash drift: %s → %s" d.Prefix d.Recorded d.Current
 
-                if report.Drifted <> [] then
-                    2
-                else
+                if report.Drifted = [] then
                     printfn "%d vocabulary(ies) checked; no drift" report.Checked
-                    0
+
+            refreshExitCode result
 
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with

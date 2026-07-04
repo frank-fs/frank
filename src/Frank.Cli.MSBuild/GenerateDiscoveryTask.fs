@@ -45,11 +45,7 @@ type GenerateDiscoveryTask() =
                 this.Log.LogError($"GenerateDiscoveryTask: could not read lock file: {msg}")
                 false
             | Ok lock ->
-                let prefixes = lock.Vocabularies |> Map.map (fun _ v -> Uri(v.Uri))
-
-                let registry =
-                    { VocabularyRegistry.empty with
-                        Prefixes = prefixes }
+                let registry = DiscoveryEmitter.buildRegistry lock
 
                 match DiscoveryEmitter.emit this.ModuleName this.ProfileUri registry lock with
                 | Error msg ->

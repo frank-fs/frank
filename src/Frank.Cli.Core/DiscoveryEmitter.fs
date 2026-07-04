@@ -212,6 +212,12 @@ let private configExpr
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/// Build a VocabularyRegistry from a lock file's vocabulary entries.
+/// Populates only Prefixes; Using stays empty (the lock supplies confirmed IRIs).
+let buildRegistry (lock: LockFile) : VocabularyRegistry =
+    { VocabularyRegistry.empty with
+        Prefixes = lock.Vocabularies |> Map.map (fun _ v -> Uri(v.Uri)) }
+
 /// Emit a GeneratedDiscovery F# module from a lock file and vocabulary registry.
 ///
 /// moduleName   — the F# module name to emit (e.g. "TicTacToe.GeneratedDiscovery")

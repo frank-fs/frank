@@ -11,6 +11,7 @@
     <Compile Include="StubBuildEngine.fs" />
     <Compile Include="Fixtures.fs" />
     <Compile Include="ValidateLockFileTaskTests.fs" />
+    <Compile Include="BuildGateIntegrationTests.fs" />
     <Compile Include="GenerateDiscoveryTaskTests.fs" />
     <Compile Include="GenerateLinkedDataTaskTests.fs" />
     <Compile Include="GenerateValidationTaskTests.fs" />

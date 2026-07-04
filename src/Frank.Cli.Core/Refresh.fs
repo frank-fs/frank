@@ -14,6 +14,13 @@ type RefreshReport =
     { Checked: int
       Drifted: DriftEntry list }
 
+/// Maps a refresh result to the CLI exit code.
+/// Error _ → 1 (fetch or read failure); Ok with drift → 2; Ok clean → 0.
+let refreshExitCode (result: Result<RefreshReport, string>) : int =
+    match result with
+    | Error _ -> 1
+    | Ok report -> if report.Drifted <> [] then 2 else 0
+
 let private checkOne
     (fetch: Fetch)
     (prefix: string)

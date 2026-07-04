@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="RefreshCliTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -19,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli/Frank.Cli.fsproj" />
+    <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
   </ItemGroup>
 
 </Project>

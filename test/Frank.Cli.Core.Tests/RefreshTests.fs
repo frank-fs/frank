@@ -6,24 +6,12 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Semantic.VocabFetcher
 open Frank.Cli.Core.Refresh
+open Frank.Cli.Core.Tests.RefreshFixtures
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-let private schemaBody: byte[] =
-    Text.Encoding.UTF8.GetBytes "{ \"@context\": \"https://schema.org/\" }"
-
-let private schemaBodyHash: string = sha256Hex schemaBody
-
-let private stubFetch (body: byte[]) : Fetch =
-    fun (_: Uri) -> async { return Ok {| ContentType = None; Body = body |} }
-
 let private errorFetch (reason: string) : Fetch =
     fun (_: Uri) -> async { return Error reason }
-
-let private mkVocabEntry (hash: string) : VocabularyEntry =
-    { Uri = "https://schema.org/"
-      FetchedAt = DateTimeOffset.UnixEpoch
-      Hash = hash }
 
 let private mkLock (vocabs: Map<string, VocabularyEntry>) : LockFile =
     { SchemaVersion = 1
