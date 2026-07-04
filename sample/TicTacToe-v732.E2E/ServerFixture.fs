@@ -81,10 +81,6 @@ type ServerFixture() =
         psi.ArgumentList.Add app
         psi.ArgumentList.Add "--urls"
         psi.ArgumentList.Add url
-        // Suppress NU1903 (Microsoft.OpenApi 2.0.0 advisory) until #383 bumps the package.
-        // src/Directory.Build.props sets TreatWarningsAsErrors=true which turns this into an
-        // error in the spawned build, preventing the server from starting.
-        psi.ArgumentList.Add "-p:TreatWarningsAsErrors=false"
         psi.EnvironmentVariables.["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] <- "1"
 
         for (k, v) in extraEnv do
