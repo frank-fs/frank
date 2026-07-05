@@ -58,4 +58,22 @@ type ValidateLockFileTask() =
 
                     false
                 else
+                    let warnIntegrity msg =
+                        this.Log.LogWarning(
+                            subcategory = null,
+                            warningCode = "FRANKSEM-INTEGRITY",
+                            helpKeyword = null,
+                            file = this.LockFilePath,
+                            lineNumber = 0,
+                            columnNumber = 0,
+                            endLineNumber = 0,
+                            endColumnNumber = 0,
+                            message = msg,
+                            messageArgs = [||]
+                        )
+
+                    match LockFile.verifyIntegrity lock with
+                    | Ok() -> ()
+                    | Error msg -> warnIntegrity msg
+
                     true

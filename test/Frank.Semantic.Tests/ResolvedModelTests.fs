@@ -20,6 +20,7 @@ let private mkVocabEntry (uri: string) : VocabularyEntry =
 let private emptyLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
+      Integrity = None
       Vocabularies = Map.empty
       DeclaredPrefixes = Map.empty
       Mappings = [] }
@@ -406,6 +407,7 @@ let at_rm_ci =
         let lock: LockFile =
             { SchemaVersion = 1
               Generated = DateTimeOffset.UtcNow
+              Integrity = None
               Vocabularies =
                 Map.ofList
                     [ "ex",

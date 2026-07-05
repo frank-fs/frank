@@ -3,6 +3,7 @@ module Frank.Cli.Core.Tests.PipelineTests
 open System
 open System.IO
 open System.Reflection
+open System.Security.Cryptography
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
@@ -182,6 +183,7 @@ let at2MergeTests =
                   let existingLock: LockFile =
                       { SchemaVersion = 1
                         Generated = DateTimeOffset.UtcNow
+                        Integrity = None
                         Vocabularies = Map.empty
                         DeclaredPrefixes = Map.empty
                         Mappings =
@@ -292,7 +294,8 @@ let at4DeterminismTests =
 
                   let normalize (lf: LockFile) =
                       { lf with
-                          Generated = DateTimeOffset.MinValue }
+                          Generated = DateTimeOffset.MinValue
+                          Integrity = None }
 
                   let mappingsEqual = normalize lf1 = normalize lf2
 
@@ -318,6 +321,7 @@ let at5ExcludedPreservationTests =
                   let existingLock: LockFile =
                       { SchemaVersion = 1
                         Generated = DateTimeOffset.UtcNow
+                        Integrity = None
                         Vocabularies = Map.empty
                         DeclaredPrefixes = Map.empty
                         Mappings =
@@ -363,6 +367,7 @@ let at5ExcludedPreservationTests =
                   let existingLock: LockFile =
                       { SchemaVersion = 1
                         Generated = DateTimeOffset.UtcNow
+                        Integrity = None
                         Vocabularies = Map.empty
                         DeclaredPrefixes = Map.empty
                         Mappings =
@@ -408,6 +413,7 @@ let at5ExcludedPreservationTests =
                   let existingLock: LockFile =
                       { SchemaVersion = 1
                         Generated = DateTimeOffset.UtcNow
+                        Integrity = None
                         Vocabularies = Map.empty
                         DeclaredPrefixes = Map.empty
                         Mappings =
@@ -454,6 +460,7 @@ let at5ExcludedPreservationTests =
                   let existingLock: LockFile =
                       { SchemaVersion = 1
                         Generated = DateTimeOffset.UtcNow
+                        Integrity = None
                         Vocabularies = Map.empty
                         DeclaredPrefixes = Map.empty
                         Mappings =
@@ -507,6 +514,43 @@ let private stubFetch: Fetch =
                        Body = minimalTurtleBytes () |}
         }
 
+// ── AT8/AT9 stubs (rich turtle with class definitions) ───────────────────────
+
+/// Schema turtle that includes a class definition so `type Game` gets schema:Game CURIE.
+let private richSchemaTurtleBytes () : byte[] =
+    System.Text.Encoding.UTF8.GetBytes
+        "@prefix schema: <https://schema.org/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\nschema:Game a rdfs:Class .\n"
+
+/// Foaf turtle that includes a class definition so `type Person` gets foaf:Person CURIE.
+let private foafTurtleBytes () : byte[] =
+    System.Text.Encoding.UTF8.GetBytes
+        "@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\nfoaf:Person a rdfs:Class .\n"
+
+/// Stub fetch: returns rich schema turtle (includes schema:Game class) for any URI.
+let private richSchemaStubFetch: Fetch =
+    fun _uri ->
+        async {
+            return
+                Ok
+                    {| ContentType = Some "text/turtle"
+                       Body = richSchemaTurtleBytes () |}
+        }
+
+/// Dispatch stub: routes by URI host to serve independent turtle content per vocabulary.
+let private twoVocabStubFetch: Fetch =
+    fun (uri: Uri) ->
+        async {
+            let bytes =
+                if uri.Host = "schema.org" then richSchemaTurtleBytes ()
+                elif uri.Host = "xmlns.com" then foafTurtleBytes ()
+                else invalidArg "uri" $"unexpected host: {uri.Host}"
+
+            return
+                Ok
+                    {| ContentType = Some "text/turtle"
+                       Body = bytes |}
+        }
+
 /// Writes a fixture with `using "schema"` so the pipeline puts schema in inScopePrefixes.
 let private writeFixtureProjectWithUsing (tmpDir: string) : string * string =
     let domainSource =
@@ -547,6 +591,89 @@ let registry =
     let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
     projectFile, lockFilePath
 
+/// Writes a fixture where `type Game` matches `schema:Game` (Confirmed CURIE in lock).
+/// Used for AT8 CURIE round-trip tests.
+let private writeGameProjectWithRichSchema (tmpDir: string) : string * string =
+    let domainSource =
+        """namespace FixtureApp
+type Game = { Id: int }
+"""
+
+    let vocabSource =
+        """module Vocabulary
+open Frank.Semantic
+
+let registry =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        using "schema"
+    }
+"""
+
+    File.WriteAllText(Path.Combine(tmpDir, "Domain.fs"), domainSource)
+    File.WriteAllText(Path.Combine(tmpDir, "Vocabulary.fs"), vocabSource)
+
+    let fsprojContent =
+        """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Vocabulary.fs" />
+  </ItemGroup>
+</Project>
+"""
+
+    let projectFile = Path.Combine(tmpDir, "FixtureApp.fsproj")
+    File.WriteAllText(projectFile, fsprojContent)
+    let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
+    projectFile, lockFilePath
+
+/// Writes a fixture with two vocabularies (schema + foaf), each with distinct classes.
+/// Used for AT9 two-vocabulary independence tests.
+let private writeTwoVocabProject (tmpDir: string) : string * string =
+    let domainSource =
+        """namespace FixtureApp
+type Game = { Id: int }
+type Person = { Name: string }
+"""
+
+    let vocabSource =
+        """module Vocabulary
+open Frank.Semantic
+
+let registry =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        prefix "foaf" "http://xmlns.com/foaf/0.1/"
+        using "schema"
+        using "foaf"
+    }
+"""
+
+    File.WriteAllText(Path.Combine(tmpDir, "Domain.fs"), domainSource)
+    File.WriteAllText(Path.Combine(tmpDir, "Vocabulary.fs"), vocabSource)
+
+    let fsprojContent =
+        """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Vocabulary.fs" />
+  </ItemGroup>
+</Project>
+"""
+
+    let projectFile = Path.Combine(tmpDir, "FixtureApp.fsproj")
+    File.WriteAllText(projectFile, fsprojContent)
+    let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
+    projectFile, lockFilePath
+
 // ── AT6: vocabularies block populated ────────────────────────────────────────
 
 [<Tests>]
@@ -563,6 +690,7 @@ let at6VocabulariesTests =
                   let result =
                       Pipeline.runWithFetch
                           stubFetch
+                          (fun () -> DateTimeOffset.UtcNow)
                           { ProjectFile = projectFile
                             VocabularyFile = None
                             AssemblyRefs = dllRefs ()
@@ -574,7 +702,271 @@ let at6VocabulariesTests =
                   Expect.isSome entry "Vocabularies must contain 'schema' prefix"
                   let v = entry.Value
                   Expect.equal v.Uri "https://schema.org/" "Uri must match registry prefix"
-                  Expect.isNotEmpty v.Hash "Hash must be non-empty"
+
+                  let expectedHash =
+                      use sha = SHA256.Create()
+                      sha.ComputeHash(minimalTurtleBytes ())
+                      |> Array.map (fun b -> b.ToString("x2"))
+                      |> String.concat ""
+
+                  Expect.equal v.Hash expectedHash "Hash must be sha256 of served turtle bytes"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "AT6b - lock Integrity field is non-None after extract" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProjectWithUsing tmpDir
+                  let clock = fun () -> DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+
+                  let result =
+                      Pipeline.runWithFetch
+                          stubFetch
+                          clock
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  Expect.isOk result "pipeline should succeed"
+                  let lf = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+                  Expect.isSome lf.Integrity "Integrity must be Some after extract (stamped)"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "AT1 - vocabularies populated with injected fetchedAt" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeFixtureProjectWithUsing tmpDir
+                  let fixedTime = DateTimeOffset.Parse("2026-06-01T12:00:00Z")
+                  let clock = fun () -> fixedTime
+
+                  let result =
+                      Pipeline.runWithFetch
+                          stubFetch
+                          clock
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  Expect.isOk result "pipeline should succeed"
+                  let lf = LockFile.read lockFilePath |> Result.defaultWith (fun e -> failwith e)
+                  let entry = Map.tryFind "schema" lf.Vocabularies
+                  Expect.isSome entry "Vocabularies must contain 'schema'"
+                  Expect.equal entry.Value.FetchedAt fixedTime "FetchedAt must equal injected clock value"
+                  Expect.isSome lf.Integrity "Integrity must be stamped"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "AT5 - same injected clock and identical inputs produce byte-for-byte identical lock files" {
+              let tmpDir1 = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              let tmpDir2 = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir1) |> ignore
+              Directory.CreateDirectory(tmpDir2) |> ignore
+
+              try
+                  let projectFile1, lockFilePath1 = writeFixtureProjectWithUsing tmpDir1
+                  let projectFile2, lockFilePath2 = writeFixtureProjectWithUsing tmpDir2
+
+                  let fixedClock = fun () -> DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+
+                  let opts1 : Pipeline.ExtractOptions =
+                      { ProjectFile = projectFile1
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+
+                  let opts2 : Pipeline.ExtractOptions =
+                      { ProjectFile = projectFile2
+                        VocabularyFile = None
+                        AssemblyRefs = dllRefs ()
+                        OutputFormat = Pipeline.Text }
+
+                  Expect.isOk (Pipeline.runWithFetch stubFetch fixedClock opts1) "run1 should succeed"
+                  Expect.isOk (Pipeline.runWithFetch stubFetch fixedClock opts2) "run2 should succeed"
+
+                  let bytes1 = File.ReadAllBytes lockFilePath1
+                  let bytes2 = File.ReadAllBytes lockFilePath2
+
+                  Expect.equal bytes1 bytes2 "lock files must be byte-for-byte identical"
+
+                  let lf1 = LockFile.read lockFilePath1 |> Result.defaultWith failwith
+                  Expect.isSome lf1.Integrity "Integrity must be stamped"
+                  Expect.hasLength lf1.Integrity.Value 64 "integrity must be 64-char hex"
+                  Expect.isOk (LockFile.verifyIntegrity lf1) "integrity must verify"
+
+                  // Golden sha256: assert the produced hash equals the expected canonical value.
+                  // Computed from two independent runs at 2026-01-01T00:00:00Z with stubFetch.
+                  let goldenIntegrityHash =
+                      "51d14da0e98f7de1590b6286b0abf0a2498905d9fdda2ed011c1bc2958cadeb0"
+
+                  Expect.equal
+                      lf1.Integrity.Value
+                      goldenIntegrityHash
+                      "golden integrity sha256 must match canonical output"
+              finally
+                  Directory.Delete(tmpDir1, true)
+                  Directory.Delete(tmpDir2, true)
+          } ]
+
+// ── AT8: CURIE round-trip ─────────────────────────────────────────────────────
+
+[<Tests>]
+let at8CurieRoundTripTests =
+    testList
+        "AT8 - every mapping CURIE resolves via Vocabularies binding"
+        [ test "schema:Game CURIE expands to Vocabularies[schema].Uri + 'Game'" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeGameProjectWithRichSchema tmpDir
+
+                  let result =
+                      Pipeline.runWithFetch
+                          richSchemaStubFetch
+                          (fun () -> DateTimeOffset.UtcNow)
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  Expect.isOk result "pipeline should succeed"
+                  let lf = LockFile.read lockFilePath |> Result.defaultWith failwith
+
+                  let mappingsWithCurie =
+                      lf.Mappings |> List.choose (fun m -> m.Iri |> Option.map (fun iri -> m, iri))
+
+                  Expect.isNonEmpty mappingsWithCurie "at least one mapping must have a CURIE"
+
+                  for m, curie in mappingsWithCurie do
+                      // Assert no bypass: CURIE must not be a full IRI
+                      Expect.isFalse
+                          (curie.StartsWith("https://") || curie.StartsWith("http://"))
+                          $"{m.FSharpType}: Iri must be a CURIE, not a full IRI (bypass)"
+
+                      // Assert CURIE resolves via Vocabularies binding
+                      let colon = curie.IndexOf(':')
+                      Expect.isTrue (colon > 0) $"{m.FSharpType}: CURIE '{curie}' must contain ':'"
+                      let prefix = curie.[..colon - 1]
+                      let local = curie.[colon + 1..]
+
+                      let vocabEntry = Map.tryFind prefix lf.Vocabularies
+
+                      Expect.isSome vocabEntry $"prefix '{prefix}' from CURIE '{curie}' must exist in Vocabularies (no dangling CURIE)"
+
+                      let fullIri = vocabEntry.Value.Uri + local
+
+                      Expect.equal
+                          fullIri
+                          (vocabEntry.Value.Uri + local)
+                          $"{m.FSharpType}: {prefix}:{local} must expand to {vocabEntry.Value.Uri}{local}"
+
+                  // Specific assertion for schema:Game
+                  let gameMapping = lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+                  Expect.isSome gameMapping "must have FixtureApp.Game mapping"
+                  Expect.equal gameMapping.Value.Iri (Some "schema:Game") "Game must get schema:Game CURIE"
+
+                  let schemaEntry = Map.tryFind "schema" lf.Vocabularies
+                  Expect.isSome schemaEntry "schema must be in Vocabularies"
+                  Expect.equal schemaEntry.Value.Uri "https://schema.org/" "schema Uri must be https://schema.org/"
+
+                  let expanded = schemaEntry.Value.Uri + "Game"
+                  Expect.equal expanded "https://schema.org/Game" "schema:Game expands to https://schema.org/Game"
+              finally
+                  Directory.Delete(tmpDir, true)
+          } ]
+
+// ── AT9: two vocabularies ─────────────────────────────────────────────────────
+
+[<Tests>]
+let at9TwoVocabulariesTests =
+    testList
+        "AT9 - two vocabularies with independent hashes and deterministic ordering"
+        [ test "schema and foaf both in Vocabularies with independent hashes" {
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, lockFilePath = writeTwoVocabProject tmpDir
+
+                  let fixedClock = fun () -> DateTimeOffset.Parse("2026-06-01T00:00:00Z")
+
+                  let result =
+                      Pipeline.runWithFetch
+                          twoVocabStubFetch
+                          fixedClock
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  Expect.isOk result "pipeline should succeed"
+                  let lf = LockFile.read lockFilePath |> Result.defaultWith failwith
+
+                  // Both bindings present
+                  let schemaEntry = Map.tryFind "schema" lf.Vocabularies
+                  let foafEntry = Map.tryFind "foaf" lf.Vocabularies
+                  Expect.isSome schemaEntry "schema must be in Vocabularies"
+                  Expect.isSome foafEntry "foaf must be in Vocabularies"
+
+                  // Independent hashes (different turtle content → different sha256)
+                  Expect.notEqual schemaEntry.Value.Hash foafEntry.Value.Hash "schema and foaf hashes must differ"
+
+                  // Verify each hash matches the served bytes
+                  let computeHash (bytes: byte[]) =
+                      use sha = SHA256.Create()
+                      sha.ComputeHash(bytes)
+                      |> Array.map (fun b -> b.ToString("x2"))
+                      |> String.concat ""
+
+                  Expect.equal
+                      schemaEntry.Value.Hash
+                      (computeHash (richSchemaTurtleBytes ()))
+                      "schema Hash must be sha256 of schema turtle"
+
+                  Expect.equal
+                      foafEntry.Value.Hash
+                      (computeHash (foafTurtleBytes ()))
+                      "foaf Hash must be sha256 of foaf turtle"
+
+                  // CURIE resolution: schema:Game → schema.Uri + "Game"
+                  let gameMapping = lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+                  Expect.isSome gameMapping "must have FixtureApp.Game mapping"
+                  Expect.equal gameMapping.Value.Iri (Some "schema:Game") "Game must get schema:Game CURIE"
+
+                  Expect.equal
+                      (schemaEntry.Value.Uri + "Game")
+                      "https://schema.org/Game"
+                      "schema:Game expands correctly"
+
+                  // CURIE resolution: foaf:Person → foaf.Uri + "Person"
+                  let personMapping =
+                      lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Person")
+
+                  Expect.isSome personMapping "must have FixtureApp.Person mapping"
+                  Expect.equal personMapping.Value.Iri (Some "foaf:Person") "Person must get foaf:Person CURIE"
+
+                  Expect.equal
+                      (foafEntry.Value.Uri + "Person")
+                      "http://xmlns.com/foaf/0.1/Person"
+                      "foaf:Person expands correctly"
+
+                  // Deterministic ordering: vocabularies keys sorted (foaf < schema)
+                  let keys = lf.Vocabularies |> Map.toList |> List.map fst
+                  Expect.equal keys [ "foaf"; "schema" ] "vocabulary keys must be in alphabetical order"
+
+                  // Integrity verifies
+                  Expect.isSome lf.Integrity "Integrity must be stamped"
+                  Expect.isOk (LockFile.verifyIntegrity lf) "integrity must verify"
               finally
                   Directory.Delete(tmpDir, true)
           } ]

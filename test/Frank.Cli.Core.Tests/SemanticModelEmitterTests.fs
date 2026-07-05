@@ -18,6 +18,7 @@ let private probeRegistry: VocabularyRegistry =
 let private probeLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "schema",
@@ -54,6 +55,7 @@ let private probeLock: LockFile =
 let private noClassLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UtcNow
+      Integrity = None
       Vocabularies = Map.empty
       DeclaredPrefixes = Map.empty
       Mappings =
@@ -186,6 +188,7 @@ let excludedMappingTests =
               let twoMappingLock: LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -242,6 +245,7 @@ let unionCaseEmissionTests =
               let lock: LockFile =
                   { SchemaVersion = 1
                     Generated = exDateOffset
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "ex",
@@ -311,6 +315,7 @@ let unionCaseEmissionTests =
               let lock: LockFile =
                   { SchemaVersion = 1
                     Generated = exDateOffset
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "ex",
@@ -370,6 +375,7 @@ let unionCaseEmissionTests =
               let lock: LockFile =
                   { SchemaVersion = 1
                     Generated = exDateOffset
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "ex",
@@ -485,6 +491,7 @@ let private exRegistry: VocabularyRegistry =
 let private moveLock: LockFile =
     { SchemaVersion = 1
       Generated = exDateOffset
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "ex",
@@ -595,6 +602,7 @@ let private crossNsRegistry: VocabularyRegistry =
 let private crossNsLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "ex",

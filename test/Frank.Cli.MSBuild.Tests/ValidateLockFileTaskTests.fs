@@ -201,4 +201,72 @@ let validateTests =
                   let result = task.Execute()
                   Expect.isFalse result "Execute should return false for bad JSON"
                   Expect.isNonEmpty engine.Errors "error logged for bad JSON")
+          }
+
+          test "AT3 - stamped lock with valid integrity: Execute returns true, zero integrity warnings" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+                  let stamped = LockFile.withIntegrity confirmedLock
+                  let lockPath = writeLockFile dir stamped
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true"
+                  Expect.isEmpty engine.Errors "no errors"
+                  Expect.isEmpty engine.Warnings "no integrity warnings for valid stamped lock")
+          }
+
+          test "AT4 - hand-edited IRI changes hash: exactly one FRANKSEM-INTEGRITY warning, build proceeds" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+                  let stamped = LockFile.withIntegrity confirmedLock
+                  // Tamper with one IRI after stamping to simulate hand-edit
+                  let tampered =
+                      { stamped with
+                          Mappings =
+                              stamped.Mappings
+                              |> List.map (fun m -> { m with Iri = Some "schema:CreativeWork" }) }
+
+                  let lockPath = writeLockFile dir tampered
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true (build proceeds)"
+                  Expect.isEmpty engine.Errors "no MS001 error (all mappings are confirmed)"
+                  Expect.hasLength engine.Warnings 1 "exactly one FRANKSEM-INTEGRITY warning"
+                  Expect.contains engine.WarningCodes "FRANKSEM-INTEGRITY" "warning code is FRANKSEM-INTEGRITY"
+                  Expect.equal
+                      engine.WarningMessages.[0]
+                      "lock appears hand-edited; regenerate"
+                      "warning message must be exact text")
+          }
+
+          test "AT4b - canonical-equivalent reformat (CRLF LF reindent): no integrity warning" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+                  let stamped = LockFile.withIntegrity confirmedLock
+                  let lockPath = writeLockFile dir stamped
+                  // Read the raw JSON, replace LF with CRLF, write back — canonical form strips whitespace
+                  let raw = File.ReadAllText(lockPath)
+                  let reformatted = raw.Replace("\n", "\r\n")
+                  File.WriteAllText(lockPath, reformatted)
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true"
+                  Expect.isEmpty engine.Warnings "CRLF reformat must not trigger integrity warning")
+          }
+
+          test "AT7 - Integrity=None: warning 'lock is unstamped; regenerate', build proceeds" {
+              withTempDir (fun dir ->
+                  let engine = StubBuildEngine()
+                  let unstamped = { confirmedLock with Integrity = None }
+                  let lockPath = writeLockFile dir unstamped
+                  let task = makeTask engine lockPath
+                  let result = task.Execute()
+                  Expect.isTrue result "Execute should return true (build proceeds)"
+                  Expect.isEmpty engine.Errors "no MS001 error"
+                  Expect.isNonEmpty engine.Warnings "at least one warning for unstamped lock"
+                  Expect.contains engine.WarningCodes "FRANKSEM-INTEGRITY" "warning code is FRANKSEM-INTEGRITY"
+                  Expect.equal
+                      engine.WarningMessages.[0]
+                      "lock is unstamped; regenerate"
+                      "warning message must be exact text")
           } ]

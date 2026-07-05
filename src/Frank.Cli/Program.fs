@@ -236,6 +236,15 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
                 printfn "%s" (render lf)
                 0
 
+/// Stamp integrity and refresh the Generated timestamp before writing.
+/// Used by every handler that mutates and writes back a lock (accept, finalize).
+let private stampAndWrite (lockPath: string) (lf: LockFile) : unit =
+    LockFile.write
+        lockPath
+        (LockFile.withIntegrity
+            { lf with
+                Generated = DateTimeOffset.UtcNow })
+
 let private parseSource: string -> Result<MappingSource, string> =
     parseChoice "source" [ "llm", Llm; "manual", Manual ]
 
@@ -298,10 +307,7 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
 
                             let updated, summary = Accept.apply lf doc source oracle
 
-                            write
-                                lockPath
-                                { updated with
-                                    Generated = DateTimeOffset.UtcNow }
+                            stampAndWrite lockPath updated
 
                             for w in summary.Warnings do
                                 eprintfn "warning: %s" w
@@ -335,7 +341,7 @@ let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
             1
         | Ok lf ->
             let updated, summary = Finalize.run lf
-            write lockPath updated
+            stampAndWrite lockPath updated
 
             printfn
                 "Finalized: %d confirmed, %d excluded (%d already decided)"

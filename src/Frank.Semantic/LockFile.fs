@@ -2,6 +2,7 @@ namespace Frank.Semantic
 
 open System
 open System.IO
+open System.Security.Cryptography
 open System.Text.Json
 open System.Text.Json.Nodes
 
@@ -17,6 +18,7 @@ module LockFile =
     type LockFile =
         { SchemaVersion: int
           Generated: DateTimeOffset
+          Integrity: string option
           Vocabularies: Map<string, VocabularyEntry>
           DeclaredPrefixes: Map<string, string>
           Mappings: Mapping list }
@@ -324,6 +326,8 @@ module LockFile =
                             requireString node "generated"
                             |> Result.bind parseIso8601
                             |> Result.bind (fun generated ->
+                                let integrity = optionalString node "integrity"
+
                                 parseVocabularies node.["vocabularies"]
                                 |> Result.bind (fun vocabularies ->
                                     parseDeclaredPrefixes node.["declaredPrefixes"]
@@ -332,6 +336,7 @@ module LockFile =
                                         |> Result.map (fun mappings ->
                                             { SchemaVersion = version
                                               Generated = generated
+                                              Integrity = integrity
                                               Vocabularies = vocabularies
                                               DeclaredPrefixes = declaredPrefixes
                                               Mappings = mappings })))))
@@ -422,6 +427,10 @@ module LockFile =
         root.Add("schemaVersion", JsonValue.Create lf.SchemaVersion)
         root.Add("generated", JsonValue.Create(formatIso8601 lf.Generated))
 
+        match lf.Integrity with
+        | None -> ()
+        | Some h -> root.Add("integrity", JsonValue.Create h)
+
         let vocabs = JsonObject()
 
         for key in lf.Vocabularies |> Map.toSeq |> Seq.map fst |> Seq.sort do
@@ -443,6 +452,40 @@ module LockFile =
 
         root.Add("mappings", mappings)
         root
+
+    // ── Integrity ─────────────────────────────────────────────────────────────────
+
+    let private canonicalBytes (lf: LockFile) : byte[] =
+        let root = serializeDoc { lf with Integrity = None }
+        let json = root.ToJsonString writeOptions
+        Text.Encoding.UTF8.GetBytes json
+
+    /// Compute the SHA-256 integrity hash of a lock file's canonical form.
+    /// Invariant to the lock's Integrity field value — always hashes the
+    /// canonical form with Integrity = None.
+    let computeIntegrity (lf: LockFile) : string =
+        use sha = SHA256.Create()
+        let hash = sha.ComputeHash(canonicalBytes lf)
+        hash |> Array.map (fun b -> b.ToString("x2")) |> String.concat ""
+
+    /// Return a new lock with Integrity stamped to the computed hash.
+    let withIntegrity (lf: LockFile) : LockFile =
+        { lf with
+            Integrity = Some(computeIntegrity lf) }
+
+    /// Verify the stored Integrity against the recomputed hash.
+    /// None → Error "lock is unstamped; regenerate"
+    /// Mismatch → Error "lock appears hand-edited; regenerate"
+    let verifyIntegrity (lf: LockFile) : Result<unit, string> =
+        match lf.Integrity with
+        | None -> Error "lock is unstamped; regenerate"
+        | Some stored ->
+            let computed = computeIntegrity lf
+
+            if stored = computed then
+                Ok()
+            else
+                Error "lock appears hand-edited; regenerate"
 
     // ── Effectful I/O ─────────────────────────────────────────────────────────
 

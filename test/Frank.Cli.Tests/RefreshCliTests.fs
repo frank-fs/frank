@@ -4,6 +4,7 @@ open System
 open System.Diagnostics
 open System.IO
 open System.Net
+open System.Security.Cryptography
 open System.Text
 open System.Threading.Tasks
 open Expecto
@@ -80,6 +81,7 @@ let private serveOnce (listener: HttpListener) (capMs: int) : Task =
 let private staleLockFor (port: int) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "vocab",
@@ -119,6 +121,57 @@ let private runCli (args: string[]) (capMs: int) : int * string * string =
     proc.WaitForExit()
     proc.ExitCode, stdoutTask.Result, stderrTask.Result
 
+/// SHA-256 hex of stubTurtleBytes (used for the "no drift" case).
+let private stubTurtleSha256 () : string =
+    use sha = SHA256.Create()
+    sha.ComputeHash(stubTurtleBytes)
+    |> Array.map (fun b -> b.ToString("x2"))
+    |> String.concat ""
+
+/// Lock where the recorded hash MATCHES stubTurtleBytes → no drift on refresh.
+let private freshLockFor (port: int) : LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
+      Vocabularies =
+        Map.ofList
+            [ "vocab",
+              { Uri = $"http://localhost:{port}/vocab.ttl"
+                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                Hash = stubTurtleSha256 () } ]
+      DeclaredPrefixes = Map.empty
+      Mappings = [] }
+
+/// Serve stubTurtleBytes, capturing the URL of the first incoming request.
+let private serveOnceCapturingUrl (listener: HttpListener) (capMs: int) : Task * Task<string> =
+    let ctxTask = listener.GetContextAsync()
+    let urlTcs = TaskCompletionSource<string>()
+
+    let serving =
+        Task.Run(fun () ->
+            if ctxTask.Wait(capMs) then
+                try
+                    let ctx = ctxTask.Result
+                    urlTcs.TrySetResult(ctx.Request.Url.AbsoluteUri) |> ignore
+                    ctx.Response.ContentType <- "text/turtle"
+                    ctx.Response.StatusCode <- 200
+                    ctx.Response.ContentLength64 <- int64 stubTurtleBytes.Length
+                    use stream = ctx.Response.OutputStream
+                    stream.Write(stubTurtleBytes, 0, stubTurtleBytes.Length)
+                with _ ->
+                    urlTcs.TrySetResult("") |> ignore
+            else
+                urlTcs.TrySetResult("") |> ignore
+
+            try
+                listener.Stop()
+            with _ ->
+                ()
+
+            (listener :> IDisposable).Dispose())
+
+    serving, urlTcs.Task
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 [<Tests>]
@@ -144,4 +197,122 @@ let refreshCliTests =
                   Expect.stringContains stderr "vocabulary hash drift" "drift message must appear on STDERR"
 
                   Expect.isFalse (stdout.Contains "vocabulary hash drift") "drift message must NOT appear on stdout")
+          }
+
+          test "AT2 - unchanged vocab: refresh exits 0 and stub receives GET for exactly the recorded URL" {
+              withTempDir (fun dir ->
+                  let capMs = 5_000
+                  let listener, port = bindHttpListener ()
+                  let serving, urlTask = serveOnceCapturingUrl listener capMs
+                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
+                  let lock = freshLockFor port
+                  LockFile.write lockPath lock
+
+                  let exitCode, _stdout, stderr =
+                      runCli [| "semantic"; "refresh"; "--lock-file"; lockPath |] capMs
+
+                  serving.Wait(1_000) |> ignore
+
+                  Expect.equal exitCode 0 $"refresh must exit 0 when no drift; stderr:\n{stderr}"
+
+                  // The stub received a request for exactly the URL recorded in Vocabularies
+                  let recordedUrl = lock.Vocabularies.["vocab"].Uri
+                  let requestedUrl = urlTask.Result
+
+                  Expect.equal requestedUrl recordedUrl "stub must receive GET for the URL recorded in Vocabularies")
+          }
+
+          test "AT2 - unreachable vocab URL: refresh exits 1 (error, not drift)" {
+              withTempDir (fun dir ->
+                  // Bind and immediately close a listener to get a port that's not serving.
+                  let l, port = bindHttpListener ()
+                  l.Stop()
+                  (l :> IDisposable).Dispose()
+
+                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
+                  LockFile.write lockPath (staleLockFor port)
+
+                  let capMs = 5_000
+                  let exitCode, _stdout, stderr =
+                      runCli [| "semantic"; "refresh"; "--lock-file"; lockPath |] capMs
+
+                  Expect.equal exitCode 1 $"unreachable URL must exit 1 (error); stderr:\n{stderr}")
+          } ]
+
+[<Tests>]
+let at6AcceptFinalizeIntegrityTests =
+    testList
+        "AT6 - accept and finalize stamp Integrity on the written lock"
+        [ test "frank semantic finalize: written lock has Integrity=Some and verifyIntegrity=Ok" {
+              withTempDir (fun dir ->
+                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
+
+                  let draftLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                        Integrity = None
+                        Vocabularies = Map.empty
+                        DeclaredPrefixes = Map.empty
+                        Mappings =
+                          [ { FSharpType = "MyApp.Draft"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = Convention
+                              Status = Proposed
+                              Alternates = []
+                              Rt = None
+                              Shape = MappingShape.Record [] } ] }
+
+                  LockFile.write lockPath draftLock
+
+                  let capMs = 10_000
+
+                  let exitCode, _stdout, stderr =
+                      runCli [| "semantic"; "finalize"; "--lock-file"; lockPath |] capMs
+
+                  Expect.equal exitCode 0 $"finalize must exit 0; stderr:\n{stderr}"
+
+                  let lf = LockFile.read lockPath |> Result.defaultWith failwith
+                  Expect.isSome lf.Integrity "Integrity must be Some after finalize"
+                  Expect.isOk (LockFile.verifyIntegrity lf) "Integrity must verify after finalize")
+          }
+
+          test "frank semantic accept: written lock has Integrity=Some and verifyIntegrity=Ok" {
+              withTempDir (fun dir ->
+                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
+                  let resolvedPath = Path.Combine(dir, "resolved.json")
+
+                  let draftLock: LockFile =
+                      { SchemaVersion = 1
+                        Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                        Integrity = None
+                        Vocabularies = Map.empty
+                        DeclaredPrefixes = Map.empty
+                        Mappings =
+                          [ { FSharpType = "MyApp.Order"
+                              Iri = None
+                              Confidence = 0.0
+                              Source = Convention
+                              Status = Proposed
+                              Alternates = []
+                              Rt = None
+                              Shape = MappingShape.Record [] } ] }
+
+                  LockFile.write lockPath draftLock
+
+                  let resolvedJson =
+                      """{"schemaVersion":1,"resolved":[{"fsharpType":"MyApp.Order","iri":"schema:Order","fields":[]}]}"""
+
+                  File.WriteAllText(resolvedPath, resolvedJson)
+
+                  let capMs = 10_000
+
+                  let exitCode, _stdout, stderr =
+                      runCli [| "semantic"; "accept"; "--lock-file"; lockPath; "--input"; resolvedPath |] capMs
+
+                  Expect.equal exitCode 0 $"accept must exit 0; stderr:\n{stderr}"
+
+                  let lf = LockFile.read lockPath |> Result.defaultWith failwith
+                  Expect.isSome lf.Integrity "Integrity must be Some after accept"
+                  Expect.isOk (LockFile.verifyIntegrity lf) "Integrity must verify after accept")
           } ]

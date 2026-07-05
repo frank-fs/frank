@@ -78,20 +78,18 @@ let private sourceFilesFromFsproj (projectFile: string) : Result<string list, st
 
 /// Read existing lock file, or return an empty one if absent.
 let private readOrEmptyLock (path: string) : LockFile =
-    if File.Exists path then
-        LockFile.read path
-        |> Result.defaultValue
-            { SchemaVersion = 1
-              Generated = DateTimeOffset.UtcNow
-              Vocabularies = Map.empty
-              DeclaredPrefixes = Map.empty
-              Mappings = [] }
-    else
+    let empty () =
         { SchemaVersion = 1
           Generated = DateTimeOffset.UtcNow
+          Integrity = None
           Vocabularies = Map.empty
           DeclaredPrefixes = Map.empty
           Mappings = [] }
+
+    if File.Exists path then
+        LockFile.read path |> Result.defaultWith (fun _ -> empty ())
+    else
+        empty ()
 
 /// Merge semantics: all decided (confirmed/excluded) entries preserved regardless of source;
 /// undecided convention guesses (proposed/unresolved) are replaced by fresh extract output.
@@ -126,6 +124,7 @@ let private accumulateTerms (acc: VocabTerms) g : VocabTerms =
 /// Fetch all in-scope vocabularies and return merged VocabTerms with per-prefix entries.
 let private fetchVocabTerms
     (fetch: VocabFetcher.Fetch)
+    (clock: unit -> DateTimeOffset)
     (projectDir: string)
     (registry: VocabularyRegistry)
     : Async<Result<VocabTerms * Map<string, VocabularyEntry>, string>> =
@@ -165,6 +164,8 @@ let private fetchVocabTerms
                     | Error _ -> None)
                 |> Array.fold accumulateTerms emptyTerms
 
+            let fetchedAt = clock ()
+
             let vocabEntries =
                 List.zip inScopePrefixes (Array.toList results)
                 |> List.choose (fun ((prefix, uri), r) ->
@@ -173,7 +174,7 @@ let private fetchVocabTerms
                         Some(
                             prefix,
                             { Uri = uri.AbsoluteUri
-                              FetchedAt = DateTimeOffset.UtcNow
+                              FetchedAt = fetchedAt
                               Hash = cv.Hash }
                         )
                     | Error _ -> None)
@@ -194,9 +195,10 @@ let private extractFromFiles (sourceFiles: string list) : Result<TypeInfo list, 
     let combined = sourceFiles |> List.map File.ReadAllText |> String.concat "\n\n"
     Extractor.extractTypeInfosFromSource combined
 
-/// Write the updated lock file to disk.
+/// Write the updated lock file to disk, stamping integrity with the injected clock.
 let private writeLock
     (lockPath: string)
+    (clock: unit -> DateTimeOffset)
     (existing: LockFile)
     (fresh: Mapping list)
     (vocabularies: Map<string, VocabularyEntry>)
@@ -206,19 +208,26 @@ let private writeLock
 
     let updated =
         { existing with
-            Generated = DateTimeOffset.UtcNow
+            Generated = clock ()
+            Integrity = None
             Vocabularies = vocabularies
             DeclaredPrefixes = declaredPrefixes
             Mappings = merged }
 
+    let stamped = LockFile.withIntegrity updated
     Directory.CreateDirectory(Path.GetDirectoryName lockPath) |> ignore
-    LockFile.write lockPath updated
+    LockFile.write lockPath stamped
     summarize merged
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
-/// Pipeline core with the vocabulary fetcher injected. `run` wraps this with the production HttpClient-backed fetcher.
-let internal runWithFetch (fetch: VocabFetcher.Fetch) (opts: ExtractOptions) : Result<ExtractSummary, string> =
+/// Pipeline core with the vocabulary fetcher and clock injected.
+/// `run` wraps this with the production HttpClient-backed fetcher and real clock.
+let internal runWithFetch
+    (fetch: VocabFetcher.Fetch)
+    (clock: unit -> DateTimeOffset)
+    (opts: ExtractOptions)
+    : Result<ExtractSummary, string> =
     let projectFile = Path.GetFullPath opts.ProjectFile
 
     if not (File.Exists projectFile) then
@@ -246,7 +255,7 @@ let internal runWithFetch (fetch: VocabFetcher.Fetch) (opts: ExtractOptions) : R
 
                         let projectDir = Path.GetDirectoryName projectFile
 
-                        match fetchVocabTerms fetch projectDir registry |> Async.RunSynchronously with
+                        match fetchVocabTerms fetch clock projectDir registry |> Async.RunSynchronously with
                         | Error e -> Error $"vocab fetch failed: {e}"
                         | Ok(terms, vocabEntries) ->
 
@@ -257,10 +266,10 @@ let internal runWithFetch (fetch: VocabFetcher.Fetch) (opts: ExtractOptions) : R
                             let declaredPrefixes =
                                 registry.Prefixes |> Map.map (fun _ (u: Uri) -> u.AbsoluteUri)
 
-                            Ok(writeLock lockPath existingLock freshMappings vocabEntries declaredPrefixes)
+                            Ok(writeLock lockPath clock existingLock freshMappings vocabEntries declaredPrefixes)
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.
 let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
     use client = new HttpClient()
-    runWithFetch (VocabFetcher.httpFetch client) opts
+    runWithFetch (VocabFetcher.httpFetch client) (fun () -> DateTimeOffset.UtcNow) opts

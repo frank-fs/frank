@@ -16,6 +16,7 @@ let private errorFetch (reason: string) : Fetch =
 let private mkLock (vocabs: Map<string, VocabularyEntry>) : LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.UnixEpoch
+      Integrity = None
       Vocabularies = vocabs
       DeclaredPrefixes = Map.empty
       Mappings = [] }

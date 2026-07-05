@@ -7,6 +7,7 @@ open Frank.Semantic.LockFile
 let confirmedLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "schema",
@@ -90,6 +91,7 @@ let unresolvedOnlyLock: LockFile =
 let confirmedExLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "ex",

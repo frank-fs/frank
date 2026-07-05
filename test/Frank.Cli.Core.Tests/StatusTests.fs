@@ -20,6 +20,7 @@ let private mapping fsType status : Mapping =
 let private lockWith (mappings: Mapping list) : LockFile.LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UtcNow
+      Integrity = None
       Vocabularies = Map.empty
       DeclaredPrefixes = Map.empty
       Mappings = mappings }

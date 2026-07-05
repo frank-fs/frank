@@ -25,6 +25,7 @@ let private schemaVocabs: Map<string, VocabularyEntry> =
 let private mkLock (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
+      Integrity = None
       Vocabularies = emptyVocabs
       DeclaredPrefixes = Map.empty
       Mappings = mappings }
@@ -32,6 +33,7 @@ let private mkLock (mappings: Mapping list) : LockFile =
 let private mkLockWithVocabs (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
       Generated = System.DateTimeOffset.UnixEpoch
+      Integrity = None
       Vocabularies = schemaVocabs
       DeclaredPrefixes = Map.empty
       Mappings = mappings }
@@ -341,6 +343,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -400,6 +403,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -460,6 +464,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -508,6 +513,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -548,6 +554,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -584,6 +591,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -618,6 +626,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -653,6 +662,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -699,6 +709,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -746,6 +757,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -801,6 +813,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -849,6 +862,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -895,6 +909,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -931,6 +946,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -973,6 +989,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -1016,6 +1033,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -1059,6 +1077,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -1306,6 +1325,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -1348,6 +1368,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -1404,6 +1425,7 @@ let acceptTests =
               let lock =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.UnixEpoch
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",

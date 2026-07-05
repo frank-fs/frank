@@ -27,6 +27,7 @@ let private registry: VocabularyRegistry =
 let private lock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "schema",
@@ -253,6 +254,7 @@ let skipPathTests =
               let lockNoIri: LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -287,6 +289,7 @@ let skipPathTests =
               let lockNonNullary: LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -339,6 +342,7 @@ let private hostRelRegistry: VocabularyRegistry =
 let private hostRelLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies =
         Map.ofList
             [ "schema",

@@ -1,5 +1,6 @@
 module Frank.Cli.Core.Tests.VocabSwapTests
 
+open System
 open System.IO
 open System.Reflection
 open Expecto
@@ -116,6 +117,7 @@ let private writeFixtureProject (dir: string) (vocabSrc: string) : string =
 let private extractLock (fetch: Fetch) (projPath: string) : LockFile =
     Pipeline.runWithFetch
         fetch
+        (fun () -> DateTimeOffset.UtcNow)
         { ProjectFile = projPath
           VocabularyFile = None
           AssemblyRefs = [ frankSemanticDllPath (); fsharpCoreDllPath () ]

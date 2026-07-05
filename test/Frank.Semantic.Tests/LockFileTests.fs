@@ -88,6 +88,7 @@ let private genLockFile =
         return
             ({ SchemaVersion = 1
                Generated = generated
+               Integrity = None
                Vocabularies = vocabs
                DeclaredPrefixes = Map.empty
                Mappings = mappings }
@@ -238,6 +239,7 @@ let roundTripTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -290,6 +292,7 @@ let roundTripTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings =
@@ -320,6 +323,7 @@ let roundTripTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+                    Integrity = None
                     Vocabularies =
                       Map.ofList
                           [ "schema",
@@ -424,6 +428,7 @@ let diffFriendlyTests =
         let lf1: LockFile.LockFile =
             { SchemaVersion = 1
               Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+              Integrity = None
               Vocabularies = Map.ofList [ "schema", vocab ]
               DeclaredPrefixes = Map.empty
               Mappings = [ mapping1 ] }
@@ -487,6 +492,7 @@ let mergeTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
@@ -523,6 +529,7 @@ let mergeTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
@@ -564,6 +571,7 @@ let mergeTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
@@ -601,6 +609,7 @@ let mergeTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
@@ -625,6 +634,7 @@ let mergeTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.UtcNow
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ existing ] }
@@ -829,6 +839,7 @@ let excludedStatusTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings =
@@ -873,6 +884,7 @@ let vocabKeySortTests =
         let lf: LockFile.LockFile =
             { SchemaVersion = 1
               Generated = DateTimeOffset.Parse("2026-04-20T12:00:00Z")
+              Integrity = None
               Vocabularies =
                 Map.ofList
                     [ "schema",
@@ -1045,6 +1057,7 @@ let unionShapeRoundTripTests =
               let lf: LockFile.LockFile =
                   { SchemaVersion = 1
                     Generated = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                    Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.empty
                     Mappings = [ mapping ] }
@@ -1130,4 +1143,19 @@ let bareCatchNarrowingTests =
                   | Error msg -> Expect.stringContains msg "alternates" "error cites alternates"
               finally
                   File.Delete path
-          } ]
+          }
+
+          testProperty "AT10 - computeIntegrity is invariant to the Integrity field value" (fun () ->
+              let lf =
+                  ({ SchemaVersion = 1
+                     Generated = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+                     Integrity = None
+                     Vocabularies = Map.empty
+                     DeclaredPrefixes = Map.empty
+                     Mappings = [] }
+                  : LockFile.LockFile)
+
+              let hashNone = LockFile.computeIntegrity lf
+              let hashCorrect = LockFile.computeIntegrity { lf with Integrity = Some hashNone }
+              let hashGarbage = LockFile.computeIntegrity { lf with Integrity = Some "garbage-value" }
+              hashNone = hashCorrect && hashNone = hashGarbage) ]

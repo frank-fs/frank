@@ -20,6 +20,7 @@ let private altSchemaBodyHash: string = sha256Hex altSchemaBody
 let private confirmedLock: LockFile =
     { SchemaVersion = 1
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
       Vocabularies = Map.ofList [ "schema", mkVocabEntry schemaBodyHash ]
       DeclaredPrefixes = Map.empty
       Mappings =
