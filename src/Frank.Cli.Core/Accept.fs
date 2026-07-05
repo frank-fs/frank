@@ -175,7 +175,7 @@ let parseResolved (json: string) : Result<ResolvedDoc, string> =
                 let versionResult =
                     try
                         Ok(versionNode.GetValue<int>())
-                    with _ ->
+                    with :? System.InvalidOperationException ->
                         Error "resolved.json: schemaVersion must be an integer"
 
                 versionResult
