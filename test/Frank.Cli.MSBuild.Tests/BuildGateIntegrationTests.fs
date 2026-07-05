@@ -8,6 +8,7 @@ open Expecto
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
+open Frank.TestSupport.TempDir
 
 // ── Path resolution ───────────────────────────────────────────────────────────
 
@@ -36,29 +37,6 @@ let private taskDllPath: string = typeof<ValidateLockFileTask>.Assembly.Location
 /// Frank.Discovery.fsproj in this worktree.
 let private frankDiscoveryFsproj: string =
     Path.Combine(worktreeRoot, "src", "Frank.Discovery", "Frank.Discovery.fsproj")
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// On macOS /var is a symlink to /private/var. MSBuild resolves the real path when
-/// computing relative ProjectReference paths. Canonicalize so the fixture project's
-/// base dir matches what MSBuild sees, allowing a genuine ProjectReference.
-let private canonicalizeTempDir (dir: string) : string =
-    let varTarget = DirectoryInfo("/var").ResolveLinkTarget(returnFinalTarget = true)
-
-    if varTarget <> null && dir.StartsWith("/var/") then
-        Path.Combine(varTarget.FullName, dir.[5..])
-    else
-        dir
-
-let private withTempDir (f: string -> unit) =
-    let rawDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    let dir = canonicalizeTempDir rawDir
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
 
 /// Shared subprocess driver. Captures combined stdout+stderr; kills on capMs timeout.
 let private runProcess (exe: string) (args: string) (capMs: int) : int * string =

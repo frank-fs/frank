@@ -9,17 +9,7 @@ open Frank.Semantic.LockFile
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-let private withTempDir (f: string -> unit) =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
+open Frank.TestSupport.TempDir
 
 /// Paths to assemblies the FSI session must reference for the vocab CE to compile.
 /// We use the assemblies already loaded in the test process — guaranteed same version.

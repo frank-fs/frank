@@ -8,15 +8,7 @@ open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
 open Frank.Semantic
 open Frank.Semantic.LockFile
-
-let private withTempDir (f: string -> unit) =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
+open Frank.TestSupport.TempDir
 
 let private makeTask (engine: StubBuildEngine) (lockPath: string) : ValidateLockFileTask =
     let task = ValidateLockFileTask()

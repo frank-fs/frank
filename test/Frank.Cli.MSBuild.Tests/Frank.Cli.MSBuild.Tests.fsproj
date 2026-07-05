@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj" />
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="..\Frank.TestSupport\Frank.TestSupport.fsproj" />
   </ItemGroup>
 
 </Project>

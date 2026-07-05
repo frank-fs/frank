@@ -8,6 +8,7 @@ open Frank.Semantic.LockFile
 open Frank.Semantic.VocabFetcher
 open Frank.Cli.Core.Refresh
 open Frank.Cli.Core.Tests.RefreshFixtures
+open Frank.TestSupport.TempDir
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -36,17 +37,6 @@ let private confirmedLock: LockFile =
                       Confidence = 1.0
                       Source = Convention
                       Status = Confirmed } ] } ] }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-let private withTempDir (f: string -> unit) =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
 
 // ── AT4 drift completeness tests ─────────────────────────────────────────────
 

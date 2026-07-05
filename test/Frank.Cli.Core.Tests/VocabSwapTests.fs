@@ -7,6 +7,7 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Semantic.VocabFetcher
 open Frank.Cli.Core
+open Frank.TestSupport.TempDir
 
 // ── Vocabulary document stubs ─────────────────────────────────────────────────
 //
@@ -88,15 +89,6 @@ let private frankSemanticDllPath () =
 
 let private fsharpCoreDllPath () =
     Assembly.GetAssembly(typeof<int list>).Location
-
-let private withTempDir (f: string -> 'a) : 'a =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
 
 let private writeFixtureProject (dir: string) (vocabSrc: string) : string =
     File.WriteAllText(Path.Combine(dir, "Domain.fs"), domainSource)

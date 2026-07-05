@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Cli/Frank.Cli.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="..\Frank.TestSupport\Frank.TestSupport.fsproj" />
   </ItemGroup>
 
 </Project>

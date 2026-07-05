@@ -43,6 +43,7 @@
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="..\Frank.TestSupport\Frank.TestSupport.fsproj" />
   </ItemGroup>
 
 </Project>

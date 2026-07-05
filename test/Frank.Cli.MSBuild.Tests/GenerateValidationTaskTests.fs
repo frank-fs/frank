@@ -9,17 +9,7 @@ open Frank.Semantic.LockFile
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-let private withTempDir (f: string -> unit) =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
+open Frank.TestSupport.TempDir
 
 let private frankSemanticDll =
     typeof<Frank.Semantic.VocabularyRegistry>.Assembly.Location

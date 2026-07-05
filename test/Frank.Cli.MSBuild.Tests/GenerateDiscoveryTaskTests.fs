@@ -5,15 +5,7 @@ open Expecto
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
-
-let private withTempDir (f: string -> unit) =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
+open Frank.TestSupport.TempDir
 
 let private makeTask (engine: StubBuildEngine) (lockPath: string) (outDir: string) : GenerateDiscoveryTask =
     let task = GenerateDiscoveryTask()

@@ -72,6 +72,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Semantic.Tests", "tes
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.Validation.Tests", "test\Frank.Validation.Tests\Frank.Validation.Tests.fsproj", "{B6F4E1CF-D137-4712-9081-0DFFFC9A02BC}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frank.TestSupport", "test\Frank.TestSupport\Frank.TestSupport.fsproj", "{5EA214A9-1CC8-4DF0-98AD-62602D92F895}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -442,6 +444,18 @@ Global
 		{B6F4E1CF-D137-4712-9081-0DFFFC9A02BC}.Release|x64.Build.0 = Release|Any CPU
 		{B6F4E1CF-D137-4712-9081-0DFFFC9A02BC}.Release|x86.ActiveCfg = Release|Any CPU
 		{B6F4E1CF-D137-4712-9081-0DFFFC9A02BC}.Release|x86.Build.0 = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|x64.Build.0 = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Debug|x86.Build.0 = Debug|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|x64.ActiveCfg = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|x64.Build.0 = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|x86.ActiveCfg = Release|Any CPU
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -477,6 +491,7 @@ Global
 		{643844B8-A725-4D0B-84E6-D136E3A9DC11} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 		{A717175C-B38B-43D2-882B-4829C4B1C355} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 		{B6F4E1CF-D137-4712-9081-0DFFFC9A02BC} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
+		{5EA214A9-1CC8-4DF0-98AD-62602D92F895} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {69BCA08B-4B88-4702-91B2-B5E891A078D9}

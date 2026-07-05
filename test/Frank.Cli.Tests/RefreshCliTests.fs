@@ -9,6 +9,7 @@ open System.Threading.Tasks
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
+open Frank.TestSupport.TempDir
 
 // ── Stub Turtle served on loopback ────────────────────────────────────────────
 
@@ -26,15 +27,6 @@ let private frankCliDll: string =
         Path.GetDirectoryName(Reflection.Assembly.GetExecutingAssembly().Location)
 
     Path.Combine(testDir, "Frank.Cli.dll")
-
-let private withTempDir (f: string -> 'a) : 'a =
-    let dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-    Directory.CreateDirectory dir |> ignore
-
-    try
-        f dir
-    finally
-        Directory.Delete(dir, recursive = true)
 
 /// Bind an HttpListener on a random port without a prior TcpListener (no TOCTOU).
 /// Tries up to 20 random ports; raises invalidOp if none succeed.
