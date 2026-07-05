@@ -44,3 +44,15 @@ module AcceptNegotiation =
 
             entries
             |> Seq.exists (fun e -> matchesMediaType e && hasExactProfile e && isNonZeroQ e)
+
+    /// Appends "Accept" to the response Vary header exactly once.
+    /// If "Accept" is already present (case-insensitive token match), this is a no-op.
+    /// Preserves other existing Vary tokens (e.g. "Accept-Encoding").
+    let appendVaryAccept (response: HttpResponse) : unit =
+        let hasAccept =
+            response.Headers["Vary"]
+            |> Seq.collect (fun v -> v.Split(','))
+            |> Seq.exists (fun t -> t.Trim().Equals("Accept", System.StringComparison.OrdinalIgnoreCase))
+
+        if not hasAccept then
+            response.Headers.Append("Vary", "Accept")

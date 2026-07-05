@@ -221,8 +221,7 @@ type ProvenanceMiddleware
             else
                 ctx.Response.ContentLength <- System.Nullable()
                 ctx.Response.ContentType <- "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
-                let varyValue = StringValues "Accept"
-                ctx.Response.Headers.Append("Vary", varyValue)
+                Frank.AcceptNegotiation.appendVaryAccept ctx.Response
                 do! ctx.Response.WriteAsync(ProvenanceGraph.toJsonLd record)
         }
 
@@ -245,7 +244,7 @@ type ProvenanceMiddleware
             let status = ctx.Response.StatusCode
 
             if status >= 200 && status < 400 then
-                ctx.Response.Headers.Append("Vary", StringValues "Accept")
+                Frank.AcceptNegotiation.appendVaryAccept ctx.Response
                 ctx.Response.Headers.Append("Link", linkHeaderValue)
 
             Task.CompletedTask)

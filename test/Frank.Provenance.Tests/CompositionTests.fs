@@ -321,6 +321,27 @@ let private startValidationServer (valConfig: ValidationConfig) =
 // ---------------------------------------------------------------------------
 
 [<Tests>]
+let varyDedupeTests =
+    testList
+        "Vary: Accept deduplication (#381)"
+        [ testCaseAsync "AC#381: Vary: Accept appears exactly once when LinkedData and Provenance both run"
+          <| async {
+              use app = startComposedServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/orders")
+              req.Headers.Add("Accept", "application/ld+json")
+              let! (resp: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+
+              let acceptCount =
+                  resp.Headers.Vary
+                  |> Seq.filter (fun t -> t.Equals("Accept", System.StringComparison.OrdinalIgnoreCase))
+                  |> Seq.length
+
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              Expect.equal acceptCount 1 "Vary: Accept appears exactly once"
+          } ]
+
+[<Tests>]
 let tests =
     testList
         "IRI Composition (AC #5 / #332)"
