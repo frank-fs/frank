@@ -5,6 +5,17 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
 
+/// Validates href-template variables in the JSON Home document by running the existing
+/// serializer check before the app starts serving. Reuses homeResourcesFromEndpoints and
+/// JsonHomeSerializer.serialize — the existing invalidOp fires on an unresolved variable,
+/// naming it. Register via DI as IStartupValidator (done automatically by useDiscoveryWith).
+type HrefVarsValidator(config: DiscoveryConfig) =
+    interface IStartupValidator with
+        member _.Validate(ds) =
+            DiscoveryMiddleware.homeResourcesFromEndpoints config.ResourceHrefVars ds
+            |> JsonHomeSerializer.serialize
+            |> ignore
+
 /// Extensions adding static semantic discovery (JSON Home, ALPS, OPTIONS/Allow,
 /// Link rel=describedby) to the Frank WebHostBuilder CE. Consumes a DiscoveryConfig
 /// (the MSBuild-generated GeneratedDiscovery module) plus endpoint metadata.
@@ -17,6 +28,7 @@ module DiscoveryExtensions =
         member _.UseDiscoveryWith(spec: WebHostSpec, config: DiscoveryConfig) : WebHostSpec =
             let addServices (services: IServiceCollection) =
                 services.AddSingleton<DiscoveryConfig>(config) |> ignore
+                services.AddSingleton<IStartupValidator>(HrefVarsValidator(config)) |> ignore
                 spec.Services services
 
             let addMiddleware (app: IApplicationBuilder) =

@@ -519,4 +519,26 @@
 
   </Target>
 
+
+  <!--
+    FrankValidateHrefVars: after build, invoke the app with FRANK_VALIDATE=1 so the
+    seam in WebHostBuilder.Run runs all IStartupValidator implementations (including
+    HrefVarsValidator from Frank.Discovery) and exits non-zero if any href-template
+    variable has no derived meaning IRI. The build then fails, naming the variable,
+    before any server socket is bound.
+
+    Gate: only runs for Exe projects that reference Frank.Discovery (package or project).
+    Set FrankSkipHrefVarsValidation=true to opt out (e.g. integration test hosts).
+    Bounded: 30-second timeout per Holzmann rule 10.
+  -->
+  <Target Name="FrankValidateHrefVars"
+          AfterTargets="Build"
+          Condition="('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe') and (@(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Discovery')) == 'True' or @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Discovery')) == 'True') and '$(FrankSkipHrefVarsValidation)' != 'true'">
+
+    <Exec Command="dotnet exec &quot;$(TargetPath)&quot;"
+          EnvironmentVariables="FRANK_VALIDATE=1"
+          Timeout="30000" />
+
+  </Target>
+
 </Project>

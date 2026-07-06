@@ -8,11 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../TestEndpointDataSource.fs" Link="TestEndpointDataSource.fs" />
     <Compile Include="TestHelpers.fs" />
     <Compile Include="SerializerTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />
+    <Compile Include="ValidatorTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

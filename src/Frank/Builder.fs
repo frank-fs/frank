@@ -389,6 +389,28 @@ module Builder =
                     services)
               UseDefaults = false }
 
+    /// Validates composed endpoints before the app starts serving.
+    /// Implementations throw <c>invalidOp</c> (InvalidOperationException) to signal a
+    /// validation failure that should fail the build. Register via DI as IStartupValidator.
+    type IStartupValidator =
+        abstract member Validate: EndpointDataSource -> unit
+
+    let private runValidators (services: IServiceProvider) (dataSource: EndpointDataSource) =
+        let mutable anyFailed = false
+
+        for v in services.GetServices<IStartupValidator>() do
+            try
+                v.Validate dataSource
+            with :? InvalidOperationException as ex ->
+                eprintfn "FRANK_VALIDATE error: %s" ex.Message
+                anyFailed <- true
+
+        if anyFailed then
+            Environment.Exit 1
+        else
+            eprintfn "FRANK_VALIDATE: OK"
+            Environment.Exit 0
+
     [<Sealed>]
     type WebHostBuilder(args: string[]) =
 
@@ -412,9 +434,14 @@ module Builder =
 
             let dataSource = ResourceEndpointDataSource(spec.Endpoints)
             (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
-            app.Run()
+
+            if Environment.GetEnvironmentVariable "FRANK_VALIDATE" = "1" then
+                runValidators app.Services (dataSource :> EndpointDataSource)
+            else
+                app.Run()
 #else
             let builder = Host.CreateDefaultBuilder(args)
+            let dataSource = ResourceEndpointDataSource(spec.Endpoints)
 
             let config =
                 Action<_>(fun webBuilder ->
@@ -426,10 +453,7 @@ module Builder =
                             |> spec.BeforeRoutingMiddleware
                             |> fun app -> app.UseRouting()
                             |> spec.Middleware
-                            |> fun app ->
-                                app.UseEndpoints(fun endpoints ->
-                                    let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-                                    endpoints.DataSources.Add(dataSource))
+                            |> fun app -> app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(dataSource))
                             |> ignore)
                     |> ignore)
 
@@ -439,7 +463,12 @@ module Builder =
                 else
                     builder.ConfigureWebHost(config)
 
-            configured.Build().Run()
+            let host = configured.Build()
+
+            if Environment.GetEnvironmentVariable "FRANK_VALIDATE" = "1" then
+                runValidators host.Services (dataSource :> EndpointDataSource)
+            else
+                host.Run()
 #endif
 
         member __.Yield(_) = WebHostSpec.Empty
