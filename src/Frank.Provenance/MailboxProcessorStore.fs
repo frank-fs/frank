@@ -49,33 +49,42 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
             indices.Add(position)
             index.[key] <- indices
 
+    // Removes oldest records when MaxRecords is exceeded and rebuilds indexes.
+    // Returns the (possibly rebuilt) index pair; caller reassigns its mutable variables.
+    let evictIfNeeded
+        (records: ResizeArray<ProvenanceRecord>)
+        (resourceIndex: Dictionary<string, ResizeArray<int>>)
+        (agentIndex: Dictionary<string, ResizeArray<int>>)
+        =
+        if records.Count > config.MaxRecords then
+            let evictCount = min config.EvictionBatchSize records.Count
+
+            logger.LogInformation(
+                "Evicting {EvictCount} oldest records (store has {Count}, max {Max})",
+                evictCount,
+                records.Count,
+                config.MaxRecords
+            )
+
+            records.RemoveRange(0, evictCount)
+            rebuildIndexes records
+        else
+            resourceIndex, agentIndex
+
+    let lookupByIndex (records: ResizeArray<ProvenanceRecord>) (index: Dictionary<string, ResizeArray<int>>) key =
+        match index.TryGetValue(key) with
+        | true, indices -> List.init indices.Count (fun j -> records.[indices.[j]])
+        | false, _ -> []
+
     let agent =
         MailboxProcessor<StoreMessage>.Start(fun inbox ->
             let records = ResizeArray<ProvenanceRecord>()
             let mutable resourceIndex = Dictionary<string, ResizeArray<int>>()
             let mutable agentIndex = Dictionary<string, ResizeArray<int>>()
 
-            let evictIfNeeded () =
-                if records.Count > config.MaxRecords then
-                    let evictCount = min config.EvictionBatchSize records.Count
-
-                    logger.LogInformation(
-                        "Evicting {EvictCount} oldest records (store has {Count}, max {Max})",
-                        evictCount,
-                        records.Count,
-                        config.MaxRecords
-                    )
-
-                    records.RemoveRange(0, evictCount)
-                    let ri, ai = rebuildIndexes records
-                    resourceIndex <- ri
-                    agentIndex <- ai
-
-            let lookupByIndex (index: Dictionary<string, ResizeArray<int>>) key =
-                match index.TryGetValue(key) with
-                | true, indices -> List.init indices.Count (fun j -> records.[indices.[j]])
-                | false, _ -> []
-
+            // Rule 10: loop is bounded by the Dispose message. IDisposable.Dispose posts
+            // Dispose to the mailbox; the Dispose handler clears state and returns without
+            // recursing, ending the agent. No other exit path exists during normal operation.
             let rec loop () =
                 async {
                     let! msg = inbox.Receive()
@@ -86,13 +95,15 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                         records.Add(record)
                         addToIndex resourceIndex record.ResourceUri position
                         addToIndex agentIndex record.Agent.Id position
-                        evictIfNeeded ()
+                        let ri, ai = evictIfNeeded records resourceIndex agentIndex
+                        resourceIndex <- ri
+                        agentIndex <- ai
                         return! loop ()
                     | QueryByResource(uri, reply) ->
-                        reply.Reply(lookupByIndex resourceIndex uri)
+                        reply.Reply(lookupByIndex records resourceIndex uri)
                         return! loop ()
                     | QueryByAgent(agentId, reply) ->
-                        reply.Reply(lookupByIndex agentIndex agentId)
+                        reply.Reply(lookupByIndex records agentIndex agentId)
                         return! loop ()
                     | Dispose reply ->
                         logger.LogInformation("Disposing provenance store, draining {Count} records", records.Count)

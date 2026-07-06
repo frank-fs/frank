@@ -26,10 +26,9 @@ module ProvenanceExtensions =
         builder.Metadata.Add(HttpMethodMetadata [| "GET" |])
         builder.Build()
 
-    let private wireMiddlewareAndEndpoint
-        (spec: WebHostSpec)
-        (addServices: IServiceCollection -> IServiceCollection)
-        : WebHostSpec =
+    // Adds the provenance middleware and endpoint to the spec; caller sets Services separately.
+    // Kept as a named function (not inlined) to avoid duplicating the addMiddleware body in two CE members.
+    let private addProvenanceMiddlewareAndEndpoint (spec: WebHostSpec) : WebHostSpec =
         let addMiddleware (app: IApplicationBuilder) =
             let configured = spec.Middleware app
             configured.UseMiddleware<ProvenanceMiddleware>() |> ignore
@@ -37,7 +36,6 @@ module ProvenanceExtensions =
 
         { spec with
             Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint () |]
-            Services = addServices
             Middleware = addMiddleware }
 
     type WebHostBuilder with
@@ -56,7 +54,8 @@ module ProvenanceExtensions =
 
                 spec.Services services
 
-            wireMiddlewareAndEndpoint spec addServices
+            { addProvenanceMiddlewareAndEndpoint spec with
+                Services = addServices }
 
         [<CustomOperation("useProvenance")>]
         member _.UseProvenance(spec: WebHostSpec) : WebHostSpec =
@@ -80,4 +79,5 @@ module ProvenanceExtensions =
 
                 spec.Services services
 
-            wireMiddlewareAndEndpoint spec addServices
+            { addProvenanceMiddlewareAndEndpoint spec with
+                Services = addServices }

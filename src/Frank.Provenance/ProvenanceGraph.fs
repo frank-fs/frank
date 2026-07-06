@@ -106,6 +106,8 @@ let toJsonLd (record: ProvenanceRecord) : string = compact (toGraph record) []
 let toJsonLdWith (extraContext: (string * string) list) (record: ProvenanceRecord) : string =
     compact (toGraph record) extraContext
 
+// Rule 10: iteration count is bounded by the store's MaxRecords setting upstream.
+// No additional runtime cap is applied here to avoid silently truncating output.
 let listToJsonLd (extraContext: (string * string) list) (records: ProvenanceRecord list) : string =
     let g = new Graph() :> IGraph
 
