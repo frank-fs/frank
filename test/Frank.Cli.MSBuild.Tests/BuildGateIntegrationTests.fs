@@ -219,3 +219,110 @@ let buildGateIntegrationTests =
 
                   Expect.equal exitCode 0 $"Confirmed-only lock must pass build gate; output:\n{combined}")
           } ]
+
+/// Item-2: library-style fixture (no Program.fs) — inject ordering with non-domain trailing file.
+///
+/// Fixture: @(Compile) = [Model.fs, Vocabulary.fs, Extra.fs, GeneratedStub.fs]
+///   GeneratedStub.fs matches the Generated* exclusion → NOT in the domain set.
+///   Domain set = [Model.fs, Vocabulary.fs, Extra.fs]; domain-last = Extra.fs.
+///
+/// Expected order after FrankInjectGeneratedFile with domain-anchored logic:
+///   [Model.fs, Vocabulary.fs, GeneratedDiscovery.fs, Extra.fs, GeneratedStub.fs]
+///   genIdx(2) < extraIdx(3) ← PASSES only with domain-last anchor.
+///
+/// With naive positional-last anchor (GeneratedStub.fs is last @(Compile) item):
+///   [Model.fs, Vocabulary.fs, Extra.fs, GeneratedDiscovery.fs, GeneratedStub.fs]
+///   genIdx(3) > extraIdx(2) ← assertion FAILS → confirms the fix is load-bearing.
+[<Tests>]
+let item2LibraryInjectTests =
+    testList
+        "Item-2: domain-anchored inject ordering for library projects (no Program.fs)"
+        [ test "FrankInjectGeneratedFile places Generated before last domain file, not trailing Generated* file" {
+              withTempDir (fun dir ->
+                  let lockPath = writeLockFile dir confirmedLock
+
+                  File.WriteAllText(Path.Combine(dir, "Model.fs"), "module LibFix.Model\ntype Widget = { Id: int }\n")
+
+                  File.WriteAllText(Path.Combine(dir, "Vocabulary.fs"), "module LibFix.Vocabulary\nlet x = 1\n")
+
+                  File.WriteAllText(Path.Combine(dir, "Extra.fs"), "module LibFix.Extra\nlet y = 2\n")
+
+                  // GeneratedStub.fs matches Generated* exclusion → outside domain set.
+                  // Placed AFTER Extra.fs so positional-last ≠ domain-last.
+                  File.WriteAllText(
+                      Path.Combine(dir, "GeneratedStub.fs"),
+                      "module LibFix.GeneratedStub\nlet stub = ()\n"
+                  )
+
+                  let intermediateOutputPath = Path.Combine(dir, "obj", "Debug", "net10.0")
+                  Directory.CreateDirectory(intermediateOutputPath) |> ignore
+
+                  File.WriteAllText(
+                      Path.Combine(intermediateOutputPath, "GeneratedDiscovery.fs"),
+                      "module LibFix.GeneratedDiscovery\n"
+                  )
+
+                  let projPath = Path.Combine(dir, "LibFix.fsproj")
+
+                  let projContent =
+                      $"""<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <FrankLockFilePath>{lockPath}</FrankLockFilePath>
+    <FrankMSBuildAssemblyFile>{taskDllPath}</FrankMSBuildAssemblyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Model.fs" />
+    <Compile Include="Vocabulary.fs" />
+    <Compile Include="Extra.fs" />
+    <Compile Include="GeneratedStub.fs" />
+  </ItemGroup>
+  <Import Project="{targetsFilePath}" />
+  <Target Name="FrankGenerateSemanticModel" />
+  <Target Name="FrankGenerateLinkedData" />
+  <Target Name="FrankGenerateValidation" />
+  <Target Name="FrankGenerateProvenance" />
+  <Target Name="DumpCompileOrder" AfterTargets="FrankInjectGeneratedFile">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/compile-order.txt"
+                      Lines="@(Compile->'%%(Filename)%%(Extension)')"
+                      Overwrite="true" />
+  </Target>
+</Project>
+"""
+
+                  File.WriteAllText(projPath, projContent)
+
+                  let capMs = 60_000
+
+                  let exitCode, combined =
+                      runDotnetMsBuildTarget projPath "FrankInjectGeneratedFile,DumpCompileOrder" capMs
+
+                  Expect.equal exitCode 0 $"FrankInjectGeneratedFile must succeed; output:\n{combined}"
+
+                  let orderFile = Path.Combine(dir, "compile-order.txt")
+                  Expect.isTrue (File.Exists orderFile) "DumpCompileOrder must have written compile-order.txt"
+
+                  let compileOrder = File.ReadAllLines(orderFile) |> Array.toList
+
+                  let idxOf name =
+                      compileOrder
+                      |> List.tryFindIndex (fun f -> f.Equals(name, StringComparison.OrdinalIgnoreCase))
+
+                  let modelIdx = idxOf "Model.fs" |> Option.defaultValue -1
+                  let vocabIdx = idxOf "Vocabulary.fs" |> Option.defaultValue -1
+                  let genIdx = idxOf "GeneratedDiscovery.fs" |> Option.defaultValue -1
+                  let extraIdx = idxOf "Extra.fs" |> Option.defaultValue -1
+
+                  Expect.isGreaterThan genIdx -1 $"GeneratedDiscovery.fs must be in @(Compile); order: {compileOrder}"
+
+                  Expect.isGreaterThan genIdx modelIdx "Generated must come after Model.fs"
+                  Expect.isGreaterThan genIdx vocabIdx "Generated must come after Vocabulary.fs"
+
+                  // Key assertion: Generated anchors before Extra.fs (last DOMAIN file),
+                  // not before GeneratedStub.fs (positional-last, excluded from domain set).
+                  // With naive positional-last anchor, genIdx > extraIdx → this assertion fails.
+                  Expect.isLessThan
+                      genIdx
+                      extraIdx
+                      $"Generated must anchor before Extra.fs (domain-last), not after it; order: {compileOrder}")
+          } ]

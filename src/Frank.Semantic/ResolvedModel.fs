@@ -17,6 +17,9 @@ type ResolvedCase =
       Iri: Uri
       IsNullary: bool }
 
+// Invariant: LocalName and GenericArity are derived from FSharpType via
+// parseLocalName at the single construction site (buildResource ~line 266).
+// Never set them independently — if FSharpType ever changes, recompute both.
 type ResolvedResource =
     { FSharpType: string
       LocalName: string

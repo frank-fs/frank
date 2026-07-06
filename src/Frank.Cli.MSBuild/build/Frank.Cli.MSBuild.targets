@@ -81,6 +81,26 @@
   </Target>
 
   <!--
+    FrankComputeDomainItems: populate _FrankDomainItems and _FrankLastDomainFile once per build.
+    Domain = Compile items minus .fsi signature files, Program.fs, and Generated* files.
+    _FrankLastDomainFile is the LAST domain-set file (property, not item) used as the
+    Case B anchor by all FrankInject* targets (avoids the broken ->Reverse()->First() chain).
+  -->
+  <Target Name="FrankComputeDomainItems">
+    <ItemGroup>
+      <_FrankDomainItems Include="@(Compile)"
+        Condition="'%(Extension)' != '.fsi' and '%(Filename)%(Extension)' != 'Program.fs' and !$([System.String]::Copy('%(Filename)').StartsWith('Generated'))" />
+    </ItemGroup>
+    <!-- Expand reversed items as a semicolon string; split to get the last original item. -->
+    <PropertyGroup>
+      <_FrankDomainReversed>@(_FrankDomainItems->Reverse())</_FrankDomainReversed>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(_FrankDomainReversed)' != ''">
+      <_FrankLastDomainFile>$(_FrankDomainReversed.Split(';')[0])</_FrankLastDomainFile>
+    </PropertyGroup>
+  </Target>
+
+  <!--
     FrankInjectGeneratedFile: always runs before CoreCompile (not incremental).
     Injects the already-generated GeneratedDiscovery.fs into @(Compile).
 
@@ -88,26 +108,25 @@
     - If the project already lists the generated file in @(Compile), skip — the
       author controls position.
     - Else if Program.fs is in @(Compile), insert immediately before it.
-    - Else insert before the last @(Compile) item (best-effort: at minimum the
-      generated file precedes the final consumer).
-    Limitation: "before the resource-definition file" is impractical in pure
-    MSBuild without a file-content probe; Program.fs-or-last is the defensible
-    default for library projects that omit Program.fs.
+    - Else insert before the last domain item (.fsi, Program.fs, Generated* excluded).
   -->
   <Target Name="FrankInjectGeneratedFile"
           BeforeTargets="BeforeCompile;CoreCompile"
+          DependsOnTargets="FrankComputeDomainItems"
           Condition="Exists('$(IntermediateOutputPath)GeneratedDiscovery.fs')">
 
     <PropertyGroup>
       <_FrankGeneratedFile>$(IntermediateOutputPath)GeneratedDiscovery.fs</_FrankGeneratedFile>
     </PropertyGroup>
 
-    <!-- Step 1: capture anchor candidates (before any reordering). -->
+    <!-- Step 1a: capture Case A anchor (Program.fs). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)'))">
-      <!-- Case A anchor: Program.fs if present. -->
       <_FrankProgramFs Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
-      <!-- Case B anchor: last compile item (used only when Program.fs absent). -->
-      <_FrankLastCompile Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFs)' == ''" />
+    </ItemGroup>
+
+    <!-- Step 1b: capture Case B anchor (last domain file, when no Program.fs). -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)')) and '@(_FrankProgramFs)' == '' and '$(_FrankLastDomainFile)' != ''">
+      <_FrankLastCompile Include="$(_FrankLastDomainFile)" />
     </ItemGroup>
 
     <!-- Step 2 Case A: Program.fs present — remove it, insert generated file, re-add. -->
@@ -117,7 +136,7 @@
       <Compile Include="@(_FrankProgramFs)" />
     </ItemGroup>
 
-    <!-- Step 2 Case B: no Program.fs — insert generated file before the last item. -->
+    <!-- Step 2 Case B: no Program.fs — insert generated file before the last domain file. -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedFile)')) and '@(_FrankProgramFs)' == '' and '@(_FrankLastCompile)' != ''">
       <Compile Remove="@(_FrankLastCompile)" />
       <Compile Include="$(_FrankGeneratedFile)" />
@@ -187,16 +206,20 @@
   -->
   <Target Name="FrankInjectGeneratedLinkedDataFile"
           BeforeTargets="BeforeCompile;CoreCompile"
+          DependsOnTargets="FrankComputeDomainItems"
           Condition="Exists('$(IntermediateOutputPath)GeneratedLinkedData.fs')">
 
     <PropertyGroup>
       <_FrankGeneratedLDFile>$(IntermediateOutputPath)GeneratedLinkedData.fs</_FrankGeneratedLDFile>
     </PropertyGroup>
 
-    <!-- Step 1: capture anchor candidates. -->
+    <!-- Step 1a: capture Case A anchor (Program.fs). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)'))">
       <_FrankProgramFsLD Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
-      <_FrankLastCompileLD Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsLD)' == ''" />
+    </ItemGroup>
+    <!-- Step 1b: capture Case B anchor (last domain file, when no Program.fs). -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedLDFile)')) and '@(_FrankProgramFsLD)' == '' and '$(_FrankLastDomainFile)' != ''">
+      <_FrankLastCompileLD Include="$(_FrankLastDomainFile)" />
     </ItemGroup>
 
     <!-- Step 2 Case A: Program.fs present. -->
@@ -277,6 +300,7 @@
     inject targets: explicit-item-first, Program.fs-or-last-item best-effort default.
   -->
   <Target Name="FrankInjectGeneratedSemanticModelFile"
+          DependsOnTargets="FrankComputeDomainItems"
           BeforeTargets="BeforeCompile;CoreCompile"
           Condition="Exists('$(IntermediateOutputPath)GeneratedSemantics.fs')">
 
@@ -284,10 +308,13 @@
       <_FrankGeneratedSemFile>$(IntermediateOutputPath)GeneratedSemantics.fs</_FrankGeneratedSemFile>
     </PropertyGroup>
 
-    <!-- Step 1: capture anchor candidates. -->
+    <!-- Step 1a: capture Case A anchor (Program.fs). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)'))">
       <_FrankProgramFsSem Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
-      <_FrankLastCompileSem Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsSem)' == ''" />
+    </ItemGroup>
+    <!-- Step 1b: capture Case B anchor (last domain file, when no Program.fs). -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedSemFile)')) and '@(_FrankProgramFsSem)' == '' and '$(_FrankLastDomainFile)' != ''">
+      <_FrankLastCompileSem Include="$(_FrankLastDomainFile)" />
     </ItemGroup>
 
     <!-- Step 2 Case A: Program.fs present. -->
@@ -367,16 +394,20 @@
   -->
   <Target Name="FrankInjectGeneratedValidationFile"
           BeforeTargets="BeforeCompile;CoreCompile"
+          DependsOnTargets="FrankComputeDomainItems"
           Condition="Exists('$(IntermediateOutputPath)GeneratedValidation.fs')">
 
     <PropertyGroup>
       <_FrankGeneratedValFile>$(IntermediateOutputPath)GeneratedValidation.fs</_FrankGeneratedValFile>
     </PropertyGroup>
 
-    <!-- Step 1: capture anchor candidates. -->
+    <!-- Step 1a: capture Case A anchor (Program.fs). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedValFile)'))">
       <_FrankProgramFsVal Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
-      <_FrankLastCompileVal Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsVal)' == ''" />
+    </ItemGroup>
+    <!-- Step 1b: capture Case B anchor (last domain file, when no Program.fs). -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedValFile)')) and '@(_FrankProgramFsVal)' == '' and '$(_FrankLastDomainFile)' != ''">
+      <_FrankLastCompileVal Include="$(_FrankLastDomainFile)" />
     </ItemGroup>
 
     <!-- Step 2 Case A: Program.fs present. -->
@@ -456,16 +487,20 @@
   -->
   <Target Name="FrankInjectGeneratedProvenanceFile"
           BeforeTargets="BeforeCompile;CoreCompile"
+          DependsOnTargets="FrankComputeDomainItems"
           Condition="Exists('$(IntermediateOutputPath)GeneratedProvenance.fs')">
 
     <PropertyGroup>
       <_FrankGeneratedProvFile>$(IntermediateOutputPath)GeneratedProvenance.fs</_FrankGeneratedProvFile>
     </PropertyGroup>
 
-    <!-- Step 1: capture anchor candidates. -->
+    <!-- Step 1a: capture Case A anchor (Program.fs). -->
     <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedProvFile)'))">
       <_FrankProgramFsProv Include="@(Compile)" Condition="'%(Filename)%(Extension)' == 'Program.fs'" />
-      <_FrankLastCompileProv Include="@(Compile->Reverse()->First())" Condition="'@(_FrankProgramFsProv)' == ''" />
+    </ItemGroup>
+    <!-- Step 1b: capture Case B anchor (last domain file, when no Program.fs). -->
+    <ItemGroup Condition="!@(Compile->AnyHaveMetadataValue('Identity', '$(_FrankGeneratedProvFile)')) and '@(_FrankProgramFsProv)' == '' and '$(_FrankLastDomainFile)' != ''">
+      <_FrankLastCompileProv Include="$(_FrankLastDomainFile)" />
     </ItemGroup>
 
     <!-- Step 2 Case A: Program.fs present. -->

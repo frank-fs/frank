@@ -9,6 +9,14 @@ open Frank.Semantic
 
 // ── FCS typecheck ─────────────────────────────────────────────────────────────
 
+// ── Type alias for uniform CE-operation handlers ─────────────────────────────
+
+/// Signature shared by all CE operation handlers that take only args + state.
+/// Handlers that close over implFiles/depth/visited (e.g. applyInclude) do NOT use this alias.
+type private OpHandler = FSharpExpr list -> VocabularyRegistry -> Result<VocabularyRegistry, string>
+
+// ── FCS typecheck ─────────────────────────────────────────────────────────────
+
 /// Build FCS project options using script resolution on the primary (last) source file,
 /// then typecheck all source files together. Returns implementation file contents.
 let private typecheckFiles
@@ -167,46 +175,52 @@ let private applyTypeIriOp<'K when 'K: comparison>
         | Error e -> Error e
         | Ok resolved -> insertSingleton label (makeKey typeName) resolved getMap setMap state
 
-let private applyPrefix (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: nameExpr :: uriExpr :: _ ->
-        match requireConst nameExpr, requireConst uriExpr with
-        | Error e, _
-        | _, Error e -> Error e
-        | Ok name, Ok uri ->
-            insertSingleton "prefix" name (Uri(uri)) (fun s -> s.Prefixes) (fun s m -> { s with Prefixes = m }) state
-    | _ -> Error "Prefix: wrong argument count"
+let private applyPrefix: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: nameExpr :: uriExpr :: _ ->
+            match requireConst nameExpr, requireConst uriExpr with
+            | Error e, _
+            | _, Error e -> Error e
+            | Ok name, Ok uri ->
+                insertSingleton
+                    "prefix"
+                    name
+                    (Uri(uri))
+                    (fun s -> s.Prefixes)
+                    (fun s m -> { s with Prefixes = m })
+                    state
+        | _ -> Error "Prefix: wrong argument count"
 
-let private applyUsing (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: prefixExpr :: _ ->
-        match requireConst prefixExpr with
-        | Error e -> Error e
-        | Ok prefix ->
-            if Set.contains prefix state.Using then
-                Error $"prefix '{prefix}' already in using set"
-            else
-                Ok
-                    { state with
-                        Using = Set.add prefix state.Using }
-    | _ -> Error "Using: wrong argument count"
+let private applyUsing: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: prefixExpr :: _ ->
+            match requireConst prefixExpr with
+            | Error e -> Error e
+            | Ok prefix ->
+                if Set.contains prefix state.Using then
+                    Error $"prefix '{prefix}' already in using set"
+                else
+                    Ok
+                        { state with
+                            Using = Set.add prefix state.Using }
+        | _ -> Error "Using: wrong argument count"
 
-let private applyEquivalentClass
-    (args: FSharpExpr list)
-    (state: VocabularyRegistry)
-    : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: typeExpr :: iriExpr :: _ ->
-        applyTypeIriOp
-            "EquivalentClass"
-            typeExpr
-            iriExpr
-            id
-            state.Prefixes
-            (fun s -> s.EquivalentClasses)
-            (fun s m -> { s with EquivalentClasses = m })
-            state
-    | _ -> Error "EquivalentClass: wrong argument count"
+let private applyEquivalentClass: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: typeExpr :: iriExpr :: _ ->
+            applyTypeIriOp
+                "EquivalentClass"
+                typeExpr
+                iriExpr
+                id
+                state.Prefixes
+                (fun s -> s.EquivalentClasses)
+                (fun s m -> { s with EquivalentClasses = m })
+                state
+        | _ -> Error "EquivalentClass: wrong argument count"
 
 /// Resolve IRI and append to a list-value map entry (no conflict, always appends).
 let private resolveAndAppend<'K when 'K: comparison>
@@ -223,32 +237,34 @@ let private resolveAndAppend<'K when 'K: comparison>
         let existing = getMap state |> Map.tryFind key |> Option.defaultValue []
         Ok(setMap state (Map.add key (existing @ [ resolved ]) (getMap state)))
 
-let private applySeeAlso (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: typeExpr :: iriExpr :: _ ->
-        match requireTypeKey typeExpr, requireConst iriExpr with
-        | Error e, _
-        | _, Error e -> Error e
-        | Ok key, Ok iri ->
-            resolveAndAppend key iri state.Prefixes (fun s -> s.SeeAlso) (fun s m -> { s with SeeAlso = m }) state
-    | _ -> Error "SeeAlso: wrong argument count"
+let private applySeeAlso: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: typeExpr :: iriExpr :: _ ->
+            match requireTypeKey typeExpr, requireConst iriExpr with
+            | Error e, _
+            | _, Error e -> Error e
+            | Ok key, Ok iri ->
+                resolveAndAppend key iri state.Prefixes (fun s -> s.SeeAlso) (fun s m -> { s with SeeAlso = m }) state
+        | _ -> Error "SeeAlso: wrong argument count"
 
-let private applyFieldSeeAlso (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: typeExpr :: fieldExpr :: iriExpr :: _ ->
-        match requireTypeKey typeExpr, requireConst fieldExpr, requireConst iriExpr with
-        | Error e, _, _
-        | _, Error e, _
-        | _, _, Error e -> Error e
-        | Ok key, Ok field, Ok iri ->
-            resolveAndAppend
-                (key, field)
-                iri
-                state.Prefixes
-                (fun s -> s.FieldSeeAlso)
-                (fun s m -> { s with FieldSeeAlso = m })
-                state
-    | _ -> Error "FieldSeeAlso: wrong argument count"
+let private applyFieldSeeAlso: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: typeExpr :: fieldExpr :: iriExpr :: _ ->
+            match requireTypeKey typeExpr, requireConst fieldExpr, requireConst iriExpr with
+            | Error e, _, _
+            | _, Error e, _
+            | _, _, Error e -> Error e
+            | Ok key, Ok field, Ok iri ->
+                resolveAndAppend
+                    (key, field)
+                    iri
+                    state.Prefixes
+                    (fun s -> s.FieldSeeAlso)
+                    (fun s m -> { s with FieldSeeAlso = m })
+                    state
+        | _ -> Error "FieldSeeAlso: wrong argument count"
 
 /// Insert into a singleton-value map by arbitrary key, detecting conflicts.
 let private insertValue<'K, 'V when 'K: comparison and 'V: equality>
@@ -264,35 +280,34 @@ let private insertValue<'K, 'V when 'K: comparison and 'V: equality>
     | Some _ -> Error $"{label} declared with conflicting value for '{key}'"
     | None -> Ok(setMap state (Map.add key value (getMap state)))
 
-let private applyProvClass (args: FSharpExpr list) (state: VocabularyRegistry) : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: typeExpr :: provClassExpr :: _ ->
-        match requireTypeKey typeExpr, requireProvOClass provClassExpr with
-        | Error e, _
-        | _, Error e -> Error e
-        | Ok key, Ok cls ->
-            insertValue "ProvClass" key cls (fun s -> s.ProvClasses) (fun s m -> { s with ProvClasses = m }) state
-    | _ -> Error "ProvClass: wrong argument count"
+let private applyProvClass: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: typeExpr :: provClassExpr :: _ ->
+            match requireTypeKey typeExpr, requireProvOClass provClassExpr with
+            | Error e, _
+            | _, Error e -> Error e
+            | Ok key, Ok cls ->
+                insertValue "ProvClass" key cls (fun s -> s.ProvClasses) (fun s m -> { s with ProvClasses = m }) state
+        | _ -> Error "ProvClass: wrong argument count"
 
-let private applyConstrainPattern
-    (args: FSharpExpr list)
-    (state: VocabularyRegistry)
-    : Result<VocabularyRegistry, string> =
-    match args with
-    | _ :: typeExpr :: fieldExpr :: patternExpr :: _ ->
-        match requireTypeKey typeExpr, requireConst fieldExpr, requireConst patternExpr with
-        | Error e, _, _
-        | _, Error e, _
-        | _, _, Error e -> Error e
-        | Ok key, Ok field, Ok pattern ->
-            insertValue
-                "ConstrainPattern"
-                (key, field)
-                pattern
-                (fun s -> s.ConstraintPatterns)
-                (fun s m -> { s with ConstraintPatterns = m })
-                state
-    | _ -> Error "ConstrainPattern: wrong argument count"
+let private applyConstrainPattern: OpHandler =
+    fun args state ->
+        match args with
+        | _ :: typeExpr :: fieldExpr :: patternExpr :: _ ->
+            match requireTypeKey typeExpr, requireConst fieldExpr, requireConst patternExpr with
+            | Error e, _, _
+            | _, Error e, _
+            | _, _, Error e -> Error e
+            | Ok key, Ok field, Ok pattern ->
+                insertValue
+                    "ConstrainPattern"
+                    (key, field)
+                    pattern
+                    (fun s -> s.ConstraintPatterns)
+                    (fun s m -> { s with ConstraintPatterns = m })
+                    state
+        | _ -> Error "ConstrainPattern: wrong argument count"
 
 // ── include merge helper ──────────────────────────────────────────────────────
 
@@ -318,28 +333,31 @@ let private findBindingBody
         let idx = bindingName.LastIndexOf('.')
         if idx >= 0 then bindingName.[idx + 1 ..] else bindingName
 
-    let found = ResizeArray<FSharpExpr>()
-
-    // Fix 11: bound the entity-decl search to prevent unbounded recursion.
-    let rec search (depth: int) (decls: FSharpImplementationFileDeclaration list) : unit =
+    let rec search
+        (depth: int)
+        (acc: FSharpExpr list)
+        (decls: FSharpImplementationFileDeclaration list)
+        : FSharpExpr list =
         if depth >= MaxSearchDepth then
-            ()
+            acc
         else
-            for decl in decls do
-                match decl with
-                | FSharpImplementationFileDeclaration.Entity(_, ds) -> search (depth + 1) ds
-                | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
-                    if mfv.CompiledName = simpleName then
-                        found.Add(body)
-                | FSharpImplementationFileDeclaration.InitAction _ -> ()
+            List.fold
+                (fun a decl ->
+                    match decl with
+                    | FSharpImplementationFileDeclaration.Entity(_, ds) -> search (depth + 1) a ds
+                    | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
+                        if mfv.CompiledName = simpleName then body :: a else a
+                    | FSharpImplementationFileDeclaration.InitAction _ -> a)
+                acc
+                decls
 
-    for f in implFiles do
-        search 0 f.Declarations
+    let found: FSharpExpr list =
+        List.fold (fun acc (f: FSharpImplementationFileContents) -> search 0 acc f.Declarations) [] implFiles
 
-    match found.Count with
-    | 0 -> Error $"binding '{bindingName}' not found in source files"
-    | 1 -> Ok found.[0]
-    | n -> Error $"binding '{bindingName}' found {n} times (ambiguous)"
+    match found with
+    | [] -> Error $"binding '{bindingName}' not found in source files"
+    | [ expr ] -> Ok expr
+    | _ -> Error $"binding '{bindingName}' found {List.length found} times (ambiguous)"
 
 // ── CE traversal (mutually recursive group) ───────────────────────────────────
 
@@ -452,7 +470,32 @@ and private applyOperation
     | "Include" -> applyInclude implFiles depth visited args state
     | _ -> Ok state
 
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── Public entry points ───────────────────────────────────────────────────────
+
+/// Typecheck F# source files via FCS. Returns implementation file contents.
+/// Exposed so callers can typecheck once and re-use implFiles across multiple evalImplFiles calls.
+let typecheckSources
+    (assemblyRefs: string list)
+    (sourceFiles: string list)
+    : Result<FSharpImplementationFileContents list, string> =
+    typecheckFiles assemblyRefs sourceFiles
+
+/// Walk the post-typecheck typed AST and evaluate the named binding as a VocabularyRegistry.
+/// Pure function: no file I/O, no FCS typecheck — implFiles must be pre-typechecked.
+/// Useful for testing the walk in isolation or re-evaluating multiple bindings without re-checking.
+let evalImplFiles
+    (implFiles: FSharpImplementationFileContents list)
+    (bindingName: string)
+    : Result<VocabularyRegistry, string> =
+    if implFiles.IsEmpty then
+        invalidArg (nameof implFiles) "implFiles must not be empty"
+
+    if String.IsNullOrWhiteSpace bindingName then
+        invalidArg (nameof bindingName) "bindingName must not be empty"
+
+    match findBindingBody implFiles bindingName with
+    | Error e -> Error e
+    | Ok body -> walkCEBody implFiles 0 Set.empty body
 
 /// Evaluate the project's vocabulary CE by FCS-typechecking the source files and
 /// walking the typed AST. No code execution, no reflection.
@@ -480,9 +523,6 @@ let evalRegistry
     if String.IsNullOrWhiteSpace bindingName then
         invalidArg (nameof bindingName) "bindingName must not be empty"
 
-    match typecheckFiles assemblyRefs sourceFiles with
+    match typecheckSources assemblyRefs sourceFiles with
     | Error e -> Error e
-    | Ok implFiles ->
-        match findBindingBody implFiles bindingName with
-        | Error e -> Error e
-        | Ok body -> walkCEBody implFiles 0 Set.empty body
+    | Ok implFiles -> evalImplFiles implFiles bindingName

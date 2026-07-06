@@ -2,6 +2,7 @@ module Frank.Semantic.Tests.ResolvedModelTests
 
 open System
 open Expecto
+open FsCheck
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
@@ -622,3 +623,89 @@ let at_rm9 =
               | Ok _ -> failwith "Expected Error: prefix 'myns' not in lock.Vocabularies"
               | Error msg -> Expect.stringContains msg "myns" "error names the unresolvable prefix"
           } ]
+
+// ── Item #3 regression tests: lock-prefix resolution ─────────────────────────
+// Confirm behavior added by #370: build resolves IRIs from lock.Vocabularies,
+// not registry.Prefixes. Would have FAILED pre-#370 (Vocabularies always empty).
+
+[<Tests>]
+let item3_lock_prefix_regression =
+    testList
+        "Item-3: lock-prefix resolution regression"
+        [ test "Test-A: schema:Game resolves from lock.Vocabularies when registry.Prefixes lacks schema" {
+              let fsharpType = "TicTacToe.Model.Game"
+              let mapping = mkMapping fsharpType (Some "schema:Game") []
+
+              let lock =
+                  { lockWithSchema with
+                      DeclaredPrefixes = Map.empty
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build VocabularyRegistry.empty lock with
+              | Error e -> failwith $"Expected Ok when schema: in lock.Vocabularies: {e}"
+              | Ok model ->
+                  let res = model.Resources |> List.head
+
+                  Expect.equal
+                      res.ClassIri
+                      (Some(Uri "https://schema.org/Game"))
+                      "IRI from lock.Vocabularies not registry"
+          }
+
+          test
+              "Test-B: zzz prefix absent from lock.Vocabularies and lock.DeclaredPrefixes returns Error naming both zzz and type" {
+              let fsharpType = "My.Ns.Zapper"
+              let mapping = mkMapping fsharpType (Some "zzz:Foo") []
+
+              let lock =
+                  { emptyLock with
+                      DeclaredPrefixes = Map.empty
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build VocabularyRegistry.empty lock with
+              | Ok _ -> failwith "Expected Error for unknown prefix zzz"
+              | Error msg ->
+                  Expect.stringContains msg "zzz" "error names the unknown prefix"
+                  Expect.stringContains msg fsharpType "error names the offending F# type"
+          } ]
+
+// ── Item #12d: ResolvedResource LocalName/GenericArity invariant ──────────────
+// ResolvedResource stores both FSharpType (raw) and LocalName/GenericArity
+// (both from parseLocalName at the single construction site in buildResource).
+// Invariant: parseLocalName r.FSharpType = (r.LocalName, r.GenericArity).
+// The test-local helper mirrors the private production implementation.
+
+let private testParseLocalName (fsharpType: string) : string * int =
+    let segment =
+        match fsharpType.LastIndexOf('.') with
+        | -1 -> fsharpType
+        | idx -> fsharpType.[idx + 1 ..]
+
+    match segment.IndexOf('`') with
+    | -1 -> segment, 0
+    | bt ->
+        let name = segment.[.. bt - 1]
+
+        match Int32.TryParse(segment.[bt + 1 ..]) with
+        | true, n -> name, n
+        | false, _ -> segment, 0
+
+[<Tests>]
+let item12d_localname_invariant =
+    testList
+        "Item-12d: ResolvedResource LocalName/GenericArity invariant"
+        [ testProperty
+              "FsCheck: parseLocalName r.FSharpType = (r.LocalName, r.GenericArity) for constructed resources"
+              (fun (NonWhiteSpaceString fsharpType) ->
+                  let mapping = mkMapping fsharpType None []
+
+                  let lock =
+                      { emptyLock with
+                          Mappings = [ mapping ] }
+
+                  match ResolvedModel.build VocabularyRegistry.empty lock with
+                  | Error _ -> true
+                  | Ok model ->
+                      let r = model.Resources |> List.head
+                      let expectedLocal, expectedArity = testParseLocalName fsharpType
+                      r.LocalName = expectedLocal && r.GenericArity = expectedArity) ]

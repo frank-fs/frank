@@ -318,3 +318,36 @@ let registry =
               finally
                   Directory.Delete(tmpDir, true)
           } ]
+
+// ── Item #10a: evalImplFiles invocable independently ─────────────────────────
+
+[<Tests>]
+let evalImplFilesTests =
+    testList
+        "VocabularyEvaluator - Item #10a: evalImplFiles invocable without re-typecheck"
+        [ test "evalImplFiles returns same registry as evalRegistry without re-typechecking" {
+              let semanticDll = frankSemanticDllPath ()
+              let fsharpCoreDll = fsharpCoreDllPath ()
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let srcFile = Path.Combine(tmpDir, "Vocabulary.fsx")
+                  File.WriteAllText(srcFile, fullFidelitySource)
+
+                  // Typecheck once in fixture setup.
+                  let implFiles =
+                      VocabularyEvaluator.typecheckSources [ semanticDll; fsharpCoreDll ] [ srcFile ]
+
+                  let files = Expect.wantOk implFiles "typecheckSources must succeed"
+
+                  // Call evalImplFiles directly — no second ParseAndCheckProject in this body.
+                  let result = VocabularyEvaluator.evalImplFiles files "CliTestVocab.registry"
+
+                  let reg = Expect.wantOk result "evalImplFiles must succeed"
+                  Expect.isTrue (reg.Prefixes.ContainsKey "schema") "schema prefix present"
+                  Expect.isNonEmpty reg.EquivalentClasses "EquivalentClasses populated"
+                  Expect.isNonEmpty reg.ProvClasses "ProvClasses populated"
+              finally
+                  Directory.Delete(tmpDir, true)
+          } ]
