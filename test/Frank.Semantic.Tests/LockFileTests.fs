@@ -1159,3 +1159,136 @@ let bareCatchNarrowingTests =
               let hashCorrect = LockFile.computeIntegrity { lf with Integrity = Some hashNone }
               let hashGarbage = LockFile.computeIntegrity { lf with Integrity = Some "garbage-value" }
               hashNone = hashCorrect && hashNone = hashGarbage) ]
+
+// ── AC4: namespaceOf ──────────────────────────────────────────────────────────
+
+[<Tests>]
+let namespaceOfTests =
+    testList
+        "AC4 namespaceOf"
+        [ test "qualified name returns namespace prefix" {
+              Expect.equal (LockFile.namespaceOf "TicTacToe.Model.Game") "TicTacToe.Model" "three-part type"
+          }
+
+          test "single identifier returns (global)" {
+              Expect.equal (LockFile.namespaceOf "Game") "(global)" "global default"
+          }
+
+          test "two-part name returns first segment" { Expect.equal (LockFile.namespaceOf "A.B") "A" "two-part" }
+
+          test "deep nesting returns everything-before-last-dot" {
+              Expect.equal (LockFile.namespaceOf "A.B.C.D") "A.B.C" "deep"
+          } ]
+
+// ── AC1 + AC2: countByPackage ─────────────────────────────────────────────────
+
+let private pkgMapping fsType iri status : Mapping =
+    { FSharpType = fsType
+      Iri = iri
+      Confidence = 1.0
+      Source = Manual
+      Status = status
+      Alternates = []
+      Rt = None
+      Shape = MappingShape.Record [] }
+
+let private zeroCounts: LockFile.StatusCounts =
+    { Confirmed = 0
+      Proposed = 0
+      Unresolved = 0
+      Excluded = 0 }
+
+let private addCounts (a: LockFile.StatusCounts) (b: LockFile.StatusCounts) : LockFile.StatusCounts =
+    { Confirmed = a.Confirmed + b.Confirmed
+      Proposed = a.Proposed + b.Proposed
+      Unresolved = a.Unresolved + b.Unresolved
+      Excluded = a.Excluded + b.Excluded }
+
+[<Tests>]
+let countByPackageTests =
+    testList
+        "AC1+AC2 countByPackage"
+        [ test "two namespaces produce two groups" {
+              let mappings =
+                  [ pkgMapping "MyApp.Orders.Order" (Some "schema:Order") Confirmed
+                    pkgMapping "MyApp.Orders.LineItem" (Some "schema:OrderItem") Confirmed
+                    pkgMapping "MyApp.Catalog.Product" (Some "schema:Product") Proposed ]
+
+              let groups = LockFile.countByPackage mappings
+              Expect.equal (List.length groups) 2 "two groups"
+          }
+
+          test "AC1 reconciliation: per-group counts sum to global totals" {
+              let mappings =
+                  [ pkgMapping "MyApp.Orders.Order" (Some "schema:Order") Confirmed
+                    pkgMapping "MyApp.Orders.LineItem" (Some "schema:OrderItem") Confirmed
+                    pkgMapping "MyApp.Catalog.Product" None Unresolved
+                    pkgMapping "MyApp.Catalog.Category" None Excluded ]
+
+              let global' = LockFile.countByStatus mappings
+
+              let summed =
+                  LockFile.countByPackage mappings
+                  |> List.map (fun g -> g.Counts)
+                  |> List.fold addCounts zeroCounts
+
+              Expect.equal summed global' "reconciles to global"
+          }
+
+          test "AC2 two distinct schema terms → schema (2)" {
+              let mappings =
+                  [ pkgMapping "MyApp.Orders.Game" (Some "schema:Game") Confirmed
+                    pkgMapping "MyApp.Orders.Result" (Some "schema:result") Confirmed ]
+
+              let groups = LockFile.countByPackage mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ ("schema", 2) ] "schema (2)"
+          }
+
+          test "AC2 unresolved with Iri=None contributes no vocab" {
+              let mappings = [ pkgMapping "MyApp.Orders.Foo" None Unresolved ]
+
+              let groups = LockFile.countByPackage mappings
+              let group = List.exactlyOne groups
+              Expect.isEmpty group.Vocabs "no vocab for None Iri"
+          }
+
+          test "AC2 two distinct vocab prefixes shown separately" {
+              let mappings =
+                  [ pkgMapping "MyApp.Orders.Order" (Some "schema:Order") Confirmed
+                    pkgMapping "MyApp.Orders.Payment" (Some "pay:Payment") Confirmed ]
+
+              let groups = LockFile.countByPackage mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ ("pay", 1); ("schema", 1) ] "two vocabs sorted"
+          }
+
+          test "groups sorted by namespace ascending" {
+              let mappings =
+                  [ pkgMapping "Z.Type" None Proposed; pkgMapping "A.Type" None Proposed ]
+
+              let groups = LockFile.countByPackage mappings
+              let names = groups |> List.map (fun g -> g.Namespace)
+              Expect.equal names [ "A"; "Z" ] "sorted ascending"
+          }
+
+          test "duplicate Iri counts as one distinct term" {
+              let mappings =
+                  [ pkgMapping "MyApp.Orders.A" (Some "schema:Game") Confirmed
+                    pkgMapping "MyApp.Orders.B" (Some "schema:Game") Confirmed ]
+
+              let groups = LockFile.countByPackage mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ ("schema", 1) ] "one distinct term"
+          }
+
+          test "absolute IRI keyed by full IRI, not dropped" {
+              let absIri = "https://schema.org/Game"
+
+              let mappings = [ pkgMapping "MyApp.Orders.Game" (Some absIri) Confirmed ]
+
+              let groups = LockFile.countByPackage mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ (absIri, 1) ] "absolute IRI preserved as key"
+              Expect.isFalse (group.Vocabs |> List.exists (fun (k, _) -> k = "https")) "protocol prefix not used"
+          } ]

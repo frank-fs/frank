@@ -58,3 +58,78 @@ let at5StatusTests =
               Expect.stringContains output "Unresolved: 0" "unresolved zero"
               Expect.stringContains output "Excluded:   0" "excluded zero"
           } ]
+
+// ── AT6: formatByPackage ──────────────────────────────────────────────────────
+
+let private mappingWith fsType iri status : Mapping =
+    { FSharpType = fsType
+      Iri = iri
+      Confidence = 1.0
+      Source = Convention
+      Status = status
+      Alternates = []
+      Rt = None
+      Shape = MappingShape.Record [] }
+
+[<Tests>]
+let formatByPackageTests =
+    testList
+        "AT6 - Status.formatByPackage"
+        [ test "two namespaces produce separate blocks" {
+              let lf =
+                  lockWith
+                      [ mappingWith "MyApp.Orders.Order" (Some "schema:Order") Confirmed
+                        mappingWith "MyApp.Catalog.Product" (Some "schema:Product") Proposed ]
+
+              let output = Status.formatByPackage lf
+              Expect.stringContains output "MyApp.Orders" "orders block"
+              Expect.stringContains output "MyApp.Catalog" "catalog block"
+          }
+
+          test "per-namespace confirmed count is correct" {
+              let lf =
+                  lockWith
+                      [ mappingWith "MyApp.Orders.Order" None Confirmed
+                        mappingWith "MyApp.Orders.LineItem" None Confirmed
+                        mappingWith "MyApp.Catalog.Product" None Proposed ]
+
+              let output = Status.formatByPackage lf
+              Expect.stringContains output "MyApp.Orders" "orders block"
+              Expect.stringContains output "MyApp.Catalog" "catalog block"
+              Expect.stringContains output "Confirmed:  2" "two confirmed in orders"
+              Expect.stringContains output "Proposed:   1" "one proposed in catalog"
+          }
+
+          test "vocab usage shown for namespace" {
+              let lf =
+                  lockWith
+                      [ mappingWith "MyApp.Orders.Game" (Some "schema:Game") Confirmed
+                        mappingWith "MyApp.Orders.Result" (Some "schema:result") Confirmed ]
+
+              let output = Status.formatByPackage lf
+              Expect.stringContains output "schema (2)" "two schema terms"
+          }
+
+          test "AC3 plain format unchanged" {
+              let lf = lockWith [ mapping "A" Confirmed; mapping "B" Proposed ]
+
+              let output = Status.format lf
+
+              Expect.equal
+                  output
+                  "Confirmed:  1\nProposed:   1\nUnresolved: 0\nExcluded:   0"
+                  "byte-identical to prior format"
+          }
+
+          test "namespace (global) shown for unqualified types" {
+              let lf = lockWith [ mappingWith "Game" None Proposed ]
+              let output = Status.formatByPackage lf
+              Expect.stringContains output "(global)" "global namespace shown"
+          }
+
+          test "no vocab line when no IRIs present" {
+              let lf = lockWith [ mappingWith "MyApp.Orders.Foo" None Unresolved ]
+              let output = Status.formatByPackage lf
+              Expect.stringContains output "MyApp.Orders" "namespace shown"
+              Expect.isFalse (output.Contains "vocabs:") "no vocabs line when none"
+          } ]

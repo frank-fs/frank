@@ -519,6 +519,11 @@ module LockFile =
           Unresolved: int
           Excluded: int }
 
+    type PackageGroup =
+        { Namespace: string
+          Counts: StatusCounts
+          Vocabs: (string * int) list }
+
     let countByStatus (mappings: Mapping list) : StatusCounts =
         let tally (acc: StatusCounts) (m: Mapping) =
             match m.Status with
@@ -538,6 +543,59 @@ module LockFile =
               Unresolved = 0
               Excluded = 0 }
             mappings
+
+    // ── Package grouping ─────────────────────────────────────────────────────
+
+    /// Derive the F# namespace from a fully-qualified type name.
+    /// "A.B.C" → "A.B"; "A" → "(global)".
+    let namespaceOf (fsharpType: string) : string =
+        let lastDot = fsharpType.LastIndexOf('.')
+
+        if lastDot < 0 then
+            "(global)"
+        else
+            fsharpType.[.. lastDot - 1]
+
+    /// Extract a vocabulary key from a mapping IRI.
+    /// CURIEs ("schema:Game") → prefix ("schema").
+    /// Absolute IRIs ("https://schema.org/Game") → full IRI (not silently dropped).
+    let private vocabKeyOf (iri: string) : string =
+        let colonIdx = iri.IndexOf(':')
+
+        if colonIdx < 0 then
+            iri
+        else
+            let prefix = iri.[.. colonIdx - 1]
+
+            match prefix with
+            | "http"
+            | "https"
+            | "urn"
+            | "ftp" -> iri
+            | _ -> prefix
+
+    /// Group mappings by derived namespace and aggregate status counts and vocab usage.
+    /// Groups are sorted by namespace; vocabs within each group are sorted by key.
+    let countByPackage (mappings: Mapping list) : PackageGroup list =
+        let byNs = mappings |> List.groupBy (fun m -> namespaceOf m.FSharpType)
+
+        byNs
+        |> List.map (fun (ns, ms) ->
+            let counts = countByStatus ms
+
+            let vocabs =
+                ms
+                |> List.choose (fun m -> m.Iri)
+                |> List.distinct
+                |> List.map vocabKeyOf
+                |> List.groupBy id
+                |> List.map (fun (key, xs) -> key, List.length xs)
+                |> List.sortBy fst
+
+            { Namespace = ns
+              Counts = counts
+              Vocabs = vocabs })
+        |> List.sortBy (fun g -> g.Namespace)
 
     // ── Prefix utilities ─────────────────────────────────────────────────────
 

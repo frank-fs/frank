@@ -63,12 +63,14 @@ type AcceptArgs =
 type StatusArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
+    | By_Package
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+            | By_Package -> "break down coverage and vocabulary usage per F# namespace"
 
 /// Arguments for the `frank semantic finalize` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -362,7 +364,13 @@ let private handleStatus (args: ParseResults<StatusArgs>) : int =
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            printfn "%s" (format lf)
+            let output =
+                if args.Contains StatusArgs.By_Package then
+                    formatByPackage lf
+                else
+                    format lf
+
+            printfn "%s" output
             0
 
 let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
