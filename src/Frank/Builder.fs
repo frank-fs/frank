@@ -395,21 +395,29 @@ module Builder =
     type IStartupValidator =
         abstract member Validate: EndpointDataSource -> unit
 
-    let private runValidators (services: IServiceProvider) (dataSource: EndpointDataSource) =
-        let mutable anyFailed = false
+    let private collectValidationErrors (services: IServiceProvider) (dataSource: EndpointDataSource) : string list =
+        [ for v in services.GetServices<IStartupValidator>() do
+              try
+                  v.Validate dataSource
+              with :? InvalidOperationException as ex ->
+                  yield ex.Message ]
 
-        for v in services.GetServices<IStartupValidator>() do
-            try
-                v.Validate dataSource
-            with :? InvalidOperationException as ex ->
-                eprintfn "FRANK_VALIDATE error: %s" ex.Message
-                anyFailed <- true
+    let private runValidateMode (services: IServiceProvider) (dataSource: EndpointDataSource) : unit =
+        let validators = services.GetServices<IStartupValidator>() |> Seq.toList
 
-        if anyFailed then
-            Environment.Exit 1
+        if validators.IsEmpty then
+            ()
         else
-            eprintfn "FRANK_VALIDATE: OK"
-            Environment.Exit 0
+            let errors = collectValidationErrors services dataSource
+
+            if errors.IsEmpty then
+                eprintfn "FRANK_VALIDATE: OK"
+                Environment.Exit 0
+            else
+                for e in errors do
+                    eprintfn "FRANK_VALIDATE error: %s" e
+
+                Environment.Exit 1
 
     [<Sealed>]
     type WebHostBuilder(args: string[]) =
@@ -436,9 +444,9 @@ module Builder =
             (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
 
             if Environment.GetEnvironmentVariable "FRANK_VALIDATE" = "1" then
-                runValidators app.Services (dataSource :> EndpointDataSource)
-            else
-                app.Run()
+                runValidateMode app.Services (dataSource :> EndpointDataSource)
+
+            app.Run()
 #else
             let builder = Host.CreateDefaultBuilder(args)
             let dataSource = ResourceEndpointDataSource(spec.Endpoints)
@@ -466,9 +474,9 @@ module Builder =
             let host = configured.Build()
 
             if Environment.GetEnvironmentVariable "FRANK_VALIDATE" = "1" then
-                runValidators host.Services (dataSource :> EndpointDataSource)
-            else
-                host.Run()
+                runValidateMode host.Services (dataSource :> EndpointDataSource)
+
+            host.Run()
 #endif
 
         member __.Yield(_) = WebHostSpec.Empty

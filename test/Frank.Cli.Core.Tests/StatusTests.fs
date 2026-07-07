@@ -102,9 +102,10 @@ let formatByPackageTests =
 
           test "vocab usage shown for namespace" {
               let lf =
-                  lockWith
-                      [ mappingWith "MyApp.Orders.Game" (Some "schema:Game") Confirmed
-                        mappingWith "MyApp.Orders.Result" (Some "schema:result") Confirmed ]
+                  { lockWith
+                        [ mappingWith "MyApp.Orders.Game" (Some "schema:Game") Confirmed
+                          mappingWith "MyApp.Orders.Result" (Some "schema:result") Confirmed ] with
+                      DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let output = Status.formatByPackage lf
               Expect.stringContains output "schema (2)" "two schema terms"

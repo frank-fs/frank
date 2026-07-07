@@ -2,7 +2,6 @@ namespace Frank.Semantic
 
 open System
 open System.IO
-open System.Security.Cryptography
 open VDS.RDF
 open VDS.RDF.Parsing
 
@@ -79,10 +78,7 @@ module VocabFetcher =
             Map.tryFind ext extensionMap |> Option.defaultValue JsonLd
 
     /// SHA-256 hex string (lowercase, 64 chars) of the given bytes.
-    let sha256Hex (bytes: byte[]) : string =
-        use sha = SHA256.Create()
-        let hash = sha.ComputeHash(bytes)
-        hash |> Array.map (fun b -> b.ToString("x2")) |> String.concat ""
+    let sha256Hex (bytes: byte[]) : string = Hashing.sha256Hex bytes
 
     /// Canonical cache file name: <name>.<hash>.<ext>
     let cacheFileName (name: string) (hash: string) (format: VocabFormat) : string =

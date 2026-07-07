@@ -51,6 +51,7 @@ module AcceptNegotiation =
     let appendVaryAccept (response: HttpResponse) : unit =
         let hasAccept =
             response.Headers["Vary"]
+            |> Seq.filter (System.String.IsNullOrEmpty >> not)
             |> Seq.collect (fun v -> v.Split(','))
             |> Seq.exists (fun t -> t.Trim().Equals("Accept", System.StringComparison.OrdinalIgnoreCase))
 

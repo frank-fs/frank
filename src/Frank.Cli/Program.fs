@@ -159,42 +159,41 @@ let private printSummary (fmt: Pipeline.OutputFormat) (s: Pipeline.ExtractSummar
 
 // ── Command handlers ──────────────────────────────────────────────────────────
 
-let private handleExtract (args: ParseResults<ExtractArgs>) : int =
-    let formatResult =
+let private buildExtractOpts
+    (args: ParseResults<ExtractArgs>)
+    : Result<Pipeline.OutputFormat * Pipeline.ExtractOptions, string> =
+    let fmtResult =
         args.TryGetResult(ExtractArgs.Output_Format)
         |> Option.map parseOutputFormat
         |> Option.defaultValue (Ok Pipeline.Text)
 
-    match formatResult with
-    | Error e ->
-        eprintfn "error: %s" e
-        1
-    | Ok fmt ->
-
-        let projectResult =
-            match args.TryGetResult(ExtractArgs.Project) with
-            | Some p -> Ok p
-            | None -> findProjectFile (Directory.GetCurrentDirectory())
-
-        match projectResult with
-        | Error e ->
-            eprintfn "error: %s" e
-            1
-        | Ok projectFile ->
-
+    fmtResult
+    |> Result.bind (fun fmt ->
+        (match args.TryGetResult(ExtractArgs.Project) with
+         | Some p -> Ok p
+         | None -> findProjectFile (Directory.GetCurrentDirectory()))
+        |> Result.map (fun projectFile ->
             let opts: Pipeline.ExtractOptions =
                 { ProjectFile = projectFile
                   VocabularyFile = args.TryGetResult(ExtractArgs.Vocabulary_File)
                   AssemblyRefs = runtimeAssemblyRefs ()
                   OutputFormat = fmt }
 
-            match Pipeline.run opts with
-            | Error e ->
-                eprintfn "error: %s" e
-                1
-            | Ok summary ->
-                printSummary fmt summary
-                0
+            fmt, opts))
+
+let private handleExtract (args: ParseResults<ExtractArgs>) : int =
+    match buildExtractOpts args with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok(fmt, opts) ->
+        match Pipeline.run opts with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok summary ->
+            printSummary fmt summary
+            0
 
 let private lockPathFrom (lockFile: string option) (project: string option) : Result<string, string> =
     match lockFile with
@@ -240,96 +239,83 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
 
 /// Stamp integrity and refresh the Generated timestamp before writing.
 /// Used by every handler that mutates and writes back a lock (accept, finalize).
-let private stampAndWrite (lockPath: string) (lf: LockFile) : unit =
-    LockFile.write
-        lockPath
-        (LockFile.withIntegrity
-            { lf with
-                Generated = DateTimeOffset.UtcNow })
+let private stampAndWrite (clock: unit -> DateTimeOffset) (lockPath: string) (lf: LockFile) : unit =
+    LockFile.write lockPath (LockFile.withIntegrity { lf with Generated = clock () })
 
 let private parseSource: string -> Result<MappingSource, string> =
     parseChoice "source" [ "llm", Llm; "manual", Manual ]
 
-let private handleAccept (args: ParseResults<AcceptArgs>) : int =
+let private parseAcceptInputs
+    (args: ParseResults<AcceptArgs>)
+    : Result<Pipeline.OutputFormat * Accept.ResolvedDoc * MappingSource * string, string> =
     let formatStr =
         args.TryGetResult(AcceptArgs.Output_Format) |> Option.defaultValue "text"
 
-    match parseOutputFormat formatStr with
+    let inputPath = args.GetResult(AcceptArgs.Input)
+    let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
+
+    parseOutputFormat formatStr
+    |> Result.bind (fun fmt ->
+        (try
+            Ok(File.ReadAllText inputPath)
+         with ex ->
+             Error $"could not read '{inputPath}': {ex.Message}")
+        |> Result.bind (fun json ->
+            Accept.parseResolved json
+            |> Result.bind (fun doc ->
+                parseSource sourceStr
+                |> Result.bind (fun source ->
+                    lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project)
+                    |> Result.map (fun lockPath -> fmt, doc, source, lockPath)))))
+
+let private applyAcceptDoc
+    (fmt: Pipeline.OutputFormat)
+    (doc: Accept.ResolvedDoc)
+    (source: MappingSource)
+    (lockPath: string)
+    : Result<Accept.AcceptSummary, string> =
+    read lockPath
+    |> Result.map (fun lf ->
+        let cacheDir =
+            Path.Combine(Path.GetDirectoryName(Path.GetFullPath lockPath), "vocab")
+
+        let oracle = Accept.buildOracle lf.Vocabularies cacheDir
+        let updated, summary = Accept.apply lf doc source oracle
+        stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updated
+        summary)
+
+let private renderAcceptSummary (fmt: Pipeline.OutputFormat) (summary: Accept.AcceptSummary) : unit =
+    for w in summary.Warnings do
+        eprintfn "warning: %s" w
+
+    for r in summary.Rejected do
+        eprintfn "%s: %s" r.FSharpType r.Reason
+
+    match fmt with
+    | Pipeline.Json -> printfn "%s" (Accept.summaryToJson summary)
+    | Pipeline.Text ->
+        printfn
+            "Merged %d mapping(s); %d excluded; %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
+            summary.Merged
+            summary.Excluded
+            summary.Rejected.Length
+            summary.Unchanged
+            summary.AlreadyConfirmed
+            summary.FieldsUnresolved
+
+let private handleAccept (args: ParseResults<AcceptArgs>) : int =
+    match parseAcceptInputs args with
     | Error e ->
         eprintfn "error: %s" e
         1
-    | Ok fmt ->
-
-        let inputPath = args.GetResult(AcceptArgs.Input)
-
-        let jsonResult =
-            try
-                Ok(File.ReadAllText inputPath)
-            with ex ->
-                Error $"could not read '{inputPath}': {ex.Message}"
-
-        match jsonResult with
+    | Ok(fmt, doc, source, lockPath) ->
+        match applyAcceptDoc fmt doc source lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
-        | Ok json ->
-
-            match Accept.parseResolved json with
-            | Error e ->
-                eprintfn "error: %s" e
-                1
-            | Ok doc ->
-
-                let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
-
-                match parseSource sourceStr with
-                | Error e ->
-                    eprintfn "error: %s" e
-                    1
-                | Ok source ->
-
-                    match
-                        lockPathFrom (args.TryGetResult AcceptArgs.Lock_File) (args.TryGetResult AcceptArgs.Project)
-                    with
-                    | Error e ->
-                        eprintfn "error: %s" e
-                        1
-                    | Ok lockPath ->
-
-                        match read lockPath with
-                        | Error e ->
-                            eprintfn "error: %s" e
-                            1
-                        | Ok lf ->
-
-                            let cacheDir =
-                                Path.Combine(Path.GetDirectoryName(Path.GetFullPath lockPath), "vocab")
-
-                            let oracle = Accept.buildOracle lf.Vocabularies cacheDir
-
-                            let updated, summary = Accept.apply lf doc source oracle
-
-                            stampAndWrite lockPath updated
-
-                            for w in summary.Warnings do
-                                eprintfn "warning: %s" w
-
-                            for r in summary.Rejected do
-                                eprintfn "%s: %s" r.FSharpType r.Reason
-
-                            match fmt with
-                            | Pipeline.Json -> printfn "%s" (Accept.summaryToJson summary)
-                            | Pipeline.Text ->
-                                printfn
-                                    "Merged %d mapping(s); %d excluded; %d rejected; %d unchanged; %d already-confirmed; %d field(s) still unresolved"
-                                    summary.Merged
-                                    summary.Excluded
-                                    summary.Rejected.Length
-                                    summary.Unchanged
-                                    summary.AlreadyConfirmed
-                                    summary.FieldsUnresolved
-
-                            0
+        | Ok summary ->
+            renderAcceptSummary fmt summary
+            0
 
 let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
     match lockPathFrom (args.TryGetResult FinalizeArgs.Lock_File) (args.TryGetResult FinalizeArgs.Project) with
@@ -343,7 +329,7 @@ let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
             1
         | Ok lf ->
             let updated, summary = Finalize.run lf
-            stampAndWrite lockPath updated
+            stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updated
 
             printfn
                 "Finalized: %d confirmed, %d excluded (%d already decided)"

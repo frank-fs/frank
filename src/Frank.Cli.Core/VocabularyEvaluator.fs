@@ -333,6 +333,19 @@ let private findBindingBody
         let idx = bindingName.LastIndexOf('.')
         if idx >= 0 then bindingName.[idx + 1 ..] else bindingName
 
+    let matchDecl
+        (simpleName: string)
+        (search: int -> FSharpExpr list -> FSharpImplementationFileDeclaration list -> FSharpExpr list)
+        (depth: int)
+        (acc: FSharpExpr list)
+        (decl: FSharpImplementationFileDeclaration)
+        : FSharpExpr list =
+        match decl with
+        | FSharpImplementationFileDeclaration.Entity(_, ds) -> search (depth + 1) acc ds
+        | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
+            if mfv.CompiledName = simpleName then body :: acc else acc
+        | FSharpImplementationFileDeclaration.InitAction _ -> acc
+
     let rec search
         (depth: int)
         (acc: FSharpExpr list)
@@ -341,15 +354,7 @@ let private findBindingBody
         if depth >= MaxSearchDepth then
             acc
         else
-            List.fold
-                (fun a decl ->
-                    match decl with
-                    | FSharpImplementationFileDeclaration.Entity(_, ds) -> search (depth + 1) a ds
-                    | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(mfv, _, body) ->
-                        if mfv.CompiledName = simpleName then body :: a else a
-                    | FSharpImplementationFileDeclaration.InitAction _ -> a)
-                acc
-                decls
+            List.fold (matchDecl simpleName search depth) acc decls
 
     let found: FSharpExpr list =
         List.fold (fun acc (f: FSharpImplementationFileContents) -> search 0 acc f.Declarations) [] implFiles
@@ -434,6 +439,13 @@ and private walkCEBodyAt
     (walkDepth: int)
     (expr: FSharpExpr)
     : Result<VocabularyRegistry, string> =
+    let applyCallArgs (mfv: FSharpMemberOrFunctionOrValue) (args: FSharpExpr list) =
+        match args with
+        | prevStateExpr :: _ ->
+            walkCEBodyAt implFiles depth visited (walkDepth + 1) prevStateExpr
+            |> Result.bind (applyOperation implFiles depth visited mfv.CompiledName args)
+        | [] -> Ok VocabularyRegistry.empty
+
     if walkDepth >= MaxWalkDepth then
         Error $"vocabulary CE/declaration nesting exceeded {MaxWalkDepth} levels"
     else
@@ -441,13 +453,7 @@ and private walkCEBodyAt
         | FSharpExprPatterns.Application(func, _, _) -> walkCEBodyAt implFiles depth visited (walkDepth + 1) func
         | FSharpExprPatterns.Lambda(_, body) -> walkCEBodyAt implFiles depth visited (walkDepth + 1) body
         | FSharpExprPatterns.Call(_, mfv, _, _, _) when mfv.CompiledName = "Yield" -> Ok VocabularyRegistry.empty
-        | FSharpExprPatterns.Call(_, mfv, _, _, args) ->
-            match args with
-            | prevStateExpr :: _ ->
-                match walkCEBodyAt implFiles depth visited (walkDepth + 1) prevStateExpr with
-                | Error e -> Error e
-                | Ok state -> applyOperation implFiles depth visited mfv.CompiledName args state
-            | [] -> Ok VocabularyRegistry.empty
+        | FSharpExprPatterns.Call(_, mfv, _, _, args) -> applyCallArgs mfv args
         | _ -> Ok VocabularyRegistry.empty
 
 /// Dispatch a single CE operation by CompiledName to its per-op handler.

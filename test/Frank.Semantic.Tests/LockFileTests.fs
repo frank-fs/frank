@@ -1204,6 +1204,9 @@ let private addCounts (a: LockFile.StatusCounts) (b: LockFile.StatusCounts) : Lo
       Unresolved = a.Unresolved + b.Unresolved
       Excluded = a.Excluded + b.Excluded }
 
+let private schemaPrefixes = Set.ofList [ "schema" ]
+let private schemaAndPayPrefixes = Set.ofList [ "schema"; "pay" ]
+
 [<Tests>]
 let countByPackageTests =
     testList
@@ -1214,7 +1217,7 @@ let countByPackageTests =
                     pkgMapping "MyApp.Orders.LineItem" (Some "schema:OrderItem") Confirmed
                     pkgMapping "MyApp.Catalog.Product" (Some "schema:Product") Proposed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage schemaPrefixes mappings
               Expect.equal (List.length groups) 2 "two groups"
           }
 
@@ -1228,7 +1231,7 @@ let countByPackageTests =
               let global' = LockFile.countByStatus mappings
 
               let summed =
-                  LockFile.countByPackage mappings
+                  LockFile.countByPackage schemaPrefixes mappings
                   |> List.map (fun g -> g.Counts)
                   |> List.fold addCounts zeroCounts
 
@@ -1240,7 +1243,7 @@ let countByPackageTests =
                   [ pkgMapping "MyApp.Orders.Game" (Some "schema:Game") Confirmed
                     pkgMapping "MyApp.Orders.Result" (Some "schema:result") Confirmed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage schemaPrefixes mappings
               let group = List.exactlyOne groups
               Expect.equal group.Vocabs [ ("schema", 2) ] "schema (2)"
           }
@@ -1248,7 +1251,7 @@ let countByPackageTests =
           test "AC2 unresolved with Iri=None contributes no vocab" {
               let mappings = [ pkgMapping "MyApp.Orders.Foo" None Unresolved ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage Set.empty mappings
               let group = List.exactlyOne groups
               Expect.isEmpty group.Vocabs "no vocab for None Iri"
           }
@@ -1258,7 +1261,7 @@ let countByPackageTests =
                   [ pkgMapping "MyApp.Orders.Order" (Some "schema:Order") Confirmed
                     pkgMapping "MyApp.Orders.Payment" (Some "pay:Payment") Confirmed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage schemaAndPayPrefixes mappings
               let group = List.exactlyOne groups
               Expect.equal group.Vocabs [ ("pay", 1); ("schema", 1) ] "two vocabs sorted"
           }
@@ -1267,7 +1270,7 @@ let countByPackageTests =
               let mappings =
                   [ pkgMapping "Z.Type" None Proposed; pkgMapping "A.Type" None Proposed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage Set.empty mappings
               let names = groups |> List.map (fun g -> g.Namespace)
               Expect.equal names [ "A"; "Z" ] "sorted ascending"
           }
@@ -1277,7 +1280,7 @@ let countByPackageTests =
                   [ pkgMapping "MyApp.Orders.A" (Some "schema:Game") Confirmed
                     pkgMapping "MyApp.Orders.B" (Some "schema:Game") Confirmed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage schemaPrefixes mappings
               let group = List.exactlyOne groups
               Expect.equal group.Vocabs [ ("schema", 1) ] "one distinct term"
           }
@@ -1287,8 +1290,28 @@ let countByPackageTests =
 
               let mappings = [ pkgMapping "MyApp.Orders.Game" (Some absIri) Confirmed ]
 
-              let groups = LockFile.countByPackage mappings
+              let groups = LockFile.countByPackage Set.empty mappings
               let group = List.exactlyOne groups
               Expect.equal group.Vocabs [ (absIri, 1) ] "absolute IRI preserved as key"
               Expect.isFalse (group.Vocabs |> List.exists (fun (k, _) -> k = "https")) "protocol prefix not used"
+          }
+
+          test "A4: unusual-scheme IRI (did:example:123) keyed by full IRI when prefix not declared" {
+              let didIri = "did:example:123"
+              let mappings = [ pkgMapping "MyApp.Identity.User" (Some didIri) Confirmed ]
+
+              let groups = LockFile.countByPackage Set.empty mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ (didIri, 1) ] "did: IRI kept as full key"
+              Expect.isFalse (group.Vocabs |> List.exists (fun (k, _) -> k = "did")) "did prefix not used as key"
+          }
+
+          test "A4: unusual-scheme IRI (file:///x) is NOT misclassified as file CURIE when prefix not declared" {
+              let fileIri = "file:///x"
+              let mappings = [ pkgMapping "MyApp.Res.File" (Some fileIri) Confirmed ]
+
+              let groups = LockFile.countByPackage Set.empty mappings
+              let group = List.exactlyOne groups
+              Expect.equal group.Vocabs [ (fileIri, 1) ] "file: IRI kept as full key"
+              Expect.isFalse (group.Vocabs |> List.exists (fun (k, _) -> k = "file")) "file prefix not used as key"
           } ]

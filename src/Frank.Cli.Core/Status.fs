@@ -19,5 +19,8 @@ let private formatGroupBlock (g: PackageGroup) : string =
         $"{g.Namespace}\n{statusLine}\nvocabs: {vocabList}"
 
 let formatByPackage (lf: LockFile) : string =
-    let groups = countByPackage lf.Mappings
+    let knownPrefixes =
+        Set.union (lf.Vocabularies |> Map.keys |> Set.ofSeq) (lf.DeclaredPrefixes |> Map.keys |> Set.ofSeq)
+
+    let groups = countByPackage knownPrefixes lf.Mappings
     groups |> List.map formatGroupBlock |> String.concat "\n\n"

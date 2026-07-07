@@ -209,7 +209,6 @@ let private writeLock
     let updated =
         { existing with
             Generated = clock ()
-            Integrity = None
             Vocabularies = vocabularies
             DeclaredPrefixes = declaredPrefixes
             Mappings = merged }
@@ -220,6 +219,41 @@ let private writeLock
     summarize merged
 
 // ── Main entry point ──────────────────────────────────────────────────────────
+
+let private resolveSources
+    (opts: ExtractOptions)
+    (projectFile: string)
+    : Result<string * string list * string list, string> =
+    resolveVocabFile projectFile opts.VocabularyFile
+    |> Result.bind (fun vocabFile ->
+        sourceFilesFromFsproj projectFile
+        |> Result.map (fun allSourceFiles ->
+            let curated = curateSourceFiles allSourceFiles
+            let domain = curated |> List.filter (fun f -> f <> vocabFile)
+            vocabFile, curated, domain))
+
+let private buildMappings
+    (fetch: VocabFetcher.Fetch)
+    (clock: unit -> DateTimeOffset)
+    (opts: ExtractOptions)
+    (projectFile: string)
+    (curated: string list)
+    (domain: string list)
+    : Result<Map<string, VocabularyEntry> * Mapping list * VocabularyRegistry, string> =
+    tryEvalRegistry opts.AssemblyRefs curated
+    |> Result.mapError (fun e -> $"registry eval failed: {e}")
+    |> Result.bind (fun registry ->
+        extractFromFiles domain
+        |> Result.mapError (fun e -> $"type extraction failed: {e}")
+        |> Result.bind (fun typeInfos ->
+            let projectDir = Path.GetDirectoryName projectFile
+
+            fetchVocabTerms fetch clock projectDir registry
+            |> Async.RunSynchronously
+            |> Result.mapError (fun e -> $"vocab fetch failed: {e}")
+            |> Result.map (fun (terms, vocabEntries) ->
+                let fresh = typeInfos |> List.map (ConventionEngine.score terms registry)
+                vocabEntries, fresh, registry)))
 
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
@@ -233,40 +267,17 @@ let internal runWithFetch
     if not (File.Exists projectFile) then
         Error $"project file not found: {projectFile}"
     else
+        resolveSources opts projectFile
+        |> Result.bind (fun (_vocabFile, curated, domain) ->
+            buildMappings fetch clock opts projectFile curated domain
+            |> Result.map (fun (vocabEntries, fresh, registry) ->
+                let lockPath = lockFilePath projectFile
+                let existingLock = readOrEmptyLock lockPath
 
-        match resolveVocabFile projectFile opts.VocabularyFile with
-        | Error e -> Error e
-        | Ok vocabFile ->
+                let declaredPrefixes =
+                    registry.Prefixes |> Map.map (fun _ (u: Uri) -> u.AbsoluteUri)
 
-            match sourceFilesFromFsproj projectFile with
-            | Error e -> Error e
-            | Ok allSourceFiles ->
-
-                let curatedFiles = curateSourceFiles allSourceFiles
-                let domainFiles = curatedFiles |> List.filter (fun f -> f <> vocabFile)
-
-                match tryEvalRegistry opts.AssemblyRefs curatedFiles with
-                | Error e -> Error $"registry eval failed: {e}"
-                | Ok registry ->
-
-                    match extractFromFiles domainFiles with
-                    | Error e -> Error $"type extraction failed: {e}"
-                    | Ok typeInfos ->
-
-                        let projectDir = Path.GetDirectoryName projectFile
-
-                        match fetchVocabTerms fetch clock projectDir registry |> Async.RunSynchronously with
-                        | Error e -> Error $"vocab fetch failed: {e}"
-                        | Ok(terms, vocabEntries) ->
-
-                            let freshMappings = typeInfos |> List.map (ConventionEngine.score terms registry)
-                            let lockPath = lockFilePath projectFile
-                            let existingLock = readOrEmptyLock lockPath
-
-                            let declaredPrefixes =
-                                registry.Prefixes |> Map.map (fun _ (u: Uri) -> u.AbsoluteUri)
-
-                            Ok(writeLock lockPath clock existingLock freshMappings vocabEntries declaredPrefixes)
+                writeLock lockPath clock existingLock fresh vocabEntries declaredPrefixes))
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.

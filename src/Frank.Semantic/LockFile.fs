@@ -2,7 +2,6 @@ namespace Frank.Semantic
 
 open System
 open System.IO
-open System.Security.Cryptography
 open System.Text.Json
 open System.Text.Json.Nodes
 
@@ -296,50 +295,49 @@ module LockFile =
 
     let private supportedVersions = Set.ofList [ 1 ]
 
-    let private parseDoc (json: string) : Result<LockFile, string> =
-        let rootResult =
-            try
-                Ok(JsonNode.Parse json)
-            with ex ->
-                Error $"JSON parse error: {ex.Message}"
+    let private parseSchemaVersion (node: JsonNode) : Result<int, string> =
+        let versionNode = node.["schemaVersion"]
 
-        rootResult
+        if versionNode = null then
+            Error "lock file: schemaVersion is required"
+        else
+            try
+                let v = versionNode.GetValue<int>()
+
+                if Set.contains v supportedVersions then
+                    Ok v
+                else
+                    Error $"lock file schema version {v} not supported by this CLI"
+            with :? InvalidOperationException ->
+                Error "lock file: schemaVersion must be an integer"
+
+    let private parseBody (node: JsonNode) (version: int) : Result<LockFile, string> =
+        let integrity = optionalString node "integrity"
+
+        requireString node "generated"
+        |> Result.bind parseIso8601
+        |> Result.bind (fun generated ->
+            parseVocabularies node.["vocabularies"]
+            |> Result.bind (fun vocabularies ->
+                parseDeclaredPrefixes node.["declaredPrefixes"]
+                |> Result.bind (fun declaredPrefixes ->
+                    parseMappingList node.["mappings"]
+                    |> Result.map (fun mappings ->
+                        { SchemaVersion = version
+                          Generated = generated
+                          Integrity = integrity
+                          Vocabularies = vocabularies
+                          DeclaredPrefixes = declaredPrefixes
+                          Mappings = mappings }))))
+
+    let private parseDoc (json: string) : Result<LockFile, string> =
+        (try
+            Ok(JsonNode.Parse json)
+         with ex ->
+             Error $"JSON parse error: {ex.Message}")
         |> Result.bind (fun node ->
             match node with
-            | :? JsonObject ->
-                let schemaVersionNode = node.["schemaVersion"]
-
-                if schemaVersionNode = null then
-                    Error "lock file: schemaVersion is required"
-                else
-                    let versionResult =
-                        try
-                            Ok(schemaVersionNode.GetValue<int>())
-                        with :? InvalidOperationException ->
-                            Error "lock file: schemaVersion must be an integer"
-
-                    versionResult
-                    |> Result.bind (fun version ->
-                        if not (Set.contains version supportedVersions) then
-                            Error $"lock file schema version {version} not supported by this CLI"
-                        else
-                            requireString node "generated"
-                            |> Result.bind parseIso8601
-                            |> Result.bind (fun generated ->
-                                let integrity = optionalString node "integrity"
-
-                                parseVocabularies node.["vocabularies"]
-                                |> Result.bind (fun vocabularies ->
-                                    parseDeclaredPrefixes node.["declaredPrefixes"]
-                                    |> Result.bind (fun declaredPrefixes ->
-                                        parseMappingList node.["mappings"]
-                                        |> Result.map (fun mappings ->
-                                            { SchemaVersion = version
-                                              Generated = generated
-                                              Integrity = integrity
-                                              Vocabularies = vocabularies
-                                              DeclaredPrefixes = declaredPrefixes
-                                              Mappings = mappings })))))
+            | :? JsonObject -> parseSchemaVersion node |> Result.bind (parseBody node)
             | _ -> Error "lock file: root must be a JSON object")
 
     // ── JSON serialization (pure, deterministic) ──────────────────────────────
@@ -463,10 +461,7 @@ module LockFile =
     /// Compute the SHA-256 integrity hash of a lock file's canonical form.
     /// Invariant to the lock's Integrity field value — always hashes the
     /// canonical form with Integrity = None.
-    let computeIntegrity (lf: LockFile) : string =
-        use sha = SHA256.Create()
-        let hash = sha.ComputeHash(canonicalBytes lf)
-        hash |> Array.map (fun b -> b.ToString("x2")) |> String.concat ""
+    let computeIntegrity (lf: LockFile) : string = Hashing.sha256Hex (canonicalBytes lf)
 
     /// Return a new lock with Integrity stamped to the computed hash.
     let withIntegrity (lf: LockFile) : LockFile =
@@ -557,26 +552,24 @@ module LockFile =
             fsharpType.[.. lastDot - 1]
 
     /// Extract a vocabulary key from a mapping IRI.
-    /// CURIEs ("schema:Game") → prefix ("schema").
-    /// Absolute IRIs ("https://schema.org/Game") → full IRI (not silently dropped).
-    let private vocabKeyOf (iri: string) : string =
+    /// An IRI whose substring before the first ':' is a member of knownPrefixes is a CURIE:
+    ///   "schema:Game" with knownPrefixes containing "schema" → "schema".
+    /// All other strings are treated as absolute IRIs and keyed by the full IRI.
+    let private vocabKeyOf (knownPrefixes: Set<string>) (iri: string) : string =
         let colonIdx = iri.IndexOf(':')
 
         if colonIdx < 0 then
             iri
         else
             let prefix = iri.[.. colonIdx - 1]
-
-            match prefix with
-            | "http"
-            | "https"
-            | "urn"
-            | "ftp" -> iri
-            | _ -> prefix
+            if Set.contains prefix knownPrefixes then prefix else iri
 
     /// Group mappings by derived namespace and aggregate status counts and vocab usage.
     /// Groups are sorted by namespace; vocabs within each group are sorted by key.
-    let countByPackage (mappings: Mapping list) : PackageGroup list =
+    /// knownPrefixes: union of Vocabularies keys and DeclaredPrefixes keys from the lock.
+    ///   CURIEs whose prefix is in this set are grouped by prefix;
+    ///   all other IRIs (including absolute IRIs and unrecognised schemes) are keyed by full IRI.
+    let countByPackage (knownPrefixes: Set<string>) (mappings: Mapping list) : PackageGroup list =
         let byNs = mappings |> List.groupBy (fun m -> namespaceOf m.FSharpType)
 
         byNs
@@ -587,7 +580,7 @@ module LockFile =
                 ms
                 |> List.choose (fun m -> m.Iri)
                 |> List.distinct
-                |> List.map vocabKeyOf
+                |> List.map (vocabKeyOf knownPrefixes)
                 |> List.groupBy id
                 |> List.map (fun (key, xs) -> key, List.length xs)
                 |> List.sortBy fst

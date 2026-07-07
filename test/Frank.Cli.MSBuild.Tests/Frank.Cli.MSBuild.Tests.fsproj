@@ -12,6 +12,7 @@
     <Compile Include="Fixtures.fs" />
     <Compile Include="ValidateLockFileTaskTests.fs" />
     <Compile Include="BuildGateIntegrationTests.fs" />
+    <Compile Include="HrefVarsGateTests.fs" />
     <Compile Include="GenerateDiscoveryTaskTests.fs" />
     <Compile Include="GenerateLinkedDataTaskTests.fs" />
     <Compile Include="GenerateValidationTaskTests.fs" />
