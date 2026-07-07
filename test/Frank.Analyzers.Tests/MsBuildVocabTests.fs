@@ -75,4 +75,15 @@ let msbuildTests =
           testCase "Benign guard: fetched vocab + TreatWarningsAsErrors → build succeeds"
           <| fun _ ->
               let exitCode, output = runBuildFixture "VocabBenign"
-              Expect.equal exitCode 0 $"Build should succeed for benign vocab. Output:\n{output}" ]
+              Expect.equal exitCode 0 $"Build should succeed for benign vocab. Output:\n{output}"
+
+          testCase "AT2 MSBuild: resource /tictactoe in source covers /tictactoe# namespace → no FRANK002"
+          <| fun _ ->
+              let exitCode, output = runBuildFixture "VocabRouted"
+              Expect.equal exitCode 0 $"Build should succeed when route covers namespace. Output:\n{output}"
+
+          testCase "AT2 MSBuild fail-when-broken: resource /tic does not cover /tictactoe# → FRANK002 fires"
+          <| fun _ ->
+              let exitCode, output = runBuildFixture "VocabRoutedBroken"
+              Expect.isGreaterThan exitCode 0 "Build should fail when route does not cover namespace"
+              Expect.stringContains output "FRANK002" "Output should mention FRANK002" ]

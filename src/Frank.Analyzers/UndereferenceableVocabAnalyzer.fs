@@ -2,7 +2,6 @@ module Frank.Analyzers.UndereferenceableVocabAnalyzer
 
 open System.IO
 open FSharp.Analyzers.SDK
-open FSharp.Analyzers.SDK.ASTCollecting
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text
 open Frank.Semantic
@@ -38,32 +37,6 @@ let private findLockFile (startDir: string) : string option =
                     walk parent.FullName (depth + 1)
 
     walk startDir 0
-
-// ── Route extraction from ParsedInput ────────────────────────────────────────
-
-let private tryExtractResourceRoute (expr: SynExpr) : string option =
-    match expr with
-    | SynExpr.App(
-        funcExpr = SynExpr.App(funcExpr = SynExpr.Ident ident; argExpr = SynExpr.Const(constant = synConst))
-        argExpr = SynExpr.ComputationExpr _) when ident.idText = "resource" ->
-        match synConst with
-        | SynConst.String(route, _, _) -> Some route
-        | _ -> None
-    | _ -> None
-
-/// Extract all resource route literals from a parsed F# file.
-let extractRoutes (parseTree: ParsedInput) : string list =
-    let routes = ResizeArray<string>()
-
-    let collector =
-        { new SyntaxCollectorBase() with
-            override _.WalkExpr(_, expr) =
-                match tryExtractResourceRoute expr with
-                | Some route -> routes.Add route
-                | None -> () }
-
-    walkAst collector parseTree
-    routes |> Seq.toList
 
 // ── Diagnostic creation ───────────────────────────────────────────────────────
 

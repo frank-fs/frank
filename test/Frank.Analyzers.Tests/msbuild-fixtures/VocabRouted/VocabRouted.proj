@@ -1,0 +1,22 @@
+<Project DefaultTargets="Build">
+
+  <!--
+    AT2 MSBuild fixture: ttt declared (not fetched), but the project sources contain
+    resource "/tictactoe" which covers the /tictactoe# namespace path.
+    Expected: dotnet build succeeds — FRANK002 suppressed by real route.
+  -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Resource.fs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildProjectDirectory)/../../../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
+
+  <Target Name="Build" />
+
+</Project>

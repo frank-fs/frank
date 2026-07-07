@@ -31,6 +31,8 @@
          release so every consumer of Frank.Semantic (and transitively Frank.LinkedData,
          Frank.Validation, Frank.Provenance) resolves a non-vulnerable AngleSharp. -->
     <PackageReference Include="AngleSharp" Version="1.5.2" />
+    <!-- 43.10.101 matches FSharp.Analyzers.SDK 0.35.0 exact pin; patch-safe with Frank.Cli.Core 43.10.103 -->
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.10.101" />
   </ItemGroup>
 
 </Project>

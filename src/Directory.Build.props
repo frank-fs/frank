@@ -18,8 +18,11 @@
     <OutputType>Library</OutputType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- NU1608: FSharp.Compiler.Service and FSharp.Analyzers.SDK have exact FSharp.Core
-         constraints that vary by SDK version. Keep as warning, not error. -->
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1608</WarningsNotAsErrors>
+         constraints that vary by SDK version. Keep as warning, not error.
+         NU1605: Frank.Semantic pins FCS 43.10.101 (matching FSharp.Analyzers.SDK) while
+         Frank.Cli.Core uses 43.10.103; NuGet resolves to the higher patch — safe for
+         parse-only API used by extractRoutes. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1608;NU1605</WarningsNotAsErrors>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 

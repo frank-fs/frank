@@ -565,14 +565,14 @@
 
     <CheckUndereferenceableVocabTask
       LockFilePath="$(FrankLockFilePath)"
-      Routes="@(FrankVocabRoutes)">
+      SourceFiles="@(Compile->'%(FullPath)')">
       <Output TaskParameter="ProblematicPrefixes" ItemName="_FrankVocabProblems" />
     </CheckUndereferenceableVocabTask>
 
     <Warning
       Condition="'@(_FrankVocabProblems)' != ''"
       Code="FRANK002"
-      Text="Vocabulary '%(_FrankVocabProblems.Identity)' is neither dereferenceable (not in lock's fetched Vocabularies) nor routed (no &lt;FrankVocabRoutes&gt; item covers it). Publish the vocabulary or add a route." />
+      Text="Vocabulary '%(_FrankVocabProblems.Identity)' is neither dereferenceable (not in lock's fetched Vocabularies) nor routed (no resource route in the project's source covers its namespace path). Publish the vocabulary or add a resource route." />
 
   </Target>
 

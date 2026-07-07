@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-07-07T00:00:00+00:00",
+  "vocabularies": {},
+  "declaredPrefixes": {
+    "ttt": "https://example.org/tictactoe#"
+  },
+  "mappings": []
+}
