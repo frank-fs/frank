@@ -554,7 +554,8 @@
   <!--
     FrankCheckVocab: warn (FRANK002) for each vocabulary prefix declared in the lock
     that is neither dereferenceable (fetched, in lock.Vocabularies) nor covered by a
-    declared route (<FrankVocabRoutes> items). No network I/O; deterministic, CI-safe.
+    resource route found in the project's compiled source (@(Compile) items).
+    No network I/O; deterministic, CI-safe.
 
     Gate: lock file must exist (FrankLockFilePath set and file present).
     TreatWarningsAsErrors=true promotes FRANK002 to error via MSBuildWarningsAsErrors above.
