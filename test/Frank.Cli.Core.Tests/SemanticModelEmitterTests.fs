@@ -139,11 +139,13 @@ let iriMatchTests =
                   "Holder iri arm uses System.Uri"
           }
 
-          test "iri function return type annotation is System.Uri" {
+          test "iri member return type annotation is System.Uri (no bare let iri)" {
               let src =
                   unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
 
-              Expect.stringContains src "let iri (r: SemanticResource) : System.Uri =" "iri return type is System.Uri"
+              Expect.stringContains src "member this.Iri" "Iri is emitted as a member, not a bare function"
+              Expect.stringContains src "System.Uri" "Iri member return type is System.Uri"
+              Expect.isFalse (src.Contains "let iri ") "bare let iri must not exist (open-clash guard)"
           } ]
 
 [<Tests>]
@@ -662,4 +664,42 @@ let crossNamespaceQualificationTests =
 
               let errors = typecheckTwoSources crossNsDomainSrc src
               Expect.isEmpty errors $"qualified patterns must compile with no open; got: {errors}"
+          } ]
+
+// ── AT1 — open-clash guard ───────────────────────────────────────────────────
+
+let private openClashCallerSrc =
+    """
+module Probe.App
+
+open Probe.Generated
+
+let iri (x: obj) = "custom"
+let clrType (x: obj) = typeof<obj>
+"""
+
+[<Tests>]
+let openClashTests =
+    testList
+        "SemanticModelEmitter — AT1 open-clash guard"
+        [ test "caller that opens generated module AND defines own iri/clrType compiles clean" {
+              let src =
+                  unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
+
+              let errors =
+                  FcsTypecheck.typecheckThreeSources domainSrc src openClashCallerSrc
+
+              Expect.isEmpty
+                  errors
+                  $"open-clash: caller with own iri/clrType must compile clean post-fix; got: {errors}"
+          }
+
+          test "no bare let iri or let clrType in generated module" {
+              let src =
+                  unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
+
+              Expect.isFalse (src.Contains "let iri ") "bare let iri absent (anti-shortcut)"
+              Expect.isFalse (src.Contains "let clrType ") "bare let clrType absent (anti-shortcut)"
+              Expect.stringContains src "member this.Iri" "Iri emitted as member"
+              Expect.stringContains src "member this.ClrType" "ClrType emitted as member"
           } ]

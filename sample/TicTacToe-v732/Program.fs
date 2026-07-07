@@ -332,7 +332,7 @@ let private gameResource =
     resource "/games/{id}" {
         name "Game"
         entryPoint
-        relation ((TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.Game).AbsoluteUri)
+        relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
 
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
@@ -347,7 +347,7 @@ let private movesResource =
         name "GameMoves"
 
         relation (
-            (TicTacToe.GeneratedSemantics.iri TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest).AbsoluteUri
+            TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest.Iri.AbsoluteUri
         )
 
         post (

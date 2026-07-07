@@ -142,6 +142,33 @@ let unionDecl (name: string) (cases: string list) : ModuleDeclItem =
 let valueDecl (name: string) (typeName: string) (value: WidgetBuilder<Expr>) : ModuleDeclItem =
     BindingDecl(Value(name, value, typeName))
 
+/// A match expression: match <subject> with | pat -> e ...
+let matchExprClauses (subject: string) (clauses: (string * WidgetBuilder<Expr>) list) : WidgetBuilder<Expr> =
+    MatchExpr(subject, [ for (pat, e) in clauses -> MatchClauseExpr(pat, e) ])
+
+/// A DU type declaration with instance member properties.
+/// Emits member this.Iri: System.Uri and member this.ClrType: System.Type on the union.
+/// Replaces bare module-level let iri/let clrType that clash on open.
+let unionDeclWithMembers
+    (name: string)
+    (cases: string list)
+    (iriClauses: (string * WidgetBuilder<Expr>) list)
+    (clrTypeClauses: (string * WidgetBuilder<Expr>) list)
+    : ModuleDeclItem =
+    let iriBody = matchExprClauses "this" iriClauses
+    let clrTypeBody = matchExprClauses "this" clrTypeClauses
+
+    UnionDecl(
+        (Union(name) {
+            for c in cases do
+                UnionCase(c)
+        })
+            .members () {
+            Member("this.Iri", iriBody, "System.Uri")
+            Member("this.ClrType", clrTypeBody, "System.Type")
+        }
+    )
+
 /// let <name> (<paramName>: <paramType>) : <returnType> = match <paramName> with <clauses>
 let matchFunction
     (name: string)
