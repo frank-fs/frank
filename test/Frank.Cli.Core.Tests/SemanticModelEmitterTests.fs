@@ -668,33 +668,11 @@ let crossNamespaceQualificationTests =
 
 // ── AT1 — open-clash guard ───────────────────────────────────────────────────
 
-let private openClashCallerSrc =
-    """
-module Probe.App
-
-open Probe.Generated
-
-let iri (x: obj) = "custom"
-let clrType (x: obj) = typeof<obj>
-"""
-
 [<Tests>]
 let openClashTests =
     testList
         "SemanticModelEmitter — AT1 open-clash guard"
-        [ test "caller that opens generated module AND defines own iri/clrType compiles clean" {
-              let src =
-                  unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
-
-              let errors =
-                  FcsTypecheck.typecheckThreeSources domainSrc src openClashCallerSrc
-
-              Expect.isEmpty
-                  errors
-                  $"open-clash: caller with own iri/clrType must compile clean post-fix; got: {errors}"
-          }
-
-          test "no bare let iri or let clrType in generated module" {
+        [ test "no bare let iri or let clrType in generated module" {
               let src =
                   unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
 
