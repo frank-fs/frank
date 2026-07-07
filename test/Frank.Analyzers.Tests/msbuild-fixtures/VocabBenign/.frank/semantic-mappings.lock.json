@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-07-07T00:00:00+00:00",
+  "vocabularies": {
+    "ttt": {
+      "uri": "https://example.org/tictactoe#",
+      "fetchedAt": "2026-07-07T00:00:00+00:00",
+      "hash": "abc123def456"
+    }
+  },
+  "declaredPrefixes": {
+    "ttt": "https://example.org/tictactoe#"
+  },
+  "mappings": []
+}

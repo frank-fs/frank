@@ -13,6 +13,7 @@
     <Compile Include="Mapping.fs" />
     <Compile Include="Hashing.fs" />
     <Compile Include="LockFile.fs" />
+    <Compile Include="VocabCheck.fs" />
     <Compile Include="ResolvedModel.fs" />
     <Compile Include="OntologyTypes.fs" />
     <Compile Include="ShapeTypes.fs" />

@@ -17,6 +17,10 @@
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
   <UsingTask
+    TaskName="Frank.Cli.MSBuild.CheckUndereferenceableVocabTask"
+    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
+
+  <UsingTask
     TaskName="Frank.Cli.MSBuild.GenerateDiscoveryTask"
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
@@ -531,6 +535,47 @@
     Set FrankSkipHrefVarsValidation=true to opt out (e.g. integration test hosts).
     Bounded: 30-second timeout per Holzmann rule 10.
   -->
+  <!--
+    Promote FRANK002 MSBuild warnings to errors when TreatWarningsAsErrors is set.
+    This mirrors how fsc promotes compiler warnings under the same flag.
+  -->
+  <PropertyGroup Condition="'$(TreatWarningsAsErrors)' == 'true'">
+    <MSBuildWarningsAsErrors>$(MSBuildWarningsAsErrors);FRANK002</MSBuildWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    Compute default FrankLockFilePath at import time so target conditions evaluate it.
+    Only sets the property if it is empty AND the default path exists on disk.
+  -->
+  <PropertyGroup Condition="'$(FrankLockFilePath)' == '' and Exists('$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json')">
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+  </PropertyGroup>
+
+  <!--
+    FrankCheckVocab: warn (FRANK002) for each vocabulary prefix declared in the lock
+    that is neither dereferenceable (fetched, in lock.Vocabularies) nor covered by a
+    declared route (<FrankVocabRoutes> items). No network I/O; deterministic, CI-safe.
+
+    Gate: lock file must exist (FrankLockFilePath set and file present).
+    TreatWarningsAsErrors=true promotes FRANK002 to error via MSBuildWarningsAsErrors above.
+  -->
+  <Target Name="FrankCheckVocab"
+          BeforeTargets="Build"
+          Condition="Exists('$(FrankLockFilePath)')">
+
+    <CheckUndereferenceableVocabTask
+      LockFilePath="$(FrankLockFilePath)"
+      Routes="@(FrankVocabRoutes)">
+      <Output TaskParameter="ProblematicPrefixes" ItemName="_FrankVocabProblems" />
+    </CheckUndereferenceableVocabTask>
+
+    <Warning
+      Condition="'@(_FrankVocabProblems)' != ''"
+      Code="FRANK002"
+      Text="Vocabulary '%(_FrankVocabProblems.Identity)' is neither dereferenceable (not in lock's fetched Vocabularies) nor routed (no &lt;FrankVocabRoutes&gt; item covers it). Publish the vocabulary or add a route." />
+
+  </Target>
+
   <Target Name="FrankValidateHrefVars"
           AfterTargets="Build"
           Condition="('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe') and (@(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Discovery')) == 'True' or @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Discovery')) == 'True') and '$(FrankSkipHrefVarsValidation)' != 'true'">

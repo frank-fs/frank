@@ -1,0 +1,17 @@
+<Project DefaultTargets="Build">
+
+  <!--
+    AT4 test fixture: ttt declared but not fetched, no routes, TreatWarningsAsErrors=true.
+    Expected: dotnet build fails with FRANK002 error.
+  -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildProjectDirectory)/../../../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
+
+  <Target Name="Build" />
+
+</Project>

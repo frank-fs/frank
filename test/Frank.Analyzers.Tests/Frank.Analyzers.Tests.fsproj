@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="fixtures/VocabNoRoute.fs" />
+    <Compile Include="fixtures/VocabWithRoute.fs" />
     <Compile Include="fixtures/DuplicateGet.fs" />
     <Compile Include="fixtures/ValidSingleHandlers.fs" />
     <Compile Include="fixtures/MultipleResources.fs" />
@@ -24,6 +26,8 @@
     <Compile Include="fixtures/DatastarWithPost.fs" />
     <Compile Include="fixtures/DatastarNoConflict.fs" />
     <Compile Include="AnalyzerTests.fs" />
+    <Compile Include="VocabAnalyzerTests.fs" />
+    <Compile Include="MsBuildVocabTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -31,6 +35,10 @@
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Datastar/Frank.Datastar.fsproj" />
     <ProjectReference Include="../../src/Frank.Analyzers/Frank.Analyzers.fsproj" />
+    <!-- Build-order dependency only: ensure Frank.Cli.MSBuild DLL exists before MSBuild integration tests run -->
+    <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
   <ItemGroup>

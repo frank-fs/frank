@@ -1,0 +1,17 @@
+<Project DefaultTargets="Build">
+
+  <!--
+    Benign guard fixture: ttt is fetched (in Vocabularies), TreatWarningsAsErrors=true.
+    Expected: dotnet build succeeds (no FRANK002 emitted).
+  -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildProjectDirectory)/../../../../src/Frank.Cli.MSBuild/build/Frank.Cli.MSBuild.targets" />
+
+  <Target Name="Build" />
+
+</Project>

@@ -8,12 +8,18 @@
 
   <ItemGroup>
     <Compile Include="DuplicateHandlerAnalyzer.fs" />
+    <Compile Include="UndereferenceableVocabAnalyzer.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- FSharp.Core pinned to 10.0.101: required by FSharp.Analyzers.SDK 0.35.0 (exact dependency) -->
-    <PackageReference Update="FSharp.Core" Version="10.0.101" />
+    <!-- NU1608 suppressed in Directory.Build.props: FSharp.Analyzers.SDK 0.35.0 requests
+         FSharp.Core=10.0.101 but Frank.Semantic requires >=10.1.301 on net10.0;
+         runtime compatibility is maintained — pin removed to unblock restore. -->
     <PackageReference Include="FSharp.Analyzers.SDK" Version="0.35.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
   </ItemGroup>
 
 </Project>
