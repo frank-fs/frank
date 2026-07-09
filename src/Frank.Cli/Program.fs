@@ -421,17 +421,22 @@ let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            use client = RdfConneg.makeNoRedirectClient ()
-            let fetch = RdfConneg.rdfFetch client
-            let force = args.Contains RefreshArgs.Force
-            let now = DateTimeOffset.UtcNow
+            match verifyIfStamped lf with
+            | Error e ->
+                eprintfn "error: lock tampered — %s" e
+                1
+            | Ok() ->
+                use client = RdfConneg.makeNoRedirectClient ()
+                let fetch = RdfConneg.rdfFetch client
+                let force = args.Contains RefreshArgs.Force
+                let now = DateTimeOffset.UtcNow
 
-            let (report, updatedLf) =
-                refresh fetch SlaPolicy.defaultPolicy now force lf |> Async.RunSynchronously
+                let (report, updatedLf) =
+                    refresh fetch SlaPolicy.defaultPolicy now force lf |> Async.RunSynchronously
 
-            stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
-            printRefreshOutcomes report
-            refreshExitCode report
+                stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
+                printRefreshOutcomes report
+                refreshExitCode report
 
 let private printValidateOutcomes (report: ValidateReport) : unit =
     for prefix, outcome in report.Outcomes do

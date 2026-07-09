@@ -68,6 +68,8 @@ jobs:
 
           Exit codes: 0=clean, 1=transient (not filed), 2=drift (this issue)."
 
+          gh label create vocab-drift --force || true
+
           gh issue create \
             --repo "$REPO" \
             --title "$TITLE" \

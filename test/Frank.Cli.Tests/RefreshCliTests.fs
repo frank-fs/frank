@@ -224,6 +224,43 @@ let refreshCliTests =
                   Expect.equal requestedUrl recordedUrl "stub must receive GET for the URL recorded in Vocabularies")
           }
 
+          test "frank semantic refresh: tampered stamped lock exits 1 and does NOT re-stamp the lock" {
+              withTempDir (fun dir ->
+                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
+
+                  // Build a properly stamped base lock (empty vocabs).
+                  let stampedBase =
+                      withIntegrity
+                          { SchemaVersion = 2
+                            Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                            Integrity = None
+                            Vocabularies = Map.empty
+                            DeclaredPrefixes = Map.empty
+                            Mappings = [] }
+
+                  // Tamper: inject a fake vocab entry while keeping the original Integrity hash.
+                  // verifyIntegrity will compute a different hash for the modified content.
+                  let fakeEntry = { v1Empty with Uri = "http://fake.example/injected" }
+                  let tampered = { stampedBase with Vocabularies = Map.ofList [ "injected", fakeEntry ] }
+                  write lockPath tampered
+
+                  // Pre-condition: on-disk lock must fail integrity right now.
+                  let preCli = read lockPath |> Result.defaultWith failwith
+                  Expect.isError (verifyIntegrity preCli) "pre-condition: tampered lock must fail integrity check"
+
+                  let capMs = 5_000
+
+                  let exitCode, _stdout, stderr =
+                      runCli [| "semantic"; "refresh"; "--lock-file"; lockPath |] capMs
+
+                  Expect.equal exitCode 1 $"tampered lock must cause refresh to exit 1; stderr:\n{stderr}"
+                  Expect.stringContains stderr "tampered" "stderr must report the lock as tampered"
+
+                  // The on-disk lock must NOT have been overwritten or re-stamped.
+                  let afterCli = read lockPath |> Result.defaultWith failwith
+                  Expect.isError (verifyIntegrity afterCli) "lock must NOT be laundered — integrity must still fail after refresh")
+          }
+
           test "AT2 - unreachable vocab URL: refresh exits 1 (error, not drift)" {
               withTempDir (fun dir ->
                   // Bind and immediately close a listener to get a port that's not serving.
