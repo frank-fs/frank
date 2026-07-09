@@ -44,10 +44,8 @@ module VocabClassifier =
         match Uri.TryCreate(uriStr, UriKind.Absolute) with
         | false, _ -> None
         | true, u ->
-            // Normalize scheme to https for comparison (http↔https equivalence)
-            let host = u.Host.ToLowerInvariant().TrimStart([| 'w' |])
-
-            // Strip leading 'ww.' after removing one 'w' is fragile; use specific www. check
+            // Scheme is dropped entirely; http↔https are equivalent for authority identity.
+            // www. prefix stripped so www.example.org and example.org compare equal.
             let host =
                 if u.Host.ToLowerInvariant().StartsWith("www.") then
                     u.Host.ToLowerInvariant().[4..]

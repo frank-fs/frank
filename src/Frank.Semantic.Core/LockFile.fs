@@ -17,17 +17,23 @@ module LockFile =
           LastChecked: DateTimeOffset option }
 
     type VocabularyEntry =
-        { Uri: string
-          FetchedAt: DateTimeOffset
-          Hash: string
-          // Schema-v2 evidence fields (absent in v1 JSON; safe defaults applied on read)
-          MediaType: string option
-          Validated: ValidationStatus
-          Terms: Set<string> option // None=unknown; Some Set.empty=parsed-but-no-terms (suppresses check)
-          HttpStatus: int option
-          Owned: bool
-          ETag: string option
-          LastModified: string option }
+        {
+            Uri: string
+            FetchedAt: DateTimeOffset
+            Hash: string
+            // Schema-v2 evidence fields (absent in v1 JSON; safe defaults applied on read)
+            MediaType: string option
+            Validated: ValidationStatus
+            /// Populated by `frank semantic validate` (V2/V3); consumed by the #378 analyzer for
+            /// term-level dereferenceability. None = not yet fetched or parsed (unknown);
+            /// Some Set.empty = vocabulary parsed but asserts no terms (suppresses Undereferenceable check).
+            /// The V1 classifier does not read this field — Terms are captured in the lock for #378 to consume.
+            Terms: Set<string> option
+            HttpStatus: int option
+            Owned: bool
+            ETag: string option
+            LastModified: string option
+        }
 
     // Default for v1 backward-compat and test construction.
     // IsValidated=false with explicit reason; never trusted as validated.

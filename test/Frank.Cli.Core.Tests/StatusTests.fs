@@ -169,8 +169,30 @@ let ac10StatusSurfaceTests =
                       (Map.ofList [ "schema", "https://schema.org/" ])
 
               let output = Status.format fixedNow lf
-              Expect.stringContains output "schema" "status output mentions schema"
-              Expect.stringContains output "Confirmed" "status output shows Confirmed"
+              Expect.stringContains output "  schema: Confirmed" "vocab section shows schema: Confirmed"
+          }
+
+          test "A-C10: classifier state equals status surface state for Confirmed prefix" {
+              let confirmedEntry =
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = fixedNow.AddDays(-5.0)
+                      Hash = "sha256:abc"
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = Some fixedNow } }
+
+              let lf =
+                  lockWithVocabs
+                      (Map.ofList [ "schema", confirmedEntry ])
+                      (Map.ofList [ "schema", "https://schema.org/" ])
+
+              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
+              Expect.equal (List.head states) VocabState.Confirmed "classifier: schema is Confirmed"
+
+              let output = Status.format fixedNow lf
+              Expect.stringContains output "  schema: Confirmed" "status surface agrees with classifier: schema: Confirmed"
           }
 
           test "undereferenceable vocab: status format shows Undereferenceable" {
