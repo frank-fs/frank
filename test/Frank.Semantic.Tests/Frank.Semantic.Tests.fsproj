@@ -16,6 +16,7 @@
     <Compile Include="OntologyTypesTests.fs" />
     <Compile Include="ShapeTypesTests.fs" />
     <Compile Include="SemanticCoreTests.fs" />
+    <Compile Include="ConnegFetcherTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
