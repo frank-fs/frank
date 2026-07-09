@@ -196,7 +196,7 @@ let refreshCliTests =
 
                   Expect.equal exitCode 2 $"refresh must exit 2 when drift detected; stderr:\n{stderr}"
 
-                  Expect.stringContains stderr "vocabulary hash drift" "drift message must appear on STDERR"
+                  Expect.stringContains stderr "drift: content hash changed" "drift message must appear on STDERR"
 
                   Expect.isFalse (stdout.Contains "vocabulary hash drift") "drift message must NOT appear on stdout")
           }

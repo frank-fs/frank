@@ -1,5 +1,9 @@
 module Frank.Cli.Core.Pipeline
 
+// Pipeline.run uses VocabFetcher.httpFetch for cache-aware vocab discovery (fetchAndCache path).
+// Migrating to ConnegFetch is deferred pending fetchAndCache refactor. See V3 report.
+#nowarn "44"
+
 open System
 open System.IO
 open System.Net.Http

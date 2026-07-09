@@ -1,0 +1,87 @@
+name: Network re-verify (weekly cron)
+
+# Split-clocks design:
+#   Per-PR (ci.yml): offline only — loopback stubs, committed lock, no egress.
+#   Weekly cron (this file): live network re-verify of vocab endpoints.
+#     exit 0 = all vocab entries still reachable and unchanged.
+#     exit 1 = operational failure (transient) — does NOT file an issue.
+#     exit 2 = drift detected (404/410 or content-hash change) — files an issue.
+# This job NEVER runs on pull_request and NEVER blocks contributor PRs.
+
+on:
+  schedule:
+    # Every Monday at 02:00 UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  vocab-recheck:
+    name: frank semantic refresh (live network)
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+      LOCK_PATH: sample/TicTacToe-v732/.frank/semantic-mappings.lock.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build Frank CLI
+        run: |
+          dotnet restore src/Frank.Cli/Frank.Cli.fsproj
+          dotnet build src/Frank.Cli/Frank.Cli.fsproj -c Release --no-restore
+
+      - name: Run frank semantic refresh (network)
+        id: refresh
+        # set +e so the shell does not abort on non-zero exit codes (2=drift, 1=transient).
+        # FRANK_EXIT captures the true exit code before any further commands can change $?.
+        run: |
+          set +e
+          dotnet run --project src/Frank.Cli --no-build -c Release -- \
+            semantic refresh --lock-file "$LOCK_PATH"
+          FRANK_EXIT=$?
+          set -e
+          echo "exit_code=$FRANK_EXIT" >> "$GITHUB_OUTPUT"
+
+      - name: File issue on drift (exit 2 only)
+        if: steps.refresh.outputs.exit_code == '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="[vocab-drift] frank semantic refresh detected drift"
+          BODY="The weekly vocab re-verify found drift (exit 2) in the committed lock.
+
+          **Lock file:** \`$LOCK_PATH\`
+          **Workflow run:** $RUN_URL
+
+          Run \`frank semantic refresh --lock-file \$LOCK_PATH\` locally (with network) to see which entries drifted, then update and re-commit the lock.
+
+          Exit codes: 0=clean, 1=transient (not filed), 2=drift (this issue)."
+
+          gh issue create \
+            --repo "$REPO" \
+            --title "$TITLE" \
+            --body "$BODY" \
+            --label "vocab-drift"
+
+      - name: Summarise result
+        if: always()
+        env:
+          EXIT_CODE: ${{ steps.refresh.outputs.exit_code }}
+        run: |
+          case "$EXIT_CODE" in
+            0) echo "Result: clean — all vocab entries reachable and unchanged." ;;
+            1) echo "Result: transient — probe failed (operational, no issue filed)." ;;
+            2) echo "Result: DRIFT detected — issue filed." ;;
+            *) echo "Result: unexpected exit code $EXIT_CODE" ;;
+          esac

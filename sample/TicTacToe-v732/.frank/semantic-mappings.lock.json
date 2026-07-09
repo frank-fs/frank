@@ -1,11 +1,19 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generated": "2026-06-28T21:35:50+00:00",
+  "integrity": "ca4ce542f203587343e7f66913f5520b88ecf8744d7215f6f3e65eef0c3282be",
   "vocabularies": {
     "schema": {
       "uri": "https://schema.org/",
       "fetchedAt": "2026-06-28T20:36:58+00:00",
-      "hash": "0f0c97a4f666b2f8563573fe48453782fd51b87a504523cf0c9aff6a71c3eec4"
+      "hash": "0f0c97a4f666b2f8563573fe48453782fd51b87a504523cf0c9aff6a71c3eec4",
+      "validated": {
+        "isValidated": false,
+        "reason": "not-yet-validated",
+        "lastChecked": null
+      },
+      "terms": null,
+      "owned": false
     }
   },
   "declaredPrefixes": {
@@ -20,6 +28,7 @@
       "confidence": 0,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "union",
       "cases": [
@@ -103,6 +112,7 @@
       "confidence": 0.5599999999999999,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/Place",
         "https://schema.org/Playground"
@@ -133,6 +143,7 @@
       "confidence": 0.519,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/Statement",
         "https://schema.org/StatusEnumeration"
@@ -171,6 +182,7 @@
       "confidence": 0,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "union",
       "cases": [
@@ -198,6 +210,7 @@
       "confidence": 0,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "union",
       "cases": [
@@ -225,6 +238,7 @@
       "confidence": 0.2812121212121212,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "record",
       "fields": []
@@ -235,6 +249,7 @@
       "confidence": 0.38575757575757574,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "record",
       "fields": []
@@ -245,6 +260,7 @@
       "confidence": 0.44555555555555554,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/GameServer",
         "https://schema.org/StatusEnumeration"
@@ -258,6 +274,7 @@
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/ResumeAction"
@@ -380,6 +397,7 @@
       "confidence": 1,
       "source": "manual",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -393,6 +411,7 @@
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
+      "rt": null,
       "alternates": [
         "https://schema.org/GameServer",
         "https://schema.org/GamePlayMode"
@@ -421,6 +440,7 @@
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -449,6 +469,7 @@
       "confidence": 0.264,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -462,6 +483,7 @@
       "confidence": 0.474,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -475,6 +497,7 @@
       "confidence": 0.40041666666666664,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/GameServer",
         "https://schema.org/GamePlayMode"
@@ -488,6 +511,7 @@
       "confidence": 0.447,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/MovieClip",
         "https://schema.org/MovieSeries"
@@ -501,6 +525,7 @@
       "confidence": 0,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [],
       "shape": "union",
       "cases": [
@@ -588,6 +613,7 @@
       "confidence": 0.794,
       "source": "convention",
       "status": "excluded",
+      "rt": null,
       "alternates": [
         "https://schema.org/GamePlayMode",
         "https://schema.org/GameServerStatus"
@@ -606,10 +632,10 @@
     {
       "fsharpType": "TicTacToe.Model.MoveRequest",
       "iri": "schema:MoveAction",
-      "rt": "schema:Game",
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
+      "rt": "schema:Game",
       "alternates": [
         "https://schema.org/MovieSeries",
         "https://schema.org/MovieClip"

@@ -18,6 +18,9 @@ type ConnegFetchResult =
     | NonRdfContent of {| MediaType: string; HttpStatus: int |}
     | RedirectCapHit
     | FetchFailed of reason: string
+    /// Durable HTTP error with the response status code.
+    /// 404/410 = link rot (drift); 5xx/429 = probe-failed (transient).
+    | HttpErrorStatus of status: int * uri: Uri
 
 /// Injectable boundary: URI × prior-ETag × prior-LastModified → ConnegFetchResult.
 /// Inject the real rdfFetch in production; inject a stub in tests.
@@ -38,7 +41,10 @@ type FetchEvidence =
 type EvidenceResult =
     | Updated of FetchEvidence
     | Unchanged
+    /// Durable: 404/410/non-RDF/redirect-cap/RDF-parse-failed — Validated=false, exit 2.
     | Undereferenceable of reason: string
+    /// Transient: 5xx/429/network/timeout — Validated unchanged, exit 1.
+    | TransientFailure of reason: string
 
 module RdfConneg =
 
@@ -124,13 +130,17 @@ module RdfConneg =
 
     /// Build schema-v2 evidence from a ConnegFetchResult.
     /// Pure: no network I/O; RDF parsing and hashing are in-memory.
+    /// 404/410 → Undereferenceable (durable); 5xx/429/network → TransientFailure (operational).
     let buildEvidence (namespaceBase: Uri) (now: DateTimeOffset) (result: ConnegFetchResult) : EvidenceResult =
         match result with
         | NotModified -> Unchanged
         | RedirectCapHit -> Undereferenceable $"redirect cap ({maxRedirectHops} hops) exceeded"
-        | FetchFailed reason -> Undereferenceable $"fetch failed: {reason}"
+        | FetchFailed reason -> TransientFailure $"network error: {reason}"
         | NonRdfContent r -> Undereferenceable $"non-RDF content-type '{r.MediaType}' (HTTP {r.HttpStatus})"
         | RdfContent r -> fromRdfContent namespaceBase now r
+        | HttpErrorStatus(404, uri) -> Undereferenceable $"HTTP 404 — gone: {uri}"
+        | HttpErrorStatus(410, uri) -> Undereferenceable $"HTTP 410 — permanently gone: {uri}"
+        | HttpErrorStatus(status, uri) -> TransientFailure $"HTTP {status} probe-failed: {uri}"
 
     // ── Effectful helpers ─────────────────────────────────────────────────────
 
@@ -227,7 +237,7 @@ module RdfConneg =
                 elif status >= 300 && status < 400 then
                     return! handleRedirect client uri priorETag priorLastModified hops response
                 else
-                    return FetchFailed $"HTTP {status} from {uri}"
+                    return HttpErrorStatus(status, uri)
         }
 
     and private handleRedirect
@@ -245,7 +255,18 @@ module RdfConneg =
             | None -> async.Return(FetchFailed $"redirect from {uri} has no Location header")
             | Some next -> fetchLoop client next priorETag priorLastModified (hops + 1)
 
+    /// Create an HttpClient with AllowAutoRedirect=false, as required by rdfFetch.
+    /// Asserts the property at construction time; fails loudly if the setting does not take effect.
+    let makeNoRedirectClient () : HttpClient =
+        let handler = new HttpClientHandler()
+        handler.AllowAutoRedirect <- false
+
+        if handler.AllowAutoRedirect then
+            invalidArg "handler" "AllowAutoRedirect must be false for rdfFetch; hop counting is done in fetchLoop"
+
+        new HttpClient(handler)
+
     /// Production ConnegFetch backed by a shared HttpClient.
-    /// The client MUST have AllowAutoRedirect = false to enable hop counting.
+    /// The client MUST have AllowAutoRedirect = false. Use makeNoRedirectClient.
     let rdfFetch (client: HttpClient) : ConnegFetch =
         fun uri priorETag priorLastModified -> fetchLoop client uri priorETag priorLastModified 0

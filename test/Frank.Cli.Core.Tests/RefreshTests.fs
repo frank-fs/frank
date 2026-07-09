@@ -4,84 +4,100 @@ open System
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
-open Frank.Semantic.VocabFetcher
 open Frank.Cli.Core.Refresh
 open Frank.Cli.Core.Tests.RefreshFixtures
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
-
-let private errorFetch (reason: string) : Fetch =
-    fun (_: Uri) -> async { return Error reason }
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 let private mkLock (vocabs: Map<string, VocabularyEntry>) : LockFile =
-    { SchemaVersion = 1
+    { SchemaVersion = 2
       Generated = DateTimeOffset.UnixEpoch
       Integrity = None
       Vocabularies = vocabs
       DeclaredPrefixes = Map.empty
       Mappings = [] }
 
+let private fixedNow = DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero)
+
+let private runRefresh (fetch: ConnegFetch) (lf: LockFile) : RefreshReport * LockFile =
+    refresh fetch SlaPolicy.defaultPolicy fixedNow false lf |> Async.RunSynchronously
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 [<Tests>]
 let refreshTests =
     testList
-        "Refresh"
-        [ testCase "AT4: hash drift detected — drifted entry returned with recorded and current hashes"
+        "Refresh — core per-entry continuation and classification"
+        [ testCase "hash drift detected — DriftDetected outcome with reason"
           <| fun () ->
-              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
+              let entry =
+                  { mkVocabEntry "DEADBEEF" with
+                      FetchedAt = fixedNow.AddDays(-35.0) }
 
-              let fetch = stubFetch schemaBody
+              let lock = mkLock (Map.ofList [ "schema", entry ])
+              let altBody = Text.Encoding.UTF8.GetBytes "changed"
+              let fetch = stubTurtleConnegFetch altBody
+              let (report, _) = runRefresh fetch lock
 
-              let result = refresh fetch lock |> Async.RunSynchronously
+              let driftOutcomes =
+                  report.Outcomes
+                  |> List.choose (fun (p, o) ->
+                      match o with
+                      | DriftDetected r -> Some(p, r)
+                      | _ -> None)
 
-              match result with
-              | Error e -> failtest $"unexpected error: {e}"
-              | Ok report ->
-                  Expect.equal report.Checked 1 "one vocab checked"
-                  Expect.equal report.Drifted.Length 1 "one drift entry"
-                  let d = report.Drifted.[0]
-                  Expect.equal d.Prefix "schema" "prefix"
-                  Expect.equal d.Recorded "DEADBEEF" "recorded hash"
-                  Expect.equal d.Current schemaBodyHash "current hash"
+              Expect.equal driftOutcomes.Length 1 "one drift outcome"
+              let (prefix, _reason) = driftOutcomes.[0]
+              Expect.equal prefix "schema" "prefix"
+              Expect.equal (refreshExitCode report) 2 "exit code 2 on drift"
 
-          testCase "no drift — drifted list empty, checked = 1"
+          testCase "no drift — EvidenceRefreshed, exit 0"
           <| fun () ->
-              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry schemaBodyHash ])
+              let entry =
+                  { mkVocabEntry schemaBodyHash with
+                      FetchedAt = fixedNow.AddDays(-35.0) }
 
-              let fetch = stubFetch schemaBody
+              let lock = mkLock (Map.ofList [ "schema", entry ])
+              let fetch = stubTurtleConnegFetch schemaBody
+              let (report, _) = runRefresh fetch lock
 
-              let result = refresh fetch lock |> Async.RunSynchronously
+              Expect.equal
+                  (report.Outcomes |> List.forall (fun (_, o) -> match o with | EvidenceRefreshed -> true | _ -> false))
+                  true
+                  "all EvidenceRefreshed"
 
-              match result with
-              | Error e -> failtest $"unexpected error: {e}"
-              | Ok report ->
-                  Expect.equal report.Checked 1 "one vocab checked"
-                  Expect.equal report.Drifted [] "no drift"
+              Expect.equal (refreshExitCode report) 0 "exit code 0 on no drift"
 
-          testCase "fetch error — refresh returns Error containing prefix and reason"
-          <| fun () ->
-              let lock = mkLock (Map.ofList [ "schema", mkVocabEntry "DEADBEEF" ])
-
-              let fetch = errorFetch "boom"
-
-              let result = refresh fetch lock |> Async.RunSynchronously
-
-              match result with
-              | Ok _ -> failtest "expected Error"
-              | Error msg ->
-                  Expect.stringContains msg "schema" "error contains prefix"
-                  Expect.stringContains msg "boom" "error contains reason"
-
-          testCase "empty vocabularies — Ok with Checked=0 and Drifted=[]"
+          testCase "empty vocabularies — empty outcomes, exit 0"
           <| fun () ->
               let lock = mkLock Map.empty
-              let fetch = errorFetch "should not be called"
+              let fetch = stubConnegFetch (FetchFailed "should not be called")
+              let (report, _) = runRefresh fetch lock
+              Expect.equal report.Outcomes [] "no outcomes"
+              Expect.equal (refreshExitCode report) 0 "exit 0"
 
-              let result = refresh fetch lock |> Async.RunSynchronously
+          testCase "all entries visited — per-entry continuation"
+          <| fun () ->
+              let entry1 =
+                  { mkVocabEntry "DEADBEEF" with
+                      FetchedAt = fixedNow.AddDays(-35.0)
+                      Uri = "http://localhost:9001/v1" }
 
-              match result with
-              | Error e -> failtest $"unexpected error: {e}"
-              | Ok report ->
-                  Expect.equal report.Checked 0 "zero checked"
-                  Expect.equal report.Drifted [] "no drift" ]
+              let entry2 =
+                  { mkVocabEntry "DEADBEEF" with
+                      FetchedAt = fixedNow.AddDays(-35.0)
+                      Uri = "http://localhost:9002/v2" }
+
+              let lock =
+                  mkLock (Map.ofList [ "v1", entry1; "v2", entry2 ])
+
+              let count = ref 0
+
+              let fetch : ConnegFetch =
+                  fun _uri _etag _lastMod ->
+                      incr count
+                      async { return HttpErrorStatus(404, Uri "http://localhost:9001/v1") }
+
+              let (report, _) = runRefresh fetch lock
+              Expect.equal !count 2 "both entries visited (no early abort)"
+              Expect.equal report.Outcomes.Length 2 "two outcomes" ]

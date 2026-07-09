@@ -241,7 +241,10 @@ module VocabFetcher =
 
     // ── Production boundary ───────────────────────────────────────────────────
 
-    /// Production Fetch implementation backed by a shared HttpClient.
+    /// Plain-GET vocabulary fetcher.
+    /// Retired in V3 — use Frank.Semantic.RdfConneg.rdfFetch for content-negotiation,
+    /// conditional requests (ETag/If-None-Match), and structured exit codes.
+    [<Obsolete("Use RdfConneg.rdfFetch (via RdfConneg.makeNoRedirectClient) instead. httpFetch does not negotiate RDF content, send conditional headers, or distinguish link-rot from transient failures.")>]
     let httpFetch (client: Net.Http.HttpClient) : Fetch =
         fun uri ->
             async {

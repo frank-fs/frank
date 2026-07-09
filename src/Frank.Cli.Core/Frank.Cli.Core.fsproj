@@ -13,6 +13,7 @@
     <Compile Include="Clarify.fs" />
     <Compile Include="Accept.fs" />
     <Compile Include="Refresh.fs" />
+    <Compile Include="Validate.fs" />
     <Compile Include="Status.fs" />
     <Compile Include="Finalize.fs" />
     <Compile Include="AstRender.fs" />

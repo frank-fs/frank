@@ -139,6 +139,7 @@ let connegTests =
                               Expect.isFalse terms.IsEmpty "Terms must be non-empty"
                           | Unchanged -> failtest "expected Updated, got Unchanged"
                           | Undereferenceable r -> failtest $"expected Updated, got Undereferenceable: {r}"
+                          | TransientFailure r -> failtest $"expected Updated, got TransientFailure: {r}"
                       })
           }
 
@@ -160,6 +161,7 @@ let connegTests =
                               Expect.stringContains reason "text/html" "reason mentions content-type"
                           | Updated _ -> failtest "expected Undereferenceable, got Updated"
                           | Unchanged -> failtest "expected Undereferenceable, got Unchanged"
+                          | TransientFailure r -> failtest $"expected Undereferenceable, got TransientFailure: {r}"
                       })
           } ]
 
@@ -195,6 +197,7 @@ let redirectTests =
                           | Unchanged -> failtest "expected Updated, got Unchanged"
                           | Undereferenceable r ->
                               failtest $"expected Updated after following 303, got Undereferenceable: {r}"
+                          | TransientFailure r -> failtest $"expected Updated, got TransientFailure: {r}"
                       })
           } ]
 
@@ -250,6 +253,7 @@ let conditionalTests =
                           | Unchanged -> ()
                           | Updated _ -> failtest "expected Unchanged (304) but got Updated (re-parse)"
                           | Undereferenceable r -> failtest $"expected Unchanged, got Undereferenceable: {r}"
+                          | TransientFailure r -> failtest $"expected Unchanged, got TransientFailure: {r}"
                       })
           } ]
 
@@ -276,5 +280,6 @@ let redirectCapTests =
                           | Undereferenceable reason -> Expect.stringContains reason "cap" "reason mentions cap"
                           | Updated _ -> failtest "expected Undereferenceable (cap hit), got Updated"
                           | Unchanged -> failtest "expected Undereferenceable (cap hit), got Unchanged"
+                          | TransientFailure r -> failtest $"expected Undereferenceable (cap hit), got TransientFailure: {r}"
                       })
           } ]

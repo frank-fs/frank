@@ -12,16 +12,18 @@ open Frank.TestSupport.TempDir
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-let private altSchemaBody: byte[] =
-    Text.Encoding.UTF8.GetBytes """{ "@context": "https://schema.org/", "@comment": "updated" }"""
-
-let private altSchemaBodyHash: string = sha256Hex altSchemaBody
+let private fixedNow = DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero)
 
 let private confirmedLock: LockFile =
-    { SchemaVersion = 1
+    { SchemaVersion = 2
       Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
       Integrity = None
-      Vocabularies = Map.ofList [ "schema", mkVocabEntry schemaBodyHash ]
+      Vocabularies =
+        Map.ofList
+            [ "schema",
+              { mkVocabEntry schemaBodyHash with
+                  FetchedAt = fixedNow.AddDays(-35.0)
+                  Uri = "https://schema.org/" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
@@ -39,79 +41,91 @@ let private confirmedLock: LockFile =
                       Source = Convention
                       Status = Confirmed } ] } ] }
 
-// ── AT4 drift completeness tests ─────────────────────────────────────────────
+// ── AT4 exit code unit tests ──────────────────────────────────────────────────
 
 [<Tests>]
 let driftExitCodeTests =
     testList
-        "AT4 — refreshExitCode maps Result to exit 2/0/1"
-        [ test "exit code is 2 when drifted list is non-empty" {
+        "AT4 — refreshExitCode: exit 2/1/0 from EntryOutcome list"
+        [ test "exit code is 2 when DriftDetected present" {
               let report: RefreshReport =
-                  { Checked = 1
-                    Drifted =
-                      [ { Prefix = "schema"
-                          Recorded = "DEADBEEF"
-                          Current = altSchemaBodyHash } ] }
+                  { Outcomes = [ "schema", DriftDetected "HTTP 404 — gone" ] }
 
-              Expect.equal (refreshExitCode (Ok report)) 2 "exit 2 when drift present"
+              Expect.equal (refreshExitCode report) 2 "exit 2 when drift present"
           }
 
-          test "exit code is 0 when drifted list is empty" {
-              let report: RefreshReport = { Checked = 1; Drifted = [] }
-              Expect.equal (refreshExitCode (Ok report)) 0 "zero exit when no drift"
+          test "exit code is 1 when only ProbeFailed present" {
+              let report: RefreshReport =
+                  { Outcomes = [ "schema", ProbeFailed "HTTP 503 probe-failed" ] }
+
+              Expect.equal (refreshExitCode report) 1 "exit 1 on probe failure"
           }
 
-          test "exit code is 1 on Error" { Expect.equal (refreshExitCode (Error "boom")) 1 "Error maps to exit 1" }
+          test "exit code is 2 when both DriftDetected and ProbeFailed (drift dominates)" {
+              let report: RefreshReport =
+                  { Outcomes =
+                      [ "a", DriftDetected "gone"
+                        "b", ProbeFailed "transient" ] }
 
-          test "AT4: refresh with altered fetch → refreshExitCode returns 2" {
-              let driftedLock =
-                  { confirmedLock with
-                      Vocabularies = Map.ofList [ "schema", mkVocabEntry "STALE_HASH" ] }
+              Expect.equal (refreshExitCode report) 2 "drift dominates over probe failure"
+          }
 
-              let fetch = stubFetch schemaBody
-              let result = refresh fetch driftedLock |> Async.RunSynchronously
+          test "exit code is 0 when only EvidenceRefreshed and SkippedFresh" {
+              let report: RefreshReport =
+                  { Outcomes =
+                      [ "a", EvidenceRefreshed
+                        "b", SkippedFresh ] }
 
-              match result with
-              | Error e -> failtest $"unexpected error: {e}"
-              | Ok report -> Expect.equal (refreshExitCode (Ok report)) 2 "CLI returns 2 when drift detected"
+              Expect.equal (refreshExitCode report) 0 "exit 0 when clean"
+          }
+
+          test "AT4: refresh with drifted content → exit 2" {
+              let altBody = Text.Encoding.UTF8.GetBytes "{ \"@context\": \"changed\" }"
+              let fetch = stubTurtleConnegFetch altBody
+              let driftedLock = { confirmedLock with Vocabularies = Map.ofList [ "schema", mkVocabEntry "STALE_HASH" |> (fun e -> { e with FetchedAt = fixedNow.AddDays(-35.0); Uri = "https://schema.org/" }) ] }
+              let (report, _) = refresh fetch SlaPolicy.defaultPolicy fixedNow false driftedLock |> Async.RunSynchronously
+              Expect.equal (refreshExitCode report) 2 "CLI returns 2 when drift detected"
           } ]
+
+// ── Lock immutability: refresh does not write to disk ─────────────────────────
 
 [<Tests>]
 let lockImmutabilityTests =
     testList
-        "AT4 — confirmed lock file not auto-mutated by refresh"
-        [ test "lock file bytes are identical before and after refresh when drift detected" {
+        "AT4 — refresh (core function) does not write to disk"
+        [ test "lock file bytes are identical before and after calling refresh" {
               withTempDir (fun dir ->
                   let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
                   LockFile.write lockPath confirmedLock
 
                   let bytesBefore = File.ReadAllBytes lockPath
 
-                  let altFetch = stubFetch altSchemaBody
-                  let result = refresh altFetch confirmedLock |> Async.RunSynchronously
-
-                  match result with
-                  | Error e -> failtest $"unexpected error: {e}"
-                  | Ok report -> Expect.equal report.Drifted.Length 1 "drift was detected"
+                  let altBody = Text.Encoding.UTF8.GetBytes "{ \"@context\": \"changed\" }"
+                  let altFetch = stubTurtleConnegFetch altBody
+                  let (_report, _) = refresh altFetch SlaPolicy.defaultPolicy fixedNow false confirmedLock |> Async.RunSynchronously
 
                   let bytesAfter = File.ReadAllBytes lockPath
-
-                  Expect.equal bytesAfter bytesBefore "confirmed lock file must not be mutated by refresh")
+                  Expect.equal bytesAfter bytesBefore "core refresh must not write to disk")
           }
 
-          test "confirmed mapping IRI is byte-identical after refresh with drift" {
+          test "mappings are preserved in updated lock after drift detected" {
               withTempDir (fun dir ->
-                  let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
-                  LockFile.write lockPath confirmedLock
+                  let altBody = Text.Encoding.UTF8.GetBytes "changed"
+                  let altFetch = stubTurtleConnegFetch altBody
 
-                  let lockTextBefore = File.ReadAllText lockPath
+                  let (report, updatedLock) =
+                      refresh altFetch SlaPolicy.defaultPolicy fixedNow false confirmedLock
+                      |> Async.RunSynchronously
 
-                  let altFetch = stubFetch altSchemaBody
-                  refresh altFetch confirmedLock |> Async.RunSynchronously |> ignore
+                  let hasDrift =
+                      report.Outcomes
+                      |> List.exists (fun (_, o) ->
+                          match o with
+                          | DriftDetected _ -> true
+                          | _ -> false)
 
-                  let lockTextAfter = File.ReadAllText lockPath
-
-                  Expect.equal lockTextAfter lockTextBefore "lock file text unchanged after drift refresh")
+                  Expect.isTrue hasDrift "drift detected (precondition)"
+                  Expect.equal updatedLock.Mappings confirmedLock.Mappings "mappings unchanged in updated lock")
           } ]
 
 let private mappingHasUndecided (m: Mapping) : bool =
@@ -137,14 +151,20 @@ let buildGateAfterDriftTests =
                   let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
                   LockFile.write lockPath confirmedLock
 
-                  let altFetch = stubFetch altSchemaBody
+                  let altFetch = stubTurtleConnegFetch (Text.Encoding.UTF8.GetBytes "changed")
 
-                  let report =
-                      refresh altFetch confirmedLock
+                  let (report, _) =
+                      refresh altFetch SlaPolicy.defaultPolicy fixedNow false confirmedLock
                       |> Async.RunSynchronously
-                      |> Result.defaultWith (fun e -> failwith $"unexpected refresh error: {e}")
 
-                  Expect.equal report.Drifted.Length 1 "drift detected (precondition)"
+                  let hasDrift =
+                      report.Outcomes
+                      |> List.exists (fun (_, o) ->
+                          match o with
+                          | DriftDetected _ -> true
+                          | _ -> false)
+
+                  Expect.isTrue hasDrift "drift detected (precondition)"
 
                   let lock =
                       LockFile.read lockPath

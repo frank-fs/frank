@@ -8,6 +8,7 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Cli.Core
 open Frank.Cli.Core.Refresh
+open Frank.Cli.Core.Validate
 open Frank.Cli.Core.Status
 
 // ── CLI argument definitions ──────────────────────────────────────────────────
@@ -89,6 +90,20 @@ type FinalizeArgs =
 type RefreshArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
+    | Force
+
+    interface IArgParserTemplate with
+        member a.Usage =
+            match a with
+            | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
+            | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+            | Force -> "re-verify all entries regardless of SLA freshness"
+
+/// Arguments for the `frank semantic validate` subcommand.
+[<CliPrefix(CliPrefix.DoubleDash)>]
+type ValidateArgs =
+    | [<AltCommandLine("-p")>] Project of path: string
+    | [<AltCommandLine("-l")>] Lock_File of path: string
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -102,6 +117,7 @@ type SemanticArgs =
     | [<CliPrefix(CliPrefix.None)>] Clarify of ParseResults<ClarifyArgs>
     | [<CliPrefix(CliPrefix.None)>] Accept of ParseResults<AcceptArgs>
     | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshArgs>
+    | [<CliPrefix(CliPrefix.None)>] Validate of ParseResults<ValidateArgs>
     | [<CliPrefix(CliPrefix.None)>] Status of ParseResults<StatusArgs>
     | [<CliPrefix(CliPrefix.None)>] Finalize of ParseResults<FinalizeArgs>
 
@@ -111,7 +127,8 @@ type SemanticArgs =
             | Extract _ -> "extract semantic mappings from a Frank project"
             | Clarify _ -> "emit unresolved/proposed mappings as an LLM contract"
             | Accept _ -> "merge LLM/hand-resolved mappings into the lock file"
-            | Refresh _ -> "re-fetch vocabularies and report hash drift"
+            | Refresh _ -> "re-verify vocabularies and update evidence; SLA-driven unless --force"
+            | Validate _ -> "validate self-hosted (owned) vocab endpoints serve real RDF"
             | Status _ -> "summarize lock-file mapping counts"
             | Finalize _ -> "decide a draft lock: confirm exact matches, exclude the rest (zero LLM)"
 
@@ -366,31 +383,92 @@ let private handleStatus (args: ParseResults<StatusArgs>) : int =
                 printfn "%s" output
                 0
 
+let private printRefreshOutcomes (report: RefreshReport) : unit =
+    for prefix, outcome in report.Outcomes do
+        match outcome with
+        | DriftDetected reason -> eprintfn "%s drift: %s" prefix reason
+        | ProbeFailed reason -> eprintfn "%s probe-failed: %s" prefix reason
+        | EvidenceRefreshed -> ()
+        | SkippedFresh -> ()
+
+    let checkedCount =
+        report.Outcomes
+        |> List.filter (fun (_, o) ->
+            match o with
+            | SkippedFresh -> false
+            | _ -> true)
+        |> List.length
+
+    let skipped =
+        report.Outcomes
+        |> List.filter (fun (_, o) ->
+            match o with
+            | SkippedFresh -> true
+            | _ -> false)
+        |> List.length
+
+    if checkedCount > 0 then
+        printfn "%d vocabulary(ies) checked (%d skipped fresh)" checkedCount skipped
+
 let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
     match lockPathFrom (args.TryGetResult RefreshArgs.Lock_File) (args.TryGetResult RefreshArgs.Project) with
     | Error e ->
         eprintfn "error: %s" e
-        refreshExitCode (Error e)
+        1
     | Ok lockPath ->
         match read lockPath with
         | Error e ->
             eprintfn "error: %s" e
-            refreshExitCode (Error e)
+            1
         | Ok lf ->
-            use client = new System.Net.Http.HttpClient()
-            let fetch = VocabFetcher.httpFetch client
-            let result = refresh fetch lf |> Async.RunSynchronously
+            use client = RdfConneg.makeNoRedirectClient ()
+            let fetch = RdfConneg.rdfFetch client
+            let force = args.Contains RefreshArgs.Force
+            let now = DateTimeOffset.UtcNow
 
-            match result with
-            | Error e -> eprintfn "error: %s" e
-            | Ok report ->
-                for d in report.Drifted do
-                    eprintfn "%s vocabulary hash drift: %s → %s" d.Prefix d.Recorded d.Current
+            let (report, updatedLf) =
+                refresh fetch SlaPolicy.defaultPolicy now force lf |> Async.RunSynchronously
 
-                if report.Drifted = [] then
-                    printfn "%d vocabulary(ies) checked; no drift" report.Checked
+            stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
+            printRefreshOutcomes report
+            refreshExitCode report
 
-            refreshExitCode result
+let private printValidateOutcomes (report: ValidateReport) : unit =
+    for prefix, outcome in report.Outcomes do
+        match outcome with
+        | LyingIri reason -> eprintfn "%s lying-IRI: %s" prefix reason
+        | ValidateTransient reason -> eprintfn "%s validate-probe-failed: %s" prefix reason
+        | Validated -> printfn "%s: Validated=true" prefix
+
+let private handleValidate (args: ParseResults<ValidateArgs>) : int =
+    match lockPathFrom (args.TryGetResult ValidateArgs.Lock_File) (args.TryGetResult ValidateArgs.Project) with
+    | Error e ->
+        eprintfn "error: %s" e
+        1
+    | Ok lockPath ->
+        match read lockPath with
+        | Error e ->
+            eprintfn "error: %s" e
+            1
+        | Ok lf ->
+            match verifyIfStamped lf with
+            | Error e ->
+                eprintfn "error: lock tampered — %s" e
+                1
+            | Ok() ->
+                let ownedCount = lf.Vocabularies |> Map.filter (fun _ e -> e.Owned) |> Map.count
+
+                if ownedCount = 0 then
+                    printfn "no owned vocabulary entries to validate"
+                    0
+                else
+                    use client = RdfConneg.makeNoRedirectClient ()
+                    let fetch = RdfConneg.rdfFetch client
+                    let now = DateTimeOffset.UtcNow
+                    let (report, updatedLf) = validate fetch now lf |> Async.RunSynchronously
+                    stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
+                    printValidateOutcomes report
+                    validateExitCode report
 
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with
@@ -398,6 +476,7 @@ let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     | SemanticArgs.Clarify clarifyArgs -> handleClarify clarifyArgs
     | SemanticArgs.Accept acceptArgs -> handleAccept acceptArgs
     | SemanticArgs.Refresh refreshArgs -> handleRefresh refreshArgs
+    | SemanticArgs.Validate validateArgs -> handleValidate validateArgs
     | SemanticArgs.Status statusArgs -> handleStatus statusArgs
     | SemanticArgs.Finalize finalizeArgs -> handleFinalize finalizeArgs
 
