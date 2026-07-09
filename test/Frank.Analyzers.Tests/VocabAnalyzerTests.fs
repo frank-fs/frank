@@ -58,9 +58,10 @@ let private makeLock (declaredPrefixes: (string * string) list) (fetchedVocabs: 
         fetchedVocabs
         |> List.map (fun (prefix, uri) ->
             prefix,
-            { Uri = uri
-              FetchedAt = DateTimeOffset.UtcNow
-              Hash = "testhash" })
+            { v1Empty with
+                Uri = uri
+                FetchedAt = DateTimeOffset.UtcNow
+                Hash = "testhash" })
         |> Map.ofList
 
     { emptyLock with

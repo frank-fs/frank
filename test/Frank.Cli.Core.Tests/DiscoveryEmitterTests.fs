@@ -22,9 +22,10 @@ let private ticTacToeLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
@@ -72,9 +73,10 @@ let private ticTacToeLock: LockFile =
                       Status = Confirmed } ] } ] }
 
 let private schemaVocabEntry: VocabularyEntry =
-    { Uri = "https://schema.org/"
-      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-      Hash = "test" }
+    { v1Empty with
+        Uri = "https://schema.org/"
+        FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+        Hash = "test" }
 
 let private minimalLock (mapping: Mapping) : LockFile =
     { SchemaVersion = 1
@@ -582,9 +584,10 @@ let private tttDeclaredOnlyLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
       Mappings =
         [ { FSharpType = "TicTacToe.MoveAction"

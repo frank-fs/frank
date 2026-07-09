@@ -47,13 +47,15 @@ let private stringLock: Frank.Semantic.LockFile.LockFile =
         Vocabularies =
             Map.ofList
                 [ "schema",
-                  { Uri = "https://schema.org/"
-                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                    Hash = "sha256:abc" }
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                      Hash = "sha256:abc" }
                   "wikidata",
-                  { Uri = "https://www.wikidata.org/wiki/"
-                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                    Hash = "sha256:def" } ]
+                  { v1Empty with
+                      Uri = "https://www.wikidata.org/wiki/"
+                      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                      Hash = "sha256:def" } ]
         Mappings =
             [ { FSharpType = "System.String"
                 Iri = Some "schema:Text"

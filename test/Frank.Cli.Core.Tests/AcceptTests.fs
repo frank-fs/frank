@@ -18,9 +18,10 @@ let private emptyVocabs: Map<string, VocabularyEntry> = Map.empty
 let private schemaVocabs: Map<string, VocabularyEntry> =
     Map.ofList
         [ "schema",
-          { Uri = "https://schema.org/"
-            FetchedAt = System.DateTimeOffset.UnixEpoch
-            Hash = "stub" } ]
+          { v1Empty with
+              Uri = "https://schema.org/"
+              FetchedAt = System.DateTimeOffset.UnixEpoch
+              Hash = "stub" } ]
 
 let private mkLock (mappings: Mapping list) : LockFile =
     { SchemaVersion = 1
@@ -347,9 +348,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
-                              Hash = "h" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                                Hash = "h" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
@@ -407,9 +409,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
-                              Hash = "h" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                                Hash = "h" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -468,9 +471,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
-                              Hash = "h" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.Parse "2026-01-01T00:00:00Z"
+                                Hash = "h" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
@@ -517,9 +521,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -558,9 +563,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -595,13 +601,15 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" }
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" }
                             "myns",
-                            { Uri = "https://example.com/ns/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://example.com/ns/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Foo"
@@ -630,9 +638,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -666,9 +675,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -713,9 +723,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Result"
@@ -761,9 +772,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Result"
@@ -817,9 +829,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Item"
@@ -866,9 +879,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -913,9 +927,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -950,9 +965,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"
@@ -993,9 +1009,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Status"
@@ -1037,9 +1054,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Move"
@@ -1081,9 +1099,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.X"
@@ -1329,9 +1348,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
                     Mappings =
                       [ { FSharpType = "App.MoveRequest"
@@ -1372,9 +1392,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
                     Mappings =
                       [ { FSharpType = "App.MoveRequest"
@@ -1429,9 +1450,10 @@ let acceptTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = System.DateTimeOffset.UnixEpoch
-                              Hash = "stub" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = System.DateTimeOffset.UnixEpoch
+                                Hash = "stub" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "App.Game"

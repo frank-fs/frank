@@ -27,9 +27,10 @@ let private lock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "MyApp.OrderPlaced"
@@ -97,9 +98,10 @@ let private lockWithExternalDeclared: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes =
         Map.ofList
             [ "schema", "https://schema.org/"

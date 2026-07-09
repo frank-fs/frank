@@ -5,6 +5,7 @@ open System.IO
 open Expecto
 open FsCheck
 open Frank.Semantic
+open Frank.Semantic.LockFile
 
 // ── Generators ────────────────────────────────────────────────────────────────
 
@@ -67,9 +68,10 @@ let private genVocabEntry =
             |> Gen.map (fun (NonEmptyString s) -> $"sha256:{s}")
 
         return
-            ({ Uri = uri
-               FetchedAt = fetchedAt
-               Hash = hash }
+            ({ v1Empty with
+                Uri = uri
+                FetchedAt = fetchedAt
+                Hash = hash }
             : LockFile.VocabularyEntry)
     }
 
@@ -243,9 +245,10 @@ let roundTripTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                              Hash = "sha256:abc123" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                                Hash = "sha256:abc123" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Order"
@@ -327,13 +330,15 @@ let roundTripTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                              Hash = "sha256:abc123" }
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                                Hash = "sha256:abc123" }
                             "prov",
-                            { Uri = "http://www.w3.org/ns/prov#"
-                              FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                              Hash = "sha256:def456" } ]
+                            { v1Empty with
+                                Uri = "http://www.w3.org/ns/prov#"
+                                FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                                Hash = "sha256:def456" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Order"
@@ -401,9 +406,10 @@ let roundTripTests =
 let diffFriendlyTests =
     test "AT5: adding one mapping touches only the new entry's lines" {
         let vocab: LockFile.VocabularyEntry =
-            { Uri = "https://schema.org/"
-              FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-              Hash = "sha256:abc123" }
+            { v1Empty with
+                Uri = "https://schema.org/"
+                FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                Hash = "sha256:abc123" }
 
         let mapping1: Mapping =
             { FSharpType = "MyApp.Order"
@@ -888,17 +894,20 @@ let vocabKeySortTests =
               Vocabularies =
                 Map.ofList
                     [ "schema",
-                      { Uri = "https://schema.org/"
-                        FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                        Hash = "sha256:aaa" }
+                      { v1Empty with
+                          Uri = "https://schema.org/"
+                          FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                          Hash = "sha256:aaa" }
                       "prov",
-                      { Uri = "http://www.w3.org/ns/prov#"
-                        FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                        Hash = "sha256:bbb" }
+                      { v1Empty with
+                          Uri = "http://www.w3.org/ns/prov#"
+                          FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                          Hash = "sha256:bbb" }
                       "dcat",
-                      { Uri = "http://www.w3.org/ns/dcat#"
-                        FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
-                        Hash = "sha256:ccc" } ]
+                      { v1Empty with
+                          Uri = "http://www.w3.org/ns/dcat#"
+                          FetchedAt = DateTimeOffset.Parse("2026-04-20T11:00:00Z")
+                          Hash = "sha256:ccc" } ]
               DeclaredPrefixes = Map.empty
               Mappings = [] }
 

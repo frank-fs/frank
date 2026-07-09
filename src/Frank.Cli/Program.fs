@@ -350,14 +350,21 @@ let private handleStatus (args: ParseResults<StatusArgs>) : int =
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            let output =
-                if args.Contains StatusArgs.By_Package then
-                    formatByPackage lf
-                else
-                    format lf
+            match verifyIfStamped lf with
+            | Error e ->
+                eprintfn "error: lock tampered — %s" e
+                1
+            | Ok() ->
+                let now = DateTimeOffset.UtcNow
 
-            printfn "%s" output
-            0
+                let output =
+                    if args.Contains StatusArgs.By_Package then
+                        formatByPackage now lf
+                    else
+                        format now lf
+
+                printfn "%s" output
+                0
 
 let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
     match lockPathFrom (args.TryGetResult RefreshArgs.Lock_File) (args.TryGetResult RefreshArgs.Project) with

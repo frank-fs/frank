@@ -3,6 +3,7 @@ module Frank.Cli.Core.Tests.StatusTests
 open Expecto
 open Frank.Semantic
 open Frank.Semantic.LockFile
+open Frank.Semantic.VocabClassifier
 open Frank.Cli.Core
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ let at5StatusTests =
                         mapping "G" Excluded
                         mapping "H" Excluded ]
 
-              let output = Status.format lf
+              let output = Status.format System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "Confirmed:  3" "confirmed count"
               Expect.stringContains output "Proposed:   2" "proposed count"
               Expect.stringContains output "Unresolved: 1" "unresolved count"
@@ -52,7 +53,7 @@ let at5StatusTests =
 
           test "empty lock produces all-zero counts" {
               let lf = lockWith []
-              let output = Status.format lf
+              let output = Status.format System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "Confirmed:  0" "confirmed zero"
               Expect.stringContains output "Proposed:   0" "proposed zero"
               Expect.stringContains output "Unresolved: 0" "unresolved zero"
@@ -81,7 +82,7 @@ let formatByPackageTests =
                       [ mappingWith "MyApp.Orders.Order" (Some "schema:Order") Confirmed
                         mappingWith "MyApp.Catalog.Product" (Some "schema:Product") Proposed ]
 
-              let output = Status.formatByPackage lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "MyApp.Orders" "orders block"
               Expect.stringContains output "MyApp.Catalog" "catalog block"
           }
@@ -93,7 +94,7 @@ let formatByPackageTests =
                         mappingWith "MyApp.Orders.LineItem" None Confirmed
                         mappingWith "MyApp.Catalog.Product" None Proposed ]
 
-              let output = Status.formatByPackage lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "MyApp.Orders" "orders block"
               Expect.stringContains output "MyApp.Catalog" "catalog block"
               Expect.stringContains output "Confirmed:  2" "two confirmed in orders"
@@ -107,14 +108,14 @@ let formatByPackageTests =
                           mappingWith "MyApp.Orders.Result" (Some "schema:result") Confirmed ] with
                       DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
-              let output = Status.formatByPackage lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "schema (2)" "two schema terms"
           }
 
           test "AC3 plain format unchanged" {
               let lf = lockWith [ mapping "A" Confirmed; mapping "B" Proposed ]
 
-              let output = Status.format lf
+              let output = Status.format System.DateTimeOffset.UtcNow lf
 
               Expect.equal
                   output
@@ -124,13 +125,59 @@ let formatByPackageTests =
 
           test "namespace (global) shown for unqualified types" {
               let lf = lockWith [ mappingWith "Game" None Proposed ]
-              let output = Status.formatByPackage lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "(global)" "global namespace shown"
           }
 
           test "no vocab line when no IRIs present" {
               let lf = lockWith [ mappingWith "MyApp.Orders.Foo" None Unresolved ]
-              let output = Status.formatByPackage lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
               Expect.stringContains output "MyApp.Orders" "namespace shown"
               Expect.isFalse (output.Contains "vocabs:") "no vocabs line when none"
+          } ]
+
+// ── A-C10: Status surface agrees with classifier ──────────────────────────────
+
+let private fixedNow = System.DateTimeOffset(2026, 7, 9, 12, 0, 0, System.TimeSpan.Zero)
+
+let private lockWithVocabs (vocabs: Map<string, VocabularyEntry>) (prefixes: Map<string, string>) : LockFile =
+    { SchemaVersion = 2
+      Generated = fixedNow
+      Integrity = None
+      Vocabularies = vocabs
+      DeclaredPrefixes = prefixes
+      Mappings = [] }
+
+[<Tests>]
+let ac10StatusSurfaceTests =
+    testList
+        "A-C10: Status surface agrees with classifier"
+        [ test "confirmed vocab: status format shows Confirmed" {
+              let confirmedEntry =
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = fixedNow.AddDays(-5.0)
+                      Hash = "sha256:abc"
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = Some fixedNow } }
+
+              let lf =
+                  lockWithVocabs
+                      (Map.ofList [ "schema", confirmedEntry ])
+                      (Map.ofList [ "schema", "https://schema.org/" ])
+
+              let output = Status.format fixedNow lf
+              Expect.stringContains output "schema" "status output mentions schema"
+              Expect.stringContains output "Confirmed" "status output shows Confirmed"
+          }
+
+          test "undereferenceable vocab: status format shows Undereferenceable" {
+              let lf =
+                  lockWithVocabs Map.empty (Map.ofList [ "ex", "https://example.org/" ])
+
+              let output = Status.format fixedNow lf
+              Expect.stringContains output "ex" "status output mentions ex"
+              Expect.stringContains output "Undereferenceable" "status output shows Undereferenceable"
           } ]

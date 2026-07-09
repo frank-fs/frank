@@ -11,9 +11,10 @@ let confirmedLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:abc" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:abc" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
@@ -95,9 +96,10 @@ let confirmedExLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "ex",
-              { Uri = "http://example.org/tictactoe#"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:ex-test" } ]
+              { v1Empty with
+                  Uri = "http://example.org/tictactoe#"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:ex-test" } ]
       DeclaredPrefixes = Map.ofList [ "ex", "http://example.org/tictactoe#" ]
       Mappings =
         [ { FSharpType = "Fixture.Game"

@@ -14,9 +14,10 @@ let private exPrefix = Uri "http://example.com/vocab#"
 let private prefixes = Map.ofList [ "schema", schemaPrefix; "ex", exPrefix ]
 
 let private mkVocabEntry (uri: string) : VocabularyEntry =
-    { Uri = uri
-      FetchedAt = DateTimeOffset.UtcNow
-      Hash = "test" }
+    { v1Empty with
+        Uri = uri
+        FetchedAt = DateTimeOffset.UtcNow
+        Hash = "test" }
 
 let private emptyLock: LockFile =
     { SchemaVersion = 1
@@ -412,9 +413,10 @@ let at_rm_ci =
               Vocabularies =
                 Map.ofList
                     [ "ex",
-                      { Uri = "http://example.com/vocab#"
-                        FetchedAt = DateTimeOffset.UtcNow
-                        Hash = "test" } ]
+                      { v1Empty with
+                          Uri = "http://example.com/vocab#"
+                          FetchedAt = DateTimeOffset.UtcNow
+                          Hash = "test" } ]
               DeclaredPrefixes = Map.empty
               Mappings =
                 [ { FSharpType = "MyApp.Color"

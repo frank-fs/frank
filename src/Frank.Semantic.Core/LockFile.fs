@@ -9,10 +9,42 @@ open System.Text.Json.Nodes
 
 module LockFile =
 
+    // Invariant: v1 entries read with IsValidated=false so legacy locks are
+    // never silently laundered into "validated" state (A-C6, A-C11).
+    type ValidationStatus =
+        { IsValidated: bool
+          Reason: string option
+          LastChecked: DateTimeOffset option }
+
     type VocabularyEntry =
         { Uri: string
           FetchedAt: DateTimeOffset
-          Hash: string }
+          Hash: string
+          // Schema-v2 evidence fields (absent in v1 JSON; safe defaults applied on read)
+          MediaType: string option
+          Validated: ValidationStatus
+          Terms: Set<string> option // None=unknown; Some Set.empty=parsed-but-no-terms (suppresses check)
+          HttpStatus: int option
+          Owned: bool
+          ETag: string option
+          LastModified: string option }
+
+    // Default for v1 backward-compat and test construction.
+    // IsValidated=false with explicit reason; never trusted as validated.
+    let v1Empty: VocabularyEntry =
+        { Uri = ""
+          FetchedAt = DateTimeOffset.MinValue
+          Hash = ""
+          MediaType = None
+          Validated =
+            { IsValidated = false
+              Reason = Some "legacy-v1-unvalidated"
+              LastChecked = None }
+          Terms = None
+          HttpStatus = None
+          Owned = false
+          ETag = None
+          LastModified = None }
 
     type LockFile =
         { SchemaVersion: int
@@ -60,7 +92,7 @@ module LockFile =
 
     let isDecided (status: MappingStatus) : bool = status = Confirmed || status = Excluded
 
-    // ── JSON deserialization (pure) ───────────────────────────────────────────
+    // ── JSON deserialization helpers (pure) ───────────────────────────────────
 
     let parseIso8601 (s: string) : Result<DateTimeOffset, string> =
         match DateTimeOffset.TryParse(s) with
@@ -94,6 +126,95 @@ module LockFile =
                 Ok(n.GetValue<float>())
             with :? InvalidOperationException ->
                 Error $"field '{key}' is not a number"
+
+    let private optionalInt (node: JsonNode) (key: string) : int option =
+        match node.[key] with
+        | null -> None
+        | n ->
+            try
+                Some(n.GetValue<int>())
+            with :? InvalidOperationException ->
+                None
+
+    let private optionalBool (node: JsonNode) (key: string) : bool option =
+        match node.[key] with
+        | null -> None
+        | n ->
+            try
+                Some(n.GetValue<bool>())
+            with :? InvalidOperationException ->
+                None
+
+    // ── ValidationStatus JSON ─────────────────────────────────────────────────
+
+    let private parseValidationStatus (node: JsonNode) : ValidationStatus =
+        match node.["validated"] with
+        | null ->
+            // v1 default: unvalidated, never silently trusted
+            { IsValidated = false
+              Reason = Some "legacy-v1-unvalidated"
+              LastChecked = None }
+        | vNode ->
+            let isValidated = optionalBool vNode "isValidated" |> Option.defaultValue false
+
+            let reason = optionalString vNode "reason"
+
+            let lastChecked =
+                optionalString vNode "lastChecked"
+                |> Option.bind (fun s ->
+                    match parseIso8601 s with
+                    | Ok dto -> Some dto
+                    | Error _ -> None)
+
+            { IsValidated = isValidated
+              Reason = reason
+              LastChecked = lastChecked }
+
+    let private serializeValidationStatus (vs: ValidationStatus) : JsonObject =
+        let obj = JsonObject()
+        obj.Add("isValidated", JsonValue.Create vs.IsValidated)
+
+        match vs.Reason with
+        | None -> obj.Add("reason", JsonValue.Create<string>(null))
+        | Some r -> obj.Add("reason", JsonValue.Create r)
+
+        match vs.LastChecked with
+        | None -> obj.Add("lastChecked", JsonValue.Create<string>(null))
+        | Some dto -> obj.Add("lastChecked", JsonValue.Create(dto.ToString("yyyy-MM-ddTHH:mm:ssK")))
+
+        obj
+
+    // ── Terms JSON ────────────────────────────────────────────────────────────
+
+    let private parseTerms (node: JsonNode) : Set<string> option =
+        match node.["terms"] with
+        | null -> None
+        | :? JsonArray as arr ->
+            arr
+            |> Seq.choose (fun x ->
+                if isNull x then
+                    None
+                else
+                    try
+                        Some(x.GetValue<string>())
+                    with :? InvalidOperationException ->
+                        None)
+            |> Set.ofSeq
+            |> Some
+        | _ -> None
+
+    let private serializeTerms (terms: Set<string> option) : JsonNode =
+        match terms with
+        | None -> JsonValue.Create<string>(null) :> JsonNode
+        | Some s ->
+            let arr = JsonArray()
+
+            for t in s |> Set.toList |> List.sort do
+                arr.Add(JsonValue.Create t)
+
+            arr
+
+    // ── Mapping deserialization ───────────────────────────────────────────────
 
     let private parseAlternates (node: JsonNode) : Result<string list, string> =
         match node with
@@ -240,7 +361,9 @@ module LockFile =
             |> Result.map List.rev
         | _ -> Error "field 'mappings' must be an array"
 
-    let private parseVocabEntry (node: JsonNode) : Result<VocabularyEntry, string> =
+    // ── VocabularyEntry deserialization ───────────────────────────────────────
+
+    let private parseVocabEntry (version: int) (node: JsonNode) : Result<VocabularyEntry, string> =
         requireString node "uri"
         |> Result.bind (fun uri ->
             requireString node "fetchedAt"
@@ -248,9 +371,24 @@ module LockFile =
             |> Result.bind (fun fetchedAt ->
                 requireString node "hash"
                 |> Result.map (fun hash ->
-                    { Uri = uri
-                      FetchedAt = fetchedAt
-                      Hash = hash })))
+                    if version >= 2 then
+                        // v2: read all evidence fields; optional ones default to None/false
+                        { Uri = uri
+                          FetchedAt = fetchedAt
+                          Hash = hash
+                          MediaType = optionalString node "mediaType"
+                          Validated = parseValidationStatus node
+                          Terms = parseTerms node
+                          HttpStatus = optionalInt node "httpStatus"
+                          Owned = optionalBool node "owned" |> Option.defaultValue false
+                          ETag = optionalString node "etag"
+                          LastModified = optionalString node "lastModified" }
+                    else
+                        // v1: only uri/fetchedAt/hash; apply unvalidated defaults
+                        { v1Empty with
+                            Uri = uri
+                            FetchedAt = fetchedAt
+                            Hash = hash })))
 
     let private parseDeclaredPrefixValue (key: string) (value: JsonNode) : Result<string, string> =
         match value with
@@ -277,7 +415,7 @@ module LockFile =
                 (Ok Map.empty)
         | _ -> Error "field 'declaredPrefixes' must be an object"
 
-    let private parseVocabularies (node: JsonNode) : Result<Map<string, VocabularyEntry>, string> =
+    let private parseVocabularies (version: int) (node: JsonNode) : Result<Map<string, VocabularyEntry>, string> =
         match node with
         | null -> Ok Map.empty
         | :? JsonObject as obj ->
@@ -287,13 +425,13 @@ module LockFile =
                     match acc with
                     | Error e -> Error e
                     | Ok m ->
-                        match parseVocabEntry kvp.Value with
+                        match parseVocabEntry version kvp.Value with
                         | Error e -> Error $"vocabularies['{kvp.Key}']: {e}"
                         | Ok v -> Ok(Map.add kvp.Key v m))
                 (Ok Map.empty)
         | _ -> Error "field 'vocabularies' must be an object"
 
-    let private supportedVersions = Set.ofList [ 1 ]
+    let private supportedVersions = Set.ofList [ 1; 2 ]
 
     let private parseSchemaVersion (node: JsonNode) : Result<int, string> =
         let versionNode = node.["schemaVersion"]
@@ -317,7 +455,7 @@ module LockFile =
         requireString node "generated"
         |> Result.bind parseIso8601
         |> Result.bind (fun generated ->
-            parseVocabularies node.["vocabularies"]
+            parseVocabularies version node.["vocabularies"]
             |> Result.bind (fun vocabularies ->
                 parseDeclaredPrefixes node.["declaredPrefixes"]
                 |> Result.bind (fun declaredPrefixes ->
@@ -413,11 +551,34 @@ module LockFile =
 
         obj
 
-    let private serializeVocabEntry (v: VocabularyEntry) : JsonObject =
+    let private serializeVocabEntry (version: int) (v: VocabularyEntry) : JsonObject =
         let obj = JsonObject()
         obj.Add("uri", JsonValue.Create v.Uri)
         obj.Add("fetchedAt", JsonValue.Create(formatIso8601 v.FetchedAt))
         obj.Add("hash", JsonValue.Create v.Hash)
+
+        if version >= 2 then
+            match v.MediaType with
+            | None -> ()
+            | Some mt -> obj.Add("mediaType", JsonValue.Create mt)
+
+            obj.Add("validated", serializeValidationStatus v.Validated)
+            obj.Add("terms", serializeTerms v.Terms)
+
+            match v.HttpStatus with
+            | None -> ()
+            | Some s -> obj.Add("httpStatus", JsonValue.Create s)
+
+            obj.Add("owned", JsonValue.Create v.Owned)
+
+            match v.ETag with
+            | None -> ()
+            | Some e -> obj.Add("etag", JsonValue.Create e)
+
+            match v.LastModified with
+            | None -> ()
+            | Some lm -> obj.Add("lastModified", JsonValue.Create lm)
+
         obj
 
     let private serializeDoc (lf: LockFile) : JsonObject =
@@ -432,7 +593,7 @@ module LockFile =
         let vocabs = JsonObject()
 
         for key in lf.Vocabularies |> Map.toSeq |> Seq.map fst |> Seq.sort do
-            vocabs.Add(key, serializeVocabEntry lf.Vocabularies.[key])
+            vocabs.Add(key, serializeVocabEntry lf.SchemaVersion lf.Vocabularies.[key])
 
         root.Add("vocabularies", vocabs)
 
@@ -451,7 +612,7 @@ module LockFile =
         root.Add("mappings", mappings)
         root
 
-    // ── Integrity ─────────────────────────────────────────────────────────────────
+    // ── Integrity ─────────────────────────────────────────────────────────────
 
     let private canonicalBytes (lf: LockFile) : byte[] =
         let root = serializeDoc { lf with Integrity = None }
@@ -459,8 +620,7 @@ module LockFile =
         Text.Encoding.UTF8.GetBytes json
 
     /// Compute the SHA-256 integrity hash of a lock file's canonical form.
-    /// Invariant to the lock's Integrity field value — always hashes the
-    /// canonical form with Integrity = None.
+    /// Invariant to the lock's Integrity field value — always hashes with Integrity = None.
     let computeIntegrity (lf: LockFile) : string = Hashing.sha256Hex (canonicalBytes lf)
 
     /// Return a new lock with Integrity stamped to the computed hash.
@@ -482,6 +642,13 @@ module LockFile =
             else
                 Error "lock appears hand-edited; regenerate"
 
+    /// Verify integrity only if the lock carries a stamp; pass through unstamped legacy locks.
+    /// Use this at load-time: unstamped v1 locks (no Integrity field) are legacy, not tampered.
+    let verifyIfStamped (lf: LockFile) : Result<unit, string> =
+        match lf.Integrity with
+        | None -> Ok()
+        | Some _ -> verifyIntegrity lf
+
     // ── Effectful I/O ─────────────────────────────────────────────────────────
 
     /// Read and validate a lock file from disk.
@@ -497,6 +664,7 @@ module LockFile =
             Error $"could not read lock file '{path}': {ex.Message}"
 
     /// Write a lock file to disk with deterministic serialization.
+    /// v2 vocabulary entries include all evidence fields; v1 entries include only uri/fetchedAt/hash.
     /// Vocabularies keys are sorted alphabetically. Mappings preserve given order.
     let write (path: string) (lf: LockFile) : unit =
         if String.IsNullOrWhiteSpace path then
@@ -566,9 +734,6 @@ module LockFile =
 
     /// Group mappings by derived namespace and aggregate status counts and vocab usage.
     /// Groups are sorted by namespace; vocabs within each group are sorted by key.
-    /// knownPrefixes: union of Vocabularies keys and DeclaredPrefixes keys from the lock.
-    ///   CURIEs whose prefix is in this set are grouped by prefix;
-    ///   all other IRIs (including absolute IRIs and unrecognised schemes) are keyed by full IRI.
     let countByPackage (knownPrefixes: Set<string>) (mappings: Mapping list) : PackageGroup list =
         let byNs = mappings |> List.groupBy (fun m -> namespaceOf m.FSharpType)
 
@@ -634,8 +799,7 @@ module LockFile =
                         Payload = mergeFields c.Payload r.Payload }
                 | None -> c)
             |> MappingShape.Union
-        // Shape kind changed between lock versions (type went record<->union in source);
-        // no field-level merge is meaningful — take the freshly resolved shape wholesale.
+        // Shape kind changed (record↔union): take freshly resolved shape wholesale.
         | _ -> resolved
 
     let private mergeOneMapping (existing: Mapping) (resolved: Mapping) : Mapping =

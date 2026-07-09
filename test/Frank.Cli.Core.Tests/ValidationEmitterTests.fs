@@ -31,9 +31,10 @@ let private lock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "TicTacToe.MoveAction"
@@ -258,9 +259,10 @@ let skipPathTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                              Hash = "sha256:test" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                                Hash = "sha256:test" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "TicTacToe.NoIriType"
@@ -293,9 +295,10 @@ let skipPathTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                              Hash = "sha256:test" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                                Hash = "sha256:test" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "TicTacToe.PayloadUnion"
@@ -346,9 +349,10 @@ let private hostRelLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
       Mappings =
         [ { FSharpType = "TicTacToe.MoveRequest"

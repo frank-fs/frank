@@ -10,9 +10,6 @@
     <Compile Include="ProvOClass.fs" />
     <Compile Include="VocabularyRegistry.fs" />
     <Compile Include="VocabularyBuilder.fs" />
-    <Compile Include="Mapping.fs" />
-    <Compile Include="Hashing.fs" />
-    <Compile Include="LockFile.fs" />
     <Compile Include="VocabCheck.fs" />
     <Compile Include="ResolvedModel.fs" />
     <Compile Include="OntologyTypes.fs" />
@@ -33,6 +30,10 @@
     <PackageReference Include="AngleSharp" Version="1.5.2" />
     <!-- 43.10.101 matches FSharp.Analyzers.SDK 0.35.0 exact pin; patch-safe with Frank.Cli.Core 43.10.103 -->
     <PackageReference Include="FSharp.Compiler.Service" Version="43.10.101" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank.Semantic.Core/Frank.Semantic.Core.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -14,6 +14,7 @@ let stubFetch (body: byte[]) : Fetch =
     fun (_: Uri) -> async { return Ok {| ContentType = None; Body = body |} }
 
 let mkVocabEntry (hash: string) : VocabularyEntry =
-    { Uri = "https://schema.org/"
-      FetchedAt = DateTimeOffset.UnixEpoch
-      Hash = hash }
+    { v1Empty with
+        Uri = "https://schema.org/"
+        FetchedAt = DateTimeOffset.UnixEpoch
+        Hash = hash }

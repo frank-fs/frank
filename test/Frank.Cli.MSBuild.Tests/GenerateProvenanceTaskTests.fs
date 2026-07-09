@@ -70,9 +70,10 @@ let private provenanceLock: LockFile =
         Vocabularies =
             Map.ofList
                 [ "prov",
-                  { Uri = "http://www.w3.org/ns/prov#"
-                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                    Hash = "sha256:def" } ]
+                  { v1Empty with
+                      Uri = "http://www.w3.org/ns/prov#"
+                      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                      Hash = "sha256:def" } ]
         Mappings =
             [ { FSharpType = "TicTacToe.Agent"
                 Iri = Some "prov:Agent"
@@ -135,9 +136,10 @@ let private orderActionLock: LockFile =
         Vocabularies =
             Map.ofList
                 [ "schema",
-                  { Uri = "https://schema.org/"
-                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                    Hash = "sha256:abc" } ]
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                      Hash = "sha256:abc" } ]
         Mappings =
             [ { FSharpType = "TicTacToe.OrderPlaced"
                 Iri = Some "schema:OrderAction"

@@ -85,9 +85,10 @@ let private staleLockFor (port: int) : LockFile =
       Vocabularies =
         Map.ofList
             [ "vocab",
-              { Uri = $"http://localhost:{port}/vocab.ttl"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:STALE" } ]
+              { v1Empty with
+                  Uri = $"http://localhost:{port}/vocab.ttl"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:STALE" } ]
       DeclaredPrefixes = Map.empty
       Mappings = [] }
 
@@ -136,9 +137,10 @@ let private freshLockFor (port: int) : LockFile =
       Vocabularies =
         Map.ofList
             [ "vocab",
-              { Uri = $"http://localhost:{port}/vocab.ttl"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = stubTurtleSha256 () } ]
+              { v1Empty with
+                  Uri = $"http://localhost:{port}/vocab.ttl"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = stubTurtleSha256 () } ]
       DeclaredPrefixes = Map.empty
       Mappings = [] }
 

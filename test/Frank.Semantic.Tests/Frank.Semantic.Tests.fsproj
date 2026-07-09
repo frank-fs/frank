@@ -15,6 +15,7 @@
     <Compile Include="ResolvedModelTests.fs" />
     <Compile Include="OntologyTypesTests.fs" />
     <Compile Include="ShapeTypesTests.fs" />
+    <Compile Include="SemanticCoreTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -27,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../../src/Frank.Semantic.Core/Frank.Semantic.Core.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -73,9 +73,10 @@ let private validationLock: LockFile =
         Vocabularies =
             Map.ofList
                 [ "schema",
-                  { Uri = "https://schema.org/"
-                    FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                    Hash = "sha256:abc" } ]
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                      Hash = "sha256:abc" } ]
         Mappings =
             [ { FSharpType = "TicTacToe.MoveAction"
                 Iri = Some "schema:MoveAction"

@@ -22,9 +22,10 @@ let private probeLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "schema",
-              { Uri = "https://schema.org/"
-                FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-                Hash = "sha256:test" } ]
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "Probe.Game"
@@ -194,9 +195,10 @@ let excludedMappingTests =
                     Vocabularies =
                       Map.ofList
                           [ "schema",
-                            { Uri = "https://schema.org/"
-                              FetchedAt = DateTimeOffset.UtcNow
-                              Hash = "sha256:test" } ]
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                FetchedAt = DateTimeOffset.UtcNow
+                                Hash = "sha256:test" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "MyApp.Game"
@@ -251,9 +253,10 @@ let unionCaseEmissionTests =
                     Vocabularies =
                       Map.ofList
                           [ "ex",
-                            { Uri = "https://ex.org/"
-                              FetchedAt = exDateOffset
-                              Hash = "sha256:t" } ]
+                            { v1Empty with
+                                Uri = "https://ex.org/"
+                                FetchedAt = exDateOffset
+                                Hash = "sha256:t" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "Probe.Move"
@@ -321,9 +324,10 @@ let unionCaseEmissionTests =
                     Vocabularies =
                       Map.ofList
                           [ "ex",
-                            { Uri = "https://ex.org/"
-                              FetchedAt = exDateOffset
-                              Hash = "sha256:t" } ]
+                            { v1Empty with
+                                Uri = "https://ex.org/"
+                                FetchedAt = exDateOffset
+                                Hash = "sha256:t" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "Probe.Light"
@@ -381,9 +385,10 @@ let unionCaseEmissionTests =
                     Vocabularies =
                       Map.ofList
                           [ "ex",
-                            { Uri = "https://ex.org/"
-                              FetchedAt = exDateOffset
-                              Hash = "sha256:t" } ]
+                            { v1Empty with
+                                Uri = "https://ex.org/"
+                                FetchedAt = exDateOffset
+                                Hash = "sha256:t" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings =
                       [ { FSharpType = "Probe.Move"
@@ -497,9 +502,10 @@ let private moveLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "ex",
-              { Uri = "https://ex.org/"
-                FetchedAt = exDateOffset
-                Hash = "sha256:t" } ]
+              { v1Empty with
+                  Uri = "https://ex.org/"
+                  FetchedAt = exDateOffset
+                  Hash = "sha256:t" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "Probe.Move"
@@ -608,9 +614,10 @@ let private crossNsLock: LockFile =
       Vocabularies =
         Map.ofList
             [ "ex",
-              { Uri = "https://ex.org/"
-                FetchedAt = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
-                Hash = "sha256:t" } ]
+              { v1Empty with
+                  Uri = "https://ex.org/"
+                  FetchedAt = DateTimeOffset.Parse "2025-01-01T00:00:00Z"
+                  Hash = "sha256:t" } ]
       DeclaredPrefixes = Map.empty
       Mappings =
         [ { FSharpType = "CrossNs.Domain.Status"

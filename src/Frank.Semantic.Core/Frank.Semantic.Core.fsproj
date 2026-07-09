@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>semantic;vocabulary;linked-data</PackageTags>
+    <Description>Pure lock types and vocabulary classification for Frank semantic discovery — no dotNetRdf, no FCS</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Mapping.fs" />
+    <Compile Include="Hashing.fs" />
+    <Compile Include="LockFile.fs" />
+    <Compile Include="VocabClassifier.fs" />
+  </ItemGroup>
+
+</Project>

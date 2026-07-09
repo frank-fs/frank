@@ -173,9 +173,10 @@ let private fetchVocabTerms
                     | Ok cv ->
                         Some(
                             prefix,
-                            { Uri = uri.AbsoluteUri
-                              FetchedAt = fetchedAt
-                              Hash = cv.Hash }
+                            { v1Empty with
+                                Uri = uri.AbsoluteUri
+                                FetchedAt = fetchedAt
+                                Hash = cv.Hash }
                         )
                     | Error _ -> None)
                 |> Map.ofList
