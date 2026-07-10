@@ -140,12 +140,14 @@ let connegTests =
                           | Unchanged -> failtest "expected Updated, got Unchanged"
                           | Undereferenceable r -> failtest $"expected Updated, got Undereferenceable: {r}"
                           | TransientFailure r -> failtest $"expected Updated, got TransientFailure: {r}"
+                          | UnverifiableNonRdf r -> failtest $"expected Updated, got UnverifiableNonRdf: {r}"
                       })
           }
 
           // Stub always returns HTML regardless of Accept header.
-          // rdfFetch must reject the HTML response and yield Undereferenceable.
-          testAsync "stub returns HTML always; evidence is Undereferenceable (non-RDF)" {
+          // M2: text/html now yields UnverifiableNonRdf (not Undereferenceable) — possibly RDFa,
+          // not verifiable offline. Only owned-validate maps this to LyingIri/exit-2.
+          testAsync "stub returns HTML always; evidence is UnverifiableNonRdf (M2: not durable)" {
               let handler (ctx: HttpListenerContext) = respond ctx 200 "text/html" htmlBytes
 
               do!
@@ -157,11 +159,12 @@ let connegTests =
                           let evidence = RdfConneg.buildEvidence baseUri DateTimeOffset.UtcNow fetchResult
 
                           match evidence with
-                          | Undereferenceable reason ->
+                          | UnverifiableNonRdf reason ->
                               Expect.stringContains reason "text/html" "reason mentions content-type"
-                          | Updated _ -> failtest "expected Undereferenceable, got Updated"
-                          | Unchanged -> failtest "expected Undereferenceable, got Unchanged"
-                          | TransientFailure r -> failtest $"expected Undereferenceable, got TransientFailure: {r}"
+                          | Undereferenceable r -> failtest $"text/html must be UnverifiableNonRdf, not Undereferenceable: {r}"
+                          | Updated _ -> failtest "expected UnverifiableNonRdf, got Updated"
+                          | Unchanged -> failtest "expected UnverifiableNonRdf, got Unchanged"
+                          | TransientFailure r -> failtest $"expected UnverifiableNonRdf, got TransientFailure: {r}"
                       })
           } ]
 
@@ -198,6 +201,7 @@ let redirectTests =
                           | Undereferenceable r ->
                               failtest $"expected Updated after following 303, got Undereferenceable: {r}"
                           | TransientFailure r -> failtest $"expected Updated, got TransientFailure: {r}"
+                          | UnverifiableNonRdf r -> failtest $"expected Updated, got UnverifiableNonRdf: {r}"
                       })
           } ]
 
@@ -254,6 +258,7 @@ let conditionalTests =
                           | Updated _ -> failtest "expected Unchanged (304) but got Updated (re-parse)"
                           | Undereferenceable r -> failtest $"expected Unchanged, got Undereferenceable: {r}"
                           | TransientFailure r -> failtest $"expected Unchanged, got TransientFailure: {r}"
+                          | UnverifiableNonRdf r -> failtest $"expected Unchanged, got UnverifiableNonRdf: {r}"
                       })
           } ]
 
@@ -281,5 +286,73 @@ let redirectCapTests =
                           | Updated _ -> failtest "expected Undereferenceable (cap hit), got Updated"
                           | Unchanged -> failtest "expected Undereferenceable (cap hit), got Unchanged"
                           | TransientFailure r -> failtest $"expected Undereferenceable (cap hit), got TransientFailure: {r}"
+                          | UnverifiableNonRdf r -> failtest $"expected Undereferenceable (cap hit), got UnverifiableNonRdf: {r}"
+                      })
+          } ]
+
+// ── M5: any 2xx status accepted ───────────────────────────────────────────────
+
+[<Tests>]
+let m5Any2xxLoopbackTests =
+    testList
+        "M5 — fetchLoop accepts any 2xx, not just 200"
+        [ testAsync "loopback stub serves 203 + Turtle → rdfFetch yields RdfContent, buildEvidence is Updated" {
+              let handler (ctx: HttpListenerContext) =
+                  let ns = ctx.Request.Url.GetLeftPart(UriPartial.Authority) + "/"
+                  let body = turtleWithNs ns
+                  ctx.Response.StatusCode <- 203
+                  ctx.Response.ContentType <- "text/turtle"
+                  ctx.Response.ContentLength64 <- int64 body.Length
+                  use stream = ctx.Response.OutputStream
+                  stream.Write(body, 0, body.Length)
+
+              do!
+                  withStub 1 handler (fun baseUri ->
+                      async {
+                          use client = makeClient ()
+                          let fetch = RdfConneg.rdfFetch client
+                          let! fetchResult = fetch baseUri None None
+                          let evidence = RdfConneg.buildEvidence baseUri DateTimeOffset.UtcNow fetchResult
+
+                          match evidence with
+                          | Updated ev ->
+                              Expect.isTrue ev.Validated.IsValidated "203 + Turtle → Validated=true"
+                              Expect.equal ev.HttpStatus (Some 203) "HttpStatus captured as 203"
+                          | TransientFailure r ->
+                              failtest $"203 must not be transient failure; got: {r}"
+                          | Undereferenceable r ->
+                              failtest $"203 must not be Undereferenceable; got: {r}"
+                          | Unchanged -> failtest "expected Updated, got Unchanged"
+                          | UnverifiableNonRdf r -> failtest $"expected Updated, got UnverifiableNonRdf: {r}"
+                      })
+          } ]
+
+// ── M1: 406/415/401/403 → durable Undereferenceable ──────────────────────────
+
+[<Tests>]
+let m1DurableHttpStatusLoopbackTests =
+    testList
+        "M1 — 406/415/401/403 are durable (Undereferenceable), not transient"
+        [ testAsync "loopback stub returns 406 → buildEvidence is Undereferenceable (not TransientFailure)" {
+              let handler (ctx: HttpListenerContext) =
+                  ctx.Response.StatusCode <- 406
+                  ctx.Response.ContentLength64 <- 0L
+                  ctx.Response.OutputStream.Close()
+
+              do!
+                  withStub 1 handler (fun baseUri ->
+                      async {
+                          use client = makeClient ()
+                          let fetch = RdfConneg.rdfFetch client
+                          let! fetchResult = fetch baseUri None None
+                          let evidence = RdfConneg.buildEvidence baseUri DateTimeOffset.UtcNow fetchResult
+
+                          match evidence with
+                          | Undereferenceable reason ->
+                              Expect.stringContains reason "406" "reason mentions 406"
+                          | TransientFailure r -> failtest $"406 must not be TransientFailure; got: {r}"
+                          | Updated _ -> failtest "expected Undereferenceable, got Updated"
+                          | Unchanged -> failtest "expected Undereferenceable, got Unchanged"
+                          | UnverifiableNonRdf r -> failtest $"expected Undereferenceable, got UnverifiableNonRdf: {r}"
                       })
           } ]

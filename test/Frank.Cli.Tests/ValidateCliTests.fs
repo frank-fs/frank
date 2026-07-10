@@ -108,36 +108,40 @@ let private serveRequest
 
 /// Lock with a single Owned=true entry pointing at the given port.
 /// FetchedAt is set far in the past so SLA forces a probe.
+/// v2 locks must be stamped; verifyIfStamped rejects unstamped v2 (M3).
 let private ownedLockFor (port: int) : LockFile =
-    { SchemaVersion = 2
-      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-      Integrity = None
-      Vocabularies =
-        Map.ofList
-            [ "vocab",
-              { v1Empty with
-                  Uri = $"http://localhost:{port}/"
-                  FetchedAt = DateTimeOffset.Parse("2020-01-01T00:00:00Z")
-                  Hash = "sha256:INITIAL"
-                  Owned = true } ]
-      DeclaredPrefixes = Map.empty
-      Mappings = [] }
+    withIntegrity
+        { SchemaVersion = 2
+          Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+          Integrity = None
+          Vocabularies =
+            Map.ofList
+                [ "vocab",
+                  { v1Empty with
+                      Uri = $"http://localhost:{port}/"
+                      FetchedAt = DateTimeOffset.Parse("2020-01-01T00:00:00Z")
+                      Hash = "sha256:INITIAL"
+                      Owned = true } ]
+          DeclaredPrefixes = Map.empty
+          Mappings = [] }
 
 /// Lock with a single Owned=false entry — validate must SKIP unowned entries.
+/// v2 locks must be stamped; verifyIfStamped rejects unstamped v2 (M3).
 let private unownedLockFor (port: int) : LockFile =
-    { SchemaVersion = 2
-      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
-      Integrity = None
-      Vocabularies =
-        Map.ofList
-            [ "vocab",
-              { v1Empty with
-                  Uri = $"http://localhost:{port}/"
-                  FetchedAt = DateTimeOffset.Parse("2020-01-01T00:00:00Z")
-                  Hash = "sha256:INITIAL"
-                  Owned = false } ]
-      DeclaredPrefixes = Map.empty
-      Mappings = [] }
+    withIntegrity
+        { SchemaVersion = 2
+          Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+          Integrity = None
+          Vocabularies =
+            Map.ofList
+                [ "vocab",
+                  { v1Empty with
+                      Uri = $"http://localhost:{port}/"
+                      FetchedAt = DateTimeOffset.Parse("2020-01-01T00:00:00Z")
+                      Hash = "sha256:INITIAL"
+                      Owned = false } ]
+          DeclaredPrefixes = Map.empty
+          Mappings = [] }
 
 // ── A-C7 tests ────────────────────────────────────────────────────────────────
 

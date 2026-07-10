@@ -23,6 +23,7 @@
     <Compile Include="VocabSwapTests.fs" />
     <Compile Include="DriftCliTests.fs" />
     <Compile Include="RefreshV3Tests.fs" />
+    <Compile Include="ValidateTests.fs" />
     <Compile Include="StatusTests.fs" />
     <Compile Include="FinalizeTests.fs" />
     <Compile Include="AstRenderTests.fs" />

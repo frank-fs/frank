@@ -55,21 +55,14 @@ let private probeFailedEntry (now: DateTimeOffset) (reason: string) (entry: Voca
                 Reason = Some reason
                 LastChecked = Some now } }
 
-let private reachableEntry
-    (now: DateTimeOffset)
-    (status: int)
-    (etag: string option)
-    (lastMod: string option)
-    (entry: VocabularyEntry)
-    : VocabularyEntry =
+// M2: non-durable, non-drift outcome for unowned text/html (possibly RDFa).
+// Sets Validated=false so the entry is not trusted, but does not raise a drift alarm.
+let private unverifiableEntry (now: DateTimeOffset) (reason: string) (entry: VocabularyEntry) : VocabularyEntry =
     { entry with
-        FetchedAt = now
-        HttpStatus = Some status
-        ETag = etag
-        LastModified = lastMod
         Validated =
-            { entry.Validated with
-                LastChecked = Some now } }
+            { IsValidated = false
+              Reason = Some reason
+              LastChecked = Some now } }
 
 let private updatedEntry (now: DateTimeOffset) (ev: FetchEvidence) (entry: VocabularyEntry) : VocabularyEntry =
     { entry with
@@ -91,32 +84,33 @@ let private unchangedEntry (now: DateTimeOffset) (entry: VocabularyEntry) : Voca
 
 // ── Per-entry classification ──────────────────────────────────────────────────
 
+// M4: classifyOwned is now a TRANSFORM over buildEvidence (kills the fork/asymmetry).
+// Owned and unowned agree on reachability failures (404/410/406/redirect-cap → durable).
+// Content-drift is suppressed for owned: hash change is NOT flagged as DriftDetected.
+// M7: capture Terms/MediaType in the owned refresh path via updatedEntry (side effect of M4).
 let private classifyOwned
     (now: DateTimeOffset)
+    (namespaceBase: Uri)
     (entry: VocabularyEntry)
     (result: ConnegFetchResult)
     : EntryOutcome * VocabularyEntry =
-    match result with
-    | HttpErrorStatus(404, _) ->
-        let r = "HTTP 404 — owned vocab gone"
-        DriftDetected r, goneEntry now 404 r entry
-    | HttpErrorStatus(410, _) ->
-        let r = "HTTP 410 — owned vocab permanently gone"
-        DriftDetected r, goneEntry now 410 r entry
-    | HttpErrorStatus(status, _) ->
-        let r = $"HTTP {status} probe-failed"
-        ProbeFailed r, probeFailedEntry now r entry
-    | FetchFailed reason ->
-        let r = $"network error: {reason}"
-        ProbeFailed r, probeFailedEntry now r entry
-    | RedirectCapHit ->
-        let r = $"redirect cap ({RdfConneg.maxRedirectHops} hops) exceeded"
-        ProbeFailed r, probeFailedEntry now r entry
-    | NotModified -> EvidenceRefreshed, unchangedEntry now entry
-    | NonRdfContent r ->
-        let reason = $"owned vocab serving non-RDF: {r.MediaType} (HTTP {r.HttpStatus})"
-        DriftDetected reason, goneEntry now r.HttpStatus reason entry
-    | RdfContent r -> EvidenceRefreshed, reachableEntry now r.HttpStatus r.ETag r.LastModified entry
+    let evidence = RdfConneg.buildEvidence namespaceBase now result
+
+    match evidence with
+    | TransientFailure reason -> ProbeFailed reason, probeFailedEntry now reason entry
+    | Unchanged -> EvidenceRefreshed, unchangedEntry now entry
+    | Undereferenceable reason ->
+        let status = RdfConneg.statusOf result
+        DriftDetected reason, goneEntry now status reason entry
+    | UnverifiableNonRdf reason ->
+        // Owned endpoint serving text/html is a LyingIri — same semantics as Undereferenceable.
+        // An owned vocab that claims to serve RDF but returns HTML is durable drift.
+        let status = RdfConneg.statusOf result
+        DriftDetected reason, goneEntry now status reason entry
+    | Updated ev ->
+        // Content change does NOT constitute drift for owned (suppress content-drift).
+        // Still capture all evidence (Terms, MediaType, Hash) so term evidence stays current.
+        EvidenceRefreshed, updatedEntry now ev entry
 
 let private classifyUnowned
     (now: DateTimeOffset)
@@ -130,13 +124,12 @@ let private classifyUnowned
     | TransientFailure reason -> ProbeFailed reason, probeFailedEntry now reason entry
     | Unchanged -> EvidenceRefreshed, unchangedEntry now entry
     | Undereferenceable reason ->
-        let status =
-            match result with
-            | HttpErrorStatus(s, _) -> s
-            | NonRdfContent r -> r.HttpStatus
-            | _ -> 0
-
+        let status = RdfConneg.statusOf result
         DriftDetected reason, goneEntry now status reason entry
+    | UnverifiableNonRdf reason ->
+        // M2: external text/html (possibly RDFa) is not verifiable offline.
+        // Not durable drift — do not raise exit 2. Mark Validated=false but return EvidenceRefreshed.
+        EvidenceRefreshed, unverifiableEntry now reason entry
     | Updated ev ->
         if ev.Hash <> entry.Hash then
             let reason = $"content hash changed: {entry.Hash} → {ev.Hash}"
@@ -158,13 +151,18 @@ let private processEntry
         if not force && not (isStale policy prefix entry now) then
             return SkippedFresh, entry
         else
-            let namespaceBase = Uri(entry.Uri)
-            let! result = fetch namespaceBase entry.ETag entry.LastModified
+            // L4: guard Uri parse — a malformed persisted URI is a modeled error, not an exception.
+            match Uri.TryCreate(entry.Uri, UriKind.Absolute) with
+            | false, _ ->
+                let reason = $"malformed vocabulary URI: {entry.Uri}"
+                return ProbeFailed reason, probeFailedEntry now reason entry
+            | true, namespaceBase ->
+                let! result = fetch namespaceBase entry.ETag entry.LastModified
 
-            if entry.Owned then
-                return classifyOwned now entry result
-            else
-                return classifyUnowned now namespaceBase entry result
+                if entry.Owned then
+                    return classifyOwned now namespaceBase entry result
+                else
+                    return classifyUnowned now namespaceBase entry result
     }
 
 // ── Main refresh ──────────────────────────────────────────────────────────────

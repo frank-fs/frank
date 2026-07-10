@@ -370,3 +370,42 @@ let slaTests =
               let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-50.0); Owned = false }
               Expect.isFalse (isStale policy "schema" entry fixedNow) "50d < 100d per-vocab override → not stale"
           } ]
+
+// ── M3: verifyIfStamped must require stamp for schema v2 ─────────────────────
+
+[<Tests>]
+let m3VerifyIfStampedV2Tests =
+    testList
+        "M3 — verifyIfStamped requires stamp when SchemaVersion >= 2"
+        [ test "v2 lock with Integrity=None and validated-true entry → verifyIfStamped returns Error" {
+              let validatedEntry =
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      Hash = "sha256:abc"
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = Some fixedNow } }
+
+              let lf: LockFile =
+                  { SchemaVersion = 2
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.ofList [ "schema", validatedEntry ]
+                    DeclaredPrefixes = Map.empty
+                    Mappings = [] }
+
+              Expect.isError (verifyIfStamped lf) "v2 unstamped lock must be rejected by verifyIfStamped"
+          }
+
+          test "v1 lock with Integrity=None still passes verifyIfStamped (legacy compat)" {
+              let lf: LockFile =
+                  { SchemaVersion = 1
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.empty
+                    Mappings = [] }
+
+              Expect.isOk (verifyIfStamped lf) "v1 unstamped lock is legacy — must still pass"
+          } ]

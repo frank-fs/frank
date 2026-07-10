@@ -82,22 +82,28 @@ let private validateOne
     (entry: VocabularyEntry)
     : Async<ValidateOutcome * VocabularyEntry> =
     async {
-        let namespaceBase = Uri(entry.Uri)
-        let! result = fetch namespaceBase entry.ETag entry.LastModified
-        let evidence = RdfConneg.buildEvidence namespaceBase now result
+        // L4: guard Uri parse — a malformed persisted URI is a modeled error, not an exception.
+        match Uri.TryCreate(entry.Uri, UriKind.Absolute) with
+        | false, _ ->
+            let reason = $"malformed vocabulary URI: {entry.Uri}"
+            return ValidateTransient reason, transientEntry now reason entry
+        | true, namespaceBase ->
+            let! result = fetch namespaceBase entry.ETag entry.LastModified
+            let evidence = RdfConneg.buildEvidence namespaceBase now result
 
-        match evidence with
-        | Updated ev -> return Validated, validatedEntry now ev entry
-        | Unchanged -> return Validated, unchangedEntry now entry
-        | TransientFailure reason -> return ValidateTransient reason, transientEntry now reason entry
-        | Undereferenceable reason ->
-            let status =
-                match result with
-                | HttpErrorStatus(s, _) -> s
-                | NonRdfContent r -> r.HttpStatus
-                | _ -> 0
-
-            return LyingIri reason, lyingEntry now reason status entry
+            match evidence with
+            | Updated ev -> return Validated, validatedEntry now ev entry
+            | Unchanged -> return Validated, unchangedEntry now entry
+            | TransientFailure reason -> return ValidateTransient reason, transientEntry now reason entry
+            | Undereferenceable reason ->
+                let status = RdfConneg.statusOf result
+                return LyingIri reason, lyingEntry now reason status entry
+            | UnverifiableNonRdf reason ->
+                // M2 / A-C7: owned endpoint returning text/html is a LyingIri — the endpoint claims
+                // to serve RDF (it is owned and declared as a vocab IRI) but does not.
+                // validate only runs on Owned=true entries; UnverifiableNonRdf is still a lying IRI here.
+                let status = RdfConneg.statusOf result
+                return LyingIri reason, lyingEntry now reason status entry
     }
 
 // ── Main validate ─────────────────────────────────────────────────────────────

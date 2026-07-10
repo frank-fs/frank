@@ -41,20 +41,27 @@ type FetchEvidence =
 type EvidenceResult =
     | Updated of FetchEvidence
     | Unchanged
-    /// Durable: 404/410/non-RDF/redirect-cap/RDF-parse-failed — Validated=false, exit 2.
+    /// Durable: 404/410/406/415/401/403/redirect-cap/RDF-parse-failed — Validated=false, exit 2.
     | Undereferenceable of reason: string
     /// Transient: 5xx/429/network/timeout — Validated unchanged, exit 1.
     | TransientFailure of reason: string
+    /// External vocab served text/html (possibly RDFa) — not verifiable offline, not durable drift.
+    /// Validated=false but NOT exit-2; maps to a non-durable probe outcome for unowned vocabs.
+    | UnverifiableNonRdf of reason: string
 
 module RdfConneg =
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
+    // L6.3: Accept header aligned with isRdfMediaType (advertise all accepted types)
     let private rdfAcceptValue =
-        "text/turtle;q=1.0, application/ld+json;q=0.9, application/rdf+xml;q=0.8"
+        "text/turtle;q=1.0, application/ld+json;q=0.9, application/rdf+xml;q=0.8, application/n-triples;q=0.7, text/n3;q=0.6"
 
     /// Maximum 3xx redirects to follow before giving up (httpRange-14 / cap per Holzmann #10).
     let maxRedirectHops = 5
+
+    // M6: explicit per-request timeout to bound wall-clock (Holzmann #10)
+    let private requestTimeoutSeconds = 30
 
     let private rdfMediaTypes =
         Set.ofList
@@ -93,6 +100,15 @@ module RdfConneg =
         |> Seq.choose extractLocalName
         |> Set.ofSeq
 
+    /// Extract the HTTP status code from a ConnegFetchResult.
+    /// L3: extracted from duplicated inline match in Refresh.fs and Validate.fs.
+    let statusOf (result: ConnegFetchResult) : int =
+        match result with
+        | HttpErrorStatus(s, _) -> s
+        | NonRdfContent r -> r.HttpStatus
+        | RdfContent r -> r.HttpStatus
+        | _ -> 0
+
     // ── Pure evidence builder ─────────────────────────────────────────────────
 
     let private validatedStatus (now: DateTimeOffset) : LockFile.ValidationStatus =
@@ -130,16 +146,35 @@ module RdfConneg =
 
     /// Build schema-v2 evidence from a ConnegFetchResult.
     /// Pure: no network I/O; RDF parsing and hashing are in-memory.
-    /// 404/410 → Undereferenceable (durable); 5xx/429/network → TransientFailure (operational).
+    /// 404/410/406/415 → Undereferenceable (durable); 401/403 → Undereferenceable auth-walled (durable,
+    ///   deliberate decision: anonymous follow-your-nose agent cannot resolve auth-walled IRIs).
+    /// 5xx/429/network → TransientFailure (operational).
+    /// text/html (unowned) → UnverifiableNonRdf (non-durable; possibly RDFa, not verifiable offline).
     let buildEvidence (namespaceBase: Uri) (now: DateTimeOffset) (result: ConnegFetchResult) : EvidenceResult =
         match result with
         | NotModified -> Unchanged
         | RedirectCapHit -> Undereferenceable $"redirect cap ({maxRedirectHops} hops) exceeded"
         | FetchFailed reason -> TransientFailure $"network error: {reason}"
-        | NonRdfContent r -> Undereferenceable $"non-RDF content-type '{r.MediaType}' (HTTP {r.HttpStatus})"
+        | NonRdfContent r ->
+            if stripParams r.MediaType = "text/html" then
+                // M2: external text/html (possibly RDFa) — not verifiable offline, not durable drift.
+                // An owned endpoint serving text/html is LyingIri — callers (Validate.validateOne)
+                // must map UnverifiableNonRdf to LyingIri for owned entries.
+                UnverifiableNonRdf $"non-RDF media type 'text/html' (possibly RDFa) — not verifiable offline"
+            else
+                Undereferenceable $"non-RDF content-type '{r.MediaType}' (HTTP {r.HttpStatus})"
         | RdfContent r -> fromRdfContent namespaceBase now r
         | HttpErrorStatus(404, uri) -> Undereferenceable $"HTTP 404 — gone: {uri}"
         | HttpErrorStatus(410, uri) -> Undereferenceable $"HTTP 410 — permanently gone: {uri}"
+        // M1: 406/415 = server will never give RDF for this IRI — durable Undereferenceable.
+        | HttpErrorStatus(406, uri) -> Undereferenceable $"HTTP 406 — no RDF representation (not acceptable): {uri}"
+        | HttpErrorStatus(415, uri) ->
+            Undereferenceable $"HTTP 415 — no RDF representation (unsupported media type): {uri}"
+        // M1: 401/403 = auth-walled; deliberate decision — anonymous follow-your-nose agent cannot
+        // resolve this IRI. Durable: requires credentials we do not have.
+        | HttpErrorStatus(401, uri) -> Undereferenceable $"HTTP 401 — auth-walled (anonymous dereference fails): {uri}"
+        | HttpErrorStatus(403, uri) -> Undereferenceable $"HTTP 403 — auth-walled (anonymous dereference fails): {uri}"
+        // 5xx/429 = transient server-side failures; keep as TransientFailure (exit 1).
         | HttpErrorStatus(status, uri) -> TransientFailure $"HTTP {status} probe-failed: {uri}"
 
     // ── Effectful helpers ─────────────────────────────────────────────────────
@@ -171,20 +206,22 @@ module RdfConneg =
         (priorLastModified: string option)
         : Async<Result<HttpResponseMessage, string>> =
         async {
+            // L5: only wrap network/IO exceptions; genuine defects must surface, not be mislabeled.
+            use msg = new HttpRequestMessage(HttpMethod.Get, uri)
+            msg.Headers.TryAddWithoutValidation("Accept", rdfAcceptValue) |> ignore
+
+            priorETag
+            |> Option.iter (fun e -> msg.Headers.TryAddWithoutValidation("If-None-Match", e) |> ignore)
+
+            priorLastModified
+            |> Option.iter (fun lm -> msg.Headers.TryAddWithoutValidation("If-Modified-Since", lm) |> ignore)
+
             try
-                use msg = new HttpRequestMessage(HttpMethod.Get, uri)
-                msg.Headers.TryAddWithoutValidation("Accept", rdfAcceptValue) |> ignore
-
-                priorETag
-                |> Option.iter (fun e -> msg.Headers.TryAddWithoutValidation("If-None-Match", e) |> ignore)
-
-                priorLastModified
-                |> Option.iter (fun lm -> msg.Headers.TryAddWithoutValidation("If-Modified-Since", lm) |> ignore)
-
                 let! resp = client.SendAsync(msg) |> Async.AwaitTask
                 return Ok resp
-            with ex ->
-                return Error ex.Message
+            with
+            | :? HttpRequestException as ex -> return Error ex.Message
+            | :? Threading.Tasks.TaskCanceledException as ex -> return Error ex.Message
         }
 
     let private handleSuccessResponse (response: HttpResponseMessage) : Async<ConnegFetchResult> =
@@ -228,13 +265,22 @@ module RdfConneg =
             match reqResult with
             | Error msg -> return FetchFailed msg
             | Ok response ->
+                // H3: Constitution rule 6 — dispose HttpResponseMessage on all exit paths.
+                use _ = response
                 let status = int response.StatusCode
 
-                if status = 304 then
+                // L6.1: 304 is only meaningful when we sent a conditional (If-None-Match or
+                // If-Modified-Since). A spurious 304 without a validator would incorrectly reset
+                // the SLA clock on a never-confirmed entry; treat as a fresh response instead.
+                let sentConditional = priorETag.IsSome || priorLastModified.IsSome
+
+                if status = 304 && sentConditional then
                     return NotModified
-                elif status = 200 then
+                // M5: accept any 2xx, not just 200.
+                elif status >= 200 && status < 300 then
                     return! handleSuccessResponse response
-                elif status >= 300 && status < 400 then
+                // L6.2: 300 (Multiple Choices) excluded from followable-redirect range.
+                elif status >= 301 && status < 400 then
                     return! handleRedirect client uri priorETag priorLastModified hops response
                 else
                     return HttpErrorStatus(status, uri)
@@ -253,10 +299,13 @@ module RdfConneg =
         else
             match resolveLocation uri response with
             | None -> async.Return(FetchFailed $"redirect from {uri} has no Location header")
-            | Some next -> fetchLoop client next priorETag priorLastModified (hops + 1)
+            // L1: RFC 9110 §13.1 — validators (If-None-Match/If-Modified-Since) are resource-specific.
+            // Do not forward them across redirect hops to the new Location target.
+            | Some next -> fetchLoop client next None None (hops + 1)
 
     /// Create an HttpClient with AllowAutoRedirect=false, as required by rdfFetch.
     /// Asserts the property at construction time; fails loudly if the setting does not take effect.
+    /// M6: explicit 30s per-request timeout to bound wall-clock (Holzmann #10).
     let makeNoRedirectClient () : HttpClient =
         let handler = new HttpClientHandler()
         handler.AllowAutoRedirect <- false
@@ -264,7 +313,9 @@ module RdfConneg =
         if handler.AllowAutoRedirect then
             invalidArg "handler" "AllowAutoRedirect must be false for rdfFetch; hop counting is done in fetchLoop"
 
-        new HttpClient(handler)
+        let client = new HttpClient(handler)
+        client.Timeout <- TimeSpan.FromSeconds(float requestTimeoutSeconds)
+        client
 
     /// Production ConnegFetch backed by a shared HttpClient.
     /// The client MUST have AllowAutoRedirect = false. Use makeNoRedirectClient.

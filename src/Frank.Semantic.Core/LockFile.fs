@@ -648,11 +648,16 @@ module LockFile =
             else
                 Error "lock appears hand-edited; regenerate"
 
-    /// Verify integrity only if the lock carries a stamp; pass through unstamped legacy locks.
-    /// Use this at load-time: unstamped v1 locks (no Integrity field) are legacy, not tampered.
+    /// Verify integrity only if the lock carries a stamp, or if the lock is schema v2 or later.
+    /// M3: v2 locks without a stamp are rejected — a hand-authored v2 with validated=true and no
+    /// integrity field would otherwise launder as trusted. Only v1 (legacy) may be unstamped.
     let verifyIfStamped (lf: LockFile) : Result<unit, string> =
         match lf.Integrity with
-        | None -> Ok()
+        | None ->
+            if lf.SchemaVersion >= 2 then
+                Error "v2 lock is unstamped; regenerate with 'frank semantic finalize'"
+            else
+                Ok()
         | Some _ -> verifyIntegrity lf
 
     // ── Effectful I/O ─────────────────────────────────────────────────────────
@@ -765,12 +770,22 @@ module LockFile =
 
     /// Build the combined prefix map from vocabularies and declared prefixes.
     /// Declared prefixes take precedence over vocabulary entries on key conflict.
+    /// L4: malformed URIs are silently excluded (a persisted bad URI is a modeled error, not a crash).
     let buildPrefixMap
         (vocabularies: Map<string, VocabularyEntry>)
         (declaredPrefixes: Map<string, string>)
         : Map<string, Uri> =
-        let fromVocabs = vocabularies |> Map.map (fun _ entry -> Uri(entry.Uri))
-        let fromDeclared = declaredPrefixes |> Map.map (fun _ uri -> Uri(uri))
+        let addIfValid (uriStr: string) (key: string) (acc: Map<string, Uri>) =
+            match Uri.TryCreate(uriStr, UriKind.Absolute) with
+            | true, u -> Map.add key u acc
+            | false, _ -> acc
+
+        let fromVocabs =
+            Map.fold (fun acc k entry -> addIfValid entry.Uri k acc) Map.empty vocabularies
+
+        let fromDeclared =
+            Map.fold (fun acc k uri -> addIfValid uri k acc) Map.empty declaredPrefixes
+
         Map.fold (fun acc k v -> Map.add k v acc) fromVocabs fromDeclared
 
     // ── Pure merge ────────────────────────────────────────────────────────────

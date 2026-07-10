@@ -87,6 +87,10 @@ module VocabClassifier =
     /// Classify each referenced namespace prefix against the lock using the default SLA policy.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
     /// This is the SINGLE classifier all surfaces (status, analyzer, CI) project from.
+    ///
+    /// H2 boundary: classification is NAMESPACE-LEVEL only (does the namespace dereference to
+    /// parseable RDF?). Term-level membership (is the referenced term ∈ entry.Terms?) is enforced
+    /// by the #378 analyzer which consumes entry.Terms. Do NOT add term-membership checking here.
     let classifyReferencedVocab (lock: LockFile) (now: DateTimeOffset) (referencedNs: string list) : VocabState list =
         let policy = SlaPolicy.defaultPolicy
 

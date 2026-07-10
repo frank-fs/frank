@@ -251,7 +251,10 @@ let ac8Tests =
 
           testCase "owned entry with same hash past 90d → EvidenceRefreshed (no content-drift for owned)"
           <| fun () ->
-              let altBody = Text.Encoding.UTF8.GetBytes "completely different content"
+              // Valid Turtle with different content than schemaBody → different hash, but owned so NOT drift.
+              let altBody =
+                  Text.Encoding.UTF8.GetBytes
+                      "@prefix schema: <https://schema.org/> .\nschema:Person a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
 
               let entry =
                   { mkOwnedEntry "http://localhost:9503/vocab" 95.0 with
@@ -320,3 +323,182 @@ let ac9Tests =
 
               let outcome = report.Outcomes |> List.head |> snd
               Expect.equal outcome EvidenceRefreshed "EvidenceRefreshed with --force within 30d" ]
+
+// ── M1: 406/415/401/403 → durable Undereferenceable (exit 2) ─────────────────
+
+[<Tests>]
+let m1DurableHttpStatusTests =
+    testList
+        "M1 — 406/415/401/403 are durable (exit 2), 5xx remain transient (exit 1)"
+        [ testCase "406 → DriftDetected, Validated=false, exit 2"
+          <| fun () ->
+              let entry =
+                  { mkUnownedEntry "http://localhost:9701/v" 35.0 with
+                      Hash = schemaBodyHash }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+              let stubUri = Uri "http://localhost:9701/v"
+              let fetch = stubConnegFetch (HttpErrorStatus(406, stubUri))
+              let (report, updatedLock) = runRefresh fetch false lock
+              Expect.isTrue (hasDrift report) "DriftDetected on 406"
+              Expect.equal (refreshExitCode report) 2 "exit 2 on 406"
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.isFalse updatedEntry.Validated.IsValidated "Validated=false after 406"
+              Expect.isSome updatedEntry.Validated.Reason "reason set after 406"
+
+          testCase "415 → DriftDetected, exit 2"
+          <| fun () ->
+              let entry =
+                  { mkUnownedEntry "http://localhost:9702/v" 35.0 with
+                      Hash = schemaBodyHash }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+              let stubUri = Uri "http://localhost:9702/v"
+              let fetch = stubConnegFetch (HttpErrorStatus(415, stubUri))
+              let (report, _) = runRefresh fetch false lock
+              Expect.isTrue (hasDrift report) "DriftDetected on 415"
+              Expect.equal (refreshExitCode report) 2 "exit 2 on 415"
+
+          testCase "401 → DriftDetected auth-walled, exit 2"
+          <| fun () ->
+              let entry =
+                  { mkUnownedEntry "http://localhost:9703/v" 35.0 with
+                      Hash = schemaBodyHash }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+              let stubUri = Uri "http://localhost:9703/v"
+              let fetch = stubConnegFetch (HttpErrorStatus(401, stubUri))
+              let (report, updatedLock) = runRefresh fetch false lock
+              Expect.isTrue (hasDrift report) "DriftDetected on 401"
+              Expect.equal (refreshExitCode report) 2 "exit 2 on 401"
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.isSome updatedEntry.Validated.Reason "reason set for 401"
+              Expect.stringContains (updatedEntry.Validated.Reason.Value) "auth" "reason mentions auth-walled"
+
+          testCase "503 regression — still ProbeFailed, Validated unchanged, exit 1"
+          <| fun () ->
+              let priorValidated =
+                  { IsValidated = true
+                    Reason = None
+                    LastChecked = Some(fixedNow.AddDays(-35.0)) }
+
+              let entry =
+                  { mkUnownedEntry "http://localhost:9704/v" 35.0 with
+                      Validated = priorValidated }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+              let stubUri = Uri "http://localhost:9704/v"
+              let fetch = stubConnegFetch (HttpErrorStatus(503, stubUri))
+              let (report, updatedLock) = runRefresh fetch false lock
+              Expect.isFalse (hasDrift report) "no drift on 503"
+              Expect.isTrue (hasFailed report) "ProbeFailed on 503"
+              Expect.equal (refreshExitCode report) 1 "exit 1 on 503"
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.equal updatedEntry.Validated.IsValidated true "IsValidated UNCHANGED on 503" ]
+
+// ── M2: unowned text/html → UnverifiableNonRdf (NOT exit 2) ──────────────────
+
+[<Tests>]
+let m2HtmlNonRdfTests =
+    testList
+        "M2 — unowned text/html is not durable drift; owned text/html is still drift (A-C7)"
+        [ testCase "unowned text/html 200 → NOT exit 2 (non-durable, unverifiable)"
+          <| fun () ->
+              let entry = mkUnownedEntry "http://localhost:9801/v" 35.0
+              let lock = mkLockV2 [ "vocab", entry ]
+
+              let fetch =
+                  stubConnegFetch (NonRdfContent {| MediaType = "text/html"; HttpStatus = 200 |})
+
+              let (report, _) = runRefresh fetch false lock
+              Expect.isFalse (hasDrift report) "text/html from unowned must NOT be drift"
+              Expect.notEqual (refreshExitCode report) 2 "exit must NOT be 2 for unowned text/html"
+
+          testCase "unowned text/html entry has Validated=false (unverifiable, not confirmed)"
+          <| fun () ->
+              let entry =
+                  { mkUnownedEntry "http://localhost:9802/v" 35.0 with
+                      Validated = { IsValidated = true; Reason = None; LastChecked = None } }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+
+              let fetch =
+                  stubConnegFetch (NonRdfContent {| MediaType = "text/html"; HttpStatus = 200 |})
+
+              let (_, updatedLock) = runRefresh fetch false lock
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.isFalse updatedEntry.Validated.IsValidated "Validated=false for unverifiable text/html" ]
+
+// ── M4: owned path through buildEvidence — reachability failures durable ──────
+
+[<Tests>]
+let m4OwnedBuildEvidenceTests =
+    testList
+        "M4 — owned classifyOwned is a transform over buildEvidence"
+        [ testCase "owned entry hitting RedirectCapHit → DriftDetected (durable), exit 2"
+          <| fun () ->
+              let entry = mkOwnedEntry "http://localhost:9901/vocab" 95.0
+              let lock = mkLockV2 [ "vocab", entry ]
+              let fetch = stubConnegFetch RedirectCapHit
+              let (report, updatedLock) = runRefresh fetch false lock
+              Expect.isTrue (hasDrift report) "owned RedirectCapHit must be DriftDetected"
+              Expect.equal (refreshExitCode report) 2 "exit 2 on owned RedirectCapHit"
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.isFalse updatedEntry.Validated.IsValidated "Validated=false on owned redirect cap"
+
+          testCase "owned 404 → DriftDetected durable (regression after M4 refactor)"
+          <| fun () ->
+              let entry = mkOwnedEntry "http://localhost:9902/vocab" 95.0
+              let lock = mkLockV2 [ "vocab", entry ]
+              let stubUri = Uri "http://localhost:9902/vocab"
+              let fetch = stubConnegFetch (HttpErrorStatus(404, stubUri))
+              let (report, _) = runRefresh fetch false lock
+              Expect.isTrue (hasDrift report) "owned 404 must still be DriftDetected after M4 refactor"
+              Expect.equal (refreshExitCode report) 2 "exit 2 on owned 404"
+
+          testCase "owned content hash change → NOT drift (suppress content-drift, A-C8 regression)"
+          <| fun () ->
+              // Valid Turtle with different content → different hash than schemaBodyHash, but owned so NOT drift.
+              let altBody =
+                  Text.Encoding.UTF8.GetBytes
+                      "@prefix schema: <https://schema.org/> .\nschema:Person a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
+
+              let entry =
+                  { mkOwnedEntry "http://localhost:9903/vocab" 95.0 with
+                      Hash = schemaBodyHash }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+              let fetch = stubTurtleConnegFetch altBody
+              let (report, _) = runRefresh fetch false lock
+              Expect.isFalse (hasDrift report) "owned: content hash change is NOT drift (suppress)"
+              Expect.equal (refreshExitCode report) 0 "exit 0 — owned content change is reachability only" ]
+
+// ── M5: any 2xx → success ────────────────────────────────────────────────────
+
+[<Tests>]
+let m5Any2xxTests =
+    testList
+        "M5 — any 2xx status accepted, not just 200"
+        [ testCase "203 + Turtle body → EvidenceRefreshed, Validated=true"
+          <| fun () ->
+              let entry =
+                  { mkUnownedEntry "http://localhost:9951/v" 35.0 with
+                      Hash = schemaBodyHash }
+
+              let lock = mkLockV2 [ "vocab", entry ]
+
+              let result203 =
+                  RdfContent
+                      {| MediaType = "text/turtle"
+                         Body = schemaBody
+                         HttpStatus = 203
+                         ETag = None
+                         LastModified = None
+                         CacheControlMaxAge = None |}
+
+              let fetch = stubConnegFetch result203
+              let (report, updatedLock) = runRefresh fetch false lock
+              Expect.isFalse (hasDrift report) "203 + Turtle: no drift"
+              Expect.isFalse (hasFailed report) "203 + Turtle: not a failure"
+              let updatedEntry = updatedLock.Vocabularies.["vocab"]
+              Expect.isTrue updatedEntry.Validated.IsValidated "203 + Turtle → Validated=true" ]
