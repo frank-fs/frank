@@ -168,3 +168,45 @@ let finalizeTests =
               let lf3, _ = Finalize.run lf2
               Expect.equal lf3.Mappings lf2.Mappings "second run is a no-op"
           } ]
+
+// ── stampOwnedVocabs tests ────────────────────────────────────────────────────
+
+let private vocabEntry (uri: string) : VocabularyEntry = { v1Empty with Uri = uri }
+
+[<Tests>]
+let stampOwnedVocabsTests =
+    testList
+        "Finalize.stampOwnedVocabs"
+        [ test "self-hosted entry → Owned=true, external → Owned=false" {
+              let vocabs =
+                  Map.ofList
+                      [ "local", vocabEntry "https://example.org/vocab#"
+                        "schema", vocabEntry "https://schema.org/" ]
+
+              let result = Finalize.stampOwnedVocabs "https://example.org" vocabs
+
+              Expect.isTrue result.["local"].Owned "example.org entry must be Owned=true"
+              Expect.isFalse result.["schema"].Owned "schema.org entry must be Owned=false"
+          }
+
+          test "www normalization: http://www.example.org owned by https://example.org" {
+              let vocabs = Map.ofList [ "www", vocabEntry "http://www.example.org/vocab#" ]
+              let result = Finalize.stampOwnedVocabs "https://example.org" vocabs
+              Expect.isTrue result.["www"].Owned "www variant must be owned by apex authority"
+          }
+
+          test "no entries → empty map preserved" {
+              let result = Finalize.stampOwnedVocabs "https://example.org" Map.empty
+              Expect.equal result Map.empty "empty map stays empty"
+          }
+
+          test "pre-existing Owned=true on external entry is corrected to false" {
+              let vocabs =
+                  Map.ofList
+                      [ "ext",
+                        { vocabEntry "https://schema.org/" with
+                            Owned = true } ]
+
+              let result = Finalize.stampOwnedVocabs "https://example.org" vocabs
+              Expect.isFalse result.["ext"].Owned "pre-set Owned=true on external must become false"
+          } ]

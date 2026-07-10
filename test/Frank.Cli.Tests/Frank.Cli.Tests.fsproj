@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="RefreshCliTests.fs" />
     <Compile Include="ValidateCliTests.fs" />
+    <Compile Include="FinalizeCliTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

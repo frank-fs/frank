@@ -78,12 +78,15 @@ type StatusArgs =
 type FinalizeArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
+    | Base_Uri of uri: string
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
+            | Base_Uri _ ->
+                "authority URI of this application (e.g. https://example.org); stamps Owned=true on matching vocabulary entries"
 
 /// Arguments for the `frank semantic refresh` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -259,6 +262,14 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
 let private stampAndWrite (clock: unit -> DateTimeOffset) (lockPath: string) (lf: LockFile) : unit =
     LockFile.write lockPath (LockFile.withIntegrity { lf with Generated = clock () })
 
+let private parseOptionalBaseUri (arg: string option) : Result<string option, string> =
+    match arg with
+    | None -> Ok None
+    | Some s ->
+        match Uri.TryCreate(s, UriKind.Absolute) with
+        | true, _ -> Ok(Some s)
+        | false, _ -> Error $"--base-uri '{s}' is not a valid absolute URI"
+
 let private parseSource: string -> Result<MappingSource, string> =
     parseChoice "source" [ "llm", Llm; "manual", Manual ]
 
@@ -334,20 +345,38 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
             renderAcceptSummary fmt summary
             0
 
+let private parseFinalizeInputs (args: ParseResults<FinalizeArgs>) : Result<string option * string, string> =
+    parseOptionalBaseUri (args.TryGetResult FinalizeArgs.Base_Uri)
+    |> Result.bind (fun baseUri ->
+        lockPathFrom (args.TryGetResult FinalizeArgs.Lock_File) (args.TryGetResult FinalizeArgs.Project)
+        |> Result.map (fun lockPath -> baseUri, lockPath))
+
+let private applyFinalize (baseUri: string option) (lockPath: string) : Result<Finalize.FinalizeSummary, string> =
+    read lockPath
+    |> Result.map (fun lf ->
+        let finalized, summary = Finalize.run lf
+
+        let withOwned =
+            match baseUri with
+            | None -> finalized
+            | Some uri ->
+                { finalized with
+                    Vocabularies = Finalize.stampOwnedVocabs uri finalized.Vocabularies }
+
+        stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath withOwned
+        summary)
+
 let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
-    match lockPathFrom (args.TryGetResult FinalizeArgs.Lock_File) (args.TryGetResult FinalizeArgs.Project) with
+    match parseFinalizeInputs args with
     | Error e ->
         eprintfn "error: %s" e
         1
-    | Ok lockPath ->
-        match read lockPath with
+    | Ok(baseUri, lockPath) ->
+        match applyFinalize baseUri lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
-        | Ok lf ->
-            let updated, summary = Finalize.run lf
-            stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updated
-
+        | Ok summary ->
             printfn
                 "Finalized: %d confirmed, %d excluded (%d already decided)"
                 summary.Confirmed

@@ -44,6 +44,15 @@ let private decideMapping (m: Mapping) : Mapping =
             Status = Excluded
             Shape = shape }
 
+/// Stamp Owned on every vocabulary entry using appBaseUri authority.
+/// Calls VocabClassifier.isOwnedByAuthority — do not re-implement the authority logic here.
+/// Pure: returns a new map; leaves the input unchanged.
+let stampOwnedVocabs (appBaseUri: string) (vocabs: Map<string, VocabularyEntry>) : Map<string, VocabularyEntry> =
+    vocabs
+    |> Map.map (fun _ entry ->
+        { entry with
+            Owned = VocabClassifier.isOwnedByAuthority appBaseUri entry.Uri })
+
 /// Resolve a draft lock to all-decided: Confirmed stays; everything else Excluded.
 /// Deterministic, zero tokens. Pure.
 let run (lf: LockFile) : LockFile * FinalizeSummary =
