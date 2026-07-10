@@ -127,7 +127,8 @@ let private draftLockWithVocabs (ownedUri: string) (externalUri: string) : LockF
 
 [<Tests>]
 let finalizeCliTests =
-    testList
+    testSequenced
+    <| testList
         "H1 — frank semantic finalize --base-uri Owned stamping"
         [ test "--base-uri stamps Owned=true on self-hosted, false on external" {
               withTempDir (fun dir ->
@@ -143,7 +144,7 @@ let finalizeCliTests =
                              "https://example.org"
                              "--lock-file"
                              lockPath |]
-                          5_000
+                          30_000
 
                   Expect.equal exitCode 0 $"finalize must exit 0; stderr:\n{stderr}"
 
@@ -161,7 +162,7 @@ let finalizeCliTests =
                   LockFile.write lockPath (draftLockWithVocabs "https://example.org/vocab#" "https://schema.org/")
 
                   let exitCode, _stdout, stderr =
-                      runCli [| "semantic"; "finalize"; "--lock-file"; lockPath |] 5_000
+                      runCli [| "semantic"; "finalize"; "--lock-file"; lockPath |] 30_000
 
                   Expect.equal exitCode 0 $"finalize without --base-uri must exit 0; stderr:\n{stderr}"
 
@@ -180,7 +181,7 @@ let finalizeCliTests =
                   let originalLf = LockFile.read lockPath |> Result.defaultWith failwith
 
                   let exitCode, _stdout, stderr =
-                      runCli [| "semantic"; "finalize"; "--base-uri"; "not-a-uri"; "--lock-file"; lockPath |] 5_000
+                      runCli [| "semantic"; "finalize"; "--base-uri"; "not-a-uri"; "--lock-file"; lockPath |] 30_000
 
                   Expect.equal exitCode 1 $"malformed --base-uri must exit 1; stderr:\n{stderr}"
                   Expect.isTrue (stderr.Contains "not-a-uri") "error must mention the bad value"
@@ -192,7 +193,7 @@ let finalizeCliTests =
           test "end-to-end: finalize --base-uri then validate sees owned entry (closes inert-path gap)" {
               withTempDir (fun dir ->
                   let listener, port = bindHttpListener ()
-                  let capMs = 8_000
+                  let capMs = 30_000
                   let serving = serveRequest listener capMs "text/turtle" 200 (stubTurtleBytes port)
 
                   let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")

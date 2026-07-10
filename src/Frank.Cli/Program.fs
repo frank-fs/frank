@@ -262,6 +262,15 @@ let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
 let private stampAndWrite (clock: unit -> DateTimeOffset) (lockPath: string) (lf: LockFile) : unit =
     LockFile.write lockPath (LockFile.withIntegrity { lf with Generated = clock () })
 
+/// Read a lock file and verify its integrity if stamped.
+/// Returns Error if read fails or if a stamp is present but does not match.
+let private readVerified (lockPath: string) : Result<LockFile, string> =
+    read lockPath
+    |> Result.bind (fun lf ->
+        verifyIfStamped lf
+        |> Result.map (fun () -> lf)
+        |> Result.mapError (fun e -> $"lock tampered — {e}"))
+
 let private parseOptionalBaseUri (arg: string option) : Result<string option, string> =
     match arg with
     | None -> Ok None
@@ -352,6 +361,7 @@ let private parseFinalizeInputs (args: ParseResults<FinalizeArgs>) : Result<stri
         |> Result.map (fun lockPath -> baseUri, lockPath))
 
 let private applyFinalize (baseUri: string option) (lockPath: string) : Result<Finalize.FinalizeSummary, string> =
+    // Deliberate: no integrity check here — finalize regenerates integrity (unlike refresh/validate/status).
     read lockPath
     |> Result.map (fun lf ->
         let finalized, summary = Finalize.run lf
@@ -391,26 +401,21 @@ let private handleStatus (args: ParseResults<StatusArgs>) : int =
         eprintfn "error: %s" e
         1
     | Ok lockPath ->
-        match read lockPath with
+        match readVerified lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            match verifyIfStamped lf with
-            | Error e ->
-                eprintfn "error: lock tampered — %s" e
-                1
-            | Ok() ->
-                let now = DateTimeOffset.UtcNow
+            let now = DateTimeOffset.UtcNow
 
-                let output =
-                    if args.Contains StatusArgs.By_Package then
-                        formatByPackage now lf
-                    else
-                        format now lf
+            let output =
+                if args.Contains StatusArgs.By_Package then
+                    formatByPackage now lf
+                else
+                    format now lf
 
-                printfn "%s" output
-                0
+            printfn "%s" output
+            0
 
 let private printRefreshOutcomes (report: RefreshReport) : unit =
     for prefix, outcome in report.Outcomes do
@@ -420,21 +425,15 @@ let private printRefreshOutcomes (report: RefreshReport) : unit =
         | EvidenceRefreshed -> ()
         | SkippedFresh -> ()
 
-    let checkedCount =
+    let checked_, skipped_ =
         report.Outcomes
-        |> List.filter (fun (_, o) ->
+        |> List.partition (fun (_, o) ->
             match o with
             | SkippedFresh -> false
             | _ -> true)
-        |> List.length
 
-    let skipped =
-        report.Outcomes
-        |> List.filter (fun (_, o) ->
-            match o with
-            | SkippedFresh -> true
-            | _ -> false)
-        |> List.length
+    let checkedCount = checked_.Length
+    let skipped = skipped_.Length
 
     if checkedCount > 0 then
         printfn "%d vocabulary(ies) checked (%d skipped fresh)" checkedCount skipped
@@ -445,27 +444,22 @@ let private handleRefresh (args: ParseResults<RefreshArgs>) : int =
         eprintfn "error: %s" e
         1
     | Ok lockPath ->
-        match read lockPath with
+        match readVerified lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            match verifyIfStamped lf with
-            | Error e ->
-                eprintfn "error: lock tampered — %s" e
-                1
-            | Ok() ->
-                use client = RdfConneg.makeNoRedirectClient ()
-                let fetch = RdfConneg.rdfFetch client
-                let force = args.Contains RefreshArgs.Force
-                let now = DateTimeOffset.UtcNow
+            use client = RdfConneg.makeNoRedirectClient ()
+            let fetch = RdfConneg.rdfFetch client
+            let force = args.Contains RefreshArgs.Force
+            let now = DateTimeOffset.UtcNow
 
-                let (report, updatedLf) =
-                    refresh fetch SlaPolicy.defaultPolicy now force lf |> Async.RunSynchronously
+            let (report, updatedLf) =
+                refresh fetch SlaPolicy.defaultPolicy now force lf |> Async.RunSynchronously
 
-                stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
-                printRefreshOutcomes report
-                refreshExitCode report
+            stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
+            printRefreshOutcomes report
+            refreshExitCode report
 
 let private printValidateOutcomes (report: ValidateReport) : unit =
     for prefix, outcome in report.Outcomes do
@@ -480,29 +474,24 @@ let private handleValidate (args: ParseResults<ValidateArgs>) : int =
         eprintfn "error: %s" e
         1
     | Ok lockPath ->
-        match read lockPath with
+        match readVerified lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
         | Ok lf ->
-            match verifyIfStamped lf with
-            | Error e ->
-                eprintfn "error: lock tampered — %s" e
-                1
-            | Ok() ->
-                let ownedCount = lf.Vocabularies |> Map.filter (fun _ e -> e.Owned) |> Map.count
+            let ownedCount = lf.Vocabularies |> Map.filter (fun _ e -> e.Owned) |> Map.count
 
-                if ownedCount = 0 then
-                    printfn "no owned vocabulary entries to validate"
-                    0
-                else
-                    use client = RdfConneg.makeNoRedirectClient ()
-                    let fetch = RdfConneg.rdfFetch client
-                    let now = DateTimeOffset.UtcNow
-                    let (report, updatedLf) = validate fetch now lf |> Async.RunSynchronously
-                    stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
-                    printValidateOutcomes report
-                    validateExitCode report
+            if ownedCount = 0 then
+                printfn "no owned vocabulary entries to validate"
+                0
+            else
+                use client = RdfConneg.makeNoRedirectClient ()
+                let fetch = RdfConneg.rdfFetch client
+                let now = DateTimeOffset.UtcNow
+                let (report, updatedLf) = validate fetch now lf |> Async.RunSynchronously
+                stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updatedLf
+                printValidateOutcomes report
+                validateExitCode report
 
 let private handleSemantic (args: ParseResults<SemanticArgs>) : int =
     match args.GetSubCommand() with

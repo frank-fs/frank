@@ -564,10 +564,10 @@ module LockFile =
         obj.Add("hash", JsonValue.Create v.Hash)
 
         if version >= 2 then
-            match v.MediaType with
-            | None -> ()
-            | Some mt -> obj.Add("mediaType", JsonValue.Create mt)
+            let addOpt (key: string) (opt: string option) =
+                opt |> Option.iter (fun v -> obj.Add(key, JsonValue.Create v))
 
+            addOpt "mediaType" v.MediaType
             obj.Add("validated", serializeValidationStatus v.Validated)
             obj.Add("terms", serializeTerms v.Terms)
 
@@ -576,14 +576,8 @@ module LockFile =
             | Some s -> obj.Add("httpStatus", JsonValue.Create s)
 
             obj.Add("owned", JsonValue.Create v.Owned)
-
-            match v.ETag with
-            | None -> ()
-            | Some e -> obj.Add("etag", JsonValue.Create e)
-
-            match v.LastModified with
-            | None -> ()
-            | Some lm -> obj.Add("lastModified", JsonValue.Create lm)
+            addOpt "etag" v.ETag
+            addOpt "lastModified" v.LastModified
 
         obj
 

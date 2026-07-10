@@ -356,3 +356,62 @@ let m1DurableHttpStatusLoopbackTests =
                           | UnverifiableNonRdf r -> failtest $"expected Undereferenceable, got UnverifiableNonRdf: {r}"
                       })
           } ]
+
+// ── Item-6 regression: application/xml RDF response → Updated ────────────────
+
+[<Tests>]
+let applicationXmlRdfTests =
+    testList
+        "Item-6 regression — application/xml RDF/XML response is accepted, not rejected"
+        [ test "application/xml body with valid RDF/XML → buildEvidence produces Updated (not Undereferenceable)" {
+              let rdfXmlBody =
+                  Encoding.UTF8.GetBytes
+                      """<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:ex="http://example.org/widgets/">
+  <rdfs:Class rdf:about="http://example.org/widgets/Widget"/>
+</rdf:RDF>"""
+
+              let result =
+                  RdfContent
+                      {| MediaType = "application/xml"
+                         Body = rdfXmlBody
+                         HttpStatus = 200
+                         ETag = None
+                         LastModified = None
+                         CacheControlMaxAge = None |}
+
+              let namespaceBase = Uri "http://example.org/widgets/"
+              let evidence = RdfConneg.buildEvidence namespaceBase DateTimeOffset.UtcNow result
+
+              match evidence with
+              | Updated ev ->
+                  Expect.equal ev.MediaType (Some "application/xml") "MediaType captured as application/xml"
+                  Expect.isTrue ev.Validated.IsValidated "IsValidated=true for application/xml RDF"
+              | Undereferenceable r -> failtest $"application/xml RDF must not be Undereferenceable: {r}"
+              | UnverifiableNonRdf r -> failtest $"application/xml RDF must not be UnverifiableNonRdf: {r}"
+              | TransientFailure r -> failtest $"application/xml RDF must not be TransientFailure: {r}"
+              | Unchanged -> failtest "expected Updated, got Unchanged"
+          } ]
+
+// ── Item-8 regression: application/xhtml+xml → UnverifiableNonRdf ────────────
+
+[<Tests>]
+let xhtmlPlusRdfTests =
+    testList
+        "Item-8 regression — application/xhtml+xml is UnverifiableNonRdf (same as text/html)"
+        [ test "application/xhtml+xml response → buildEvidence is UnverifiableNonRdf, not Undereferenceable" {
+              let result = NonRdfContent {| MediaType = "application/xhtml+xml"; HttpStatus = 200 |}
+              let namespaceBase = Uri "http://example.org/"
+              let evidence = RdfConneg.buildEvidence namespaceBase DateTimeOffset.UtcNow result
+
+              match evidence with
+              | UnverifiableNonRdf reason ->
+                  Expect.stringContains reason "application/xhtml+xml" "reason mentions content-type"
+              | Undereferenceable r ->
+                  failtest $"application/xhtml+xml must be UnverifiableNonRdf, not Undereferenceable: {r}"
+              | Updated _ -> failtest "expected UnverifiableNonRdf, got Updated"
+              | Unchanged -> failtest "expected UnverifiableNonRdf, got Unchanged"
+              | TransientFailure r -> failtest $"expected UnverifiableNonRdf, got TransientFailure: {r}"
+          } ]

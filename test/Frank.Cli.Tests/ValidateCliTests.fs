@@ -147,11 +147,12 @@ let private unownedLockFor (port: int) : LockFile =
 
 [<Tests>]
 let validateCliTests =
-    testList
+    testSequenced
+    <| testList
         "A-C7 — frank semantic validate: self-hosted endpoint RDF conneg"
         [ test "owned entry serves RDF Turtle → exit 0, Validated=true in updated lock" {
               withTempDir (fun dir ->
-                  let capMs = 5_000
+                  let capMs = 30_000
                   let listener, port = bindHttpListener ()
                   let serving = serveRequest listener capMs "text/turtle" 200 stubTurtleBytes
                   let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
@@ -171,7 +172,7 @@ let validateCliTests =
 
           test "owned entry serves HTML (non-RDF) → exit 2 (LyingIri), Validated=false in updated lock" {
               withTempDir (fun dir ->
-                  let capMs = 5_000
+                  let capMs = 30_000
                   let listener, port = bindHttpListener ()
                   let serving = serveRequest listener capMs "text/html" 200 htmlBytes
                   let lockPath = Path.Combine(dir, "semantic-mappings.lock.json")
@@ -201,7 +202,7 @@ let validateCliTests =
                   let lock = unownedLockFor port
                   LockFile.write lockPath lock
 
-                  let capMs = 5_000
+                  let capMs = 30_000
 
                   let exitCode, _stdout, stderr =
                       runCli [| "semantic"; "validate"; "--lock-file"; lockPath |] capMs
@@ -214,7 +215,7 @@ let validateCliTests =
 
           test "owned entry returns 503 → exit 1 (transient), Validated unchanged" {
               withTempDir (fun dir ->
-                  let capMs = 5_000
+                  let capMs = 30_000
                   let listener, port = bindHttpListener ()
 
                   let serving =

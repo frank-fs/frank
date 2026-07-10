@@ -20,58 +20,14 @@ type ValidateReport =
 /// 1 if any ValidateTransient (operational, no lying-IRI).
 /// 0 if all Validated.
 let validateExitCode (report: ValidateReport) : int =
-    let hasLying =
+    EntryUpdate.outcomesExitCode
+        (function
+        | LyingIri _ -> true
+        | _ -> false)
+        (function
+        | ValidateTransient _ -> true
+        | _ -> false)
         report.Outcomes
-        |> List.exists (fun (_, o) ->
-            match o with
-            | LyingIri _ -> true
-            | _ -> false)
-
-    let hasTransient =
-        report.Outcomes
-        |> List.exists (fun (_, o) ->
-            match o with
-            | ValidateTransient _ -> true
-            | _ -> false)
-
-    if hasLying then 2
-    elif hasTransient then 1
-    else 0
-
-// ── Entry update helpers (pure) ───────────────────────────────────────────────
-
-let private validatedEntry (now: DateTimeOffset) (ev: FetchEvidence) (entry: VocabularyEntry) : VocabularyEntry =
-    { entry with
-        FetchedAt = now
-        Hash = ev.Hash
-        MediaType = ev.MediaType
-        Validated = ev.Validated
-        Terms = ev.Terms
-        HttpStatus = ev.HttpStatus
-        ETag = ev.ETag
-        LastModified = ev.LastModified }
-
-let private lyingEntry (now: DateTimeOffset) (reason: string) (status: int) (entry: VocabularyEntry) : VocabularyEntry =
-    { entry with
-        HttpStatus = Some status
-        Validated =
-            { IsValidated = false
-              Reason = Some reason
-              LastChecked = Some now } }
-
-let private transientEntry (now: DateTimeOffset) (reason: string) (entry: VocabularyEntry) : VocabularyEntry =
-    { entry with
-        Validated =
-            { entry.Validated with
-                Reason = Some reason
-                LastChecked = Some now } }
-
-let private unchangedEntry (now: DateTimeOffset) (entry: VocabularyEntry) : VocabularyEntry =
-    { entry with
-        FetchedAt = now
-        Validated =
-            { entry.Validated with
-                LastChecked = Some now } }
 
 // ── Single-entry validation ───────────────────────────────────────────────────
 
@@ -86,24 +42,22 @@ let private validateOne
         match Uri.TryCreate(entry.Uri, UriKind.Absolute) with
         | false, _ ->
             let reason = $"malformed vocabulary URI: {entry.Uri}"
-            return ValidateTransient reason, transientEntry now reason entry
+            return ValidateTransient reason, EntryUpdate.probeFailedEntry now reason entry
         | true, namespaceBase ->
             let! result = fetch namespaceBase entry.ETag entry.LastModified
             let evidence = RdfConneg.buildEvidence namespaceBase now result
 
             match evidence with
-            | Updated ev -> return Validated, validatedEntry now ev entry
-            | Unchanged -> return Validated, unchangedEntry now entry
-            | TransientFailure reason -> return ValidateTransient reason, transientEntry now reason entry
+            | Updated ev -> return Validated, EntryUpdate.updatedEntry now ev entry
+            | Unchanged -> return Validated, EntryUpdate.unchangedEntry now entry
+            | TransientFailure reason -> return ValidateTransient reason, EntryUpdate.probeFailedEntry now reason entry
             | Undereferenceable reason ->
-                let status = RdfConneg.statusOf result
-                return LyingIri reason, lyingEntry now reason status entry
+                return LyingIri reason, EntryUpdate.goneEntry now reason (RdfConneg.statusOf result) entry
             | UnverifiableNonRdf reason ->
-                // M2 / A-C7: owned endpoint returning text/html is a LyingIri — the endpoint claims
-                // to serve RDF (it is owned and declared as a vocab IRI) but does not.
+                // A-C7: owned endpoint returning possibly-RDFa content is a LyingIri — the endpoint
+                // claims to serve RDF (it is owned and declared as a vocab IRI) but does not.
                 // validate only runs on Owned=true entries; UnverifiableNonRdf is still a lying IRI here.
-                let status = RdfConneg.statusOf result
-                return LyingIri reason, lyingEntry now reason status entry
+                return LyingIri reason, EntryUpdate.goneEntry now reason (RdfConneg.statusOf result) entry
     }
 
 // ── Main validate ─────────────────────────────────────────────────────────────
@@ -122,10 +76,10 @@ let validate (fetch: ConnegFetch) (now: DateTimeOffset) (lf: LockFile) : Async<V
 
         for prefix, entry in ownedEntries do
             let! outcome, updatedEntry = validateOne fetch now prefix entry
-            outcomes <- outcomes @ [ prefix, outcome ]
+            outcomes <- (prefix, outcome) :: outcomes
             updatedVocabs <- Map.add prefix updatedEntry updatedVocabs
 
-        let report = { Outcomes = outcomes }
+        let report = { Outcomes = List.rev outcomes }
         let updatedLf = { lf with Vocabularies = updatedVocabs }
         return report, updatedLf
     }

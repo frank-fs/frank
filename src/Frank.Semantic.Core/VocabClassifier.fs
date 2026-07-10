@@ -46,11 +46,13 @@ module VocabClassifier =
         | true, u ->
             // Scheme is dropped entirely; http↔https are equivalent for authority identity.
             // www. prefix stripped so www.example.org and example.org compare equal.
+            let lowHost = u.Host.ToLowerInvariant()
+
             let host =
-                if u.Host.ToLowerInvariant().StartsWith("www.") then
-                    u.Host.ToLowerInvariant().[4..]
+                if lowHost.StartsWith("www.") then
+                    lowHost.[4..]
                 else
-                    u.Host.ToLowerInvariant()
+                    lowHost
 
             let port = if u.IsDefaultPort then "" else $":{u.Port}"
 

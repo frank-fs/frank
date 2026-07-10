@@ -12,6 +12,7 @@
     <Compile Include="Pipeline.fs" />
     <Compile Include="Clarify.fs" />
     <Compile Include="Accept.fs" />
+    <Compile Include="EntryUpdate.fs" />
     <Compile Include="Refresh.fs" />
     <Compile Include="Validate.fs" />
     <Compile Include="Status.fs" />

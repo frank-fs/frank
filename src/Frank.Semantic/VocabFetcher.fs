@@ -59,7 +59,7 @@ module VocabFetcher =
           "text/n3", Turtle ]
         |> Map.ofList
 
-    let private stripParams (ct: string) =
+    let stripParams (ct: string) =
         match ct.IndexOf(';') with
         | -1 -> ct.Trim().ToLowerInvariant()
         | idx -> ct.[.. idx - 1].Trim().ToLowerInvariant()

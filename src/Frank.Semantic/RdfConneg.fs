@@ -55,7 +55,7 @@ module RdfConneg =
 
     // L6.3: Accept header aligned with isRdfMediaType (advertise all accepted types)
     let private rdfAcceptValue =
-        "text/turtle;q=1.0, application/ld+json;q=0.9, application/rdf+xml;q=0.8, application/n-triples;q=0.7, text/n3;q=0.6"
+        "text/turtle;q=1.0, application/ld+json;q=0.9, application/rdf+xml;q=0.8, application/n-triples;q=0.7, text/n3;q=0.6, application/xml;q=0.5"
 
     /// Maximum 3xx redirects to follow before giving up (httpRange-14 / cap per Holzmann #10).
     let maxRedirectHops = 5
@@ -68,15 +68,18 @@ module RdfConneg =
             [ "text/turtle"
               "application/ld+json"
               "application/rdf+xml"
+              "application/xml"
               "application/n-triples"
               "text/n3" ]
 
+    // Media types whose responses may embed RDF (RDFa etc.) but cannot be verified offline.
+    // Not durable drift for unowned; maps to LyingIri for owned endpoints (A-C7).
+    let private mayEmbedRdf = Set.ofList [ "text/html"; "application/xhtml+xml" ]
+
     // ── Pure helpers ──────────────────────────────────────────────────────────
 
-    let private stripParams (ct: string) : string =
-        match ct.IndexOf(';') with
-        | -1 -> ct.Trim().ToLowerInvariant()
-        | idx -> ct.[.. idx - 1].Trim().ToLowerInvariant()
+    // Single source of truth: delegate to VocabFetcher so both modules share one implementation.
+    let private stripParams = VocabFetcher.stripParams
 
     /// True when contentType is a recognised RDF serialisation media type.
     let isRdfMediaType (contentType: string) : bool =
@@ -94,8 +97,7 @@ module RdfConneg =
     let termsInNamespace (namespaceBase: Uri) (iris: VocabTermIris) : Set<string> =
         let baseStr = namespaceBase.AbsoluteUri
 
-        Set.unionMany [ iris.ClassIris; iris.PropertyIris; iris.IndividualIris ]
-        |> Set.toSeq
+        Seq.concat [ iris.ClassIris; iris.PropertyIris; iris.IndividualIris ]
         |> Seq.filter (fun iri -> iri.StartsWith(baseStr, StringComparison.Ordinal))
         |> Seq.choose extractLocalName
         |> Set.ofSeq
@@ -156,11 +158,13 @@ module RdfConneg =
         | RedirectCapHit -> Undereferenceable $"redirect cap ({maxRedirectHops} hops) exceeded"
         | FetchFailed reason -> TransientFailure $"network error: {reason}"
         | NonRdfContent r ->
-            if stripParams r.MediaType = "text/html" then
-                // M2: external text/html (possibly RDFa) — not verifiable offline, not durable drift.
-                // An owned endpoint serving text/html is LyingIri — callers (Validate.validateOne)
+            let mt = stripParams r.MediaType
+
+            if Set.contains mt mayEmbedRdf then
+                // M2: text/html and application/xhtml+xml may embed RDFa — not verifiable offline, not durable drift.
+                // An owned endpoint serving these is LyingIri — callers (Validate.validateOne)
                 // must map UnverifiableNonRdf to LyingIri for owned entries.
-                UnverifiableNonRdf $"non-RDF media type 'text/html' (possibly RDFa) — not verifiable offline"
+                UnverifiableNonRdf $"non-RDF media type '{mt}' (possibly RDFa) — not verifiable offline"
             else
                 Undereferenceable $"non-RDF content-type '{r.MediaType}' (HTTP {r.HttpStatus})"
         | RdfContent r -> fromRdfContent namespaceBase now r
